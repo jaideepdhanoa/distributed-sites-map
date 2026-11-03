@@ -338,7 +338,7 @@ export default function Explorer() {
             const listedHere = subcount(step.id, "listed");
             const contactedHere = subcount(step.id, "contacted");
             const note = step.id === "universe"
-              ? `Built from ${censusForCity.toLocaleString()} census records, with duplicates merged.`
+              ? `Built from ${censusForCity.toLocaleString()} census records. The count keeps the rows the workbook includes.`
               : FUNNEL_NOTES[step.id];
             return (
               <Fragment key={step.id}>

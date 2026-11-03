@@ -433,13 +433,345 @@ def addr_key(value: str) -> str:
     return text
 
 
+_DIR_WORDS = (
+    ("northeast", "ne"),
+    ("northwest", "nw"),
+    ("southeast", "se"),
+    ("southwest", "sw"),
+    ("north", "n"),
+    ("south", "s"),
+    ("east", "e"),
+    ("west", "w"),
+)
+
+
+def loose_street_keys(value: str) -> list[str]:
+    """House number plus the street token. City names stay, so Chandler Blvd still matches.
+
+    A trailing ZIP is removed. A 5-digit house number is kept. Store numbers such as
+    "#262 6111 W Sahara" yield the street, not the store number.
+    """
+    text = (value or "").lower()
+    text = re.sub(r"[^a-z0-9 ]", " ", text)
+    text = re.sub(r"\b(az|nv|fl|arizona|nevada|florida)\b", " ", text)
+    text = re.sub(r"(?<=\s)\d{5}\b", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    for word, short in _DIR_WORDS:
+        text = re.sub(rf"\b{word}\b", short, text)
+    lettered: list[str] = []
+    numeric: list[str] = []
+    for match in re.finditer(r"(\d+)\s+((?:ne|nw|se|sw|n|s|e|w)\s+)?([a-z0-9]+)", text):
+        name = re.sub(r"^(\d+)(?:st|nd|rd|th)$", r"\1", match.group(3))
+        key = f"{match.group(1)} {name}"
+        bucket = numeric if name.isdigit() else lettered
+        if key not in bucket:
+            bucket.append(key)
+    return lettered or numeric
+
+
+def loose_street_key(value: str) -> str:
+    keys = loose_street_keys(value)
+    return keys[0] if keys else ""
+
+
 def street_signature(value: str) -> str:
-    key = addr_key(value)
-    match = re.match(r"(\d+)\s+([nesw]\s+)?([a-z0-9]+)", key)
-    if not match:
+    return loose_street_key(value)
+
+
+def apn_text(value) -> str:
+    if value is None:
         return ""
-    number, _, name = match.groups()
-    return f"{number} {name}"
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else str(value)
+    text = str(value).strip()
+    if re.fullmatch(r"\d+\.0+", text):
+        return text.split(".")[0]
+    return text
+
+
+COUNTY_VERDICT = {
+    "pass": "PASS",
+    "maybe": "MAYBE",
+    "fail": "FAIL",
+    "not a car wash": "NOT_A_WASH",
+    "unresolved": "UNRESOLVED",
+}
+
+
+def load_universe_rows(path: Path) -> list[dict]:
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb["Universe"]
+    cursor = ws.iter_rows(values_only=True)
+    header = [str(cell).strip() if cell is not None else "" for cell in next(cursor)]
+    out = []
+    for row in cursor:
+        if not row or not any(row[:8]):
+            continue
+        item = {}
+        for index, key in enumerate(header):
+            if key and index < len(row):
+                item[key] = row[index]
+        out.append(item)
+    wb.close()
+    return out
+
+
+def _universe_geocode_query(address: str, city_name: str, market: str) -> str:
+    text = re.sub(r"\s+", " ", address or "").strip()
+    if not text:
+        return ""
+    if re.search(r"\b(AZ|NV|FL)\b", text):
+        return text
+    local = (city_name or "").strip()
+    if not local or "unincorporated" in local.lower():
+        local = {"PHX": "Maricopa County", "LAS": "Clark County", "MIA": "Miami-Dade County"}.get(market, "")
+    state = {"PHX": "AZ", "LAS": "NV", "MIA": "FL"}.get(market, "")
+    return f"{text}, {local}, {state}".strip(", ")
+
+
+def apply_live_universe(
+    rows: list[dict],
+    sites: list[dict],
+    by_id: dict,
+    by_apn: dict,
+    blank_site,
+    screening: dict,
+    verdict_rows: list,
+    crosswalk: list,
+) -> dict:
+    """One counted workbook row is one site. Service area and the county verdict come from that row.
+
+    The census file still supplies the pin, the parcel, and the aerial review when a row matches.
+    A second row for a parcel already used, and any row that does not match, becomes its own site.
+    Rows the workbook does not count drop out of the unique total.
+    """
+    by_apn_site: dict[tuple[str, str], list[str]] = defaultdict(list)
+    by_street: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for site in sites:
+        if site.get("origin") != "universe":
+            continue
+        for token in apn_tokens(site.get("apn")):
+            by_apn_site[(site["city"], token)].append(site["site_id"])
+        for key in loose_street_keys(site.get("address") or ""):
+            by_street[(site["city"], key)].append(site["site_id"])
+
+    claimed: set[str] = set()
+    yes_ids: set[str] = set()
+    seq: Counter = Counter()
+    fresh = 0
+    matched = 0
+    geocode_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
+
+    def claim(city: str, apn_value, address: str) -> tuple[str | None, str | None]:
+        seen: list[str] = []
+        for token in apn_tokens(apn_value):
+            for sid in by_apn_site.get((city, token), []):
+                if sid not in seen:
+                    seen.append(sid)
+        free = [sid for sid in seen if sid not in claimed]
+        if free:
+            return sorted(free)[0], None
+        twin = seen[0] if seen else None
+        for key in loose_street_keys(address):
+            pool: list[str] = []
+            for sid in by_street.get((city, key), []):
+                if sid not in pool:
+                    pool.append(sid)
+            free = [sid for sid in pool if sid not in claimed]
+            if len(free) == 1:
+                return free[0], twin
+            if twin is None and pool:
+                twin = pool[0]
+        return None, twin
+
+    def paint(site: dict, row: dict, *, is_new: bool) -> None:
+        site["counts_as_site"] = True
+        site["duplicate_of"] = None
+        site["origin"] = "universe"
+        if is_new:
+            site["name"] = scrub(row.get("Business name"))
+            site["address"] = scrub(row.get("Address"))
+            site["apn"] = apn_text(row.get("APN"))
+            site["site_class"] = site_class(str(row.get("Site class") or ""))
+            site["county_url"] = county_url(site["city"], site["apn"], site["address"])
+        elif not site.get("apn"):
+            site["apn"] = apn_text(row.get("APN"))
+        owner = scrub(row.get("Owner of record") or row.get("Owner"))
+        if owner:
+            site["owner"] = owner
+        service = str(row.get("Service area") or "").strip()
+        site["in_area"] = service == "In"
+        ring = str(site.get("service_ring") or "")
+        if site["in_area"]:
+            site["expansion_horizon"] = False
+            if site["city"] == "LAS":
+                if ring not in {"core", "100"}:
+                    site["service_ring"] = "100"
+            else:
+                site["service_ring"] = "service"
+        elif ring in {"200", "300"}:
+            site["expansion_horizon"] = True
+            site["service_ring"] = ring
+        else:
+            site["expansion_horizon"] = False
+            site["service_ring"] = "outside"
+        own = first_number(row.get("Spare ac (own parcel)"))
+        adj = first_number(row.get("Spare ac (same-owner adjoining)"))
+        if own is not None:
+            site["spare_ac_own"] = own
+            site["spare_ac_own_text"] = scrub(row.get("Spare ac (own parcel)"))
+        if adj is not None:
+            site["spare_ac_adjoining"] = adj
+            site["spare_ac_adjoining_text"] = scrub(row.get("Spare ac (same-owner adjoining)"))
+        sqft = first_number(row.get("Lot size (sq ft)"))
+        if sqft and not site.get("lot_ac"):
+            site["lot_ac"] = round(sqft / 43560, 3)
+        miles = first_number(row.get("Dist to depot (mi)"))
+        if miles is not None and site.get("miles_to_depot") is None:
+            site["miles_to_depot"] = miles
+        if site.get("lat") is None or site.get("lon") is None:
+            lat = first_number(row.get("Lat"))
+            lon = first_number(row.get("Lon"))
+            if lat is not None and lon is not None:
+                site["lat"] = lat
+                site["lon"] = lon
+                site["coord_status"] = "known"
+                site["street_view_url"] = f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}"
+        if not site.get("land_tier"):
+            hit = screening["rows"].get((site["city"], norm_apn(site.get("apn"))))
+            if hit:
+                aerial = str(hit.get("aerial") or "").strip()
+                site["aerial_fit"] = aerial
+                site["land_tier"] = {"FIT_10": "L10", "FIT_4": "L4"}.get(aerial)
+                if hit.get("spare_sqft") is not None and site.get("spare_ac_own") is None:
+                    site["spare_ac_own"] = round(hit["spare_sqft"] / 43560, 3)
+        had_verdict = bool(site.get("verdict"))
+        tier = str(row.get("Final tier") or "").strip()
+        verdict = COUNTY_VERDICT.get(tier.lower())
+        site["verdict"] = verdict
+        if tier:
+            site["reconciliation_tier"] = scrub(tier)
+        basis = plain_note(row.get("Verdict basis"))
+        if verdict:
+            if basis:
+                site["evidence"] = basis[:700]
+            if verdict == "PASS" and site["in_area"]:
+                site["network_status"] = "cleared"
+            elif verdict == "PASS":
+                site["network_status"] = "held"
+                site["expansion_horizon"] = True
+            elif site.get("network_status") == "cleared":
+                site["network_status"] = None
+            note = basis[:400]
+            verdict_rows.append(
+                {
+                    "site_id": site["site_id"],
+                    "market": site["city"],
+                    "name": site["name"],
+                    "address": site["address"],
+                    "apn": norm_apn(site.get("apn")),
+                    "adjudicated_verdict": verdict,
+                    "spare_ac_own": site["spare_ac_own"] if site.get("spare_ac_own") is not None else "",
+                    "spare_ac_same_owner_adjoining": site["spare_ac_adjoining"] if site.get("spare_ac_adjoining") is not None else "",
+                    "operating_evidence": "",
+                    "parcel_evidence": note,
+                    "confidence": site.get("confidence") or "",
+                    "notes": note,
+                    "aerial_verdict": "",
+                    "land_verdict_provisional": "",
+                    "operating_evidence_tier": "",
+                    "retrieved_at": "2026-11-03",
+                    "reviewer": "county check",
+                    "supersedes": "",
+                    "source_file": "Universe tab",
+                }
+            )
+            site["reviews"].append(
+                {
+                    "reviewer": "county check",
+                    "kind": "county",
+                    "verdict": verdict,
+                    "provisional": False,
+                    "spare_ac_own": site.get("spare_ac_own"),
+                    "spare_ac_adjoining": site.get("spare_ac_adjoining"),
+                    "confidence": site.get("confidence") or "",
+                    "date": "2026-11-03",
+                    "note": note,
+                }
+            )
+            crosswalk.append({"site_id": site["site_id"], "source": "Universe tab", "source_key": site["site_id"]})
+        elif had_verdict:
+            site["evidence"] = ""
+            if site.get("network_status") == "cleared":
+                site["network_status"] = None
+
+    for row in rows:
+        if str(row.get("Counted in funnel") or "").strip().lower() != "yes":
+            continue
+        city = str(row.get("Market") or "").strip()
+        if city not in {"LAS", "PHX", "MIA"}:
+            continue
+        sid, twin = claim(city, row.get("APN"), str(row.get("Address") or ""))
+        is_new = sid is None
+        if is_new:
+            seq[city] += 1
+            sid = f"WB-{city}-{seq[city]:04d}"
+            site = blank_site(sid, city)
+            sites.append(site)
+            by_id[sid] = site
+            fresh += 1
+        else:
+            site = by_id[sid]
+            claimed.add(sid)
+            matched += 1
+        paint(site, row, is_new=is_new)
+        if is_new and (site.get("lat") is None or site.get("lon") is None) and twin and twin in by_id:
+            other = by_id[twin]
+            if other.get("lat") is not None and other.get("lon") is not None:
+                site["lat"] = other["lat"]
+                site["lon"] = other["lon"]
+                site["coord_status"] = "known"
+                site["street_view_url"] = other.get("street_view_url") or ""
+        if site.get("lat") is None or site.get("lon") is None:
+            query = _universe_geocode_query(site.get("address") or "", str(row.get("City") or ""), city)
+            coords = geocode_address(query, geocode_cache) if query else None
+            if coords:
+                site["lon"], site["lat"] = float(coords[0]), float(coords[1])
+                site["coord_status"] = "known"
+                site["street_view_url"] = f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={site['lat']},{site['lon']}"
+        yes_ids.add(sid)
+        for token in apn_tokens(site.get("apn")):
+            bucket = by_apn[(city, token)]
+            if sid not in bucket:
+                bucket.append(sid)
+
+    dropped = []
+    for site in sites:
+        if site.get("origin") != "universe" or site["site_id"] in yes_ids:
+            continue
+        site["counts_as_site"] = False
+        site["in_area"] = False
+        site["verdict"] = None
+        if site.get("network_status") == "cleared":
+            site["network_status"] = None
+        dropped.append(site["site_id"])
+
+    GEOCODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    GEOCODE_CACHE.write_text(json.dumps(geocode_cache))
+    counted = [site for site in sites if site["site_id"] in yes_ids]
+    county = Counter(site.get("verdict") or "" for site in counted)
+    return {
+        "counted": len(counted),
+        "matched_existing": matched,
+        "new_sites": fresh,
+        "dropped_existing": dropped,
+        "by_city": {city: sum(1 for site in counted if site["city"] == city) for city in ("LAS", "PHX", "MIA")},
+        "in_area_by_city": {
+            city: sum(1 for site in counted if site["city"] == city and site["in_area"]) for city in ("LAS", "PHX", "MIA")
+        },
+        "county_verdicts": {key: county.get(key, 0) for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")},
+        "missing_point": [site["site_id"] for site in counted if site.get("lat") is None or site.get("lon") is None],
+    }
 
 
 def load_csv(path: Path) -> list[dict]:
@@ -791,7 +1123,10 @@ DEAL_FIELDS = (
 
 def deal_street_signature(value: str) -> str:
     text = re.sub(r"^(phx|las|mia|sna)\s+", "", (value or "").lower().strip())
-    text = addr_key(text)
+    # City names stay. "Chandler" is the street in "7455 W Chandler Blvd", not only the city.
+    text = re.sub(r"[^a-z0-9 ]", " ", text)
+    text = re.sub(r"\b(az|nv|fl|arizona|nevada|florida)\b", " ", text)
+    text = re.sub(r"(?<=\s)\d{5}\b", " ", text)
     text = re.sub(
         r"\b(avenue|ave|street|st|road|rd|boulevard|blvd|drive|dr|lane|ln|way|court|ct|place|pl|circle|cir|parkway|pkwy|highway|hwy)\b",
         " ",
@@ -2363,6 +2698,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     muse_override = load_muse_file(Path(muse_file)) if muse_file else {}
     workbook = source_workbook()
     census = census_counts(workbook)
+    universe_rows = load_universe_rows(workbook)
     pipeline_rows = sheet_rows(workbook, "Pipeline", 3)
     land_rows = sheet_rows(workbook, "Land Sites", 3)
     areas = load_service_areas()
@@ -2731,6 +3067,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         )
         crosswalk.append({"site_id": sid, "source": "reconciliation_final", "source_key": sid})
 
+    live_universe = apply_live_universe(
+        universe_rows, sites, by_id, by_apn, blank_site, screening, verdict_rows, crosswalk
+    )
+
     def attach_price(site, price, source, url, date, status):
         if price is None or site.get("asking_price"):
             return
@@ -3022,7 +3362,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "unit": "rows",
                 "total": census["total"],
                 "by_city": census["by_city"],
-                "note": "Workbook Universe tab. A census union, not a count of operating businesses. The map draws the deduped site records, which are fewer than the row count.",
+                "note": "Workbook Universe tab. A census union, not a count of operating businesses. The Universe step keeps the rows marked counted, one site each.",
             },
             {
                 "id": "unique",
@@ -3032,13 +3372,14 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "by_city": by_city(countable),
                 "by_class": class_breakdown(countable),
                 "note": (
-                    f"Universe file has {len(universe)} site records. "
-                    f"Same-parcel pairs counted once: "
+                    f"Counted rows on the Universe tab: {len(countable)}. "
+                    f"The tab has {census['total']} rows in all. "
+                    f"Census file records not on a counted row are left out"
                     + (
-                        ", ".join(f"{dup} with {keep}" for dup, keep in sorted(duplicate_of.items()))
-                        or "none"
+                        f" ({len(live_universe['dropped_existing'])})."
+                        if live_universe.get("dropped_existing")
+                        else "."
                     )
-                    + ". An earlier reference is about 1,640."
                 ),
             },
             {
@@ -3049,7 +3390,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "by_city": by_city(in_area),
                 "by_class": class_breakdown(in_area),
                 "by_city_class": city_class(in_area),
-                "note": "LAS operative area is the 100 ring with the core inside it. The 200 and 300 rings are the expansion horizon and count as outside. An earlier reference is 1,043 (LV 179 / PHX 254 / MIA 610). This map shows our screen.",
+                "note": "Service area comes from the Universe tab. In is inside the current area. Out and unknown stay outside. Las Vegas rings 200 and 300 stay on the expansion horizon.",
             },
             {
                 "id": "land_tier",
@@ -3126,14 +3467,20 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     warnings = []
     if census["total"] != 1701:
         warnings.append(f"Census row count is {census['total']}, workbook expectation was 1,701.")
-    if by_city(in_area) != {"LAS": 182, "PHX": 251, "MIA": 608}:
-        warnings.append(f"In-area city split is {by_city(in_area)}, expected LV 182 / PHX 251 / MIA 608.")
-    if len(l10) != 25 or len(l4) != 48:
-        warnings.append(
-            f"In-area land tiers are L10 {len(l10)} (county-checked {sum(1 for s in l10 if s['verification']=='county-checked')}) "
-            f"and L4 {len(l4)} (county-checked {sum(1 for s in l4 if s['verification']=='county-checked')}). "
-            "The brief expected about 25 L10 and about 48 L4, with all L10 county-checked and about 3 of the L4 county-checked."
-        )
+    if len(countable) != 1658 or by_city(countable) != {"LAS": 417, "PHX": 555, "MIA": 686}:
+        warnings.append(f"Unique sites are {len(countable)} {by_city(countable)}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).")
+    if by_city(in_area) != {"LAS": 179, "PHX": 254, "MIA": 610}:
+        warnings.append(f"In-area city split is {by_city(in_area)}, workbook service area is LV 179 / PHX 254 / MIA 610.")
+    workbook_county = live_universe.get("county_verdicts") or {}
+    if workbook_county != {"PASS": 13, "MAYBE": 30, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
+        warnings.append(f"Workbook county verdicts before the two Maybe holds are {workbook_county}.")
+    map_verdicts = {key: verdict_groups[key]["total"] for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")}
+    if map_verdicts != {"PASS": 11, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
+        warnings.append(f"Map verdicts are {map_verdicts}, expected Pass 11, Maybe 32, Fail 47, Not a car wash 15, Unresolved 4 after the two holds.")
+    if len(cleared) != 9:
+        warnings.append(f"Cleared on the map is {len(cleared)} ({[site['site_id'] for site in cleared]}). The two holds should leave 9.")
+    if live_universe.get("missing_point"):
+        warnings.append("Counted sites with no pin: " + ", ".join(live_universe["missing_point"][:12]))
     if screening["conflicts"]:
         warnings.append(f"Screening rows with more than one aerial verdict for the same parcel: {len(screening['conflicts'])}.")
     if len(contacted_any) != 0:
@@ -3146,7 +3493,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         warnings.append("The muse verdict file was set but no site rows were read.")
     for sid in ("PHX-U644", "PHX-U646"):
         site = by_id.get(sid)
-        if site:
+        if site and site.get("counts_as_site"):
             warnings.append(f"{sid} in_area={site['in_area']} (screening-tab boundary note in the plan).")
 
     areas_fc = {"type": "FeatureCollection", "features": areas}
@@ -3175,6 +3522,16 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     report = {
         "generated_at": funnel["generated_at"],
         "census_rows": census,
+        "live_universe": {
+            "counted": live_universe.get("counted"),
+            "by_city": live_universe.get("by_city"),
+            "in_area_by_city": live_universe.get("in_area_by_city"),
+            "matched_existing": live_universe.get("matched_existing"),
+            "new_sites": live_universe.get("new_sites"),
+            "dropped_existing": len(live_universe.get("dropped_existing") or []),
+            "county_verdicts_before_holds": live_universe.get("county_verdicts"),
+            "note": "County verdicts are the Universe tab before Charleston Car Wash and the Chandler Quick Quack are held at Maybe. Cleared on the map is the in-area Pass rows after those two holds.",
+        },
         "unique_site_records": len([s for s in sites if s["origin"] == "universe"]),
         "unique_sites_counted": len(countable),
         "same_parcel_collapsed": duplicate_of,
@@ -3212,9 +3569,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "unmatched_by_city": dict(Counter(item["city"] for item in off_market_unmatched)),
             "unmatched_rows": off_market_unmatched,
             "note": (
-                "Unmatched off-market rows are not added to the universe. "
-                "The universe step is the deduped census, and these parcels are not in it. "
-                "Drawing them would make the map disagree with that count."
+                "Matched off-market rows add research to the census site and do not add a second pin. "
+                "Unmatched rows are drawn in universe mode and filtered by business type. "
+                "They are not part of the car-wash census counts."
             ),
         },
         "sites_without_coordinates": [
@@ -3520,6 +3877,36 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     terrible = by_id.get("LAS-U100") or {}
     if terrible.get("verdict") != "PASS" or terrible.get("network_status") != "cleared":
         problems.append("LAS-U100 Terrible's #153 must stay cleared")
+    if len(unique_rows) != 1658:
+        problems.append(f"unique sites are {len(unique_rows)}, workbook counted rows are 1,658")
+    if unique_by_city != {"LAS": 417, "PHX": 555, "MIA": 686}:
+        problems.append(f"unique sites by city are {unique_by_city}, expected LAS 417 / PHX 555 / MIA 686")
+    in_area_rows = [feature for feature in features if _universe_stage(feature, "in_area")]
+    in_area_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in in_area_rows))
+    if len(in_area_rows) != 1043 or in_area_by_city != {"LAS": 179, "PHX": 254, "MIA": 610}:
+        problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,043 (LAS 179 / PHX 254 / MIA 610)")
+    verdict_counts = Counter((feature.get("properties") or {}).get("verdict") for feature in unique_rows)
+    expected_verdicts = {"PASS": 11, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
+    got_verdicts = {key: verdict_counts.get(key, 0) for key in expected_verdicts}
+    if got_verdicts != expected_verdicts:
+        problems.append(f"county verdicts on counted sites are {got_verdicts}, expected {expected_verdicts} after the two Maybe holds")
+    cleared_rows = [feature for feature in features if _universe_stage(feature, "cleared")]
+    if len(cleared_rows) != 9:
+        problems.append(
+            "cleared pins are "
+            + str(len(cleared_rows))
+            + " ("
+            + ", ".join(sorted((feature.get("properties") or {}).get("site_id") or "" for feature in cleared_rows))
+            + "), the two holds should leave 9"
+        )
+    held_pass = sorted(
+        (feature.get("properties") or {}).get("site_id")
+        for feature in unique_rows
+        if (feature.get("properties") or {}).get("verdict") == "PASS"
+        and (feature.get("properties") or {}).get("network_status") == "held"
+    )
+    if held_pass != ["LAS-U15", "LAS-U866"]:
+        problems.append(f"Pass rows outside the service area are {held_pass}, expected LAS-U15 and LAS-U866")
     problems.extend(pipeline_pin_problems(deals or [], features))
     return problems
 

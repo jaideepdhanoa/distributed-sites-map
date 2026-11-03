@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T22:22:27Z",
+  "generated_at": "2026-11-03T22:37:37Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -8,27 +8,50 @@
       "MIA": 712
     }
   },
-  "unique_site_records": 1645,
-  "unique_sites_counted": 1643,
+  "live_universe": {
+    "counted": 1658,
+    "by_city": {
+      "LAS": 417,
+      "PHX": 555,
+      "MIA": 686
+    },
+    "in_area_by_city": {
+      "LAS": 179,
+      "PHX": 254,
+      "MIA": 610
+    },
+    "matched_existing": 1621,
+    "new_sites": 37,
+    "dropped_existing": 24,
+    "county_verdicts_before_holds": {
+      "PASS": 13,
+      "MAYBE": 30,
+      "FAIL": 47,
+      "NOT_A_WASH": 15,
+      "UNRESOLVED": 4
+    },
+    "note": "County verdicts are the Universe tab before Charleston Car Wash and the Chandler Quick Quack are held at Maybe. Cleared on the map is the in-area Pass rows after those two holds."
+  },
+  "unique_site_records": 1682,
+  "unique_sites_counted": 1658,
   "same_parcel_collapsed": {
     "LAS-V2-249": "LAS-U878",
     "LAS-V2-226": "LAS-U97"
   },
   "in_area": {
-    "total": 1041,
+    "total": 1043,
     "by_city": {
-      "LAS": 182,
-      "PHX": 251,
-      "MIA": 608
+      "LAS": 179,
+      "PHX": 254,
+      "MIA": 610
     },
     "by_class": {
-      "Gas-attached": 411,
-      "Core": 307,
+      "Gas-attached": 406,
+      "Core": 319,
       "Embedded": 256,
-      "Not a wash": 46,
-      "Licence-only": 17,
-      "Quarantined": 3,
-      "Closed": 1
+      "Not a wash": 45,
+      "Licence-only": 15,
+      "Quarantined": 2
     }
   },
   "muse_in_area_reference": {
@@ -49,13 +72,13 @@
     }
   },
   "land_tiers": {
-    "L10": 22,
-    "L4": 44,
-    "L10_checked": 22,
-    "L4_checked": 6,
-    "pending": 38,
-    "eliminated_not_a_wash": 7,
-    "held_fits": 20,
+    "L10": 21,
+    "L4": 17,
+    "L10_checked": 21,
+    "L4_checked": 17,
+    "pending": 0,
+    "eliminated_not_a_wash": 11,
+    "held_fits": 19,
     "screening_rows": 1689,
     "screening_matched_sites": 1624,
     "incoming": {
@@ -66,17 +89,17 @@
   },
   "verdicts": {
     "PASS": 11,
-    "MAYBE": 22,
-    "FAIL": 21,
-    "NOT_A_WASH": 11,
-    "UNRESOLVED": 3
+    "MAYBE": 32,
+    "FAIL": 47,
+    "NOT_A_WASH": 15,
+    "UNRESOLVED": 4
   },
   "verdicts_on_land_fits": {
     "PASS": 9,
-    "MAYBE": 17,
+    "MAYBE": 26,
     "FAIL": 0,
     "NOT_A_WASH": 0,
-    "UNRESOLVED": 2
+    "UNRESOLVED": 3
   },
   "pass_cleared": [
     "LAS-U100",
@@ -98,44 +121,54 @@
     "LAS-U115",
     "LAS-U134",
     "LAS-U1516",
+    "LAS-U32",
     "LAS-U34",
+    "LAS-U36",
     "LAS-U38",
     "LAS-U43",
     "LAS-U799",
     "LAS-U843",
+    "LAS-U848",
     "LAS-U943",
+    "MIA-U1081",
+    "MIA-U1174",
     "MIA-U1181",
+    "MIA-U1239",
+    "MIA-U762",
     "MIA-U777",
+    "PHX-U1005",
     "PHX-U236",
     "PHX-U252",
     "PHX-U462",
+    "PHX-U463",
     "PHX-U476",
     "PHX-U510",
     "PHX-U513",
     "PHX-U517",
     "PHX-U519",
     "PHX-U540",
-    "PHX-U543"
+    "PHX-U543",
+    "PHX-U565"
   ],
-  "listed_of_candidates": 5,
+  "listed_of_candidates": 2,
   "contacted_of_candidates": 0,
   "contacted_any": 0,
-  "pipeline_rows": 78,
+  "pipeline_rows": 79,
   "land_rows": 42,
   "pipeline_stage_counts": {
     "Dropped": 11,
-    "1 Desk screen": 18,
-    "0 Off-market target": 49
+    "1 Desk screen": 19,
+    "Off market (no lead)": 49
   },
   "land_stage_counts": {
     "1 Desk screen": 25,
-    "0 Off-market target": 17
+    "Off market (no lead)": 17
   },
   "deals": {
-    "pipeline": 29,
+    "pipeline": 30,
     "land": 25,
-    "matched": 37,
-    "unmatched": 17,
+    "matched": 39,
+    "unmatched": 16,
     "geocode_failed": [
       {
         "deal_id": "PIPE-PHX-0006",
@@ -226,15 +259,15 @@
       "PHX": 14,
       "SNA": 1,
       "LAS": 8,
-      "MIA": 6
+      "MIA": 7
     },
     "pipeline_by_stage": {
       "Dropped": 11,
-      "1 Desk screen": 18
+      "1 Desk screen": 19
     },
     "pipeline_by_group": {
       "dropped": 11,
-      "desk": 18
+      "desk": 19
     },
     "land_by_city": {
       "LAS": 11,
@@ -259,7 +292,7 @@
           "without_link": 3
         },
         "MIA": {
-          "with_link": 4,
+          "with_link": 5,
           "without_link": 2
         }
       },
@@ -277,11 +310,11 @@
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 10,
-      "listed_sites": 82
+      "listed_sites_with_link": 12,
+      "listed_sites": 79
     },
     "source_lines": {
-      "broker-listed": 43,
+      "broker-listed": 44,
       "broker": 11
     }
   },
@@ -730,13 +763,11 @@
         "placed": true
       }
     ],
-    "note": "Unmatched off-market rows are not added to the universe. The universe step is the deduped census, and these parcels are not in it. Drawing them would make the map disagree with that count."
+    "note": "Matched off-market rows add research to the census site and do not add a second pin. Unmatched rows are drawn in universe mode and filtered by business type. They are not part of the car-wash census counts."
   },
   "sites_without_coordinates": [
     "PIPE-PHX-0003",
-    "PIPE-PHX-0004",
     "PIPE-PHX-0006",
-    "PIPE-PHX-0007",
     "PIPE-PHX-0008",
     "PIPE-PHX-0009",
     "PIPE-LAS-0015",
@@ -768,37 +799,38 @@
   ],
   "parcels": {
     "counts": {
-      "cache_hit": 922,
-      "not_found": 156,
+      "cache_hit": 906,
+      "not_found": 154,
       "broward_unavailable": 44,
-      "features": 945,
-      "adjoining": 23,
+      "fetched": 21,
+      "features": 958,
+      "adjoining": 31,
       "by_city": {
-        "LAS": 207,
-        "MIA": 441,
-        "PHX": 274
+        "LAS": 204,
+        "MIA": 446,
+        "PHX": 277
       },
       "by_method": {
-        "parcel number": 875,
-        "pin location": 47
+        "parcel number": 877,
+        "pin location": 50
       }
     },
     "coverage": {
       "LAS": {
-        "targets": 207,
-        "matched": 207,
+        "targets": 204,
+        "matched": 204,
         "none": 0,
         "pct": 100.0
       },
       "MIA": {
-        "targets": 635,
-        "matched": 441,
-        "none": 194,
-        "pct": 69.4
+        "targets": 638,
+        "matched": 446,
+        "none": 192,
+        "pct": 69.9
       },
       "PHX": {
-        "targets": 280,
-        "matched": 274,
+        "targets": 283,
+        "matched": 277,
         "none": 6,
         "pct": 97.9
       }
@@ -806,22 +838,22 @@
     "by_layer": {
       "universe": {
         "LAS": {
-          "targets": 190,
-          "matched": 190,
+          "targets": 187,
+          "matched": 187,
           "none": 0,
           "no_geometry": 0,
           "pct": 100.0
         },
         "MIA": {
-          "targets": 631,
-          "matched": 437,
-          "none": 194,
+          "targets": 633,
+          "matched": 442,
+          "none": 191,
           "no_geometry": 0,
-          "pct": 69.3
+          "pct": 69.8
         },
         "PHX": {
-          "targets": 260,
-          "matched": 258,
+          "targets": 263,
+          "matched": 261,
           "none": 2,
           "no_geometry": 0,
           "pct": 99.2
@@ -843,11 +875,11 @@
           "pct": 100.0
         },
         "MIA": {
-          "targets": 3,
+          "targets": 4,
           "matched": 3,
-          "none": 0,
+          "none": 1,
           "no_geometry": 0,
-          "pct": 100.0
+          "pct": 75.0
         }
       },
       "land": {
@@ -979,12 +1011,6 @@
       },
       {
         "id": "MIA-U1198",
-        "city": "MIA",
-        "kind": "universe",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1199",
         "city": "MIA",
         "kind": "universe",
         "reason": "outside the Miami-Dade parcel layer"
@@ -1398,12 +1424,6 @@
         "reason": "outside the Miami-Dade parcel layer"
       },
       {
-        "id": "MIA-U1284",
-        "city": "MIA",
-        "kind": "universe",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
         "id": "MIA-U1285",
         "city": "MIA",
         "kind": "universe",
@@ -1519,12 +1539,6 @@
       },
       {
         "id": "MIA-U1345",
-        "city": "MIA",
-        "kind": "universe",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1346",
         "city": "MIA",
         "kind": "universe",
         "reason": "outside the Miami-Dade parcel layer"
@@ -2070,21 +2084,22 @@
         "reason": "no parcel at this pin"
       },
       {
+        "id": "PIPE-MIA-0079",
+        "city": "MIA",
+        "kind": "pipeline",
+        "reason": "no parcel at this pin"
+      },
+      {
         "id": "LAND-PHX-0003",
         "city": "PHX",
         "kind": "land",
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 922, 'not_found': 156, 'broward_unavailable': 44, 'features': 945, 'adjoining': 23, 'by_city': {'LAS': 207, 'MIA': 441, 'PHX': 274}, 'by_method': {'parcel number': 875, 'pin location': 47}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 906, 'not_found': 154, 'broward_unavailable': 44, 'fetched': 21, 'features': 958, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 446, 'PHX': 277}, 'by_method': {'parcel number': 877, 'pin location': 50}}."
   },
   "muse_source": "second review column",
-  "warnings": [
-    "In-area land tiers are L10 22 (county-checked 22) and L4 44 (county-checked 6). The brief expected about 25 L10 and about 48 L4, with all L10 county-checked and about 3 of the L4 county-checked.",
-    "Pipeline tab has 78 rows (stages {'Dropped': 11, '1 Desk screen': 18, '0 Off-market target': 49}). The older note of 79 is not in this export.",
-    "PHX-U644 in_area=False (screening-tab boundary note in the plan).",
-    "PHX-U646 in_area=False (screening-tab boundary note in the plan)."
-  ],
+  "warnings": [],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
     "Nightly workbook sync is not wired; drop a new export in data/source and rerun this script.",
@@ -2095,12 +2110,12 @@
     "Outreach drafts are not loaded.",
     "Human verdict write-back is a later version and is not in this app."
   ],
-  "verdicts_appended": 0,
-  "verdicts_total": 2551,
+  "verdicts_appended": 109,
+  "verdicts_total": 2660,
   "parcel_bytes": {
-    "parcels.geojson": 483976,
-    "parcels-PHX.geojson": 139652,
-    "parcels-LAS.geojson": 104109,
-    "parcels-MIA.geojson": 240301
+    "parcels.geojson": 496104,
+    "parcels-PHX.geojson": 144851,
+    "parcels-LAS.geojson": 103539,
+    "parcels-MIA.geojson": 247800
   }
 }

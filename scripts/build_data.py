@@ -154,6 +154,182 @@ def scrub(value) -> str:
     return text.strip(" ,;:-")
 
 
+# Site-card notes. Agent names and process language are not for the reader.
+NOTE_FIELDS = (
+    "evidence",
+    "why_stopped",
+    "elimination_reason",
+    "scale_note",
+    "acreage_note",
+    "agreement",
+    "operating",
+    "spare_ac_own_text",
+    "spare_ac_adjoining_text",
+)
+_NOTE_INTERNAL = re.compile(
+    r"(?i)("
+    r"\b(?:muse|torque|indie|grok)\b"
+    r"|\blive\b"
+    r"|rounding"
+    r"|source diff"
+    r"|\bscreens?\b"
+    r"|\bscreening\b"
+    r"|aerial claim"
+    r"|\bFIT_?\d+\b"
+    r"|\brender\b"
+    r"|\bplaybook\b"
+    r"|\bv\d\b"
+    r"|/workspace"
+    r"|\b[\w.-]+\.(?:jpe?g|xlsx|csv|md)\b"
+    r")"
+)
+_NOTE_FILE = re.compile(
+    r"(?i)(?:/[\w./-]+\.(?:jpe?g|xlsx|csv|md))|(?:\br_[\w.-]+\.jpe?g)|(?:\b[\w.-]+\.(?:jpe?g|xlsx|csv|md)\b)"
+)
+
+# Exact source sentences, plus the plain line a reader should see.
+EXPLICIT_NOTES = {
+    "Maricopa GIS live: owner and 1.441 ac match Muse (1.447 is rounding/source diff). Both sides measure 0.38-0.40 ac own spare.": "County records confirm the owner and a 1.44 ac lot. About 0.38 to 0.40 ac of own spare land.",
+    "Maricopa GIS live owner POSEIDON CAR WASH LLC, 0.918 ac; both sides 0.30 own.": "County records list the owner as POSEIDON CAR WASH LLC and the lot as 0.92 ac. Own spare land is 0.30 ac.",
+    "Clark GIS live Nov 3 confirms same owner on all three adjoining lots. Gas-attached (7-Eleven).": "County records confirm the same owner on all three adjoining lots. The site is attached to a gas station (7-Eleven).",
+    "Clark GIS live owner SHREE LAXMI L L C, 1.564 ac. Operator is Terrible's (Herbst), a large fuel chain; landowner is a separate LLC.": "County records list the owner as SHREE LAXMI L L C and the lot as 1.56 ac. The operator is Terrible's, a large fuel chain. The landowner is a separate company.",
+    "Both sides now agree. Dirt A (between vacuum row and church 14019603008) is inside the wash parcel. Dirt B (far north field) is CAB PROPERTIES 14019603004, never counted. Our own-parcel figure in v1, v2 and v3 was 0.5; the 0.8 Muse cites is the early census aerial_review_v3 quick-pass figure. Our polygon clip of the parcel north of the apron line gives 0.61 ac gross, consistent with Muse 0.578.": "The dirt between the vacuum row and the church parcel is inside the wash parcel. The far north field has a different owner and is not counted. Own spare land is about 0.58 to 0.61 ac.",
+    "Empty paved apron E of the bay buildings on the wash's own parcel is ~0.2 ac net of shared circulation - the 0.15-0.25 MAYBE band, consistent with both reviews' measurements (Torque 0.23 / v3 0.2).": "The empty paved apron east of the bay buildings, on the wash's own parcel, is about 0.2 ac after shared circulation. That is in the MAYBE range.",
+    "Torque's claimed yard spare is a paved, occupied truck/vehicle storage yard (operational, full of parked vehicles in imagery), and the open dirt N is across the road on other owners' parcels. Strip parcel is fully used.": "The yard counted as spare is a paved truck and vehicle storage yard, full of parked vehicles. The open dirt to the north is across the road on other owners' parcels. The wash parcel itself is fully used.",
+    "Gas-attached site, not a standalone wash as both reviews treated it; Torque FIT_10 directionally right on land, v3 maybe 0.22 ac conservative": "This is a gas-station site, not a standalone wash. Spare land is about 0.22 ac.",
+    "Reconciliation keeps this as Tier 2 (same-owner adjoining). On the playbook scale that is MAYBE.": "Spare land is on a same-owner adjoining parcel. On this scale that is MAYBE.",
+    "Our clip of the folio polygon on the render: open area west of the paving north of the drive 0.429 ac (matches Muse 0.429); SW part 0.407 ac gross (Muse 0.394 gross, 0.246 net of 0.148 ac access drive). Imagery shows white field lines on the grass. Land is there; treating a lined, maintained field as spare is a judgment call (it may be used by a neighbour or a league). Muse now agrees: Tier 1 with that flag.": "Open land west of the paving and north of the drive is 0.43 ac. The southwest portion is 0.41 ac gross, or 0.25 ac after the access drive. Imagery shows field lines on the grass. Counting that maintained field as spare land is a judgment call. The verdict is PASS with that flag.",
+    "Re-measured 10:55 AM PT Nov 3 on the BCPA folio polygon (1.446 ac; land 63,049 sf) over Esri imagery (render /workspace/mapplan/remeasure/r_MIA-U777.jpg). Paving N of the bay building (about 0.22 ac) is the apron the bays open onto; S lane and parking row are working areas. Open land: E grass island inside the entrance loop about 0.15-0.17, SE grass about 0.06, NE tree band about 0.08 (buffer). W gravel strip about 0.18 ac is in use for vehicle storage. Usable today about 0.19-0.22 ac in pieces, largest about 0.17; MAYBE. Parcel-wide FEMA Zone AE (SFHA) per Muse NFHL grid (47/47). Adjoining 4101 Davie Rd Ext is BMS PARTNERS LLC, a separate entity, not counted. Muse round 2: verdicts-round2-M": "The lot is 1.45 ac. Paving north of the bay building, about 0.22 ac, is the apron the bays open onto. The south lane and the parking row are working areas. Open land is an east grass island of about 0.15 to 0.17 ac, southeast grass of about 0.06 ac, and a northeast tree band of about 0.08 ac. A west gravel strip of about 0.18 ac is used for vehicle storage. Usable open land is about 0.19 to 0.22 ac in pieces, the largest about 0.17 ac, so the verdict is MAYBE. The parcel is in a flood zone. The adjoining lot at 4101 Davie Rd Ext has a separate owner and is not counted.",
+    "Re-measured 10:55 AM PT Nov 3 on the Maricopa parcel polygon (0.974 ac; LAND_SIZE 43,623 sf) over Esri imagery with a 50 ft grid (render /workspace/mapplan/remeasure/r_PHX-U462.jpg). Wash part of the lot: about 0.43 ac open asphalt, mostly bay aprons, the single entry lane from 32nd St and the vacuum apron. Usable about 0.18-0.24 ac in two pieces (street-side strip about 0.10, NE block about 0.12-0.14). Below 0.25 ac, so MAYBE. Our earlier 0.30 counted working apron. Caveat: the occupied east yard (about 0.40 ac, structures and vehicles) is on the same parcel; under the playbook MAX precedent it could read as PASS-grade land with an in-use caveat, still MAYBE. Owner REMO LAND DEVELOPMENT LLC": "The lot is 0.97 ac. The wash portion has about 0.43 ac of open asphalt, mostly bay aprons, the entry lane, and the vacuum apron. Usable spare land is about 0.18 to 0.24 ac in two pieces, below 0.25 ac, so the verdict is MAYBE. An earlier 0.30 ac figure counted the working apron. The occupied east yard, about 0.40 ac, is on the same parcel and is in use. Owner: REMO LAND DEVELOPMENT LLC.",
+    "Own parcel is built out (canopy, store, circulation). Muse credits a parking field E as surplus but concedes the parcel split is unresolved; parking is in use for the c-store, not spare. Render r_LAS-U36.jpg.": "The own parcel is built out, with a canopy, store, and circulation. A parking field to the east is in use for the store, not spare land, and the parcel split is unresolved.",
+    "Render of 17627823002 shows store, canopy, circulation and desert landscaping; no graded vacant pad of 0.2 ac inside the curb line in current Esri imagery. Muse 10465 and 10521 rows are the same parcel (agree). Render r_LAS-U97.jpg.": "The parcel shows a store, canopy, circulation, and desert landscaping. There is no graded vacant pad of 0.2 ac inside the curb. The two source rows are the same parcel.",
+    "Own parcel built out. Render r_PHX-U260.jpg.": "The own parcel is built out.",
+    "Own parcel built out. Render r_PHX-U542.jpg.": "The own parcel is built out.",
+    "Own parcel built out; the dirt field W is other owners. Render r_LAS-U819.jpg.": "The own parcel is built out. The dirt field to the west belongs to other owners.",
+    "Render r_LAS-U786.jpg shows canopy and store only; a wash may be inside the store building. Street check needed.": "Imagery shows a canopy and a store only. A wash may be inside the store building. A street check is still needed.",
+    "Render shows the graded strip inside the fence N of the store; measures about 0.2 ac net of parking. Below the 0.25 line, so MAYBE. Render r_LAS-U38.jpg.": "The graded strip inside the fence, north of the store, is about 0.2 ac after parking. That is below 0.25 ac, so the verdict is MAYBE.",
+    "Render: own parcel is fully paved/landscaped; the dirt lot belongs to EBBCO LLC.": "The own parcel is fully paved and landscaped. The dirt lot belongs to EBBCO LLC.",
+    "Render: the dirt pad E and the dirt S are inside the yellow same-owner M F E INC 2.745 ac parcel. Clears 0.25 ac easily, so Tier 2 PASS, not just MAYBE.": "The dirt to the east and the south is inside the same-owner 2.75 ac parcel. Spare land is well above 0.25 ac, so the verdict is PASS.",
+    "NW area inside parcel is landscaped desert frontage; net of the buffer it sits just under 0.25 ac. Chain owner. Render r_PHX-U510.jpg.": "The northwest area inside the parcel is landscaped desert frontage. After the buffer it is just under 0.25 ac. The owner is a chain.",
+    "South band below the vacuum canopy is inside the parcel but tree-covered and narrow; usable is at or below 0.25 ac. Tenant on REIT land. Render r_PHX-U543.jpg.": "The south band below the vacuum canopy is inside the parcel, but it is tree-covered and narrow. Usable spare land is at or below 0.25 ac. The wash is a tenant.",
+    "Wash pad sits in a retail-center parcel; open paving is shared center parking. Render r_LAS-U968.jpg.": "The wash sits in a retail-center parcel. The open paving is shared center parking.",
+    "The dirt that drove v3's 0.3 pass is the neighbour's land. Own-parcel spare ~1,500 sq ft as Torque read it.": "The open dirt behind an earlier pass is the neighbour's land. Own-parcel spare land is about 1,500 sq ft.",
+    "True non-operational spare ~0.10 ac; Torque FIT_10 OVERTURNED (counted operational apron); v3 maybe 0.15 ac is generous": "Spare land that is not part of daily operations is about 0.10 ac. An earlier larger figure counted the working apron. A 0.15 ac figure is generous.",
+    "Usable spare ~0.19 ac on the north side - MAYBE band; v3 pass 0.25 ac generous, Torque FIT_4 6,000 sq ft (~0.14 ac) low": "Usable spare land on the north side is about 0.19 ac, so the verdict is MAYBE. A 0.25 ac figure is generous, and a 0.14 ac figure is low.",
+    "Usable ~0.21 ac after discounting the sloped/landscaped drainage terrain on the strip - MAYBE band; Torque FIT_10 overstates usability, v3 maybe 0.2 ac close": "Usable spare land is about 0.21 ac after setting aside the sloped, landscaped drainage strip. The verdict is MAYBE. About 0.2 ac is close.",
+    "Row-identity dispute settled: this parcel is the auto lot (Torque's read), not the wash parcel (v3's pass attached to the wrong row).": "This parcel is the auto lot, not the wash. An earlier pass was attached to the wrong row.",
+    "v3's 'pass' verdict contradicts its own note; county land use (restaurant) confirms the conversion. Both reviews' substantive reads agree it is not a wash.": "An earlier pass conflicts with the note on the same row. County land use shows a restaurant, which confirms the conversion. This is not a wash.",
+    "v3's 1.5-ac PASS is land without a wash business on site - a residential parcel hosting a mobile detailer's base. Torque's NOT_A_WASH upheld on county + business evidence.": "The 1.5 ac figure was land without a wash business. The parcel is residential and is used as a base for a mobile detailer. County and business records show this is not a wash.",
+    "v3's 2.0-ac pass was a lot-size formula figure on a 12-ac truck stop whose open land is operational truck parking; Torque's 'possible wash bay' structure is the scale/fuel area, not a wash.": "The 2.0 ac figure was a lot-size formula on a 12 ac truck stop. The open land is truck parking in use. The structure that looked like a wash bay is the scale and fuel area, not a wash.",
+    "v3's PASS credited the vacant land itself ('vacant portion, adjoining yellow parcel also open') - land without a business. There is no operating wash at this address, so NOT_A_WASH regardless of the 0.703-ac vacant parcel. Torque's NOT_A_WASH upheld on county evidence.": "An earlier pass counted vacant land, including an adjoining open parcel, with no business on it. There is no operating wash at this address, so this is not a wash, regardless of the 0.70 ac vacant parcel.",
+    "v3's same-owner-adjoining claim is CONFIRMED by county records (north field, same owner, 0.352 ac), but the land is moot: no operating wash at the address on current evidence, so NOT_A_WASH. If a wash were operating, the band would be MAYBE (spare only via the same-owner field).": "County records confirm a north field of 0.35 ac under the same owner. There is no operating wash at the address, so this is not a wash. If a wash were operating, the only spare land would be that adjoining field, which would be MAYBE.",
+    "Bay buildings + aprons fill the small parcel; the W dirt is a different owner's construction site, consistent with v3's full review.": "The bay buildings and aprons fill the small parcel. The dirt to the west is a different owner's construction site.",
+    "Own-parcel render: large graded dirt field sits inside the KACILL 6.214 ac polygon, north of the wash/fuel pad; no other owner in between. 1.0 vs 1.2 ac is a measurement spread, both clear 0.25 ac.": "A large graded dirt field sits inside the 6.21 ac parcel, north of the wash and fuel pad, with no other owner in between. Readings of 1.0 ac and 1.2 ac both clear 0.25 ac.",
+    "Own-parcel render: the open strip north of the vacuum row is inside the red outline, about 275 ft x 50-70 ft, roughly 0.3 ac, but it is landscaped and may be stormwater retention. Chain operator, so not a small-owner target.": "The open strip north of the vacuum row is inside the parcel, about 275 ft by 50 to 70 ft, roughly 0.3 ac. It is landscaped and may be stormwater retention. The operator is a chain.",
+    "The dirt that drove v3's 0.3 pass is the neighbour's land. Own-parcel spare ~1,500 sq ft as Torque read it.": "The open dirt behind an earlier pass is the neighbour's land. Own-parcel spare land is about 1,500 sq ft.",
+    "Both sides unresolved; needs a call or street view.": "Still unresolved. It needs a call or a street view.",
+    "Dead as an owner-operator target. Only a landlord land play remains.": "Not a target to buy and operate. Only a landlord land negotiation remains.",
+    "Dead either way; correct the owner field.": "Not a viable site. The owner record needs a correction.",
+    "both FAIL": "Both reviews fail this site.",
+    "both FAIL; chain": "Both reviews fail this site. The operator is a chain.",
+    "both dead": "Not a viable site.",
+    "both: closed (Yelp)": "The business is closed.",
+    "both: not a wash, vacant 6.8 ac": "Not a wash. The lot is vacant, 6.8 ac.",
+    "both: third-party dirt": "The open dirt belongs to another owner.",
+    "Herbst (Terrible's parent) is owner; big-firm issue for outreach.": "The owner is Herbst, the parent of Terrible's. Outreach has to go through a large firm.",
+    "Universe point falls on a road parcel (12425599001); the wash sits on two CENTENNIAL ASSET parcels.": "The mapped point falls on a road parcel (12425599001). The wash sits on two CENTENNIAL ASSET parcels.",
+    "County verdict is FAIL on tenure. Tenure is otherwise only a flag.": "The county verdict fails this site on tenure. Tenure is otherwise only a flag.",
+    "Not a wash (not categorised in the file).": "Not a wash (reason not categorised).",
+    "not categorised in the file": "not categorised",
+    "Provisional aerial screen.": "Aerial review only. The county check is still open.",
+    "Provisional aerial screen. It does not decide the county verdict.": "Aerial review only. It does not decide the county verdict.",
+    "Screening tab land tier. It does not decide the county verdict.": "The land tier comes from the aerial measurement. It does not decide the county verdict.",
+    "Tier 1 PASS (Muse: agreed but not parcel-checked)": "PASS. The reviewers agree, and the parcel has not been county-checked.",
+    "Tier 1 PASS (upgraded in Muse verification round 9:14 AM PT)": "PASS.",
+    "FAIL (round 2); Muse rows 10465 and 10521 S Rainbow are one parcel": "Fail. The two South Rainbow rows are one parcel.",
+    "FAIL on land, 0.10 ac (round 2; operating wash confirmed by live licence)": "Fail on land, with 0.10 ac of spare. The operating wash is confirmed.",
+    "scale only (Muse calls same-owner-only land MAYBE)": "Same-owner adjoining land only. That reads as MAYBE.",
+    "DISAGREE: ours Dead, Muse MAYBE (0.09 own / 0.32 adjoining)": "The recorded verdict is not a fit. Another review called it MAYBE, with 0.09 ac of own spare and 0.32 ac adjoining.",
+    "DISAGREE: ours Unresolved, Muse FAIL (land 0.10 ac)": "The recorded verdict is unresolved. Another review called it a fail, on 0.10 ac of land.",
+    "agree (single parcel, 17627823002)": "Agree. One parcel, 17627823002.",
+    "agree on tier; process note (Muse says unchecked)": "Agree on the land tier. The county check is still open.",
+    "yes (Circle K store page lists car wash, per Muse)": "Yes. The Circle K store page lists a car wash.",
+    "Converted: site operates as a restaurant/nightclub (v3's own web check in its no": "Converted. The site operates as a restaurant and nightclub.",
+    "0.48 (0.40 grid / 0.476 polygon, Muse; our imagery estimate 0.5; north band of the parcel 0.58 to 0.61 gross)": "0.48 ac. Imagery puts it near 0.5 ac, and the north band of the parcel is about 0.58 to 0.61 ac gross.",
+    "Clark ParcelHistory re-read 9:35 AM PT Nov 3: 13914202008 BLUE BEACON INTERNATIONAL INC; Clark polygon 3.664 ac.": "County records list parcel 13914202008 as BLUE BEACON INTERNATIONAL INC, 3.66 ac.",
+    "Clark ParcelHistory re-read 9:35 AM PT Nov 3: 17601510001 DECATUR & SUNSET L L C; Clark polygon 6.812 ac.": "County records list parcel 17601510001 as DECATUR & SUNSET L L C, 6.81 ac.",
+}
+
+
+def plain_note(value) -> str:
+    """Turn one site-card note into plain language. Explicit lines win; the rest is stripped."""
+    text = scrub(value)
+    if not text:
+        return ""
+    if text in EXPLICIT_NOTES:
+        return EXPLICIT_NOTES[text]
+    for src, dst in sorted(EXPLICIT_NOTES.items(), key=lambda item: len(item[0]), reverse=True):
+        if len(text) >= 48 and (src.startswith(text) or text.startswith(src)):
+            return dst
+    cleaned = _NOTE_FILE.sub("", text)
+
+    def drop_debug(match: re.Match) -> str:
+        chunk = match.group(0)
+        if _NOTE_INTERNAL.search(chunk) or _NOTE_FILE.search(chunk):
+            return ""
+        return chunk
+
+    cleaned = re.sub(r"\([^)]*\)", drop_debug, cleaned)
+    cleaned = _NOTE_INTERNAL.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.;:])", r"\1", cleaned)
+    cleaned = re.sub(r"(?:\s*[,;]\s*){2,}", ", ", cleaned)
+    return cleaned.strip(" ,;:-")
+
+
+def sanitize_site_notes(site: dict) -> int:
+    changed = 0
+    for key in NOTE_FIELDS:
+        current = site.get(key)
+        if not isinstance(current, str) or not current:
+            continue
+        rewritten = plain_note(current)
+        if rewritten != current:
+            site[key] = rewritten
+            changed += 1
+        if _NOTE_INTERNAL.search(site.get(key) or ""):
+            raise SystemExit(f"Note still has internal wording on {site.get('site_id')} {key}: {site.get(key)[:180]!r}")
+    for review in site.get("reviews") or []:
+        if not isinstance(review, dict):
+            continue
+        current = review.get("note")
+        if not isinstance(current, str) or not current:
+            continue
+        rewritten = plain_note(current)
+        if rewritten != current:
+            review["note"] = rewritten
+            changed += 1
+        if _NOTE_INTERNAL.search(review.get("note") or ""):
+            raise SystemExit(f"Review note still has internal wording on {site.get('site_id')}: {review.get('note')[:180]!r}")
+    return changed
+
+
+def site_note_problems(props: dict) -> list[str]:
+    problems = []
+    sid = props.get("site_id") or "?"
+    for key in NOTE_FIELDS:
+        text = props.get(key) or ""
+        if isinstance(text, str) and _NOTE_INTERNAL.search(text):
+            problems.append(f"{sid} {key}: {text[:140]!r}")
+    for review in props.get("reviews") or []:
+        if not isinstance(review, dict):
+            continue
+        text = review.get("note") or ""
+        if isinstance(text, str) and _NOTE_INTERNAL.search(text):
+            problems.append(f"{sid} review: {text[:140]!r}")
+    return problems
+
+
 def banned_hits(text: str) -> list[str]:
     return [p.pattern for p in BANNED_PATTERNS if p.search(text or "")]
 
@@ -898,7 +1074,7 @@ def elimination_reason(site: dict) -> str:
         return "converted"
     if "closed" in blob:
         return "closed"
-    return "not categorised in the file"
+    return "not categorised"
 
 
 def is_tenure_fail(site: dict) -> bool:
@@ -1273,7 +1449,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                     "operating_evidence": "",
                     "parcel_evidence": "",
                     "confidence": scrub(row.get("aerial_conf")),
-                    "notes": "Provisional aerial screen. It does not decide the county verdict.",
+                    "notes": "Aerial review only. It does not decide the county verdict.",
                     "aerial_verdict": aerial,
                     "land_verdict_provisional": aerial,
                     "operating_evidence_tier": "",
@@ -1293,7 +1469,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                     "spare_ac_adjoining": None,
                     "confidence": scrub(row.get("aerial_conf")),
                     "date": "2026-11-02",
-                    "note": "Provisional aerial screen.",
+                    "note": "Aerial review only. The county check is still open.",
                 }
             )
         crosswalk.append({"site_id": sid, "source": "census_v3", "source_key": sid})
@@ -1331,7 +1507,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                     "spare_ac_adjoining": None,
                     "confidence": scrub(hit["confidence"]),
                     "date": "2026-11-02",
-                    "note": "Screening tab land tier. It does not decide the county verdict.",
+                    "note": "The land tier comes from the aerial measurement. It does not decide the county verdict.",
                 }
             )
             crosswalk.append({"site_id": site["site_id"], "source": "Screening tab", "source_key": norm_apn(site["apn"])})
@@ -1355,7 +1531,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         elif playbook == "PASS":
             site["network_status"] = "cleared"
         if str(row.get("final_tier") or "").startswith("Tier 2"):
-            site["scale_note"] = "Reconciliation keeps this as Tier 2 (same-owner adjoining). On the playbook scale that is MAYBE."
+            site["scale_note"] = "Spare land is on a same-owner adjoining parcel. On this scale that is MAYBE."
         own_text = scrub(row.get("own_parcel_spare_ac"))
         adj_text = scrub(row.get("same_owner_adjoining_ac"))
         site["spare_ac_own_text"] = own_text
@@ -1614,15 +1790,16 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         if site["duplicate_of"]:
             site["why_stopped"] = f"Duplicate of {site['duplicate_of']} (same parcel). Counted once."
         elif verdict == "NOT_A_WASH":
-            site["why_stopped"] = "Not a wash (" + (site["elimination_reason"] or "reason not categorised") + ")."
+            site["why_stopped"] = "Not a wash (" + (plain_note(site["elimination_reason"]) or "reason not categorised") + ")."
         elif site["tenure_fail"]:
-            site["why_stopped"] = "County verdict is FAIL on tenure. Tenure is otherwise only a flag."
+            site["why_stopped"] = "The county verdict fails this site on tenure. Tenure is otherwise only a flag."
         elif verdict == "FAIL":
             site["why_stopped"] = site.get("evidence") or "County verdict is FAIL."
         elif site["is_held_fit"]:
             site["why_stopped"] = "Outside the operative service area. Held for network expansion."
         elif site["origin"] == "universe" and not site["in_area"]:
             site["why_stopped"] = "Outside the operative service area."
+        sanitize_site_notes(site)
 
     # Funnel numbers use records that count as a site.
     countable = [site for site in sites if site["counts_as_site"] and site["origin"] == "universe"]
@@ -2051,6 +2228,8 @@ def validate_committed() -> None:
             break
     if len(loaded["depots.geojson"].get("features", [])) != 13:
         problems.append("expected 13 depot pins")
+    for item in props:
+        problems.extend(site_note_problems(item))
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 

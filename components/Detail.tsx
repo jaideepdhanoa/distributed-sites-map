@@ -65,6 +65,13 @@ export default function Detail({
         <span>Utility proximity</span><div>{site.utility_proximity || "Unknown"}</div>
         <span>Tenure</span><div>{site.tenure || "—"}</div>
       </div>
+      {site.research_sources ? (
+        <>
+          <h3>Research sources</h3>
+          <p>{site.research_sources}</p>
+          {site.research_note ? <p>{site.research_note}</p> : null}
+        </>
+      ) : null}
       {reasons.length ? reasons.map((reason) => <p key={reason}>{reason}</p>) : null}
       {price ? (
         <>

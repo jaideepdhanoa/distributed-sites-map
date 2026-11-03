@@ -50,6 +50,8 @@ const KEEP = [
   "parcel_acres",
   "lot_ac_source",
   "listing_url",
+  "research_sources",
+  "research_note",
   "evidence",
   "spare_ac_own_text",
   "spare_ac_adjoining_text",

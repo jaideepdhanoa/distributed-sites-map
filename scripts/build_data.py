@@ -906,12 +906,49 @@ def _broker_channel(broker: str) -> str:
     return firm[:120]
 
 
-def deal_source(row: dict, listing_url: str) -> tuple[str, str]:
-    """A source line and its type: off-market, or broker with or without a listing."""
-    broker = str(row.get("Broker") or "")
+def is_off_market_row(row: dict) -> bool:
+    """Off-market research is not a broker or agent deal."""
     status = str(row.get("Listing status") or "")
-    off_market = bool(re.search(r"(?i)off-market", status) or re.match(r"(?i)^none yet\b", broker.strip()))
-    if off_market:
+    stage = str(row.get("Stage") or "")
+    broker = str(row.get("Broker") or "")
+    return bool(
+        re.search(r"(?i)\boff-market\b", status)
+        or re.search(r"(?i)off-market", stage)
+        or re.match(r"(?i)^none yet\b", broker.strip())
+    )
+
+
+def research_sources_line(row: dict) -> str:
+    return "; ".join(_source_records(row.get("Source of the numbers")))[:400]
+
+
+def clean_research_text(row: dict) -> str:
+    """Notes and land comments, without lot size, people, sheets, or power units."""
+    kept = []
+    for key in ("What we know", "Land notes"):
+        text = trim_restated_facts(plain_note(row.get(key)))
+        text = re.sub(r"(?i)\bon \d+(?:\.\d+)? acres?\b", "", text)
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            piece = sentence.strip(" ;")
+            if not piece:
+                continue
+            if re.search(r"(?i)\b(kV|kW|MW|kilowatt|kilovolt)\b", piece):
+                continue
+            if _DEAL_PRIVATE.search(piece) or _DEAL_LEAK.search(piece) or banned_hits(piece) or _NOTE_INTERNAL.search(piece):
+                continue
+            if re.search(r"https?://", piece):
+                continue
+            kept.append(piece if piece.endswith(".") else piece + ".")
+    cleaned = " ".join(kept)
+    cleaned = re.sub(r"\s+\.", ".", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    return cleaned[:500]
+
+
+def deal_source(row: dict, listing_url: str) -> tuple[str, str]:
+    """A source line and its type. Off-market rows are not deal cards."""
+    broker = str(row.get("Broker") or "")
+    if is_off_market_row(row):
         records = _source_records(row.get("Source of the numbers"))
         line = "Off-market lead (our own research)"
         if records:
@@ -1172,6 +1209,8 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 matched += 1
             broker, firm = split_broker(row.get("Broker"))
             price = parse_price(row.get("Asking price ($)"))
+            if is_off_market_row(row):
+                continue
             url = listing_url_from_row(row)
             source_line, source_kind = deal_source(row, url)
             blob = " ".join(str(row.get(col) or "") for col in ("Listing link", "What we know", "Land evidence", "Next step"))
@@ -2344,6 +2383,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "asking_price_status": None,
             "pipeline_stage": None,
             "pipeline_id": None,
+            "research_sources": "",
+            "research_note": "",
             "land_only": False,
             "on_land_tab": False,
             "quarantine": False,
@@ -2649,9 +2690,40 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             return hits[0]
         return None
 
+    off_market_matched: list[dict] = []
+    off_market_unmatched: list[dict] = []
+
+    def attach_off_market_research(site: dict, row: dict) -> None:
+        records = [part.strip() for part in (site.get("research_sources") or "").split(";") if part.strip()]
+        for record in _source_records(row.get("Source of the numbers")):
+            if record not in records:
+                records.append(record)
+        site["research_sources"] = "; ".join(records)[:400]
+        note = clean_research_text(row)
+        evidence = site.get("evidence") or ""
+        prior = site.get("research_note") or ""
+        if note and note not in prior and note not in evidence:
+            site["research_note"] = (prior + " " + note).strip()[:700]
+
     def absorb_workbook_row(row: dict, kind: str):
         city = str(row.get("Market") or "").strip() or "UNK"
         label = str(row.get("Site") or "").strip()
+        if is_off_market_row(row):
+            matched = match_universe(city, row.get("APN or folio"), label)
+            entry = {
+                "city": city,
+                "kind": kind,
+                "label": scrub(label)[:160],
+                "name": scrub(row.get("Name"))[:120],
+                "apn": str(row.get("APN or folio") or ""),
+                "universe_id": matched or "",
+            }
+            if matched:
+                attach_off_market_research(by_id[matched], row)
+                off_market_matched.append(entry)
+            else:
+                off_market_unmatched.append(entry)
+            return
         key = f"{kind}|{label}"
         assigned = registry_id(reg, "PIPE" if kind == "pipeline" else "LAND", key, city if city in {"LAS", "PHX", "MIA"} else "XX")
         matched = match_universe(city, row.get("APN or folio"), label)
@@ -3003,6 +3075,18 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "pipeline_stage_counts": dict(Counter(str(row.get("Stage")) for row in pipeline_rows)),
         "land_stage_counts": dict(Counter(str(row.get("Stage")) for row in land_rows)),
         "deals": deal_report,
+        "off_market": {
+            "matched": len(off_market_matched),
+            "unmatched": len(off_market_unmatched),
+            "matched_by_city": dict(Counter(item["city"] for item in off_market_matched)),
+            "unmatched_by_city": dict(Counter(item["city"] for item in off_market_unmatched)),
+            "unmatched_rows": off_market_unmatched,
+            "note": (
+                "Unmatched off-market rows are not added to the universe. "
+                "The universe step is the deduped census, and these parcels are not in it. "
+                "Drawing them would make the map disagree with that count."
+            ),
+        },
         "sites_without_coordinates": [
             site["site_id"] for site in sites if site["coord_status"] != "known" and site["counts_as_site"]
         ],
@@ -3304,6 +3388,8 @@ def pipeline_pin_problems(deals: list[dict], sites: list[dict]) -> list[str]:
         props = feature.get("properties") or {}
         if props.get("kind") != "pipeline":
             continue
+        if props.get("source_kind") == "off-market" or re.search(r"(?i)off-market", props.get("stage") or ""):
+            problems.append(f"{props.get('deal_id')} is off-market and still in the pipeline")
         groups.setdefault((props.get("city") or "?", props.get("stage_group") or ""), []).append(feature)
     for (city, stage), rows in sorted(groups.items()):
         drawable = 0

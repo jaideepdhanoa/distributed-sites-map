@@ -29,7 +29,7 @@ export const FUNNEL_NOTES: Record<string, string> = {
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have room for about 10 or about 4 parking bays inside the service area. Cleared sites passed the county check.",
-  pipeline: "Active deals are still being pursued. Sourced and desk screen are the first two steps. Dropped deals are no longer pursued.",
+  pipeline: "Broker and agent deals only. Off-market research stays on the universe site. Sourced and desk screen are the first two steps. Dropped deals are no longer pursued.",
 };
 
 const STAGE_TITLES: Record<string, string> = {

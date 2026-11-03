@@ -3039,54 +3039,6 @@ PIPE-LAS-0015,Pipeline,LAS Auto repair and body shop (address to come)
 LAS-U829,Pipeline,LAS 3190 W Sahara Ave
 LAS-U977,Pipeline,LAS 4115 W Desert Inn Rd
 PIPE-PHX-0018,Pipeline,"PHX Tire business, Apache Junction"
-PHX-U350,Pipeline,PHX 4210 W Glendale Ave
-PHX-U234,Pipeline,PHX 5002 E McDowell Rd
-PHX-U442,Pipeline,PHX 2675 W Jomax Rd
-PHX-U372,Pipeline,PHX 6149 N 7th St
-PHX-U590,Pipeline,PHX 15625 S 32nd St
-PIPE-PHX-0024,Pipeline,PHX 2649 W Indian School Rd
-PHX-U348,Pipeline,PHX 3550 W Dunlap Ave
-PHX-U169,Pipeline,PHX 5925 W McDowell Rd
-PHX-U189,Pipeline,PHX 216 E Broadway Rd
-PHX-U369,Pipeline,PHX 9215 N 7th St
-PHX-U339,Pipeline,PHX 1940 W Cactus Rd
-PHX-U371,Pipeline,PHX 6332 N 12th St
-PHX-U462,Pipeline,PHX 13849 N 32nd St
-PHX-U558,Pipeline,"PHX 2039 S Power Rd, Mesa"
-PIPE-PHX-0033,Pipeline,"PHX 7045 E Main St, Mesa"
-PIPE-PHX-0034,Pipeline,"PHX 747 E Southern Ave, Mesa"
-PIPE-PHX-0035,Pipeline,PHX 2427 W Northern Ave
-PIPE-PHX-0036,Pipeline,PHX 15440 N 40th St
-PIPE-PHX-0037,Pipeline,PHX 5838 N 19th Ave
-PIPE-PHX-0038,Pipeline,PHX 11044 N Cave Creek Rd
-PIPE-PHX-0039,Pipeline,"PHX 11625 N Saguaro Blvd, Fountain Hills"
-PHX-U389,Pipeline,"PHX 17115 E Shea Blvd, Fountain Hills"
-PIPE-PHX-0041,Pipeline,"PHX 16040 N 75th Ave, Peoria"
-PIPE-LAS-0042,Pipeline,LAS 3045 N Lamb Blvd
-LAS-U95,Pipeline,"LAS 51 W Horizon Ridge Pkwy, Henderson"
-PIPE-LAS-0044,Pipeline,LAS 4435 W Wigwam Ave
-PIPE-LAS-0045,Pipeline,"LAS Paradise yard, APN 162-19-802-035"
-PIPE-LAS-0046,Pipeline,LAS 2730 N Nellis Blvd
-PIPE-LAS-0047,Pipeline,LAS 5045 E Cheyenne Ave
-LAS-U793,Pipeline,LAS 7501 Alta Dr
-PIPE-LAS-0049,Pipeline,LAS 400 Northbridge Ln
-LAS-U65,Pipeline,"LAS 4706 W Craig Rd, North Las Vegas"
-LAS-U919,Pipeline,LAS 500 S Buffalo Dr
-PIPE-LAS-0052,Pipeline,"LAS 1450 E Lake Mead Pkwy, Henderson"
-LAS-U813,Pipeline,LAS 4820 W Charleston Blvd
-PIPE-LAS-0054,Pipeline,LAS 3446 W Hacienda Ave
-LAS-U852,Pipeline,LAS 2535 S Torrey Pines Dr
-MIA-U697,Pipeline,MIA 17696 SW 8th St
-PIPE-MIA-0057,Pipeline,MIA 12005 SW 129th Ct
-PIPE-MIA-0058,Pipeline,MIA 12539 SW 128th St
-MIA-U718,Pipeline,MIA 10700 SW 186th St
-PIPE-MIA-0060,Pipeline,MIA 8500 NW 64th St
-MIA-U665,Pipeline,"MIA 33513 S Dixie Hwy, Florida City"
-PIPE-MIA-0062,Pipeline,MIA 13470 SW 128th St
-PIPE-MIA-0063,Pipeline,MIA 17110 S Dixie Hwy
-PIPE-MIA-0064,Pipeline,"MIA 24005 S Federal Hwy, Homestead"
-PIPE-MIA-0065,Pipeline,"MIA 17501 NW 27th Ave, Miami Gardens"
-PIPE-MIA-0066,Pipeline,MIA 1500 SW 67th Ave
 PIPE-PHX-0067,Pipeline,"PHX Sinclair gas station, Mesa (address to come)"
 PIPE-PHX-0068,Pipeline,"PHX Shell gas station, Gilbert (address to come)"
 PIPE-PHX-0069,Pipeline,"PHX ARCO ampm gas station, Phoenix (address to come)"
@@ -3098,7 +3050,6 @@ PIPE-MIA-0074,Pipeline,MIA Auto repair with real estate (address to come)
 PIPE-MIA-0075,Pipeline,"MIA Gas station with land, North Miami (address to come)"
 PIPE-MIA-0076,Pipeline,MIA 1601 NW 119th St
 PIPE-MIA-0077,Pipeline,MIA Mechanic shop near Tamiami Airport (address to come)
-PIPE-MIA-0078,Pipeline,MIA 3700 NW 27th Ave
 LAND-LAS-0001,Land Sites,LAS 2436 E Cheyenne Ave
 LAND-PHX-0002,Land Sites,PHX 4405 N 7th Ave
 LAND-PHX-0003,Land Sites,"PHX 3141 E Ocotillo Rd, San Tan Valley"
@@ -3114,23 +3065,6 @@ LAND-LAS-0012,Land Sites,"LAS 2625 Branson St, North Las Vegas"
 LAND-LAS-0013,Land Sites,"LAS Las Vegas Blvd N, 0.60-acre IP lot (89115)"
 LAND-LAS-0014,Land Sites,LAS 7910 S Dean Martin Dr
 LAND-LAS-0015,Land Sites,"LAS Denning St and Aurora Beam Ave, Whitney"
-LAND-MIA-0016,Land Sites,MIA 7370 NW 12th St and 7391 NW 11th St
-LAND-MIA-0017,Land Sites,"MIA 2190 NW 110th Ave, Sweetwater"
-LAND-MIA-0018,Land Sites,MIA 2180 NW 22nd St
-LAND-MIA-0019,Land Sites,MIA 2757 NW 36th St and 2736 NW 37th St
-LAND-MIA-0020,Land Sites,MIA 2900 NW 36th St and 2901 NW 35th St
-LAND-MIA-0021,Land Sites,MIA 3650 NW South River Dr
-LAND-MIA-0022,Land Sites,MIA 1200 NW 36th St
-LAND-MIA-0023,Land Sites,"MIA 1200 Old Griffin Rd, Dania Beach"
-LAND-MIA-0024,Land Sites,"MIA 2575 W State Road 84, Dania Beach"
-LAND-MIA-0025,Land Sites,"MIA 5021 SW 51st St, Davie"
-LAND-MIA-0026,Land Sites,"MIA 3300 SW 11th Ave, Fort Lauderdale"
-LAND-MIA-0027,Land Sites,"MIA 5900 Mayo St, Hollywood"
-LAND-MIA-0028,Land Sites,"MIA Ansin Blvd, Hallandale Beach"
-LAND-MIA-0029,Land Sites,"MIA 1301 SW 12th Ave, Dania Beach"
-LAND-MIA-0030,Land Sites,"MIA 2392 SW 57th Ave, West Park"
-LAND-MIA-0031,Land Sites,"MIA Dewey St near S State Road 7, Hollywood area"
-LAND-MIA-0032,Land Sites,"MIA 1400 NE 16th Ct, Fort Lauderdale"
 LAND-PHX-0033,Land Sites,PHX 5020 S 16th St
 LAND-PHX-0034,Land Sites,"PHX 654 N Country Club Dr, Mesa"
 LAND-PHX-0035,Land Sites,PHX 2345 W Buckeye Rd

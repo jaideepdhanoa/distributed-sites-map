@@ -1,0 +1,414 @@
+site_id,name,address,ring,in100,class_after_aerial,aerial_verdict
+LAS-U10,ARCO HAND CAR WASH | DESERT OASIS CARWASH | Rancho Hand Car Wash,2901 N Rancho Dr,100,True,gas-attached,fail
+LAS-U100,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's Car Wash #153",4070 Arville St,core,True,gas-attached,maybe
+LAS-U101,,3965 East Charleston Boulevard,100,True,core standalone,maybe
+LAS-U102,Showtime Carwash | VIP Car Wash and Detail,70 East Centennial Parkway,300,False,core standalone,fail
+LAS-U103,Mr. Car Wash LLC,6146 W Charleston Blvd,100,True,core standalone,fail
+LAS-U104,"ARCO AM PM 81948 | ampm (fuel, car_wash=yes)",1590 N Lamb Blvd,300,False,gas-attached,maybe
+LAS-U105,GO CAR WASH | GO Car Wash | Quick & Clean Car Wash,3265 South Nellis Boulevard,300,False,core standalone,fail
+LAS-U106,"Green Valley Grocery #38 | Shell | Shell (fuel, car_wash=yes)",3711 S Fort Apache Rd,200,False,gas-attached,fail
+LAS-U107,Global Truck & Car Wash | Global Truck wash,8112 S Valley View Blvd,100,True,core standalone,fail
+LAS-U108,Car Wash | Country Club Auto Spa,9260 S Eastern Ave,200,False,gas-attached,fail
+LAS-U109,,320 E Basic Rd,,False,out of area,not reviewed (out of area)
+LAS-U11,,785 W Craig Rd,300,False,core standalone,fail
+LAS-U110,Circle K,1381 W Warm Springs Rd,,False,out of area,not reviewed (out of area)
+LAS-U111,LUV Car Wash,1630 W Sunset Rd,,False,out of area,not reviewed (out of area)
+LAS-U112,,1101 W Sunset Rd,,False,out of area,not reviewed (out of area)
+LAS-U114,Mr. Terrible's Self Serve Wash | Terrible Herbst Self Serve Car Wash | Terrible's | Terrible's Car Wash,2343 E Warm Springs Rd,100,True,core standalone,fail
+LAS-U115,CIRCLE K #2622004 | Circle K,6145 Cactus Ave,300,False,gas-attached,pass
+LAS-U116,"Jones Arco | Pit Stop | ampm (fuel, car_wash=yes)",7212 S Jones Blvd,200,False,gas-attached,fail
+LAS-U117,,5735 Decatur Blvd,core,True,gas-attached,maybe
+LAS-U118,,3665 S Fort Apache Rd,200,False,embedded,maybe
+LAS-U119,Premier Car Wash & Detail | Woodie's Wash Shack - West Charleston | Woodies Wash Shack,6451 West Charleston Boulevard,100,True,core standalone,fail
+LAS-U120,"Green Valley Grocery #74 | Shell (fuel, car_wash=yes)",4885 W RUSSELL RD,core,True,gas-attached,maybe
+LAS-U121,Mr Car Wash L.L.C.,3295 E Desert Inn Rd,100,True,core standalone,fail
+LAS-U122,,569 E Sahara Ave,core,True,core standalone,maybe
+LAS-U123,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #299",5685 Mountain Vista St,100,True,gas-attached,fail
+LAS-U124,Las Vegas Auto Spa,3215 S Lamb Blvd,100,True,embedded,maybe
+LAS-U125,,5820 E Sahara Ave,,False,out of area,not reviewed (out of area)
+LAS-U126,ATM FRIENDLY BEAR CARWASH | FRIENDLY BEAR CARWASH | Friendly Bear Car Detail | Friendly Bear Car Wash | Friendly Bear Full Service Hand Car Wash,895 North Nellis Boulevard,300,False,core standalone,fail
+LAS-U127,"Chevron (fuel, car_wash=yes) | TERRIBLES 263 | Terrible's",598 N Eastern Ave,100,True,gas-attached,fail
+LAS-U128,"ARCO AM PM 82263 | Splash N' Dash Car Wash | ampm (fuel, car_wash=yes)",2320 Fremont St,100,True,gas-attached,fail
+LAS-U129,Blue Beacon | Blue Beacon Truck Wash,2932 Losee Rd,100,True,gas-attached,pass
+LAS-U13,,2841 W Craig Rd,300,False,core standalone,fail
+LAS-U130,Fabulous Freddy's,4305 West Craig Road,300,False,gas-attached,fail
+LAS-U131,Desert Pit Stop Car Wash,7165 N Hualapai Way,,False,out of area,not reviewed (out of area)
+LAS-U132,,7983 N Hualapai Way,,False,out of area,not reviewed (out of area)
+LAS-U133,TERRIBLES CAR WASH 218 | Terrible's,7125 W Ann Rd,300,False,core standalone,maybe
+LAS-U134,"7-Eleven Store #42918A | Car Wash | Chevron (fuel, car_wash=yes)",6390 N Durango Dr,300,False,gas-attached,pass
+LAS-U135,Speedee Mart #125,6770 N Hualapai Way,300,False,gas-attached,maybe
+LAS-U136,"Chevron | Chevron (fuel, car_wash=yes) | Terrible's",439 W Dorrell Ln,300,False,gas-attached,maybe
+LAS-U137,Uncle Rayski Car Wash | Uncle Rayski's Magic Car Wash,7235 Aliante Pkwy,300,False,gas-attached,fail
+LAS-U138,,4161 St Rose Pkwy,,False,out of area,not reviewed (out of area)
+LAS-U14,"Chevron (fuel, car_wash=yes) | Terrible's #385",2222 Fremont St,100,True,gas-attached,fail
+LAS-U15,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #196",2025 N Lamb Blvd,300,False,gas-attached,pass
+LAS-U1513,Sinclair,8050 Dean Martin Drive,100,True,gas-attached,pass
+LAS-U1515,Blu Car Wash Sahara | WOW CARWASH | WOW Carwash,5950 W Sahara Ave,100,True,core standalone,fail
+LAS-U1516,CHARLESTON CAR WASH | Charleston Car Wash | Spa Charleston Car Wash,1961 E Charleston Blvd,core,True,core standalone,maybe
+LAS-U1517,WET SPOT CARWASH,5201 W Cheyenne Ave,100,True,core standalone,fail
+LAS-U1518,Flamingo Hand Car Wash,6047 W Flamingo Rd,core,True,core standalone,fail
+LAS-U1519,Mr Car Wash LLC,5975 W Flamingo Rd,core,True,core standalone,fail
+LAS-U1520,WOW Carwash,3295 S Pecos Rd,100,True,core standalone,fail
+LAS-U1521,WOW CARWASH | WOW Carwash - E. Warm Springs,2210 E Warm Springs Rd,100,True,core standalone,fail
+LAS-U1522,S & K Market,1625 N Lamb Blvd,300,False,gas-attached,fail
+LAS-U1523,Coin Wash LLC | Vida Full Hand Car Wash & Detail,5853 W Tropicana Ave,core,True,core standalone,fail
+LAS-U1524,WOW CARWASH | WOW Carwash,9280 S DURANGO DRIVE,300,False,core standalone,unknown
+LAS-U1525,Foster Day,2250 E Warm Springs Rd,100,True,embedded,fail
+LAS-U1526,DASH Car Wash (ex Ultra Clean Express) | Sparkle Car Wash,2930 W Craig Rd,300,False,core standalone,fail
+LAS-U1527,BLISS Car Wash | BLISS Car Wash - E. Ann Rd.,290 East Ann Road,300,False,core standalone,unknown
+LAS-U1529,Vip Car Wash Lv,2100 Ballard Dr,100,True,embedded,unknown
+LAS-U1530,Tropicana Auto Spa,3580 E Tropicana Ave,100,True,core standalone,fail
+LAS-U1531,Carwash carrillo,north lamb,100,True,embedded,maybe
+LAS-U1532,"Chevron (fuel, car_wash=yes)",2353 E. WARM SPRINGS RD,100,True,gas-attached,fail
+LAS-U1533,DASH Car Wash (ex Ultra Clean Express),715 W Craig Rd,300,False,merged into LAS-U11,fail
+LAS-U1551,7 Hills Mobile Detail,2630 Sunridge Heights Pkwy,,False,out of area,not reviewed (out of area)
+LAS-U1552,A Happy Dog Wash,1725 S Rainbow Blvd 12,100,True,not a wash,not reviewed
+LAS-U1553,AG MOBILE CAR WASH,2075 Palm St,100,True,not a wash,not reviewed
+LAS-U1554,AVALOS CAR WASH,3065 N Rancho Dr 184,100,True,licence-only candidate,fail
+LAS-U1555,Allison Washburn,10750 W Charleston Blvd 180,200,False,not a wash,not reviewed
+LAS-U1556,BUBBLES CAR WASH,2435 N Rainbow Blvd,200,False,closed,pass
+LAS-U1557,Barking Dogs Self-Wash & Grooming,7220 W Azure Dr 130,300,False,not a wash,not reviewed
+LAS-U1558,Carlos Mobile Car Wash,4600 W Charleston Blvd Apt 5,core,True,not a wash,not reviewed
+LAS-U1559,Chicoma,3808 Vegas Dr,100,True,not a wash,fail
+LAS-U1560,D&B Mobile Detail LLC,5155 Blue Diamond Rd 102,200,False,not a wash,not reviewed
+LAS-U1561,FRANK LOPEZ INC,3100 E Sahara Ave,100,True,not a wash,fail
+LAS-U1563,J & J Window Wash,6360 Mcleod Dr,100,True,not a wash,not reviewed
+LAS-U1564,KENS COLORS,801 S Rancho Dr B1,core,True,not a wash,not reviewed
+LAS-U1565,Laqueshia Washington,8970 W Cheyenne Ave 100,200,False,not a wash,not reviewed
+LAS-U1566,MAGICWASH LAUNDROMAT,1120 S Decatur Blvd,core,True,not a wash,not reviewed
+LAS-U1567,MOBILE CAR WASH MARTINEZ,1647 E Charleston Blvd,core,True,not a wash,not reviewed
+LAS-U1570,PRIME AUTO RESOURCES INC,5720 W Sahara Ave,100,True,not a wash,fail
+LAS-U1571,Pressure Washers Unlimited,3400 Sirius Ave H,core,True,not a wash,not reviewed
+LAS-U1572,Prime Pressure Washing,450 Fremont St 163,core,True,not a wash,not reviewed
+LAS-U1573,RICHARD WASHINSKY M.D. P.L.L.C.,2851 N Tenaya Way 103,200,False,not a wash,not reviewed
+LAS-U1574,RIGHT HAND CAR WASH,812 E Sahara Ave 3,core,True,quarantined (lapsed licence),fail
+LAS-U1575,Reflections Window Washing/Cleaning LLC.,8275 S Eastern Ave,200,False,not a wash,not reviewed
+LAS-U1576,SMOG PLUS LLC,2535 S Durango Dr,200,False,not a wash,not reviewed
+LAS-U1577,SPIFFY'S WATERLESS CAR WASH LLC,3901 W Charleston Blvd,core,True,not a wash,not reviewed
+LAS-U1578,Silver Horizon Supply,1050 N Rancho Dr B,100,True,not a wash,not reviewed
+LAS-U1580,TRAVELING AUTO SPA,3670 W Oquendo Rd,core,True,not a wash,not reviewed
+LAS-U1581,The Washburn Computer Group Inc,5000 W Oakey Blvd D14,core,True,not a wash,not reviewed
+LAS-U1582,WASH & WEAR LAUNDROMAT,2448 E Bonanza Rd,100,True,not a wash,not reviewed
+LAS-U1583,WASH N FUN LAUNDROMAT,4425 Stewart Ave 101,300,False,not a wash,not reviewed
+LAS-U1584,WASH N SAVE LAUNDROMAT,235 N Eastern Ave 124,100,True,not a wash,not reviewed
+LAS-U1585,Wash and Wear Laundromat,2560 S Valley View Blvd,core,True,not a wash,not reviewed
+LAS-U1586,Washington Federal National Association,9340 Sun City Blvd 103,200,False,not a wash,not reviewed
+LAS-U1587,Xcellent Touch Enterprise LLC,2008 Hamilton Ln,core,True,quarantined (lapsed licence),fail
+LAS-U1588,Snackers,"Snackers 3315 S Valley View Blvd Las Vegas, NV 89102",core,True,not a wash,not reviewed
+LAS-U1589,Gloss-It,"Gloss-It 5032 W Post Rd Las Vegas, NV 89118",core,True,licence-only candidate,fail
+LAS-U1592,Picarsso Auto Spa,"Picarsso Auto Spa #115 7580 Las Vegas S Blvd Las Vegas, NV 89123",100,True,licence-only candidate,fail
+LAS-U1593,Royal Flush Auto Detailing,"Royal Flush Auto Detailing 2121 E Sahara Ave Las Vegas, NV 89169",100,True,quarantined (lapsed licence),fail
+LAS-U1594,Millennium Tints,"Millennium Tints Ste# 7 2520 E Sunset Rd Las Vegas, NV 89120",100,True,not a wash,not reviewed
+LAS-U1595,"Neptune Mobile Wash, LLC","Neptune Mobile Wash, LLC 2874 Marco St Las Vegas, NV 89115",300,False,not a wash,not reviewed
+LAS-U1596,"Clear Quality Auto Glass, LLC","Clear Quality Auto Glass, LLC Ste 3 5370 S Decatur Blvd Las Vegas, NV 89118",core,True,not a wash,not reviewed
+LAS-U1597,Affordable Window Tinting,"Affordable Window Tinting Ste# B-3 4180 W Desert Inn Rd Las Vegas, NV 89102",core,True,not a wash,not reviewed
+LAS-U1598,Capital Tint,"Capital Tint 125 N Gibson Rd Henderson, NV 89014",,False,out of area,not reviewed (out of area)
+LAS-U1599,Paradise Tint,"Paradise Tint 5075 Arville St Las Vegas, NV 89118",core,True,not a wash,not reviewed
+LAS-U16,Bueno Bueno Car Wash | Bueno Bueno Car Wash LLC | My Garage Car Wash,2225 N Nellis Blvd,300,False,core standalone,maybe
+LAS-U1600,Two Brothers Mobile Car Wash & Detail,"Two Brothers Mobile Car Wash & Detail Ste 3D 4801 S Pecos Rd Las Vegas, NV 89121",100,True,not a wash,not reviewed
+LAS-U1602,The Stripe Guy LLC,"The Stripe Guy LLC Suite 111-169 8465 W Sahara Ave Las Vegas, NV 89117",200,False,not a wash,not reviewed
+LAS-U1604,Avalos Window Tint & Auto Accessories,"Avalos Window Tint & Auto Accessories Ste 2 & 3 4225 E Sahara Ave Las Vegas, NV 89104",200,False,not a wash,not reviewed
+LAS-U1605,Dent Solutions LLC,"Dent Solutions LLC #140-203 6440 Sky Pointe Dr Las Vegas, NV 89131",300,False,not a wash,not reviewed
+LAS-U1608,Sin City Mobile Detailing,"Sin City Mobile Detailing Unit # 302 3230 W Hacienda Ave Las Vegas, NV 89118",core,True,not a wash,not reviewed
+LAS-U1610,Eco Tint,"Eco Tint 6428 Windy Rd Las Vegas, NV 89119",core,True,not a wash,not reviewed
+LAS-U1611,"Tire Kickers, LLC","Tire Kickers, LLC 5031 Wagon Trail Ave Las Vegas, NV 89118",core,True,not a wash,not reviewed
+LAS-U1613,DESERT MOBILE DETAILING,"DESERT MOBILE DETAILING 1C #369 505 E Windmill Ln Las Vegas, NV 89123",100,True,not a wash,not reviewed
+LAS-U1615,Ramirez Detailing Services LLC,"Ramirez Detailing Services LLC Suite 210 9130 W Russell Rd Las Vegas, NV 89148",200,False,not a wash,fail
+LAS-U1616,WOW Carwash,"WOW Carwash 6535 E Lake Mead Blvd Las Vegas, NV 89156",,False,out of area,not reviewed (out of area)
+LAS-U1617,Towbin Motorcars,"Towbin Motorcars 6060 Laredo St Las Vegas, NV 89146",100,True,not a wash,not reviewed
+LAS-U1618,THE WRAPTURE LLC,"THE WRAPTURE LLC SUITE F 4005 W Reno Ave Las Vegas, NV 89118",core,True,not a wash,not reviewed
+LAS-U1619,FINITY HIGH-END DETAILING,"FINITY HIGH-END DETAILING Ste D1114 3651 Lindell Rd Las Vegas, NV 89103",100,True,licence-only candidate,fail
+LAS-U1620,Fleetwash,"Fleetwash Suite D 4500 Andrews St North Las Vegas, NV 89081",300,False,licence-only candidate,fail
+LAS-U1621,Rolling Oasis Mobile Detailing,"Rolling Oasis Mobile Detailing Suite 5 #265373 5725 S Valley View Blvd Las Vegas, NV 89118",core,True,not a wash,not reviewed
+LAS-U1622,Rivas Pro Detail,"Rivas Pro Detail #F 530 E Pamalyn Ave Las Vegas, NV 89119",core,True,licence-only candidate,fail
+LAS-U1624,VEGAS CARWASH,"VEGAS CARWASH 6315 E Lake Mead Blvd Las Vegas, NV 89156",,False,out of area,not reviewed (out of area)
+LAS-U1625,CARWASH ORELLANA,"CARWASH ORELLANA 3787 E Lake Mead Blvd Las Vegas, NV 89115",300,False,not a wash,pass
+LAS-U17,,,,False,out of area,not reviewed (out of area)
+LAS-U1701,Mon Carwash,3550 Cambridge St,core,True,core standalone,fail
+LAS-U1702,DANIELA'S CAR WASH,4760 S Pecos Rd,100,True,core standalone,fail
+LAS-U18,"Chevron (fuel, car_wash=yes) | Mr. Terrible's Self-Serve Wash | TERRIBLES 147 | Terrible's",13 N Nellis Blvd,300,False,gas-attached,fail
+LAS-U19,,5780 E Charleston Blvd,,False,out of area,not reviewed (out of area)
+LAS-U2,Falcon Ridge Car Wash,1080 W Pioneer Blvd,,False,out of area,not reviewed (out of area)
+LAS-U21,,5766 Sahara Ave,,False,out of area,not reviewed (out of area)
+LAS-U22,Speedy Car Wash | Speedy Carwash LLC,2425 S Nellis Blvd,300,False,core standalone,fail
+LAS-U23,,3175 S Nellis Blvd,300,False,core standalone,fail
+LAS-U24,Tommy's Express | Tommy's Express Car Wash,2842 S Nellis Blvd,300,False,core standalone,fail
+LAS-U25,Rainbow Market | Rainbow Market Car Wash | Rainbow Market and Car Wash,South Nellis Boulevard,300,False,gas-attached,fail
+LAS-U26,"Green Valley Grocery #31 | Shell (fuel, car_wash=yes)",4620 E Flamingo Rd,200,False,gas-attached,fail
+LAS-U27,Mr Car Wash LLC,4820 S Nellis Blvd,200,False,core standalone,fail
+LAS-U28,"Chevron (fuel, car_wash=yes) | Terrible's",,100,True,gas-attached,fail
+LAS-U29,WOW CARWASH | WOW Carwash,2251 East Sahara Avenue,100,True,core standalone,fail
+LAS-U3,,3685 N Moapa Valley Blvd,,False,out of area,not reviewed (out of area)
+LAS-U30,JLV detail & car wash,2655 S Maryland,core,True,embedded,maybe
+LAS-U31,,6135 S Pecos Rd,100,True,core standalone,fail
+LAS-U32,Showtime Carwash,5893 W Tropicana Ave,core,True,core standalone,maybe
+LAS-U33,Sam's Club | Sam's Club #4983,7100 Arroyo Crossing Pkwy,100,True,gas-attached,maybe
+LAS-U34,Arco AMPM #83293 | Splash N' Dash Car Wash,7282 S Fort Apache Rd,300,False,gas-attached,pass
+LAS-U35,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #433",7330 S Buffalo Dr,300,False,gas-attached,fail
+LAS-U36,"Chevron (fuel, car_wash=yes) | Terrible's",4349 Nexus Way,300,False,gas-attached,maybe
+LAS-U37,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #314",8594 Blue Diamond Road,300,False,gas-attached,fail
+LAS-U38,"Green Valley Grocery #76 | Shell (fuel, car_wash=yes)",10083 S Jones Blvd,300,False,gas-attached,maybe
+LAS-U39,,2082 E Warm Springs Rd,100,True,core standalone,fail
+LAS-U4,,5575 N 5Th St,300,False,gas-attached,fail
+LAS-U40,Rebel #94,7280 Las Vegas Blvd S,core,True,gas-attached,fail
+LAS-U41,"Chevron (fuel, car_wash=yes) | Terrible's",2601 Wigwam Pkwy,200,False,gas-attached,fail
+LAS-U42,7-Eleven | Sinclair,3810 Blue Diamond Rd,100,True,gas-attached,maybe
+LAS-U43,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #435",21 E Silverado Ranch Blvd,100,True,gas-attached,pass
+LAS-U44,Shell,901 W Sunset Rd,,False,out of area,not reviewed (out of area)
+LAS-U45,,201 N Stephanie St,,False,out of area,not reviewed (out of area)
+LAS-U46,Pit Stop LV,1420 Paseo Verde Pkwy,,False,out of area,not reviewed (out of area)
+LAS-U47,,15 E Horizon Ridge Pkwy,,False,out of area,not reviewed (out of area)
+LAS-U48,Shell,500 Conestoga Way,,False,out of area,not reviewed (out of area)
+LAS-U49,Self Service Car Wash,915 Nevada Way,,False,out of area,not reviewed (out of area)
+LAS-U5,,9580 W Skye Canyon Park Dr,,False,out of area,not reviewed (out of area)
+LAS-U50,El Dorado Pass Truck Wash,1700 Railroad Pass Casino Rd,,False,out of area,not reviewed (out of area)
+LAS-U51,,3425 Volunteer Blvd,,False,out of area,not reviewed (out of area)
+LAS-U52,,,,False,out of area,not reviewed (out of area)
+LAS-U53,,2014 W Ann Rd,300,False,core standalone,fail
+LAS-U54,Uncle Rayski's Magic Car Wash | Uncle Rayskis Magic Wa,6020 N Decatur Blvd,300,False,core standalone,maybe
+LAS-U55,Terrible's,8356 Grand Teton Dr,,False,out of area,not reviewed (out of area)
+LAS-U56,Terrible's | Terrible's 332,7560 Oso Blanca Rd,300,False,gas-attached,maybe
+LAS-U57,"Chevron (fuel, car_wash=yes) | Lucky Spot",6890 N Hualapai Way,300,False,gas-attached,fail
+LAS-U58,Uncle Rayski's Magic Car Wash | Uncle Rayskis Durango Deersprings Mini Mart,6775 N Durango Dr,300,False,gas-attached,maybe
+LAS-U59,DESERT CAR WASH | Desert Car Wash,7890 W Ann Rd 110,300,False,core standalone,maybe
+LAS-U6,"Haddies 2 | Haddies Car Wash | Shell (fuel, car_wash=yes)",7709 N El Capitan Way,300,False,gas-attached,fail
+LAS-U60,"Chevron (fuel, car_wash=yes) | Self Car Wash",8500 W Charleston Blvd,200,False,gas-attached,fail
+LAS-U61,"Chevron (fuel, car_wash=yes) | TERRIBLES 156 | Terrible's",109 South Rainbow Boulevard,200,False,gas-attached,maybe
+LAS-U62,"Chevron (fuel, car_wash=yes) | Mr. Terrible's Self-Serve Wash | TERRIBLE HERBST HAND WASH 141 | Terrible's",6376 West Charleston Boulevard,100,True,gas-attached,fail
+LAS-U63,GO Car Wash | GO Car Wash Management Corp | GOO GOO 3 MINUTE EXPRESS WASH,5550 W Charleston Blvd,100,True,core standalone,fail
+LAS-U64,Sam's Club Car Wash,2650 E Craig Rd,300,False,embedded,maybe
+LAS-U65,Craig Road Car Wash,4706 W Craig Rd,300,False,core standalone,fail
+LAS-U66,"Chevron (fuel, car_wash=yes) | Terrible's",1450 W Cheyenne Avenue,100,True,gas-attached,fail
+LAS-U67,DASH Car Wash (ex Ultra Clean Express) | Ultra Clean Express Car Wash,3130 North Martin L King Boulevard,100,True,core standalone,fail
+LAS-U68,Short Line Express Market,2151 N Rancho Dr,100,True,gas-attached,maybe
+LAS-U69,"Chevron (fuel, car_wash=yes) | TERRIBLES 293 | Terrible's",1500 West Bonanza Road,core,True,gas-attached,maybe
+LAS-U7,WOW Car Wash | WOW Carwash,,300,False,core standalone,fail
+LAS-U70,Premier Auto Wash | Premier Car Wash,4975 E Charleston Blvd,300,False,core standalone,fail
+LAS-U71,Nellis Car Wash,2945 S Nellis Blvd,300,False,core standalone,fail
+LAS-U72,LUV Car Wash | Luv Car Wash,3650 E Tropicana Ave,100,True,core standalone,fail
+LAS-U73,DASH CAR WASH-DESERT INN | DASH Car Wash (ex Ultra Clean Express) | Dash Car Wash | Ultra Clean Express Car Wash,2710 E Desert Inn Rd,100,True,core standalone,fail
+LAS-U74,"GO Car Wash | GO Car Wash Management, Corp.",1630 E Tropicana Ave,core,True,core standalone,fail
+LAS-U75,GO Car Wash | GO Car Wash Management Corp,5270 S Decatur Blvd,core,True,core standalone,fail
+LAS-U76,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #262 | Terrible's Car Wash #172",6065 West Sahara Avenue,100,True,gas-attached,fail
+LAS-U77,"Car Wash | Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #328",9380 W Tropicana Ave,200,False,gas-attached,fail
+LAS-U78,DASH Car Wash (ex Ultra Clean Express) | Ultra Clean Express Car Wash,4132 S Jones Blvd,core,True,core standalone,fail
+LAS-U786,Golden Market 5 | Sinclair,3585 North Lamb Boulevard,300,False,gas-attached,pass
+LAS-U787,7 ELEVEN STORE 39600 | Sinclair,1200 North Town Center Drive,200,False,gas-attached,maybe
+LAS-U788,City Express | Las Vegas Hand Car Wash | Sinclair,5680 S Pecos Rd,100,True,gas-attached,fail
+LAS-U79,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #430",5325 S Decatur Blvd,core,True,gas-attached,fail
+LAS-U790,WOW CarWash | WOW Carwash,1630 Simmons St,100,True,core standalone,fail
+LAS-U791,"Chevron (fuel, car_wash=yes) | Freaky Fast Car Wash | Terrible's | Terrible's #447 Car Wash",6120 Smoke Ranch Rd,200,False,gas-attached,fail
+LAS-U792,Fabulous Freddy's Car Wash | Terrible' s #465 | Terrible's,7155 Grand Montecito Pkwy,300,False,gas-attached,fail
+LAS-U793,Foster Day Car Wash | Mr. Car Wash LLC,7501 Alta Dr,200,False,core standalone,maybe
+LAS-U794,Terrible's | Terrible's #426,1601 Industrial Rd,core,True,gas-attached,fail
+LAS-U795,"Chevron (fuel, car_wash=yes) | TERRIBLES 310",3320 Novat St,200,False,gas-attached,maybe
+LAS-U796,"Chevron (fuel, car_wash=yes) | TERRIBLES CAR WASH 260 | Terrible's",6034 Centennial Center Blvd,300,False,gas-attached,maybe
+LAS-U797,DRIVETIME,2301 Mcleod St,100,True,embedded,maybe
+LAS-U798,Fabulous Freddy's | Terrible's | Terrible's #464,9611 Trailwood Dr,200,False,gas-attached,maybe
+LAS-U799,Mr Car Wash | Mr Car Wash (LV local) | Mr. Car Wash LLC,2401 N Decatur Blvd,100,True,core standalone,pass
+LAS-U8,WOW Carwash,4330 N Rancho Dr,300,False,core standalone,fail
+LAS-U80,"LUV CAR WASH GROUP, LLC | LUV Car Wash",5730 South Jones Boulevard,core,True,core standalone,fail
+LAS-U800,"Chevron (fuel, car_wash=yes) | TERRIBLES CAR WASH 270 | Terrible's",320 N Rancho Dr,core,True,gas-attached,fail
+LAS-U801,The Detail Shop of Las Vegas,8560 W Sahara Ave,200,False,gas-attached,fail
+LAS-U802,"Chevron (fuel, car_wash=yes) | TERRIBLES 184 | Terrible's",8598 W Lake Mead Blvd,200,False,gas-attached,fail
+LAS-U803,WOW Carwash | WOW Carwash - N. Pecos,880 N Pecos Rd,100,True,core standalone,fail
+LAS-U804,Terrible's 379,400 N Eastern Ave,100,True,gas-attached,pass
+LAS-U805,"Andrade""s carwash | WASH AND SHOP",2880 E Bonanza Rd,100,True,core standalone,fail
+LAS-U806,JET CAR WASH,4949 E Bonanza Rd,300,False,core standalone,fail
+LAS-U807,DIAZ DETAILING & PROFESSIONAL CAR WASH LLC | New Image Auto Spa | THE Auto Spa | THE Auto Spa LV,420 S Rampart Blvd,200,False,embedded,fail
+LAS-U808,Dollar wash | SPEEDY CAR WASH | Self Car Wash,1402 N Eastern Ave,100,True,core standalone,maybe
+LAS-U809,"QUICKYS CONVENIENCE CENTER | Shell (fuel, car_wash=yes)",4400 N Jones Blvd,300,False,gas-attached,fail
+LAS-U81,EcoWash | Showplace Auto Boutique | Showplace Car Wash,7235 S Rainbow Blvd,200,False,core standalone,maybe
+LAS-U810,7 ELEVEN STORE 39605,3250 N Durango Dr 110,200,False,gas-attached,maybe
+LAS-U811,"Chevron (fuel, car_wash=yes) | TERRIBLES CAR WASH 246 | Terrible's",10890 W Charleston Blvd,200,False,gas-attached,maybe
+LAS-U812,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #347",5590 N Rainbow Blvd,300,False,gas-attached,maybe
+LAS-U813,CHARLESTON WEST CAR WASH | Charleston West Car Wash,4820 W Charleston Blvd,core,True,core standalone,fail
+LAS-U814,"Chevron (fuel, car_wash=yes) | TERRIBLES 227 | Terrible's",7300 W Cheyenne Ave,200,False,gas-attached,fail
+LAS-U815,FUNNYS,4747 N Rancho Dr,300,False,gas-attached,fail
+LAS-U816,FUNNYS II,3550 N Rancho Dr,200,False,core standalone,fail
+LAS-U817,LUV Car Wash | Luv Car Wash,421 N Nellis Blvd,300,False,core standalone,fail
+LAS-U818,Fabulous Freddy's | Terrible's | Terrible's #463,1101 S Fort Apache Rd,200,False,gas-attached,maybe
+LAS-U819,"Chevron (fuel, car_wash=yes) | TERRIBLES 296 | Terrible's",4401 N Rainbow Blvd,300,False,gas-attached,pass
+LAS-U82,WOW Carwash,6550 South Fort Apache Road,300,False,core standalone,fail
+LAS-U820,7 ELEVEN FOOD STORE 1608 39487,228 N Las Vegas Blvd,core,True,gas-attached,maybe
+LAS-U821,"Green Valley Car Wash | Green Valley Grocery 37 | Shell (fuel, car_wash=yes)",2400 N Rainbow Blvd,200,False,gas-attached,fail
+LAS-U822,Quick Quack | Quick Quack Car Wash,4315 E Bonanza Rd,300,False,core standalone,unknown
+LAS-U823,WOW Carwash,6347 W Lake Mead Blvd,200,False,core standalone,fail
+LAS-U824,"Chevron (fuel, car_wash=yes) | TERRIBLES CAR WASH 119 | Terrible's",3650 W Sahara Ave,core,True,gas-attached,fail
+LAS-U825,7 ELEVEN STORE 39598,3970 N Tenaya Way 120,200,False,gas-attached,fail
+LAS-U826,"Green Valley Grocery 54 | Shell (fuel, car_wash=yes)",7801 W Charleston Blvd,200,False,gas-attached,fail
+LAS-U827,"Chevron (fuel, car_wash=yes) | TERRIBLES 266",298 S Decatur Blvd,core,True,gas-attached,fail
+LAS-U828,VEGAS SUDS CAR WASH | Vegas Suds Carwash | Western Auto Wash,3810 N Jones Blvd,200,False,core standalone,fail
+LAS-U829,Wash N Go Sahara,3190 W Sahara Ave,core,True,core standalone,maybe
+LAS-U83,"7-Eleven Store #42920A | Chevron (fuel, car_wash=yes)",7325 S Jones Blvd,200,False,gas-attached,fail
+LAS-U830,B&S AUTO REPAIR,4306 E Charleston Blvd,300,False,core standalone,fail
+LAS-U831,SMOG CHECK CAR WASH LLC | Smog Check Car Wash,547 N Lamb Blvd,300,False,core standalone,fail
+LAS-U832,CHEMISM LLC,2300 W Sahara Ave 800,core,True,embedded,maybe
+LAS-U833,DESERT OASIS CAR WASH | Desert Oasis Car Wash,6400 W Craig Rd,300,False,core standalone,maybe
+LAS-U834,Fuel Bros Oakey,1550 W Oakey Blvd,core,True,gas-attached,fail
+LAS-U835,FLETCHER JONES IMPORTS,7300 W Sahara Ave,200,False,embedded,maybe
+LAS-U836,Oasis Hand Car Wash,3425 E Flamingo Rd,100,True,embedded,maybe
+LAS-U837,"Chevron (fuel, car_wash=yes) | Terrible's #264",4910 S Maryland Pkwy,core,True,gas-attached,pass
+LAS-U838,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #253",3650 S Town Center Dr,200,False,gas-attached,fail
+LAS-U839,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's Carwash #125",4090 S Maryland Pkwy,core,True,gas-attached,fail
+LAS-U84,Foster Day | Mr Car Wash LLC | Mr. Car Wash,2250 West Warm Springs Road,core,True,core standalone,fail
+LAS-U840,Speedee Mart #119,3480 S Hualapai Way,200,False,gas-attached,fail
+LAS-U841,"Green Valley Grocery #30 | Shell (fuel, car_wash=yes)",6875 W Russell Rd,100,True,gas-attached,fail
+LAS-U842,"Chevron (fuel, car_wash=yes) | University Auto Spa",1196 E Tropicana Ave,core,True,gas-attached,fail
+LAS-U843,Auto Wash Laundry LLC | Wash N Go,3757 E Lake Mead Blvd,300,False,core standalone,pass
+LAS-U844,Superior Touch Auto Spa | The Best Detail,8566 Hogan Falls Cir,200,False,core standalone,fail
+LAS-U845,Car Wash Express | DMK LITOSCARWASH,3139 E Sahara Ave,100,True,embedded,maybe
+LAS-U846,"Fabulous Freddy's | Fabulous Freddy's Car Wash | Shell (fuel, car_wash=yes)",4350 S Durango Dr,200,False,gas-attached,fail
+LAS-U847,Boulder Food Mart,4620 Boulder Hwy,200,False,gas-attached,fail
+LAS-U848,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #305",4850 W Silverado Ranch Blvd,100,True,gas-attached,fail
+LAS-U849,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #283",11330 Southern Highlands Pkwy,300,False,gas-attached,maybe
+LAS-U85,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #269",8132 Las Vegas Blvd S,100,True,gas-attached,fail
+LAS-U850,Terrible's | Terrible's #326,9430 Peace Way,200,False,gas-attached,fail
+LAS-U851,Speedee Mart #123,390 E Silverado Ranch Blvd,100,True,gas-attached,maybe
+LAS-U852,Fresh & Clean Car Wash | Sun Shade Window Tinting | Tech Auto Detail,2535 S Torrey Pines Dr,100,True,core standalone,fail
+LAS-U853,Las Vegas Wheel Works,10620 Southern Highlands Pkwy,300,False,gas-attached,maybe
+LAS-U854,Rebel #95,6720 W Flamingo Rd,100,True,gas-attached,fail
+LAS-U855,Jorge's Car Wash,3075 E Flamingo Rd,100,True,core standalone,fail
+LAS-U856,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #290",6050 W Sunset Rd,core,True,gas-attached,pass
+LAS-U857,Terrible's | Terrible's #331,3275 S Rainbow Blvd,100,True,gas-attached,fail
+LAS-U858,Topaz Super Car Wash | Topaz Super Wash LLC,4860 Topaz St,100,True,core standalone,fail
+LAS-U859,"Chevron (fuel, car_wash=yes) | Haddie's Car Wash | Haddies 1",9920 W Flamingo Rd,200,False,gas-attached,maybe
+LAS-U86,LUV Car Wash | Luv Car Wash,4620 Blue Diamond Rd,100,True,core standalone,fail
+LAS-U860,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #345",3780 W Sunset Rd,core,True,gas-attached,fail
+LAS-U861,WOW Carwash,3935 S Buffalo Dr,200,False,core standalone,fail
+LAS-U862,Super Bubble Car Wash | Super Bubbles Car Wash | Tropicana Car Wash,1315 E Tropicana Ave,core,True,core standalone,fail
+LAS-U863,"Alamo Hand Car Wash | ampm (fuel, car_wash=yes)",5705 S Rainbow Blvd,100,True,gas-attached,maybe
+LAS-U864,WOW Car Wash | WOW Carwash,9860 S Maryland Pkwy,300,False,core standalone,fail
+LAS-U865,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #349",47 E Cactus Ave,300,False,gas-attached,fail
+LAS-U866,"Chevron (fuel, car_wash=yes) | Terrible's #390",3616 Las Vegas Blvd N,300,False,gas-attached,pass
+LAS-U867,GO Car Wash | GO Car Wash Management Corp | Quick N Clean | Upper Image Car Wash,2881 E Charleston Blvd,100,True,core standalone,fail
+LAS-U868,GO Car Wash | GO Car Wash Management Corp | Upper Image Car Wash,6170 S Rainbow Blvd,100,True,core standalone,fail
+LAS-U869,Clean & Shine Detail Car Wash | Clean and Shine Detail Car Wash LLC,7559 Amigo St,200,False,core standalone,pass
+LAS-U87,Oasis Auto Spa,3032 Candelaria Drive,200,False,core standalone,fail
+LAS-U870,"CIRCLE K #2652001 | Circle K (fuel, car_wash=yes)",3265 W Cactus Ave,300,False,gas-attached,maybe
+LAS-U871,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #350",9235 S Jones Blvd,200,False,gas-attached,maybe
+LAS-U872,Singh Market,5118 E Lake Mead Blvd,300,False,gas-attached,fail
+LAS-U873,Terrible's #395,5530 W Warm Springs Rd,core,True,gas-attached,fail
+LAS-U874,Nebula Auto Spa,8834 Duncan Barrel Ave,300,False,core standalone,unknown
+LAS-U875,Sam's Club #6261,1910 E Serene Ave,200,False,gas-attached,maybe
+LAS-U876,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #428",8120 S Maryland Pkwy,200,False,gas-attached,fail
+LAS-U877,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #397",6525 S Decatur Blvd,core,True,gas-attached,pass
+LAS-U878,"Chevron (fuel, car_wash=yes) | Terrible's #394",8289 Dean Martin Dr,100,True,gas-attached,fail
+LAS-U879,"Chevron (fuel, car_wash=yes) | Pit Stop Express Car Wash | Terrible's | Terrible's #431",6480 S Rainbow Blvd,100,True,gas-attached,fail
+LAS-U88,Speedee Mart #115,10490 S Decatur Blvd,300,False,gas-attached,maybe
+LAS-U880,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #432",3250 W Cactus Ave,300,False,gas-attached,maybe
+LAS-U881,DI ARCO AM/PM  | Zoras Express Car Wash,3820 E Desert Inn Rd,100,True,gas-attached,fail
+LAS-U882,LUV Car Wash | Luv Car Wash,7495 S Rainbow Blvd,200,False,core standalone,fail
+LAS-U883,DASH CAR WASH-FLAMINGO | DASH Car Wash (ex Ultra Clean Express) | Ultra Clean Express Car Wash,6750 W Flamingo Rd,100,True,core standalone,fail
+LAS-U884,Car Wash Los Berros Dgo LLC,2162 N Lamb Blvd,300,False,embedded,maybe
+LAS-U885,EXPRESS CARWASH,8665 W Flamingo Rd,200,False,embedded,maybe
+LAS-U886,DIAZ DETAILING & PROFESSIONAL CAR WASH LLC | Diaz Detailing & Professional Car Wash Llc,3335 E Russell Rd,100,True,embedded,maybe
+LAS-U887,ARCO AMPM 42713,1195 E Pyle Ave,300,False,gas-attached,pass
+LAS-U888,Southwest Car Wash,6015 Spring Mountain Rd,100,True,core standalone,fail
+LAS-U889,Green Valley Grocery #89,6505 S Buffalo Dr,200,False,gas-attached,maybe
+LAS-U89,Tommy,601 Whitney Ranch Dr,,False,out of area,not reviewed (out of area)
+LAS-U890,DASH Car Wash (ex Ultra Clean Express) | Dash Car Wash | Dash Car Wash Rainbow,9280 S Rainbow Blvd,300,False,core standalone,fail
+LAS-U891,Rainbow Car Wash,1578 N. Nellis Blvd,300,False,core standalone,fail
+LAS-U892,FUEL BROS EL CAPITAN | Peak Mart & Car Wash,9010 W Flamingo Rd,200,False,gas-attached,fail
+LAS-U893,WOW CARWASH,8580 W Desert Inn Rd,200,False,core standalone,fail
+LAS-U894,"Green Valley Grocery #57 | Shell (fuel, car_wash=yes)",1465 E Windmill Ln,200,False,gas-attached,fail
+LAS-U895,"Car Wash | Green Valley Grocery #59 | Shell (fuel, car_wash=yes)",6285 S Durango Dr,200,False,gas-attached,fail
+LAS-U896,"Green Valley Grocery #70 | Shell (fuel, car_wash=yes)",10480 Las Vegas Blvd S,300,False,gas-attached,fail
+LAS-U897,AOA DETAILING L.L.C | CHACON'S CAR WASH LLC,732 S 6th St,core,True,core standalone,fail
+LAS-U898,"7-ELEVEN STORE #42915A | Chevron (fuel, car_wash=yes)",7095 S Durango Dr,300,False,gas-attached,fail
+LAS-U899,"7-Eleven Store #42919A | Chevron (fuel, car_wash=yes)",8096 S Durango Dr,300,False,gas-attached,fail
+LAS-U9,DASH Car Wash (ex Ultra Clean Express) | DASH Car Wash Cheyenne | Ultra Clean Express Car Wash,5140 W Cheyenne Ave,100,True,core standalone,fail
+LAS-U90,WOW Car Wash,46 N Stephanie St,,False,out of area,not reviewed (out of area)
+LAS-U900,BLISS Car Wash | Bliss Car Wash Nevada,4420 Blue Diamond Blvd.,100,True,gas-attached,fail
+LAS-U901,BLISS Car Wash | BLISS Car Wash - Tropicana | BLISS Car Wash Nevada,2360 E Tropicana Ave,100,True,core standalone,pass
+LAS-U902,CAR WASH CARINA YMY,3253 E Flamingo Rd,100,True,core standalone,unknown
+LAS-U903,Quick Quack | Quick Quack Car Wash,5611 S Durango Dr,200,False,core standalone,unknown
+LAS-U904,Quick Quack | WashU CarWash,325 W Centennial Pkwy,300,False,core standalone,fail
+LAS-U905,Tommy's Express Car Wash | Tommys Express,4555 W.,300,False,core standalone,fail
+LAS-U906,Sinclair Gas Station,8095 S Rainbow Blvd,200,False,gas-attached,maybe
+LAS-U908,Terrible's,7820 W Sahara Ave,200,False,gas-attached,fail
+LAS-U909,Finish Line Auto Spa And Detailing,8615 W Flamingo Rd,200,False,embedded,fail
+LAS-U91,Extra Mile Auto Spa Mobile Car Wash & Detail,975 S Boulder Hwy,,False,out of area,not reviewed (out of area)
+LAS-U910,The WASH at LV,9615 W Flamingo Rd,200,False,embedded,maybe
+LAS-U911,Sin City Carwash,6850 Spring Mountain Rd,100,True,embedded,maybe
+LAS-U912,Trejos Car wash,4600 W Sirius Ave,core,True,embedded,unknown
+LAS-U913,The Wash Club,4130 Spring Mountain Rd,core,True,embedded,fail
+LAS-U914,VR AutoSpa,3863 S Valley View Blvd,core,True,embedded,fail
+LAS-U915,Windy City Wash and Wax,4790 Polaris Ave,core,True,embedded,maybe
+LAS-U916,Trop Stop Gas & Car Wash,4885 W Tropicana Ave,core,True,gas-attached,maybe
+LAS-U917,702AutoWash,5329 Cameron St,core,True,embedded,fail
+LAS-U918,Diamond Detailing,4280 W Reno Ave  Ste I,core,True,embedded,maybe
+LAS-U919,Lusso Auto Design & Auto Spa,500 S Buffalo Dr,200,False,core standalone,fail
+LAS-U92,,1440 S Boulder Hwy,,False,out of area,not reviewed (out of area)
+LAS-U920,Terrible's,7510 W Cheyenne Ave,200,False,gas-attached,fail
+LAS-U921,Reds Hand Wash Express,304 S Jones Blvd,200,False,embedded,fail
+LAS-U923,Terrible's,4322 W Ann Rd,300,False,gas-attached,maybe
+LAS-U924,Decatur Autowash,4750 N Decatur Blvd,300,False,embedded,fail
+LAS-U925,"Chevron (fuel, car_wash=yes) | Terrible's",10 E Starr Avenue,300,False,gas-attached,maybe
+LAS-U926,"Chevron (fuel, car_wash=yes) | Terrible's",3366 St Rose Pkwy,300,False,gas-attached,maybe
+LAS-U927,Car Wash and Shoeshine,4590 S Maryland Pkwy,core,True,core standalone,fail
+LAS-U928,Papagalos Car Wash,1285 E Reno Ave,core,True,embedded,fail
+LAS-U929,Terrible's,3061 St. Rose Pkwy,300,False,gas-attached,fail
+LAS-U93,,1625 Boulder City Pkwy,,False,out of area,not reviewed (out of area)
+LAS-U930,Power Detailing,9550 S Eastern Ave,300,False,embedded,maybe
+LAS-U931,Solutions Laser Wash,5660 Ferrell St,300,False,embedded,fail
+LAS-U932,Las Vegas Tints,2971 Sammy Davis Jr Dr,core,True,gas-attached,maybe
+LAS-U933,Hidden Canyon Car Wash,1731 W Alexander Rd,300,False,embedded,maybe
+LAS-U934,Mlk and Carey 100% Hand Car Wash | The Car Wash,2415 N Martin L King Blvd,100,True,embedded,fail
+LAS-U935,Heavenly clean car wash,826 Hart Ave,100,True,embedded,fail
+LAS-U936,GENIE Car Wash,425 Fremont St,core,True,embedded,fail
+LAS-U937,"Chevron (fuel, car_wash=yes) | Terrible's",335 W Craig Rd,300,False,gas-attached,maybe
+LAS-U938,Picarsso Auto Spa,Services Available In:,core,True,embedded,maybe
+LAS-U939,Cadena's %100 Hand Car Wash and Auto Detail,2250 S Maryland Pkwy,core,True,core standalone,fail
+LAS-U94,,3470 Volunteer Blvd,,False,out of area,not reviewed (out of area)
+LAS-U940,AF Carwash & Detail,1765 E Charleston Blvd,core,True,core standalone,fail
+LAS-U941,WOW Carwash - East Craig,655 E Craig Rd,300,False,core standalone,fail
+LAS-U942,Lemon-Drop Self Service Car Wash | Mr Car Wash (LV local),2513 Las Vegas Blvd N,100,True,core standalone,fail
+LAS-U943,All City Auto Spa | Cheyenne Hand Car Wash,2436 E Cheyenne Ave,100,True,core standalone,pass
+LAS-U944,"Chevron (fuel, car_wash=yes) | Terrible's",5685 Losee Road,300,False,gas-attached,fail
+LAS-U945,"Chevron (fuel, car_wash=yes) | Terrible's",5982 Losee Rd,300,False,gas-attached,maybe
+LAS-U946,Bob's Car Wash,2310 E Lake Mead Blvd,100,True,embedded,pass
+LAS-U947,Mr Mac Auto Care Supplies,2728 E Charleston Blvd,100,True,core standalone,fail
+LAS-U948,Martinez Carwash,3025 E Desert Inn Rd,100,True,embedded,maybe
+LAS-U949,Car Wash,2000 N Bassler St,100,True,embedded,maybe
+LAS-U95,Horizon Village Square Car Wash,51 W Horizon Ridge Pkwy,,False,out of area,not reviewed (out of area)
+LAS-U950,"Chevron (fuel, car_wash=yes) | Terrible's",2605 St Rose Pkwy,300,False,gas-attached,fail
+LAS-U951,"Chevron (fuel, car_wash=yes) | Terrible's",201 N Pecos Rd,200,False,gas-attached,maybe
+LAS-U952,DI Auto and Truck Wash and Detail,4263 Boulder Hwy Unit 2,200,False,core standalone,fail
+LAS-U953,LV Auto Wash & Detail,5140 E Bonanza Rd,300,False,embedded,fail
+LAS-U954,702 Carwash,1314 N Nellis Blvd,300,False,core standalone,fail
+LAS-U955,Magic Auto Spa & EP Smog,4450 E Washington Ave,300,False,embedded,fail
+LAS-U956,California Car Wash,1615 N Pecos Rd,100,True,core standalone,fail
+LAS-U957,Terrible's,3616 Las Vegas Blvd N,300,False,gas-attached,pass
+LAS-U958,"Splash N' Dash Car Wash | ampm (fuel, car_wash=yes)",4380 N Lamb Blvd,300,False,gas-attached,fail
+LAS-U959,Terrible's,4280 E. Tropical Pkwy,300,False,gas-attached,maybe
+LAS-U96,Green Valley Hand Car Wash | WOW Carwash | WOW Carwash - East Sunset,4625 West Sunset Road,200,False,core standalone,fail
+LAS-U960,Wow Carwash,320 N 5th Street,300,False,embedded,pass
+LAS-U961,"ampm (fuel, car_wash=yes)",300 W LAKE MEAD BLVD,100,True,gas-attached,fail
+LAS-U962,"Shell (fuel, car_wash=yes)",4390 W CRAIG RD,300,False,gas-attached,fail
+LAS-U963,"Shell (fuel, car_wash=yes)",5225 CAMINO AL NORTE,300,False,gas-attached,maybe
+LAS-U964,"Shell (fuel, car_wash=yes)",1797 E CACTUS AVE,300,False,gas-attached,fail
+LAS-U965,"Shell (fuel, car_wash=yes)",2800 E TROPICAL PKWY,300,False,gas-attached,fail
+LAS-U966,"Chevron (fuel, car_wash=yes)",7800 W. SAHARA,200,False,gas-attached,fail
+LAS-U967,"Chevron (fuel, car_wash=yes)",7500 W CHEYENNE AVE,200,False,gas-attached,fail
+LAS-U968,"Chevron (fuel, car_wash=yes) | Terrible's",2755 E CRAIG RD,300,False,gas-attached,pass
+LAS-U969,"Chevron (fuel, car_wash=yes)",720 E CHEYENNE AVE,100,True,gas-attached,maybe
+LAS-U97,"Chevron (fuel, car_wash=yes) | Terrible's | Terrible's #389",10465 South Rainbow Boulevard,300,False,gas-attached,fail
+LAS-U970,"Sunoco (fuel, car_wash=yes)",3025 LAS VEGAS BLVD NORTH,300,False,gas-attached,fail
+LAS-U971,"7-Eleven (fuel, car_wash=yes) | seven_eleven_ca_us (fuel, car_wash=yes)",2525 W Deer Springs Way,300,False,gas-attached,maybe
+LAS-U972,WOW Carwash,6653 N Durango Dr,300,False,embedded,maybe
+LAS-U974,BLISS Car Wash,2131 Rock Springs Dr,200,False,core standalone,unknown
+LAS-U975,Mr. Car Wash LLC | Mr. Car Wash Mini Storage,4910 Vegas Dr,100,True,core standalone,fail
+LAS-U976,Haddie's Car Wash,7709 N El Capitan Way,300,False,core standalone,unknown
+LAS-U977,Wash N Go Car Wash - Desert Inn,4115 W Desert Inn Rd,core,True,core standalone,fail
+LAS-U98,"7-Eleven Store #42921A | Chevron (fuel, car_wash=yes) | Short Line Express Car Wash",8221 S Fort Apache Rd,300,False,gas-attached,maybe
+LAS-U99,Sparkle Car Wash,9780 W Tropicana Ave,300,False,core standalone,fail
+LAS-V2-203,Detailers of Las Vegas,6565 Spencer St,core,True,gas-attached,fail
+LAS-V2-214,Wash Up LLC,3680 S Maryland Pkwy,core,True,embedded,pass
+LAS-V2-220,APG Cuba Carwash,6530 Annie Oakley Dr,100,True,core standalone,fail
+LAS-V2-224,The Collection Auto Spa and Design LLC,8056 Rafael Rivera Way,200,False,embedded,maybe
+LAS-V2-226,GREEN VALLEY GROCERY #85,10521 S Rainbow Blvd,300,False,gas-attached,fail
+LAS-V2-242,WOW CARWASH,1925 E SUNSET RD,core,True,core standalone,unknown
+LAS-V2-249,Terrible's,8229 Dean Martin Dr,100,True,gas-attached,fail
+LAS-V2-255,Splash N Dash Car Wash,7282 S Fort Apache Rd,200,False,embedded,fail
+LAS-X1,Former self-serve car wash (listed),"2515 S Bruce St, Las Vegas, NV 89169",core,True,"closed (former self-serve, listed for sale)",pass

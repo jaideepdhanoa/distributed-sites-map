@@ -1,0 +1,340 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -80.2105062,
+     25.7965996
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-MIA-01",
+    "city": "MIA",
+    "name_address": "868 NW 21st Terrace",
+    "kmz_layer": "Confirmed Sites",
+    "kmz_description": "Charging and Validation Site (sublease from Cruise)",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2PCYS7B1AVTS83EGZNY (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1eGYZNo7ktQ9qJkHxl2H__d3YiLyNXWo, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "high",
+    "evidence": "KMZ (Confirmed Sites): \"Charging and Validation Site (sublease from Cruise)\". Jesse email Oct 29: \"near the existing 868 21st Terrace site\". Yuka email Oct 2 (Distributed sites update): \"Terrace and Cotton Center are subleased from Cruise as distressed assets\""
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -80.2542281,
+     25.8021373
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-MIA-02",
+    "city": "MIA",
+    "name_address": "3611 NW S River Dr",
+    "kmz_layer": "Confirmed Sites",
+    "kmz_description": "Service Site Candidate",
+    "status": "candidate",
+    "notes": "",
+    "source": "KMZ 01M6GZX2PCYS7B1AVTS83EGZNY (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1eGYZNo7ktQ9qJkHxl2H__d3YiLyNXWo, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "high",
+    "evidence": "KMZ (Confirmed Sites): \"Service Site Candidate\". No other mention found in Gmail"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -80.1928034,
+     25.8433126
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-MIA-03",
+    "city": "MIA",
+    "name_address": "7424 NE 2nd Ave",
+    "kmz_layer": "Confirmed Sites",
+    "kmz_description": "Pitstop #2 candidate from Neo Charging 25k sq-ft",
+    "status": "candidate",
+    "notes": "",
+    "source": "KMZ 01M6GZX2PCYS7B1AVTS83EGZNY (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1eGYZNo7ktQ9qJkHxl2H__d3YiLyNXWo, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "high",
+    "evidence": "KMZ (Confirmed Sites): \"Pitstop #2 candidate from Neo Charging 25k sq-ft\". No other mention found in Gmail"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -80.353516,
+     25.783107
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-MIA-04",
+    "city": "MIA",
+    "name_address": "9700 NW 12th St",
+    "kmz_layer": "Confirmed Sites",
+    "kmz_description": "Pitstop #3 from Voltera",
+    "status": "planned",
+    "notes": "",
+    "source": "KMZ 01M6GZX2PCYS7B1AVTS83EGZNY (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1eGYZNo7ktQ9qJkHxl2H__d3YiLyNXWo, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "medium",
+    "evidence": "KMZ (Confirmed Sites): \"Pitstop #3 from Voltera\". Yuka email Oct 2: compare a distributed site \"with (2) the central hub (9700 NW 12th St for Miami)\"; \"Lin suggested using 9700 NW 12th St for Miami\" as the benchmark. Fact Base (Sep 29): Voltera Miami depot \"79 DC fast stalls\" (Voltera facility exists; Moove use reads as planned, not yet live)"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -115.1538623,
+     36.159804
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-LAS-01",
+    "city": "LAS",
+    "name_address": "1050 S Main St",
+    "kmz_layer": "Vegas_core",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "pin appears twice in the KMZ (Vegas_core and Sites layers); de-duplicated",
+    "source": "KMZ 01M6GZX2QRGGA4DA7MDDPSJE6M (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1_SgyGpj3vzPj8OYtIxaobgq1EvH6Ww0, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layers Sites and Vegas_core, no description, same blue pin style as the Phoenix pins. Counter-signal: Fact Base (Sep 29) benchmarks Vegas against \"the next docket site\" / \"Next Vegas site\", which may mean no Vegas depot was live on Sep 29"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -115.1884647,
+     36.0799812
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-LAS-02",
+    "city": "LAS",
+    "name_address": "6025 Procyon St",
+    "kmz_layer": "Sites",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "KMZ also has a ~3.16 ac polygon \"Procyon Service Depot\" around this pin (only placemark named depot; verified name)",
+    "source": "KMZ 01M6GZX2QRGGA4DA7MDDPSJE6M (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1_SgyGpj3vzPj8OYtIxaobgq1EvH6Ww0, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layer Sites; the only placemark named a depot: a 3.16 ac polygon \"Procyon Service Depot\" drawn around this pin. Same Sep 29 \"next Vegas site\" counter-signal as other Vegas pins"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -115.132054,
+     36.089481
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-LAS-03",
+    "city": "LAS",
+    "name_address": "5516 Tamarus St",
+    "kmz_layer": "Sites",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2QRGGA4DA7MDDPSJE6M (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1_SgyGpj3vzPj8OYtIxaobgq1EvH6Ww0, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layer Sites, no description. Pipeline notes (Oct 29) call it \"Nearest Moove site\", but those notes were written by us from this same KMZ, so they are not independent. Same Sep 29 \"next Vegas site\" counter-signal"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.904597,
+     33.6203296
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-PHX-01",
+    "city": "PHX",
+    "name_address": "8175 E Butherus Dr",
+    "kmz_layer": "Phx ODD",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2SXZFZED1S0EA79X37H (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1qDszfX1A0yMrG26VRcdQLUIM9e_cn5s, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layer Phx ODD, no description, same pin style as Cotton Center. Pipeline notes (Oct 29) call it \"Nearest Moove site\", but those notes were written by us from this same KMZ, so they are not independent"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.9866155,
+     33.4031215
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-PHX-02",
+    "city": "PHX",
+    "name_address": "4410 E Cotton Center Blvd",
+    "kmz_layer": "Phx ODD",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2SXZFZED1S0EA79X37H (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1qDszfX1A0yMrG26VRcdQLUIM9e_cn5s, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "high",
+    "evidence": "Yuka email Oct 2: \"Terrace and Cotton Center are subleased from Cruise as distressed assets\". Summary doc (Sep 29): \"Today that charging comes from big depots like Cotton\"; Fact Base benchmarks \"Phoenix vs Cotton\""
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -112.0704241,
+     33.4356713
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-PHX-03",
+    "city": "PHX",
+    "name_address": "1224 S 3rd St",
+    "kmz_layer": "Phx ODD",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2SXZFZED1S0EA79X37H (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1qDszfX1A0yMrG26VRcdQLUIM9e_cn5s, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layer Phx ODD, no description. Pipeline notes (Oct 29) call it \"Nearest Moove site\", but those notes were written by us from this same KMZ, so they are not independent"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8791979,
+     33.4099271
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-PHX-04",
+    "city": "PHX",
+    "name_address": "2166 W Broadway Rd, Mesa, AZ 85202",
+    "kmz_layer": "Phx ODD",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2SXZFZED1S0EA79X37H (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1qDszfX1A0yMrG26VRcdQLUIM9e_cn5s, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layer Phx ODD, no description"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8944859,
+     33.4647036
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-PHX-05",
+    "city": "PHX",
+    "name_address": "8701 E McDowell Rd, Scottsdale, AZ 85257",
+    "kmz_layer": "Phx ODD",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "not cited as nearest Moove site in any Pipeline service-area note (Oct 29)",
+    "source": "KMZ 01M6GZX2SXZFZED1S0EA79X37H (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1qDszfX1A0yMrG26VRcdQLUIM9e_cn5s, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "medium",
+    "evidence": "Jaideep email to Yuka Oct 2 (Streamlined model thread): \"McDowell's 64.8% utilization and 24-hour charging\", which implies a live site on McDowell; this is the only McDowell pin (match inferred)"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.9702669,
+     33.3946864
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-PHX-06",
+    "city": "PHX",
+    "name_address": "3011 S 52nd St, Tempe, AZ 85282",
+    "kmz_layer": "Phx ODD",
+    "kmz_description": "",
+    "status": "operating",
+    "notes": "",
+    "source": "KMZ 01M6GZX2SXZFZED1S0EA79X37H (export of Jesse DaSilva My Maps https://www.google.com/maps/d/edit?mid=1qDszfX1A0yMrG26VRcdQLUIM9e_cn5s, shared by email Oct 29 2026 thread \"ODDs & Site\")",
+    "confidence": "low",
+    "evidence": "Default (no data against). KMZ layer Phx ODD, no description"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.1887754,
+       36.0800844
+      ],
+      [
+       -115.1887888,
+       36.0789485
+      ],
+      [
+       -115.1877937,
+       36.0787143
+      ],
+      [
+       -115.1877803,
+       36.079098
+      ],
+      [
+       -115.1877562,
+       36.0791284
+      ],
+      [
+       -115.1877454,
+       36.08008
+      ],
+      [
+       -115.1887754,
+       36.0800844
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "depot_id": "DEP-LAS-02-footprint",
+    "city": "LAS",
+    "name_address": "Procyon Service Depot (footprint of 6025 Procyon St)",
+    "kmz_layer": "Sites",
+    "source": "KMZ 01M6GZX2QRGGA4DA7MDDPSJE6M",
+    "status_basis": "verified polygon; inferred same site as 6025 Procyon St pin",
+    "status": "operating",
+    "confidence": "low",
+    "evidence": "Footprint of 6025 Procyon St; same status as that pin"
+   }
+  }
+ ]
+}

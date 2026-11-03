@@ -1,0 +1,22 @@
+,scan,LAS,PHX,MIA,ALL
+"L0a merged census rows (union, before dedupe)",after fresh scan Nov 2 2026 (refreshed),428,561,712,1701
+L0b universe sites after dedupe (all geographies),after fresh scan Nov 2 2026 (refreshed),412,549,683,1644
+L1 in service area (sites),after fresh scan Nov 2 2026 (refreshed),377,251,608,1236
+L1 of which: core standalone / new / licence-only / gas-attached / embedded / not a wash / quarantined / closed,after fresh scan Nov 2 2026 (refreshed),118 / 0 / 6 / 156 / 45 / 47 / 3 / 1,121 / 3 / 0 / 63 / 64 / 0 / 0 / 0,119 / 2 / 12 / 295 / 166 / 14 / 0 / 0,358 / 5 / 18 / 514 / 275 / 61 / 3 / 1
+"L2 operating standalone (core + new, after aerial reclass)",after fresh scan Nov 2 2026 (refreshed),118,124,121,363
+L2 aerial reviewed (rendered),after fresh scan Nov 2 2026 (refreshed),118,123,121,362
+"L3 land fit PASS (spare >=0.25 ac, aerial)",after fresh scan Nov 2 2026 (refreshed),5,8,4,17
+L3 side: maybe (0.15-0.25 ac),after fresh scan Nov 2 2026 (refreshed),13,34,22,69
+L3 side: unknown (imagery/parcel unclear),after fresh scan Nov 2 2026 (refreshed),9,5,9,23
+L3 side: fail,after fresh scan Nov 2 2026 (refreshed),91,76,86,253
+L4 tenure of L3 (owner-occ inferred / landlord / chain / public / unknown),after fresh scan Nov 2 2026 (refreshed),0 / 0 / 0 / 0 / 5,2 / 0 / 0 / 0 / 6,2 / 0 / 0 / 0 / 2,4 / 0 / 0 / 0 / 13
+"L5 power proxy favourable, of L3 (PROXY: substation <=1 mi or line <=1,000 ft)",after fresh scan Nov 2 2026 (refreshed),3,8,3,14
+"L6 listed, of L3 (public listing or Pipeline/Land Sites row)",after fresh scan Nov 2 2026 (refreshed),1,1,0,2
+"L7 contacted, of L3 (Pipeline outreach evidence)",after fresh scan Nov 2 2026 (refreshed),1,0,0,1
+"C full fit, of L3 (no SFHA, no open UST, commercial zoning, lot >=0.5 ac)",after fresh scan Nov 2 2026 (refreshed),2,3,0,5
+"C full fit, of L2 (any aerial verdict)",after fresh scan Nov 2 2026 (refreshed),88,27,19,134
+Side: L2 listed (any verdict),after fresh scan Nov 2 2026 (refreshed),17,8,2,27
+Side: L2 contacted (any verdict),after fresh scan Nov 2 2026 (refreshed),3,1,0,4
+Side: in-area non-standalone with aerial PASS (gas/embedded/closed/licence-only/not-wash),after fresh scan Nov 2 2026 (refreshed),22,2,3,27
+Side: in-area licence-only candidates (no physical wash confirmed),after fresh scan Nov 2 2026 (refreshed),6,0,12,18
+Side: outside-universe fresh-scan additions with PASS,after fresh scan Nov 2 2026 (refreshed),1,0,0,1

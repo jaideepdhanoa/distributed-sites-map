@@ -1,0 +1,202 @@
+{
+  "generated_at": "2026-11-03T19:27:43Z",
+  "census_rows": {
+    "total": 1701,
+    "by_city": {
+      "LAS": 428,
+      "PHX": 561,
+      "MIA": 712
+    }
+  },
+  "unique_site_records": 1645,
+  "unique_sites_counted": 1643,
+  "same_parcel_collapsed": {
+    "LAS-V2-249": "LAS-U878",
+    "LAS-V2-226": "LAS-U97"
+  },
+  "in_area": {
+    "total": 1041,
+    "by_city": {
+      "LAS": 182,
+      "PHX": 251,
+      "MIA": 608
+    },
+    "by_class": {
+      "Gas-attached": 411,
+      "Core": 307,
+      "Embedded": 256,
+      "Not a wash": 46,
+      "Licence-only": 17,
+      "Quarantined": 3,
+      "Closed": 1
+    }
+  },
+  "muse_in_area_reference": {
+    "in_area_sites": 1043,
+    "by_city": {
+      "LAS": 179,
+      "PHX": 254,
+      "MIA": 610
+    },
+    "note": "Muse reference for the service-area step. The map shows our screen, not this reference.",
+    "unique_sites": 1640,
+    "verdict": {
+      "PASS": 10,
+      "MAYBE": 21,
+      "FAIL": 21,
+      "NOT_A_WASH": 11,
+      "UNRESOLVED": 2
+    }
+  },
+  "land_tiers": {
+    "L10": 25,
+    "L4": 44,
+    "L10_checked": 25,
+    "L4_checked": 3,
+    "pending": 41,
+    "eliminated_not_a_wash": 7,
+    "held_fits": 18,
+    "screening_rows": 1689,
+    "screening_matched_sites": 1624,
+    "incoming": {
+      "rows": 0,
+      "applied": 0,
+      "unmatched": []
+    }
+  },
+  "verdicts": {
+    "PASS": 10,
+    "MAYBE": 20,
+    "FAIL": 21,
+    "NOT_A_WASH": 11,
+    "UNRESOLVED": 3
+  },
+  "verdicts_on_land_fits": {
+    "PASS": 6,
+    "MAYBE": 11,
+    "FAIL": 10,
+    "NOT_A_WASH": 1,
+    "UNRESOLVED": 0
+  },
+  "pass_cleared": [
+    "LAS-U129",
+    "LAS-U877",
+    "MIA-U1347",
+    "MIA-U753",
+    "PHX-U180",
+    "PHX-U197",
+    "PHX-U232",
+    "PHX-U535"
+  ],
+  "pass_held": [
+    "LAS-U15",
+    "LAS-U866"
+  ],
+  "maybe_ids": [
+    "LAS-U101",
+    "LAS-U115",
+    "LAS-U134",
+    "LAS-U34",
+    "LAS-U38",
+    "LAS-U43",
+    "LAS-U799",
+    "LAS-U843",
+    "LAS-U943",
+    "MIA-U1181",
+    "MIA-U777",
+    "PHX-U236",
+    "PHX-U252",
+    "PHX-U462",
+    "PHX-U476",
+    "PHX-U510",
+    "PHX-U513",
+    "PHX-U517",
+    "PHX-U540",
+    "PHX-U543"
+  ],
+  "listed_of_candidates": 5,
+  "contacted_of_candidates": 0,
+  "contacted_any": 0,
+  "pipeline_rows": 78,
+  "land_rows": 42,
+  "pipeline_stage_counts": {
+    "Dropped": 11,
+    "1 Desk screen": 18,
+    "0 Off-market target": 49
+  },
+  "land_stage_counts": {
+    "1 Desk screen": 25,
+    "0 Off-market target": 17
+  },
+  "sites_without_coordinates": [
+    "PIPE-PHX-0003",
+    "PIPE-PHX-0004",
+    "PIPE-PHX-0006",
+    "PIPE-PHX-0007",
+    "PIPE-PHX-0008",
+    "PIPE-PHX-0009",
+    "PIPE-LAS-0015",
+    "PIPE-PHX-0018",
+    "PIPE-PHX-0067",
+    "PIPE-PHX-0068",
+    "PIPE-PHX-0069",
+    "PIPE-LAS-0072",
+    "PIPE-MIA-0074",
+    "PIPE-MIA-0075",
+    "PIPE-MIA-0077",
+    "LAND-PHX-0003"
+  ],
+  "disagreements": [
+    "LAS-U15",
+    "LAS-U36",
+    "LAS-U786",
+    "LAS-U97",
+    "MIA-U1347"
+  ],
+  "acreage_notes": [
+    "LAS-U15",
+    "LAS-U786",
+    "LAS-U837",
+    "MIA-U1347",
+    "MIA-U753"
+  ],
+  "scale_notes": [
+    "LAS-U115",
+    "LAS-U134",
+    "LAS-U34",
+    "LAS-U43",
+    "LAS-U799",
+    "LAS-U843",
+    "PHX-U236",
+    "PHX-U517",
+    "PHX-U540"
+  ],
+  "parcels": {
+    "counts": {
+      "cache_hit": 61,
+      "cache_miss_empty": 4,
+      "features": 61
+    },
+    "note": "Parcel outlines were requested from Clark, Maricopa, and Miami-Dade county map services for county-checked sites. Broward County's map service did not resolve, so Broward sites have no outline. Same-owner adjoining parcels were not in the source files and were not fetched. Cache and fetch counts: {'cache_hit': 61, 'cache_miss_empty': 4, 'features': 61}."
+  },
+  "muse_unmatched": [],
+  "warnings": [
+    "In-area land tiers are L10 25 (county-checked 25) and L4 44 (county-checked 3). The brief expected about 25 L10 and about 48 L4, with all L10 county-checked and about 3 of the L4 county-checked.",
+    "Pipeline tab has 78 rows (stages {'Dropped': 11, '1 Desk screen': 18, '0 Off-market target': 49}). The older note of 79 is not in this export.",
+    "PHX-U644 in_area=False (screening-tab boundary note in the plan).",
+    "PHX-U646 in_area=False (screening-tab boundary note in the plan)."
+  ],
+  "skipped": [
+    "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
+    "Nightly workbook sync is not wired; drop a new export in data/source and rerun this script.",
+    "Full in-area parcel pull was not done. Outlines are limited to county-checked sites whose county service answered.",
+    "Broward parcel geometry is unavailable: the county host did not resolve.",
+    "Same-owner adjoining parcel polygons are not in the source bundle.",
+    "The 75\u2013250 m review band was not recomputed. The one same-parcel pair found by APN is flagged.",
+    "Edge-band distance to the polygon was not recomputed.",
+    "Outreach drafts are not loaded.",
+    "Human verdict write-back is a later version and is not in this app."
+  ],
+  "verdicts_appended": 0,
+  "verdicts_total": 1304
+}

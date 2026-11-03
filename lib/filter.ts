@@ -44,30 +44,53 @@ export function landFit(site: SiteProps): boolean {
   return site.land_tier === "L10" || site.land_tier === "L4";
 }
 
+// Universe funnel, each step a subset of the one before it:
+// Universe > Unique > In service area > L10/L4 > County-checked > Cleared > Listed > Contacted.
+// Held fits sit outside the operative service area (the Las Vegas 200/300 rings). They are
+// excluded from In service area and every later step, and are offered only as a separate note
+// on L10/L4. Listed and Contacted count only sites that also passed Cleared. Listings and
+// contacts that are still only candidates are a separate note, not part of those steps.
 export function inStage(site: SiteProps, stage: StageId): boolean {
   if (site.land_only || site.origin !== "universe") return false;
-  if (site.duplicate_of && stage !== "universe") return false;
-  const candidate = site.counts_as_site && site.in_area && landFit(site) && !eliminated(site);
+  const unique = Boolean(site.counts_as_site) && !site.duplicate_of;
+  const inArea = unique && Boolean(site.in_area);
+  const land = inArea && landFit(site) && !eliminated(site);
+  const county = land && site.verification === "county-checked";
+  const cleared = county && site.verdict === "PASS" && site.network_status === "cleared";
+  const listed = cleared && Boolean(site.listed);
+  const contacted = listed && Boolean(site.contacted);
   switch (stage) {
     case "universe":
       return true;
     case "unique":
-      return site.counts_as_site;
+      return unique;
     case "in_area":
-      return site.counts_as_site && site.in_area;
+      return inArea;
     case "land":
-      return candidate || Boolean(site.is_held_fit);
+      return land;
     case "county":
-      return candidate && site.verification === "county-checked";
+      return county;
     case "cleared":
-      return site.verdict === "PASS" && site.network_status === "cleared" && site.in_area;
+      return cleared;
     case "listed":
-      return candidate && site.listed;
+      return listed;
     case "contacted":
-      return candidate && site.contacted;
+      return contacted;
     default:
       return false;
   }
+}
+
+export function heldOutside(site: SiteProps): boolean {
+  return !site.land_only && site.origin === "universe" && Boolean(site.counts_as_site) && !site.duplicate_of && Boolean(site.is_held_fit) && !site.in_area;
+}
+
+export function listedEarlier(site: SiteProps): boolean {
+  return inStage(site, "land") && Boolean(site.listed) && !inStage(site, "cleared");
+}
+
+export function contactedEarlier(site: SiteProps): boolean {
+  return inStage(site, "land") && Boolean(site.contacted) && !inStage(site, "contacted");
 }
 
 export function droppedAt(site: SiteProps, stage: StageId): boolean {

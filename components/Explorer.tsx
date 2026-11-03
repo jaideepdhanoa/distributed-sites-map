@@ -5,7 +5,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
-import { CITY_VIEW, CITIES, compareSites, droppedAt, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
+import { CITY_VIEW, CITIES, compareSites, contactedEarlier, droppedAt, heldOutside, inStage, listedEarlier, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -58,6 +58,8 @@ export default function Explorer() {
   const landSites = params.get("land") === "1";
   const query = params.get("q") || "";
   const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
+  const extraParam = params.get("extra");
+  const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeParam = params.get("pstage") as PipeId | null;
   const pipeStage: PipeId = pipeParam && PIPE_STEPS.some((step) => step.id === pipeParam) ? pipeParam : "sourced";
 
@@ -130,6 +132,12 @@ export default function Explorer() {
     };
     if (compare) {
       add(sites.filter((site) => site.verdict_disagreement && passesChips(site, true)));
+    } else if (extra === "held") {
+      add(sites.filter((site) => heldOutside(site) && passesChips(site, true)));
+    } else if (extra === "listed") {
+      add(sites.filter((site) => listedEarlier(site) && passesChips(site, true)));
+    } else if (extra === "contacted") {
+      add(sites.filter((site) => contactedEarlier(site) && passesChips(site, true)));
     } else {
       add(sites.filter((site) => inStage(site, stage) && passesChips(site, false)));
       if (showDropped) add(sites.filter((site) => droppedAt(site, stage) && passesChips(site, true)));
@@ -138,7 +146,7 @@ export default function Explorer() {
     return [...byId.values()].sort(compareSites);
     // passesChips closes over the chip state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query]);
+  }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query, extra]);
 
   const visibleFeatures: SiteFeature[] = visibleSites
     .map((site) => features.find((feature) => feature.properties.site_id === site.site_id))
@@ -195,12 +203,12 @@ export default function Explorer() {
   }
 
   function count(step: StageId) {
-    if (step === "universe") {
-      const census = data?.funnel.stages.find((item) => item.id === "census");
-      return census?.by_city?.[city] ?? census?.total ?? 0;
-    }
     return sites.filter((site) => site.city === city && inStage(site, step)).length;
   }
+
+  const heldCount = sites.filter((site) => site.city === city && heldOutside(site)).length;
+  const listedEarlierCount = sites.filter((site) => site.city === city && listedEarlier(site)).length;
+  const contactedEarlierCount = sites.filter((site) => site.city === city && contactedEarlier(site)).length;
 
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
@@ -240,10 +248,25 @@ export default function Explorer() {
           {funnel === "universe" ? STEPS.map((step, index) => (
             <Fragment key={step.id}>
               {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
-              <button className={stage === step.id ? "on" : ""} type="button" aria-current={stage === step.id ? "step" : undefined} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id }); }}>
+              <button className={stage === step.id && !extra ? "on" : ""} type="button" aria-current={stage === step.id && !extra ? "step" : undefined} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id, extra: null }); }}>
                 <span>{step.label}</span>
                 <strong>{count(step.id).toLocaleString()}</strong>
               </button>
+              {step.id === "land" && heldCount > 0 ? (
+                <button className={`aside ${extra === "held" ? "on" : ""}`} type="button" onClick={() => write({ stage: null, extra: extra === "held" ? null : "held" })}>
+                  {heldCount} held outside the service area
+                </button>
+              ) : null}
+              {step.id === "listed" && listedEarlierCount > 0 ? (
+                <button className={`aside ${extra === "listed" ? "on" : ""}`} type="button" onClick={() => write({ stage: "listed", extra: extra === "listed" ? null : "listed" })}>
+                  {listedEarlierCount} more listed among candidates
+                </button>
+              ) : null}
+              {step.id === "contacted" && contactedEarlierCount > 0 ? (
+                <button className={`aside ${extra === "contacted" ? "on" : ""}`} type="button" onClick={() => write({ stage: "contacted", extra: extra === "contacted" ? null : "contacted" })}>
+                  {contactedEarlierCount} more contacted among candidates
+                </button>
+              ) : null}
             </Fragment>
           )) : PIPE_STEPS.map((step, index) => (
             <Fragment key={step.id}>

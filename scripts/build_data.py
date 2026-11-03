@@ -2656,8 +2656,65 @@ def validate_committed() -> None:
         problems.append("geocode_failed must be a list")
     for item in props:
         problems.extend(site_note_problems(item))
+    problems.extend(funnel_subset_problems(sites))
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
+
+
+def _universe_stage(site: dict, stage: str) -> bool:
+    """Mirror lib/filter.ts inStage. Each step is a subset of the previous one."""
+    props = site.get("properties") or {}
+    if props.get("land_only") or props.get("origin") != "universe":
+        return False
+    unique = bool(props.get("counts_as_site")) and not props.get("duplicate_of")
+    in_area = unique and bool(props.get("in_area"))
+    land = in_area and props.get("land_tier") in {"L10", "L4"} and (props.get("verdict") or "") not in {"FAIL", "NOT_A_WASH"} and not props.get("tenure_fail")
+    county = land and props.get("verification") == "county-checked"
+    cleared = county and props.get("verdict") == "PASS" and props.get("network_status") == "cleared"
+    listed = cleared and bool(props.get("listed"))
+    contacted = listed and bool(props.get("contacted"))
+    return {
+        "universe": True,
+        "unique": unique,
+        "in_area": in_area,
+        "land": land,
+        "county": county,
+        "cleared": cleared,
+        "listed": listed,
+        "contacted": contacted,
+    }[stage]
+
+
+def funnel_subset_problems(features: list[dict]) -> list[str]:
+    """The count on each funnel step is the number of pins in that step, and the steps nest."""
+    order = ["universe", "unique", "in_area", "land", "county", "cleared", "listed", "contacted"]
+    problems = []
+    groups = {"all": features}
+    for city in ("PHX", "LAS", "MIA"):
+        groups[city] = [feature for feature in features if (feature.get("properties") or {}).get("city") == city]
+    for label, rows in groups.items():
+        previous = None
+        for stage in order:
+            chosen = [feature for feature in rows if _universe_stage(feature, stage)]
+            pins = [feature for feature in chosen if (feature.get("geometry") or {}).get("type") == "Point"]
+            if len(chosen) != len(pins):
+                problems.append(f"{label} {stage}: count {len(chosen)} but only {len(pins)} pins")
+            ids = {((feature.get("properties") or {}).get("site_id")) for feature in chosen}
+            if previous is not None and not ids <= previous:
+                extra = sorted(item for item in ids - previous if item)[:8]
+                problems.append(f"{label} {stage} is not a subset of the previous step: {', '.join(extra)}")
+            previous = ids
+        held = [
+            feature
+            for feature in rows
+            if not (feature.get("properties") or {}).get("land_only")
+            and (feature.get("properties") or {}).get("origin") == "universe"
+            and (feature.get("properties") or {}).get("is_held_fit")
+            and (feature.get("properties") or {}).get("in_area")
+        ]
+        if held:
+            problems.append(f"{label} held sites are inside the service area")
+    return problems
 
 
 def check_against_report(report: dict) -> None:

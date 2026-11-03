@@ -60,6 +60,16 @@ a { color: var(--pine); }
 }
 .funnel button.on { color: var(--ink); border-bottom-color: var(--pine); background: #e7f0ea; }
 .funnel strong { font-variant-numeric: tabular-nums; color: var(--ink); font-size: 14px; }
+.funnel .aside {
+  border: 0;
+  background: transparent;
+  color: #3f3832;
+  font-size: 12px;
+  text-decoration: underline;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.funnel .aside.on { color: var(--pine); font-weight: 650; }
 .chev { color: #8a8175; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chips button, .cities button, .who button, .close {

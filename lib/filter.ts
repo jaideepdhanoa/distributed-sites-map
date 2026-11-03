@@ -44,8 +44,10 @@ export function landFit(site: SiteProps): boolean {
   return site.land_tier === "L10" || site.land_tier === "L4";
 }
 
-// Universe funnel, each step a subset of the one before it:
-// Universe > Unique > In service area > L10/L4 > County-checked > Cleared > Listed > Contacted.
+// Universe funnel. Universe is the census row count, not a pin count. Unique is the sites
+// left after those records are merged, and every later step is a subset of the one before it:
+// Unique > In service area > L10/L4 > County-checked > Cleared > Listed > Contacted.
+// Choosing Universe draws the same pins as Unique.
 // Held fits sit outside the operative service area (the Las Vegas 200/300 rings). They are
 // excluded from In service area and every later step, and are offered only as a separate note
 // on L10/L4. Listed and Contacted count only sites that also passed Cleared. Listings and

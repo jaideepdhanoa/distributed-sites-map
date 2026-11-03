@@ -2656,7 +2656,7 @@ def validate_committed() -> None:
         problems.append("geocode_failed must be a list")
     for item in props:
         problems.extend(site_note_problems(item))
-    problems.extend(funnel_subset_problems(sites))
+    problems.extend(funnel_subset_problems(sites, loaded["funnel.json"]))
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 
@@ -2685,10 +2685,24 @@ def _universe_stage(site: dict, stage: str) -> bool:
     }[stage]
 
 
-def funnel_subset_problems(features: list[dict]) -> list[str]:
-    """The count on each funnel step is the number of pins in that step, and the steps nest."""
-    order = ["universe", "unique", "in_area", "land", "county", "cleared", "listed", "contacted"]
+def funnel_subset_problems(features: list[dict], funnel: dict) -> list[str]:
+    """From Unique onward each step is a subset of the previous one and matches its pins.
+
+    Universe is the census row count. Choosing it draws the same pins as Unique.
+    """
+    order = ["unique", "in_area", "land", "county", "cleared", "listed", "contacted"]
     problems = []
+    stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
+    census = stages.get("census") or {}
+    if census.get("total") != 1701 or census.get("by_city") != {"LAS": 428, "PHX": 561, "MIA": 712}:
+        problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,701 rows")
+    unique_rows = [feature for feature in features if _universe_stage(feature, "unique")]
+    unique_stage = stages.get("unique") or {}
+    if len(unique_rows) != unique_stage.get("total"):
+        problems.append("unique pin count does not match the unique funnel stage")
+    unique_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in unique_rows))
+    if unique_by_city != unique_stage.get("by_city"):
+        problems.append(f"unique pins by city are {unique_by_city}, funnel says {unique_stage.get('by_city')}")
     groups = {"all": features}
     for city in ("PHX", "LAS", "MIA"):
         groups[city] = [feature for feature in features if (feature.get("properties") or {}).get("city") == city]

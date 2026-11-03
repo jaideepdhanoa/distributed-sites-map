@@ -139,7 +139,8 @@ export default function Explorer() {
     } else if (extra === "contacted") {
       add(sites.filter((site) => contactedEarlier(site) && passesChips(site, true)));
     } else {
-      add(sites.filter((site) => inStage(site, stage) && passesChips(site, false)));
+      const pinStage = stage === "universe" ? "unique" : stage;
+      add(sites.filter((site) => inStage(site, pinStage) && passesChips(site, false)));
       if (showDropped) add(sites.filter((site) => droppedAt(site, stage) && passesChips(site, true)));
       if (landSites) add(sites.filter((site) => site.land_only && passesChips(site, true)));
     }
@@ -203,6 +204,10 @@ export default function Explorer() {
   }
 
   function count(step: StageId) {
+    if (step === "universe") {
+      const census = data?.funnel.stages.find((item) => item.id === "census");
+      return census?.by_city?.[city] ?? census?.total ?? 0;
+    }
     return sites.filter((site) => site.city === city && inStage(site, step)).length;
   }
 
@@ -247,7 +252,11 @@ export default function Explorer() {
         <nav className="funnel" aria-label="Funnel">
           {funnel === "universe" ? STEPS.map((step, index) => (
             <Fragment key={step.id}>
-              {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
+              {index === 1 ? (
+                <span className="merge">{count("universe").toLocaleString()} records merged into {count("unique").toLocaleString()} sites</span>
+              ) : index > 0 ? (
+                <span className="chev" aria-hidden="true">›</span>
+              ) : null}
               <button className={stage === step.id && !extra ? "on" : ""} type="button" aria-current={stage === step.id && !extra ? "step" : undefined} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id, extra: null }); }}>
                 <span>{step.label}</span>
                 <strong>{count(step.id).toLocaleString()}</strong>

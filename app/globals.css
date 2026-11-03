@@ -60,6 +60,7 @@ a { color: var(--pine); }
 }
 .funnel button.on { color: var(--ink); border-bottom-color: var(--pine); background: #e7f0ea; }
 .funnel strong { font-variant-numeric: tabular-nums; color: var(--ink); font-size: 14px; }
+.funnel .merge { color: #3f3832; font-size: 12px; white-space: nowrap; }
 .funnel .aside {
   border: 0;
   background: transparent;

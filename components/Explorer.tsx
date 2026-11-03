@@ -12,7 +12,6 @@ import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
 
 const PIPE_STEPS: { id: PipeId; label: string }[] = [
-  { id: "sourced", label: "Sourced" },
   { id: "desk", label: "Desk screen" },
   { id: "contacted", label: "Contacted" },
   { id: "later", label: "Later stages" },
@@ -63,7 +62,7 @@ export default function Explorer() {
   const extraParam = params.get("extra");
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeParam = params.get("pstage") as PipeId | null;
-  const pipeStage: PipeId = pipeParam && PIPE_STEPS.some((step) => step.id === pipeParam) ? pipeParam : "sourced";
+  const pipeStage: PipeId = pipeParam && PIPE_STEPS.some((step) => step.id === pipeParam) ? pipeParam : "desk";
 
   function write(next: Record<string, string | null>) {
     const url = new URLSearchParams(params.toString());
@@ -282,11 +281,10 @@ export default function Explorer() {
   function summaryText() {
     if (funnel === "pipeline") {
       const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city);
-      const sourced = rows.filter((deal) => deal.stage_group === "sourced").length;
       const desk = rows.filter((deal) => deal.stage_group === "desk").length;
       const dropped = rows.filter((deal) => deal.stage_group === "dropped").length;
       const active = rows.length - dropped;
-      return `${place}: ${active} active deals (${sourced} sourced, ${desk} desk screen), ${dropped} dropped`;
+      return `${place}: ${active} active deals (${desk} desk screen), ${dropped} dropped`;
     }
     const candidates = sites.filter((site) => site.city === city && inStage(site, "land")).length;
     const cleared = sites.filter((site) => site.city === city && inStage(site, "cleared")).length;
@@ -374,7 +372,7 @@ export default function Explorer() {
               <Fragment key={step.id}>
                 {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                 <span className="step">
-                  <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "sourced" ? null : step.id })}>
+                  <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id })}>
                     <span>{step.label}</span>
                     <strong>{squares.toLocaleString()}</strong>
                   </button>

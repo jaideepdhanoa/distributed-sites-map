@@ -6,7 +6,6 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
   { id: "unchecked", label: "Not yet checked", note: "Satellite imagery suggests the land fits. County records have not been checked." },
   { id: "ruled-out", label: "Ruled out", note: "Closed, not a wash, or no spare land. Shown only at the funnel step where it drops out." },
   { id: "listing", label: "Listing", note: "A site or deal that is on the market." },
-  { id: "sourced", label: "Sourced deal", note: "A deal that has been recorded and is not yet in desk review." },
   { id: "desk", label: "Desk screen", note: "A first review of the listing or lead." },
   { id: "land", label: "Land site", note: "Land without an operating wash. Hidden until that layer is turned on." },
   { id: "depot", label: "Depot", note: "Existing operating depot." },
@@ -22,7 +21,6 @@ export const FUNNEL_NOTES: Record<string, string> = {
   cleared: "County records confirm an operating wash with enough spare land on its own parcel. The workbook clears 11. Charleston Car Wash and the Chandler Quick Quack stay Possible until review, so the map shows 9.",
   listed: "Sites on this step that are on the market.",
   contacted: "Sites on this step where a conversation with the owner or broker has started.",
-  sourced: "Deals found and recorded, not yet screened.",
   desk: "A first review of the listing or lead.",
   later: "Work past the first conversation. None are in this stage yet.",
   dropped: "The deal is no longer being pursued.",
@@ -43,11 +41,10 @@ export const CENSUS_NOTE = "Car washes. Other categories will get their own cens
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have room for about 10 or about 4 parking bays inside the service area. Cleared sites passed the county check.",
-  pipeline: "Broker and agent deals only. Off-market research stays on the universe site. Sourced and desk screen are the first two steps. Dropped deals are no longer pursued.",
+  pipeline: "Broker and agent deals only. Off-market research stays on the universe site. Desk screen is the first step. Dropped deals are no longer pursued.",
 };
 
 const STAGE_TITLES: Record<string, string> = {
-  sourced: "Sourced",
   desk: "Desk screen",
   contacted: "Contacted",
   later: "Later stages",
@@ -55,7 +52,7 @@ const STAGE_TITLES: Record<string, string> = {
 };
 
 export function stageTitle(group: string) {
-  return STAGE_TITLES[group] || "Sourced";
+  return STAGE_TITLES[group] || "Deal";
 }
 
 export function stageDetail(stage: string, group: string) {

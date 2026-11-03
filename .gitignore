@@ -1,0 +1,11 @@
+# Local inputs. Never commit these.
+data/source/
+node_modules
+.next
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+*.log
+tsconfig.tsbuildinfo

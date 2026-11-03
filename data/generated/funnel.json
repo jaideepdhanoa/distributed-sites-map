@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T22:08:43Z",
+  "generated_at": "2026-11-03T22:13:39Z",
   "muse_reference": {
     "in_area_sites": 1043,
     "by_city": {
@@ -142,7 +142,7 @@
           "PHX": 13,
           "MIA": 24
         },
-        "county_checked": 3,
+        "county_checked": 6,
         "ids": [
           "LAS-U100",
           "LAS-U1515",
@@ -220,16 +220,16 @@
       "name": "Verified",
       "unit": "sites",
       "total": 66,
-      "county_checked": 25,
-      "pending": 41,
+      "county_checked": 28,
+      "pending": 38,
       "by_city_checked": {
-        "LAS": 7,
-        "PHX": 14,
+        "LAS": 9,
+        "PHX": 15,
         "MIA": 4
       },
       "by_city_pending": {
-        "LAS": 7,
-        "PHX": 10,
+        "LAS": 5,
+        "PHX": 9,
         "MIA": 24
       },
       "note": "Among in-area L10 and L4. County-checked sites have a verdict and evidence. The rest are aerial only, pending verification. New verdict files dropped in data/source/incoming are picked up on the next data build."
@@ -238,17 +238,17 @@
       "id": "verdict",
       "name": "Verdict split",
       "unit": "sites",
-      "total": 25,
+      "total": 28,
       "by_city": {
-        "LAS": 7,
-        "PHX": 14,
+        "LAS": 9,
+        "PHX": 15,
         "MIA": 4
       },
       "outcomes": {
         "PASS": {
-          "total": 8,
+          "total": 9,
           "by_city": {
-            "LAS": 2,
+            "LAS": 3,
             "PHX": 4,
             "MIA": 2
           },
@@ -259,15 +259,16 @@
             "MIA-U753",
             "PHX-U180",
             "PHX-U197",
+            "LAS-U100",
             "PHX-U232",
             "PHX-U535"
           ]
         },
         "MAYBE": {
-          "total": 15,
+          "total": 17,
           "by_city": {
-            "LAS": 4,
-            "PHX": 9,
+            "LAS": 5,
+            "PHX": 10,
             "MIA": 2
           },
           "ids": [
@@ -285,7 +286,9 @@
             "PHX-U517",
             "PHX-U540",
             "PHX-U543",
-            "PHX-U513"
+            "LAS-U1516",
+            "PHX-U513",
+            "PHX-U519"
           ]
         },
         "FAIL": {
@@ -319,8 +322,8 @@
           ]
         }
       },
-      "all_county_checked": 65,
-      "note": "Verdicts for the county-checked in-area land fits. The full reconciliation file still has 65 county-checked sites, including ones that are not L10 or L4. Same-owner adjoining stays MAYBE on the playbook scale. Tenure is a flag unless the verdict itself is FAIL on tenure."
+      "all_county_checked": 68,
+      "note": "Verdicts for the county-checked in-area land fits. The full reconciliation file still has 68 county-checked sites, including ones that are not L10 or L4. Same-owner adjoining stays MAYBE on the playbook scale. Tenure is a flag unless the verdict itself is FAIL on tenure."
     },
     {
       "id": "listed",

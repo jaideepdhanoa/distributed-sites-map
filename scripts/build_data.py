@@ -2795,6 +2795,17 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         explicit_reason = site.get("elimination_reason") or ""
         site["elimination_reason"] = explicit_reason or elimination_reason(site)
         site["tenure_fail"] = is_tenure_fail(site)
+        # Jaideep, 3 Nov 2026: the workbook clears 11 sites. Charleston Car Wash
+        # (LAS-U1516, 1961 E Charleston) and the Chandler Quick Quack (PHX-U519,
+        # 7455 W Chandler) stay Maybe until he reviews them. Terrible's #153
+        # (LAS-U100, 4070 Arville St) stays cleared. The map therefore shows 9.
+        if site["site_id"] in {"LAS-U1516", "PHX-U519"}:
+            site["verdict"] = "MAYBE"
+            if site.get("network_status") == "cleared":
+                site["network_status"] = None
+        elif site["site_id"] == "LAS-U100":
+            site["verdict"] = "PASS"
+            site["network_status"] = "cleared"
         if site.get("verdict"):
             site["verification"] = "county-checked"
         elif site.get("aerial_fit"):
@@ -3375,6 +3386,14 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
         ]
         if held:
             problems.append(f"{label} held sites are inside the service area")
+    by_id = {(feature.get("properties") or {}).get("site_id"): feature.get("properties") or {} for feature in features}
+    for sid in ("LAS-U1516", "PHX-U519"):
+        props = by_id.get(sid) or {}
+        if props.get("verdict") != "MAYBE" or props.get("network_status") == "cleared":
+            problems.append(f"{sid} must stay Maybe until reviewed")
+    terrible = by_id.get("LAS-U100") or {}
+    if terrible.get("verdict") != "PASS" or terrible.get("network_status") != "cleared":
+        problems.append("LAS-U100 Terrible's #153 must stay cleared")
     problems.extend(pipeline_pin_problems(deals or [], features))
     return problems
 

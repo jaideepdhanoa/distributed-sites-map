@@ -763,6 +763,17 @@ _STREET_DIRS = {
 _DEAL_LEAK = re.compile(
     r"(?i)\b(ebitda|revenue|moove|playbook|offer|target price|walk-?away|kilowatt|kwh|amps|voltage|electrical|power)\b"
 )
+_DEAL_PRIVATE = re.compile(
+    r"(?i)("
+    r"\b(?:cindel|ming|ricardo|yuka|jaideep|jesse)\b"
+    r"|\b(?:outreach|approv\w*|wording|nda|docusign|redline)\b"
+    r"|\b(?:replied|reply|copied|email|nudged|folder|memo)\b"
+    r"|\b(?:ruled out|downgraded|task board|our side|no contact|no price|no reply)\b"
+    r"|\b(?:lane broker|passed on|pass on|waiting for|followed up)\b"
+    r"|\b(?:sweep|priority area)\b"
+    r"|moved to the land"
+    r")"
+)
 DEAL_FIELDS = (
     "deal_id",
     "kind",
@@ -815,6 +826,23 @@ def stage_group(stage) -> str:
     return "later"
 
 
+EXPLICIT_DEAL_NOTES = {
+    "Street view and the Dec 2025 deed to confirm the use; then owner outreach once Cindel approves the wording": "Confirm use from street view and the deed.",
+    "Test-fit stalls on the south paving; then owner outreach once Cindel approves the wording": "Test-fit stalls on the south paving.",
+    "Get the address and lot size from WCI (Paul) or the listing; then a land check": "Get the address and lot size, then check the land.",
+    "Get the address and lot size; then a land check": "Get the address and lot size, then check the land.",
+    "None: no spare land (Oct 21 aerial)": "No spare land.",
+    "Low priority": "",
+    "Low priority: only about 5 stalls fit": "Only about 5 stalls fit.",
+    "Low priority: only about 4 stalls fit": "Only about 4 stalls fit.",
+    "Low priority: only the east dirt strip is free (about 7 stalls)": "Only the east dirt strip is free, about 7 stalls.",
+    "Low priority: about 7 stalls fit on the south asphalt": "About 7 stalls fit on the south asphalt.",
+    "Low priority: collision is \"not now\" in the plan": "",
+    "Low priority unless the segment widens": "",
+    "Low priority: trucks fill the yard": "Trucks fill the yard.",
+}
+
+
 def split_broker(value) -> tuple[str, str]:
     text = scrub(value)
     match = re.match(r"^(.*?)\s*\(([^)]+)\)", text)
@@ -829,16 +857,60 @@ def split_broker(value) -> tuple[str, str]:
     return broker, firm
 
 
+_DEAL_KEEP = re.compile(
+    r"(?i)\b(?:confirm|check|verify|test-fit|identify|street view|deed|zoning|lease|easement|stalls?|spare|service area|lot size|parking|entitlement|survey|title report|environmental|assemblage|land)\b"
+)
+_DEAL_DROP = re.compile(
+    r"(?i)(?:\boffer\w*|\bprices?\b|\$|\bpackage\b|\breceipt\b|\broger\b|\bpencek\b|\bcrexi\b|\bbizbuysell\b|\bcomp\b|\brevisit\b|\bsold\b|\bwithdrawn\b|\bfolder\b|\bcall\b|\bemail\b|\bknocked out\b|\bdesk checks?\b|\bpipeline\b|\bask\b)"
+)
+
+
 def clean_deal_note(value) -> str:
+    """Keep a neutral next step. Drop names, approvals, outreach, and legal chatter."""
     text = plain_note(value)
     if not text:
         return ""
+    if text in EXPLICIT_DEAL_NOTES:
+        return EXPLICIT_DEAL_NOTES[text]
     kept = []
-    for sentence in re.split(r"(?<=[.!?])\s+", text):
-        if not sentence or _DEAL_LEAK.search(sentence) or banned_hits(sentence) or _NOTE_INTERNAL.search(sentence):
+    for chunk in re.split(r"(?<=[.!?])\s+|;\s+", text):
+        piece = chunk.strip(" ;")
+        if not piece:
             continue
-        kept.append(sentence)
-    return " ".join(kept).strip()
+        if _DEAL_LEAK.search(piece) or _DEAL_PRIVATE.search(piece) or banned_hits(piece) or _NOTE_INTERNAL.search(piece):
+            continue
+        if re.search(r"(?i)\bno spare\b", piece):
+            kept.append("No spare land")
+            continue
+        if re.match(r"(?i)^(dropped|stays|oct|nov|low priority|out of scope|gone from|knocked out)\b", piece):
+            continue
+        if re.search(r"(?i)land sites row|pairing it with", piece):
+            continue
+        if _DEAL_DROP.search(piece) or not _DEAL_KEEP.search(piece):
+            continue
+        piece = re.sub(r"(?i)^(?:then|next|our side)\s*[:,]?\s*", "", piece).strip()
+        if not piece or not _DEAL_KEEP.search(piece):
+            continue
+        kept.append(piece[0].upper() + piece[1:] if piece[:1].islower() else piece)
+    cleaned = ". ".join(part.rstrip(".") for part in kept).strip()
+    if cleaned and not cleaned.endswith("."):
+        cleaned += "."
+    if not cleaned or _DEAL_PRIVATE.search(cleaned) or _DEAL_LEAK.search(cleaned) or _DEAL_DROP.search(cleaned):
+        return ""
+    return cleaned[:400]
+
+
+def deal_text_problems(deal_id: str, props: dict) -> list[str]:
+    problems = []
+    for key in ("next_step", "asking_price_source", "name", "address"):
+        text = props.get(key) or ""
+        if not isinstance(text, str) or not text:
+            continue
+        if key in {"next_step", "asking_price_source"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
+            problems.append(f"{deal_id} {key}: {text[:140]!r}")
+        if _NOTE_INTERNAL.search(text) or banned_hits(text):
+            problems.append(f"{deal_id} {key}: {text[:140]!r}")
+    return problems
 
 
 def _geocode_query(row: dict) -> str:
@@ -1018,9 +1090,12 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
             extra = set(props) - set(DEAL_FIELDS)
             if extra:
                 raise SystemExit("Deal fields outside the whitelist: " + ", ".join(sorted(extra)))
-            if banned_hits(json.dumps(props)) or site_note_problems({"site_id": deal_id, "evidence": props["next_step"], "why_stopped": props["asking_price_source"]}):
+            if deal_text_problems(deal_id, props) or banned_hits(json.dumps(props)):
                 props["next_step"] = ""
-                props["asking_price_source"] = firm or "Listing"
+                if _DEAL_PRIVATE.search(props["asking_price_source"] or "") or _DEAL_LEAK.search(props["asking_price_source"] or ""):
+                    props["asking_price_source"] = firm or ""
+            if deal_text_problems(deal_id, props):
+                raise SystemExit("Deal text still has internal wording: " + "; ".join(deal_text_problems(deal_id, props)[:3]))
             features.append(
                 {
                     "type": "Feature",
@@ -2573,7 +2648,9 @@ def validate_committed() -> None:
         if extra:
             problems.append("deal properties not allowed: " + ", ".join(sorted(extra)))
             break
-        problems.extend(site_note_problems({"site_id": (feature.get("properties") or {}).get("deal_id"), "evidence": (feature.get("properties") or {}).get("next_step") or "", "why_stopped": (feature.get("properties") or {}).get("asking_price_source") or "", "agreement": (feature.get("properties") or {}).get("name") or ""}))
+        props_deal = feature.get("properties") or {}
+        problems.extend(deal_text_problems(str(props_deal.get("deal_id") or "?"), props_deal))
+        problems.extend(site_note_problems({"site_id": props_deal.get("deal_id"), "evidence": props_deal.get("next_step") or "", "why_stopped": props_deal.get("asking_price_source") or ""}))
     failed = deal_report.get("geocode_failed") or []
     if not isinstance(failed, list):
         problems.append("geocode_failed must be a list")

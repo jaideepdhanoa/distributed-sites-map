@@ -8,6 +8,7 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
+import { stageDetail } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
@@ -90,7 +91,11 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
   { accessorKey: "deal_id", header: "Deal" },
   { accessorKey: "name", header: "Name" },
   { accessorKey: "city", header: "City" },
-  { accessorKey: "stage", header: "Stage" },
+  {
+    id: "stage",
+    accessorFn: (row) => stageDetail(row.stage, row.stage_group),
+    header: "Stage",
+  },
   { accessorKey: "firm", header: "Firm" },
   { accessorKey: "broker", header: "Broker" },
   { accessorKey: "asking_price_display", header: "Asking" },

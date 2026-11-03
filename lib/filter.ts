@@ -44,14 +44,12 @@ export function landFit(site: SiteProps): boolean {
   return site.land_tier === "L10" || site.land_tier === "L4";
 }
 
-// Universe funnel. Universe is the census row count, not a pin count. Unique is the sites
-// left after those records are merged, and every later step is a subset of the one before it:
-// Unique > In service area > L10/L4 > County-checked > Cleared > Listed > Contacted.
-// Choosing Universe draws the same pins as Unique.
+// Universe funnel. The first step is one pin per place after census records are merged.
+// Each later step is a subset of the one before it:
+// Universe > In service area > L10/L4 > County-checked > Cleared.
 // Held fits sit outside the operative service area (the Las Vegas 200/300 rings). They are
 // excluded from In service area and every later step, and are offered only as a separate note
-// on L10/L4. Listed and Contacted count only sites that also passed Cleared. Listings and
-// contacts that are still only candidates are a separate note, not part of those steps.
+// on L10/L4. Listed and contacted are counts on each step, not steps of their own.
 export function inStage(site: SiteProps, stage: StageId): boolean {
   if (site.land_only || site.origin !== "universe") return false;
   const unique = Boolean(site.counts_as_site) && !site.duplicate_of;
@@ -63,7 +61,6 @@ export function inStage(site: SiteProps, stage: StageId): boolean {
   const contacted = listed && Boolean(site.contacted);
   switch (stage) {
     case "universe":
-      return true;
     case "unique":
       return unique;
     case "in_area":

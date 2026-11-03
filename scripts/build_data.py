@@ -88,11 +88,11 @@ AREA_NAMES = {
     "phx_2026_v5": ("phx-service", "PHX service area", "service", "PHX"),
     "polygon 1": ("mia-current", "MIA service area", "service", "MIA"),
     "launch odd": ("mia-launch", "MIA launch area", "service", "MIA"),
-    "extended odd": ("mia-extended", "MIA extended area", "service", "MIA"),
-    "ft lauderdale": ("mia-pri-ftl", "MIA priority area", "service", "MIA"),
-    "highland lakes": ("mia-pri-hl", "MIA priority area", "service", "MIA"),
-    "fontainebleau": ("mia-pri-fb", "MIA priority area", "service", "MIA"),
-    "mid-2027 northern odd boundary": ("mia-future", "MIA future boundary", "future", "MIA"),
+    "extended odd": ("mia-extended", "MIA extended area", "expansion", "MIA"),
+    "ft lauderdale": ("mia-pri-ftl", "MIA priority area", "expansion", "MIA"),
+    "highland lakes": ("mia-pri-hl", "MIA priority area", "expansion", "MIA"),
+    "fontainebleau": ("mia-pri-fb", "MIA priority area", "expansion", "MIA"),
+    "mid-2027 northern odd boundary": ("mia-future", "MIA future boundary", "expansion", "MIA"),
 }
 
 BROWARD_HINTS = (
@@ -143,6 +143,22 @@ VERDICT_FIELDS = [
 ]
 
 
+def neutral_author(value) -> str:
+    token = str(value or "").strip().lower()
+    if token in {"indie", "county check"}:
+        return "county check"
+    if token in {"muse", "second review"}:
+        return "second review"
+    return str(value or "").strip()
+
+
+def neutral_source(value) -> str:
+    text = str(value or "")
+    text = text.replace("reconciliation muse column", "second review column")
+    text = text.replace("muse verdict file", "second review file")
+    return text
+
+
 def scrub(value) -> str:
     if value is None:
         return ""
@@ -189,78 +205,19 @@ _NOTE_FILE = re.compile(
 )
 
 # Exact source sentences, plus the plain line a reader should see.
-EXPLICIT_NOTES = {
-    "Maricopa GIS live: owner and 1.441 ac match Muse (1.447 is rounding/source diff). Both sides measure 0.38-0.40 ac own spare.": "County records confirm the owner and a 1.44 ac lot. About 0.38 to 0.40 ac of own spare land.",
-    "Maricopa GIS live owner POSEIDON CAR WASH LLC, 0.918 ac; both sides 0.30 own.": "County records list the owner as POSEIDON CAR WASH LLC and the lot as 0.92 ac. Own spare land is 0.30 ac.",
-    "Clark GIS live Nov 3 confirms same owner on all three adjoining lots. Gas-attached (7-Eleven).": "County records confirm the same owner on all three adjoining lots. The site is attached to a gas station (7-Eleven).",
-    "Clark GIS live owner SHREE LAXMI L L C, 1.564 ac. Operator is Terrible's (Herbst), a large fuel chain; landowner is a separate LLC.": "County records list the owner as SHREE LAXMI L L C and the lot as 1.56 ac. The operator is Terrible's, a large fuel chain. The landowner is a separate company.",
-    "Both sides now agree. Dirt A (between vacuum row and church 14019603008) is inside the wash parcel. Dirt B (far north field) is CAB PROPERTIES 14019603004, never counted. Our own-parcel figure in v1, v2 and v3 was 0.5; the 0.8 Muse cites is the early census aerial_review_v3 quick-pass figure. Our polygon clip of the parcel north of the apron line gives 0.61 ac gross, consistent with Muse 0.578.": "The dirt between the vacuum row and the church parcel is inside the wash parcel. The far north field has a different owner and is not counted. Own spare land is about 0.58 to 0.61 ac.",
-    "Empty paved apron E of the bay buildings on the wash's own parcel is ~0.2 ac net of shared circulation - the 0.15-0.25 MAYBE band, consistent with both reviews' measurements (Torque 0.23 / v3 0.2).": "The empty paved apron east of the bay buildings, on the wash's own parcel, is about 0.2 ac after shared circulation. That is in the MAYBE range.",
-    "Torque's claimed yard spare is a paved, occupied truck/vehicle storage yard (operational, full of parked vehicles in imagery), and the open dirt N is across the road on other owners' parcels. Strip parcel is fully used.": "The yard counted as spare is a paved truck and vehicle storage yard, full of parked vehicles. The open dirt to the north is across the road on other owners' parcels. The wash parcel itself is fully used.",
-    "Gas-attached site, not a standalone wash as both reviews treated it; Torque FIT_10 directionally right on land, v3 maybe 0.22 ac conservative": "This is a gas-station site, not a standalone wash. Spare land is about 0.22 ac.",
-    "Reconciliation keeps this as Tier 2 (same-owner adjoining). On the playbook scale that is MAYBE.": "Spare land is on a same-owner adjoining parcel. On this scale that is MAYBE.",
-    "Our clip of the folio polygon on the render: open area west of the paving north of the drive 0.429 ac (matches Muse 0.429); SW part 0.407 ac gross (Muse 0.394 gross, 0.246 net of 0.148 ac access drive). Imagery shows white field lines on the grass. Land is there; treating a lined, maintained field as spare is a judgment call (it may be used by a neighbour or a league). Muse now agrees: Tier 1 with that flag.": "Open land west of the paving and north of the drive is 0.43 ac. The southwest portion is 0.41 ac gross, or 0.25 ac after the access drive. Imagery shows field lines on the grass. Counting that maintained field as spare land is a judgment call. The verdict is PASS with that flag.",
-    "Re-measured 10:55 AM PT Nov 3 on the BCPA folio polygon (1.446 ac; land 63,049 sf) over Esri imagery (render /workspace/mapplan/remeasure/r_MIA-U777.jpg). Paving N of the bay building (about 0.22 ac) is the apron the bays open onto; S lane and parking row are working areas. Open land: E grass island inside the entrance loop about 0.15-0.17, SE grass about 0.06, NE tree band about 0.08 (buffer). W gravel strip about 0.18 ac is in use for vehicle storage. Usable today about 0.19-0.22 ac in pieces, largest about 0.17; MAYBE. Parcel-wide FEMA Zone AE (SFHA) per Muse NFHL grid (47/47). Adjoining 4101 Davie Rd Ext is BMS PARTNERS LLC, a separate entity, not counted. Muse round 2: verdicts-round2-M": "The lot is 1.45 ac. Paving north of the bay building, about 0.22 ac, is the apron the bays open onto. The south lane and the parking row are working areas. Open land is an east grass island of about 0.15 to 0.17 ac, southeast grass of about 0.06 ac, and a northeast tree band of about 0.08 ac. A west gravel strip of about 0.18 ac is used for vehicle storage. Usable open land is about 0.19 to 0.22 ac in pieces, the largest about 0.17 ac, so the verdict is MAYBE. The parcel is in a flood zone. The adjoining lot at 4101 Davie Rd Ext has a separate owner and is not counted.",
-    "Re-measured 10:55 AM PT Nov 3 on the Maricopa parcel polygon (0.974 ac; LAND_SIZE 43,623 sf) over Esri imagery with a 50 ft grid (render /workspace/mapplan/remeasure/r_PHX-U462.jpg). Wash part of the lot: about 0.43 ac open asphalt, mostly bay aprons, the single entry lane from 32nd St and the vacuum apron. Usable about 0.18-0.24 ac in two pieces (street-side strip about 0.10, NE block about 0.12-0.14). Below 0.25 ac, so MAYBE. Our earlier 0.30 counted working apron. Caveat: the occupied east yard (about 0.40 ac, structures and vehicles) is on the same parcel; under the playbook MAX precedent it could read as PASS-grade land with an in-use caveat, still MAYBE. Owner REMO LAND DEVELOPMENT LLC": "The lot is 0.97 ac. The wash portion has about 0.43 ac of open asphalt, mostly bay aprons, the entry lane, and the vacuum apron. Usable spare land is about 0.18 to 0.24 ac in two pieces, below 0.25 ac, so the verdict is MAYBE. An earlier 0.30 ac figure counted the working apron. The occupied east yard, about 0.40 ac, is on the same parcel and is in use. Owner: REMO LAND DEVELOPMENT LLC.",
-    "Own parcel is built out (canopy, store, circulation). Muse credits a parking field E as surplus but concedes the parcel split is unresolved; parking is in use for the c-store, not spare. Render r_LAS-U36.jpg.": "The own parcel is built out, with a canopy, store, and circulation. A parking field to the east is in use for the store, not spare land, and the parcel split is unresolved.",
-    "Render of 17627823002 shows store, canopy, circulation and desert landscaping; no graded vacant pad of 0.2 ac inside the curb line in current Esri imagery. Muse 10465 and 10521 rows are the same parcel (agree). Render r_LAS-U97.jpg.": "The parcel shows a store, canopy, circulation, and desert landscaping. There is no graded vacant pad of 0.2 ac inside the curb. The two source rows are the same parcel.",
-    "Own parcel built out. Render r_PHX-U260.jpg.": "The own parcel is built out.",
-    "Own parcel built out. Render r_PHX-U542.jpg.": "The own parcel is built out.",
-    "Own parcel built out; the dirt field W is other owners. Render r_LAS-U819.jpg.": "The own parcel is built out. The dirt field to the west belongs to other owners.",
-    "Render r_LAS-U786.jpg shows canopy and store only; a wash may be inside the store building. Street check needed.": "Imagery shows a canopy and a store only. A wash may be inside the store building. A street check is still needed.",
-    "Render shows the graded strip inside the fence N of the store; measures about 0.2 ac net of parking. Below the 0.25 line, so MAYBE. Render r_LAS-U38.jpg.": "The graded strip inside the fence, north of the store, is about 0.2 ac after parking. That is below 0.25 ac, so the verdict is MAYBE.",
-    "Render: own parcel is fully paved/landscaped; the dirt lot belongs to EBBCO LLC.": "The own parcel is fully paved and landscaped. The dirt lot belongs to EBBCO LLC.",
-    "Render: the dirt pad E and the dirt S are inside the yellow same-owner M F E INC 2.745 ac parcel. Clears 0.25 ac easily, so Tier 2 PASS, not just MAYBE.": "The dirt to the east and the south is inside the same-owner 2.75 ac parcel. Spare land is well above 0.25 ac, so the verdict is PASS.",
-    "NW area inside parcel is landscaped desert frontage; net of the buffer it sits just under 0.25 ac. Chain owner. Render r_PHX-U510.jpg.": "The northwest area inside the parcel is landscaped desert frontage. After the buffer it is just under 0.25 ac. The owner is a chain.",
-    "South band below the vacuum canopy is inside the parcel but tree-covered and narrow; usable is at or below 0.25 ac. Tenant on REIT land. Render r_PHX-U543.jpg.": "The south band below the vacuum canopy is inside the parcel, but it is tree-covered and narrow. Usable spare land is at or below 0.25 ac. The wash is a tenant.",
-    "Wash pad sits in a retail-center parcel; open paving is shared center parking. Render r_LAS-U968.jpg.": "The wash sits in a retail-center parcel. The open paving is shared center parking.",
-    "The dirt that drove v3's 0.3 pass is the neighbour's land. Own-parcel spare ~1,500 sq ft as Torque read it.": "The open dirt behind an earlier pass is the neighbour's land. Own-parcel spare land is about 1,500 sq ft.",
-    "True non-operational spare ~0.10 ac; Torque FIT_10 OVERTURNED (counted operational apron); v3 maybe 0.15 ac is generous": "Spare land that is not part of daily operations is about 0.10 ac. An earlier larger figure counted the working apron. A 0.15 ac figure is generous.",
-    "Usable spare ~0.19 ac on the north side - MAYBE band; v3 pass 0.25 ac generous, Torque FIT_4 6,000 sq ft (~0.14 ac) low": "Usable spare land on the north side is about 0.19 ac, so the verdict is MAYBE. A 0.25 ac figure is generous, and a 0.14 ac figure is low.",
-    "Usable ~0.21 ac after discounting the sloped/landscaped drainage terrain on the strip - MAYBE band; Torque FIT_10 overstates usability, v3 maybe 0.2 ac close": "Usable spare land is about 0.21 ac after setting aside the sloped, landscaped drainage strip. The verdict is MAYBE. About 0.2 ac is close.",
-    "Row-identity dispute settled: this parcel is the auto lot (Torque's read), not the wash parcel (v3's pass attached to the wrong row).": "This parcel is the auto lot, not the wash. An earlier pass was attached to the wrong row.",
-    "v3's 'pass' verdict contradicts its own note; county land use (restaurant) confirms the conversion. Both reviews' substantive reads agree it is not a wash.": "An earlier pass conflicts with the note on the same row. County land use shows a restaurant, which confirms the conversion. This is not a wash.",
-    "v3's 1.5-ac PASS is land without a wash business on site - a residential parcel hosting a mobile detailer's base. Torque's NOT_A_WASH upheld on county + business evidence.": "The 1.5 ac figure was land without a wash business. The parcel is residential and is used as a base for a mobile detailer. County and business records show this is not a wash.",
-    "v3's 2.0-ac pass was a lot-size formula figure on a 12-ac truck stop whose open land is operational truck parking; Torque's 'possible wash bay' structure is the scale/fuel area, not a wash.": "The 2.0 ac figure was a lot-size formula on a 12 ac truck stop. The open land is truck parking in use. The structure that looked like a wash bay is the scale and fuel area, not a wash.",
-    "v3's PASS credited the vacant land itself ('vacant portion, adjoining yellow parcel also open') - land without a business. There is no operating wash at this address, so NOT_A_WASH regardless of the 0.703-ac vacant parcel. Torque's NOT_A_WASH upheld on county evidence.": "An earlier pass counted vacant land, including an adjoining open parcel, with no business on it. There is no operating wash at this address, so this is not a wash, regardless of the 0.70 ac vacant parcel.",
-    "v3's same-owner-adjoining claim is CONFIRMED by county records (north field, same owner, 0.352 ac), but the land is moot: no operating wash at the address on current evidence, so NOT_A_WASH. If a wash were operating, the band would be MAYBE (spare only via the same-owner field).": "County records confirm a north field of 0.35 ac under the same owner. There is no operating wash at the address, so this is not a wash. If a wash were operating, the only spare land would be that adjoining field, which would be MAYBE.",
-    "Bay buildings + aprons fill the small parcel; the W dirt is a different owner's construction site, consistent with v3's full review.": "The bay buildings and aprons fill the small parcel. The dirt to the west is a different owner's construction site.",
-    "Own-parcel render: large graded dirt field sits inside the KACILL 6.214 ac polygon, north of the wash/fuel pad; no other owner in between. 1.0 vs 1.2 ac is a measurement spread, both clear 0.25 ac.": "A large graded dirt field sits inside the 6.21 ac parcel, north of the wash and fuel pad, with no other owner in between. Readings of 1.0 ac and 1.2 ac both clear 0.25 ac.",
-    "Own-parcel render: the open strip north of the vacuum row is inside the red outline, about 275 ft x 50-70 ft, roughly 0.3 ac, but it is landscaped and may be stormwater retention. Chain operator, so not a small-owner target.": "The open strip north of the vacuum row is inside the parcel, about 275 ft by 50 to 70 ft, roughly 0.3 ac. It is landscaped and may be stormwater retention. The operator is a chain.",
-    "The dirt that drove v3's 0.3 pass is the neighbour's land. Own-parcel spare ~1,500 sq ft as Torque read it.": "The open dirt behind an earlier pass is the neighbour's land. Own-parcel spare land is about 1,500 sq ft.",
-    "Both sides unresolved; needs a call or street view.": "Still unresolved. It needs a call or a street view.",
-    "Dead as an owner-operator target. Only a landlord land play remains.": "Not a target to buy and operate. Only a landlord land negotiation remains.",
-    "Dead either way; correct the owner field.": "Not a viable site. The owner record needs a correction.",
-    "both FAIL": "Both reviews fail this site.",
-    "both FAIL; chain": "Both reviews fail this site. The operator is a chain.",
-    "both dead": "Not a viable site.",
-    "both: closed (Yelp)": "The business is closed.",
-    "both: not a wash, vacant 6.8 ac": "Not a wash. The lot is vacant, 6.8 ac.",
-    "both: third-party dirt": "The open dirt belongs to another owner.",
-    "Herbst (Terrible's parent) is owner; big-firm issue for outreach.": "The owner is Herbst, the parent of Terrible's. Outreach has to go through a large firm.",
-    "Universe point falls on a road parcel (12425599001); the wash sits on two CENTENNIAL ASSET parcels.": "The mapped point falls on a road parcel (12425599001). The wash sits on two CENTENNIAL ASSET parcels.",
-    "County verdict is FAIL on tenure. Tenure is otherwise only a flag.": "The county verdict fails this site on tenure. Tenure is otherwise only a flag.",
-    "Not a wash (not categorised in the file).": "Not a wash (reason not categorised).",
-    "not categorised in the file": "not categorised",
-    "Provisional aerial screen.": "Aerial review only. The county check is still open.",
-    "Provisional aerial screen. It does not decide the county verdict.": "Aerial review only. It does not decide the county verdict.",
-    "Screening tab land tier. It does not decide the county verdict.": "The land tier comes from the aerial measurement. It does not decide the county verdict.",
-    "Tier 1 PASS (Muse: agreed but not parcel-checked)": "PASS. The reviewers agree, and the parcel has not been county-checked.",
-    "Tier 1 PASS (upgraded in Muse verification round 9:14 AM PT)": "PASS.",
-    "FAIL (round 2); Muse rows 10465 and 10521 S Rainbow are one parcel": "Fail. The two South Rainbow rows are one parcel.",
-    "FAIL on land, 0.10 ac (round 2; operating wash confirmed by live licence)": "Fail on land, with 0.10 ac of spare. The operating wash is confirmed.",
-    "scale only (Muse calls same-owner-only land MAYBE)": "Same-owner adjoining land only. That reads as MAYBE.",
-    "DISAGREE: ours Dead, Muse MAYBE (0.09 own / 0.32 adjoining)": "The recorded verdict is not a fit. Another review called it MAYBE, with 0.09 ac of own spare and 0.32 ac adjoining.",
-    "DISAGREE: ours Unresolved, Muse FAIL (land 0.10 ac)": "The recorded verdict is unresolved. Another review called it a fail, on 0.10 ac of land.",
-    "agree (single parcel, 17627823002)": "Agree. One parcel, 17627823002.",
-    "agree on tier; process note (Muse says unchecked)": "Agree on the land tier. The county check is still open.",
-    "yes (Circle K store page lists car wash, per Muse)": "Yes. The Circle K store page lists a car wash.",
-    "Converted: site operates as a restaurant/nightclub (v3's own web check in its no": "Converted. The site operates as a restaurant and nightclub.",
-    "0.48 (0.40 grid / 0.476 polygon, Muse; our imagery estimate 0.5; north band of the parcel 0.58 to 0.61 gross)": "0.48 ac. Imagery puts it near 0.5 ac, and the north band of the parcel is about 0.58 to 0.61 ac gross.",
-    "Clark ParcelHistory re-read 9:35 AM PT Nov 3: 13914202008 BLUE BEACON INTERNATIONAL INC; Clark polygon 3.664 ac.": "County records list parcel 13914202008 as BLUE BEACON INTERNATIONAL INC, 3.66 ac.",
-    "Clark ParcelHistory re-read 9:35 AM PT Nov 3: 17601510001 DECATUR & SUNSET L L C; Clark polygon 6.812 ac.": "County records list parcel 17601510001 as DECATUR & SUNSET L L C, 6.81 ac.",
-}
+def _load_rewrites(kind: str) -> dict:
+    path = SRC / "note_rewrites.json"
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    table = payload.get(kind) or {}
+    return table if isinstance(table, dict) else {}
 
+
+EXPLICIT_NOTES = _load_rewrites("notes")
 
 def plain_note(value) -> str:
     """Turn one site-card note into plain language. Explicit lines win; the rest is stripped."""
@@ -294,7 +251,7 @@ def sanitize_site_notes(site: dict) -> int:
         current = site.get(key)
         if not isinstance(current, str) or not current:
             continue
-        rewritten = plain_note(current)
+        rewritten = trim_restated_facts(plain_note(current))
         if rewritten != current:
             site[key] = rewritten
             changed += 1
@@ -303,16 +260,35 @@ def sanitize_site_notes(site: dict) -> int:
     for review in site.get("reviews") or []:
         if not isinstance(review, dict):
             continue
+        author = neutral_author(review.get("reviewer") or "")
+        if author != (review.get("reviewer") or ""):
+            review["reviewer"] = author
+            changed += 1
         current = review.get("note")
         if not isinstance(current, str) or not current:
             continue
-        rewritten = plain_note(current)
+        rewritten = trim_restated_facts(plain_note(current))
         if rewritten != current:
             review["note"] = rewritten
             changed += 1
         if _NOTE_INTERNAL.search(review.get("note") or ""):
             raise SystemExit(f"Review note still has internal wording on {site.get('site_id')}: {review.get('note')[:180]!r}")
     return changed
+
+
+def trim_restated_facts(text: str) -> str:
+    """Drop sentences that only repeat the lot size or the owner already shown on the card."""
+    kept = []
+    for piece in re.split(r"(?<=[.!?])\s+", text or ""):
+        sentence = piece.strip()
+        if not sentence:
+            continue
+        if re.match(r"(?i)^the lot is [\d.,]+ ac\.?$", sentence):
+            continue
+        if re.match(r"(?i)^owner: .+\.?$", sentence):
+            continue
+        kept.append(sentence)
+    return " ".join(kept).strip()
 
 
 def site_note_problems(props: dict) -> list[str]:
@@ -328,6 +304,9 @@ def site_note_problems(props: dict) -> list[str]:
         text = review.get("note") or ""
         if isinstance(text, str) and _NOTE_INTERNAL.search(text):
             problems.append(f"{sid} review: {text[:140]!r}")
+        author = str(review.get("reviewer") or "")
+        if re.search(r"(?i)\b(muse|indie|torque)\b", author):
+            problems.append(f"{sid} reviewer: {author}")
     return problems
 
 
@@ -454,13 +433,345 @@ def addr_key(value: str) -> str:
     return text
 
 
+_DIR_WORDS = (
+    ("northeast", "ne"),
+    ("northwest", "nw"),
+    ("southeast", "se"),
+    ("southwest", "sw"),
+    ("north", "n"),
+    ("south", "s"),
+    ("east", "e"),
+    ("west", "w"),
+)
+
+
+def loose_street_keys(value: str) -> list[str]:
+    """House number plus the street token. City names stay, so Chandler Blvd still matches.
+
+    A trailing ZIP is removed. A 5-digit house number is kept. Store numbers such as
+    "#262 6111 W Sahara" yield the street, not the store number.
+    """
+    text = (value or "").lower()
+    text = re.sub(r"[^a-z0-9 ]", " ", text)
+    text = re.sub(r"\b(az|nv|fl|arizona|nevada|florida)\b", " ", text)
+    text = re.sub(r"(?<=\s)\d{5}\b", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    for word, short in _DIR_WORDS:
+        text = re.sub(rf"\b{word}\b", short, text)
+    lettered: list[str] = []
+    numeric: list[str] = []
+    for match in re.finditer(r"(\d+)\s+((?:ne|nw|se|sw|n|s|e|w)\s+)?([a-z0-9]+)", text):
+        name = re.sub(r"^(\d+)(?:st|nd|rd|th)$", r"\1", match.group(3))
+        key = f"{match.group(1)} {name}"
+        bucket = numeric if name.isdigit() else lettered
+        if key not in bucket:
+            bucket.append(key)
+    return lettered or numeric
+
+
+def loose_street_key(value: str) -> str:
+    keys = loose_street_keys(value)
+    return keys[0] if keys else ""
+
+
 def street_signature(value: str) -> str:
-    key = addr_key(value)
-    match = re.match(r"(\d+)\s+([nesw]\s+)?([a-z0-9]+)", key)
-    if not match:
+    return loose_street_key(value)
+
+
+def apn_text(value) -> str:
+    if value is None:
         return ""
-    number, _, name = match.groups()
-    return f"{number} {name}"
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else str(value)
+    text = str(value).strip()
+    if re.fullmatch(r"\d+\.0+", text):
+        return text.split(".")[0]
+    return text
+
+
+COUNTY_VERDICT = {
+    "pass": "PASS",
+    "maybe": "MAYBE",
+    "fail": "FAIL",
+    "not a car wash": "NOT_A_WASH",
+    "unresolved": "UNRESOLVED",
+}
+
+
+def load_universe_rows(path: Path) -> list[dict]:
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb["Universe"]
+    cursor = ws.iter_rows(values_only=True)
+    header = [str(cell).strip() if cell is not None else "" for cell in next(cursor)]
+    out = []
+    for row in cursor:
+        if not row or not any(row[:8]):
+            continue
+        item = {}
+        for index, key in enumerate(header):
+            if key and index < len(row):
+                item[key] = row[index]
+        out.append(item)
+    wb.close()
+    return out
+
+
+def _universe_geocode_query(address: str, city_name: str, market: str) -> str:
+    text = re.sub(r"\s+", " ", address or "").strip()
+    if not text:
+        return ""
+    if re.search(r"\b(AZ|NV|FL)\b", text):
+        return text
+    local = (city_name or "").strip()
+    if not local or "unincorporated" in local.lower():
+        local = {"PHX": "Maricopa County", "LAS": "Clark County", "MIA": "Miami-Dade County"}.get(market, "")
+    state = {"PHX": "AZ", "LAS": "NV", "MIA": "FL"}.get(market, "")
+    return f"{text}, {local}, {state}".strip(", ")
+
+
+def apply_live_universe(
+    rows: list[dict],
+    sites: list[dict],
+    by_id: dict,
+    by_apn: dict,
+    blank_site,
+    screening: dict,
+    verdict_rows: list,
+    crosswalk: list,
+) -> dict:
+    """One counted workbook row is one site. Service area and the county verdict come from that row.
+
+    The census file still supplies the pin, the parcel, and the aerial review when a row matches.
+    A second row for a parcel already used, and any row that does not match, becomes its own site.
+    Rows the workbook does not count drop out of the unique total.
+    """
+    by_apn_site: dict[tuple[str, str], list[str]] = defaultdict(list)
+    by_street: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for site in sites:
+        if site.get("origin") != "universe":
+            continue
+        for token in apn_tokens(site.get("apn")):
+            by_apn_site[(site["city"], token)].append(site["site_id"])
+        for key in loose_street_keys(site.get("address") or ""):
+            by_street[(site["city"], key)].append(site["site_id"])
+
+    claimed: set[str] = set()
+    yes_ids: set[str] = set()
+    seq: Counter = Counter()
+    fresh = 0
+    matched = 0
+    geocode_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
+
+    def claim(city: str, apn_value, address: str) -> tuple[str | None, str | None]:
+        seen: list[str] = []
+        for token in apn_tokens(apn_value):
+            for sid in by_apn_site.get((city, token), []):
+                if sid not in seen:
+                    seen.append(sid)
+        free = [sid for sid in seen if sid not in claimed]
+        if free:
+            return sorted(free)[0], None
+        twin = seen[0] if seen else None
+        for key in loose_street_keys(address):
+            pool: list[str] = []
+            for sid in by_street.get((city, key), []):
+                if sid not in pool:
+                    pool.append(sid)
+            free = [sid for sid in pool if sid not in claimed]
+            if len(free) == 1:
+                return free[0], twin
+            if twin is None and pool:
+                twin = pool[0]
+        return None, twin
+
+    def paint(site: dict, row: dict, *, is_new: bool) -> None:
+        site["counts_as_site"] = True
+        site["duplicate_of"] = None
+        site["origin"] = "universe"
+        if is_new:
+            site["name"] = scrub(row.get("Business name"))
+            site["address"] = scrub(row.get("Address"))
+            site["apn"] = apn_text(row.get("APN"))
+            site["site_class"] = site_class(str(row.get("Site class") or ""))
+            site["county_url"] = county_url(site["city"], site["apn"], site["address"])
+        elif not site.get("apn"):
+            site["apn"] = apn_text(row.get("APN"))
+        owner = scrub(row.get("Owner of record") or row.get("Owner"))
+        if owner:
+            site["owner"] = owner
+        service = str(row.get("Service area") or "").strip()
+        site["in_area"] = service == "In"
+        ring = str(site.get("service_ring") or "")
+        if site["in_area"]:
+            site["expansion_horizon"] = False
+            if site["city"] == "LAS":
+                if ring not in {"core", "100"}:
+                    site["service_ring"] = "100"
+            else:
+                site["service_ring"] = "service"
+        elif ring in {"200", "300"}:
+            site["expansion_horizon"] = True
+            site["service_ring"] = ring
+        else:
+            site["expansion_horizon"] = False
+            site["service_ring"] = "outside"
+        own = first_number(row.get("Spare ac (own parcel)"))
+        adj = first_number(row.get("Spare ac (same-owner adjoining)"))
+        if own is not None:
+            site["spare_ac_own"] = own
+            site["spare_ac_own_text"] = scrub(row.get("Spare ac (own parcel)"))
+        if adj is not None:
+            site["spare_ac_adjoining"] = adj
+            site["spare_ac_adjoining_text"] = scrub(row.get("Spare ac (same-owner adjoining)"))
+        sqft = first_number(row.get("Lot size (sq ft)"))
+        if sqft and not site.get("lot_ac"):
+            site["lot_ac"] = round(sqft / 43560, 3)
+        miles = first_number(row.get("Dist to depot (mi)"))
+        if miles is not None and site.get("miles_to_depot") is None:
+            site["miles_to_depot"] = miles
+        if site.get("lat") is None or site.get("lon") is None:
+            lat = first_number(row.get("Lat"))
+            lon = first_number(row.get("Lon"))
+            if lat is not None and lon is not None:
+                site["lat"] = lat
+                site["lon"] = lon
+                site["coord_status"] = "known"
+                site["street_view_url"] = f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}"
+        if not site.get("land_tier"):
+            hit = screening["rows"].get((site["city"], norm_apn(site.get("apn"))))
+            if hit:
+                aerial = str(hit.get("aerial") or "").strip()
+                site["aerial_fit"] = aerial
+                site["land_tier"] = {"FIT_10": "L10", "FIT_4": "L4"}.get(aerial)
+                if hit.get("spare_sqft") is not None and site.get("spare_ac_own") is None:
+                    site["spare_ac_own"] = round(hit["spare_sqft"] / 43560, 3)
+        had_verdict = bool(site.get("verdict"))
+        tier = str(row.get("Final tier") or "").strip()
+        verdict = COUNTY_VERDICT.get(tier.lower())
+        site["verdict"] = verdict
+        if tier:
+            site["reconciliation_tier"] = scrub(tier)
+        basis = plain_note(row.get("Verdict basis"))
+        if verdict:
+            if basis:
+                site["evidence"] = basis[:700]
+            if verdict == "PASS" and site["in_area"]:
+                site["network_status"] = "cleared"
+            elif verdict == "PASS":
+                site["network_status"] = "held"
+                site["expansion_horizon"] = True
+            elif site.get("network_status") == "cleared":
+                site["network_status"] = None
+            note = basis[:400]
+            verdict_rows.append(
+                {
+                    "site_id": site["site_id"],
+                    "market": site["city"],
+                    "name": site["name"],
+                    "address": site["address"],
+                    "apn": norm_apn(site.get("apn")),
+                    "adjudicated_verdict": verdict,
+                    "spare_ac_own": site["spare_ac_own"] if site.get("spare_ac_own") is not None else "",
+                    "spare_ac_same_owner_adjoining": site["spare_ac_adjoining"] if site.get("spare_ac_adjoining") is not None else "",
+                    "operating_evidence": "",
+                    "parcel_evidence": note,
+                    "confidence": site.get("confidence") or "",
+                    "notes": note,
+                    "aerial_verdict": "",
+                    "land_verdict_provisional": "",
+                    "operating_evidence_tier": "",
+                    "retrieved_at": "2026-11-03",
+                    "reviewer": "county check",
+                    "supersedes": "",
+                    "source_file": "Universe tab",
+                }
+            )
+            site["reviews"].append(
+                {
+                    "reviewer": "county check",
+                    "kind": "county",
+                    "verdict": verdict,
+                    "provisional": False,
+                    "spare_ac_own": site.get("spare_ac_own"),
+                    "spare_ac_adjoining": site.get("spare_ac_adjoining"),
+                    "confidence": site.get("confidence") or "",
+                    "date": "2026-11-03",
+                    "note": note,
+                }
+            )
+            crosswalk.append({"site_id": site["site_id"], "source": "Universe tab", "source_key": site["site_id"]})
+        elif had_verdict:
+            site["evidence"] = ""
+            if site.get("network_status") == "cleared":
+                site["network_status"] = None
+
+    for row in rows:
+        if str(row.get("Counted in funnel") or "").strip().lower() != "yes":
+            continue
+        city = str(row.get("Market") or "").strip()
+        if city not in {"LAS", "PHX", "MIA"}:
+            continue
+        sid, twin = claim(city, row.get("APN"), str(row.get("Address") or ""))
+        is_new = sid is None
+        if is_new:
+            seq[city] += 1
+            sid = f"WB-{city}-{seq[city]:04d}"
+            site = blank_site(sid, city)
+            sites.append(site)
+            by_id[sid] = site
+            fresh += 1
+        else:
+            site = by_id[sid]
+            claimed.add(sid)
+            matched += 1
+        paint(site, row, is_new=is_new)
+        if is_new and (site.get("lat") is None or site.get("lon") is None) and twin and twin in by_id:
+            other = by_id[twin]
+            if other.get("lat") is not None and other.get("lon") is not None:
+                site["lat"] = other["lat"]
+                site["lon"] = other["lon"]
+                site["coord_status"] = "known"
+                site["street_view_url"] = other.get("street_view_url") or ""
+        if site.get("lat") is None or site.get("lon") is None:
+            query = _universe_geocode_query(site.get("address") or "", str(row.get("City") or ""), city)
+            coords = geocode_address(query, geocode_cache) if query else None
+            if coords:
+                site["lon"], site["lat"] = float(coords[0]), float(coords[1])
+                site["coord_status"] = "known"
+                site["street_view_url"] = f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={site['lat']},{site['lon']}"
+        yes_ids.add(sid)
+        for token in apn_tokens(site.get("apn")):
+            bucket = by_apn[(city, token)]
+            if sid not in bucket:
+                bucket.append(sid)
+
+    dropped = []
+    for site in sites:
+        if site.get("origin") != "universe" or site["site_id"] in yes_ids:
+            continue
+        site["counts_as_site"] = False
+        site["in_area"] = False
+        site["verdict"] = None
+        if site.get("network_status") == "cleared":
+            site["network_status"] = None
+        dropped.append(site["site_id"])
+
+    GEOCODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    GEOCODE_CACHE.write_text(json.dumps(geocode_cache))
+    counted = [site for site in sites if site["site_id"] in yes_ids]
+    county = Counter(site.get("verdict") or "" for site in counted)
+    return {
+        "counted": len(counted),
+        "matched_existing": matched,
+        "new_sites": fresh,
+        "dropped_existing": dropped,
+        "by_city": {city: sum(1 for site in counted if site["city"] == city) for city in ("LAS", "PHX", "MIA")},
+        "in_area_by_city": {
+            city: sum(1 for site in counted if site["city"] == city and site["in_area"]) for city in ("LAS", "PHX", "MIA")
+        },
+        "county_verdicts": {key: county.get(key, 0) for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")},
+        "missing_point": [site["site_id"] for site in counted if site.get("lat") is None or site.get("lon") is None],
+    }
 
 
 def load_csv(path: Path) -> list[dict]:
@@ -469,20 +780,29 @@ def load_csv(path: Path) -> list[dict]:
 
 
 def sheet_rows(path: Path, sheet: str, header_row: int) -> list[dict]:
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    """Read a sheet, including hyperlink targets that are not in the cell text."""
+    wb = openpyxl.load_workbook(path, read_only=False, data_only=True)
     ws = wb[sheet]
-    rows = list(ws.iter_rows(values_only=True))
+    rows = list(ws.iter_rows())
     wb.close()
-    header = [str(c).strip() if c is not None else "" for c in rows[header_row]]
+    header = [str(cell.value).strip() if cell.value is not None else "" for cell in rows[header_row]]
     out = []
     for row in rows[header_row + 1 :]:
-        if not row or row[0] in (None, ""):
+        if not row or row[0].value in (None, ""):
             continue
         item = {}
-        for i, key in enumerate(header):
+        links: list[tuple[str, str]] = []
+        for i, cell in enumerate(row):
+            key = header[i] if i < len(header) else ""
             if not key:
                 continue
-            item[key] = row[i] if i < len(row) else None
+            item[key] = cell.value
+            target = ""
+            if cell.hyperlink is not None and cell.hyperlink.target:
+                target = str(cell.hyperlink.target).strip()
+            if target:
+                links.append((key, target))
+        item["_links"] = links
         out.append(item)
     return out
 
@@ -793,12 +1113,20 @@ DEAL_FIELDS = (
     "coord_status",
     "miles_to_depot",
     "listed",
+    "parcel_match",
+    "parcel_acres",
+    "source_line",
+    "source_kind",
+    "business_type",
 )
 
 
 def deal_street_signature(value: str) -> str:
     text = re.sub(r"^(phx|las|mia|sna)\s+", "", (value or "").lower().strip())
-    text = addr_key(text)
+    # City names stay. "Chandler" is the street in "7455 W Chandler Blvd", not only the city.
+    text = re.sub(r"[^a-z0-9 ]", " ", text)
+    text = re.sub(r"\b(az|nv|fl|arizona|nevada|florida)\b", " ", text)
+    text = re.sub(r"(?<=\s)\d{5}\b", " ", text)
     text = re.sub(
         r"\b(avenue|ave|street|st|road|rd|boulevard|blvd|drive|dr|lane|ln|way|court|ct|place|pl|circle|cir|parkway|pkwy|highway|hwy)\b",
         " ",
@@ -826,21 +1154,248 @@ def stage_group(stage) -> str:
     return "later"
 
 
-EXPLICIT_DEAL_NOTES = {
-    "Street view and the Dec 2025 deed to confirm the use; then owner outreach once Cindel approves the wording": "Confirm use from street view and the deed.",
-    "Test-fit stalls on the south paving; then owner outreach once Cindel approves the wording": "Test-fit stalls on the south paving.",
-    "Get the address and lot size from WCI (Paul) or the listing; then a land check": "Get the address and lot size, then check the land.",
-    "Get the address and lot size; then a land check": "Get the address and lot size, then check the land.",
-    "None: no spare land (Oct 21 aerial)": "No spare land.",
-    "Low priority": "",
-    "Low priority: only about 5 stalls fit": "Only about 5 stalls fit.",
-    "Low priority: only about 4 stalls fit": "Only about 4 stalls fit.",
-    "Low priority: only the east dirt strip is free (about 7 stalls)": "Only the east dirt strip is free, about 7 stalls.",
-    "Low priority: about 7 stalls fit on the south asphalt": "About 7 stalls fit on the south asphalt.",
-    "Low priority: collision is \"not now\" in the plan": "",
-    "Low priority unless the segment widens": "",
-    "Low priority: trucks fill the yard": "Trucks fill the yard.",
-}
+EXPLICIT_DEAL_NOTES = _load_rewrites("deals")
+
+_LISTING_HOSTS = {"loopnet.com", "crexi.com", "bizbuysell.com", "carwashbrokers.com", "matthews.com"}
+
+
+def _url_host(url: str) -> str:
+    return re.sub(r"^https?://(www\.)?", "", (url or "").lower()).split("/")[0]
+
+
+_PUBLIC_SOURCE = re.compile(
+    r"(?i)realmo|maricopa|clark county|miami-dade|broward|loopnet|crexi|bizbuysell|matthews|property appraiser|assessor|parcel"
+)
+_INTERNAL_SOURCE = re.compile(
+    r"(?i)(off-market targets|\btargets tab\b|\bfolder\b|\brank\b|deep check|\bemail\b|\bcall\b|transcript|"
+    r"\bsheet\b|\btab\b|\bpackage\b|p&l|flyer|brochure|memorandum|moove|esri|flood|udc\b|epa\b|"
+    r"nv energy|bizquest|cash flow|ebitda|service-area|priority area|imagery)"
+)
+_MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
+
+
+def _source_date(text: str) -> str:
+    match = re.search(rf"(?i)\b({_MONTHS})[a-z]*\.?\s+(\d{{1,2}}),?\s+(20\d{{2}})", text or "")
+    if not match:
+        return ""
+    return f"{match.group(1)[:3].title()} {int(match.group(2))} {match.group(3)}"
+
+
+def _public_source_clause(clause: str) -> str:
+    """Keep a public record and its date. Drop people, sheets, and internal files."""
+    text = re.sub(r"\s+", " ", clause or "").strip(" ;")
+    if not text or not _PUBLIC_SOURCE.search(text):
+        return ""
+    if _INTERNAL_SOURCE.search(text) and not re.search(r"(?i)realmo record|county|appraiser|assessor|parcel", text):
+        return ""
+    head = re.split(r"\s+\(", text, maxsplit=1)[0]
+    head = re.sub(r"(?i)\s+(layer|layers|open data|tax roll)\b.*", "", head)
+    head = re.sub(r"\s+", " ", head).strip(" ,;")
+    replacements = (
+        (r"(?i)^realmo record\b.*", "Realmo record"),
+        (r"(?i)^realmo listing\b.*", "Realmo listing"),
+        (r"(?i)^maricopa county\b.*", "Maricopa County parcel"),
+        (r"(?i)^clark county parcel\b.*", "Clark County parcel"),
+        (r"(?i)^clark county assessor\b.*", "Clark County assessor"),
+        (r"(?i)^miami-dade\b.*", "Miami-Dade Property Appraiser"),
+        (r"(?i)^broward\b.*", "Broward County Property Appraiser"),
+        (r"(?i)^loopnet\b.*", "LoopNet listing"),
+        (r"(?i)^crexi\b.*", "Crexi listing"),
+        (r"(?i)^bizbuysell\b.*", "BizBuySell listing"),
+        (r"(?i)^matthews\b.*", "Matthews listing"),
+        (r"(?i)^car wash brokers\b.*", "Car Wash Brokers listing"),
+    )
+    for pattern, label in replacements:
+        if re.search(pattern, head):
+            head = label
+            break
+    else:
+        return ""
+    if _INTERNAL_SOURCE.search(head) or _DEAL_PRIVATE.search(head) or _DEAL_LEAK.search(head) or banned_hits(head):
+        return ""
+    dated = _source_date(text)
+    return f"{head}, {dated}" if dated else head
+
+
+def _source_records(value) -> list[str]:
+    seen = []
+    for clause in re.split(r";\s*", str(value or "")):
+        plain = _public_source_clause(clause)
+        if plain and plain not in seen:
+            seen.append(plain)
+    return seen
+
+
+def _broker_channel(broker: str) -> str:
+    """Brokerage or agent, without the person's name in parentheses."""
+    text = re.sub(r"\s+", " ", str(broker or "")).strip()
+    if not text or re.match(r"(?i)^none yet\b", text):
+        return ""
+    shown = re.match(r"(?i)^not shown\s*\(([^)]+)\)", text)
+    if shown:
+        return shown.group(1).strip()
+    firm = re.split(r"\s+\(", text, maxsplit=1)[0]
+    firm = re.split(r",\s*(?:exclusive|also|bizbuysell|loopnet|crexi)\b", firm, maxsplit=1, flags=re.I)[0]
+    firm = firm.strip(" ,;")
+    if _DEAL_PRIVATE.search(firm) or _DEAL_LEAK.search(firm) or banned_hits(firm) or _NOTE_INTERNAL.search(firm):
+        return ""
+    return firm[:120]
+
+
+BUSINESS_TYPES = (
+    "Car wash",
+    "Auto repair",
+    "Tire and lube",
+    "Gas station",
+    "Yard or lot",
+    "Storage",
+    "Land",
+    "Other",
+)
+
+
+def business_type_from_text(raw: str) -> str:
+    """Map a workbook label onto the small set of business types."""
+    text = re.sub(r"\s+", " ", raw or "").strip().lower()
+    if not text:
+        return "Other"
+    if "tire" in text or "lube" in text:
+        return "Tire and lube"
+    if "vacant" in text or "land only" in text or "entitled" in text or text == "land":
+        return "Land"
+    if any(word in text for word in ("yard", "lot", "parking")):
+        return "Yard or lot"
+    if "storage" in text:
+        return "Storage"
+    if "car wash" in text or "truck wash" in text:
+        return "Car wash"
+    if any(word in text for word in ("gas", "c-store", "fuel", "station")):
+        return "Gas station"
+    if any(word in text for word in ("repair", "collision", "auto service", "automotive", "fleet", "garage")):
+        return "Auto repair"
+    if text == "car wash":
+        return "Car wash"
+    if text == "auto service":
+        return "Auto repair"
+    if text == "other":
+        return "Other"
+    return "Other"
+
+
+def business_type_from_row(row: dict, census: bool = False) -> str:
+    """Census rows are car washes. Deals use the business type column, then Segment."""
+    if census:
+        return "Car wash"
+    for key in ("Business type", "Business Type", "Segment", "Segment group"):
+        raw = str(row.get(key) or "").strip()
+        if raw:
+            return business_type_from_text(raw)
+    return "Other"
+
+
+def is_off_market_row(row: dict) -> bool:
+    """Off-market research is not a broker or agent deal.
+
+    A Lead source column wins when the workbook has one. Until then the stage
+    does: 'Off-market target' and 'Off market (no lead)' both stay out of the pipeline.
+    """
+    lead = str(row.get("Lead source") or row.get("Lead Source") or "").strip()
+    if lead:
+        return bool(re.search(r"(?i)off[\s-]*market|no lead|own research", lead))
+    status = str(row.get("Listing status") or "")
+    stage = str(row.get("Stage") or "")
+    broker = str(row.get("Broker") or "")
+    return bool(
+        re.search(r"(?i)off[\s-]*market", f"{status} {stage}")
+        or re.search(r"(?i)no lead", stage)
+        or re.match(r"(?i)^none yet\b", broker.strip())
+    )
+
+
+def research_sources_line(row: dict) -> str:
+    return "; ".join(_source_records(row.get("Source of the numbers")))[:400]
+
+
+def clean_research_text(row: dict) -> str:
+    """Notes and land comments, without lot size, people, sheets, or power units."""
+    kept = []
+    for key in ("What we know", "Land notes"):
+        text = trim_restated_facts(plain_note(row.get(key)))
+        text = re.sub(r"(?i)\bon \d+(?:\.\d+)? acres?\b", "", text)
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            piece = sentence.strip(" ;")
+            if not piece:
+                continue
+            if re.search(r"(?i)\b(kV|kW|MW|kilowatt|kilovolt)\b", piece):
+                continue
+            if _DEAL_PRIVATE.search(piece) or _DEAL_LEAK.search(piece) or banned_hits(piece) or _NOTE_INTERNAL.search(piece):
+                continue
+            if re.search(r"https?://", piece):
+                continue
+            kept.append(piece if piece.endswith(".") else piece + ".")
+    cleaned = " ".join(kept)
+    cleaned = re.sub(r"\s+\.", ".", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    return cleaned[:500]
+
+
+def deal_source(row: dict, listing_url: str) -> tuple[str, str]:
+    """A source line and its type. Off-market rows are not deal cards."""
+    broker = str(row.get("Broker") or "")
+    if is_off_market_row(row):
+        records = _source_records(row.get("Source of the numbers"))
+        line = "Off-market lead (our own research)"
+        if records:
+            line = f"{line}. " + "; ".join(records)
+        if not line.endswith("."):
+            line += "."
+        return line[:400], "off-market"
+    name = _broker_channel(broker)
+    if not name and listing_url:
+        host = _url_host(listing_url)
+        name = {
+            "loopnet.com": "LoopNet",
+            "crexi.com": "Crexi",
+            "bizbuysell.com": "BizBuySell",
+            "matthews.com": "Matthews",
+            "carwashbrokers.com": "Car Wash Brokers",
+        }.get(host, "")
+    if not name:
+        name = "Broker"
+    kind = "broker-listed" if listing_url else "broker"
+    return name[:160], kind
+
+
+def listing_url_from_row(row: dict) -> str:
+    """Prefer a public listing page over a map pin or a file folder.
+
+    Hyperlink targets are included even when the visible cell text is not the URL.
+    """
+    found = []
+    for key, value in row.items():
+        if str(key).startswith("_") or not isinstance(value, str):
+            continue
+        for match in re.findall(r"https?://[^\s)>\"]+", value):
+            found.append((str(key), match.rstrip(".,;")))
+    for key, target in row.get("_links") or []:
+        for match in re.findall(r"https?://[^\s)>\"]+", str(target)):
+            found.append((str(key), match.rstrip(".,;")))
+    if not found:
+        return ""
+
+    def rank(item):
+        key, url = item
+        host = _url_host(url)
+        listing = host in _LISTING_HOSTS
+        drive = "google." in host or host.endswith("google.com")
+        preferred_col = key == "Listing link"
+        return (0 if listing else 1 if not drive else 2, 0 if preferred_col else 1)
+
+    found.sort(key=rank)
+    best = found[0][1]
+    if "google." in _url_host(best):
+        return ""
+    return best[:400]
 
 
 def split_broker(value) -> tuple[str, str]:
@@ -902,14 +1457,16 @@ def clean_deal_note(value) -> str:
 
 def deal_text_problems(deal_id: str, props: dict) -> list[str]:
     problems = []
-    for key in ("next_step", "asking_price_source", "name", "address"):
+    for key in ("next_step", "asking_price_source", "name", "address", "source_line"):
         text = props.get(key) or ""
         if not isinstance(text, str) or not text:
             continue
-        if key in {"next_step", "asking_price_source"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
+        if key in {"next_step", "asking_price_source", "source_line"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
         if _NOTE_INTERNAL.search(text) or banned_hits(text):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
+    if not str(props.get("source_line") or "").strip():
+        problems.append(f"{deal_id} source_line is blank")
     return problems
 
 
@@ -1046,9 +1603,10 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 matched += 1
             broker, firm = split_broker(row.get("Broker"))
             price = parse_price(row.get("Asking price ($)"))
-            url = str(row.get("Listing link") or "").strip()
-            if url.lower() in {"none", "n/a"}:
-                url = ""
+            if is_off_market_row(row):
+                continue
+            url = listing_url_from_row(row)
+            source_line, source_kind = deal_source(row, url)
             blob = " ".join(str(row.get(col) or "") for col in ("Listing link", "What we know", "Land evidence", "Next step"))
             coords = google_coords(blob)
             status = "from listing" if coords else ""
@@ -1086,7 +1644,14 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 "coord_status": status,
                 "miles_to_depot": miles,
                 "listed": str(row.get("Listing status") or "").strip() == "Listed",
+                "parcel_match": "",
+                "parcel_acres": None,
+                "source_line": source_line,
+                "source_kind": source_kind,
+                "business_type": business_type_from_row(row),
             }
+            if props["business_type"] not in BUSINESS_TYPES:
+                raise SystemExit(f"{deal_id} business type is not allowed: {props['business_type']}")
             extra = set(props) - set(DEAL_FIELDS)
             if extra:
                 raise SystemExit("Deal fields outside the whitelist: " + ", ".join(sorted(extra)))
@@ -1130,12 +1695,47 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
         current = best.get(universe_id)
         if current is None or rank.get(props["stage_group"], 9) < rank.get(current["stage_group"], 9):
             best[universe_id] = props
+    by_universe: dict[str, list[dict]] = {}
+    for feature in features:
+        uid = feature["properties"].get("universe_id") or ""
+        if uid:
+            by_universe.setdefault(uid, []).append(feature["properties"])
     for site in sites:
         link = best.get(site["site_id"])
         site["linked_deal_id"] = link["deal_id"] if link else ""
         site["linked_deal_name"] = link["name"] if link else ""
         site["linked_deal_stage"] = link["stage"] if link else ""
+        listing = ""
+        if site.get("listed"):
+            if link and link.get("listing_url"):
+                listing = link["listing_url"]
+            else:
+                for props in by_universe.get(site["site_id"], []):
+                    if props.get("listing_url"):
+                        listing = props["listing_url"]
+                        break
+        site["listing_url"] = listing
+    report["listing_links"] = {
+        "pipeline": _listing_split(pipeline),
+        "land": _listing_split(land),
+        "listed_sites_with_link": sum(1 for site in sites if site.get("listed") and site.get("listing_url")),
+        "listed_sites": sum(1 for site in sites if site.get("listed")),
+    }
+    report["source_lines"] = dict(Counter(item["properties"].get("source_kind") or "" for item in features))
     return {"type": "FeatureCollection", "features": features}, report
+
+
+def _listing_split(features: list[dict]) -> dict:
+    out: dict[str, dict] = {}
+    for feature in features:
+        props = feature["properties"]
+        city = props.get("city") or "?"
+        bucket = out.setdefault(city, {"with_link": 0, "without_link": 0})
+        if props.get("listing_url"):
+            bucket["with_link"] += 1
+        else:
+            bucket["without_link"] += 1
+    return out
 
 
 def nearest_depot_miles(lon: float, lat: float, depots: list[dict]) -> float | None:
@@ -1186,10 +1786,63 @@ def looks_broward(address: str) -> bool:
     return any(hint in blob for hint in BROWARD_HINTS)
 
 
-def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
+def _simplify_geom(geom: dict, tolerance: float = 0.00008) -> dict:
+    if not geom:
+        return geom
+    kind = geom.get("type")
+    coords = geom.get("coordinates")
+    if kind == "Polygon":
+        return {"type": "Polygon", "coordinates": [_simplify_ring(ring, tolerance) for ring in coords]}
+    if kind == "MultiPolygon":
+        return {"type": "MultiPolygon", "coordinates": [[_simplify_ring(ring, tolerance) for ring in poly] for poly in coords]}
+    return geom
+
+
+def _simplify_ring(ring: list, tolerance: float) -> list:
+    if len(ring) < 5:
+        return ring
+    closed = ring[0] == ring[-1]
+    body = ring[:-1] if closed else ring
+    simple = _rdp(body, tolerance)
+    if len(simple) < 3:
+        simple = body[:3]
+    if closed and simple[0] != simple[-1]:
+        simple = simple + [simple[0]]
+    return simple
+
+
+def _rdp(points: list, tolerance: float) -> list:
+    if len(points) < 3:
+        return points
+    end = len(points) - 1
+    farthest = 0.0
+    index = 0
+    for i in range(1, end):
+        distance = _perp(points[i], points[0], points[end])
+        if distance > farthest:
+            farthest = distance
+            index = i
+    if farthest > tolerance:
+        left = _rdp(points[: index + 1], tolerance)
+        right = _rdp(points[index:], tolerance)
+        return left[:-1] + right
+    return [points[0], points[end]]
+
+
+def _perp(point, start, end) -> float:
+    if start == end:
+        return ((point[0] - start[0]) ** 2 + (point[1] - start[1]) ** 2) ** 0.5
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    scale = dx * dx + dy * dy
+    if scale == 0:
+        return 0.0
+    t = max(0.0, min(1.0, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / scale))
+    x, y = start[0] + t * dx, start[1] + t * dy
+    return ((point[0] - x) ** 2 + (point[1] - y) ** 2) ** 0.5
+
+
+def fetch_parcel(city: str, apn: str, address: str, lon: float | None = None, lat: float | None = None) -> dict | None:
     tokens = apn_tokens(apn)
-    if not tokens:
-        return None
     if city == "LAS":
         for token in tokens:
             if not token.isdigit():
@@ -1200,7 +1853,7 @@ def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
                 + urllib.parse.urlencode(
                     {
                         "where": f"PARCEL='{token}'",
-                        "outFields": "PARCEL,ASSR_ACRES",
+                        "outFields": "PARCEL,ASSR_ACRES,OWNER",
                         "returnGeometry": "true",
                         "outSR": "4326",
                         "f": "geojson",
@@ -1211,6 +1864,9 @@ def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
             if feat:
                 feat["county"] = "Clark"
                 feat["apn"] = token
+                feat["match"] = "parcel number"
+                feat["acres"] = first_number((feat.get("properties") or {}).get("ASSR_ACRES"))
+                feat["owner"] = (feat.get("properties") or {}).get("OWNER") or ""
                 return feat
     elif city == "PHX":
         for token in tokens:
@@ -1219,7 +1875,7 @@ def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
                 + urllib.parse.urlencode(
                     {
                         "where": f"APN='{token}'",
-                        "outFields": "APN",
+                        "outFields": "APN,LotSize_Acre,OwnerName",
                         "returnGeometry": "true",
                         "outSR": "4326",
                         "f": "geojson",
@@ -1230,6 +1886,9 @@ def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
             if feat:
                 feat["county"] = "Maricopa"
                 feat["apn"] = token
+                feat["match"] = "parcel number"
+                feat["acres"] = first_number((feat.get("properties") or {}).get("LotSize_Acre"))
+                feat["owner"] = (feat.get("properties") or {}).get("OwnerName") or ""
                 return feat
     elif city == "MIA" and not looks_broward(address):
         for token in tokens:
@@ -1239,7 +1898,7 @@ def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
                 + urllib.parse.urlencode(
                     {
                         "where": f"FOLIO='{folio}'",
-                        "outFields": "FOLIO",
+                        "outFields": "FOLIO,TRUE_OWNER1",
                         "returnGeometry": "true",
                         "outSR": "4326",
                         "f": "geojson",
@@ -1250,24 +1909,81 @@ def fetch_parcel(city: str, apn: str, address: str) -> dict | None:
             if feat:
                 feat["county"] = "Miami-Dade"
                 feat["apn"] = folio
+                feat["match"] = "parcel number"
+                feat["owner"] = (feat.get("properties") or {}).get("TRUE_OWNER1") or ""
                 return feat
+    if lon is not None and lat is not None:
+        return fetch_parcel_at_point(city, lon, lat, address)
     return None
 
 
-def http_geojson(url: str) -> dict | None:
+def fetch_parcel_at_point(city: str, lon: float, lat: float, address: str) -> dict | None:
+    if city == "MIA" and looks_broward(address):
+        return None
+    params = {
+        "geometry": f"{lon},{lat}",
+        "geometryType": "esriGeometryPoint",
+        "inSR": "4326",
+        "spatialRel": "esriSpatialRelIntersects",
+        "returnGeometry": "true",
+        "outSR": "4326",
+        "f": "geojson",
+    }
+    if city == "LAS":
+        base = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CC_PARCELS_SHP/FeatureServer/1/query"
+        params["outFields"] = "PARCEL,ASSR_ACRES,OWNER"
+        county, apn_key, acres_key, owner_key = "Clark", "PARCEL", "ASSR_ACRES", "OWNER"
+    elif city == "PHX":
+        base = "https://gis.maricopa.gov/arcgis/rest/services/IndividualService/Parcel/MapServer/1/query"
+        params["outFields"] = "APN,LotSize_Acre,OwnerName"
+        county, apn_key, acres_key, owner_key = "Maricopa", "APN", "LotSize_Acre", "OwnerName"
+    elif city == "MIA":
+        base = "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query"
+        params["outFields"] = "FOLIO,TRUE_OWNER1"
+        county, apn_key, acres_key, owner_key = "Miami-Dade", "FOLIO", "", "TRUE_OWNER1"
+    else:
+        return None
+    feat = http_geojson(base + "?" + urllib.parse.urlencode(params))
+    if not feat:
+        return None
+    props = feat.get("properties") or {}
+    feat["county"] = county
+    feat["apn"] = str(props.get(apn_key) or "")
+    feat["match"] = "pin location"
+    feat["acres"] = first_number(props.get(acres_key)) if acres_key else None
+    feat["owner"] = props.get(owner_key) or ""
+    return feat
+
+
+def http_json(url: str) -> dict | None:
     req = urllib.request.Request(url, headers={"User-Agent": "sites-map-build"})
     try:
         with urllib.request.urlopen(req, timeout=25) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except Exception:
         return None
-    features = payload.get("features") or []
+    return payload if isinstance(payload, dict) else None
+
+
+def http_features(url: str) -> list[dict]:
+    payload = http_json(url)
+    if not payload:
+        return []
+    return payload.get("features") or []
+
+
+def http_geojson(url: str) -> dict | None:
+    features = http_features(url)
     if not features:
         return None
     geom = features[0].get("geometry")
     if not geom:
         return None
-    return {"geometry": geom}
+    try:
+        simple = _simplify_geom(geom)
+    except (TypeError, ValueError, IndexError):
+        return None
+    return {"geometry": simple, "properties": features[0].get("properties") or {}}
 
 
 def load_parcel_cache() -> dict:
@@ -1276,77 +1992,338 @@ def load_parcel_cache() -> dict:
     return {}
 
 
-def build_parcels(sites: list[dict], refresh: bool) -> tuple[list[dict], dict]:
-    cache = {} if refresh else load_parcel_cache()
+def parcel_targets(sites: list[dict], deals: list[dict]) -> list[tuple[str, dict]]:
     wanted = []
+    seen = set()
     for site in sites:
-        if not site.get("verdict"):
+        if site.get("origin") == "off-market":
+            if site.get("lon") is None or site.get("lat") is None:
+                continue
+            key = f"site|{site['site_id']}"
+            if key not in seen and site.get("city") in {"PHX", "LAS", "MIA"}:
+                seen.add(key)
+                wanted.append((key, {"kind": "site", "record": site}))
             continue
-        if site.get("duplicate_of"):
+        if site.get("land_only") or site.get("origin") != "universe" or site.get("duplicate_of"):
             continue
-        key = f"{site['city']}|{norm_apn(site.get('apn'))}|{site['site_id']}"
-        wanted.append((key, site))
+        if not site.get("counts_as_site") or not site.get("in_area"):
+            continue
+        if site["city"] not in {"PHX", "LAS", "MIA"}:
+            continue
+        key = f"site|{site['site_id']}"
+        if key in seen:
+            continue
+        seen.add(key)
+        wanted.append((key, {"kind": "site", "record": site}))
+    for feature in deals:
+        props = feature.get("properties") or {}
+        if props.get("city") not in {"PHX", "LAS", "MIA"}:
+            continue
+        if not feature.get("geometry"):
+            continue
+        key = f"deal|{props.get('deal_id')}"
+        if key in seen:
+            continue
+        seen.add(key)
+        wanted.append((key, {"kind": "deal", "record": props, "geometry": feature.get("geometry")}))
+    return wanted
+
+
+def _parcel_usable(cached) -> bool:
+    return isinstance(cached, dict) and bool(cached.get("geometry"))
+
+
+def _needs_adjoining(record: dict) -> bool:
+    if record.get("tier_from_adjoining"):
+        return True
+    value = record.get("spare_ac_adjoining")
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
+
+
+def build_parcels(sites: list[dict], refresh: bool, deals: list[dict] | None = None) -> tuple[list[dict], dict]:
+    cache = {} if refresh else load_parcel_cache()
+    # Misses cached before the pin-location fallback are not results.
+    if not refresh and cache.pop("_point_fallback", None) != 1:
+        for key in list(cache):
+            if not _parcel_usable(cache.get(key)):
+                cache.pop(key, None)
+    cache["_point_fallback"] = 1
+    wanted = parcel_targets(sites, deals or [])
     features = []
     stats = Counter()
     todo = []
-    for key, site in wanted:
-        if key in cache and not refresh:
-            cached = cache[key]
-            if cached:
-                features.append(parcel_feature(site, cached))
-                stats["cache_hit"] += 1
-            else:
-                stats["cache_miss_empty"] += 1
+    for key, target in wanted:
+        cached = cache.get(key)
+        if _parcel_usable(cached) and not refresh:
+            stats["cache_hit"] += 1
             continue
-        todo.append((key, site))
+        todo.append((key, target))
 
     def job(item):
-        key, site = item
-        if looks_broward(site.get("address") or "") and site["city"] == "MIA":
+        key, target = item
+        record = target["record"]
+        city = record.get("city") or ""
+        address = record.get("address") or ""
+        if looks_broward(address) and city == "MIA":
             return key, None, "broward_unavailable"
-        found = fetch_parcel(site["city"], site.get("apn") or "", site.get("address") or "")
+        lon = lat = None
+        geometry = target.get("geometry") or {}
+        if geometry.get("type") == "Point":
+            lon, lat = geometry["coordinates"]
+        elif record.get("lon") is not None and record.get("lat") is not None:
+            lon, lat = record.get("lon"), record.get("lat")
+        found = fetch_parcel(city, record.get("apn") or "", address, lon, lat)
         return key, found, "fetched" if found else "not_found"
 
     if todo:
-        with ThreadPoolExecutor(max_workers=6) as pool:
+        with ThreadPoolExecutor(max_workers=8) as pool:
             futures = [pool.submit(job, item) for item in todo]
             for fut in as_completed(futures):
                 key, found, label = fut.result()
                 cache[key] = found
                 stats[label] += 1
-                if found:
-                    site = next(s for k, s in todo if k == key)
-                    features.append(parcel_feature(site, found))
+    by_city = Counter()
+    by_method = Counter()
+    adjoining_count = 0
+    for key, target in wanted:
+        cached = cache.get(key)
+        record = target["record"]
+        if _parcel_usable(cached):
+            _stamp_parcel(record, cached)
+            _attach_adjoining(target, cached)
+            features.append(parcel_feature(target, cached))
+            for extra in cached.get("adjoining") or []:
+                features.append(adjoining_feature(target, cached, extra))
+                adjoining_count += 1
+            by_city[record.get("city") or "?"] += 1
+            by_method[cached.get("match") or "none"] += 1
+        else:
+            record["parcel_match"] = "none"
+            if record.get("deal_id"):
+                record["parcel_acres"] = None
+    coverage = {}
+    by_layer: dict[str, dict] = {}
+    none_rows = []
+    for key, target in wanted:
+        record = target["record"]
+        city = record.get("city") or "?"
+        kind = "universe" if target.get("kind") == "site" else (record.get("kind") or "deal")
+        bucket = coverage.setdefault(city, {"targets": 0, "matched": 0, "none": 0})
+        layer = by_layer.setdefault(kind, {}).setdefault(city, {"targets": 0, "matched": 0, "none": 0, "no_geometry": 0})
+        bucket["targets"] += 1
+        layer["targets"] += 1
+        if _parcel_usable(cache.get(key)):
+            bucket["matched"] += 1
+            layer["matched"] += 1
+        else:
+            bucket["none"] += 1
+            layer["none"] += 1
+            none_rows.append(
+                {
+                    "id": record.get("site_id") or record.get("deal_id"),
+                    "city": city,
+                    "kind": kind,
+                    "reason": _miss_reason(target),
+                }
+            )
+    for bucket in coverage.values():
+        bucket["pct"] = round(100.0 * bucket["matched"] / bucket["targets"], 1) if bucket["targets"] else 0
+    for cities in by_layer.values():
+        for bucket in cities.values():
+            bucket["pct"] = round(100.0 * bucket["matched"] / bucket["targets"], 1) if bucket["targets"] else 0
     stats["features"] = len(features)
-    stats["broward_skipped"] = sum(
-        1
-        for site in sites
-        if site.get("verdict") and site["city"] == "MIA" and looks_broward(site.get("address") or "")
+    stats["adjoining"] = adjoining_count
+    stats["by_city"] = dict(by_city)
+    stats["by_method"] = dict(by_method)
+    global LAST_CACHE
+    LAST_CACHE = cache
+    return features, {
+        "counts": dict(stats),
+        "coverage": coverage,
+        "by_layer": by_layer,
+        "none_rows": none_rows,
+        "note": parcel_note(stats),
+    }
+
+
+def _stamp_parcel(record: dict, found: dict) -> None:
+    record["parcel_match"] = found.get("match") or "none"
+    acres = found.get("acres")
+    if isinstance(acres, (int, float)) and not isinstance(acres, bool) and acres > 0:
+        record["parcel_acres"] = round(float(acres), 3)
+        if record.get("site_id"):
+            record["lot_ac_source"] = "County assessor"
+
+
+def _target_point(target: dict) -> tuple[float | None, float | None]:
+    record = target["record"]
+    geometry = target.get("geometry") or {}
+    if geometry.get("type") == "Point":
+        lon, lat = geometry["coordinates"]
+        return lon, lat
+    if record.get("lon") is not None and record.get("lat") is not None:
+        return record.get("lon"), record.get("lat")
+    return None, None
+
+
+def _miss_reason(target: dict) -> str:
+    record = target["record"]
+    _lon, lat = _target_point(target)
+    if record.get("city") == "MIA" and (
+        looks_broward(record.get("address") or "") or (isinstance(lat, (int, float)) and lat > 25.98)
+    ):
+        return "outside the Miami-Dade parcel layer"
+    if lat is None:
+        return "no coordinates"
+    return "no parcel at this pin"
+
+
+def _bbox(geom: dict, pad: float = 0.0006):
+    xs: list[float] = []
+    ys: list[float] = []
+
+    def walk(value):
+        if isinstance(value, list):
+            if len(value) >= 2 and isinstance(value[0], (int, float)) and not isinstance(value[0], bool) and isinstance(value[1], (int, float)) and not isinstance(value[1], bool):
+                xs.append(float(value[0]))
+                ys.append(float(value[1]))
+            else:
+                for item in value:
+                    walk(item)
+
+    walk((geom or {}).get("coordinates"))
+    if not xs:
+        return None
+    return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
+
+
+def lookup_owner(city: str, apn: str) -> str:
+    token = norm_apn(apn)
+    if not token:
+        return ""
+    if city == "LAS":
+        base = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CC_PARCELS_SHP/FeatureServer/1/query"
+        where, field = f"PARCEL='{token}'", "OWNER"
+    elif city == "PHX":
+        base = "https://gis.maricopa.gov/arcgis/rest/services/IndividualService/Parcel/MapServer/1/query"
+        where, field = f"APN='{token}'", "OwnerName"
+    elif city == "MIA":
+        folio = token.zfill(13) if token.isdigit() else token
+        base = "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query"
+        where, field = f"FOLIO='{folio}'", "TRUE_OWNER1"
+    else:
+        return ""
+    payload = http_json(base + "?" + urllib.parse.urlencode({"where": where, "outFields": field, "returnGeometry": "false", "f": "json"}))
+    for feat in (payload or {}).get("features") or []:
+        attrs = feat.get("attributes") or feat.get("properties") or {}
+        if attrs.get(field):
+            return str(attrs[field])
+    return ""
+
+
+def fetch_adjoining(city: str, geom: dict, owner: str, apn: str) -> list[dict]:
+    owner = (owner or "").strip()
+    box = _bbox(geom)
+    if not owner or not box:
+        return []
+    xmin, ymin, xmax, ymax = box
+    envelope = json.dumps({"xmin": xmin, "ymin": ymin, "xmax": xmax, "ymax": ymax, "spatialReference": {"wkid": 4326}})
+    safe = owner.replace("'", "''")
+    if city == "LAS":
+        base = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CC_PARCELS_SHP/FeatureServer/1/query"
+        where, out_fields, apn_key = f"OWNER='{safe}'", "PARCEL,OWNER", "PARCEL"
+    elif city == "PHX":
+        base = "https://gis.maricopa.gov/arcgis/rest/services/IndividualService/Parcel/MapServer/1/query"
+        where, out_fields, apn_key = f"OwnerName='{safe}'", "APN,OwnerName", "APN"
+    elif city == "MIA":
+        base = "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query"
+        where, out_fields, apn_key = f"TRUE_OWNER1='{safe}'", "FOLIO,TRUE_OWNER1", "FOLIO"
+    else:
+        return []
+    url = base + "?" + urllib.parse.urlencode(
+        {
+            "where": where,
+            "geometry": envelope,
+            "geometryType": "esriGeometryEnvelope",
+            "inSR": "4326",
+            "spatialRel": "esriSpatialRelIntersects",
+            "outFields": out_fields,
+            "returnGeometry": "true",
+            "outSR": "4326",
+            "f": "geojson",
+            "resultRecordCount": "12",
+        }
     )
-    return features, {"counts": dict(stats), "note": parcel_note(stats)}
+    subject = norm_apn(apn)
+    found = []
+    for feat in http_features(url):
+        props = feat.get("properties") or {}
+        token = norm_apn(props.get(apn_key))
+        if subject and token == subject:
+            continue
+        geometry = feat.get("geometry")
+        if not geometry:
+            continue
+        try:
+            simple = _simplify_geom(geometry)
+        except (TypeError, ValueError, IndexError):
+            continue
+        found.append({"geometry": simple, "apn": str(props.get(apn_key) or "")})
+    return found
 
 
-def parcel_feature(site: dict, cached: dict) -> dict:
+def _attach_adjoining(target: dict, cached: dict) -> None:
+    record = target["record"]
+    if target.get("kind") != "site" or not _needs_adjoining(record) or "adjoining" in cached:
+        return
+    owner = cached.get("owner") or ""
+    if not owner:
+        owner = lookup_owner(record.get("city") or "", cached.get("apn") or record.get("apn") or "")
+        cached["owner"] = owner
+    cached["adjoining"] = fetch_adjoining(record.get("city") or "", cached.get("geometry") or {}, owner, cached.get("apn") or record.get("apn") or "")
+
+
+def parcel_feature(target: dict, cached: dict) -> dict:
+    record = target["record"]
+    identifier = record.get("site_id") or record.get("deal_id")
     return {
         "type": "Feature",
         "geometry": cached["geometry"],
         "properties": {
-            "site_id": site["site_id"],
-            "apn": cached.get("apn") or site.get("apn"),
-            "role": "wash",
+            "site_id": identifier,
+            "apn": cached.get("apn") or record.get("apn") or "",
+            "role": "parcel",
+            "match": cached.get("match") or "parcel number",
             "county": cached.get("county"),
-            "city": site["city"],
+            "city": record.get("city"),
+            "kind": target.get("kind") or "site",
+        },
+    }
+
+
+def adjoining_feature(target: dict, cached: dict, extra: dict) -> dict:
+    record = target["record"]
+    identifier = record.get("site_id") or record.get("deal_id")
+    return {
+        "type": "Feature",
+        "geometry": extra.get("geometry"),
+        "properties": {
+            "site_id": identifier,
+            "apn": extra.get("apn") or "",
+            "role": "adjoining",
+            "match": "parcel number",
+            "county": cached.get("county"),
+            "city": record.get("city"),
+            "kind": target.get("kind") or "site",
         },
     }
 
 
 def parcel_note(stats: Counter) -> str:
     return (
-        "Parcel outlines were requested from Clark, Maricopa, and Miami-Dade county "
-        "map services for county-checked sites. Broward County's map service did not "
-        "resolve, so Broward sites have no outline. Same-owner adjoining parcels were "
-        "not in the source files and were not fetched. "
-        f"Cache and fetch counts: {dict(stats)}."
+        "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. "
+        "A parcel number match is tried first, then the pin location. "
+        f"Counts: {dict(stats)}."
     )
 
 
@@ -1379,7 +2356,39 @@ def append_verdicts(new_rows: list[dict]) -> dict:
         key = (row.get("site_id"), row.get("reviewer"), row.get("source_file"))
         current_for[key] = row["verdict_id"]
     added = 0
+    for row in existing:
+        row["reviewer"] = neutral_author(row.get("reviewer") or "")
+        row["source_file"] = neutral_source(row.get("source_file") or "")
+        for key in ("notes", "parcel_evidence", "operating_evidence"):
+            if key in row:
+                row[key] = plain_note(row.get(key) or "")
+    seen = {
+        (
+            row.get("site_id"),
+            row.get("reviewer"),
+            row.get("source_file"),
+            row.get("adjudicated_verdict"),
+            row.get("aerial_verdict"),
+            row.get("notes"),
+        )
+        for row in existing
+    }
     for row in new_rows:
+        row["reviewer"] = neutral_author(row.get("reviewer") or "")
+        row["source_file"] = neutral_source(row.get("source_file") or "")
+        for key in ("notes", "parcel_evidence", "operating_evidence"):
+            if key in row:
+                row[key] = plain_note(row.get(key) or "")
+        signature = (
+            row.get("site_id"),
+            row.get("reviewer"),
+            row.get("source_file"),
+            row.get("adjudicated_verdict"),
+            row.get("aerial_verdict"),
+            row.get("notes"),
+        )
+        if signature in seen:
+            continue
         row["verdict_id"] = verdict_id(row)
         row["supersedes"] = row.get("supersedes") or ""
         if row["verdict_id"] in by_id:
@@ -1621,7 +2630,7 @@ def apply_incoming(records, by_id, verdict_rows, crosswalk) -> dict:
             site["evidence"] = scrub(record.get("parcel_evidence"))[:700]
         if record.get("elimination_reason"):
             site["elimination_reason"] = scrub(record.get("elimination_reason"))
-        reviewer = scrub(record.get("reviewer") or "Incoming") or "Incoming"
+        reviewer = neutral_author(scrub(record.get("reviewer") or "Incoming") or "Incoming")
         retrieved = record.get("retrieved_at")
         if hasattr(retrieved, "strftime"):
             retrieved = retrieved.strftime("%Y-%m-%d")
@@ -1689,6 +2698,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     muse_override = load_muse_file(Path(muse_file)) if muse_file else {}
     workbook = source_workbook()
     census = census_counts(workbook)
+    universe_rows = load_universe_rows(workbook)
     pipeline_rows = sheet_rows(workbook, "Pipeline", 3)
     land_rows = sheet_rows(workbook, "Land Sites", 3)
     areas = load_service_areas()
@@ -1779,6 +2789,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "asking_price_status": None,
             "pipeline_stage": None,
             "pipeline_id": None,
+            "research_sources": "",
+            "research_note": "",
+            "business_type": "Car wash",
             "land_only": False,
             "on_land_tab": False,
             "quarantine": False,
@@ -1861,14 +2874,14 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                     "land_verdict_provisional": aerial,
                     "operating_evidence_tier": "",
                     "retrieved_at": "2026-11-02",
-                    "reviewer": "Indie",
+                    "reviewer": "county check",
                     "supersedes": "",
                     "source_file": "universe_v3.csv",
                 }
             )
             site["reviews"].append(
                 {
-                    "reviewer": "Indie",
+                    "reviewer": "county check",
                     "kind": "aerial",
                     "verdict": aerial,
                     "provisional": True,
@@ -1906,7 +2919,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         if aerial:
             site["reviews"].append(
                 {
-                    "reviewer": "Indie",
+                    "reviewer": "county check",
                     "kind": "aerial",
                     "verdict": aerial,
                     "provisional": True,
@@ -1985,14 +2998,14 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                     "land_verdict_provisional": "",
                     "operating_evidence_tier": "",
                     "retrieved_at": "2026-11-03",
-                    "reviewer": "Muse",
+                    "reviewer": "second review",
                     "supersedes": "",
-                    "source_file": "reconciliation muse column" if sid not in muse_override else "muse verdict file",
+                    "source_file": "second review column" if sid not in muse_override else "second review file",
                 }
             )
             site["reviews"].append(
                 {
-                    "reviewer": "Muse",
+                    "reviewer": "second review",
                     "kind": "county",
                     "verdict": muse_verdict,
                     "provisional": False,
@@ -2003,7 +3016,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                     "note": note,
                 }
             )
-            crosswalk.append({"site_id": sid, "source": "muse_latest", "source_key": sid})
+            crosswalk.append({"site_id": sid, "source": "second_review", "source_key": sid})
         if site["verdict"] in {"FAIL", "NOT_A_WASH"}:
             site["why_stopped"] = site["evidence"] or site["agreement"] or "County check did not clear this site."
         elif site["verdict"] == "UNRESOLVED":
@@ -2033,14 +3046,14 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "land_verdict_provisional": "",
                 "operating_evidence_tier": "",
                 "retrieved_at": "2026-11-03",
-                "reviewer": "Indie",
+                "reviewer": "county check",
                 "supersedes": "",
                 "source_file": "reconciliation_final.xlsx",
             }
         )
         site["reviews"].append(
             {
-                "reviewer": "Indie",
+                "reviewer": "county check",
                 "kind": "reconciliation",
                 "verdict": playbook,
                 "provisional": False,
@@ -2053,6 +3066,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             }
         )
         crosswalk.append({"site_id": sid, "source": "reconciliation_final", "source_key": sid})
+
+    live_universe = apply_live_universe(
+        universe_rows, sites, by_id, by_apn, blank_site, screening, verdict_rows, crosswalk
+    )
 
     def attach_price(site, price, source, url, date, status):
         if price is None or site.get("asking_price"):
@@ -2084,9 +3101,40 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             return hits[0]
         return None
 
+    off_market_matched: list[dict] = []
+    off_market_unmatched: list[dict] = []
+
+    def attach_off_market_research(site: dict, row: dict) -> None:
+        records = [part.strip() for part in (site.get("research_sources") or "").split(";") if part.strip()]
+        for record in _source_records(row.get("Source of the numbers")):
+            if record not in records:
+                records.append(record)
+        site["research_sources"] = "; ".join(records)[:400]
+        note = clean_research_text(row)
+        evidence = site.get("evidence") or ""
+        prior = site.get("research_note") or ""
+        if note and note not in prior and note not in evidence:
+            site["research_note"] = (prior + " " + note).strip()[:700]
+
     def absorb_workbook_row(row: dict, kind: str):
         city = str(row.get("Market") or "").strip() or "UNK"
         label = str(row.get("Site") or "").strip()
+        if is_off_market_row(row):
+            matched = match_universe(city, row.get("APN or folio"), label)
+            entry = {
+                "city": city,
+                "kind": kind,
+                "label": scrub(label)[:160],
+                "name": scrub(row.get("Name"))[:120],
+                "apn": str(row.get("APN or folio") or ""),
+                "universe_id": matched or "",
+            }
+            if matched:
+                attach_off_market_research(by_id[matched], row)
+                off_market_matched.append(entry)
+            else:
+                place_unmatched_off_market(row, city, label, entry)
+            return
         key = f"{kind}|{label}"
         assigned = registry_id(reg, "PIPE" if kind == "pipeline" else "LAND", key, city if city in {"LAS", "PHX", "MIA"} else "XX")
         matched = match_universe(city, row.get("APN or folio"), label)
@@ -2131,10 +3179,58 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             site["contacted"] = True
         crosswalk.append({"site_id": site["site_id"], "source": "Pipeline" if kind == "pipeline" else "Land Sites", "source_key": label})
 
+    off_market_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
+    off_market_seq: Counter = Counter()
+
+    def _geom_centroid(geom: dict) -> tuple[float, float] | None:
+        ring = None
+        if geom.get("type") == "Polygon":
+            ring = (geom.get("coordinates") or [[]])[0]
+        elif geom.get("type") == "MultiPolygon":
+            ring = ((geom.get("coordinates") or [[[]]])[0] or [[]])[0]
+        if not ring:
+            return None
+        lon = sum(point[0] for point in ring) / len(ring)
+        lat = sum(point[1] for point in ring) / len(ring)
+        return lon, lat
+
+    def place_unmatched_off_market(row: dict, city: str, label: str, entry: dict) -> None:
+        """A site the census does not have. Drawn on its own layer, not in the funnel."""
+        if city not in {"PHX", "LAS", "MIA"}:
+            off_market_unmatched.append(entry)
+            return
+        off_market_seq[city] += 1
+        sid = f"OFF-{city}-{off_market_seq[city]:04d}"
+        site = blank_site(sid, city)
+        site["origin"] = "off-market"
+        site["counts_as_site"] = False
+        site["in_area"] = False
+        site["name"] = scrub(row.get("Name") or label)[:160]
+        site["address"] = scrub(re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I))[:180]
+        site["apn"] = str(row.get("APN or folio") or "")
+        site["business_type"] = business_type_from_row(row)
+        attach_off_market_research(site, row)
+        query = _geocode_query(row)
+        coords = geocode_address(query, off_market_cache) if query else None
+        if coords is None and site["apn"]:
+            found = fetch_parcel(city, site["apn"], site["address"])
+            if found and found.get("geometry"):
+                coords = _geom_centroid(found["geometry"])
+        if coords:
+            site["lon"], site["lat"] = float(coords[0]), float(coords[1])
+            site["coord_status"] = "known"
+        sites.append(site)
+        by_id[sid] = site
+        entry["site_id"] = sid
+        entry["placed"] = site.get("coord_status") == "known"
+        off_market_unmatched.append(entry)
+
     for row in pipeline_rows:
         absorb_workbook_row(row, "pipeline")
     for row in land_rows:
         absorb_workbook_row(row, "land")
+    GEOCODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    GEOCODE_CACHE.write_text(json.dumps(off_market_cache))
 
     for site in sites:
         listing = best_listing(site["site_id"])
@@ -2158,6 +3254,17 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         explicit_reason = site.get("elimination_reason") or ""
         site["elimination_reason"] = explicit_reason or elimination_reason(site)
         site["tenure_fail"] = is_tenure_fail(site)
+        # Jaideep, 3 Nov 2026: the workbook clears 11 sites. Charleston Car Wash
+        # (LAS-U1516, 1961 E Charleston) and the Chandler Quick Quack (PHX-U519,
+        # 7455 W Chandler) stay Maybe until he reviews them. Terrible's #153
+        # (LAS-U100, 4070 Arville St) stays cleared. The map therefore shows 9.
+        if site["site_id"] in {"LAS-U1516", "PHX-U519"}:
+            site["verdict"] = "MAYBE"
+            if site.get("network_status") == "cleared":
+                site["network_status"] = None
+        elif site["site_id"] == "LAS-U100":
+            site["verdict"] = "PASS"
+            site["network_status"] = "cleared"
         if site.get("verdict"):
             site["verification"] = "county-checked"
         elif site.get("aerial_fit"):
@@ -2244,7 +3351,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "muse_reference": {
             "in_area_sites": 1043,
             "by_city": {"LAS": 179, "PHX": 254, "MIA": 610},
-            "note": "Muse reference for the service-area step. The map shows our screen, not this reference.",
+            "note": "Earlier reference for the service-area step. The map shows our screen, not this reference.",
             "unique_sites": 1640,
             "verdict": {"PASS": 10, "MAYBE": 21, "FAIL": 21, "NOT_A_WASH": 11, "UNRESOLVED": 2},
         },
@@ -2255,7 +3362,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "unit": "rows",
                 "total": census["total"],
                 "by_city": census["by_city"],
-                "note": "Workbook Universe tab. A census union, not a count of operating businesses. The map draws the deduped site records, which are fewer than the row count.",
+                "note": "Workbook Universe tab. A census union, not a count of operating businesses. The Universe step keeps the rows marked counted, one site each.",
             },
             {
                 "id": "unique",
@@ -2265,13 +3372,14 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "by_city": by_city(countable),
                 "by_class": class_breakdown(countable),
                 "note": (
-                    f"Universe file has {len(universe)} site records. "
-                    f"Same-parcel pairs counted once: "
+                    f"Counted rows on the Universe tab: {len(countable)}. "
+                    f"The tab has {census['total']} rows in all. "
+                    f"Census file records not on a counted row are left out"
                     + (
-                        ", ".join(f"{dup} with {keep}" for dup, keep in sorted(duplicate_of.items()))
-                        or "none"
+                        f" ({len(live_universe['dropped_existing'])})."
+                        if live_universe.get("dropped_existing")
+                        else "."
                     )
-                    + ". Muse's reference is about 1,640."
                 ),
             },
             {
@@ -2282,7 +3390,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "by_city": by_city(in_area),
                 "by_class": class_breakdown(in_area),
                 "by_city_class": city_class(in_area),
-                "note": "LAS operative area is the 100 ring with the core inside it. The 200 and 300 rings are the expansion horizon and count as outside. Muse's reference is 1,043 (LV 179 / PHX 254 / MIA 610). This map shows our screen.",
+                "note": "Service area comes from the Universe tab. In is inside the current area. Out and unknown stay outside. Las Vegas rings 200 and 300 stay on the expansion horizon.",
             },
             {
                 "id": "land_tier",
@@ -2359,14 +3467,20 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     warnings = []
     if census["total"] != 1701:
         warnings.append(f"Census row count is {census['total']}, workbook expectation was 1,701.")
-    if by_city(in_area) != {"LAS": 182, "PHX": 251, "MIA": 608}:
-        warnings.append(f"In-area city split is {by_city(in_area)}, expected LV 182 / PHX 251 / MIA 608.")
-    if len(l10) != 25 or len(l4) != 48:
-        warnings.append(
-            f"In-area land tiers are L10 {len(l10)} (county-checked {sum(1 for s in l10 if s['verification']=='county-checked')}) "
-            f"and L4 {len(l4)} (county-checked {sum(1 for s in l4 if s['verification']=='county-checked')}). "
-            "The brief expected about 25 L10 and about 48 L4, with all L10 county-checked and about 3 of the L4 county-checked."
-        )
+    if len(countable) != 1658 or by_city(countable) != {"LAS": 417, "PHX": 555, "MIA": 686}:
+        warnings.append(f"Unique sites are {len(countable)} {by_city(countable)}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).")
+    if by_city(in_area) != {"LAS": 179, "PHX": 254, "MIA": 610}:
+        warnings.append(f"In-area city split is {by_city(in_area)}, workbook service area is LV 179 / PHX 254 / MIA 610.")
+    workbook_county = live_universe.get("county_verdicts") or {}
+    if workbook_county != {"PASS": 13, "MAYBE": 30, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
+        warnings.append(f"Workbook county verdicts before the two Maybe holds are {workbook_county}.")
+    map_verdicts = {key: verdict_groups[key]["total"] for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")}
+    if map_verdicts != {"PASS": 11, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
+        warnings.append(f"Map verdicts are {map_verdicts}, expected Pass 11, Maybe 32, Fail 47, Not a car wash 15, Unresolved 4 after the two holds.")
+    if len(cleared) != 9:
+        warnings.append(f"Cleared on the map is {len(cleared)} ({[site['site_id'] for site in cleared]}). The two holds should leave 9.")
+    if live_universe.get("missing_point"):
+        warnings.append("Counted sites with no pin: " + ", ".join(live_universe["missing_point"][:12]))
     if screening["conflicts"]:
         warnings.append(f"Screening rows with more than one aerial verdict for the same parcel: {len(screening['conflicts'])}.")
     if len(contacted_any) != 0:
@@ -2379,7 +3493,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         warnings.append("The muse verdict file was set but no site rows were read.")
     for sid in ("PHX-U644", "PHX-U646"):
         site = by_id.get(sid)
-        if site:
+        if site and site.get("counts_as_site"):
             warnings.append(f"{sid} in_area={site['in_area']} (screening-tab boundary note in the plan).")
 
     areas_fc = {"type": "FeatureCollection", "features": areas}
@@ -2387,7 +3501,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"])
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     if write:
-        parcels, parcel_meta = build_parcels(sites, refresh_parcels)
+        parcels, parcel_meta = build_parcels(sites, refresh_parcels, deals_fc["features"])
 
     site_features = []
     for site in sites:
@@ -2408,6 +3522,16 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     report = {
         "generated_at": funnel["generated_at"],
         "census_rows": census,
+        "live_universe": {
+            "counted": live_universe.get("counted"),
+            "by_city": live_universe.get("by_city"),
+            "in_area_by_city": live_universe.get("in_area_by_city"),
+            "matched_existing": live_universe.get("matched_existing"),
+            "new_sites": live_universe.get("new_sites"),
+            "dropped_existing": len(live_universe.get("dropped_existing") or []),
+            "county_verdicts_before_holds": live_universe.get("county_verdicts"),
+            "note": "County verdicts are the Universe tab before Charleston Car Wash and the Chandler Quick Quack are held at Maybe. Cleared on the map is the in-area Pass rows after those two holds.",
+        },
         "unique_site_records": len([s for s in sites if s["origin"] == "universe"]),
         "unique_sites_counted": len(countable),
         "same_parcel_collapsed": duplicate_of,
@@ -2438,6 +3562,18 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "pipeline_stage_counts": dict(Counter(str(row.get("Stage")) for row in pipeline_rows)),
         "land_stage_counts": dict(Counter(str(row.get("Stage")) for row in land_rows)),
         "deals": deal_report,
+        "off_market": {
+            "matched": len(off_market_matched),
+            "unmatched": len(off_market_unmatched),
+            "matched_by_city": dict(Counter(item["city"] for item in off_market_matched)),
+            "unmatched_by_city": dict(Counter(item["city"] for item in off_market_unmatched)),
+            "unmatched_rows": off_market_unmatched,
+            "note": (
+                "Matched off-market rows add research to the census site and do not add a second pin. "
+                "Unmatched rows are drawn in universe mode and filtered by business type. "
+                "They are not part of the car-wash census counts."
+            ),
+        },
         "sites_without_coordinates": [
             site["site_id"] for site in sites if site["coord_status"] != "known" and site["counts_as_site"]
         ],
@@ -2445,14 +3581,13 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "acreage_notes": [site["site_id"] for site in sites if site["acreage_note"]],
         "scale_notes": [site["site_id"] for site in sites if site["scale_note"]],
         "parcels": parcel_meta,
-        "muse_source": muse_file or "reconciliation muse column",
+        "muse_source": muse_file or "second review column",
         "warnings": warnings,
         "skipped": [
             "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
             "Nightly workbook sync is not wired; drop a new export in data/source and rerun this script.",
-            "Full in-area parcel pull was not done. Outlines are limited to county-checked sites whose county service answered.",
-            "Broward parcel geometry is unavailable: the county host did not resolve.",
-            "Same-owner adjoining parcel polygons are not in the source bundle.",
+            "Parcel outlines cover in-area universe sites and geocoded deals in Maricopa, Clark, and Miami-Dade. Match method is parcel number, then the pin. Sites north of Miami-Dade stay unmatched.",
+            "Same-owner adjoining outlines are requested where the site record has adjoining spare land.",
             "The 75–250 m review band was not recomputed. The one same-parcel pair found by APN is flagged.",
             "Edge-band distance to the polygon was not recomputed.",
             "Outreach drafts are not loaded.",
@@ -2468,6 +3603,12 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         (OUT / "depots.geojson").write_text(json.dumps(depots))
         (OUT / "deals.geojson").write_text(json.dumps(deals_fc))
         (OUT / "parcels.geojson").write_text(json.dumps(parcels_fc))
+        for city_code in ("PHX", "LAS", "MIA"):
+            city_fc = {
+                "type": "FeatureCollection",
+                "features": [feature for feature in parcels if (feature.get("properties") or {}).get("city") == city_code],
+            }
+            (OUT / f"parcels-{city_code}.geojson").write_text(json.dumps(city_fc))
         (OUT / "funnel.json").write_text(json.dumps(funnel, indent=2))
         (OUT / "build_report.json").write_text(json.dumps(report, indent=2))
         with (OUT / "crosswalk.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -2479,6 +3620,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         write_verdicts(appended["rows"])
         report["verdicts_appended"] = appended["added"]
         report["verdicts_total"] = appended["total"]
+        report["parcel_bytes"] = {
+            name: (OUT / name).stat().st_size
+            for name in ("parcels.geojson", "parcels-PHX.geojson", "parcels-LAS.geojson", "parcels-MIA.geojson")
+        }
         (OUT / "build_report.json").write_text(json.dumps(report, indent=2))
         if PARCEL_CACHE.exists() or True:
             # cache is updated inside build_parcels via the dict; persist it
@@ -2496,51 +3641,6 @@ def save_parcel_cache_from_last():
         return
     PARCEL_CACHE.parent.mkdir(parents=True, exist_ok=True)
     PARCEL_CACHE.write_text(json.dumps(LAST_CACHE))
-
-
-def build_parcels(sites: list[dict], refresh: bool) -> tuple[list[dict], dict]:
-    global LAST_CACHE
-    cache = {} if refresh else load_parcel_cache()
-    wanted = []
-    for site in sites:
-        if not site.get("verdict") or site.get("duplicate_of"):
-            continue
-        key = f"{site['city']}|{site['site_id']}"
-        wanted.append((key, site))
-    features = []
-    stats = Counter()
-    todo = []
-    for key, site in wanted:
-        if key in cache and not refresh:
-            cached = cache[key]
-            if cached:
-                features.append(parcel_feature(site, cached))
-                stats["cache_hit"] += 1
-            else:
-                stats["cache_miss_empty"] += 1
-            continue
-        todo.append((key, site))
-
-    def job(item):
-        key, site = item
-        if site["city"] == "MIA" and looks_broward(site.get("address") or ""):
-            return key, None, "broward_unavailable"
-        found = fetch_parcel(site["city"], site.get("apn") or "", site.get("address") or "")
-        return key, found, "fetched" if found else "not_found"
-
-    if todo:
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            futures = [pool.submit(job, item) for item in todo]
-            for fut in as_completed(futures):
-                key, found, label = fut.result()
-                cache[key] = found
-                stats[label] += 1
-                if found:
-                    site = next(s for k, s in wanted if k == key)
-                    features.append(parcel_feature(site, found))
-    LAST_CACHE = cache
-    stats["features"] = len(features)
-    return features, {"counts": dict(stats), "note": parcel_note(stats)}
 
 
 def build_depots() -> dict:
@@ -2581,7 +3681,18 @@ def sources_present() -> bool:
 def validate_committed() -> None:
     """Check the files in git. Used when the raw source folder is not present."""
     problems: list[str] = []
-    required = ["sites.geojson", "areas.geojson", "depots.geojson", "parcels.geojson", "deals.geojson", "funnel.json", "build_report.json"]
+    required = [
+        "sites.geojson",
+        "areas.geojson",
+        "depots.geojson",
+        "parcels.geojson",
+        "parcels-PHX.geojson",
+        "parcels-LAS.geojson",
+        "parcels-MIA.geojson",
+        "deals.geojson",
+        "funnel.json",
+        "build_report.json",
+    ]
     loaded = {}
     for name in required:
         path = OUT / name
@@ -2594,6 +3705,12 @@ def validate_committed() -> None:
             problems.append(f"{name} is not valid JSON")
     for name, blob in loaded.items():
         problems.extend(scan_obj(blob, name))
+    for folder in ("components", "lib", "app"):
+        for path in (ROOT / folder).rglob("*"):
+            if path.suffix not in {".ts", ".tsx"}:
+                continue
+            if banned_hits(path.read_text()):
+                problems.append(f"banned text in {path.relative_to(ROOT)}")
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 
@@ -2636,6 +3753,14 @@ def validate_committed() -> None:
         if extra:
             problems.append("depot properties not allowed: " + ", ".join(sorted(extra)))
             break
+    if VERDICTS.exists():
+        with VERDICTS.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                blob = " ".join(row.get(key) or "" for key in ("notes", "parcel_evidence", "operating_evidence", "reviewer"))
+                source = row.get("source_file") or ""
+                if _NOTE_INTERNAL.search(blob) or re.search(r"(?i)\b(muse|indie|torque)\b", blob + " " + source):
+                    problems.append(f"verdict note {row.get('site_id')}: {(blob + ' ' + source)[:120]!r}")
+                    break
     if len(loaded["depots.geojson"].get("features", [])) != 13:
         problems.append("expected 13 depot pins")
     deal_features = loaded.get("deals.geojson", {}).get("features", [])
@@ -2656,7 +3781,7 @@ def validate_committed() -> None:
         problems.append("geocode_failed must be a list")
     for item in props:
         problems.extend(site_note_problems(item))
-    problems.extend(funnel_subset_problems(sites, loaded["funnel.json"]))
+    problems.extend(funnel_subset_problems(sites, loaded["funnel.json"], loaded.get("deals.geojson", {}).get("features", [])))
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 
@@ -2674,7 +3799,7 @@ def _universe_stage(site: dict, stage: str) -> bool:
     listed = cleared and bool(props.get("listed"))
     contacted = listed and bool(props.get("contacted"))
     return {
-        "universe": True,
+        "universe": unique,
         "unique": unique,
         "in_area": in_area,
         "land": land,
@@ -2685,24 +3810,32 @@ def _universe_stage(site: dict, stage: str) -> bool:
     }[stage]
 
 
-def funnel_subset_problems(features: list[dict], funnel: dict) -> list[str]:
-    """From Unique onward each step is a subset of the previous one and matches its pins.
+def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict] | None = None) -> list[str]:
+    """Universe through Cleared: each step is a subset of the previous one and matches its pins.
 
-    Universe is the census row count. Choosing it draws the same pins as Unique.
+    Universe is the unique-site count. The census row count stays in the hover note.
+    Listed and contacted are sub-counts on each step, and each listed sub-count matches its pins.
     """
-    order = ["unique", "in_area", "land", "county", "cleared", "listed", "contacted"]
+    order = ["universe", "in_area", "land", "county", "cleared"]
     problems = []
     stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
     census = stages.get("census") or {}
     if census.get("total") != 1701 or census.get("by_city") != {"LAS": 428, "PHX": 561, "MIA": 712}:
         problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,701 rows")
-    unique_rows = [feature for feature in features if _universe_stage(feature, "unique")]
+    unique_rows = [feature for feature in features if _universe_stage(feature, "universe")]
+    leaked = [
+        (feature.get("properties") or {}).get("site_id")
+        for feature in features
+        if (feature.get("properties") or {}).get("origin") == "off-market" and _universe_stage(feature, "universe")
+    ]
+    if leaked:
+        problems.append("off-market sites counted in the universe funnel: " + ", ".join(leaked[:8]))
     unique_stage = stages.get("unique") or {}
     if len(unique_rows) != unique_stage.get("total"):
-        problems.append("unique pin count does not match the unique funnel stage")
+        problems.append("universe pin count does not match the unique site total")
     unique_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in unique_rows))
     if unique_by_city != unique_stage.get("by_city"):
-        problems.append(f"unique pins by city are {unique_by_city}, funnel says {unique_stage.get('by_city')}")
+        problems.append(f"universe pins by city are {unique_by_city}, expected {unique_stage.get('by_city')}")
     groups = {"all": features}
     for city in ("PHX", "LAS", "MIA"):
         groups[city] = [feature for feature in features if (feature.get("properties") or {}).get("city") == city]
@@ -2713,6 +3846,14 @@ def funnel_subset_problems(features: list[dict], funnel: dict) -> list[str]:
             pins = [feature for feature in chosen if (feature.get("geometry") or {}).get("type") == "Point"]
             if len(chosen) != len(pins):
                 problems.append(f"{label} {stage}: count {len(chosen)} but only {len(pins)} pins")
+            listed = [feature for feature in chosen if (feature.get("properties") or {}).get("listed")]
+            listed_pins = [feature for feature in listed if (feature.get("geometry") or {}).get("type") == "Point"]
+            if len(listed) != len(listed_pins):
+                problems.append(f"{label} {stage}: listed {len(listed)} but only {len(listed_pins)} listed pins")
+            contacted = [feature for feature in chosen if (feature.get("properties") or {}).get("contacted")]
+            contacted_pins = [feature for feature in contacted if (feature.get("geometry") or {}).get("type") == "Point"]
+            if len(contacted) != len(contacted_pins):
+                problems.append(f"{label} {stage}: contacted {len(contacted)} but only {len(contacted_pins)} contacted pins")
             ids = {((feature.get("properties") or {}).get("site_id")) for feature in chosen}
             if previous is not None and not ids <= previous:
                 extra = sorted(item for item in ids - previous if item)[:8]
@@ -2728,7 +3869,82 @@ def funnel_subset_problems(features: list[dict], funnel: dict) -> list[str]:
         ]
         if held:
             problems.append(f"{label} held sites are inside the service area")
+    by_id = {(feature.get("properties") or {}).get("site_id"): feature.get("properties") or {} for feature in features}
+    for sid in ("LAS-U1516", "PHX-U519"):
+        props = by_id.get(sid) or {}
+        if props.get("verdict") != "MAYBE" or props.get("network_status") == "cleared":
+            problems.append(f"{sid} must stay Maybe until reviewed")
+    terrible = by_id.get("LAS-U100") or {}
+    if terrible.get("verdict") != "PASS" or terrible.get("network_status") != "cleared":
+        problems.append("LAS-U100 Terrible's #153 must stay cleared")
+    if len(unique_rows) != 1658:
+        problems.append(f"unique sites are {len(unique_rows)}, workbook counted rows are 1,658")
+    if unique_by_city != {"LAS": 417, "PHX": 555, "MIA": 686}:
+        problems.append(f"unique sites by city are {unique_by_city}, expected LAS 417 / PHX 555 / MIA 686")
+    in_area_rows = [feature for feature in features if _universe_stage(feature, "in_area")]
+    in_area_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in in_area_rows))
+    if len(in_area_rows) != 1043 or in_area_by_city != {"LAS": 179, "PHX": 254, "MIA": 610}:
+        problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,043 (LAS 179 / PHX 254 / MIA 610)")
+    verdict_counts = Counter((feature.get("properties") or {}).get("verdict") for feature in unique_rows)
+    expected_verdicts = {"PASS": 11, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
+    got_verdicts = {key: verdict_counts.get(key, 0) for key in expected_verdicts}
+    if got_verdicts != expected_verdicts:
+        problems.append(f"county verdicts on counted sites are {got_verdicts}, expected {expected_verdicts} after the two Maybe holds")
+    cleared_rows = [feature for feature in features if _universe_stage(feature, "cleared")]
+    if len(cleared_rows) != 9:
+        problems.append(
+            "cleared pins are "
+            + str(len(cleared_rows))
+            + " ("
+            + ", ".join(sorted((feature.get("properties") or {}).get("site_id") or "" for feature in cleared_rows))
+            + "), the two holds should leave 9"
+        )
+    held_pass = sorted(
+        (feature.get("properties") or {}).get("site_id")
+        for feature in unique_rows
+        if (feature.get("properties") or {}).get("verdict") == "PASS"
+        and (feature.get("properties") or {}).get("network_status") == "held"
+    )
+    if held_pass != ["LAS-U15", "LAS-U866"]:
+        problems.append(f"Pass rows outside the service area are {held_pass}, expected LAS-U15 and LAS-U866")
+    problems.extend(pipeline_pin_problems(deals or [], features))
     return problems
+
+
+def pipeline_pin_problems(deals: list[dict], sites: list[dict]) -> list[str]:
+    """Each pipeline step's count is the squares that step can draw."""
+    by_id = {(feature.get("properties") or {}).get("site_id"): feature for feature in sites}
+    problems = []
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for feature in deals:
+        props = feature.get("properties") or {}
+        if props.get("kind") != "pipeline":
+            continue
+        if props.get("source_kind") == "off-market" or re.search(r"(?i)off-market", props.get("stage") or ""):
+            problems.append(f"{props.get('deal_id')} is off-market and still in the pipeline")
+        groups.setdefault((props.get("city") or "?", props.get("stage_group") or ""), []).append(feature)
+    for (city, stage), rows in sorted(groups.items()):
+        drawable = 0
+        for feature in rows:
+            props = feature.get("properties") or {}
+            own = (feature.get("geometry") or {}).get("type") == "Point"
+            site = by_id.get(props.get("universe_id") or "")
+            site_point = bool(site and (site.get("geometry") or {}).get("type") == "Point")
+            if own or site_point:
+                drawable += 1
+        ids = [(feature.get("properties") or {}).get("deal_id") for feature in rows]
+        if len(ids) != len(set(ids)):
+            problems.append(f"{city} {stage}: duplicate deal ids")
+        squares = sum(1 for feature in rows if (feature.get("geometry") or {}).get("type") == "Point" or _matched_site_point(feature, by_id))
+        if squares != drawable:
+            problems.append(f"{city} {stage}: {drawable} deals to draw but {squares} squares")
+    return problems
+
+
+def _matched_site_point(feature: dict, by_id: dict) -> bool:
+    props = feature.get("properties") or {}
+    site = by_id.get(props.get("universe_id") or "")
+    return bool(site and (site.get("geometry") or {}).get("type") == "Point")
 
 
 def check_against_report(report: dict) -> None:
@@ -2765,7 +3981,7 @@ def main():
         print("Data check passed.")
         return
     report = build(write=True, refresh_parcels=args.refresh_parcels, muse_file=args.muse_verdicts)
-    print(json.dumps({k: report[k] for k in ("in_area", "land_tiers", "verdicts_on_land_fits", "listed_of_candidates", "contacted_of_candidates", "warnings")}, indent=2))
+    print(json.dumps({k: report[k] for k in ("in_area", "land_tiers", "verdicts_on_land_fits", "listed_of_candidates", "contacted_of_candidates", "deals", "parcels", "warnings")}, indent=2))
 
 
 if __name__ == "__main__":

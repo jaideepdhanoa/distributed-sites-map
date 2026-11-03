@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T21:41:42Z",
+  "generated_at": "2026-11-03T22:02:59Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -279,6 +279,11 @@
       },
       "listed_sites_with_link": 10,
       "listed_sites": 82
+    },
+    "source_lines": {
+      "broker-listed": 43,
+      "broker": 11,
+      "off-market": 66
     }
   },
   "sites_without_coordinates": [
@@ -317,8 +322,7 @@
   ],
   "parcels": {
     "counts": {
-      "cache_hit": 848,
-      "fetched": 97,
+      "cache_hit": 945,
       "not_found": 156,
       "broward_unavailable": 47,
       "features": 968,
@@ -353,1227 +357,6 @@
         "pct": 98.0
       }
     },
-    "none_rows": [
-      {
-        "id": "MIA-U1026",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1108",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "MIA-U1109",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1110",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1111",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1112",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1113",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1114",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1115",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1116",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1179",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1182",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1183",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1184",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "MIA-U1185",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1186",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1197",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1198",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1199",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1200",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1201",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1202",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1203",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1204",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1205",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1206",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1207",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1208",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1209",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1210",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1211",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1212",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1213",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1218",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1219",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1227",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1228",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "MIA-U1229",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1230",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1236",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1237",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1238",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1239",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1240",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1241",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1242",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1243",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1244",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1245",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1246",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1247",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1248",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1249",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1250",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1251",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1252",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1253",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1254",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1255",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1256",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1257",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1258",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1259",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1260",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1261",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1262",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1263",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1264",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1265",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1266",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1267",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1268",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1269",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1270",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1271",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1272",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1273",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1274",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1275",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1276",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1277",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1278",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1279",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1280",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1281",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1282",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1283",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1284",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1285",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1287",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1289",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1290",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1302",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1303",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1320",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1323",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1324",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1326",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1327",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1328",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1329",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1331",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1332",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1335",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1336",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1340",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1342",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1345",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1346",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1349",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1350",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1352",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1353",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1356",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1357",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1360",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1362",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1363",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1364",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1367",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1370",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1371",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1373",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1376",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1377",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1428",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "MIA-U1482",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1483",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1484",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1485",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1486",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1487",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1488",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1489",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1490",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1491",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1492",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1493",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1494",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1495",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1496",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1497",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1498",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1499",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1500",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1501",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1502",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1503",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1508",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1509",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1510",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1512",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1543",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1546",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1547",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1548",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U1550",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U747",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U748",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U749",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U750",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U751",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U752",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U753",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U754",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U755",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U756",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U761",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U762",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U763",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U764",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U765",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U766",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U767",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U768",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U770",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U773",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U774",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U776",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U777",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U778",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U779",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U780",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U781",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U782",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U783",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "MIA-U784",
-        "city": "MIA",
-        "kind": "site",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "PHX-U1016",
-        "city": "PHX",
-        "kind": "site",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "PHX-U645",
-        "city": "PHX",
-        "kind": "site",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "PIPE-PHX-0003",
-        "city": "PHX",
-        "kind": "deal",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "PIPE-PHX-0004",
-        "city": "PHX",
-        "kind": "deal",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "PIPE-PHX-0007",
-        "city": "PHX",
-        "kind": "deal",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "LAND-PHX-0003",
-        "city": "PHX",
-        "kind": "deal",
-        "reason": "no parcel at this pin"
-      },
-      {
-        "id": "LAND-MIA-0023",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0024",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0025",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0026",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0027",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0028",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0029",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0030",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0031",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      },
-      {
-        "id": "LAND-MIA-0032",
-        "city": "MIA",
-        "kind": "deal",
-        "reason": "outside the Miami-Dade parcel layer"
-      }
-    ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 848, 'fetched': 97, 'not_found': 156, 'broward_unavailable': 47, 'features': 968, 'adjoining': 23, 'by_city': {'LAS': 213, 'MIA': 444, 'PHX': 288}, 'by_method': {'parcel number': 842, 'pin location': 103}}.",
     "by_layer": {
       "universe": {
         "LAS": {
@@ -1581,50 +364,44 @@
           "matched": 182,
           "none": 0,
           "no_geometry": 0,
-          "pct_of_targets": 100.0,
-          "pct_of_placed": 100.0
+          "pct": 100.0
         },
         "MIA": {
           "targets": 608,
           "matched": 421,
           "none": 187,
           "no_geometry": 0,
-          "pct_of_targets": 69.2,
-          "pct_of_placed": 69.2
+          "pct": 69.2
         },
         "PHX": {
           "targets": 251,
           "matched": 249,
           "none": 2,
           "no_geometry": 0,
-          "pct_of_targets": 99.2,
-          "pct_of_placed": 99.2
+          "pct": 99.2
         }
       },
       "pipeline": {
         "PHX": {
-          "targets": 37,
+          "targets": 30,
           "matched": 27,
-          "none": 10,
-          "no_geometry": 7,
-          "pct_of_targets": 73.0,
-          "pct_of_placed": 90.0
+          "none": 3,
+          "no_geometry": 0,
+          "pct": 90.0
         },
         "LAS": {
-          "targets": 22,
+          "targets": 20,
           "matched": 20,
-          "none": 2,
-          "no_geometry": 2,
-          "pct_of_targets": 90.9,
-          "pct_of_placed": 100.0
+          "none": 0,
+          "no_geometry": 0,
+          "pct": 100.0
         },
         "MIA": {
-          "targets": 18,
+          "targets": 15,
           "matched": 15,
-          "none": 3,
-          "no_geometry": 3,
-          "pct_of_targets": 83.3,
-          "pct_of_placed": 100.0
+          "none": 0,
+          "no_geometry": 0,
+          "pct": 100.0
         }
       },
       "land": {
@@ -1633,27 +410,1245 @@
           "matched": 11,
           "none": 0,
           "no_geometry": 0,
-          "pct_of_targets": 100.0,
-          "pct_of_placed": 100.0
+          "pct": 100.0
         },
         "PHX": {
           "targets": 13,
           "matched": 12,
           "none": 1,
           "no_geometry": 0,
-          "pct_of_targets": 92.3,
-          "pct_of_placed": 92.3
+          "pct": 92.3
         },
         "MIA": {
           "targets": 18,
           "matched": 8,
           "none": 10,
           "no_geometry": 0,
-          "pct_of_targets": 44.4,
-          "pct_of_placed": 44.4
+          "pct": 44.4
         }
       }
-    }
+    },
+    "none_rows": [
+      {
+        "id": "MIA-U1026",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1108",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "MIA-U1109",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1110",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1111",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1112",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1113",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1114",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1115",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1116",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1179",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1182",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1183",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1184",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "MIA-U1185",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1186",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1197",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1198",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1199",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1200",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1201",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1202",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1203",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1204",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1205",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1206",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1207",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1208",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1209",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1210",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1211",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1212",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1213",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1218",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1219",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1227",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1228",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "MIA-U1229",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1230",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1236",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1237",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1238",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1239",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1240",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1241",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1242",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1243",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1244",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1245",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1246",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1247",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1248",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1249",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1250",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1251",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1252",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1253",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1254",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1255",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1256",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1257",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1258",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1259",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1260",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1261",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1262",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1263",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1264",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1265",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1266",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1267",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1268",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1269",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1270",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1271",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1272",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1273",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1274",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1275",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1276",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1277",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1278",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1279",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1280",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1281",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1282",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1283",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1284",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1285",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1287",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1289",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1290",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1302",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1303",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1320",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1323",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1324",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1326",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1327",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1328",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1329",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1331",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1332",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1335",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1336",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1340",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1342",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1345",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1346",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1349",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1350",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1352",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1353",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1356",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1357",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1360",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1362",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1363",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1364",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1367",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1370",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1371",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1373",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1376",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1377",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1428",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "MIA-U1482",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1483",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1484",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1485",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1486",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1487",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1488",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1489",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1490",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1491",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1492",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1493",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1494",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1495",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1496",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1497",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1498",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1499",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1500",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1501",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1502",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1503",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1508",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1509",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1510",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1512",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1543",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1546",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1547",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1548",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U1550",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U747",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U748",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U749",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U750",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U751",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U752",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U753",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U754",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U755",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U756",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U761",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U762",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U763",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U764",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U765",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U766",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U767",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U768",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U770",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U773",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U774",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U776",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U777",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U778",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U779",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U780",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U781",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U782",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U783",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "MIA-U784",
+        "city": "MIA",
+        "kind": "universe",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "PHX-U1016",
+        "city": "PHX",
+        "kind": "universe",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "PHX-U645",
+        "city": "PHX",
+        "kind": "universe",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "PIPE-PHX-0003",
+        "city": "PHX",
+        "kind": "pipeline",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "PIPE-PHX-0004",
+        "city": "PHX",
+        "kind": "pipeline",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "PIPE-PHX-0007",
+        "city": "PHX",
+        "kind": "pipeline",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "LAND-PHX-0003",
+        "city": "PHX",
+        "kind": "land",
+        "reason": "no parcel at this pin"
+      },
+      {
+        "id": "LAND-MIA-0023",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0024",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0025",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0026",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0027",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0028",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0029",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0030",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0031",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      },
+      {
+        "id": "LAND-MIA-0032",
+        "city": "MIA",
+        "kind": "land",
+        "reason": "outside the Miami-Dade parcel layer"
+      }
+    ],
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 945, 'not_found': 156, 'broward_unavailable': 47, 'features': 968, 'adjoining': 23, 'by_city': {'LAS': 213, 'MIA': 444, 'PHX': 288}, 'by_method': {'parcel number': 842, 'pin location': 103}}."
   },
   "muse_source": "second review column",
   "warnings": [

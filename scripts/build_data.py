@@ -783,6 +783,8 @@ DEAL_FIELDS = (
     "listed",
     "parcel_match",
     "parcel_acres",
+    "source_line",
+    "source_kind",
 )
 
 
@@ -823,6 +825,114 @@ _LISTING_HOSTS = {"loopnet.com", "crexi.com", "bizbuysell.com", "carwashbrokers.
 
 def _url_host(url: str) -> str:
     return re.sub(r"^https?://(www\.)?", "", (url or "").lower()).split("/")[0]
+
+
+_PUBLIC_SOURCE = re.compile(
+    r"(?i)realmo|maricopa|clark county|miami-dade|broward|loopnet|crexi|bizbuysell|matthews|property appraiser|assessor|parcel"
+)
+_INTERNAL_SOURCE = re.compile(
+    r"(?i)(off-market targets|\btargets tab\b|\bfolder\b|\brank\b|deep check|\bemail\b|\bcall\b|transcript|"
+    r"\bsheet\b|\btab\b|\bpackage\b|p&l|flyer|brochure|memorandum|moove|esri|flood|udc\b|epa\b|"
+    r"nv energy|bizquest|cash flow|ebitda|service-area|priority area|imagery)"
+)
+_MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
+
+
+def _source_date(text: str) -> str:
+    match = re.search(rf"(?i)\b({_MONTHS})[a-z]*\.?\s+(\d{{1,2}}),?\s+(20\d{{2}})", text or "")
+    if not match:
+        return ""
+    return f"{match.group(1)[:3].title()} {int(match.group(2))} {match.group(3)}"
+
+
+def _public_source_clause(clause: str) -> str:
+    """Keep a public record and its date. Drop people, sheets, and internal files."""
+    text = re.sub(r"\s+", " ", clause or "").strip(" ;")
+    if not text or not _PUBLIC_SOURCE.search(text):
+        return ""
+    if _INTERNAL_SOURCE.search(text) and not re.search(r"(?i)realmo record|county|appraiser|assessor|parcel", text):
+        return ""
+    head = re.split(r"\s+\(", text, maxsplit=1)[0]
+    head = re.sub(r"(?i)\s+(layer|layers|open data|tax roll)\b.*", "", head)
+    head = re.sub(r"\s+", " ", head).strip(" ,;")
+    replacements = (
+        (r"(?i)^realmo record\b.*", "Realmo record"),
+        (r"(?i)^realmo listing\b.*", "Realmo listing"),
+        (r"(?i)^maricopa county\b.*", "Maricopa County parcel"),
+        (r"(?i)^clark county parcel\b.*", "Clark County parcel"),
+        (r"(?i)^clark county assessor\b.*", "Clark County assessor"),
+        (r"(?i)^miami-dade\b.*", "Miami-Dade Property Appraiser"),
+        (r"(?i)^broward\b.*", "Broward County Property Appraiser"),
+        (r"(?i)^loopnet\b.*", "LoopNet listing"),
+        (r"(?i)^crexi\b.*", "Crexi listing"),
+        (r"(?i)^bizbuysell\b.*", "BizBuySell listing"),
+        (r"(?i)^matthews\b.*", "Matthews listing"),
+        (r"(?i)^car wash brokers\b.*", "Car Wash Brokers listing"),
+    )
+    for pattern, label in replacements:
+        if re.search(pattern, head):
+            head = label
+            break
+    else:
+        return ""
+    if _INTERNAL_SOURCE.search(head) or _DEAL_PRIVATE.search(head) or _DEAL_LEAK.search(head) or banned_hits(head):
+        return ""
+    dated = _source_date(text)
+    return f"{head}, {dated}" if dated else head
+
+
+def _source_records(value) -> list[str]:
+    seen = []
+    for clause in re.split(r";\s*", str(value or "")):
+        plain = _public_source_clause(clause)
+        if plain and plain not in seen:
+            seen.append(plain)
+    return seen
+
+
+def _broker_channel(broker: str) -> str:
+    """Brokerage or agent, without the person's name in parentheses."""
+    text = re.sub(r"\s+", " ", str(broker or "")).strip()
+    if not text or re.match(r"(?i)^none yet\b", text):
+        return ""
+    shown = re.match(r"(?i)^not shown\s*\(([^)]+)\)", text)
+    if shown:
+        return shown.group(1).strip()
+    firm = re.split(r"\s+\(", text, maxsplit=1)[0]
+    firm = re.split(r",\s*(?:exclusive|also|bizbuysell|loopnet|crexi)\b", firm, maxsplit=1, flags=re.I)[0]
+    firm = firm.strip(" ,;")
+    if _DEAL_PRIVATE.search(firm) or _DEAL_LEAK.search(firm) or banned_hits(firm) or _NOTE_INTERNAL.search(firm):
+        return ""
+    return firm[:120]
+
+
+def deal_source(row: dict, listing_url: str) -> tuple[str, str]:
+    """A source line and its type: off-market, or broker with or without a listing."""
+    broker = str(row.get("Broker") or "")
+    status = str(row.get("Listing status") or "")
+    off_market = bool(re.search(r"(?i)off-market", status) or re.match(r"(?i)^none yet\b", broker.strip()))
+    if off_market:
+        records = _source_records(row.get("Source of the numbers"))
+        line = "Off-market lead (our own research)"
+        if records:
+            line = f"{line}. " + "; ".join(records)
+        if not line.endswith("."):
+            line += "."
+        return line[:400], "off-market"
+    name = _broker_channel(broker)
+    if not name and listing_url:
+        host = _url_host(listing_url)
+        name = {
+            "loopnet.com": "LoopNet",
+            "crexi.com": "Crexi",
+            "bizbuysell.com": "BizBuySell",
+            "matthews.com": "Matthews",
+            "carwashbrokers.com": "Car Wash Brokers",
+        }.get(host, "")
+    if not name:
+        name = "Broker"
+    kind = "broker-listed" if listing_url else "broker"
+    return name[:160], kind
 
 
 def listing_url_from_row(row: dict) -> str:
@@ -916,14 +1026,16 @@ def clean_deal_note(value) -> str:
 
 def deal_text_problems(deal_id: str, props: dict) -> list[str]:
     problems = []
-    for key in ("next_step", "asking_price_source", "name", "address"):
+    for key in ("next_step", "asking_price_source", "name", "address", "source_line"):
         text = props.get(key) or ""
         if not isinstance(text, str) or not text:
             continue
-        if key in {"next_step", "asking_price_source"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
+        if key in {"next_step", "asking_price_source", "source_line"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
         if _NOTE_INTERNAL.search(text) or banned_hits(text):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
+    if not str(props.get("source_line") or "").strip():
+        problems.append(f"{deal_id} source_line is blank")
     return problems
 
 
@@ -1061,6 +1173,7 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
             broker, firm = split_broker(row.get("Broker"))
             price = parse_price(row.get("Asking price ($)"))
             url = listing_url_from_row(row)
+            source_line, source_kind = deal_source(row, url)
             blob = " ".join(str(row.get(col) or "") for col in ("Listing link", "What we know", "Land evidence", "Next step"))
             coords = google_coords(blob)
             status = "from listing" if coords else ""
@@ -1100,6 +1213,8 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 "listed": str(row.get("Listing status") or "").strip() == "Listed",
                 "parcel_match": "",
                 "parcel_acres": None,
+                "source_line": source_line,
+                "source_kind": source_kind,
             }
             extra = set(props) - set(DEAL_FIELDS)
             if extra:
@@ -1170,6 +1285,7 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
         "listed_sites_with_link": sum(1 for site in sites if site.get("listed") and site.get("listing_url")),
         "listed_sites": sum(1 for site in sites if site.get("listed")),
     }
+    report["source_lines"] = dict(Counter(item["properties"].get("source_kind") or "" for item in features))
     return {"type": "FeatureCollection", "features": features}, report
 
 

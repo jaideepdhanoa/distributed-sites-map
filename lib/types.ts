@@ -107,6 +107,8 @@ export type DealProps = {
   listed: boolean;
   parcel_match?: string;
   parcel_acres?: number | null;
+  source_line: string;
+  source_kind?: string;
 };
 
 export type DealFeature = {

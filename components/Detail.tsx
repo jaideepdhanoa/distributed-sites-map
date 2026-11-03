@@ -160,10 +160,20 @@ export function DealDetail({
           {deal.asking_price_display || "—"}
           {deal.asking_price_source ? ` · ${deal.asking_price_source}` : ""}
         </div>
+        <span>Source</span>
+        <div>
+          {deal.source_kind !== "off-market" && deal.listing_url ? (
+            <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">{deal.source_line || "View listing"}</a>
+          ) : (
+            deal.source_line || "Source not on file"
+          )}
+        </div>
         <span>Listing</span>
         <div>
           {deal.listing_url ? (
             <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
+          ) : deal.source_kind === "off-market" ? (
+            "Off-market"
           ) : (
             "No listing link on file"
           )}

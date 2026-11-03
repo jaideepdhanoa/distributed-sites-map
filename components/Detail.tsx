@@ -1,4 +1,4 @@
-import type { SiteProps } from "@/lib/types";
+import type { DealProps, SiteProps } from "@/lib/types";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -6,7 +6,17 @@ function acres(value: number | null | undefined, text?: string) {
   return `${value} ac`;
 }
 
-export default function Detail({ site, onClose }: { site: SiteProps | null; onClose?: () => void }) {
+export default function Detail({
+  site,
+  depotMiles,
+  onOpenDeal,
+  onClose,
+}: {
+  site: SiteProps | null;
+  depotMiles?: number | null;
+  onOpenDeal?: () => void;
+  onClose?: () => void;
+}) {
   if (!site) return null;
   const reasons = [site.evidence, site.why_stopped, site.elimination_reason].filter((line, index, all) => line && all.indexOf(line) === index);
   const price = site.asking_price_display;
@@ -20,6 +30,7 @@ export default function Detail({ site, onClose }: { site: SiteProps | null; onCl
         {site.network_status === "held" ? <span className="badge held">Held PASS</span> : null}
         {site.network_status === "cleared" ? <span className="badge checked">Cleared</span> : null}
         {site.land_only ? <span className="badge pending">Land site</span> : null}
+        {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{site.name || site.address || site.site_id}</h2>
       <p className="note">{site.address || "—"}</p>
@@ -61,7 +72,77 @@ export default function Detail({ site, onClose }: { site: SiteProps | null; onCl
       <div className="kv">
         <span>Listed</span><div>{site.listed ? "Yes" : "No"}</div>
         <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
+        <span>Nearest depot</span><div>{depotMiles == null ? "—" : `${depotMiles.toFixed(1)} mi`}</div>
       </div>
+      {site.linked_deal_id ? (
+        <>
+          <h3>Pipeline deal</h3>
+          <p>
+            <button className="text-link" type="button" onClick={onOpenDeal}>
+              {site.linked_deal_name || site.linked_deal_id}
+            </button>
+            {site.linked_deal_stage ? ` · ${site.linked_deal_stage}` : ""}
+          </p>
+        </>
+      ) : null}
+    </aside>
+  );
+}
+
+export function DealDetail({
+  deal,
+  universeName,
+  depotMiles,
+  onOpenSite,
+  onClose,
+}: {
+  deal: DealProps;
+  universeName?: string;
+  depotMiles?: number | null;
+  onOpenSite?: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <aside className="drawer">
+      <button className="close" type="button" onClick={onClose}>Close</button>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>
+        <span className="badge checked">{deal.stage || "Sourced"}</span>
+        {deal.listed ? <span className="badge l10">Listed</span> : null}
+      </div>
+      <h2>{deal.name || deal.address}</h2>
+      <p className="note">{deal.address}</p>
+      <p className="note">{deal.deal_id}</p>
+      <h3>Broker</h3>
+      <div className="kv">
+        <span>Broker</span><div>{deal.broker || "—"}</div>
+        <span>Firm</span><div>{deal.firm || "—"}</div>
+      </div>
+      <h3>Listing</h3>
+      <div className="kv">
+        <span>Stage</span><div>{deal.stage || "—"}</div>
+        <span>Asking price</span>
+        <div>
+          {deal.asking_price_display || "—"}
+          {deal.asking_price_source ? ` · ${deal.asking_price_source}` : ""}
+          {deal.listing_url ? (
+            <>
+              {" · "}
+              <a href={deal.listing_url} target="_blank" rel="noreferrer">Listing</a>
+            </>
+          ) : null}
+        </div>
+        <span>Next step</span><div>{deal.next_step || "—"}</div>
+        <span>Nearest depot</span><div>{depotMiles == null ? "—" : `${depotMiles.toFixed(1)} mi`}</div>
+      </div>
+      {deal.universe_id ? (
+        <>
+          <h3>Universe site</h3>
+          <p>
+            <button className="text-link" type="button" onClick={onOpenSite}>{universeName || deal.universe_id}</button>
+          </p>
+        </>
+      ) : null}
     </aside>
   );
 }

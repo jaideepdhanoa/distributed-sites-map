@@ -1,4 +1,28 @@
-import type { SiteProps } from "./types";
+import type { GeoFeature, SiteProps } from "./types";
+
+export type PipeId = "sourced" | "desk" | "contacted" | "later" | "dropped";
+
+export function nearestDepot(lng: number, lat: number, depots: GeoFeature[]) {
+  let best: { miles: number; label: string } | null = null;
+  for (const depot of depots) {
+    const coords = depot.geometry && depot.geometry.type === "Point" ? (depot.geometry.coordinates as number[]) : null;
+    if (!coords) continue;
+    const miles = haversineMiles(lng, lat, coords[0], coords[1]);
+    const label = String(depot.properties.id || depot.properties.address || "Depot");
+    if (!best || miles < best.miles) best = { miles, label };
+  }
+  return best;
+}
+
+function haversineMiles(lon1: number, lat1: number, lon2: number, lat2: number) {
+  const radius = 3958.8;
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const dphi = ((lat2 - lat1) * Math.PI) / 180;
+  const dlambda = ((lon2 - lon1) * Math.PI) / 180;
+  const arc = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlambda / 2) ** 2;
+  return 2 * radius * Math.asin(Math.sqrt(arc));
+}
 
 export type StageId = "universe" | "unique" | "in_area" | "land" | "county" | "cleared" | "listed" | "contacted";
 
@@ -20,30 +44,55 @@ export function landFit(site: SiteProps): boolean {
   return site.land_tier === "L10" || site.land_tier === "L4";
 }
 
+// Universe funnel. Universe is the census row count, not a pin count. Unique is the sites
+// left after those records are merged, and every later step is a subset of the one before it:
+// Unique > In service area > L10/L4 > County-checked > Cleared > Listed > Contacted.
+// Choosing Universe draws the same pins as Unique.
+// Held fits sit outside the operative service area (the Las Vegas 200/300 rings). They are
+// excluded from In service area and every later step, and are offered only as a separate note
+// on L10/L4. Listed and Contacted count only sites that also passed Cleared. Listings and
+// contacts that are still only candidates are a separate note, not part of those steps.
 export function inStage(site: SiteProps, stage: StageId): boolean {
   if (site.land_only || site.origin !== "universe") return false;
-  if (site.duplicate_of && stage !== "universe") return false;
-  const candidate = site.counts_as_site && site.in_area && landFit(site) && !eliminated(site);
+  const unique = Boolean(site.counts_as_site) && !site.duplicate_of;
+  const inArea = unique && Boolean(site.in_area);
+  const land = inArea && landFit(site) && !eliminated(site);
+  const county = land && site.verification === "county-checked";
+  const cleared = county && site.verdict === "PASS" && site.network_status === "cleared";
+  const listed = cleared && Boolean(site.listed);
+  const contacted = listed && Boolean(site.contacted);
   switch (stage) {
     case "universe":
       return true;
     case "unique":
-      return site.counts_as_site;
+      return unique;
     case "in_area":
-      return site.counts_as_site && site.in_area;
+      return inArea;
     case "land":
-      return candidate || Boolean(site.is_held_fit);
+      return land;
     case "county":
-      return candidate && site.verification === "county-checked";
+      return county;
     case "cleared":
-      return site.verdict === "PASS" && site.network_status === "cleared" && site.in_area;
+      return cleared;
     case "listed":
-      return candidate && site.listed;
+      return listed;
     case "contacted":
-      return candidate && site.contacted;
+      return contacted;
     default:
       return false;
   }
+}
+
+export function heldOutside(site: SiteProps): boolean {
+  return !site.land_only && site.origin === "universe" && Boolean(site.counts_as_site) && !site.duplicate_of && Boolean(site.is_held_fit) && !site.in_area;
+}
+
+export function listedEarlier(site: SiteProps): boolean {
+  return inStage(site, "land") && Boolean(site.listed) && !inStage(site, "cleared");
+}
+
+export function contactedEarlier(site: SiteProps): boolean {
+  return inStage(site, "land") && Boolean(site.contacted) && !inStage(site, "contacted");
 }
 
 export function droppedAt(site: SiteProps, stage: StageId): boolean {

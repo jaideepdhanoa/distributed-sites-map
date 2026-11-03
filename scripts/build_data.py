@@ -12,6 +12,7 @@ import base64
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -742,6 +743,412 @@ def google_coords(blob: str) -> tuple[float, float] | None:
     if match:
         return float(match.group(2)), float(match.group(1))
     return None
+
+
+GEOCODE_CACHE = ROOT / "data" / "cache" / "geocode_cache.json"
+_STREET_DIRS = {
+    "n": "n",
+    "s": "s",
+    "e": "e",
+    "w": "w",
+    "ne": "ne",
+    "nw": "nw",
+    "se": "se",
+    "sw": "sw",
+    "north": "n",
+    "south": "s",
+    "east": "e",
+    "west": "w",
+}
+_DEAL_LEAK = re.compile(
+    r"(?i)\b(ebitda|revenue|moove|playbook|offer|target price|walk-?away|kilowatt|kwh|amps|voltage|electrical|power)\b"
+)
+_DEAL_PRIVATE = re.compile(
+    r"(?i)("
+    r"\b(?:cindel|ming|ricardo|yuka|jaideep|jesse)\b"
+    r"|\b(?:outreach|approv\w*|wording|nda|docusign|redline)\b"
+    r"|\b(?:replied|reply|copied|email|nudged|folder|memo)\b"
+    r"|\b(?:ruled out|downgraded|task board|our side|no contact|no price|no reply)\b"
+    r"|\b(?:lane broker|passed on|pass on|waiting for|followed up)\b"
+    r"|\b(?:sweep|priority area)\b"
+    r"|moved to the land"
+    r")"
+)
+DEAL_FIELDS = (
+    "deal_id",
+    "kind",
+    "name",
+    "address",
+    "city",
+    "stage",
+    "stage_group",
+    "broker",
+    "firm",
+    "listing_url",
+    "asking_price",
+    "asking_price_display",
+    "asking_price_source",
+    "next_step",
+    "universe_id",
+    "coord_status",
+    "miles_to_depot",
+    "listed",
+)
+
+
+def deal_street_signature(value: str) -> str:
+    text = re.sub(r"^(phx|las|mia|sna)\s+", "", (value or "").lower().strip())
+    text = addr_key(text)
+    text = re.sub(
+        r"\b(avenue|ave|street|st|road|rd|boulevard|blvd|drive|dr|lane|ln|way|court|ct|place|pl|circle|cir|parkway|pkwy|highway|hwy)\b",
+        " ",
+        text,
+    )
+    text = re.sub(r"\s+", " ", text).strip()
+    match = re.search(r"(\d+)\s+((?:north|south|east|west|ne|nw|se|sw|n|s|e|w)\s+)?([a-z0-9]+)", text)
+    if not match:
+        return ""
+    direction = _STREET_DIRS.get((match.group(2) or "").strip(), "")
+    return f"{match.group(1)} {direction} {match.group(3)}".replace("  ", " ").strip()
+
+
+def stage_group(stage) -> str:
+    text = str(stage or "").strip().lower()
+    if text.startswith("dropped"):
+        return "dropped"
+    number = stage_number(stage)
+    if number is None or number <= 0:
+        return "sourced"
+    if number == 1:
+        return "desk"
+    if number == 2:
+        return "contacted"
+    return "later"
+
+
+EXPLICIT_DEAL_NOTES = {
+    "Street view and the Dec 2025 deed to confirm the use; then owner outreach once Cindel approves the wording": "Confirm use from street view and the deed.",
+    "Test-fit stalls on the south paving; then owner outreach once Cindel approves the wording": "Test-fit stalls on the south paving.",
+    "Get the address and lot size from WCI (Paul) or the listing; then a land check": "Get the address and lot size, then check the land.",
+    "Get the address and lot size; then a land check": "Get the address and lot size, then check the land.",
+    "None: no spare land (Oct 21 aerial)": "No spare land.",
+    "Low priority": "",
+    "Low priority: only about 5 stalls fit": "Only about 5 stalls fit.",
+    "Low priority: only about 4 stalls fit": "Only about 4 stalls fit.",
+    "Low priority: only the east dirt strip is free (about 7 stalls)": "Only the east dirt strip is free, about 7 stalls.",
+    "Low priority: about 7 stalls fit on the south asphalt": "About 7 stalls fit on the south asphalt.",
+    "Low priority: collision is \"not now\" in the plan": "",
+    "Low priority unless the segment widens": "",
+    "Low priority: trucks fill the yard": "Trucks fill the yard.",
+}
+
+
+def split_broker(value) -> tuple[str, str]:
+    text = scrub(value)
+    match = re.match(r"^(.*?)\s*\(([^)]+)\)", text)
+    if not match:
+        broker, firm = "", text
+    else:
+        broker, firm = match.group(2).strip(" ,;"), match.group(1).strip(" ,;")
+    if firm.lower() in {"", "none", "none yet", "n/a"}:
+        firm = ""
+    if broker.lower() in {"", "none", "none yet", "n/a", "off-market"}:
+        broker = ""
+    return broker, firm
+
+
+_DEAL_KEEP = re.compile(
+    r"(?i)\b(?:confirm|check|verify|test-fit|identify|street view|deed|zoning|lease|easement|stalls?|spare|service area|lot size|parking|entitlement|survey|title report|environmental|assemblage|land)\b"
+)
+_DEAL_DROP = re.compile(
+    r"(?i)(?:\boffer\w*|\bprices?\b|\$|\bpackage\b|\breceipt\b|\broger\b|\bpencek\b|\bcrexi\b|\bbizbuysell\b|\bcomp\b|\brevisit\b|\bsold\b|\bwithdrawn\b|\bfolder\b|\bcall\b|\bemail\b|\bknocked out\b|\bdesk checks?\b|\bpipeline\b|\bask\b)"
+)
+
+
+def clean_deal_note(value) -> str:
+    """Keep a neutral next step. Drop names, approvals, outreach, and legal chatter."""
+    text = plain_note(value)
+    if not text:
+        return ""
+    if text in EXPLICIT_DEAL_NOTES:
+        return EXPLICIT_DEAL_NOTES[text]
+    kept = []
+    for chunk in re.split(r"(?<=[.!?])\s+|;\s+", text):
+        piece = chunk.strip(" ;")
+        if not piece:
+            continue
+        if _DEAL_LEAK.search(piece) or _DEAL_PRIVATE.search(piece) or banned_hits(piece) or _NOTE_INTERNAL.search(piece):
+            continue
+        if re.search(r"(?i)\bno spare\b", piece):
+            kept.append("No spare land")
+            continue
+        if re.match(r"(?i)^(dropped|stays|oct|nov|low priority|out of scope|gone from|knocked out)\b", piece):
+            continue
+        if re.search(r"(?i)land sites row|pairing it with", piece):
+            continue
+        if _DEAL_DROP.search(piece) or not _DEAL_KEEP.search(piece):
+            continue
+        piece = re.sub(r"(?i)^(?:then|next|our side)\s*[:,]?\s*", "", piece).strip()
+        if not piece or not _DEAL_KEEP.search(piece):
+            continue
+        kept.append(piece[0].upper() + piece[1:] if piece[:1].islower() else piece)
+    cleaned = ". ".join(part.rstrip(".") for part in kept).strip()
+    if cleaned and not cleaned.endswith("."):
+        cleaned += "."
+    if not cleaned or _DEAL_PRIVATE.search(cleaned) or _DEAL_LEAK.search(cleaned) or _DEAL_DROP.search(cleaned):
+        return ""
+    return cleaned[:400]
+
+
+def deal_text_problems(deal_id: str, props: dict) -> list[str]:
+    problems = []
+    for key in ("next_step", "asking_price_source", "name", "address"):
+        text = props.get(key) or ""
+        if not isinstance(text, str) or not text:
+            continue
+        if key in {"next_step", "asking_price_source"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
+            problems.append(f"{deal_id} {key}: {text[:140]!r}")
+        if _NOTE_INTERNAL.search(text) or banned_hits(text):
+            problems.append(f"{deal_id} {key}: {text[:140]!r}")
+    return problems
+
+
+def _geocode_query(row: dict) -> str:
+    label = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", str(row.get("Site") or "").strip(), flags=re.I)
+    if not label or "address to come" in label.lower() or not re.match(r"\d", label):
+        return ""
+    market = str(row.get("Market") or "").strip()
+    blob = f"{label} {row.get('Name') or ''}".lower()
+    hinted = ""
+    for needle, place in (
+        ("san tan valley", "San Tan Valley, AZ"),
+        ("apache junction", "Apache Junction, AZ"),
+        ("scottsdale", "Scottsdale, AZ"),
+        ("gilbert", "Gilbert, AZ"),
+        ("peoria", "Peoria, AZ"),
+        ("tempe", "Tempe, AZ"),
+        ("mesa", "Mesa, AZ"),
+        ("henderson", "Henderson, NV"),
+        ("north las vegas", "North Las Vegas, NV"),
+        ("north miami", "North Miami, FL"),
+    ):
+        if needle in blob:
+            hinted = place
+            break
+    if "," in label and hinted:
+        street = label.split(",")[0].strip()
+        return f"{street}, {hinted}"
+    if "," in label:
+        suffix = {"PHX": "AZ", "LAS": "NV", "MIA": "FL", "SNA": "CA"}.get(market, "")
+        return f"{label}, {suffix}".strip(", ")
+    place = hinted or {"PHX": "Phoenix, AZ", "LAS": "Las Vegas, NV", "MIA": "Miami, FL", "SNA": "California"}.get(market, "")
+    return f"{label}, {place}".strip(", ")
+
+
+def _census_geocode(query: str) -> tuple[float, float] | None:
+    url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + urllib.parse.urlencode(
+        {"address": query, "benchmark": "Public_AR_Current", "format": "json"}
+    )
+    request = urllib.request.Request(url, headers={"User-Agent": "sites-map-build"})
+    with urllib.request.urlopen(request, timeout=25) as response:
+        payload = json.loads(response.read().decode())
+    matches = (payload.get("result") or {}).get("addressMatches") or []
+    if not matches:
+        return None
+    coords = matches[0].get("coordinates") or {}
+    return float(coords["x"]), float(coords["y"])
+
+
+def _nominatim_geocode(query: str) -> tuple[float, float] | None:
+    url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
+        {"q": query, "format": "json", "limit": 1, "countrycodes": "us"}
+    )
+    request = urllib.request.Request(url, headers={"User-Agent": "sites-map-build/1.0 (site sourcing map)"})
+    with urllib.request.urlopen(request, timeout=25) as response:
+        payload = json.loads(response.read().decode())
+    if not payload:
+        return None
+    return float(payload[0]["lon"]), float(payload[0]["lat"])
+
+
+def geocode_address(query: str, cache: dict) -> tuple[float, float] | None:
+    if not query:
+        return None
+    if query in cache:
+        found = cache[query]
+        if not found:
+            return None
+        return float(found[0]), float(found[1])
+    coords = None
+    try:
+        coords = _census_geocode(query)
+    except Exception:
+        coords = None
+    if coords is None:
+        try:
+            coords = _nominatim_geocode(query)
+        except Exception:
+            coords = None
+    cache[query] = list(coords) if coords else None
+    return coords
+
+
+def haversine_miles(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
+    radius = 3958.8
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    arc = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return 2 * radius * math.asin(math.sqrt(arc))
+
+
+def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: list[dict], depots: list[dict]) -> tuple[dict, dict]:
+    cache = {}
+    if GEOCODE_CACHE.exists():
+        cache = json.loads(GEOCODE_CACHE.read_text())
+    by_apn: dict[tuple[str, str], set[str]] = {}
+    by_street: dict[tuple[str, str], set[str]] = {}
+    for site in sites:
+        if site.get("origin") != "universe":
+            continue
+        for token in apn_tokens(site.get("apn")):
+            by_apn.setdefault((site["city"], token), set()).add(site["site_id"])
+        for field in ("address", "name"):
+            signature = deal_street_signature(site.get(field) or "")
+            if signature:
+                by_street.setdefault((site["city"], signature), set()).add(site["site_id"])
+
+    def match_row(row: dict) -> str | None:
+        city = str(row.get("Market") or "").strip()
+        found: set[str] = set()
+        for token in apn_tokens(row.get("APN or folio")):
+            found |= by_apn.get((city, token), set())
+        if len(found) == 1:
+            return next(iter(found))
+        if len(found) > 1:
+            return sorted(found)[0]
+        signature = deal_street_signature(str(row.get("Site") or ""))
+        hits = by_street.get((city, signature), set()) if signature else set()
+        if len(hits) == 1:
+            return next(iter(hits))
+        return None
+
+    features = []
+    failed = []
+    matched = 0
+    for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
+        for index, row in enumerate(rows, start=1):
+            city = str(row.get("Market") or "").strip() or "UNK"
+            label = str(row.get("Site") or "").strip()
+            deal_id = f"{'PIPE' if kind == 'pipeline' else 'LAND'}-{city}-{index:04d}"
+            universe_id = match_row(row)
+            if universe_id:
+                matched += 1
+            broker, firm = split_broker(row.get("Broker"))
+            price = parse_price(row.get("Asking price ($)"))
+            url = str(row.get("Listing link") or "").strip()
+            if url.lower() in {"none", "n/a"}:
+                url = ""
+            blob = " ".join(str(row.get(col) or "") for col in ("Listing link", "What we know", "Land evidence", "Next step"))
+            coords = google_coords(blob)
+            status = "from listing" if coords else ""
+            if coords is None:
+                query = _geocode_query(row)
+                coords = geocode_address(query, cache) if query else None
+                status = "geocoded" if coords else "failed"
+            else:
+                status = "listing"
+            lon = lat = None
+            miles = None
+            if coords:
+                lon, lat = coords
+                miles = nearest_depot_miles(lon, lat, depots)
+            else:
+                failed.append({"deal_id": deal_id, "city": city, "kind": kind, "label": label, "stage": str(row.get("Stage") or "")})
+            address = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I)
+            source = firm or broker or ("Listing" if url else "")
+            props = {
+                "deal_id": deal_id,
+                "kind": kind,
+                "name": scrub(row.get("Name") or address)[:160],
+                "address": scrub(address)[:180],
+                "city": city,
+                "stage": scrub(row.get("Stage"))[:80],
+                "stage_group": stage_group(row.get("Stage")),
+                "broker": broker[:120],
+                "firm": firm[:160],
+                "listing_url": url[:400],
+                "asking_price": price,
+                "asking_price_display": money(price) if price else None,
+                "asking_price_source": scrub(source)[:160],
+                "next_step": clean_deal_note(row.get("Next step"))[:400],
+                "universe_id": universe_id or "",
+                "coord_status": status,
+                "miles_to_depot": miles,
+                "listed": str(row.get("Listing status") or "").strip() == "Listed",
+            }
+            extra = set(props) - set(DEAL_FIELDS)
+            if extra:
+                raise SystemExit("Deal fields outside the whitelist: " + ", ".join(sorted(extra)))
+            if deal_text_problems(deal_id, props) or banned_hits(json.dumps(props)):
+                props["next_step"] = ""
+                if _DEAL_PRIVATE.search(props["asking_price_source"] or "") or _DEAL_LEAK.search(props["asking_price_source"] or ""):
+                    props["asking_price_source"] = firm or ""
+            if deal_text_problems(deal_id, props):
+                raise SystemExit("Deal text still has internal wording: " + "; ".join(deal_text_problems(deal_id, props)[:3]))
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [lon, lat]} if lon is not None else None,
+                    "properties": props,
+                }
+            )
+    GEOCODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    GEOCODE_CACHE.write_text(json.dumps(cache, indent=2))
+    pipeline = [item for item in features if item["properties"]["kind"] == "pipeline"]
+    land = [item for item in features if item["properties"]["kind"] == "land"]
+    report = {
+        "pipeline": len(pipeline),
+        "land": len(land),
+        "matched": matched,
+        "unmatched": len(features) - matched,
+        "geocode_failed": failed,
+        "pipeline_by_city": dict(Counter(item["properties"]["city"] for item in pipeline)),
+        "pipeline_by_stage": dict(Counter(item["properties"]["stage"] for item in pipeline)),
+        "pipeline_by_group": dict(Counter(item["properties"]["stage_group"] for item in pipeline)),
+        "land_by_city": dict(Counter(item["properties"]["city"] for item in land)),
+        "land_by_group": dict(Counter(item["properties"]["stage_group"] for item in land)),
+    }
+    # Prefer a live pipeline deal when several rows point at one universe site.
+    rank = {"desk": 0, "sourced": 1, "contacted": 2, "later": 3, "dropped": 4}
+    best: dict[str, dict] = {}
+    for feature in features:
+        props = feature["properties"]
+        universe_id = props["universe_id"]
+        if not universe_id or props["kind"] != "pipeline":
+            continue
+        current = best.get(universe_id)
+        if current is None or rank.get(props["stage_group"], 9) < rank.get(current["stage_group"], 9):
+            best[universe_id] = props
+    for site in sites:
+        link = best.get(site["site_id"])
+        site["linked_deal_id"] = link["deal_id"] if link else ""
+        site["linked_deal_name"] = link["name"] if link else ""
+        site["linked_deal_stage"] = link["stage"] if link else ""
+    return {"type": "FeatureCollection", "features": features}, report
+
+
+def nearest_depot_miles(lon: float, lat: float, depots: list[dict]) -> float | None:
+    best = None
+    for depot in depots:
+        geometry = depot.get("geometry") or {}
+        coords = geometry.get("coordinates")
+        if not coords:
+            continue
+        miles = haversine_miles(lon, lat, float(coords[0]), float(coords[1]))
+        if best is None or miles < best:
+            best = miles
+    return round(best, 2) if best is not None else None
 
 
 def registry_load() -> dict:
@@ -1713,8 +2120,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 site["land_only"] = True
             site["site_class"] = site["site_class"] if site["origin"] == "universe" else "Land"
         price = parse_price(row.get("Asking price ($)"))
-        source_bits = [str(row.get("Broker") or "").strip(), str(row.get("Source of the numbers") or "").strip()]
-        source = "; ".join(bit for bit in source_bits if bit)
+        person, firm_name = split_broker(row.get("Broker"))
+        source = firm_name or person or "Listing"
         url = str(row.get("Listing link") or "").strip()
         status = "verified" if url else ("inferred" if price else None)
         attach_price(site, price, source or "Pipeline workbook", url, row.get("Last checked live"), status)
@@ -1977,6 +2384,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     areas_fc = {"type": "FeatureCollection", "features": areas}
     depots = build_depots()
+    deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"])
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     if write:
         parcels, parcel_meta = build_parcels(sites, refresh_parcels)
@@ -1992,7 +2400,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     parcels_fc = {"type": "FeatureCollection", "features": parcels}
 
     problems = []
-    for blob in (sites_fc, areas_fc, depots, funnel):
+    for blob in (sites_fc, areas_fc, depots, deals_fc, funnel):
         problems.extend(scan_obj(blob))
     if problems:
         raise SystemExit("Banned or forbidden content in generated data:\n" + "\n".join(problems[:30]))
@@ -2029,6 +2437,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "land_rows": len(land_rows),
         "pipeline_stage_counts": dict(Counter(str(row.get("Stage")) for row in pipeline_rows)),
         "land_stage_counts": dict(Counter(str(row.get("Stage")) for row in land_rows)),
+        "deals": deal_report,
         "sites_without_coordinates": [
             site["site_id"] for site in sites if site["coord_status"] != "known" and site["counts_as_site"]
         ],
@@ -2057,6 +2466,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         (OUT / "sites.geojson").write_text(json.dumps(sites_fc))
         (OUT / "areas.geojson").write_text(json.dumps(areas_fc))
         (OUT / "depots.geojson").write_text(json.dumps(depots))
+        (OUT / "deals.geojson").write_text(json.dumps(deals_fc))
         (OUT / "parcels.geojson").write_text(json.dumps(parcels_fc))
         (OUT / "funnel.json").write_text(json.dumps(funnel, indent=2))
         (OUT / "build_report.json").write_text(json.dumps(report, indent=2))
@@ -2171,7 +2581,7 @@ def sources_present() -> bool:
 def validate_committed() -> None:
     """Check the files in git. Used when the raw source folder is not present."""
     problems: list[str] = []
-    required = ["sites.geojson", "areas.geojson", "depots.geojson", "parcels.geojson", "funnel.json", "build_report.json"]
+    required = ["sites.geojson", "areas.geojson", "depots.geojson", "parcels.geojson", "deals.geojson", "funnel.json", "build_report.json"]
     loaded = {}
     for name in required:
         path = OUT / name
@@ -2228,21 +2638,108 @@ def validate_committed() -> None:
             break
     if len(loaded["depots.geojson"].get("features", [])) != 13:
         problems.append("expected 13 depot pins")
+    deal_features = loaded.get("deals.geojson", {}).get("features", [])
+    deal_report = report.get("deals") or {}
+    if len(deal_features) != deal_report.get("pipeline", 0) + deal_report.get("land", 0):
+        problems.append("deal count does not match the build report")
+    allowed_deal = set(DEAL_FIELDS)
+    for feature in deal_features:
+        extra = set((feature.get("properties") or {})) - allowed_deal
+        if extra:
+            problems.append("deal properties not allowed: " + ", ".join(sorted(extra)))
+            break
+        props_deal = feature.get("properties") or {}
+        problems.extend(deal_text_problems(str(props_deal.get("deal_id") or "?"), props_deal))
+        problems.extend(site_note_problems({"site_id": props_deal.get("deal_id"), "evidence": props_deal.get("next_step") or "", "why_stopped": props_deal.get("asking_price_source") or ""}))
+    failed = deal_report.get("geocode_failed") or []
+    if not isinstance(failed, list):
+        problems.append("geocode_failed must be a list")
     for item in props:
         problems.extend(site_note_problems(item))
+    problems.extend(funnel_subset_problems(sites, loaded["funnel.json"]))
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 
 
+def _universe_stage(site: dict, stage: str) -> bool:
+    """Mirror lib/filter.ts inStage. Each step is a subset of the previous one."""
+    props = site.get("properties") or {}
+    if props.get("land_only") or props.get("origin") != "universe":
+        return False
+    unique = bool(props.get("counts_as_site")) and not props.get("duplicate_of")
+    in_area = unique and bool(props.get("in_area"))
+    land = in_area and props.get("land_tier") in {"L10", "L4"} and (props.get("verdict") or "") not in {"FAIL", "NOT_A_WASH"} and not props.get("tenure_fail")
+    county = land and props.get("verification") == "county-checked"
+    cleared = county and props.get("verdict") == "PASS" and props.get("network_status") == "cleared"
+    listed = cleared and bool(props.get("listed"))
+    contacted = listed and bool(props.get("contacted"))
+    return {
+        "universe": True,
+        "unique": unique,
+        "in_area": in_area,
+        "land": land,
+        "county": county,
+        "cleared": cleared,
+        "listed": listed,
+        "contacted": contacted,
+    }[stage]
+
+
+def funnel_subset_problems(features: list[dict], funnel: dict) -> list[str]:
+    """From Unique onward each step is a subset of the previous one and matches its pins.
+
+    Universe is the census row count. Choosing it draws the same pins as Unique.
+    """
+    order = ["unique", "in_area", "land", "county", "cleared", "listed", "contacted"]
+    problems = []
+    stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
+    census = stages.get("census") or {}
+    if census.get("total") != 1701 or census.get("by_city") != {"LAS": 428, "PHX": 561, "MIA": 712}:
+        problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,701 rows")
+    unique_rows = [feature for feature in features if _universe_stage(feature, "unique")]
+    unique_stage = stages.get("unique") or {}
+    if len(unique_rows) != unique_stage.get("total"):
+        problems.append("unique pin count does not match the unique funnel stage")
+    unique_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in unique_rows))
+    if unique_by_city != unique_stage.get("by_city"):
+        problems.append(f"unique pins by city are {unique_by_city}, funnel says {unique_stage.get('by_city')}")
+    groups = {"all": features}
+    for city in ("PHX", "LAS", "MIA"):
+        groups[city] = [feature for feature in features if (feature.get("properties") or {}).get("city") == city]
+    for label, rows in groups.items():
+        previous = None
+        for stage in order:
+            chosen = [feature for feature in rows if _universe_stage(feature, stage)]
+            pins = [feature for feature in chosen if (feature.get("geometry") or {}).get("type") == "Point"]
+            if len(chosen) != len(pins):
+                problems.append(f"{label} {stage}: count {len(chosen)} but only {len(pins)} pins")
+            ids = {((feature.get("properties") or {}).get("site_id")) for feature in chosen}
+            if previous is not None and not ids <= previous:
+                extra = sorted(item for item in ids - previous if item)[:8]
+                problems.append(f"{label} {stage} is not a subset of the previous step: {', '.join(extra)}")
+            previous = ids
+        held = [
+            feature
+            for feature in rows
+            if not (feature.get("properties") or {}).get("land_only")
+            and (feature.get("properties") or {}).get("origin") == "universe"
+            and (feature.get("properties") or {}).get("is_held_fit")
+            and (feature.get("properties") or {}).get("in_area")
+        ]
+        if held:
+            problems.append(f"{label} held sites are inside the service area")
+    return problems
+
+
 def check_against_report(report: dict) -> None:
     committed = json.loads((OUT / "build_report.json").read_text())
-    keys = ("in_area", "land_tiers", "verdicts", "pass_held", "contacted_of_candidates", "census_rows")
+    keys = ("in_area", "land_tiers", "verdicts", "pass_held", "contacted_of_candidates", "census_rows", "deals")
     mismatches = []
     for key in keys:
         if committed.get(key) != report.get(key):
             mismatches.append(key)
     problems = []
-    for name in ("sites.geojson", "areas.geojson", "depots.geojson", "parcels.geojson", "funnel.json"):
+    for name in ("sites.geojson", "areas.geojson", "depots.geojson", "parcels.geojson", "deals.geojson", "funnel.json"):
         problems.extend(scan_obj(json.loads((OUT / name).read_text()), name))
     if mismatches or problems:
         raise SystemExit(

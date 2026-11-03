@@ -3,14 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { GeoFeature, SiteFeature } from "@/lib/types";
+import type { DealFeature, GeoFeature, SiteFeature } from "@/lib/types";
 
 type Props = {
   sites: SiteFeature[];
+  deals: DealFeature[];
   areas: GeoFeature[];
   depots: GeoFeature[];
   parcels: GeoFeature[];
   selectedId: string | null;
+  showAreas: boolean;
+  showDepots: boolean;
+  showSites: boolean;
   focusLng: number;
   focusLat: number;
   focusZoom: number;
@@ -63,16 +67,15 @@ export default function MapView(props: Props) {
           areas: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           parcels: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
         },
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
-          { id: "areas-dim", type: "fill", source: "areas", filter: ["all", ["==", ["get", "group"], "service"], ["!", ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]]]], paint: { "fill-color": "#d7e2d4", "fill-opacity": 0.08 } },
-          { id: "areas-dim-line", type: "line", source: "areas", filter: ["all", ["==", ["get", "group"], "service"], ["!", ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]]]], paint: { "line-color": "#f4efe6", "line-width": 1.25, "line-opacity": 0.55 } },
-          { id: "areas-op", type: "fill", source: "areas", filter: ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]], paint: { "fill-color": "#7dffa8", "fill-opacity": 0.2 } },
-          { id: "areas-op-line", type: "line", source: "areas", filter: ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]], paint: { "line-color": "#e9fff1", "line-width": 2.75 } },
+          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#7dffa8", "fill-opacity": 0.16 } },
+          { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#e9fff1", "line-width": 2.5 } },
           { id: "expansion-fill", type: "fill", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "fill-color": "#9bb7d4", "fill-opacity": 0.06 } },
           { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#e7f1fb", "line-dasharray": [1.2, 1.2], "line-width": 2, "line-opacity": 0.9 } },
           { id: "parcels", type: "fill", source: "parcels", paint: { "fill-color": "#ffd0c8", "fill-opacity": 0.35 } },
@@ -107,10 +110,46 @@ export default function MapView(props: Props) {
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
           },
           {
+            id: "linked",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["has", "linked_deal_id"], ["!=", ["get", "linked_deal_id"], ""]],
+            paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#f7f3ea", "circle-stroke-width": 2 },
+          },
+          {
+            id: "deals-pipe",
+            type: "symbol",
+            source: "deals",
+            filter: ["==", ["get", "kind"], "pipeline"],
+            layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
+          },
+          {
+            id: "deals-land",
+            type: "symbol",
+            source: "deals",
+            filter: ["==", ["get", "kind"], "land"],
+            layout: { "icon-image": "tri-land", "icon-size": 0.95, "icon-allow-overlap": true },
+          },
+          {
             id: "depots",
             type: "symbol",
             source: "depots",
             layout: { "icon-image": "depot", "icon-size": 1, "icon-allow-overlap": true },
+          },
+          {
+            id: "depot-labels",
+            type: "symbol",
+            source: "depots",
+            minzoom: 12,
+            layout: {
+              "text-field": ["get", "id"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 11,
+              "text-offset": [0, 1.15],
+              "text-anchor": "top",
+              "text-allow-overlap": false,
+            },
+            paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 },
           },
           { id: "measure", type: "line", source: "measure", paint: { "line-color": "#f4efe6", "line-width": 2 } },
         ],
@@ -137,12 +176,64 @@ export default function MapView(props: Props) {
         }
       }
     }
+    const square = (rgb: [number, number, number]) => {
+      const pixels = new Uint8Array(size * size * 4);
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          if (x < 5 || y < 5 || x > 30 || y > 30) continue;
+          const i = (y * size + x) * 4;
+          const edge = x < 8 || y < 8 || x > 27 || y > 27;
+          pixels[i] = edge ? 28 : rgb[0];
+          pixels[i + 1] = edge ? 25 : rgb[1];
+          pixels[i + 2] = edge ? 20 : rgb[2];
+          pixels[i + 3] = 255;
+        }
+      }
+      return pixels;
+    };
+    const triangle = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const nx = (x - 17.5) / 16;
+        const ny = (y - 28) / 26;
+        if (ny <= 0 && Math.abs(nx) <= -ny * 0.55) {
+          const i = (y * size + x) * 4;
+          const edge = ny > -0.18;
+          triangle[i] = edge ? 28 : 91;
+          triangle[i + 1] = edge ? 25 : 61;
+          triangle[i + 2] = edge ? 20 : 138;
+          triangle[i + 3] = 255;
+        }
+      }
+    }
     map.on("load", () => {
       if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
+      const squares: Record<string, [number, number, number]> = {
+        sourced: [36, 88, 166],
+        desk: [196, 132, 29],
+        contacted: [31, 122, 77],
+        later: [107, 76, 154],
+        dropped: [122, 46, 40],
+      };
+      for (const [name, rgb] of Object.entries(squares)) {
+        const id = `sq-${name}`;
+        if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });
+      }
+      if (!map.hasImage("tri-land")) map.addImage("tri-land", { width: size, height: size, data: triangle });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const feature = event.features?.[0];
         const id = feature?.properties?.site_id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
+      map.on("click", "deals-pipe", (event: MapLayerMouseEvent) => {
+        if (measureRef.current) return;
+        const id = event.features?.[0]?.properties?.deal_id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
+      map.on("click", "deals-land", (event: MapLayerMouseEvent) => {
+        if (measureRef.current) return;
+        const id = event.features?.[0]?.properties?.deal_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "depots", (event: MapLayerMouseEvent) => {
@@ -191,6 +282,7 @@ export default function MapView(props: Props) {
     if (!map) return;
     const push = () => {
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
+      (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.deals.filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
       const parcel = props.parcels.filter((feature) => feature.properties.site_id === props.selectedId);
@@ -203,9 +295,32 @@ export default function MapView(props: Props) {
     };
     if (map.isStyleLoaded()) push();
     else map.once("load", push);
-  }, [props.sites, props.areas, props.depots, props.parcels, props.selectedId, focusToken, props.focusLng, props.focusLat, props.focusZoom]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.selectedId, focusToken, props.focusLng, props.focusLat, props.focusZoom]);
 
-  const selectedOnMap = props.sites.some((feature) => feature.properties.site_id === props.selectedId);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const vis = (id: string, on: boolean) => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+      };
+      vis("areas-op", props.showAreas);
+      vis("areas-op-line", props.showAreas);
+      vis("expansion-fill", props.showAreas);
+      vis("expansion-line", props.showAreas);
+      vis("depots", props.showDepots);
+      vis("depot-labels", props.showDepots);
+      vis("sites", props.showSites);
+      vis("linked", props.showSites);
+      vis("selected", props.showSites);
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [props.showAreas, props.showDepots, props.showSites]);
+
+  const selectedOnMap =
+    props.sites.some((feature) => feature.properties.site_id === props.selectedId) ||
+    props.deals.some((feature) => feature.properties.deal_id === props.selectedId);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -217,8 +332,10 @@ export default function MapView(props: Props) {
         return;
       }
       const site = propsRef.current.sites.find((feature) => feature.properties.site_id === props.selectedId);
-      if (!site?.geometry) return;
-      map.jumpTo({ center: site.geometry.coordinates, zoom: 16 });
+      const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === props.selectedId);
+      const geometry = site?.geometry || deal?.geometry;
+      if (!geometry) return;
+      map.jumpTo({ center: geometry.coordinates, zoom: 16 });
     };
     if (props.selectedId && !selectedOnMap) return;
     go();

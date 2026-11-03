@@ -8,7 +8,7 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
-import type { SiteProps } from "@/lib/types";
+import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
 
@@ -75,6 +75,65 @@ export default function SiteTable({
         <tbody>
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id} className={row.original.site_id === selectedId ? "on" : ""} onClick={() => onSelect(row.original.site_id)}>
+              {row.getVisibleCells().map((cell) => (
+                <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext()) as ReactNode}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const dealColumns: LegacyColumnDef<DealProps>[] = [
+  { accessorKey: "deal_id", header: "Deal" },
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "city", header: "City" },
+  { accessorKey: "stage", header: "Stage" },
+  { accessorKey: "firm", header: "Firm" },
+  { accessorKey: "broker", header: "Broker" },
+  { accessorKey: "asking_price_display", header: "Asking" },
+  { accessorKey: "miles_to_depot", header: "Depot mi" },
+  { accessorKey: "universe_id", header: "Universe site" },
+];
+
+export function DealTable({
+  rows,
+  selectedId,
+  onSelect,
+}: {
+  rows: DealProps[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const table = useLegacyTable({
+    data: rows,
+    columns: dealColumns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          {table.getHeaderGroups().map((group) => (
+            <tr key={group.id}>
+              {group.headers.map((header) => (
+                <th key={header.id} onClick={header.column.getToggleSortingHandler()}>
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {{ asc: " ↑", desc: " ↓" }[header.column.getIsSorted() as string] ?? ""}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row) => (
+            <tr key={row.id} className={row.original.deal_id === selectedId ? "on" : ""} onClick={() => onSelect(row.original.deal_id)}>
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext()) as ReactNode}</td>
               ))}

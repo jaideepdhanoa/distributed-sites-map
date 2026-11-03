@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T19:52:09Z",
+  "generated_at": "2026-11-03T21:03:11Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -128,6 +128,123 @@
     "1 Desk screen": 25,
     "0 Off-market target": 17
   },
+  "deals": {
+    "pipeline": 78,
+    "land": 42,
+    "matched": 37,
+    "unmatched": 83,
+    "geocode_failed": [
+      {
+        "deal_id": "PIPE-PHX-0006",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX Flex-serve wash, northeast Phoenix",
+        "stage": "Dropped"
+      },
+      {
+        "deal_id": "PIPE-PHX-0008",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX Auto repair, Maricopa County",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-PHX-0009",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX Auto service, Mesa",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-LAS-0015",
+        "city": "LAS",
+        "kind": "pipeline",
+        "label": "LAS Auto repair and body shop (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-PHX-0018",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX Tire business, Apache Junction",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-PHX-0067",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX Sinclair gas station, Mesa (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-PHX-0068",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX Shell gas station, Gilbert (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-PHX-0069",
+        "city": "PHX",
+        "kind": "pipeline",
+        "label": "PHX ARCO ampm gas station, Phoenix (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-LAS-0072",
+        "city": "LAS",
+        "kind": "pipeline",
+        "label": "LAS Gas station with real estate and a tenant (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-MIA-0074",
+        "city": "MIA",
+        "kind": "pipeline",
+        "label": "MIA Auto repair with real estate (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-MIA-0075",
+        "city": "MIA",
+        "kind": "pipeline",
+        "label": "MIA Gas station with land, North Miami (address to come)",
+        "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-MIA-0077",
+        "city": "MIA",
+        "kind": "pipeline",
+        "label": "MIA Mechanic shop near Tamiami Airport (address to come)",
+        "stage": "1 Desk screen"
+      }
+    ],
+    "pipeline_by_city": {
+      "PHX": 37,
+      "SNA": 1,
+      "LAS": 22,
+      "MIA": 18
+    },
+    "pipeline_by_stage": {
+      "Dropped": 11,
+      "1 Desk screen": 18,
+      "0 Off-market target": 49
+    },
+    "pipeline_by_group": {
+      "dropped": 11,
+      "desk": 18,
+      "sourced": 49
+    },
+    "land_by_city": {
+      "LAS": 11,
+      "PHX": 13,
+      "MIA": 18
+    },
+    "land_by_group": {
+      "desk": 25,
+      "sourced": 17
+    }
+  },
   "sites_without_coordinates": [
     "PIPE-PHX-0003",
     "PIPE-PHX-0004",
@@ -189,5 +306,5 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "verdicts_appended": 0,
-  "verdicts_total": 1308
+  "verdicts_total": 2486
 }

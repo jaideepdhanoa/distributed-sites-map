@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T19:44:32Z",
+  "generated_at": "2026-11-03T19:52:09Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -49,13 +49,13 @@
     }
   },
   "land_tiers": {
-    "L10": 38,
+    "L10": 22,
     "L4": 44,
-    "L10_checked": 38,
+    "L10_checked": 22,
     "L4_checked": 3,
     "pending": 41,
     "eliminated_not_a_wash": 7,
-    "held_fits": 23,
+    "held_fits": 20,
     "screening_rows": 1689,
     "screening_matched_sites": 1624,
     "incoming": {
@@ -74,8 +74,8 @@
   "verdicts_on_land_fits": {
     "PASS": 8,
     "MAYBE": 15,
-    "FAIL": 12,
-    "NOT_A_WASH": 4,
+    "FAIL": 0,
+    "NOT_A_WASH": 0,
     "UNRESOLVED": 2
   },
   "pass_cleared": [
@@ -172,7 +172,7 @@
   },
   "muse_source": "reconciliation muse column",
   "warnings": [
-    "In-area land tiers are L10 38 (county-checked 38) and L4 44 (county-checked 3). The brief expected about 25 L10 and about 48 L4, with all L10 county-checked and about 3 of the L4 county-checked.",
+    "In-area land tiers are L10 22 (county-checked 22) and L4 44 (county-checked 3). The brief expected about 25 L10 and about 48 L4, with all L10 county-checked and about 3 of the L4 county-checked.",
     "Pipeline tab has 78 rows (stages {'Dropped': 11, '1 Desk screen': 18, '0 Off-market target': 49}). The older note of 79 is not in this export.",
     "PHX-U644 in_area=False (screening-tab boundary note in the plan).",
     "PHX-U646 in_area=False (screening-tab boundary note in the plan)."

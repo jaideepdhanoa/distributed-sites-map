@@ -59,17 +59,14 @@ export function matches(site: SiteProps, filters: Filters): boolean {
     case "land_tier":
       if (!universe || !site.in_area) return Boolean(filters.showStops && universe);
       if (site.land_tier === "L10" || site.land_tier === "L4") return true;
-      if (site.verdict === "NOT_A_WASH") return true;
+      if (site.verdict === "NOT_A_WASH" || site.verdict === "FAIL") return true;
       return filters.showStops;
     case "verified":
       return universe && site.in_area && (site.land_tier === "L10" || site.land_tier === "L4");
     case "verdict":
-      return (
-        universe &&
-        site.in_area &&
-        (site.land_tier === "L10" || site.land_tier === "L4") &&
-        site.verification === "county-checked"
-      );
+      if (!universe || site.verification !== "county-checked") return false;
+      if (site.verdict === "FAIL" || site.verdict === "NOT_A_WASH") return true;
+      return Boolean(site.in_area && (site.land_tier === "L10" || site.land_tier === "L4"));
     case "listed":
       if (!site.is_candidate && !(filters.showHeld && site.is_held_fit)) return false;
       return filters.showStops || site.listed;

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T19:44:32Z",
+  "generated_at": "2026-11-03T19:52:09Z",
   "muse_reference": {
     "in_area_sites": 1043,
     "by_city": {
@@ -101,54 +101,38 @@
       "id": "land_tier",
       "name": "Land tier",
       "unit": "sites",
-      "total": 82,
+      "total": 66,
       "L10": {
-        "total": 38,
+        "total": 22,
         "by_city": {
-          "LAS": 12,
-          "PHX": 17,
-          "MIA": 9
+          "LAS": 7,
+          "PHX": 11,
+          "MIA": 4
         },
-        "county_checked": 38,
+        "county_checked": 22,
         "ids": [
           "LAS-U101",
-          "LAS-U107",
           "LAS-U129",
           "LAS-U43",
           "LAS-U799",
-          "LAS-U803",
           "LAS-U837",
-          "LAS-U862",
           "LAS-U877",
-          "LAS-U901",
           "LAS-U943",
-          "LAS-U946",
-          "MIA-U1086",
-          "MIA-U1156",
           "MIA-U1181",
-          "MIA-U1182",
-          "MIA-U1214",
           "MIA-U1347",
-          "MIA-U1475",
           "MIA-U753",
           "MIA-U777",
           "PHX-U180",
-          "PHX-U192",
           "PHX-U197",
           "PHX-U210",
-          "PHX-U231",
           "PHX-U236",
-          "PHX-U249",
           "PHX-U252",
-          "PHX-U260",
           "PHX-U462",
           "PHX-U476",
           "PHX-U510",
           "PHX-U517",
           "PHX-U540",
-          "PHX-U543",
-          "PHX-U545",
-          "PHX-U569"
+          "PHX-U543"
         ]
       },
       "L4": {
@@ -225,8 +209,8 @@
         ]
       },
       "held_fits": {
-        "total": 23,
-        "L10": 10,
+        "total": 20,
+        "L10": 7,
         "L4": 13
       },
       "note": "L10 is at least 10,000 sq ft of spare land and L4 is at least 4,000 sq ft. Aerial FIT codes are used when the screening tab has them. A county-checked site with no aerial code takes its tier from the county spare measurement. In-area PASS sites stay in the candidate set. Held fits sit only in the Las Vegas 200 or 300 ring."
@@ -235,13 +219,13 @@
       "id": "verified",
       "name": "Verified",
       "unit": "sites",
-      "total": 82,
-      "county_checked": 41,
+      "total": 66,
+      "county_checked": 25,
       "pending": 41,
       "by_city_checked": {
-        "LAS": 12,
-        "PHX": 20,
-        "MIA": 9
+        "LAS": 7,
+        "PHX": 14,
+        "MIA": 4
       },
       "by_city_pending": {
         "LAS": 7,
@@ -254,11 +238,11 @@
       "id": "verdict",
       "name": "Verdict split",
       "unit": "sites",
-      "total": 41,
+      "total": 25,
       "by_city": {
-        "LAS": 12,
-        "PHX": 20,
-        "MIA": 9
+        "LAS": 7,
+        "PHX": 14,
+        "MIA": 4
       },
       "outcomes": {
         "PASS": {
@@ -305,40 +289,22 @@
           ]
         },
         "FAIL": {
-          "total": 12,
+          "total": 0,
           "by_city": {
-            "LAS": 4,
-            "PHX": 4,
-            "MIA": 4
+            "LAS": 0,
+            "PHX": 0,
+            "MIA": 0
           },
-          "ids": [
-            "LAS-U107",
-            "LAS-U803",
-            "LAS-U862",
-            "LAS-U901",
-            "MIA-U1086",
-            "MIA-U1182",
-            "MIA-U1214",
-            "MIA-U1475",
-            "PHX-U192",
-            "PHX-U231",
-            "PHX-U260",
-            "PHX-U569"
-          ]
+          "ids": []
         },
         "NOT_A_WASH": {
-          "total": 4,
+          "total": 0,
           "by_city": {
-            "LAS": 1,
-            "PHX": 2,
-            "MIA": 1
+            "LAS": 0,
+            "PHX": 0,
+            "MIA": 0
           },
-          "ids": [
-            "LAS-U946",
-            "MIA-U1156",
-            "PHX-U249",
-            "PHX-U545"
-          ]
+          "ids": []
         },
         "UNRESOLVED": {
           "total": 2,
@@ -366,7 +332,7 @@
         "PHX": 2,
         "MIA": 1
       },
-      "of": 76,
+      "of": 66,
       "note": "Split of the in-area L10 and L4 sites that are not eliminated. Off-market rows are not listed. Nobody drops at this step."
     },
     {
@@ -380,7 +346,7 @@
         "PHX": 0,
         "MIA": 0
       },
-      "of": 76,
+      "of": 66,
       "note": "Contacted means Pipeline stage 2 or later. Stage 0 and stage 1 are not contacted. The workbook currently has only stages 0, 1, and Dropped, so this count is 0."
     }
   ],
@@ -389,7 +355,6 @@
     "ids": [
       "LAS-U100",
       "LAS-U101",
-      "LAS-U107",
       "LAS-U129",
       "LAS-U1515",
       "LAS-U1516",
@@ -397,10 +362,8 @@
       "LAS-U39",
       "LAS-U43",
       "LAS-U799",
-      "LAS-U803",
       "LAS-U837",
       "LAS-U848",
-      "LAS-U862",
       "LAS-U877",
       "LAS-U943",
       "LAS-U977",
@@ -415,10 +378,8 @@
       "MIA-U1174",
       "MIA-U1175",
       "MIA-U1181",
-      "MIA-U1182",
       "MIA-U1198",
       "MIA-U1213",
-      "MIA-U1214",
       "MIA-U1239",
       "MIA-U1263",
       "MIA-U1265",
@@ -428,7 +389,6 @@
       "MIA-U1308",
       "MIA-U1347",
       "MIA-U1474",
-      "MIA-U1475",
       "MIA-U688",
       "MIA-U729",
       "MIA-U748",
@@ -438,15 +398,12 @@
       "PHX-U1005",
       "PHX-U1017",
       "PHX-U180",
-      "PHX-U192",
       "PHX-U197",
       "PHX-U210",
       "PHX-U230",
-      "PHX-U231",
       "PHX-U232",
       "PHX-U236",
       "PHX-U252",
-      "PHX-U260",
       "PHX-U353",
       "PHX-U367",
       "PHX-U372",
@@ -461,7 +418,6 @@
       "PHX-U540",
       "PHX-U543",
       "PHX-U565",
-      "PHX-U569",
       "PHX-U588"
     ],
     "held_ids": [
@@ -472,7 +428,6 @@
       "LAS-U1526",
       "LAS-U18",
       "LAS-U34",
-      "LAS-U36",
       "LAS-U38",
       "LAS-U4",
       "LAS-U53",
@@ -483,10 +438,8 @@
       "LAS-U843",
       "LAS-U866",
       "LAS-U871",
-      "LAS-U887",
       "LAS-U919",
       "LAS-U96",
-      "LAS-U97",
       "LAS-U970"
     ]
   }

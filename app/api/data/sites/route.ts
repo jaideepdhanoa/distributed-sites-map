@@ -38,6 +38,8 @@ const KEEP = [
   "elimination_reason",
   "tenure_fail",
   "is_held_fit",
+  "tier_from_adjoining",
+  "why_stopped",
   "is_candidate",
   "origin",
   "muse_verdict",

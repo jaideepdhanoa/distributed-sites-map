@@ -70,11 +70,11 @@ Verdict rows are append-only in `data/verdicts/verdicts.csv`. Pull requests run 
 | Census rows | 1,701 (LAS 428 / PHX 561 / MIA 712) |
 | Unique sites | 1,643 |
 | In service area | 1,041 (LAS 182 / PHX 251 / MIA 608) |
-| Land tier L10 | 38, all county-checked once county spare is included |
+| Land tier L10 | 22. FAIL and not-a-wash sites are not given a tier |
 | Land tier L4 | 44, of which 3 are county-checked and 41 are aerial only |
 | Eliminated, not a wash, in area | 7 |
-| Held for network expansion | 23, including LAS-U15 and LAS-U866 |
-| In-area candidates | 76, including all 8 cleared PASS sites |
+| Held for network expansion | 20, including LAS-U15 and LAS-U866 |
+| In-area candidates | 66, including all 8 cleared PASS sites |
 | Of which listed | 5 |
 | Of which contacted | 0 |
 
@@ -82,7 +82,7 @@ The eight cleared PASS sites are LAS-U129, LAS-U877, MIA-U1347, MIA-U753, PHX-U1
 
 Muse's in-area reference, shown in the app and not used as our count, is 1,043 (LV 179 / PHX 254 / MIA 610).
 
-Aerial screening alone had 25 in-area L10 sites. County-checked sites with no aerial code now take L10 at 10,000 sq ft of spare land and L4 at 4,000 sq ft, which brings in-area L10 to 38. L4 remains 44 against an expected figure near 48. The screening tab has 61 partial-fit rows: 57 joined to a site, 44 are inside the operative area, 13 are in the Las Vegas 200/300 rings, and 4 did not join a site.
+Aerial screening alone had 25 in-area L10 sites. County-checked sites that are not FAIL or not-a-wash, and that have no aerial code, take L10 at 10,000 sq ft of spare land and L4 at 4,000 sq ft. Same-owner adjoining land counts toward that line. In-area L10 is 22 after dropping eliminated sites. L4 remains 44 against an expected figure near 48. The screening tab has 61 partial-fit rows: 57 joined to a site, 44 are inside the operative area, 13 are in the Las Vegas 200/300 rings, and 4 did not join a site.
 
 Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The step stays on screen.
 

@@ -65,6 +65,7 @@ export type SiteProps = {
   elimination_reason: string;
   tenure_fail: boolean;
   is_held_fit: boolean;
+  tier_from_adjoining: boolean;
   is_candidate: boolean;
   miles_to_depot: number | null;
   evidence: string;

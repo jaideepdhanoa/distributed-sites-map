@@ -18,6 +18,7 @@ export default function Detail({ site }: { site: SiteProps | null }) {
     <aside className="detail">
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge ${site.land_tier === "L10" ? "l10" : "l4"}`}>{site.land_tier}</span> : null}
+        {site.tier_from_adjoining ? <span className="badge l4">Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${verification}`}>{site.verification}</span>
         {site.network_status === "held" ? <span className="badge held">Held for network expansion</span> : null}
         {site.verdict === "NOT_A_WASH" ? <span className="badge gone">Eliminated · {site.elimination_reason}</span> : null}

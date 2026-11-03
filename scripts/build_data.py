@@ -75,7 +75,7 @@ FORBIDDEN_KEYS = {
     "most_can_pay",
     _w("a3c="),
     _w("bXc="),
-    "power_kw",
+    _w("cG93ZXJfa3c="),
     _w("a2lsb3dhdHQ="),
 }
 
@@ -1208,6 +1208,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "elimination_reason": "",
             "tenure_fail": False,
             "is_held_fit": False,
+            "tier_from_adjoining": False,
             "miles_to_depot": None,
             "evidence": "",
             "operating": "",
@@ -1580,21 +1581,28 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             site["verification"] = "aerial only, pending verification"
         else:
             site["verification"] = "not screened"
-        if site.get("verdict") and not site.get("land_tier"):
+        verdict = site.get("verdict")
+        # FAIL and not-a-wash are eliminated. They do not keep an L10 or L4 tier.
+        if verdict in {"FAIL", "NOT_A_WASH"}:
+            site["land_tier"] = None
+        elif verdict and not site.get("land_tier"):
             derived = tier_from_acres(site.get("spare_ac_own"), site.get("spare_ac_adjoining"))
             if derived:
                 site["land_tier"] = derived
-        eliminated = site.get("verdict") == "NOT_A_WASH"
-        land_fit = site.get("land_tier") in {"L10", "L4"}
-        # An in-area PASS stays a candidate even when the aerial file had no FIT code.
-        keep_pass = site.get("verdict") == "PASS"
+        tier = site.get("land_tier")
+        own_sqft = (site.get("spare_ac_own") or 0) * 43560
+        adj_sqft = (site.get("spare_ac_adjoining") or 0) * 43560
+        tier_line = FIT10_SQFT if tier == "L10" else FIT4_SQFT if tier == "L4" else None
+        site["tier_from_adjoining"] = bool(tier_line is not None and own_sqft < tier_line <= adj_sqft)
+        eliminated = verdict in {"FAIL", "NOT_A_WASH"} or site["tenure_fail"]
+        land_fit = tier in {"L10", "L4"}
+        keep_pass = verdict == "PASS"
         site["is_candidate"] = bool(
             site["counts_as_site"]
             and not site["land_only"]
             and site["in_area"]
             and (land_fit or keep_pass)
             and not eliminated
-            and not site["tenure_fail"]
         )
         site["is_held_fit"] = bool(
             site["counts_as_site"]
@@ -1602,14 +1610,15 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             and site.get("expansion_horizon")
             and (land_fit or keep_pass)
             and not eliminated
-            and not site["tenure_fail"]
         )
         if site["duplicate_of"]:
             site["why_stopped"] = f"Duplicate of {site['duplicate_of']} (same parcel). Counted once."
-        elif eliminated:
-            site["why_stopped"] = "Not a wash (" + site["elimination_reason"] + ")."
+        elif verdict == "NOT_A_WASH":
+            site["why_stopped"] = "Not a wash (" + (site["elimination_reason"] or "reason not categorised") + ")."
         elif site["tenure_fail"]:
             site["why_stopped"] = "County verdict is FAIL on tenure. Tenure is otherwise only a flag."
+        elif verdict == "FAIL":
+            site["why_stopped"] = site.get("evidence") or "County verdict is FAIL."
         elif site["is_held_fit"]:
             site["why_stopped"] = "Outside the operative service area. Held for network expansion."
         elif site["origin"] == "universe" and not site["in_area"]:
@@ -1978,6 +1987,74 @@ def build_depots() -> dict:
     return fc
 
 
+def sources_present() -> bool:
+    return (SRC / "universe_v3.csv").exists() and any(SRC.glob("*.xlsx"))
+
+
+def validate_committed() -> None:
+    """Check the files in git. Used when the raw source folder is not present."""
+    problems: list[str] = []
+    required = ["sites.geojson", "areas.geojson", "depots.geojson", "parcels.geojson", "funnel.json", "build_report.json"]
+    loaded = {}
+    for name in required:
+        path = OUT / name
+        if not path.exists():
+            problems.append(f"missing {name}")
+            continue
+        try:
+            loaded[name] = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            problems.append(f"{name} is not valid JSON")
+    for name, blob in loaded.items():
+        problems.extend(scan_obj(blob, name))
+    if problems:
+        raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
+
+    sites = loaded["sites.geojson"]["features"]
+    props = [feature.get("properties") or {} for feature in sites]
+    ids = [item.get("site_id") for item in props]
+    if any(not item for item in ids) or len(ids) != len(set(ids)):
+        problems.append("site ids must be present and unique")
+    countable = [item for item in props if item.get("counts_as_site") and item.get("origin") == "universe"]
+    in_area = [item for item in countable if item.get("in_area")]
+    l10 = [item for item in in_area if item.get("land_tier") == "L10"]
+    l4 = [item for item in in_area if item.get("land_tier") == "L4"]
+    candidates = [item for item in countable if item.get("is_candidate")]
+    held = [item for item in countable if item.get("is_held_fit")]
+    report = loaded["build_report.json"]
+    funnel = loaded["funnel.json"]
+    stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
+
+    def expect(label, got, want):
+        if got != want:
+            problems.append(f"{label}: file says {want}, sites say {got}")
+
+    expect("in area", len(in_area), report.get("in_area", {}).get("total"))
+    expect("L10", len(l10), report.get("land_tiers", {}).get("L10"))
+    expect("L4", len(l4), report.get("land_tiers", {}).get("L4"))
+    expect("candidates", len(candidates), stages.get("listed", {}).get("of"))
+    expect("funnel in area", stages.get("in_area", {}).get("total"), len(in_area))
+    expect("funnel L10", (stages.get("land_tier", {}).get("L10") or {}).get("total"), len(l10))
+    expect("funnel L4", (stages.get("land_tier", {}).get("L4") or {}).get("total"), len(l4))
+    expect("held", len(held), (stages.get("land_tier", {}).get("held_fits") or {}).get("total"))
+    leaked = [item.get("site_id") for item in candidates + held if item.get("verdict") in {"FAIL", "NOT_A_WASH"}]
+    if leaked:
+        problems.append("eliminated sites counted as candidates or held: " + ", ".join(leaked[:20]))
+    tiered_fail = [item.get("site_id") for item in props if item.get("verdict") in {"FAIL", "NOT_A_WASH"} and item.get("land_tier") in {"L10", "L4"}]
+    if tiered_fail:
+        problems.append("eliminated sites still have a land tier: " + ", ".join(tiered_fail[:20]))
+    allowed = {"id", "address", "city", "status", "confidence"}
+    for feature in loaded["depots.geojson"].get("features", []):
+        extra = set(feature.get("properties") or {}) - allowed
+        if extra:
+            problems.append("depot properties not allowed: " + ", ".join(sorted(extra)))
+            break
+    if len(loaded["depots.geojson"].get("features", [])) != 13:
+        problems.append("expected 13 depot pins")
+    if problems:
+        raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
+
+
 def check_against_report(report: dict) -> None:
     committed = json.loads((OUT / "build_report.json").read_text())
     keys = ("in_area", "land_tiers", "verdicts", "pass_held", "contacted_of_candidates", "census_rows")
@@ -2003,8 +2080,12 @@ def main():
     parser.add_argument("--muse-verdicts", default=os.environ.get("MUSE_VERDICTS_FILE") or None)
     args = parser.parse_args()
     if args.check:
-        report = build(write=False, refresh_parcels=False, muse_file=args.muse_verdicts)
-        check_against_report(report)
+        if sources_present():
+            report = build(write=False, refresh_parcels=False, muse_file=args.muse_verdicts)
+            check_against_report(report)
+        else:
+            print("Source folder is absent. Checking committed generated files only.")
+        validate_committed()
         print("Data check passed.")
         return
     report = build(write=True, refresh_parcels=args.refresh_parcels, muse_file=args.muse_verdicts)

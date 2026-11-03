@@ -5,7 +5,7 @@ const OPEN = new Set(["/login", "/api/login", "/robots.txt"]);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (OPEN.has(pathname)) return NextResponse.next();
+  if (OPEN.has(pathname) || pathname === "/maplibre-gl-worker.js") return NextResponse.next();
   const session = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
   if (session) {
     const response = NextResponse.next();
@@ -26,5 +26,5 @@ function privateHeaders() {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|maplibre-gl-worker\\.js).*)"],
 };

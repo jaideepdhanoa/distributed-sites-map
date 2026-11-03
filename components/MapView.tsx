@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GeoJSONSource, Map, NavigationControl, Popup, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
+import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoFeature, SiteFeature } from "@/lib/types";
 
@@ -11,26 +11,12 @@ type Props = {
   depots: GeoFeature[];
   parcels: GeoFeature[];
   selectedId: string | null;
-  showExpansion: boolean;
-  showLabels: boolean;
-  showRings: boolean;
+  focusLng: number;
+  focusLat: number;
+  focusZoom: number;
   onSelect: (id: string) => void;
   onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
 };
-
-function circle(lon: number, lat: number, miles: number) {
-  const coords: [number, number][] = [];
-  const radius = miles / 3958.8;
-  for (let i = 0; i <= 64; i += 1) {
-    const bearing = (2 * Math.PI * i) / 64;
-    const lat1 = (lat * Math.PI) / 180;
-    const lon1 = (lon * Math.PI) / 180;
-    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(radius) + Math.cos(lat1) * Math.sin(radius) * Math.cos(bearing));
-    const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(radius) * Math.cos(lat1), Math.cos(radius) - Math.sin(lat1) * Math.sin(lat2));
-    coords.push([(lon2 * 180) / Math.PI, (lat2 * 180) / Math.PI]);
-  }
-  return coords;
-}
 
 function acresOf(coords: [number, number][]) {
   const radius = 6378137;
@@ -56,6 +42,7 @@ export default function MapView(props: Props) {
 
   useEffect(() => {
     if (!node.current || mapRef.current) return;
+    setWorkerUrl("/maplibre-gl-worker.js");
     const map = new Map({
       container: node.current,
       style: {
@@ -77,43 +64,39 @@ export default function MapView(props: Props) {
           parcels: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-          rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
         },
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
-          { id: "areas-fill", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#1e4636", "fill-opacity": 0.14 } },
-          { id: "areas-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#1e4636", "line-width": 1.2 } },
-          { id: "expansion-fill", type: "fill", source: "areas", filter: ["==", ["get", "group"], "expansion"], layout: { visibility: "none" }, paint: { "fill-color": "#1d4e89", "fill-opacity": 0.08 } },
-          { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], layout: { visibility: "none" }, paint: { "line-color": "#1d4e89", "line-dasharray": [2, 1.5], "line-width": 1.4 } },
-          { id: "future", type: "line", source: "areas", filter: ["==", ["get", "group"], "future"], layout: { visibility: "none" }, paint: { "line-color": "#6d655b", "line-dasharray": [1, 1] } },
-          { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f4efe6", "line-width": 1, "line-opacity": 0.8 } },
-          { id: "parcels", type: "fill", source: "parcels", paint: { "fill-color": "#8d3b32", "fill-opacity": 0.25 } },
-          { id: "parcels-line", type: "line", source: "parcels", paint: { "line-color": "#8d3b32", "line-width": 2 } },
+          { id: "areas-dim", type: "fill", source: "areas", filter: ["all", ["==", ["get", "group"], "service"], ["!", ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]]]], paint: { "fill-color": "#d7e2d4", "fill-opacity": 0.08 } },
+          { id: "areas-dim-line", type: "line", source: "areas", filter: ["all", ["==", ["get", "group"], "service"], ["!", ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]]]], paint: { "line-color": "#f4efe6", "line-width": 1.25, "line-opacity": 0.55 } },
+          { id: "areas-op", type: "fill", source: "areas", filter: ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]], paint: { "fill-color": "#7dffa8", "fill-opacity": 0.2 } },
+          { id: "areas-op-line", type: "line", source: "areas", filter: ["in", ["get", "id"], ["literal", ["las-100", "las-core"]]], paint: { "line-color": "#e9fff1", "line-width": 2.75 } },
+          { id: "expansion-fill", type: "fill", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "fill-color": "#9bb7d4", "fill-opacity": 0.06 } },
+          { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#e7f1fb", "line-dasharray": [1.2, 1.2], "line-width": 2, "line-opacity": 0.9 } },
+          { id: "parcels", type: "fill", source: "parcels", paint: { "fill-color": "#ffd0c8", "fill-opacity": 0.35 } },
+          { id: "parcels-line", type: "line", source: "parcels", paint: { "line-color": "#fff7f4", "line-width": 3 } },
+          { id: "parcels-line-inner", type: "line", source: "parcels", paint: { "line-color": "#8d3b32", "line-width": 1.5 } },
           {
             id: "sites",
             type: "circle",
             source: "sites",
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3, 12, 7],
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 12, 7, 15, 10],
               "circle-color": [
                 "case",
-                ["==", ["get", "land_tier"], "L10"], "#1f6b45",
-                ["==", ["get", "land_tier"], "L4"], "#c4841d",
-                ["==", ["get", "verdict"], "NOT_A_WASH"], "#8a847c",
-                ["==", ["get", "verdict"], "FAIL"], "#9c3b32",
-                ["==", ["get", "in_area"], true], "#4d625c",
-                "#d5cec2",
+                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "#2f6f9f",
+                ["==", ["get", "verdict"], "PASS"], "#1f7a4d",
+                ["==", ["get", "verdict"], "MAYBE"], "#c4841d",
+                ["==", ["get", "verdict"], "UNRESOLVED"], "#b85c38",
+                ["==", ["get", "verdict"], "FAIL"], "#7a2e28",
+                ["==", ["get", "verdict"], "NOT_A_WASH"], "#5c574f",
+                "#f4efe6",
               ],
-              "circle-stroke-color": [
-                "case",
-                ["==", ["get", "network_status"], "held"], "#1d4e89",
-                ["==", ["get", "verification"], "aerial only, pending verification"], "#f4efe6",
-                "#1c1914",
-              ],
-              "circle-stroke-width": ["case", ["==", ["get", "site_id"], ""], 1, 1.4],
-              "circle-opacity": 0.92,
+              "circle-stroke-color": "#1c1914",
+              "circle-stroke-width": ["case", ["==", ["get", "verdict"], "UNRESOLVED"], 3, ["!", ["has", "verdict"]], 1.6, 1.2],
+              "circle-opacity": 0.95,
             },
           },
           {
@@ -125,30 +108,37 @@ export default function MapView(props: Props) {
           },
           {
             id: "depots",
-            type: "circle",
+            type: "symbol",
             source: "depots",
-            paint: {
-              "circle-radius": 7,
-              "circle-color": [
-                "match", ["get", "status"],
-                "planned", "#5c6b7a",
-                "candidate", "#8d6a2f",
-                "#1d4e89",
-              ],
-              "circle-opacity": ["case", ["==", ["get", "confidence"], "low"], 0, 0.95],
-              "circle-stroke-color": "#faf7f1",
-              "circle-stroke-width": 2,
-            },
+            layout: { "icon-image": "depot", "icon-size": 1, "icon-allow-overlap": true },
           },
           { id: "measure", type: "line", source: "measure", paint: { "line-color": "#f4efe6", "line-width": 2 } },
         ],
       },
-      center: [-98.5, 32.5],
-      zoom: 3.4,
+      center: [props.focusLng, props.focusLat],
+      zoom: props.focusZoom,
       attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    const size = 36;
+    const image = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const dx = Math.abs(x - 17.5) / 15;
+        const dy = Math.abs(y - 17.5) / 15;
+        const diamond = dx + dy;
+        if (diamond <= 1) {
+          const i = (y * size + x) * 4;
+          const edge = diamond > 0.72;
+          image[i] = edge ? 29 : 244;
+          image[i + 1] = edge ? 78 : 239;
+          image[i + 2] = edge ? 137 : 230;
+          image[i + 3] = 255;
+        }
+      }
+    }
     map.on("load", () => {
+      if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const feature = event.features?.[0];
@@ -181,8 +171,12 @@ export default function MapView(props: Props) {
       map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
       propsRef.current.onBounds(map.getBounds());
     });
+    const observed = node.current;
+    const observer = new ResizeObserver(() => map.resize());
+    observer.observe(observed);
     mapRef.current = map;
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -190,6 +184,8 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom}`;
+  const appliedFocus = useRef("");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -199,33 +195,38 @@ export default function MapView(props: Props) {
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
       const parcel = props.parcels.filter((feature) => feature.properties.site_id === props.selectedId);
       (map.getSource("parcels") as GeoJSONSource).setData({ type: "FeatureCollection", features: parcel });
-      const rings = props.depots
-        .filter((feature) => feature.geometry?.type === "Point")
-        .flatMap((feature) => {
-          const [lon, lat] = feature.geometry!.coordinates as [number, number];
-          return [1, 2, 3].map((miles) => ({
-            type: "Feature" as const,
-            properties: { miles },
-            geometry: { type: "LineString" as const, coordinates: circle(lon, lat, miles) },
-          }));
-        });
-      (map.getSource("rings") as GeoJSONSource).setData({ type: "FeatureCollection", features: rings });
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
-      map.setLayoutProperty("expansion-fill", "visibility", props.showExpansion ? "visible" : "none");
-      map.setLayoutProperty("expansion-line", "visibility", props.showExpansion ? "visible" : "none");
-      map.setLayoutProperty("labels", "visibility", props.showLabels ? "visible" : "none");
-      map.setLayoutProperty("rings", "visibility", props.showRings ? "visible" : "none");
+      if (appliedFocus.current !== focusToken) {
+        appliedFocus.current = focusToken;
+        map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
+      }
     };
     if (map.isStyleLoaded()) push();
     else map.once("load", push);
-  }, [props.sites, props.areas, props.depots, props.parcels, props.selectedId, props.showExpansion, props.showLabels, props.showRings]);
+  }, [props.sites, props.areas, props.depots, props.parcels, props.selectedId, focusToken, props.focusLng, props.focusLat, props.focusZoom]);
 
+  const selectedOnMap = props.sites.some((feature) => feature.properties.site_id === props.selectedId);
   useEffect(() => {
     const map = mapRef.current;
-    const site = props.sites.find((feature) => feature.properties.site_id === props.selectedId);
-    if (!map || !site?.geometry) return;
-    map.flyTo({ center: site.geometry.coordinates, zoom: Math.max(map.getZoom(), 15) });
-  }, [props.selectedId, props.sites]);
+    if (!map) return;
+    let cancel = false;
+    const go = () => {
+      if (cancel) return;
+      if (!props.selectedId) {
+        map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
+        return;
+      }
+      const site = propsRef.current.sites.find((feature) => feature.properties.site_id === props.selectedId);
+      if (!site?.geometry) return;
+      map.jumpTo({ center: site.geometry.coordinates, zoom: 16 });
+    };
+    if (props.selectedId && !selectedOnMap) return;
+    go();
+    if (props.selectedId) map.once("idle", go);
+    return () => {
+      cancel = true;
+    };
+  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom]);
 
   return (
     <div className="stage-map">

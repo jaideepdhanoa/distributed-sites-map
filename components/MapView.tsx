@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GeoJSONSource, Map, NavigationControl, Popup, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
+import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoFeature, SiteFeature } from "@/lib/types";
 
@@ -56,6 +56,7 @@ export default function MapView(props: Props) {
 
   useEffect(() => {
     if (!node.current || mapRef.current) return;
+    setWorkerUrl("/maplibre-gl-worker.js");
     const map = new Map({
       container: node.current,
       style: {
@@ -181,8 +182,12 @@ export default function MapView(props: Props) {
       map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
       propsRef.current.onBounds(map.getBounds());
     });
+    const observed = node.current;
+    const observer = new ResizeObserver(() => map.resize());
+    observer.observe(observed);
     mapRef.current = map;
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -222,10 +227,15 @@ export default function MapView(props: Props) {
 
   useEffect(() => {
     const map = mapRef.current;
-    const site = props.sites.find((feature) => feature.properties.site_id === props.selectedId);
-    if (!map || !site?.geometry) return;
-    map.flyTo({ center: site.geometry.coordinates, zoom: Math.max(map.getZoom(), 15) });
-  }, [props.selectedId, props.sites]);
+    if (!map || !props.selectedId) return;
+    const go = () => {
+      const site = propsRef.current.sites.find((feature) => feature.properties.site_id === propsRef.current.selectedId);
+      if (!site?.geometry) return;
+      map.jumpTo({ center: site.geometry.coordinates, zoom: Math.max(map.getZoom(), 15) });
+    };
+    if (map.loaded()) go();
+    else map.once("load", go);
+  }, [props.selectedId]);
 
   return (
     <div className="stage-map">

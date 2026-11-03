@@ -37,10 +37,10 @@ export default function Detail({ site }: { site: SiteProps | null }) {
         <span>Street</span><div>{site.street_view_url ? <a href={site.street_view_url} target="_blank" rel="noreferrer">Street view</a> : "—"}</div>
       </div>
       <h3>Owner</h3>
-      <p><Dot status={site.fields.owner?.status} />{site.owner || "—"}</p>
+      <p><Dot status={site.fields?.owner?.status} />{site.owner || "—"}</p>
       <h3>Land</h3>
       <div className="kv">
-        <span>Own parcel</span><div><Dot status={site.fields.spare?.status} />{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
+        <span>Own parcel</span><div><Dot status={site.fields?.spare?.status} />{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
         <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
         <span>Control</span><div>{site.land_control === "own_parcel" ? "Own parcel" : site.land_control === "same_owner_adjoining" ? "Same-owner adjoining" : "—"}</div>
         <span>Aerial code</span><div>{site.aerial_fit || "—"}</div>

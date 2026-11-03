@@ -107,8 +107,8 @@ export function compareSites(a: SiteProps, b: SiteProps, sort: string): number {
 }
 
 export const SORT_LABELS: Record<string, string> = {
-  tier: "Land tier, then own-parcel spare, then grid proxy, then tenure",
-  spare: "Own-parcel spare land, then tier, grid proxy, tenure",
+  tier: "Land tier, then own-parcel spare, then utility proximity, then tenure",
+  spare: "Own-parcel spare land, then tier, utility proximity, tenure",
   grid: "Utility proximity (Strong, then OK, then Weak), then the other signals",
   tenure: "Tenure (OK, then Unknown, then Tenant-risk), then the other signals",
 };

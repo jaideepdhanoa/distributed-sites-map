@@ -170,8 +170,6 @@ export default function Explorer() {
             <StageButton key={item.id} stage={item} active={filters.stage === item.id} onClick={() => write({ stage: item.id })} />
           ))}
         </div>
-        {stage?.note ? <p className="note">{stage.note}</p> : null}
-        {data.meta?.warnings?.slice(0, 2).map((warning) => <p className="note" key={warning}>{warning}</p>)}
         <div className="filters">
           <div className="cities">
             {CITIES.map((city) => (
@@ -216,15 +214,13 @@ export default function Explorer() {
               {Object.entries(SORT_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </label>
-          <p className="note">No combined score. The order is the signals above, in that sequence. Utility proximity is Strong, then OK, then Weak.</p>
           <label className="check"><input type="checkbox" checked={filters.showHeld} onChange={(event) => write({ held: event.target.checked ? null : "0" })} /> Show held for network expansion</label>
           <label className="check"><input type="checkbox" checked={filters.landSites} onChange={(event) => write({ land: event.target.checked ? "1" : null })} /> Land sites</label>
           <label className="check"><input type="checkbox" checked={filters.showStops} onChange={(event) => write({ stops: event.target.checked ? "1" : null })} /> Show sites that stopped earlier</label>
           <label className="check"><input type="checkbox" checked={showExpansion} onChange={(event) => setShowExpansion(event.target.checked)} /> Expansion horizon layer</label>
           <label className="check"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Place names</label>
           <label className="check"><input type="checkbox" checked={showRings} onChange={(event) => setShowRings(event.target.checked)} /> Depot distance rings</label>
-          <p className="note">{data.meta?.parcel_note}</p>
-          <p className="note">Showing {visible.length.toLocaleString()} sites. Data {data.meta?.generated_at || data.funnel.generated_at}.</p>
+          <p className="note">Showing {visible.length.toLocaleString()} sites.</p>
           <button className="ghost" type="button" onClick={exportCsv}>Export this view</button>
         </div>
       </aside>
@@ -246,7 +242,7 @@ export default function Explorer() {
         {view === "table" ? (
           <>
             <label className="check" style={{ padding: 8 }}><input type="checkbox" checked={inView} onChange={(event) => setInView(event.target.checked)} /> Limit to the last map view</label>
-            <SiteTable rows={visible} selectedId={selected} onSelect={(id) => { setSelected(id); write({ site: id }); setView("map"); }} />
+            <SiteTable rows={visible} selectedId={selected} onSelect={(id) => { setSelected(id); setView("map"); write({ site: id, view: null }); }} />
           </>
         ) : null}
         {view === "compare" ? <Compare features={features} onSelect={(id) => { setSelected(id); write({ site: id }); }} /> : null}
@@ -268,7 +264,7 @@ function StageButton({ stage, active, onClick }: { stage: FunnelStage; active: b
       ) : stage.id === "verified" ? (
         <em>{stage.county_checked} county-checked · {stage.pending} pending</em>
       ) : stage.id === "contacted" ? (
-        <em>{stage.total} contacted · stage stays visible at zero</em>
+        <em>{stage.total.toLocaleString()} {stage.unit}</em>
       ) : (
         <em>{stage.total.toLocaleString()} {stage.unit}</em>
       )}

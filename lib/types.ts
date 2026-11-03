@@ -71,6 +71,10 @@ export type SiteProps = {
   linked_deal_id?: string;
   linked_deal_name?: string;
   linked_deal_stage?: string;
+  parcel_match?: string;
+  parcel_acres?: number | null;
+  lot_ac_source?: string;
+  listing_url?: string;
   evidence: string;
   operating: string;
   agreement: string;
@@ -101,6 +105,8 @@ export type DealProps = {
   coord_status: string;
   miles_to_depot: number | null;
   listed: boolean;
+  parcel_match?: string;
+  parcel_acres?: number | null;
 };
 
 export type DealFeature = {

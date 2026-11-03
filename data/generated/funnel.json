@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T21:03:11Z",
+  "generated_at": "2026-11-03T21:41:42Z",
   "muse_reference": {
     "in_area_sites": 1043,
     "by_city": {
@@ -7,7 +7,7 @@
       "PHX": 254,
       "MIA": 610
     },
-    "note": "Muse reference for the service-area step. The map shows our screen, not this reference.",
+    "note": "Earlier reference for the service-area step. The map shows our screen, not this reference.",
     "unique_sites": 1640,
     "verdict": {
       "PASS": 10,
@@ -51,7 +51,7 @@
         "Closed": 2,
         "Quarantined": 3
       },
-      "note": "Universe file has 1645 site records. Same-parcel pairs counted once: LAS-V2-226 with LAS-U97, LAS-V2-249 with LAS-U878. Muse's reference is about 1,640."
+      "note": "Universe file has 1645 site records. Same-parcel pairs counted once: LAS-V2-226 with LAS-U97, LAS-V2-249 with LAS-U878. An earlier reference is about 1,640."
     },
     {
       "id": "in_area",
@@ -95,7 +95,7 @@
           "Licence-only": 12
         }
       },
-      "note": "LAS operative area is the 100 ring with the core inside it. The 200 and 300 rings are the expansion horizon and count as outside. Muse's reference is 1,043 (LV 179 / PHX 254 / MIA 610). This map shows our screen."
+      "note": "LAS operative area is the 100 ring with the core inside it. The 200 and 300 rings are the expansion horizon and count as outside. An earlier reference is 1,043 (LV 179 / PHX 254 / MIA 610). This map shows our screen."
     },
     {
       "id": "land_tier",

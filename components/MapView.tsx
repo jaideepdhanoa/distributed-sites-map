@@ -33,6 +33,43 @@ function acresOf(coords: [number, number][]) {
   return Math.abs((area * radius * radius) / 2) / 4046.8564224;
 }
 
+function areaLabels(areas: GeoFeature[]) {
+  const labels: { type: "Feature"; geometry: { type: "Point"; coordinates: [number, number] }; properties: { name: string } }[] = [];
+  const place = (id: string, name: string, nudge: [number, number] = [0, 0]) => {
+    const feature = areas.find((item) => item.properties.id === id);
+    const center = feature ? bboxCenter(feature) : null;
+    if (!center) return;
+    labels.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [center[0] + nudge[0], center[1] + nudge[1]] },
+      properties: { name },
+    });
+  };
+  place("las-100", "Core and ring 100 (current)");
+  place("las-300", "Rings 200 and 300 (later)", [0, 0.12]);
+  place("phx-service", "Phoenix service area (current)");
+  place("mia-current", "Miami service area (current)");
+  return labels;
+}
+
+function bboxCenter(feature: GeoFeature): [number, number] | null {
+  const coords = feature.geometry?.coordinates;
+  const points: number[][] = [];
+  const walk = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      points.push(value as number[]);
+      return;
+    }
+    value.forEach(walk);
+  };
+  walk(coords);
+  if (!points.length) return null;
+  const xs = points.map((point) => point[0]);
+  const ys = points.map((point) => point[1]);
+  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+}
+
 export default function MapView(props: Props) {
   const node = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
@@ -66,6 +103,7 @@ export default function MapView(props: Props) {
           },
           areas: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           parcels: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          "area-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -74,13 +112,29 @@ export default function MapView(props: Props) {
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
-          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#7dffa8", "fill-opacity": 0.16 } },
-          { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#e9fff1", "line-width": 2.5 } },
-          { id: "expansion-fill", type: "fill", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "fill-color": "#9bb7d4", "fill-opacity": 0.06 } },
-          { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#e7f1fb", "line-dasharray": [1.2, 1.2], "line-width": 2, "line-opacity": 0.9 } },
-          { id: "parcels", type: "fill", source: "parcels", paint: { "fill-color": "#ffd0c8", "fill-opacity": 0.35 } },
-          { id: "parcels-line", type: "line", source: "parcels", paint: { "line-color": "#fff7f4", "line-width": 3 } },
-          { id: "parcels-line-inner", type: "line", source: "parcels", paint: { "line-color": "#8d3b32", "line-width": 1.5 } },
+          { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
+          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#b7f0c8", "fill-opacity": 0.14 } },
+          { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#f4fff7", "line-width": 2.4 } },
+          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-allow-overlap": true }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
+          { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
+          { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
+          { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#ffb4a8", "line-width": 2.6 } },
+          {
+            id: "missing-parcel",
+            type: "circle",
+            source: "sites",
+            minzoom: 14,
+            filter: ["==", ["get", "parcel_match"], "none"],
+            paint: { "circle-radius": 13, "circle-color": "transparent", "circle-stroke-color": "#e0a100", "circle-stroke-width": 2 },
+          },
+          {
+            id: "missing-parcel-deals",
+            type: "circle",
+            source: "deals",
+            minzoom: 14,
+            filter: ["==", ["get", "parcel_match"], "none"],
+            paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#e0a100", "circle-stroke-width": 2 },
+          },
           {
             id: "sites",
             type: "circle",
@@ -122,6 +176,21 @@ export default function MapView(props: Props) {
             source: "deals",
             filter: ["==", ["get", "kind"], "pipeline"],
             layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
+          },
+          {
+            id: "deal-site-badge",
+            type: "symbol",
+            source: "deals",
+            filter: ["all", ["==", ["get", "kind"], "pipeline"], ["has", "universe_id"], ["!=", ["get", "universe_id"], ""]],
+            layout: {
+              "text-field": "Site",
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 9,
+              "text-offset": [1.1, 0.15],
+              "text-anchor": "left",
+              "text-allow-overlap": true,
+            },
+            paint: { "text-color": "#1c1914", "text-halo-color": "#f4efe6", "text-halo-width": 1.2 },
           },
           {
             id: "deals-land",
@@ -285,8 +354,11 @@ export default function MapView(props: Props) {
       (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.deals.filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
-      const parcel = props.parcels.filter((feature) => feature.properties.site_id === props.selectedId);
-      (map.getSource("parcels") as GeoJSONSource).setData({ type: "FeatureCollection", features: parcel });
+      (map.getSource("parcels") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.parcels });
+      (map.getSource("area-labels") as GeoJSONSource).setData({ type: "FeatureCollection", features: areaLabels(props.areas) });
+      if (map.getLayer("parcels-selected")) {
+        map.setFilter("parcels-selected", ["all", ["==", ["get", "site_id"], props.selectedId || ""], ["!=", ["get", "role"], "adjoining"]]);
+      }
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
       if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
@@ -306,8 +378,8 @@ export default function MapView(props: Props) {
       };
       vis("areas-op", props.showAreas);
       vis("areas-op-line", props.showAreas);
-      vis("expansion-fill", props.showAreas);
       vis("expansion-line", props.showAreas);
+      vis("area-labels", props.showAreas);
       vis("depots", props.showDepots);
       vis("depot-labels", props.showDepots);
       vis("sites", props.showSites);

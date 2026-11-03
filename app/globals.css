@@ -121,6 +121,41 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-size: 12px;
 }
 .legend li { display: flex; align-items: center; gap: 6px; }
+.layers {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 52px;
+  width: 190px;
+  background: rgba(250, 247, 241, 0.96);
+  border: 1px solid #8d8376;
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.layers strong { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+.layers label { display: flex; align-items: center; gap: 8px; }
+.funnel-switch { display: flex; gap: 6px; margin-top: 8px; }
+.funnel-switch button, .dock-tabs button, .layers > button {
+  border: 1px solid #8d8376;
+  background: white;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.funnel-switch button.on, .dock-tabs button.on { background: #1c1914; color: #faf7f1; border-color: #1c1914; }
+.summary-chip {
+  border-radius: 999px;
+  background: #e7f0ea;
+  color: #1c1914;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.dock-tabs { display: flex; gap: 6px; padding: 8px 10px 0; background: white; position: sticky; top: 0; z-index: 1; }
+.text-link { border: 0; background: transparent; color: var(--pine); padding: 0; text-decoration: underline; }
+.swatch.sq { border-radius: 2px; }
+.swatch.tri { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid #5b3d8a; background: transparent; }
 .swatch { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
 .swatch.pass { background: #1f7a4d; }
 .swatch.held { background: #2f6f9f; }

@@ -1,4 +1,28 @@
-import type { SiteProps } from "./types";
+import type { GeoFeature, SiteProps } from "./types";
+
+export type PipeId = "sourced" | "desk" | "contacted" | "later" | "dropped";
+
+export function nearestDepot(lng: number, lat: number, depots: GeoFeature[]) {
+  let best: { miles: number; label: string } | null = null;
+  for (const depot of depots) {
+    const coords = depot.geometry && depot.geometry.type === "Point" ? (depot.geometry.coordinates as number[]) : null;
+    if (!coords) continue;
+    const miles = haversineMiles(lng, lat, coords[0], coords[1]);
+    const label = String(depot.properties.id || depot.properties.address || "Depot");
+    if (!best || miles < best.miles) best = { miles, label };
+  }
+  return best;
+}
+
+function haversineMiles(lon1: number, lat1: number, lon2: number, lat2: number) {
+  const radius = 3958.8;
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const dphi = ((lat2 - lat1) * Math.PI) / 180;
+  const dlambda = ((lon2 - lon1) * Math.PI) / 180;
+  const arc = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlambda / 2) ** 2;
+  return 2 * radius * Math.asin(Math.sqrt(arc));
+}
 
 export type StageId = "universe" | "unique" | "in_area" | "land" | "county" | "cleared" | "listed" | "contacted";
 

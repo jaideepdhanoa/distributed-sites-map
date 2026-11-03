@@ -68,6 +68,9 @@ export type SiteProps = {
   tier_from_adjoining: boolean;
   is_candidate: boolean;
   miles_to_depot: number | null;
+  linked_deal_id?: string;
+  linked_deal_name?: string;
+  linked_deal_stage?: string;
   evidence: string;
   operating: string;
   agreement: string;
@@ -77,6 +80,33 @@ export type SiteProps = {
   fields: Record<string, FieldDot>;
   reviews: Review[];
   origin: string;
+};
+
+export type DealProps = {
+  deal_id: string;
+  kind: "pipeline" | "land";
+  name: string;
+  address: string;
+  city: string;
+  stage: string;
+  stage_group: "sourced" | "desk" | "contacted" | "later" | "dropped";
+  broker: string;
+  firm: string;
+  listing_url: string;
+  asking_price: number | null;
+  asking_price_display: string | null;
+  asking_price_source: string;
+  next_step: string;
+  universe_id: string;
+  coord_status: string;
+  miles_to_depot: number | null;
+  listed: boolean;
+};
+
+export type DealFeature = {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] } | null;
+  properties: DealProps;
 };
 
 export type SiteFeature = {
@@ -108,6 +138,7 @@ export type AppData = {
   areas: { type: "FeatureCollection"; features: GeoFeature[] };
   depots: { type: "FeatureCollection"; features: GeoFeature[] };
   parcels: { type: "FeatureCollection"; features: GeoFeature[] };
+  deals: { type: "FeatureCollection"; features: DealFeature[] };
   funnel: {
     generated_at: string;
     muse_reference: { in_area_sites: number; by_city: Record<string, number>; note: string };

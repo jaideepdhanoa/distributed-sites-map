@@ -1,51 +1,46 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Detail from "./Detail";
 import SiteTable from "./SiteTable";
-import { CITIES, SORT_LABELS, compareSites, matches, type Filters, type StageId } from "@/lib/filter";
-import type { AppData, FunnelStage, SiteFeature, SiteProps } from "@/lib/types";
+import { CITY_VIEW, CITIES, compareSites, droppedAt, inStage, type StageId } from "@/lib/filter";
+import type { AppData, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
 
-const STAGES: StageId[] = ["census", "unique", "in_area", "land_tier", "verified", "verdict", "listed", "contacted"];
-
-function listParam(value: string | null, fallback: string[]) {
-  if (!value) return fallback;
-  return value.split(",").filter(Boolean);
-}
+const STEPS: { id: StageId; label: string }[] = [
+  { id: "universe", label: "Universe" },
+  { id: "unique", label: "Unique" },
+  { id: "in_area", label: "In service area" },
+  { id: "land", label: "L10 / L4" },
+  { id: "county", label: "County-checked" },
+  { id: "cleared", label: "Cleared" },
+  { id: "listed", label: "Listed" },
+  { id: "contacted", label: "Contacted" },
+];
 
 export default function Explorer() {
   const params = useSearchParams();
   const router = useRouter();
-  const [data, setData] = useState<(AppData & { meta?: { warnings?: string[]; parcel_note?: string; generated_at?: string } }) | null>(null);
+  const [data, setData] = useState<AppData | null>(null);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string } | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
-  const [showLabels, setShowLabels] = useState(false);
-  const [showExpansion, setShowExpansion] = useState(false);
-  const [showRings, setShowRings] = useState(false);
-  const [inView, setInView] = useState(false);
-  const [bounds, setBounds] = useState<{ contains: (lnglat: [number, number]) => boolean } | null>(null);
-  const [view, setView] = useState(params.get("view") || "map");
+  const [tableOpen, setTableOpen] = useState(false);
+  const [compare, setCompare] = useState(false);
+  const [showDropped, setShowDropped] = useState(false);
 
-  const filters: Filters = {
-    stage: (params.get("stage") as StageId) || "candidates",
-    cities: listParam(params.get("cities"), CITIES),
-    verdict: params.get("verdict") || "any",
-    landTier: params.get("tier") || "any",
-    listed: params.get("listed") || "any",
-    contacted: params.get("contacted") || "any",
-    verification: params.get("verification") || "any",
-    query: params.get("q") || "",
-    landSites: params.get("land") === "1",
-    showHeld: params.get("held") !== "0",
-    showStops: params.get("stops") === "1",
-  };
-  const sort = params.get("sort") || "tier";
+  const city = params.get("city") || "PHX";
+  const stageParam = params.get("stage") as StageId | null;
+  const stage: StageId = stageParam && STEPS.some((step) => step.id === stageParam) ? stageParam : "land";
+  const landTier = params.get("tier") || "any";
+  const verdict = params.get("verdict") || "any";
+  const listed = params.get("listed") || "any";
+  const landSites = params.get("land") === "1";
+  const query = params.get("q") || "";
 
   function write(next: Record<string, string | null>) {
     const url = new URLSearchParams(params.toString());
@@ -82,35 +77,55 @@ export default function Explorer() {
           depots: await depotsRes.json(),
           parcels: await parcelsRes.json(),
           funnel: funnelPayload.funnel,
-          meta: funnelPayload.meta,
         });
         setMe(meRes.ok ? await meRes.json() : null);
       }
     });
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   const features = data?.sites.features ?? [];
-  const visible = useMemo(() => {
-    return features
-      .map((feature) => feature.properties)
-      .filter((site) => matches(site, filters))
-      .filter((site) => {
-        if (!inView || !bounds || view !== "table") return true;
-        const feature = features.find((item) => item.properties.site_id === site.site_id);
-        if (!feature?.geometry) return false;
-        const [lon, lat] = feature.geometry.coordinates;
-        return bounds.contains([lon, lat]);
-      })
-      .sort((a, b) => compareSites(a, b, sort));
-  }, [features, filters, inView, bounds, view, sort]);
+  const sites = features.map((feature) => feature.properties);
 
-  const visibleFeatures: SiteFeature[] = visible
+  function passesChips(site: SiteProps, loose: boolean) {
+    if (site.city !== city) return false;
+    if (query) {
+      const blob = `${site.site_id} ${site.name} ${site.address} ${site.apn} ${site.owner}`.toLowerCase();
+      if (!blob.includes(query.toLowerCase())) return false;
+    }
+    if (loose) return true;
+    if (landTier !== "any" && site.land_tier !== landTier) return false;
+    if (verdict !== "any" && (site.verdict || "none") !== verdict) return false;
+    if (listed === "yes" && !site.listed) return false;
+    return true;
+  }
+
+  const visibleSites = useMemo(() => {
+    const byId = new Map<string, SiteProps>();
+    const add = (list: SiteProps[]) => {
+      for (const site of list) byId.set(site.site_id, site);
+    };
+    if (compare) {
+      add(sites.filter((site) => site.verdict_disagreement && passesChips(site, true)));
+    } else {
+      add(sites.filter((site) => inStage(site, stage) && passesChips(site, false)));
+      if (showDropped) add(sites.filter((site) => droppedAt(site, stage) && passesChips(site, true)));
+      if (landSites) add(sites.filter((site) => site.land_only && passesChips(site, true)));
+    }
+    return [...byId.values()].sort(compareSites);
+    // passesChips closes over the chip state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query]);
+
+  const visibleFeatures: SiteFeature[] = visibleSites
     .map((site) => features.find((feature) => feature.properties.site_id === site.site_id))
     .filter((feature): feature is SiteFeature => Boolean(feature));
+
   const selectedSite = detail && detail.site_id === selected
     ? detail
-    : features.find((feature) => feature.properties.site_id === selected)?.properties ?? null;
+    : sites.find((site) => site.site_id === selected) ?? null;
 
   useEffect(() => {
     if (!selected) return;
@@ -120,180 +135,120 @@ export default function Explorer() {
       const payload = (await response.json()) as SiteProps;
       if (!cancel) setDetail(payload);
     });
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [selected]);
-  const stage = data?.funnel.stages.find((item) => item.id === filters.stage);
+
+  function choose(id: string | null) {
+    setSelected(id);
+    write({ site: id });
+  }
+
+  function jump(nextCity: string) {
+    setSelected(null);
+    write({ city: nextCity === "PHX" ? null : nextCity, site: null });
+  }
+
+  function count(step: StageId) {
+    if (step === "universe") {
+      const census = data?.funnel.stages.find((item) => item.id === "census");
+      return census?.by_city?.[city] ?? census?.total ?? 0;
+    }
+    return sites.filter((site) => site.city === city && inStage(site, step)).length;
+  }
 
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
     window.location.href = "/login";
   }
 
-  function exportCsv() {
-    const cols: (keyof SiteProps)[] = ["site_id", "city", "name", "address", "land_tier", "verification", "verdict", "spare_ac_own", "spare_ac_adjoining", "utility_proximity", "tenure", "listed", "contacted", "asking_price_display", "asking_price_source", "pipeline_stage", "owner"];
-    const lines = [cols.join(",")].concat(visible.map((site) => cols.map((col) => `"${String(site[col] ?? "").replaceAll('"', '""')}"`).join(",")));
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "sites.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   if (error) return <main className="empty">{error}</main>;
-  if (!data) return <main className="empty">Loading sites…</main>;
+  if (!data) return <main className="empty">Loading</main>;
+
+  const focus = CITY_VIEW[city] ?? CITY_VIEW.PHX;
+  const dropCount = sites.filter((site) => droppedAt(site, stage) && site.city === city).length;
 
   return (
-    <div className="app">
-      <header className="top">
-        <h1 className="word">Si<span>tes</span></h1>
-        <input className="search" placeholder="Address, APN, owner, id" value={filters.query} onChange={(event) => write({ q: event.target.value || null })} />
-        <div className="views">
-          {["map", "table", "compare"].map((item) => (
-            <button key={item} className={view === item ? "on" : ""} type="button" onClick={() => { setView(item); write({ view: item === "map" ? null : item }); }}>{item}</button>
-          ))}
-        </div>
-        <div className="who">
-          <span>{me?.u}</span>
-          {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
-          <button className="ghost" type="button" onClick={logout}>Sign out</button>
-        </div>
-      </header>
-      <aside className="rail">
-        <div className="stage">
-          <button className={`step ${filters.stage === "candidates" ? "on" : ""}`} type="button" onClick={() => write({ stage: null })}>
-            <b>Candidates</b>
-            <em>In-area L10 and L4, not eliminated</em>
-          </button>
-          {data.funnel.stages.map((item) => (
-            <StageButton key={item.id} stage={item} active={filters.stage === item.id} onClick={() => write({ stage: item.id })} />
-          ))}
-        </div>
-        <div className="filters">
+    <div className={`shell ${tableOpen ? "table-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage}>
+      <header className="bar">
+        <div className="bar-row">
+          <h1 className="word">Sites</h1>
           <div className="cities">
-            {CITIES.map((city) => (
-              <button key={city} className={`chip ${filters.cities.includes(city) ? "on" : ""}`} type="button" onClick={() => {
-                const next = filters.cities.includes(city) ? filters.cities.filter((item) => item !== city) : [...filters.cities, city];
-                write({ cities: next.length === 3 ? null : next.join(",") });
-              }}>{city}</button>
+            {CITIES.map((item) => (
+              <button key={item} className={city === item ? "on" : ""} type="button" onClick={() => jump(item)}>
+                {item === "PHX" ? "Phoenix" : item === "LAS" ? "Las Vegas" : "Miami"}
+              </button>
             ))}
           </div>
-          <label className="field">Verdict
-            <select value={filters.verdict} onChange={(event) => write({ verdict: event.target.value === "any" ? null : event.target.value })}>
-              {["any", "PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED", "none"].map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </label>
-          <label className="field">Land tier
-            <select value={filters.landTier} onChange={(event) => write({ tier: event.target.value === "any" ? null : event.target.value })}>
-              <option value="any">any</option>
-              <option value="L10">L10</option>
-              <option value="L4">L4</option>
-            </select>
-          </label>
-          <label className="field">Verification
-            <select value={filters.verification} onChange={(event) => write({ verification: event.target.value === "any" ? null : event.target.value })}>
-              <option value="any">any</option>
-              <option value="county-checked">county-checked</option>
-              <option value="aerial only, pending verification">aerial only, pending verification</option>
-              <option value="not screened">not screened</option>
-            </select>
-          </label>
-          <label className="field">Listed
-            <select value={filters.listed} onChange={(event) => write({ listed: event.target.value === "any" ? null : event.target.value })}>
-              <option value="any">any</option><option value="yes">listed</option><option value="no">not listed</option>
-            </select>
-          </label>
-          <label className="field">Contacted
-            <select value={filters.contacted} onChange={(event) => write({ contacted: event.target.value === "any" ? null : event.target.value })}>
-              <option value="any">any</option><option value="yes">contacted</option><option value="no">not contacted</option>
-            </select>
-          </label>
-          <label className="field">Sort — {SORT_LABELS[sort]}
-            <select value={sort} onChange={(event) => write({ sort: event.target.value === "tier" ? null : event.target.value })}>
-              {Object.entries(SORT_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-            </select>
-          </label>
-          <label className="check"><input type="checkbox" checked={filters.showHeld} onChange={(event) => write({ held: event.target.checked ? null : "0" })} /> Show held for network expansion</label>
-          <label className="check"><input type="checkbox" checked={filters.landSites} onChange={(event) => write({ land: event.target.checked ? "1" : null })} /> Land sites</label>
-          <label className="check"><input type="checkbox" checked={filters.showStops} onChange={(event) => write({ stops: event.target.checked ? "1" : null })} /> Show sites that stopped earlier</label>
-          <label className="check"><input type="checkbox" checked={showExpansion} onChange={(event) => setShowExpansion(event.target.checked)} /> Expansion horizon layer</label>
-          <label className="check"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Place names</label>
-          <label className="check"><input type="checkbox" checked={showRings} onChange={(event) => setShowRings(event.target.checked)} /> Depot distance rings</label>
-          <p className="note">Showing {visible.length.toLocaleString()} sites.</p>
-          <button className="ghost" type="button" onClick={exportCsv}>Export this view</button>
+          <input className="search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
+          <div className="who">
+            <span>{me?.u}</span>
+            {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
+            <button type="button" onClick={logout}>Sign out</button>
+          </div>
         </div>
-      </aside>
-      <main>
-        {view === "map" ? (
-          <MapView
-            sites={visibleFeatures}
-            areas={data.areas.features}
-            depots={data.depots.features}
-            parcels={data.parcels.features}
-            selectedId={selected}
-            showExpansion={showExpansion}
-            showLabels={showLabels}
-            showRings={showRings}
-            onSelect={(id) => { setSelected(id); write({ site: id }); }}
-            onBounds={setBounds}
-          />
-        ) : null}
-        {view === "table" ? (
-          <>
-            <label className="check" style={{ padding: 8 }}><input type="checkbox" checked={inView} onChange={(event) => setInView(event.target.checked)} /> Limit to the last map view</label>
-            <SiteTable rows={visible} selectedId={selected} onSelect={(id) => { setSelected(id); setView("map"); write({ site: id, view: null }); }} />
-          </>
-        ) : null}
-        {view === "compare" ? <Compare features={features} onSelect={(id) => { setSelected(id); write({ site: id }); }} /> : null}
-      </main>
-      <Detail site={selectedSite} />
-    </div>
-  );
-}
-
-function StageButton({ stage, active, onClick }: { stage: FunnelStage; active: boolean; onClick: () => void }) {
-  return (
-    <button className={`step ${active ? "on" : ""}`} type="button" onClick={onClick}>
-      <b>{stage.name}</b>
-      {stage.id === "land_tier" && stage.L10 && stage.L4 ? (
-        <span className="pair">
-          <div><strong>{stage.L10.total}</strong> L10</div>
-          <div><strong>{stage.L4.total}</strong> L4</div>
-        </span>
-      ) : stage.id === "verified" ? (
-        <em>{stage.county_checked} county-checked · {stage.pending} pending</em>
-      ) : stage.id === "contacted" ? (
-        <em>{stage.total.toLocaleString()} {stage.unit}</em>
-      ) : (
-        <em>{stage.total.toLocaleString()} {stage.unit}</em>
-      )}
-    </button>
-  );
-}
-
-function Compare({ features, onSelect }: { features: SiteFeature[]; onSelect: (id: string) => void }) {
-  const rows = features.filter((feature) => feature.properties.verdict_disagreement || feature.properties.acreage_note || feature.properties.scale_note);
-  return (
-    <div className="compare">
-      <h2>Where reviews differ</h2>
-      <p className="note">{rows.length} sites. Adjoining-only land is MAYBE on the shared scale even when an earlier tier called it a pass.</p>
-      {rows.map((feature) => {
-        const site = feature.properties;
-        return (
-          <article key={site.site_id}>
-            <button className="ghost" type="button" onClick={() => onSelect(site.site_id)}><strong>{site.site_id}</strong> {site.name}</button>
-            <div className="kv">
-              <span>Our call</span><div>{site.verdict} {site.reconciliation_tier}</div>
-              <span>Other review</span><div>{site.muse_verdict || "—"}</div>
-              <span>Own / adjoining</span><div>{site.spare_ac_own ?? "—"} / {site.spare_ac_adjoining ?? "—"}</div>
-            </div>
-            {site.scale_note ? <p className="note">{site.scale_note}</p> : null}
-            {site.acreage_note ? <p className="note">{site.acreage_note}</p> : null}
-            {site.evidence ? <p>{site.evidence}</p> : null}
-          </article>
-        );
-      })}
+        <nav className="funnel" aria-label="Funnel">
+          {STEPS.map((step, index) => (
+            <Fragment key={step.id}>
+              {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
+              <button className={stage === step.id ? "on" : ""} type="button" aria-current={stage === step.id ? "step" : undefined} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id }); }}>
+                <span>{step.label}</span>
+                <strong>{count(step.id).toLocaleString()}</strong>
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+        <div className="chips">
+          {["any", "L10", "L4"].map((item) => (
+            <button key={item} className={landTier === item ? "on" : ""} type="button" onClick={() => write({ tier: item === "any" ? null : item })}>
+              {item === "any" ? "All tiers" : item}
+            </button>
+          ))}
+          {["any", "PASS", "MAYBE", "UNRESOLVED"].map((item) => (
+            <button key={item} className={verdict === item ? "on" : ""} type="button" onClick={() => write({ verdict: item === "any" ? null : item })}>
+              {item === "any" ? "All verdicts" : item}
+            </button>
+          ))}
+          <button className={listed === "yes" ? "on" : ""} type="button" onClick={() => write({ listed: listed === "yes" ? null : "yes" })}>Listed</button>
+          <button className={landSites ? "on" : ""} type="button" onClick={() => write({ land: landSites ? null : "1" })}>Land sites</button>
+          <button className={compare ? "on" : ""} type="button" onClick={() => setCompare((value) => !value)}>Compare</button>
+          {dropCount > 0 ? (
+            <button className={showDropped ? "on" : ""} type="button" onClick={() => setShowDropped((value) => !value)}>
+              Dropped {dropCount.toLocaleString()}
+            </button>
+          ) : null}
+          <button className={tableOpen ? "on" : ""} type="button" onClick={() => setTableOpen((value) => !value)}>Table</button>
+        </div>
+      </header>
+      <div className="map-stage">
+        <MapView
+          sites={visibleFeatures}
+          areas={data.areas.features}
+          depots={data.depots.features}
+          parcels={data.parcels.features}
+          selectedId={selected}
+          focusLng={focus.center[0]}
+          focusLat={focus.center[1]}
+          focusZoom={focus.zoom}
+          onSelect={choose}
+          onBounds={() => undefined}
+        />
+        <ul className="legend">
+          <li><i className="swatch pass" /> Cleared PASS</li>
+          <li><i className="swatch held" /> Held PASS</li>
+          <li><i className="swatch maybe" /> MAYBE</li>
+          <li><i className="swatch aerial" /> Aerial only, not checked</li>
+          <li><i className="swatch open" /> Unresolved</li>
+          <li><i className="swatch depot" /> Depot</li>
+        </ul>
+        {selectedSite ? <Detail site={selectedSite} onClose={() => choose(null)} /> : null}
+      </div>
+      {tableOpen ? (
+        <section className="dock">
+          <SiteTable rows={visibleSites} selectedId={selected} onSelect={choose} />
+        </section>
+      ) : null}
     </div>
   );
 }

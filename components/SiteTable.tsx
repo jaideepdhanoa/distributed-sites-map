@@ -12,20 +12,30 @@ import type { SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
 
+const yesNo = (value: unknown) => (value ? "Yes" : "No");
+
 const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "site_id", header: "Site" },
+  { accessorKey: "name", header: "Name" },
   { accessorKey: "city", header: "City" },
   { accessorKey: "land_tier", header: "Tier" },
-  { accessorKey: "verification", header: "Verification" },
   { accessorKey: "verdict", header: "Verdict" },
   { accessorKey: "spare_ac_own", header: "Own ac" },
   { accessorKey: "spare_ac_adjoining", header: "Adjoining ac" },
   { accessorKey: "utility_proximity", header: "Utility proximity" },
   { accessorKey: "tenure", header: "Tenure" },
-  { accessorKey: "listed", header: "Listed" },
-  { accessorKey: "contacted", header: "Contacted" },
+  { accessorKey: "listed", header: "Listed", cell: ({ getValue }) => yesNo(getValue()) },
+  { accessorKey: "contacted", header: "Contacted", cell: ({ getValue }) => yesNo(getValue()) },
   { accessorKey: "asking_price_display", header: "Asking" },
-  { accessorKey: "pipeline_stage", header: "Pipeline" },
+  {
+    id: "why",
+    accessorKey: "why_stopped",
+    header: "Why",
+    cell: ({ getValue }) => {
+      const value = String(getValue() || "");
+      return value ? <span className="why" title={value}>{value}</span> : "—";
+    },
+  },
 ];
 
 export default function SiteTable({
@@ -38,9 +48,10 @@ export default function SiteTable({
   onSelect: (id: string) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const showWhy = rows.some((row) => row.why_stopped);
   const table = useLegacyTable({
     data: rows,
-    columns,
+    columns: showWhy ? columns : columns.filter((column) => column.id !== "why"),
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),

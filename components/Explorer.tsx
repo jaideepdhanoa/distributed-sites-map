@@ -45,6 +45,7 @@ export default function Explorer() {
   const [showPipeline, setShowPipeline] = useState(true);
   const [showLandLayer, setShowLandLayer] = useState(false);
   const [showDroppedDeals, setShowDroppedDeals] = useState(false);
+  const [showOffMarket, setShowOffMarket] = useState(true);
   const [tableTab, setTableTab] = useState<"universe" | "pipeline" | "land">("universe");
   const [tip, setTip] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
@@ -111,7 +112,9 @@ export default function Explorer() {
   }, [city]);
 
   const features = data?.sites.features ?? [];
-  const sites = features.map((feature) => feature.properties);
+  const censusFeatures = features.filter((feature) => feature.properties.origin !== "off-market");
+  const sites = censusFeatures.map((feature) => feature.properties);
+  const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && feature.properties.city === city);
 
   function passesChips(site: SiteProps, loose: boolean) {
     if (site.city !== city) return false;
@@ -207,7 +210,9 @@ export default function Explorer() {
 
   const selectedSite = detail && detail.site_id === selected
     ? detail
-    : sites.find((site) => site.site_id === selected) ?? null;
+    : sites.find((site) => site.site_id === selected)
+      ?? offMarketFeatures.find((feature) => feature.properties.site_id === selected)?.properties
+      ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
 
   useEffect(() => {
@@ -370,6 +375,11 @@ export default function Explorer() {
                   Ruled out ({dropCount.toLocaleString()})
                 </button>
               ) : null}
+              {offMarketFeatures.length > 0 ? (
+                <button className={showOffMarket ? "on" : ""} type="button" title={STATUS_NOTES.find((item) => item.id === "offmarket")?.note} onClick={() => setShowOffMarket((value) => !value)}>
+                  Other off-market {offMarketFeatures.length.toLocaleString()}
+                </button>
+              ) : null}
             </>
           ) : null}
           <button className={tableOpen ? "on" : ""} type="button" onClick={() => setTableOpen((value) => !value)}>Table</button>
@@ -391,6 +401,7 @@ export default function Explorer() {
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
+          offMarket={funnel === "pipeline" || !showOffMarket ? [] : offMarketFeatures}
           selectedId={selected}
           showAreas={showAreas}
           showDepots={showDepots}
@@ -414,6 +425,7 @@ export default function Explorer() {
               <label><input type="checkbox" checked={showPipeline} onChange={(event) => setShowPipeline(event.target.checked)} /> Pipeline deals</label>
               <label><input type="checkbox" checked={showLandLayer} onChange={(event) => setShowLandLayer(event.target.checked)} /> Land Sites</label>
               <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => setShowDroppedDeals(event.target.checked)} /> Dropped deals</label>
+              <label><input type="checkbox" checked={showOffMarket} onChange={(event) => setShowOffMarket(event.target.checked)} /> Other off-market sites</label>
             </>
           ) : null}
         </aside>

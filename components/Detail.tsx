@@ -45,6 +45,7 @@ export default function Detail({
         {site.tier_from_adjoining ? <span className="badge l4">Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         {site.land_only ? <span className="badge pending">Land site</span> : null}
+        {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{site.name || site.address || site.site_id}</h2>

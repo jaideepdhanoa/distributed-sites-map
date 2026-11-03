@@ -219,6 +219,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .swatch.sq { border-radius: 2px; }
 .swatch.tri { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid #5b3d8a; background: transparent; }
 .swatch { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
+.swatch.offmarket { background: #5c4d8a; border-radius: 2px; }
 .swatch.pass { background: #1f7a4d; }
 .swatch.held { background: #2f6f9f; }
 .swatch.maybe { background: #c4841d; }

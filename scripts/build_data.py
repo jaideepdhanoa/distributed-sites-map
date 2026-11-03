@@ -1599,6 +1599,14 @@ def parcel_targets(sites: list[dict], deals: list[dict]) -> list[tuple[str, dict
     wanted = []
     seen = set()
     for site in sites:
+        if site.get("origin") == "off-market":
+            if site.get("lon") is None or site.get("lat") is None:
+                continue
+            key = f"site|{site['site_id']}"
+            if key not in seen and site.get("city") in {"PHX", "LAS", "MIA"}:
+                seen.add(key)
+                wanted.append((key, {"kind": "site", "record": site}))
+            continue
         if site.get("land_only") or site.get("origin") != "universe" or site.get("duplicate_of"):
             continue
         if not site.get("counts_as_site") or not site.get("in_area"):
@@ -2722,7 +2730,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 attach_off_market_research(by_id[matched], row)
                 off_market_matched.append(entry)
             else:
-                off_market_unmatched.append(entry)
+                place_unmatched_off_market(row, city, label, entry)
             return
         key = f"{kind}|{label}"
         assigned = registry_id(reg, "PIPE" if kind == "pipeline" else "LAND", key, city if city in {"LAS", "PHX", "MIA"} else "XX")
@@ -2768,10 +2776,57 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             site["contacted"] = True
         crosswalk.append({"site_id": site["site_id"], "source": "Pipeline" if kind == "pipeline" else "Land Sites", "source_key": label})
 
+    off_market_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
+    off_market_seq: Counter = Counter()
+
+    def _geom_centroid(geom: dict) -> tuple[float, float] | None:
+        ring = None
+        if geom.get("type") == "Polygon":
+            ring = (geom.get("coordinates") or [[]])[0]
+        elif geom.get("type") == "MultiPolygon":
+            ring = ((geom.get("coordinates") or [[[]]])[0] or [[]])[0]
+        if not ring:
+            return None
+        lon = sum(point[0] for point in ring) / len(ring)
+        lat = sum(point[1] for point in ring) / len(ring)
+        return lon, lat
+
+    def place_unmatched_off_market(row: dict, city: str, label: str, entry: dict) -> None:
+        """A site the census does not have. Drawn on its own layer, not in the funnel."""
+        if city not in {"PHX", "LAS", "MIA"}:
+            off_market_unmatched.append(entry)
+            return
+        off_market_seq[city] += 1
+        sid = f"OFF-{city}-{off_market_seq[city]:04d}"
+        site = blank_site(sid, city)
+        site["origin"] = "off-market"
+        site["counts_as_site"] = False
+        site["in_area"] = False
+        site["name"] = scrub(row.get("Name") or label)[:160]
+        site["address"] = scrub(re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I))[:180]
+        site["apn"] = str(row.get("APN or folio") or "")
+        attach_off_market_research(site, row)
+        query = _geocode_query(row)
+        coords = geocode_address(query, off_market_cache) if query else None
+        if coords is None and site["apn"]:
+            found = fetch_parcel(city, site["apn"], site["address"])
+            if found and found.get("geometry"):
+                coords = _geom_centroid(found["geometry"])
+        if coords:
+            site["lon"], site["lat"] = float(coords[0]), float(coords[1])
+            site["coord_status"] = "known"
+        sites.append(site)
+        by_id[sid] = site
+        entry["site_id"] = sid
+        entry["placed"] = site.get("coord_status") == "known"
+        off_market_unmatched.append(entry)
+
     for row in pipeline_rows:
         absorb_workbook_row(row, "pipeline")
     for row in land_rows:
         absorb_workbook_row(row, "land")
+    GEOCODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    GEOCODE_CACHE.write_text(json.dumps(off_market_cache))
 
     for site in sites:
         listing = best_listing(site["site_id"])
@@ -3347,6 +3402,13 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     if census.get("total") != 1701 or census.get("by_city") != {"LAS": 428, "PHX": 561, "MIA": 712}:
         problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,701 rows")
     unique_rows = [feature for feature in features if _universe_stage(feature, "universe")]
+    leaked = [
+        (feature.get("properties") or {}).get("site_id")
+        for feature in features
+        if (feature.get("properties") or {}).get("origin") == "off-market" and _universe_stage(feature, "universe")
+    ]
+    if leaked:
+        problems.append("off-market sites counted in the universe funnel: " + ", ".join(leaked[:8]))
     unique_stage = stages.get("unique") or {}
     if len(unique_rows) != unique_stage.get("total"):
         problems.append("universe pin count does not match the unique site total")

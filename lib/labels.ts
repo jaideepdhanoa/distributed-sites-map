@@ -10,6 +10,7 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
   { id: "desk", label: "Desk screen", note: "A first review of the listing or lead." },
   { id: "land", label: "Land site", note: "Land without an operating wash. Hidden until that layer is turned on." },
   { id: "depot", label: "Depot", note: "Existing operating depot." },
+  { id: "offmarket", label: "Other off-market sites", note: "Sites we found ourselves that aren't car washes; no broker or listing yet." },
 ];
 
 export const FUNNEL_NOTES: Record<string, string> = {

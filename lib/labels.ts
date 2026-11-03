@@ -10,7 +10,7 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
   { id: "desk", label: "Desk screen", note: "A first review of the listing or lead." },
   { id: "land", label: "Land site", note: "Land without an operating wash. Hidden until that layer is turned on." },
   { id: "depot", label: "Depot", note: "Existing operating depot." },
-  { id: "offmarket", label: "Other off-market sites", note: "Sites we found ourselves that aren't car washes; no broker or listing yet." },
+  { id: "offmarket", label: "Off-market, other types", note: "Sites we found ourselves that are not in the car-wash census. No broker or listing yet. Choose a category with Business type." },
 ];
 
 export const FUNNEL_NOTES: Record<string, string> = {
@@ -27,6 +27,19 @@ export const FUNNEL_NOTES: Record<string, string> = {
   later: "Work past the first conversation. None are in this stage yet.",
   dropped: "The deal is no longer being pursued.",
 };
+
+export const BUSINESS_TYPES = [
+  "Car wash",
+  "Auto repair",
+  "Tire and lube",
+  "Gas station",
+  "Yard or lot",
+  "Storage",
+  "Land",
+  "Other",
+] as const;
+
+export const CENSUS_NOTE = "Car washes. Other categories will get their own census. These counts are car washes only.";
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have room for about 10 or about 4 parking bays inside the service area. Cleared sites passed the county check.",

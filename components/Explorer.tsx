@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_NOTES, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES } from "@/lib/labels";
+import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -45,7 +45,7 @@ export default function Explorer() {
   const [showPipeline, setShowPipeline] = useState(true);
   const [showLandLayer, setShowLandLayer] = useState(false);
   const [showDroppedDeals, setShowDroppedDeals] = useState(false);
-  const [showOffMarket, setShowOffMarket] = useState(true);
+  const [businessTypes, setBusinessTypes] = useState<string[] | null>(null);
   const [tableTab, setTableTab] = useState<"universe" | "pipeline" | "land">("universe");
   const [tip, setTip] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
@@ -126,7 +126,23 @@ export default function Explorer() {
     if (landTier !== "any" && site.land_tier !== landTier) return false;
     if (verdict !== "any" && (site.verdict || "none") !== verdict) return false;
     if (listed === "yes" && !site.listed) return false;
+    if (!typeOn(site.business_type || "Car wash")) return false;
     return true;
+  }
+
+  function typeOn(type: string) {
+    return businessTypes === null || businessTypes.includes(type);
+  }
+
+  function toggleType(type: string) {
+    if (businessTypes === null) {
+      setBusinessTypes([type]);
+      return;
+    }
+    const next = businessTypes.includes(type)
+      ? businessTypes.filter((item) => item !== type)
+      : [...businessTypes, type];
+    setBusinessTypes(next.length === 0 || next.length === BUSINESS_TYPES.length ? null : next);
   }
 
   const visibleSites = useMemo(() => {
@@ -150,7 +166,7 @@ export default function Explorer() {
     return [...byId.values()].sort(compareSites);
     // passesChips closes over the chip state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query, extra]);
+  }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes]);
 
   const visibleFeatures: SiteFeature[] = visibleSites
     .map((site) => features.find((feature) => feature.properties.site_id === site.site_id))
@@ -166,11 +182,12 @@ export default function Explorer() {
       if (!blob.includes(query.toLowerCase())) return false;
     }
     if (funnel === "pipeline" && deal.kind === "pipeline" && deal.stage_group !== pipeStage) return false;
+    if (!typeOn(deal.business_type || "Other")) return false;
     return true;
   }
 
   const pipelineDeals = dealRows.filter((deal) => deal.kind === "pipeline" && dealMatches(deal) && (deal.stage_group !== "dropped" || showDroppedDeals || (funnel === "pipeline" && pipeStage === "dropped")));
-  const landDeals = dealRows.filter((deal) => deal.kind === "land" && deal.city === city && (!query || `${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase())));
+  const landDeals = dealRows.filter((deal) => deal.kind === "land" && deal.city === city && typeOn(deal.business_type || "Other") && (!query || `${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase())));
 
   function dealPoint(deal: DealProps): [number, number] | null {
     if (deal.universe_id) {
@@ -192,6 +209,7 @@ export default function Explorer() {
 
   const pipelineStepRows = dealRows.filter((deal) => {
     if (deal.kind !== "pipeline" || deal.city !== city || deal.stage_group !== pipeStage) return false;
+    if (!typeOn(deal.business_type || "Other")) return false;
     if (!query) return true;
     const blob = `${deal.deal_id} ${deal.name} ${deal.address} ${deal.broker} ${deal.firm} ${deal.universe_id}`.toLowerCase();
     return blob.includes(query.toLowerCase());
@@ -298,6 +316,23 @@ export default function Explorer() {
           <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => { setTableTab("universe"); write({ funnel: null }); }}>Universe funnel</button>
           <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => { setTableTab("pipeline"); write({ funnel: "pipeline" }); }}>Pipeline funnel</button>
         </div>
+        {funnel === "universe" ? (
+          <p className="census-note" title={CENSUS_NOTE} onMouseEnter={() => setTip(CENSUS_NOTE)} onMouseLeave={() => setTip("")}>Car washes</p>
+        ) : null}
+        <div className="type-filters" aria-label="Business type">
+          <button type="button" className={businessTypes === null ? "on" : ""} onClick={() => setBusinessTypes(null)}>All types</button>
+          {BUSINESS_TYPES.map((type) => {
+            const count = sites.filter((site) => site.city === city && (site.business_type || "Car wash") === type).length
+              + offMarketFeatures.filter((feature) => (feature.properties.business_type || "Other") === type).length
+              + dealRows.filter((deal) => deal.city === city && (deal.business_type || "Other") === type).length;
+            if (count === 0 && type !== "Car wash") return null;
+            return (
+              <button key={type} type="button" className={typeOn(type) && businessTypes !== null ? "on" : businessTypes === null ? "on" : ""} onClick={() => toggleType(type)}>
+                {type} {count.toLocaleString()}
+              </button>
+            );
+          })}
+        </div>
         <nav className="funnel" aria-label="Funnel">
           {funnel === "universe" ? STEPS.map((step, index) => {
             const listedHere = subcount(step.id, "listed");
@@ -332,7 +367,7 @@ export default function Explorer() {
               </Fragment>
             );
           }) : PIPE_STEPS.map((step, index) => {
-            const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === step.id);
+            const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === step.id && typeOn(deal.business_type || "Other"));
             const squares = rows.filter((deal) => dealPoint(deal)).length;
             const unmapped = rows.length - squares;
             return (
@@ -375,11 +410,6 @@ export default function Explorer() {
                   Ruled out ({dropCount.toLocaleString()})
                 </button>
               ) : null}
-              {offMarketFeatures.length > 0 ? (
-                <button className={showOffMarket ? "on" : ""} type="button" title={STATUS_NOTES.find((item) => item.id === "offmarket")?.note} onClick={() => setShowOffMarket((value) => !value)}>
-                  Other off-market {offMarketFeatures.length.toLocaleString()}
-                </button>
-              ) : null}
             </>
           ) : null}
           <button className={tableOpen ? "on" : ""} type="button" onClick={() => setTableOpen((value) => !value)}>Table</button>
@@ -401,7 +431,7 @@ export default function Explorer() {
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
-          offMarket={funnel === "pipeline" || !showOffMarket ? [] : offMarketFeatures}
+          offMarket={funnel === "pipeline" ? [] : offMarketFeatures.filter((feature) => typeOn(feature.properties.business_type || "Other"))}
           selectedId={selected}
           showAreas={showAreas}
           showDepots={showDepots}
@@ -425,7 +455,6 @@ export default function Explorer() {
               <label><input type="checkbox" checked={showPipeline} onChange={(event) => setShowPipeline(event.target.checked)} /> Pipeline deals</label>
               <label><input type="checkbox" checked={showLandLayer} onChange={(event) => setShowLandLayer(event.target.checked)} /> Land Sites</label>
               <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => setShowDroppedDeals(event.target.checked)} /> Dropped deals</label>
-              <label><input type="checkbox" checked={showOffMarket} onChange={(event) => setShowOffMarket(event.target.checked)} /> Other off-market sites</label>
             </>
           ) : null}
         </aside>

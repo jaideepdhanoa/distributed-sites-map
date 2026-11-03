@@ -77,6 +77,7 @@ export type SiteProps = {
   listing_url?: string;
   research_sources?: string;
   research_note?: string;
+  business_type?: string;
   evidence: string;
   operating: string;
   agreement: string;
@@ -111,6 +112,7 @@ export type DealProps = {
   parcel_acres?: number | null;
   source_line: string;
   source_kind?: string;
+  business_type?: string;
 };
 
 export type DealFeature = {

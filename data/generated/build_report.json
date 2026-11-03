@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T22:18:10Z",
+  "generated_at": "2026-11-03T22:22:27Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -768,10 +768,9 @@
   ],
   "parcels": {
     "counts": {
-      "cache_hit": 889,
+      "cache_hit": 922,
       "not_found": 156,
       "broward_unavailable": 44,
-      "fetched": 33,
       "features": 945,
       "adjoining": 23,
       "by_city": {
@@ -2077,7 +2076,7 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 889, 'not_found': 156, 'broward_unavailable': 44, 'fetched': 33, 'features': 945, 'adjoining': 23, 'by_city': {'LAS': 207, 'MIA': 441, 'PHX': 274}, 'by_method': {'parcel number': 875, 'pin location': 47}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 922, 'not_found': 156, 'broward_unavailable': 44, 'features': 945, 'adjoining': 23, 'by_city': {'LAS': 207, 'MIA': 441, 'PHX': 274}, 'by_method': {'parcel number': 875, 'pin location': 47}}."
   },
   "muse_source": "second review column",
   "warnings": [

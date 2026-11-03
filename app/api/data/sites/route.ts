@@ -52,6 +52,7 @@ const KEEP = [
   "listing_url",
   "research_sources",
   "research_note",
+  "business_type",
   "evidence",
   "spare_ac_own_text",
   "spare_ac_adjoining_text",

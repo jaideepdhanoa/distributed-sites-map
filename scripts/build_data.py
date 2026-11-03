@@ -785,6 +785,7 @@ DEAL_FIELDS = (
     "parcel_acres",
     "source_line",
     "source_kind",
+    "business_type",
 )
 
 
@@ -906,14 +907,72 @@ def _broker_channel(broker: str) -> str:
     return firm[:120]
 
 
+BUSINESS_TYPES = (
+    "Car wash",
+    "Auto repair",
+    "Tire and lube",
+    "Gas station",
+    "Yard or lot",
+    "Storage",
+    "Land",
+    "Other",
+)
+
+
+def business_type_from_text(raw: str) -> str:
+    """Map a workbook label onto the small set of business types."""
+    text = re.sub(r"\s+", " ", raw or "").strip().lower()
+    if not text:
+        return "Other"
+    if "tire" in text or "lube" in text:
+        return "Tire and lube"
+    if "vacant" in text or "land only" in text or "entitled" in text or text == "land":
+        return "Land"
+    if any(word in text for word in ("yard", "lot", "parking")):
+        return "Yard or lot"
+    if "storage" in text:
+        return "Storage"
+    if "car wash" in text or "truck wash" in text:
+        return "Car wash"
+    if any(word in text for word in ("gas", "c-store", "fuel", "station")):
+        return "Gas station"
+    if any(word in text for word in ("repair", "collision", "auto service", "automotive", "fleet", "garage")):
+        return "Auto repair"
+    if text == "car wash":
+        return "Car wash"
+    if text == "auto service":
+        return "Auto repair"
+    if text == "other":
+        return "Other"
+    return "Other"
+
+
+def business_type_from_row(row: dict, census: bool = False) -> str:
+    """Census rows are car washes. Deals use the business type column, then Segment."""
+    if census:
+        return "Car wash"
+    for key in ("Business type", "Business Type", "Segment", "Segment group"):
+        raw = str(row.get(key) or "").strip()
+        if raw:
+            return business_type_from_text(raw)
+    return "Other"
+
+
 def is_off_market_row(row: dict) -> bool:
-    """Off-market research is not a broker or agent deal."""
+    """Off-market research is not a broker or agent deal.
+
+    A Lead source column wins when the workbook has one. Until then the stage
+    does: 'Off-market target' and 'Off market (no lead)' both stay out of the pipeline.
+    """
+    lead = str(row.get("Lead source") or row.get("Lead Source") or "").strip()
+    if lead:
+        return bool(re.search(r"(?i)off[\s-]*market|no lead|own research", lead))
     status = str(row.get("Listing status") or "")
     stage = str(row.get("Stage") or "")
     broker = str(row.get("Broker") or "")
     return bool(
-        re.search(r"(?i)\boff-market\b", status)
-        or re.search(r"(?i)off-market", stage)
+        re.search(r"(?i)off[\s-]*market", f"{status} {stage}")
+        or re.search(r"(?i)no lead", stage)
         or re.match(r"(?i)^none yet\b", broker.strip())
     )
 
@@ -1254,7 +1313,10 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 "parcel_acres": None,
                 "source_line": source_line,
                 "source_kind": source_kind,
+                "business_type": business_type_from_row(row),
             }
+            if props["business_type"] not in BUSINESS_TYPES:
+                raise SystemExit(f"{deal_id} business type is not allowed: {props['business_type']}")
             extra = set(props) - set(DEAL_FIELDS)
             if extra:
                 raise SystemExit("Deal fields outside the whitelist: " + ", ".join(sorted(extra)))
@@ -2393,6 +2455,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "pipeline_id": None,
             "research_sources": "",
             "research_note": "",
+            "business_type": "Car wash",
             "land_only": False,
             "on_land_tab": False,
             "quarantine": False,
@@ -2805,6 +2868,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         site["name"] = scrub(row.get("Name") or label)[:160]
         site["address"] = scrub(re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I))[:180]
         site["apn"] = str(row.get("APN or folio") or "")
+        site["business_type"] = business_type_from_row(row)
         attach_off_market_research(site, row)
         query = _geocode_query(row)
         coords = geocode_address(query, off_market_cache) if query else None

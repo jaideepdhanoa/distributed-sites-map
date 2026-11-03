@@ -88,11 +88,11 @@ AREA_NAMES = {
     "phx_2026_v5": ("phx-service", "PHX service area", "service", "PHX"),
     "polygon 1": ("mia-current", "MIA service area", "service", "MIA"),
     "launch odd": ("mia-launch", "MIA launch area", "service", "MIA"),
-    "extended odd": ("mia-extended", "MIA extended area", "service", "MIA"),
-    "ft lauderdale": ("mia-pri-ftl", "MIA priority area", "service", "MIA"),
-    "highland lakes": ("mia-pri-hl", "MIA priority area", "service", "MIA"),
-    "fontainebleau": ("mia-pri-fb", "MIA priority area", "service", "MIA"),
-    "mid-2027 northern odd boundary": ("mia-future", "MIA future boundary", "future", "MIA"),
+    "extended odd": ("mia-extended", "MIA extended area", "expansion", "MIA"),
+    "ft lauderdale": ("mia-pri-ftl", "MIA priority area", "expansion", "MIA"),
+    "highland lakes": ("mia-pri-hl", "MIA priority area", "expansion", "MIA"),
+    "fontainebleau": ("mia-pri-fb", "MIA priority area", "expansion", "MIA"),
+    "mid-2027 northern odd boundary": ("mia-future", "MIA future boundary", "expansion", "MIA"),
 }
 
 BROWARD_HINTS = (
@@ -267,7 +267,7 @@ def sanitize_site_notes(site: dict) -> int:
         current = review.get("note")
         if not isinstance(current, str) or not current:
             continue
-        rewritten = plain_note(current)
+        rewritten = trim_restated_facts(plain_note(current))
         if rewritten != current:
             review["note"] = rewritten
             changed += 1
@@ -1542,17 +1542,22 @@ def build_parcels(sites: list[dict], refresh: bool, deals: list[dict] | None = N
             if record.get("deal_id"):
                 record["parcel_acres"] = None
     coverage = {}
+    by_layer: dict[str, dict] = {}
     none_rows = []
     for key, target in wanted:
         record = target["record"]
         city = record.get("city") or "?"
-        kind = target.get("kind") or "site"
+        kind = "universe" if target.get("kind") == "site" else (record.get("kind") or "deal")
         bucket = coverage.setdefault(city, {"targets": 0, "matched": 0, "none": 0})
+        layer = by_layer.setdefault(kind, {}).setdefault(city, {"targets": 0, "matched": 0, "none": 0, "no_geometry": 0})
         bucket["targets"] += 1
+        layer["targets"] += 1
         if _parcel_usable(cache.get(key)):
             bucket["matched"] += 1
+            layer["matched"] += 1
         else:
             bucket["none"] += 1
+            layer["none"] += 1
             none_rows.append(
                 {
                     "id": record.get("site_id") or record.get("deal_id"),
@@ -1563,6 +1568,9 @@ def build_parcels(sites: list[dict], refresh: bool, deals: list[dict] | None = N
             )
     for bucket in coverage.values():
         bucket["pct"] = round(100.0 * bucket["matched"] / bucket["targets"], 1) if bucket["targets"] else 0
+    for cities in by_layer.values():
+        for bucket in cities.values():
+            bucket["pct"] = round(100.0 * bucket["matched"] / bucket["targets"], 1) if bucket["targets"] else 0
     stats["features"] = len(features)
     stats["adjoining"] = adjoining_count
     stats["by_city"] = dict(by_city)
@@ -1572,6 +1580,7 @@ def build_parcels(sites: list[dict], refresh: bool, deals: list[dict] | None = N
     return features, {
         "counts": dict(stats),
         "coverage": coverage,
+        "by_layer": by_layer,
         "none_rows": none_rows,
         "note": parcel_note(stats),
     }

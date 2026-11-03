@@ -1573,7 +1573,87 @@
         "reason": "outside the Miami-Dade parcel layer"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 848, 'fetched': 97, 'not_found': 156, 'broward_unavailable': 47, 'features': 968, 'adjoining': 23, 'by_city': {'LAS': 213, 'MIA': 444, 'PHX': 288}, 'by_method': {'parcel number': 842, 'pin location': 103}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 848, 'fetched': 97, 'not_found': 156, 'broward_unavailable': 47, 'features': 968, 'adjoining': 23, 'by_city': {'LAS': 213, 'MIA': 444, 'PHX': 288}, 'by_method': {'parcel number': 842, 'pin location': 103}}.",
+    "by_layer": {
+      "universe": {
+        "LAS": {
+          "targets": 182,
+          "matched": 182,
+          "none": 0,
+          "no_geometry": 0,
+          "pct_of_targets": 100.0,
+          "pct_of_placed": 100.0
+        },
+        "MIA": {
+          "targets": 608,
+          "matched": 421,
+          "none": 187,
+          "no_geometry": 0,
+          "pct_of_targets": 69.2,
+          "pct_of_placed": 69.2
+        },
+        "PHX": {
+          "targets": 251,
+          "matched": 249,
+          "none": 2,
+          "no_geometry": 0,
+          "pct_of_targets": 99.2,
+          "pct_of_placed": 99.2
+        }
+      },
+      "pipeline": {
+        "PHX": {
+          "targets": 37,
+          "matched": 27,
+          "none": 10,
+          "no_geometry": 7,
+          "pct_of_targets": 73.0,
+          "pct_of_placed": 90.0
+        },
+        "LAS": {
+          "targets": 22,
+          "matched": 20,
+          "none": 2,
+          "no_geometry": 2,
+          "pct_of_targets": 90.9,
+          "pct_of_placed": 100.0
+        },
+        "MIA": {
+          "targets": 18,
+          "matched": 15,
+          "none": 3,
+          "no_geometry": 3,
+          "pct_of_targets": 83.3,
+          "pct_of_placed": 100.0
+        }
+      },
+      "land": {
+        "LAS": {
+          "targets": 11,
+          "matched": 11,
+          "none": 0,
+          "no_geometry": 0,
+          "pct_of_targets": 100.0,
+          "pct_of_placed": 100.0
+        },
+        "PHX": {
+          "targets": 13,
+          "matched": 12,
+          "none": 1,
+          "no_geometry": 0,
+          "pct_of_targets": 92.3,
+          "pct_of_placed": 92.3
+        },
+        "MIA": {
+          "targets": 18,
+          "matched": 8,
+          "none": 10,
+          "no_geometry": 0,
+          "pct_of_targets": 44.4,
+          "pct_of_placed": 44.4
+        }
+      }
+    }
   },
   "muse_source": "second review column",
   "warnings": [

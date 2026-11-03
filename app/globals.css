@@ -132,7 +132,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   position: absolute;
   z-index: 2;
   left: 12px;
-  bottom: 28px;
+  bottom: 36px;
   margin: 0;
   padding: 8px 10px;
   background: rgba(250, 247, 241, 0.96);
@@ -141,11 +141,21 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-size: 12px;
   max-width: 230px;
 }
-.legend ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
+.legend ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; max-height: 42vh; overflow: auto; }
 .legend li { display: flex; align-items: center; gap: 6px; }
-.legend .tip, .guide {
-  margin: 8px 0 0;
+.legend .tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: 240px;
+  margin: 0;
+  padding: 8px 10px;
   color: #1c1914;
+  background: #faf7f1;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  line-height: 1.35;
 }
 .guide {
   position: absolute;

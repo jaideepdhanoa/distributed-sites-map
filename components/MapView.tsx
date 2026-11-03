@@ -49,6 +49,7 @@ function areaLabels(areas: GeoFeature[]) {
   place("las-300", "Rings 200 and 300 (later)", [0, 0.12]);
   place("phx-service", "Phoenix service area (current)");
   place("mia-current", "Miami service area (current)");
+  place("mia-extended", "Miami extended area (later)", [0.05, 0.08]);
   return labels;
 }
 

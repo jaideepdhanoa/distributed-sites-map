@@ -211,6 +211,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .layers strong { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
 .layers label { display: flex; align-items: center; gap: 8px; }
 .census-note { margin: 8px 0 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #4e463d; }
+.compare-panel {
+  position: absolute; z-index: 4; left: 12px; right: 220px; bottom: 96px;
+  background: rgba(250, 247, 241, 0.97); border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+}
+.compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.compare-panel h2 { margin: 0 0 8px; font-size: 16px; }
 .unplaced { margin: 8px 0 0; font-size: 13px; max-width: 720px; }
 .unplaced ul { margin: 6px 0 0; padding-left: 18px; max-height: 140px; overflow: auto; }
 .type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

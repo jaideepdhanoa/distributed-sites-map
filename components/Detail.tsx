@@ -25,6 +25,8 @@ export default function Detail({
   lat,
   lng,
   onOpenDeal,
+  onAddCompare,
+  sameOwner,
   onClose,
 }: {
   site: SiteProps | null;
@@ -32,6 +34,8 @@ export default function Detail({
   lat?: number | null;
   lng?: number | null;
   onOpenDeal?: () => void;
+  onAddCompare?: () => void;
+  sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
 }) {
   if (!site) return null;
@@ -43,6 +47,7 @@ export default function Detail({
       <h3>Summary</h3>
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
+      {onAddCompare ? <button type="button" onClick={onAddCompare}>Add to compare</button> : null}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -59,6 +64,12 @@ export default function Detail({
       <h3>Owner</h3>
       <p>{site.owner || "—"}</p>
       {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}
+      {sameOwner && sameOwner.length ? (
+        <>
+          <h3>Other sites with this owner</h3>
+          <ul>{sameOwner.map((item) => <li key={item.site_id}>{item.name || item.site_id}</li>)}</ul>
+        </>
+      ) : null}
       {site.assessor_source ? <p className="note">{site.assessor_source}</p> : null}
       <h3>Land</h3>
       <div className="kv">

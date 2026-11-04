@@ -148,6 +148,24 @@ def _maricopa(apn: str) -> dict | None:
     return features[0].get("attributes") or {}
 
 
+def _clark(parcel: str) -> dict | None:
+    url = (
+        "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CC_PARCELS_SHP/FeatureServer/1/query?"
+        + urllib.parse.urlencode(
+            {
+                "where": f"PARCEL='{parcel}'",
+                "outFields": "ADDRESS1,ADDRESS2,SALEPRICE,SALEDATE",
+                "returnGeometry": "false",
+                "f": "json",
+            }
+        )
+    )
+    features = _get(url).get("features") or []
+    if not features:
+        return None
+    return features[0].get("attributes") or {}
+
+
 def _miami(folio: str) -> dict | None:
     url = (
         "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query?"
@@ -249,7 +267,7 @@ def apply_public_records(sites: list[dict], norm_apn) -> dict:
     for site in sites:
         if site.get("origin") != "universe" or not site.get("in_area") or not site.get("counts_as_site"):
             continue
-        if site["city"] not in {"PHX", "MIA"}:
+        if site["city"] not in {"PHX", "LAS", "MIA"}:
             continue
         token = norm_apn(site.get("apn"))
         if site["city"] == "MIA" and token.isdigit():
@@ -264,13 +282,16 @@ def apply_public_records(sites: list[dict], norm_apn) -> dict:
     def job(item):
         key, city, token = item
         try:
-            found = _maricopa(token) if city == "PHX" else _miami(token)
+            if city == "LAS":
+                import time
+                time.sleep(0.15)
+            found = _maricopa(token) if city == "PHX" else _clark(token) if city == "LAS" else _miami(token)
         except Exception:
             found = None
         return key, found
 
     if todo:
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=4) as pool:
             futures = [pool.submit(job, item) for item in todo]
             for future in as_completed(futures):
                 key, found = future.result()
@@ -303,6 +324,12 @@ def apply_public_records(sites: list[dict], norm_apn) -> dict:
             site["last_sale_price_display"] = _money(row.get("SalePrice"))
             site["year_built"] = _year(row.get("ConstructionYear"))
             site["assessor_source"] = f"Maricopa County assessor parcel, retrieved {RETRIEVED}"
+        elif site["city"] == "LAS":
+            mail = ", ".join(part for part in (str(row.get("ADDRESS1") or "").strip(), str(row.get("ADDRESS2") or "").strip()) if part)
+            site["owner_mail"] = mail
+            site["last_sale_date"] = _date(row.get("SALEDATE"))
+            site["last_sale_price_display"] = _money(row.get("SALEPRICE"))
+            site["assessor_source"] = f"Clark County parcel layer, retrieved {RETRIEVED}. Year built and assessed value are not on this free layer."
         else:
             mail = ", ".join(
                 part
@@ -331,6 +358,6 @@ def apply_public_records(sites: list[dict], norm_apn) -> dict:
             "Serving utility is the smallest HIFLD electric retail territory containing the pin. "
             "Water and irrigation districts are left out. "
             "Miami-Dade's parcel layer has no last-sale date or price. "
-            "Clark County sale and year-built fields are a later pass."
+            "Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value."
         ),
     }

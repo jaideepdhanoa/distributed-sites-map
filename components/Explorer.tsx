@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, stageTitle } from "@/lib/labels";
+import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -51,6 +51,8 @@ export default function Explorer() {
   const tableTab: "universe" | "pipeline" | "land" = tabParam === "pipeline" || tabParam === "land" ? tabParam : "universe";
   const [tip, setTip] = useState("");
   const [copied, setCopied] = useState(false);
+  const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
+  const [changesNote, setChangesNote] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(true);
 
@@ -117,6 +119,10 @@ export default function Explorer() {
           funnel: funnelPayload.funnel,
         });
         setMe(meRes.ok ? await meRes.json() : null);
+        const changes = funnelPayload.meta?.changes;
+        if (changes && typeof changes.new_sites === "number") {
+          setChangesNote(`Since the previous build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`);
+        }
       }
     });
     return () => {
@@ -214,6 +220,27 @@ export default function Explorer() {
 
   const pipelineDeals = dealRows.filter((deal) => deal.kind === "pipeline" && dealMatches(deal) && (deal.stage_group !== "dropped" || showDroppedDeals || (funnel === "pipeline" && pipeStage === "dropped")));
   const landDeals = dealRows.filter((deal) => deal.kind === "land" && deal.city === city && typeOn(deal.business_type || "Other") && (!query || `${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase())));
+
+  function exportTable() {
+    const rows = tableTab === "pipeline" ? pipelineDeals : tableTab === "land" ? landDeals : visibleSites;
+    const headers = tableTab === "universe"
+      ? ["site_id", "name", "address", "city", "verdict", "zoning", "flood_zone", "year_built", "miles_to_depot", "confidence", "owner"]
+      : ["deal_id", "name", "address", "city", "stage", "firm", "asking_price_display"];
+    const lines = [headers.join(",")];
+    for (const row of rows as Record<string, unknown>[]) {
+      lines.push(headers.map((key) => `"${String(row[key] ?? "").replace(/"/g, "\"\"")}"`).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${city}-${tableTab}.csv`;
+    link.click();
+  }
+
+  function addCompare(id: string) {
+    const next = compareIds.includes(id) ? compareIds.filter((item) => item !== id) : compareIds.length >= 4 ? compareIds : [...compareIds, id];
+    write({ compare: next.length ? next.join("|") : null });
+  }
 
   function dealPoint(deal: DealProps): [number, number] | null {
     if (deal.universe_id) {
@@ -344,6 +371,7 @@ export default function Explorer() {
         {funnel === "universe" ? (
           <p className="census-note" title={CENSUS_NOTE} onMouseEnter={() => setTip(CENSUS_NOTE)} onMouseLeave={() => setTip("")}>Car washes</p>
         ) : null}
+        {changesNote ? <p className="note">{changesNote}</p> : null}
         <div className="type-filters" aria-label="Business type">
           <button type="button" className={businessTypes === null ? "on" : ""} onClick={() => setBusinessTypes(null)}>All types</button>
           {BUSINESS_TYPES.map((type) => {
@@ -446,7 +474,8 @@ export default function Explorer() {
               ))}
               <button className={listed === "yes" ? "on" : ""} type="button" onClick={() => write({ listed: listed === "yes" ? null : "yes" })}>Listed</button>
               <button className={landSites ? "on" : ""} type="button" onClick={() => write({ land: landSites ? null : "1" })}>Land sites</button>
-              <button className={compare ? "on" : ""} type="button" onClick={() => setCompare((value) => !value)}>Compare</button>
+              <button className={compare ? "on" : ""} type="button" onClick={() => setCompare((value) => !value)}>Reviews disagree</button>
+              <button type="button" onClick={exportTable}>Export CSV</button>
               {dropCount > 0 ? (
                 <button className={showDropped ? "on" : ""} type="button" onClick={() => setShowDropped((value) => !value)}>
                   Ruled out ({dropCount.toLocaleString()})
@@ -554,8 +583,31 @@ export default function Explorer() {
               return nearestDepot(coords[0], coords[1], data.depots.features)?.miles ?? selectedSite.miles_to_depot;
             })()}
             onOpenDeal={selectedSite.linked_deal_id ? () => choose(selectedSite.linked_deal_id || null) : undefined}
+            onAddCompare={() => addCompare(selectedSite.site_id)}
+            sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
           />
+        ) : null}
+        {compareIds.length >= 2 ? (
+          <aside className="compare-panel">
+            <button className="close" type="button" onClick={() => write({ compare: null })}>Close</button>
+            <h2>Side by side</h2>
+            <div className="compare-grid">
+              {compareIds.map((id) => {
+                const site = sites.find((item) => item.site_id === id);
+                if (!site) return null;
+                return (
+                  <article key={id}>
+                    <h3>{plainVerdict(site.verdict)}</h3>
+                    <p>{site.name || site.address}</p>
+                    <p className="note">{site.address}</p>
+                    <p className="note">{site.owner || "Owner not on file"}</p>
+                    <p className="note">{site.zoning || "Zoning not on file"}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </aside>
         ) : null}
       </div>
       {tableOpen ? (

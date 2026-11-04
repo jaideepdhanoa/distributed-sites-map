@@ -8,7 +8,7 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
-import { plainUtility, plainVerdict, stageDetail } from "@/lib/labels";
+import { TIER_NOTES, plainUtility, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
@@ -19,7 +19,17 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "site_id", header: "Site" },
   { accessorKey: "name", header: "Name" },
   { accessorKey: "city", header: "City" },
-  { accessorKey: "land_tier", header: "Tier" },
+  {
+    id: "tier",
+    accessorFn: (row) => tierLabel(row.land_tier),
+    header: "Spare land",
+    cell: ({ row }) => {
+      const code = row.original.land_tier;
+      const label = tierLabel(code);
+      const note = code ? TIER_NOTES[code]?.note : "";
+      return label ? <span title={note}>{label}</span> : "—";
+    },
+  },
   { id: "verdict", accessorFn: (row) => plainVerdict(row.verdict), header: "Verdict" },
   { accessorKey: "zoning", header: "Zoning" },
   { accessorKey: "flood_zone", header: "Flood" },

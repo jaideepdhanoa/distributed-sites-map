@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, stageTitle } from "@/lib/labels";
+import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, stageTitle } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -21,7 +21,7 @@ const PIPE_STEPS: { id: PipeId; label: string }[] = [
 const STEPS: { id: StageId; label: string }[] = [
   { id: "universe", label: "Universe" },
   { id: "in_area", label: "In service area" },
-  { id: "land", label: "L10 / L4" },
+  { id: "land", label: "Spare land" },
   { id: "county", label: "County-checked" },
   { id: "cleared", label: "Cleared" },
 ];
@@ -137,7 +137,7 @@ export default function Explorer() {
   function passesChips(site: SiteProps, loose: boolean) {
     if (site.city !== city) return false;
     if (query) {
-      const blob = `${site.site_id} ${site.name} ${site.address} ${site.apn} ${site.owner}`.toLowerCase();
+      const blob = `${site.site_id} ${site.name} ${site.also_known_as || ""} ${site.address} ${site.apn} ${site.owner}`.toLowerCase();
       if (!blob.includes(query.toLowerCase())) return false;
     }
     if (loose) return true;
@@ -429,9 +429,9 @@ export default function Explorer() {
         <div className="chips">
           {funnel === "universe" ? (
             <>
-              {["any", "L10", "L4"].map((item) => (
-                <button key={item} className={landTier === item ? "on" : ""} type="button" onClick={() => write({ tier: item === "any" ? null : item })}>
-                  {item === "any" ? "All tiers" : item}
+              {(["any", "L10", "L4"] as const).map((item) => (
+                <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
+                  {item === "any" ? "All tiers" : TIER_NOTES[item].label}
                 </button>
               ))}
               {[
@@ -512,6 +512,8 @@ export default function Explorer() {
                   <i className={`swatch ${item.id}`} /> {item.label}
                 </li>
               ))}
+              <li onMouseEnter={() => setTip(TIER_NOTES.L10.note)} onMouseLeave={() => setTip("")}><i className="swatch l10" /> {TIER_NOTES.L10.label}</li>
+              <li onMouseEnter={() => setTip(TIER_NOTES.L4.note)} onMouseLeave={() => setTip("")}><i className="swatch l4" /> {TIER_NOTES.L4.label}</li>
               <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")}><i className="swatch current-area" /> Current area</li>
               <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")}><i className="swatch later-area" /> Later expansion</li>
             </ul>
@@ -523,7 +525,7 @@ export default function Explorer() {
             <button className="close" type="button" onClick={() => setGuideOpen(false)}>Close</button>
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
-            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. L10 and L4 mean there is room for about 10 or about 4 parking bays on spare land.</p>
+            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>
             <ul>
               {STATUS_NOTES.map((item) => <li key={item.id}><strong>{item.label}.</strong> {item.note}</li>)}

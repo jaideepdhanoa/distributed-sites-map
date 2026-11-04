@@ -1,5 +1,5 @@
 import type { DealProps, SiteProps } from "@/lib/types";
-import { nextStepText, plainUtility, plainVerdict, stageDetail, stageTitle, statusOf } from "@/lib/labels";
+import { nextStepText, plainUtility, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -35,9 +35,8 @@ export default function Detail({
   onClose?: () => void;
 }) {
   if (!site) return null;
-  const reasons = [site.evidence, site.why_stopped, site.elimination_reason].filter((line, index, all) => line && all.indexOf(line) === index);
   const price = site.asking_price_display;
-  const why = site.why_stopped || site.evidence || "No county note is on file yet.";
+  const why = site.summary_why || "Not screened yet.";
   return (
     <aside className="drawer">
       <button className="close" type="button" onClick={onClose}>Close</button>
@@ -45,7 +44,7 @@ export default function Detail({
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {site.land_tier ? <span className={`badge ${site.land_tier === "L10" ? "l10" : "l4"}`}>{site.land_tier}</span> : null}
+        {site.land_tier ? <span className={`badge ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}>{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge l4">Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         {site.land_only ? <span className="badge pending">Land site</span> : null}
@@ -53,6 +52,7 @@ export default function Detail({
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{site.name || site.address || site.site_id}</h2>
+      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
       {mapsLinks(lat, lng)}
@@ -87,7 +87,12 @@ export default function Detail({
           {site.research_note ? <p>{site.research_note}</p> : null}
         </>
       ) : null}
-      {reasons.length ? reasons.map((reason) => <p key={reason}>{reason}</p>) : null}
+      {site.evidence ? (
+        <details>
+          <summary>Research notes</summary>
+          <p>{site.evidence}</p>
+        </details>
+      ) : null}
       {price ? (
         <>
           <h3>Asking price</h3>

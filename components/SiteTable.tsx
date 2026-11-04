@@ -34,7 +34,7 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "asking_price_display", header: "Asking" },
   {
     id: "why",
-    accessorKey: "why_stopped",
+    accessorKey: "summary_why",
     header: "Why",
     cell: ({ getValue }) => {
       const value = String(getValue() || "");
@@ -53,7 +53,7 @@ export default function SiteTable({
   onSelect: (id: string) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const showWhy = rows.some((row) => row.why_stopped);
+  const showWhy = rows.some((row) => row.summary_why);
   const table = useLegacyTable({
     data: rows,
     columns: showWhy ? columns : columns.filter((column) => column.id !== "why"),

@@ -17,6 +17,8 @@ export type SiteProps = {
   site_id: string;
   city: string;
   name: string;
+  also_known_as?: string;
+  summary_why?: string;
   address: string;
   apn: string;
   coord_status: string;

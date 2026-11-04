@@ -8,6 +8,8 @@ const KEEP = [
   "site_id",
   "city",
   "name",
+  "also_known_as",
+  "summary_why",
   "address",
   "apn",
   "coord_status",

@@ -171,6 +171,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   padding: 14px 16px;
   box-shadow: var(--shadow);
 }
+.swatch.l10 { background: #1f7a4d; }
+.swatch.l4 { background: #c4841d; }
 .swatch.cleared { background: #1f7a4d; }
 .swatch.held { background: #2f6f9f; }
 .swatch.possible { background: #c4841d; }

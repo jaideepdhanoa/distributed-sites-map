@@ -16,8 +16,8 @@ export const FUNNEL_NOTES: Record<string, string> = {
   universe: "One site for each place after duplicate census records are merged.",
   unique: "One site for each place after duplicate census records are merged.",
   in_area: "Inside the current operating area for that city.",
-  land: "Room for about 10 or about 4 parking bays on spare land.",
-  county: "In-area sites with an L10 or L4 fit that also have a county verdict. The workbook checked 109 sites in all: Pass 13, Maybe 30, Fail 47, Not a car wash 15, Unresolved 4. That full set includes sites outside the service area and sites without an L10 or L4 fit.",
+  land: "Enough spare land for a larger layout, about 10,000 sq ft, or a smaller one, about 4,000 sq ft.",
+  county: "In-area sites with enough spare land that also have a county verdict. The workbook checked 109 sites in all: 13 cleared, 30 possible, 47 ruled out, 15 not a car wash, and 4 unresolved. That full set includes sites outside the service area and sites without enough spare land.",
   cleared: "County records confirm an operating wash with enough spare land on its own parcel. The workbook clears 11. Charleston Car Wash and the Chandler Quick Quack stay Possible until review, so the map shows 9.",
   listed: "Sites on this step that are on the market.",
   contacted: "Sites on this step where a conversation with the owner or broker has started.",
@@ -40,7 +40,7 @@ export const BUSINESS_TYPES = [
 export const CENSUS_NOTE = "Car washes. Other categories will get their own census. These counts are car washes only.";
 
 export const SUMMARY_NOTES = {
-  universe: "Candidates have room for about 10 or about 4 parking bays inside the service area. Cleared sites passed the county check.",
+  universe: "Candidates have spare land inside the service area. Cleared sites passed the county check.",
   pipeline: "Broker and agent deals only. Off-market research stays on the universe site. Desk screen is the first step. Dropped deals are no longer pursued.",
 };
 
@@ -66,6 +66,21 @@ export const AREA_NOTES = {
   current: "The area served today. Las Vegas uses the core and ring 100. Phoenix and Miami use their current boundary.",
   later: "Later expansion. In Las Vegas these are rings 200 and 300. Drawn dashed, with no fill.",
 };
+
+export const TIER_NOTES: Record<string, { label: string; note: string }> = {
+  L10: {
+    label: "Larger site (10,000+ sq ft spare)",
+    note: "At least 10,000 sq ft of spare land on the parcel, or on adjoining land with the same owner.",
+  },
+  L4: {
+    label: "Smaller site (4,000+ sq ft spare)",
+    note: "At least 4,000 sq ft of spare land, and less than 10,000.",
+  },
+};
+
+export function tierLabel(tier?: string | null) {
+  return TIER_NOTES[tier || ""]?.label || "";
+}
 
 export function plainVerdict(verdict?: string | null) {
   if (verdict === "PASS") return "Cleared";

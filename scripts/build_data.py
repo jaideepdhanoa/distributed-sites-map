@@ -242,7 +242,106 @@ def plain_note(value) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = re.sub(r"\s+([,.;:])", r"\1", cleaned)
     cleaned = re.sub(r"(?:\s*[,;]\s*){2,}", ", ", cleaned)
-    return cleaned.strip(" ,;:-")
+    return strip_stall(cleaned).strip(" ,;:-")
+
+
+def strip_stall(text: str) -> str:
+    """Ship no stall wording. A numbered tier becomes a land-size phrase."""
+
+    def tier(match: re.Match) -> str:
+        number = int(match.group(1))
+        return "larger land tier" if number >= 10 else "smaller land tier"
+
+    cleaned = re.sub(r"(?i)\b(\d+)\s*-?\s*stalls?\s+tier\b", tier, text or "")
+    cleaned = re.sub(r"(?i)\bstalls\b", "bays", cleaned)
+    cleaned = re.sub(r"(?i)\bstall\b", "bay", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _title_if_shouting(text: str) -> str:
+    letters = [char for char in text if char.isalpha()]
+    if letters and all(char.isupper() for char in letters):
+        return text.title()
+    return text
+
+
+def display_name_parts(raw: str) -> tuple[str, list[str]]:
+    """One business name, plus the other names a reader might search for."""
+    pieces = []
+    for piece in re.split(r"\s*\|\s*", raw or ""):
+        piece = re.sub(r"(?i)\([^)]*(?:=|fuel|car_wash)[^)]*\)", " ", piece)
+        piece = re.sub(r"(?i)\bcar_wash\s*=\s*\w+\b", " ", piece)
+        piece = re.sub(r"\s+", " ", piece).strip(" -.,")
+        if not piece:
+            continue
+        pieces.append(_title_if_shouting(piece))
+
+    def key(value: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", value.lower())
+
+    kept: list[str] = []
+    for piece in pieces:
+        token = key(piece)
+        if not token:
+            continue
+        if any(token == key(existing) or token in key(existing) for existing in kept):
+            continue
+        kept = [existing for existing in kept if key(existing) not in token]
+        kept.append(piece)
+
+    def score(value: str) -> tuple:
+        low = value.lower()
+        return (
+            1 if re.search(r"car\s*wash|carwash", low) else 0,
+            1 if re.search(r"#\s*\d+|\b\d{2,}\b", value) else 0,
+            len(value),
+        )
+
+    if not kept:
+        return "", []
+    best = max(kept, key=score)
+    alternates = [piece for piece in kept if key(piece) != key(best)]
+    return best, alternates
+
+
+def summary_why(site: dict) -> str:
+    """One or two plain sentences from the verdict and the spare-land numbers."""
+
+    def acres(value) -> str:
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+            return ""
+        rounded = round(float(value), 1)
+        if rounded <= 0:
+            return ""
+        return f"{rounded:.1f}".rstrip("0").rstrip(".")
+
+    own = acres(site.get("spare_ac_own"))
+    adjoining = acres(site.get("spare_ac_adjoining"))
+    verdict = site.get("verdict")
+    if verdict == "PASS":
+        if own and adjoining:
+            text = f"County check confirmed about {own} ac of spare land on the parcel, plus about {adjoining} ac on adjoining land with the same owner."
+        elif own:
+            text = f"County check confirmed about {own} ac of spare land on the parcel."
+        elif adjoining:
+            text = f"County check confirmed about {adjoining} ac of spare land on adjoining land with the same owner."
+        else:
+            text = "County check confirmed spare land on the parcel."
+        if site.get("network_status") == "held" or not site.get("in_area"):
+            text += " It sits outside the current service area."
+    elif verdict == "MAYBE":
+        text = f"County check found about {own} ac of spare land. It needs a closer look." if own else "County check found borderline spare land. It needs a closer look."
+    elif verdict == "FAIL":
+        text = "Not enough spare land on the parcel."
+    elif verdict == "NOT_A_WASH":
+        text = "This place is not operating as a car wash."
+    elif verdict == "UNRESOLVED":
+        text = "A key fact is still missing, so the county check is not finished."
+    elif site.get("land_tier"):
+        text = "Imagery suggests there is spare land. County records have not been checked."
+    else:
+        text = "Not screened yet."
+    return text[:200]
 
 
 def sanitize_site_notes(site: dict) -> int:
@@ -2439,6 +2538,8 @@ def scan_obj(obj, path="$"):
         hits = banned_hits(obj)
         if hits:
             problems.append(f"banned text at {path}: {obj[:140]!r}")
+        if re.search(r"(?i)\bstalls?\b", obj):
+            problems.append(f"stall wording at {path}: {obj[:140]!r}")
     return problems
 
 
@@ -2762,6 +2863,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "site_id": sid,
             "city": city,
             "name": "",
+            "also_known_as": "",
+            "summary_why": "",
             "address": "",
             "apn": "",
             "lat": None,
@@ -3334,6 +3437,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         elif site["origin"] == "universe" and not site["in_area"]:
             site["why_stopped"] = "Outside the operative service area."
         sanitize_site_notes(site)
+        display, alternates = display_name_parts(site.get("name") or "")
+        if display:
+            site["name"] = display
+        site["also_known_as"] = "; ".join(alternates)
+        site["summary_why"] = summary_why(site)
 
     # Funnel numbers use records that count as a site.
     countable = [site for site in sites if site["counts_as_site"] and site["origin"] == "universe"]
@@ -3778,6 +3886,9 @@ def validate_committed() -> None:
                 source = row.get("source_file") or ""
                 if _NOTE_INTERNAL.search(blob) or re.search(r"(?i)\b(muse|indie|torque)\b", blob + " " + source):
                     problems.append(f"verdict note {row.get('site_id')}: {(blob + ' ' + source)[:120]!r}")
+                    break
+                if re.search(r"(?i)\bstalls?\b", blob):
+                    problems.append(f"stall wording in verdict {row.get('site_id')}")
                     break
     if len(loaded["depots.geojson"].get("features", [])) != 13:
         problems.append("expected 13 depot pins")

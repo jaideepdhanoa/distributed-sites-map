@@ -353,6 +353,24 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   position: absolute; z-index: 2; right: 8px; bottom: 6px;
   font-size: 11px; color: #f4efe6; text-shadow: 0 1px 2px #1c1914;
 }
+.map-tip-popup { pointer-events: none; }
+.map-tip-popup .maplibregl-popup-content {
+  background: #faf7f1;
+  color: #1c1914;
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.map-tip-popup .maplibregl-popup-tip { border-top-color: #faf7f1; border-bottom-color: #faf7f1; }
+.map-tip strong { display: block; font-size: 14px; }
+.map-tip-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.map-tip-extra { display: block; margin-top: 4px; color: #4e463d; }
+.swatch.stage-contacted { background: #1f7a4d; border-radius: 2px; }
+.swatch.stage-later { background: #6b4c9a; border-radius: 2px; }
+.swatch.stage-dropped { background: #7a2e28; border-radius: 2px; }
+.swatch.stage-sourced { background: #2458a6; border-radius: 2px; }
 .badge {
   display: inline-flex; align-items: center; gap: 6px;
   border-radius: 999px; padding: 4px 8px; font-size: 12px; font-weight: 650;

@@ -67,6 +67,11 @@ export const AREA_NOTES = {
   later: "Later expansion. In Las Vegas these are rings 200 and 300. Drawn dashed, with no fill.",
 };
 
+export const AREA_KIND_LABEL = {
+  current: "Current area",
+  later: "Later expansion",
+} as const;
+
 export const TIER_NOTES: Record<string, { label: string; note: string }> = {
   L10: {
     label: "Larger site (10,000+ sq ft spare)",

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle, tierLabel } from "@/lib/labels";
+import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -689,8 +689,8 @@ export default function Explorer() {
               ))}
               <li onMouseEnter={() => setTip(TIER_NOTES.L10.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(TIER_NOTES.L10.note)}><i className="swatch l10" /> {TIER_NOTES.L10.label}</li>
               <li onMouseEnter={() => setTip(TIER_NOTES.L4.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(TIER_NOTES.L4.note)}><i className="swatch l4" /> {TIER_NOTES.L4.label}</li>
-              <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.current)}><i className="swatch current-area" /> Current area</li>
-              <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.later)}><i className="swatch later-area" /> Later expansion</li>
+              <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.current)}><i className="swatch current-area" /> {AREA_KIND_LABEL.current}</li>
+              <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.later)}><i className="swatch later-area" /> {AREA_KIND_LABEL.later}</li>
             </ul>
           ) : null}
           {tip ? <p className="tip">{tip}</p> : null}

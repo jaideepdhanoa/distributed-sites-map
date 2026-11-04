@@ -143,37 +143,31 @@ Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The 
 
 ## Activity timeline
 
-Each site and deal card has an Activity section. It is built from two read-only feeds, both keyed by the record id (`PHX-U180`, `PIPE-PHX-0008`). The app does not read mail, and it does not write the workbook or Drive.
+Each site and deal card has an Activity section: one link to the site folder, a count and latest date for each materials category, a last-touched date, and the activity lines marked Map. The app does not write the workbook or Drive, and it does not read file contents.
 
-The naming rules live in `config/timeline.json`. Environment variables override them: `ACTIVITY_SHEET`, `ACTIVITY_HEADER_ROW`, `DRIVE_FOLDER_TEMPLATE`, `GOOGLE_DRIVE_ROOT_FOLDER_ID`, `GMAIL_LABEL_TEMPLATE`, and `TIMELINE_CONFIG`.
+`config/timeline.json` holds the names. `ui.showActivityLines` defaults to true. Set it to false to keep the folder link, the counts and the last-touched date, and hide the lines. `GOOGLE_DRIVE_ROOT_FOLDER_ID` overrides `drive.rootFolderId`. `ACTIVITY_SHEET` and `ACTIVITY_HEADER_ROW` override the activity tab.
+
+### Site ID
+
+Pipeline and Land Sites gain a `Site ID` column (column CK). Values look like `PIPE-PHX-0001` and `LAND-PHX-0036`. When that cell is present and well formed, it is the deal id and the id on `linked_deal_id`. A blank or unusable cell falls back to an existing registry id, then to the row position. A prefix that does not match the tab, or a duplicate id, stops the build. Until the column exists, ids stay on row order.
 
 ### Activity tab
 
-Add a tab to the pipeline workbook. The default name is `Activity`, with the header on row 1:
+Header on row 1. The map reads Event ID, Date, Site ID, Type, Summary and Visibility. It does not read Source link, File link, Logged by, Direction, Counterparty role or Outcome. Only rows whose Visibility is `Map` are shipped, and only for `listing`, `brochure`, `om`, `financials`, `photos`, `legal`, `doc`, `visit` and `stage`. A blank summary uses a fixed line. A summary that fails the wording check, or contains a price mark, is dropped.
 
-| Date | Site ID | Type | Summary | Link |
-|---|---|---|---|---|
-| 2026-11-01 | PIPE-PHX-0008 | call | Spoke with the listing desk. | https://… |
+### Drive folders
 
-Type is one of `call`, `visit`, `doc`, `email`, `brochure`, `om`, `financials`, `photos`. The summary is one neutral line. Do not put a subject, a body, or a contact number in it. Rows that fail the wording check are left out. `scripts/build_data.py` reads this tab when it rebuilds the map. A workbook sync should also run:
+The parent folder is `2 Sites`. Its id is the default `drive.rootFolderId`. Share it with the read-only service account in `GOOGLE_SERVICE_ACCOUNT_JSON`.
+
+Each site folder is named `{Site ID} {column A label}`, for example `PIPE-PHX-0001 PHX 1523 E Southern Ave`. The map matches the first token to Site ID. If the name has no id, it uses the folder id in the Folder column (column AE), including a hyperlink whose text is `Open folder`. A label that does not match column A is a warning, not a failure.
+
+Inside the site folder, only `Source files` is opened. Its categories are `1 Financials`, `2 Property and legal` and `3 Operations`, including nested folders. The fourth category is never listed. Loose files and memos are not counted. The filed date is the `YYYY-MM-DD` at the start of a file name. The card shows counts and dates, never a file name or a file link.
 
 ```bash
 python3 scripts/build_timeline.py --workbook path/to/export.xlsx
 ```
 
-That command only reads. It writes `data/generated/timeline.json`.
-
-### Drive folders
-
-Share a parent folder with the same read-only service account as `GOOGLE_SERVICE_ACCOUNT_JSON` (the raw JSON, or a path to that file). Set `GOOGLE_DRIVE_ROOT_FOLDER_ID` to that folder.
-
-By default, each record is a folder whose name is the record id, optionally followed by the address: `PIPE-PHX-0008` or `PIPE-PHX-0008 – 1 Main St`. Inside it, these subfolders are recognized: `Listing`, `County`, `Photos`, `Legal`. A file is shown only as its type (brochure, OM, financials, photos), the date, a link, and a neutral status line. The file name is not shown. Files whose names fail the wording check are omitted entirely.
-
-To nest folders, set `drive.path` in `config/timeline.json`, for example `["Sites", "{city}"]`, and set `DRIVE_FOLDER_TEMPLATE` if you want the documented pattern recorded next to the code. `{city}` means every folder at that level.
-
-### Gmail
-
-`scripts/timeline_gmail.py` is the extension point for a later label index. `gmail.labelTemplate` defaults to `Sites/{recordId}`. The function returns no rows. Do not add subjects or bodies there.
+That command only reads. It writes `data/generated/timeline.json`. The column and the renamed folders are not in the workbook yet, so a build before they exist ships no folder matches.
 
 ## Not in this version
 

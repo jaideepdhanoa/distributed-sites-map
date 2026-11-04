@@ -3,29 +3,21 @@
     "sheet": "Activity",
     "headerRow": 1,
     "columns": {
+      "eventId": ["event id"],
       "date": ["date", "when"],
-      "siteId": ["site id", "site_id", "record id", "id"],
+      "siteId": ["site id", "site_id", "record id"],
       "type": ["type", "kind"],
-      "summary": ["summary", "note", "status"],
-      "link": ["link", "url"]
+      "summary": ["summary"],
+      "visibility": ["visibility"]
     }
   },
   "drive": {
-    "rootFolderId": "",
+    "rootFolderId": "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk",
     "path": [],
-    "folderTemplate": "{recordId}",
-    "subfolderTypes": {
-      "Listing": "",
-      "County": "",
-      "Photos": "photos",
-      "Legal": ""
-    },
-    "types": {
-      "brochure": ["brochure", "flyer"],
-      "om": ["om"],
-      "financials": ["financial", "financials"],
-      "photos": ["photo", "photos", "image"]
-    }
+    "folderTemplate": "{recordId} {site}"
+  },
+  "ui": {
+    "showActivityLines": true
   },
   "dropNameTerms": ["dGVybTpuZGE=", "dGVybTpsb2k="],
   "gmail": {

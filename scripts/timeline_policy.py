@@ -10,14 +10,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 STATUS = {
-    "call": "Call logged",
-    "visit": "Visit logged",
-    "doc": "Document noted",
-    "email": "Email thread logged",
+    "listing": "Listing noted",
     "brochure": "Brochure on file",
     "om": "OM on file",
     "financials": "Financials on file",
     "photos": "Photos on file",
+    "legal": "Property or legal document on file",
+    "doc": "Document on file",
+    "visit": "Site visit logged",
+    "stage": "Stage updated",
 }
 
 
@@ -74,6 +75,6 @@ def status_line(kind: str, summary: str) -> str:
     text = " ".join((summary or "").split())
     if not text:
         return STATUS.get(kind, "")
-    if blocked(text) or "@" in text:
+    if "$" in text or "@" in text or blocked(text):
         return ""
     return text[:240]

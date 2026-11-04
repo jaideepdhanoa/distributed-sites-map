@@ -3,21 +3,30 @@
 import { useEffect, useState } from "react";
 import "./timeline.css";
 
-type Item = { date: string; type: string; summary: string; link: string };
+type Item = { date: string; type: string; summary: string };
+type Material = { category: string; label: string; count: number; latest: string };
+type Payload = {
+  folderUrl?: string;
+  materials?: Material[];
+  lastTouched?: string;
+  items?: Item[];
+  showActivityLines?: boolean;
+};
 
 const LABELS: Record<string, string> = {
-  call: "Call",
-  visit: "Visit",
-  doc: "Document",
-  email: "Email",
+  listing: "Listing",
   brochure: "Brochure",
   om: "OM",
   financials: "Financials",
   photos: "Photos",
+  legal: "Property and legal",
+  doc: "Document",
+  visit: "Visit",
+  stage: "Stage",
 };
 
 export default function Timeline({ recordId, relatedId }: { recordId: string; relatedId?: string }) {
-  const [items, setItems] = useState<Item[] | null>(null);
+  const [payload, setPayload] = useState<Payload | null>(null);
 
   useEffect(() => {
     let cancel = false;
@@ -25,27 +34,43 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     if (relatedId) query.set("related", relatedId);
     fetch(`/api/data/timeline?${query}`)
       .then(async (response) => {
-        if (!response.ok) return [];
-        const payload = (await response.json()) as { items?: Item[] };
-        return payload.items || [];
+        if (!response.ok) return {};
+        return (await response.json()) as Payload;
       })
       .then((next) => {
-        if (!cancel) setItems(next);
+        if (!cancel) setPayload(next);
       })
       .catch(() => {
-        if (!cancel) setItems([]);
+        if (!cancel) setPayload({});
       });
     return () => {
       cancel = true;
     };
   }, [recordId, relatedId]);
 
+  const materials = payload?.materials || [];
+  const items = payload?.showActivityLines === false ? [] : payload?.items || [];
+  const folderUrl = payload?.folderUrl || "";
+  const lastTouched = payload?.lastTouched || "";
+  const empty = payload !== null && !folderUrl && materials.length === 0 && !lastTouched && items.length === 0;
+
   return (
     <section className="tl" data-testid="activity">
       <h3>Activity</h3>
-      {items === null ? <p className="note">Loading activity.</p> : null}
-      {items && items.length === 0 ? <p className="note">No activity on file.</p> : null}
-      {items && items.length ? (
+      {payload === null ? <p className="note">Loading activity.</p> : null}
+      {empty ? <p className="note">No materials on file.</p> : null}
+      {folderUrl ? (
+        <p><a href={folderUrl} target="_blank" rel="noopener noreferrer">Open site folder</a></p>
+      ) : null}
+      {materials.length ? (
+        <ul className="tl-list">
+          {materials.map((item) => (
+            <li key={item.category}>{item.label} ({item.count}){item.latest ? ` · ${item.latest}` : ""}</li>
+          ))}
+        </ul>
+      ) : null}
+      {lastTouched ? <p className="note">Last touched {lastTouched}</p> : null}
+      {items.length ? (
         <ol className="tl-list">
           {items.map((item, index) => (
             <li key={`${item.date}-${item.type}-${index}`}>
@@ -54,9 +79,6 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
                 {item.date ? ` · ${item.date}` : ""}
               </p>
               <p>{item.summary}</p>
-              {item.link ? (
-                <p><a href={item.link} target="_blank" rel="noopener noreferrer">Open</a></p>
-              ) : null}
             </li>
           ))}
         </ol>

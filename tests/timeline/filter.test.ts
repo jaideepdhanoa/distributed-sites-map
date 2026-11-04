@@ -1,33 +1,44 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
-import { presentTimeline } from "../../lib/timeline/filter.ts";
+import { presentCard, showActivityLines } from "../../lib/timeline/filter.ts";
 
-function hiddenWord(): string {
-  const file = JSON.parse(readFileSync("config/timeline-terms.json", "utf8")) as { words: string[] };
-  for (const item of file.words) {
-    const text = Buffer.from(item, "base64").toString("utf8").replace(/^term:/, "");
-    if (text.length >= 6) return text;
-  }
-  throw new Error("term list is empty");
-}
-
-test("the card timeline keeps neutral rows for the open record", () => {
-  const hidden = hiddenWord();
-  const items = presentTimeline(
+test("the card merges counts and drops blocked lines", () => {
+  const card = presentCard(
     {
+      records: {
+        "PIPE-PHX-0001": {
+          folder_url: "https://drive.google.com/drive/folders/fld1",
+          materials: [
+            { category: "financials", label: "Financials", count: 3, latest: "2026-10-23" },
+            { category: "property_legal", label: "Property and legal", count: 1, latest: "2026-10-22" },
+          ],
+          last_touched: "2026-10-23",
+        },
+        "LAND-PHX-0036": {
+          folder_url: "https://drive.google.com/drive/folders/fld2",
+          materials: [{ category: "financials", label: "Financials", count: 2, latest: "2026-11-01" }],
+          last_touched: "2026-11-01",
+        },
+      },
       items: [
-        { record_id: "PHX-U180", date: "2026-11-01", type: "brochure", summary: "Brochure on file", link: "https://example.com/doc" },
-        { record_id: "PHX-U180", date: "2026-11-02", type: "doc", summary: `See ${hidden}`, link: "https://example.com/secret" },
-        { record_id: "OTHER", date: "2026-11-03", type: "call", summary: "Call logged", link: "" },
-        { record_id: "PHX-U180", date: "2026-11-04", type: "email", summary: "Email thread logged", link: "javascript:alert(1)" },
+        { record_id: "PIPE-PHX-0001", event_id: "A-1", date: "2026-10-22", type: "om", summary: "Sales package on file" },
+        { record_id: "PIPE-PHX-0001", event_id: "A-2", date: "2026-10-22", type: "call", summary: "A neutral line" },
+        { record_id: "PIPE-PHX-0001", event_id: "A-3", date: "2026-10-22", type: "doc", summary: "Quoted " + String.fromCharCode(36) + "1" },
+        { record_id: "OTHER", event_id: "A-4", date: "2026-10-22", type: "visit", summary: "Site visit logged" },
       ],
     },
-    ["PHX-U180"],
+    ["PIPE-PHX-0001", "LAND-PHX-0036"],
   );
-  assert.equal(items.length, 2);
-  assert.equal(items[0]?.type, "email");
-  assert.equal(items[0]?.link, "");
-  assert.equal(items.some((item) => item.summary.includes(hidden)), false);
-  assert.equal(items.some((item) => JSON.stringify(item).includes("subject")), false);
+  assert.equal(card.folderUrl, "https://drive.google.com/drive/folders/fld1");
+  assert.equal(card.materials[0]?.count, 5);
+  assert.equal(card.materials[0]?.latest, "2026-11-01");
+  assert.equal(card.materials[1]?.category, "property_legal");
+  assert.equal(card.items.length, 1);
+  assert.equal(card.items[0]?.type, "om");
+  assert.equal("link" in (card.items[0] || {}), false);
+  assert.equal(JSON.stringify(card).includes("/file/d/"), false);
+});
+
+test("activity lines stay on unless the config turns them off", () => {
+  assert.equal(showActivityLines(), true);
 });

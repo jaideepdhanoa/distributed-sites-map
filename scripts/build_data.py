@@ -1048,10 +1048,10 @@ def sheet_rows(path: Path, sheet: str, header_row: int) -> list[dict]:
     wb.close()
     header = [str(cell.value).strip() if cell.value is not None else "" for cell in rows[header_row]]
     out = []
-    for row in rows[header_row + 1 :]:
+    for offset, row in enumerate(rows[header_row + 1 :]):
         if not row or row[0].value in (None, ""):
             continue
-        item = {}
+        item = {"_excel_row": header_row + offset + 2}
         links: list[tuple[str, str]] = []
         for i, cell in enumerate(row):
             key = header[i] if i < len(header) else ""
@@ -2018,7 +2018,8 @@ def haversine_miles(lon1: float, lat1: float, lon2: float, lat2: float) -> float
     return 2 * radius * math.asin(math.sqrt(arc))
 
 
-def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: list[dict], depots: list[dict]) -> tuple[dict, dict]:
+def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: list[dict], depots: list[dict], reg: dict | None = None) -> tuple[dict, dict]:
+    reg = reg if reg is not None else registry_load()
     cache = {}
     if GEOCODE_CACHE.exists():
         cache = json.loads(GEOCODE_CACHE.read_text())
@@ -2056,7 +2057,7 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
         for index, row in enumerate(rows, start=1):
             city = str(row.get("Market") or "").strip() or "UNK"
             label = str(row.get("Site") or "").strip()
-            deal_id = f"{'PIPE' if kind == 'pipeline' else 'LAND'}-{city}-{index:04d}"
+            deal_id = shipped_deal_id(row, kind, index, reg)
             universe_id = match_row(row)
             if universe_id:
                 matched += 1
@@ -2208,6 +2209,74 @@ def nearest_depot_miles(lon: float, lat: float, depots: list[dict]) -> float | N
         if best is None or miles < best:
             best = miles
     return round(best, 2) if best is not None else None
+
+
+_SITE_ID = re.compile(r"^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$")
+
+
+def permanent_site_id(row: dict, kind: str) -> str | None:
+    """Use column CK when it is present and well formed. A wrong tab prefix is an error."""
+    if "Site ID" not in row:
+        return None
+    raw = str(row.get("Site ID") or "").strip().upper()
+    tab = "Pipeline" if kind == "pipeline" else "Land Sites"
+    row_no = row.get("_excel_row", "?")
+    if not raw or not _SITE_ID.fullmatch(raw):
+        return None
+    prefix = "PIPE" if kind == "pipeline" else "LAND"
+    if not raw.startswith(prefix + "-"):
+        raise SystemExit(f"Site ID {raw} on {tab} row {row_no} does not match the tab")
+    return raw
+
+
+def assert_unique_site_ids(pipeline_rows: list[dict], land_rows: list[dict]) -> None:
+    seen: dict[str, str] = {}
+    for tab, kind, rows in (("Pipeline", "pipeline", pipeline_rows), ("Land Sites", "land", land_rows)):
+        for row in rows:
+            if "Site ID" not in row:
+                continue
+            raw = str(row.get("Site ID") or "").strip().upper()
+            if not raw or not _SITE_ID.fullmatch(raw):
+                continue
+            prefix = "PIPE" if kind == "pipeline" else "LAND"
+            row_no = row.get("_excel_row", "?")
+            if not raw.startswith(prefix + "-"):
+                raise SystemExit(f"Site ID {raw} on {tab} row {row_no} does not match the tab")
+            place = f"{tab} row {row_no}"
+            if raw in seen:
+                raise SystemExit(f"Duplicate Site ID {raw} on {seen[raw]} and {place}")
+            seen[raw] = place
+
+
+def site_id_warnings(pipeline_rows: list[dict], land_rows: list[dict]) -> list[str]:
+    notes = []
+    for tab, rows in (("Pipeline", pipeline_rows), ("Land Sites", land_rows)):
+        if not rows:
+            continue
+        if not any("Site ID" in row for row in rows):
+            notes.append(f"{tab} has no Site ID column; row order is still in use.")
+            continue
+        for row in rows:
+            raw = str(row.get("Site ID") or "").strip()
+            if raw and _SITE_ID.fullmatch(raw.upper()):
+                continue
+            notes.append(f"{tab} row {row.get('_excel_row', '?')} has no usable Site ID")
+    return notes
+
+
+def shipped_deal_id(row: dict, kind: str, index: int, reg: dict) -> str:
+    """Permanent Site ID, otherwise an existing registry id, otherwise the row position."""
+    permanent = permanent_site_id(row, kind)
+    if permanent:
+        return permanent
+    city = str(row.get("Market") or "").strip() or "UNK"
+    prefix = "PIPE" if kind == "pipeline" else "LAND"
+    derived = f"{prefix}-{city}-{index:04d}"
+    if "Site ID" not in row:
+        return derived
+    label = str(row.get("Site") or "").strip()
+    existing = (reg.get("by_key") or {}).get(f"{kind}|{label}")
+    return existing or derived
 
 
 def registry_load() -> dict:
@@ -3164,6 +3233,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     universe_rows = load_universe_rows(workbook)
     pipeline_rows = sheet_rows(workbook, "Pipeline", 3)
     land_rows = sheet_rows(workbook, "Land Sites", 3)
+    assert_unique_site_ids(pipeline_rows, land_rows)
     areas = load_service_areas()
     screening = load_screening()
     incoming = load_incoming_verdicts()
@@ -3621,7 +3691,12 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 place_unmatched_off_market(row, city, label, entry)
             return
         key = f"{kind}|{label}"
-        assigned = registry_id(reg, "PIPE" if kind == "pipeline" else "LAND", key, city if city in {"LAS", "PHX", "MIA"} else "XX")
+        permanent = permanent_site_id(row, kind)
+        if permanent:
+            assigned = permanent
+            reg["by_key"][key] = permanent
+        else:
+            assigned = registry_id(reg, "PIPE" if kind == "pipeline" else "LAND", key, city if city in {"LAS", "PHX", "MIA"} else "XX")
         matched = match_universe(city, row.get("APN or folio"), label)
         if matched:
             site = by_id[matched]
@@ -3948,7 +4023,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         },
     }
 
-    warnings = []
+    warnings = site_id_warnings(pipeline_rows, land_rows)
     if census["total"] != 1701:
         warnings.append(f"Census row count is {census['total']}, workbook expectation was 1,701.")
     if len(countable) != 1658 or by_city(countable) != {"LAS": 417, "PHX": 555, "MIA": 686}:
@@ -3982,7 +4057,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     areas_fc = {"type": "FeatureCollection", "features": areas}
     depots = build_depots()
-    deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"])
+    deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"], reg)
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     public_records = {"note": "Public-record fields are added when the build writes files."}
     if write:

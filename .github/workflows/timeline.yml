@@ -17,5 +17,5 @@ jobs:
         with:
           node-version: "22"
       - run: pip install -r requirements.txt
-      - run: python3 -m unittest tests/timeline/test_timeline.py
+      - run: python3 -m unittest tests/timeline/test_timeline.py tests/timeline/test_site_id.py
       - run: node --experimental-strip-types --test tests/timeline/filter.test.ts

@@ -8,7 +8,8 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
-import { TIER_NOTES, plainUtility, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
+import { shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
@@ -35,7 +36,6 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "flood_zone", header: "Flood" },
   { accessorKey: "year_built", header: "Year built" },
   { accessorKey: "miles_to_depot", header: "Depot mi" },
-  { id: "utility", accessorFn: (row) => plainUtility(row.utility_proximity), header: "Utility proximity" },
   { accessorKey: "spare_ac_own", header: "Own ac" },
   { accessorKey: "spare_ac_adjoining", header: "Adjoining ac" },
   { accessorKey: "tenure", header: "Tenure" },
@@ -54,21 +54,58 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   },
 ];
 
+export function siteExportHeaders() {
+  return ["Site", "Name", "City", "Spare land", "Verdict", "Zoning", "Flood", "Year built", "Depot mi", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Asking source", "Why"];
+}
+
+export function siteExportRow(row: SiteProps) {
+  return [
+    row.site_id,
+    row.name,
+    row.city,
+    tierLabel(row.land_tier),
+    plainVerdict(row.verdict),
+    row.zoning,
+    row.flood_zone,
+    row.year_built,
+    row.miles_to_depot,
+    row.spare_ac_own,
+    row.spare_ac_adjoining,
+    row.tenure,
+    row.confidence,
+    row.listed ? "Yes" : "No",
+    row.contacted ? "Yes" : "No",
+    row.asking_price_display,
+    row.asking_price_source,
+    row.summary_why,
+  ];
+}
+
 export default function SiteTable({
   rows,
   selectedId,
   onSelect,
+  sorting,
+  onSortingChange,
 }: {
   rows: SiteProps[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  sorting?: SortingState;
+  onSortingChange?: (next: SortingState) => void;
 }) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [localSorting, setLocalSorting] = useState<SortingState>([]);
+  const sortingState = sorting ?? localSorting;
+  function setSorting(next: SortingState | ((old: SortingState) => SortingState)) {
+    const resolved = typeof next === "function" ? next(sortingState) : next;
+    if (onSortingChange) onSortingChange(resolved);
+    else setLocalSorting(resolved);
+  }
   const showWhy = rows.some((row) => row.summary_why);
   const table = useLegacyTable({
     data: rows,
     columns: showWhy ? columns : columns.filter((column) => column.id !== "why"),
-    state: { sorting },
+    state: { sorting: sortingState },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -79,12 +116,17 @@ export default function SiteTable({
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
-              {group.headers.map((header) => (
-                <th key={header.id} onClick={header.column.getToggleSortingHandler()}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  {{ asc: " ↑", desc: " ↓" }[header.column.getIsSorted() as string] ?? ""}
-                </th>
-              ))}
+              {group.headers.map((header) => {
+                const sorted = header.column.getIsSorted();
+                return (
+                  <th key={header.id} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}>
+                    <button type="button" onClick={header.column.getToggleSortingHandler()}>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           ))}
         </thead>
@@ -122,9 +164,10 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
     accessorFn: (row) => stageDetail(row.stage, row.stage_group),
     header: "Stage",
   },
-  { accessorKey: "firm", header: "Firm" },
-  { accessorKey: "broker", header: "Broker" },
+  { id: "firm", accessorFn: (row) => shownFirm(row), header: "Firm" },
+  { id: "broker", accessorFn: (row) => shownBroker(row), header: "Broker" },
   { accessorKey: "asking_price_display", header: "Asking" },
+  { id: "asking_source", accessorFn: (row) => shownPriceSource(row), header: "Asking source" },
   { accessorKey: "miles_to_depot", header: "Depot mi" },
   { accessorKey: "universe_id", header: "Universe site" },
 ];
@@ -153,12 +196,17 @@ export function DealTable({
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
-              {group.headers.map((header) => (
-                <th key={header.id} onClick={header.column.getToggleSortingHandler()}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  {{ asc: " ↑", desc: " ↓" }[header.column.getIsSorted() as string] ?? ""}
-                </th>
-              ))}
+              {group.headers.map((header) => {
+                const sorted = header.column.getIsSorted();
+                return (
+                  <th key={header.id} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}>
+                    <button type="button" onClick={header.column.getToggleSortingHandler()}>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           ))}
         </thead>

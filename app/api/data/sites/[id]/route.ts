@@ -11,6 +11,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const full = readGenerated("sites.geojson") as { features: SiteFeature[] };
   const feature = full.features.find((item) => item.properties.site_id === id);
   if (!feature) return NextResponse.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
+  const properties = { ...feature.properties } as Record<string, unknown>;
+  delete properties.utility_proximity;
+  delete properties.serving_utility;
+  delete properties.serving_utility_source;
   console.info(JSON.stringify({ event: "data", user: session.u, part: "site", id }));
-  return NextResponse.json(feature.properties, { headers: privateHeaders });
+  return NextResponse.json(properties, { headers: privateHeaders });
 }

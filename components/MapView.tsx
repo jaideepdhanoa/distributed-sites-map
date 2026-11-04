@@ -185,7 +185,7 @@ export default function MapView(props: Props) {
             type: "circle",
             source: "sites",
             filter: ["has", "point_count"],
-            paint: { "circle-color": "#1c1914", "circle-radius": ["step", ["get", "point_count"], 14, 20, 18, 80, 24], "circle-opacity": 0.88 },
+            paint: { "circle-color": "#1d4e89", "circle-radius": ["step", ["get", "point_count"], 16, 20, 20, 80, 26], "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2, "circle-opacity": 0.92 },
           },
           {
             id: "cluster-count",

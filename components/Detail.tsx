@@ -1,5 +1,6 @@
 import type { DealProps, SiteProps } from "@/lib/types";
-import { nextStepText, plainUtility, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { cleanNote, formatRecordedDate, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -50,7 +51,7 @@ export default function Detail({
       <h3>Summary</h3>
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
-      {onAddCompare ? <button type="button" onClick={onAddCompare}>Add to compare</button> : null}
+        {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -85,14 +86,12 @@ export default function Detail({
         <span>Year built</span><div>{site.year_built || "—"}</div>
         <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
         <span>County full cash value</span><div>{site.full_cash_value_display || "—"}</div>
-        <span>Last recorded sale</span><div>{[site.last_sale_date, site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
+        <span>Last recorded sale</span><div>{[formatRecordedDate(site.last_sale_date), site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
       </div>
       <h3>Verdict</h3>
       <div className="kv">
         <span>Verdict</span><div>{plainVerdict(site.verdict)}</div>
         <span>Operating</span><div>{site.operating || "—"}</div>
-        <span>Utility proximity</span><div>{plainUtility(site.utility_proximity)}</div>
-        <span>Serving utility</span><div>{site.serving_utility || "—"}{site.serving_utility_source ? ` · ${site.serving_utility_source}` : ""}</div>
         <span>Tenure</span><div>{site.tenure || "—"}</div>
       </div>
       {site.research_sources ? (
@@ -102,10 +101,10 @@ export default function Detail({
           {site.research_note ? <p>{site.research_note}</p> : null}
         </>
       ) : null}
-      {site.evidence ? (
+      {cleanNote(site.evidence) ? (
         <details>
           <summary>Research notes</summary>
-          <p>{site.evidence}</p>
+          <p>{cleanNote(site.evidence)}</p>
         </details>
       ) : null}
       {price ? (
@@ -196,8 +195,8 @@ export function DealDetail({
       {mapsLinks(lat, lng)}
       <h3>Broker</h3>
       <div className="kv">
-        <span>Broker</span><div>{deal.broker || "—"}</div>
-        <span>Firm</span><div>{deal.firm || "—"}</div>
+        <span>Broker</span><div>{shownBroker(deal) || "—"}</div>
+        <span>Firm</span><div>{shownFirm(deal) || "—"}</div>
       </div>
       <h3>Listing</h3>
       <div className="kv">
@@ -205,7 +204,7 @@ export function DealDetail({
         <span>Asking price</span>
         <div>
           {deal.asking_price_display || "—"}
-          {deal.asking_price_source ? ` · ${deal.asking_price_source}` : ""}
+          {shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
         </div>
         <span>Source</span>
         <div>

@@ -397,6 +397,7 @@ export default function MapView(props: Props) {
         const id = `sq-${name}`;
         if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });
       }
+      node.current?.setAttribute("data-deal-markers", "square");
       if (!map.hasImage("tri-land")) map.addImage("tri-land", { width: size, height: size, data: triangle });
       map.on("click", "clusters", (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
@@ -516,10 +517,12 @@ export default function MapView(props: Props) {
     const observer = new ResizeObserver(() => map.resize());
     observer.observe(observed);
     mapRef.current = map;
+    (window as Window & { __sitesMap?: Map }).__sitesMap = map;
     return () => {
       observer.disconnect();
       map.remove();
       mapRef.current = null;
+      if ((window as Window & { __sitesMap?: Map }).__sitesMap === map) delete (window as Window & { __sitesMap?: Map }).__sitesMap;
     };
     // The map is created once. Later effects push data in.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -55,7 +55,7 @@ const columns: LegacyColumnDef<SiteProps>[] = [
 ];
 
 export function siteExportHeaders() {
-  return ["Site", "Name", "City", "Spare land", "Verdict", "Zoning", "Flood", "Year built", "Depot mi", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Asking source", "Why"];
+  return ["Site", "Name", "City", "Spare land", "Verdict", "Zoning", "Flood", "Year built", "Depot mi", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Why"];
 }
 
 export function siteExportRow(row: SiteProps) {
@@ -76,7 +76,6 @@ export function siteExportRow(row: SiteProps) {
     row.listed ? "Yes" : "No",
     row.contacted ? "Yes" : "No",
     row.asking_price_display,
-    row.asking_price_source,
     row.summary_why,
   ];
 }

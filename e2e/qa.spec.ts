@@ -18,14 +18,15 @@ async function signIn(page: import("@playwright/test").Page) {
   await page.waitForSelector(".shell");
 }
 
-test("changes note uses the published-build counts", async ({ page }) => {
+test("changes note uses the published-build counts", async ({ page }, info) => {
   await signIn(page);
   const payload = await page.evaluate(async () => {
     const response = await fetch("/api/data/funnel");
     return response.json();
   });
   const changes = payload.meta.changes;
-  await page.getByRole("button", { name: "More" }).click();
+  if (info.project.name === "mobile") await page.getByRole("button", { name: "Menu" }).click();
+  else await page.getByRole("button", { name: "More" }).click();
   await expect(page.locator(".menu-note").filter({ hasText: "previous published build" })).toHaveText(
     `Since the previous published build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`,
   );

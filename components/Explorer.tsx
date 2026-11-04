@@ -7,7 +7,7 @@ import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
-import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle, tierLabel } from "@/lib/labels";
+import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -240,9 +240,11 @@ export default function Explorer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes]);
 
-  const visibleFeatures: SiteFeature[] = visibleSites
-    .map((site) => featureById.get(site.site_id))
-    .filter((feature): feature is SiteFeature => Boolean(feature));
+  const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
+    const feature = featureById.get(site.site_id);
+    if (!feature) return [];
+    return [{ ...feature, properties: site }];
+  });
 
   const dealFeatures = data?.deals.features ?? [];
   const dealRows = dealFeatures.map((feature) => feature.properties);
@@ -265,11 +267,11 @@ export default function Explorer() {
     const filterLine = `Filters: city ${city}, ${funnel === "pipeline" ? `pipeline ${pipeStage}` : `step ${stage}`}${query ? `, search ${query}` : ""}${landTier !== "any" ? `, tier ${landTier}` : ""}${verdict !== "any" ? `, verdict ${verdict}` : ""}${listed === "yes" ? ", listed" : ""}${businessTypes ? `, types ${businessTypes.join(" ")}` : ""}. As of ${new Date().toISOString().slice(0, 10)}.`;
     const headers = tableTab === "universe"
       ? siteExportHeaders()
-      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source"];
+      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site"];
     const body = tableTab === "universe"
       ? visibleSites.map((row) => siteExportRow(row))
       : (tableTab === "land" ? landDeals : pipelineDeals).map((row) => [
-          row.deal_id, row.name, row.city, row.stage, shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row),
+          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id,
         ]);
     const lines = [`# ${filterLine}`, headers.join(","), ...body.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`).join(","))];
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -321,7 +323,10 @@ export default function Explorer() {
         .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
         .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
   const linkedIds = new Set(pipelineSquares.map((feature) => feature.properties.universe_id).filter(Boolean));
-  const pipelineSites = features.filter((feature) => linkedIds.has(feature.properties.site_id) && feature.geometry);
+  const pipelineSites = features.flatMap((feature) => {
+    if (!linkedIds.has(feature.properties.site_id) || !feature.geometry) return [];
+    return [{ ...feature, properties: presentSite(feature.properties) }];
+  });
 
   const selectedSite = detail && detail.site_id === selected
     ? detail
@@ -508,7 +513,13 @@ export default function Explorer() {
                 </Fragment>
               );
             }) : PIPE_STEPS.map((step, index) => {
-              const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === step.id && typeOn(deal.business_type || "Other"));
+              const rows = dealRows.filter((deal) => {
+                if (deal.kind !== "pipeline" || deal.city !== city || deal.stage_group !== step.id) return false;
+                if (!typeOn(deal.business_type || "Other")) return false;
+                if (!query) return true;
+                const blob = `${deal.deal_id} ${deal.name} ${deal.address} ${deal.broker} ${deal.firm} ${deal.universe_id}`.toLowerCase();
+                return blob.includes(query.toLowerCase());
+              });
               const squares = rows.filter((deal) => dealPoint(deal)).length;
               const unmapped = rows.length - squares;
               return (

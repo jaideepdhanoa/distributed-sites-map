@@ -6,6 +6,9 @@ __pycache__/
 *.pyc
 .env
 .env.*
+e2e/.auth.json
+test-results/
+playwright-report/
 !.env.example
 *.log
 tsconfig.tsbuildinfo

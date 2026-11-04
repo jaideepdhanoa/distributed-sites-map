@@ -2898,6 +2898,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "last_sale_price_display": "",
             "year_built": "",
             "assessor_source": "",
+            "zoning_source": "",
+            "aadt_count": "",
+            "aadt_road": "",
+            "aadt_year": "",
+            "aadt_source": "",
             "verdict_disagreement": False,
             "acreage_note": "",
             "scale_note": "",
@@ -3627,6 +3632,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         from enrich_public import apply_public_records
 
         public_records = apply_public_records(sites, norm_apn)
+        from enrich_context import apply_context
+
+        public_records["context"] = apply_context(sites)
 
     site_features = []
     for site in sites:

@@ -76,7 +76,8 @@ export default function Detail({
         <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
         <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
         <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
-        <span>Zoning</span><div>{site.zoning || "—"}</div>
+        <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
+        <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${site.aadt_road}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
         <span>Flood</span><div>{site.flood_zone || "—"}</div>
         <span>Year built</span><div>{site.year_built || "—"}</div>
         <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>

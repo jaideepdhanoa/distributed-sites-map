@@ -69,6 +69,11 @@ export type SiteProps = {
   quarantine: boolean;
   flood_zone: string;
   zoning: string;
+  zoning_source?: string;
+  aadt_count?: string;
+  aadt_road?: string;
+  aadt_year?: string;
+  aadt_source?: string;
   tank_status: string;
   utility_proximity: string;
   aerial_fit: string;

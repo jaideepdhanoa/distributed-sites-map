@@ -4648,7 +4648,21 @@ def main():
         print("Data check passed.")
         return
     report = build(write=True, refresh_parcels=args.refresh_parcels, muse_file=args.muse_verdicts)
+    _write_timeline()
     print(json.dumps({k: report[k] for k in ("in_area", "land_tiers", "verdicts_on_land_fits", "listed_of_candidates", "contacted_of_candidates", "deals", "parcels", "warnings")}, indent=2))
+
+
+def _write_timeline() -> None:
+    """Read the activity tab and Drive folders. Never writes the workbook."""
+    try:
+        import build_timeline
+
+        workbook = source_workbook() if sources_present() else None
+        print(json.dumps({"timeline": build_timeline.write_timeline(workbook)}))
+    except SystemExit:
+        print("Timeline step skipped.", file=sys.stderr)
+    except Exception:
+        print("Timeline step skipped.", file=sys.stderr)
 
 
 if __name__ == "__main__":

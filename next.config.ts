@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   outputFileTracingIncludes: {
     "/api/actions/**": ["./db/migrations/**/*.sql", "./config/display-policy.json", "./data/generated/*.geojson"],
+    "/api/data/timeline": ["./config/timeline-terms.json"],
   },
   async headers() {
     return [

@@ -12,6 +12,7 @@
     "test": "node --import tsx --test tests/actions/*.test.ts",
     "test:e2e": "playwright test",
     "test:actions": "E2E_ACTIONS=1 playwright test e2e/actions.spec.ts",
+    "test:timeline": "python3 -m unittest tests/timeline/test_timeline.py && node --experimental-strip-types --test tests/timeline/filter.test.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "reconcile-suggestions": "tsx scripts/reconcile-suggestions.ts"
   },

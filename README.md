@@ -141,6 +141,40 @@ Aerial screening alone had 25 in-area L10 sites. County-checked sites that are n
 
 Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The step stays on screen.
 
+## Activity timeline
+
+Each site and deal card has an Activity section. It is built from two read-only feeds, both keyed by the record id (`PHX-U180`, `PIPE-PHX-0008`). The app does not read mail, and it does not write the workbook or Drive.
+
+The naming rules live in `config/timeline.json`. Environment variables override them: `ACTIVITY_SHEET`, `ACTIVITY_HEADER_ROW`, `DRIVE_FOLDER_TEMPLATE`, `GOOGLE_DRIVE_ROOT_FOLDER_ID`, `GMAIL_LABEL_TEMPLATE`, and `TIMELINE_CONFIG`.
+
+### Activity tab
+
+Add a tab to the pipeline workbook. The default name is `Activity`, with the header on row 1:
+
+| Date | Site ID | Type | Summary | Link |
+|---|---|---|---|---|
+| 2026-11-01 | PIPE-PHX-0008 | call | Spoke with the listing desk. | https://… |
+
+Type is one of `call`, `visit`, `doc`, `email`, `brochure`, `om`, `financials`, `photos`. The summary is one neutral line. Do not put a subject, a body, or a contact number in it. Rows that fail the wording check are left out. `scripts/build_data.py` reads this tab when it rebuilds the map. A workbook sync should also run:
+
+```bash
+python3 scripts/build_timeline.py --workbook path/to/export.xlsx
+```
+
+That command only reads. It writes `data/generated/timeline.json`.
+
+### Drive folders
+
+Share a parent folder with the same read-only service account as `GOOGLE_SERVICE_ACCOUNT_JSON` (the raw JSON, or a path to that file). Set `GOOGLE_DRIVE_ROOT_FOLDER_ID` to that folder.
+
+By default, each record is a folder whose name is the record id, optionally followed by the address: `PIPE-PHX-0008` or `PIPE-PHX-0008 – 1 Main St`. Inside it, these subfolders are recognized: `Listing`, `County`, `Photos`, `Legal`. A file is shown only as its type (brochure, OM, financials, photos), the date, a link, and a neutral status line. The file name is not shown. Files whose names fail the wording check are omitted entirely.
+
+To nest folders, set `drive.path` in `config/timeline.json`, for example `["Sites", "{city}"]`, and set `DRIVE_FOLDER_TEMPLATE` if you want the documented pattern recorded next to the code. `{city}` means every folder at that level.
+
+### Gmail
+
+`scripts/timeline_gmail.py` is the extension point for a later label index. `gmail.labelTemplate` defaults to `Sites/{recordId}`. The function returns no rows. Do not add subjects or bodies there.
+
 ## Not in this version
 
 - The workbook sync opens a pull request every four hours when the data changed. It does not merge, and it does not write back to the Sheet.

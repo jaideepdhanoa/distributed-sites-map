@@ -1,0 +1,35 @@
+{
+  "activity": {
+    "sheet": "Activity",
+    "headerRow": 1,
+    "columns": {
+      "date": ["date", "when"],
+      "siteId": ["site id", "site_id", "record id", "id"],
+      "type": ["type", "kind"],
+      "summary": ["summary", "note", "status"],
+      "link": ["link", "url"]
+    }
+  },
+  "drive": {
+    "rootFolderId": "",
+    "path": [],
+    "folderTemplate": "{recordId}",
+    "subfolderTypes": {
+      "Listing": "",
+      "County": "",
+      "Photos": "photos",
+      "Legal": ""
+    },
+    "types": {
+      "brochure": ["brochure", "flyer"],
+      "om": ["om"],
+      "financials": ["financial", "financials"],
+      "photos": ["photo", "photos", "image"]
+    }
+  },
+  "dropNameTerms": ["dGVybTpuZGE=", "dGVybTpsb2k="],
+  "gmail": {
+    "enabled": false,
+    "labelTemplate": "Sites/{recordId}"
+  }
+}

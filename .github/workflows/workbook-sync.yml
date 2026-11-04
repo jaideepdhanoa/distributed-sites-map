@@ -21,6 +21,8 @@ jobs:
       - name: Export the Sheet and rebuild
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          MAP_SYNC_INPUTS_FOLDER_ID: ${{ vars.MAP_SYNC_INPUTS_FOLDER_ID }}
+          GOOGLE_DRIVE_ROOT_FOLDER_ID: ${{ vars.TIMELINE_SITES_FOLDER_ID }}
         run: |
           if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
             echo "GOOGLE_SERVICE_ACCOUNT_JSON is not set."
@@ -32,7 +34,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- data/generated data/drift_report.csv data/workbook_stages.json; then
+          # data/generated includes timeline.json when that build writes it.
+          # git diff ignores a brand-new file, so also look for untracked generated files.
+          if git diff --quiet -- data/generated data/drift_report.csv data/workbook_stages.json \
+            && [ -z "$(git ls-files --others --exclude-standard -- data/generated data/drift_report.csv data/workbook_stages.json)" ]; then
             echo "No data change."
             exit 0
           fi
@@ -42,6 +47,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git checkout -B "$BRANCH"
           git add data/generated data/drift_report.csv data/workbook_stages.json
+          if [ -f data/generated/timeline.json ]; then
+            git add data/generated/timeline.json
+          fi
           git commit -m "Workbook sync $DATE"
           git push --force-with-lease -u origin "$BRANCH"
           TITLE="Workbook sync $DATE"

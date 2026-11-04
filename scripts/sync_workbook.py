@@ -7,21 +7,24 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
-
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "data" / "source"
 FILE_ID = "167rIKoApP3sMJ3vrp1lg3MT-h5yQGqmMhY_TbBIqByY"
-SOURCE_FOLDER_ID = "11ONFb99evERFObom8lf_Qq81onW50WBw"
 SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+CSV_MIME = "text/csv"
 FOLDER = "application/vnd.google-apps.folder"
-# These live in the Drive folder above and are copied to data/source (kmz files into data/source/kmz).
+SHEET = "application/vnd.google-apps.spreadsheet"
+DOC = "application/vnd.google-apps.document"
+NATIVE = "application/vnd.google-apps."
+EXPORT_LIMIT = 10 * 1024 * 1024
+MISSING_FOLDER = "Set MAP_SYNC_INPUTS_FOLDER_ID to the Map sync inputs folder."
+# Allowlisted names only. Anything else in the folder is skipped and never logged.
 REQUIRED_SOURCE = (
     "universe_v3.csv",
     "las_ring100_screen.csv",
@@ -30,13 +33,25 @@ REQUIRED_SOURCE = (
     "note_rewrites.json",
     "reconciliation_final.xlsx",
 )
+_REQUIRED = set(REQUIRED_SOURCE)
+_STEM = {name.rsplit(".", 1)[0]: name for name in REQUIRED_SOURCE if name.endswith((".csv", ".xlsx"))}
 
 
 def _b64(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
 
 
+def inputs_folder_id() -> str:
+    folder_id = (os.environ.get("MAP_SYNC_INPUTS_FOLDER_ID") or "").strip()
+    if not folder_id:
+        raise SystemExit(MISSING_FOLDER)
+    return folder_id
+
+
 def _token(info: dict) -> str:
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+
     now = int(time.time())
     header = _b64(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
     claim = _b64(
@@ -72,6 +87,19 @@ def _get(url: str, token: str) -> bytes:
         return response.read()
 
 
+def _download(url: str, token: str, target: str) -> bytes:
+    try:
+        blob = _get(url, token)
+    except urllib.error.HTTPError as error:
+        detail = error.read()
+        if error.code == 403 and b"exportSizeLimitExceeded" in detail:
+            raise SystemExit(f"Upload {target} as a real file.") from None
+        raise
+    if len(blob) > EXPORT_LIMIT:
+        raise SystemExit(f"Upload {target} as a real file.")
+    return blob
+
+
 def _list_children(token: str, folder_id: str) -> list[dict]:
     found = []
     page = ""
@@ -90,36 +118,72 @@ def _list_children(token: str, folder_id: str) -> list[dict]:
             return found
 
 
-def fetch_source_folder(token: str) -> None:
-    """Copy the non-workbook inputs. A base64 gzip of this folder is about 400 KB, over the 48 KB secret limit."""
+def _target_for(name: str, mime: str) -> str | None:
+    """Return the local file name this Drive item may fill, or None to skip it."""
+    if mime == FOLDER or mime == DOC or (mime.startswith(NATIVE) and mime != SHEET):
+        return None
+    if mime == SHEET:
+        return _STEM.get(name)
+    if name in _REQUIRED or name.lower().endswith(".kmz"):
+        return name
+    return None
 
-    def walk(folder_id: str, dest: Path) -> None:
-        dest.mkdir(parents=True, exist_ok=True)
-        for item in _list_children(token, folder_id):
-            name = str(item.get("name") or "")
-            if not name or name.startswith("."):
-                continue
-            if item.get("mimeType") == FOLDER:
-                walk(item["id"], dest / name)
-                continue
-            target = SRC / "kmz" / name if name.lower().endswith(".kmz") and dest == SRC else dest / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(_get(f"https://www.googleapis.com/drive/v3/files/{item['id']}?alt=media", token))
-            print(f"Fetched {target.relative_to(ROOT)}")
 
-    walk(SOURCE_FOLDER_ID, SRC)
-    missing = [name for name in REQUIRED_SOURCE if not (SRC / name).exists()]
-    if not list((SRC / "kmz").glob("*.kmz")):
+def _csv_sheet_is_one_tab(token: str, file_id: str, target: str) -> None:
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{file_id}?fields=sheets.properties.title"
+    payload = json.loads(_get(url, token).decode())
+    sheets = payload.get("sheets") or []
+    if len(sheets) != 1:
+        raise SystemExit(f"{target} has more than one tab. Upload {target} as a real file.")
+
+
+def fetch_source_folder(token: str, source_dir: Path | None = None) -> None:
+    """Copy the allowlisted inputs from the top level of the Map sync inputs folder."""
+    folder_id = inputs_folder_id()
+    src = source_dir or SRC
+    chosen: dict[str, dict] = {}
+    skipped = 0
+    for item in _list_children(token, folder_id):
+        name = str(item.get("name") or "")
+        mime = str(item.get("mimeType") or "")
+        target = _target_for(name, mime) if name and not name.startswith(".") else None
+        if not target:
+            skipped += 1
+            continue
+        if target in chosen:
+            raise SystemExit(f"{target} duplicate in Map sync inputs")
+        chosen[target] = item
+    missing = [name for name in REQUIRED_SOURCE if name not in chosen]
+    if not any(name.lower().endswith(".kmz") for name in chosen):
         missing.append("kmz/*.kmz")
     if missing:
         raise SystemExit(
-            "The Drive source folder is missing: "
+            "The Map sync inputs folder is missing: "
             + ", ".join(missing)
-            + f". Put them in folder {SOURCE_FOLDER_ID}."
+            + ". Put them in the Map sync inputs folder."
         )
+    src.mkdir(parents=True, exist_ok=True)
+    for target, item in chosen.items():
+        file_id = item["id"]
+        mime = str(item.get("mimeType") or "")
+        if mime == SHEET and target.endswith(".xlsx"):
+            url = f"https://www.googleapis.com/drive/v3/files/{file_id}/export?mimeType={urllib.parse.quote(XLSX)}"
+            blob = _download(url, token, target)
+        elif mime == SHEET and target.endswith(".csv"):
+            _csv_sheet_is_one_tab(token, file_id, target)
+            url = f"https://www.googleapis.com/drive/v3/files/{file_id}/export?mimeType={urllib.parse.quote(CSV_MIME)}"
+            blob = _download(url, token, target)
+        else:
+            blob = _download(f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media", token, target)
+        path = src / "kmz" / target if target.lower().endswith(".kmz") else src / target
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(blob)
+        print(f"Fetched {target}")
+    print(f"Skipped {skipped} other files")
 
 
 def export_workbook() -> None:
+    inputs_folder_id()
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON") or ""
     if not raw.strip():
         raise SystemExit("GOOGLE_SERVICE_ACCOUNT_JSON is not set")
@@ -130,7 +194,11 @@ def export_workbook() -> None:
         _get(f"https://www.googleapis.com/drive/v3/files/{FILE_ID}?fields=modifiedTime,name", token).decode()
     )
     modified = str(meta.get("modifiedTime") or "")[:10]
-    blob = _get(f"https://www.googleapis.com/drive/v3/files/{FILE_ID}/export?mimeType={urllib.parse.quote(XLSX)}", token)
+    blob = _download(
+        f"https://www.googleapis.com/drive/v3/files/{FILE_ID}/export?mimeType={urllib.parse.quote(XLSX)}",
+        token,
+        "pipeline_sync.xlsx",
+    )
     SRC.mkdir(parents=True, exist_ok=True)
     for path in SRC.glob("*.xlsx"):
         if path.name.lower().startswith("reconciliation"):
@@ -140,6 +208,36 @@ def export_workbook() -> None:
     if modified:
         (SRC / "workbook_as_of.txt").write_text(modified + "\n")
     print(f"Exported workbook read-only. Modified {modified or 'unknown'}.")
+
+
+def _timeline_lines() -> list[str]:
+    matched = materials = rows = warnings = 0
+    timeline_path = ROOT / "data" / "generated" / "timeline.json"
+    if timeline_path.exists():
+        payload = json.loads(timeline_path.read_text())
+        records = payload.get("records") or {}
+        if isinstance(records, dict):
+            for record in records.values():
+                if not isinstance(record, dict):
+                    continue
+                if record.get("folder_url"):
+                    matched += 1
+                if record.get("materials"):
+                    materials += 1
+        items = payload.get("items") or []
+        if isinstance(items, list):
+            rows = len(items)
+    report_path = ROOT / "data" / "generated" / "build_report.json"
+    if report_path.exists():
+        timeline = (json.loads(report_path.read_text()).get("timeline") or {})
+        if isinstance(timeline, dict) and timeline.get("warnings") is not None:
+            warnings = int(timeline["warnings"])
+    return [
+        f"Matched folders: {matched}.",
+        f"Records with materials: {materials}.",
+        f"Activity rows: {rows}.",
+        f"Timeline warnings: {warnings}.",
+    ]
 
 
 def write_sync_comment(path: Path) -> None:
@@ -154,6 +252,7 @@ def write_sync_comment(path: Path) -> None:
             f"New sites: {changes.get('new_sites', 0)}.",
             f"Verdict changes: {changes.get('verdict_changes', 0)}.",
             f"Stage moves: {changes.get('stage_moves', 0)}.",
+            *_timeline_lines(),
             "",
             "Drift report (not served to the app):",
             "```",

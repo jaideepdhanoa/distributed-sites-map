@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
 import type { DealFeature, GeoFeature, SiteFeature } from "@/lib/types";
 
 type Props = {
@@ -95,6 +96,7 @@ function bboxCenter(feature: GeoFeature): [number, number] | null {
 export default function MapView(props: Props) {
   const node = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
+  const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
   const measureRef = useRef(false);
   measureRef.current = measure;
@@ -427,16 +429,75 @@ export default function MapView(props: Props) {
         const id = event.features?.[0]?.properties?.deal_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
-      map.on("click", "depots", (event: MapLayerMouseEvent) => {
-        const feature = event.features?.[0];
-        const address = feature?.properties?.address || "Depot";
-        const status = feature?.properties?.status || "operating";
-        const confidence = feature?.properties?.confidence || "";
-        new Popup({ closeButton: false })
-          .setLngLat(event.lngLat)
-          .setHTML(`<strong>Depot</strong><br>${address}<br>${status}${confidence ? ` · ${confidence}` : ""}`)
-          .addTo(map);
+      const popup = new Popup({ closeButton: false, closeOnClick: false, closeOnMove: false, maxWidth: "280px", className: "map-tip-popup", offset: 14 });
+      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "depots", "expansion-line", "areas-op"];
+      const areaLayers = new Set(["expansion-line", "areas-op"]);
+      let shownKey = "";
+      let request = 0;
+      const hideTip = () => {
+        shownKey = "";
+        request += 1;
+        popup.remove();
+        map.getCanvas().style.cursor = "";
+      };
+      const showTip = (key: string, lngLat: { lng: number; lat: number }, model: TipModel) => {
+        if (shownKey !== key) {
+          shownKey = key;
+          popup.setHTML(tipHtml(model));
+        }
+        popup.setLngLat(lngLat);
+        if (!popup.isOpen()) popup.addTo(map);
+      };
+      map.on("mousemove", (event: MapMouseEvent) => {
+        if (measureRef.current) {
+          hideTip();
+          return;
+        }
+        const pointer = event.originalEvent as PointerEvent;
+        if (pointer && pointer.pointerType === "touch") return;
+        const layers = tipLayers.filter((id) => map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none");
+        const hits = layers.length ? map.queryRenderedFeatures(event.point, { layers }) : [];
+        const feature = hits.find((item) => !areaLayers.has(item.layer.id)) || hits[0];
+        if (!feature) {
+          hideTip();
+          return;
+        }
+        const layer = feature.layer.id;
+        map.getCanvas().style.cursor = layer === "areas-op" || layer === "expansion-line" ? "" : "pointer";
+        const props = (feature.properties || {}) as Record<string, unknown>;
+        if (layer === "clusters") {
+          const clusterId = Number(props.cluster_id);
+          const key = `cluster:${clusterId}`;
+          const count = Number(props.point_count) || 0;
+          const cached = clusterLeaves.current.get(clusterId);
+          if (cached) {
+            showTip(key, event.lngLat, clusterTip(cached));
+            return;
+          }
+          showTip(key, event.lngLat, { title: `${count.toLocaleString()} sites`, marks: [] });
+          const ticket = ++request;
+          const source = map.getSource("sites") as GeoJSONSource;
+          source.getClusterLeaves(clusterId, Math.max(count, 1), 0).then((leaves) => {
+            clusterLeaves.current.set(clusterId, leaves as { properties?: Record<string, unknown> }[]);
+            if (ticket !== request || shownKey !== key) return;
+            popup.setHTML(tipHtml(clusterTip(leaves as { properties?: Record<string, unknown> }[])));
+          }).catch(() => undefined);
+          return;
+        }
+        const model = layer === "offmarket"
+          ? siteTip(props, true)
+          : layer === "sites"
+            ? siteTip(props)
+            : layer === "deals-pipe" || layer === "deals-land"
+              ? dealTip(props)
+              : layer === "depots"
+                ? depotTip(props)
+                : areaTip(props);
+        const key = `${layer}:${String(props.site_id || props.deal_id || props.id || "")}`;
+        showTip(key, event.lngLat, model);
       });
+      map.on("mouseout", hideTip);
+      map.on("dragstart", hideTip);
       map.on("click", (event: MapMouseEvent) => {
         if (!measureRef.current) return;
         points.current = [...points.current, [event.lngLat.lng, event.lngLat.lat]];
@@ -448,8 +509,6 @@ export default function MapView(props: Props) {
         if (points.current.length >= 3) setReadout(`${acresOf(points.current).toFixed(2)} acres`);
         else if (points.current.length === 2) setReadout("Add points, then read acres");
       });
-      map.on("mouseenter", "sites", () => { map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", "sites", () => { map.getCanvas().style.cursor = ""; });
       map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
       propsRef.current.onBounds(map.getBounds());
     });
@@ -472,6 +531,7 @@ export default function MapView(props: Props) {
     const map = mapRef.current;
     if (!map) return;
     const push = () => {
+      clusterLeaves.current.clear();
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });
       (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.deals.filter((f) => f.geometry) });

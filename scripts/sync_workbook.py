@@ -17,8 +17,19 @@ from cryptography.hazmat.primitives.asymmetric import padding
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "data" / "source"
 FILE_ID = "167rIKoApP3sMJ3vrp1lg3MT-h5yQGqmMhY_TbBIqByY"
+SOURCE_FOLDER_ID = "11ONFb99evERFObom8lf_Qq81onW50WBw"
 SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+FOLDER = "application/vnd.google-apps.folder"
+# These live in the Drive folder above and are copied to data/source (kmz files into data/source/kmz).
+REQUIRED_SOURCE = (
+    "universe_v3.csv",
+    "las_ring100_screen.csv",
+    "listings_match_v3.csv",
+    "depots.csv",
+    "note_rewrites.json",
+    "reconciliation_final.xlsx",
+)
 
 
 def _b64(raw: bytes) -> str:
@@ -61,18 +72,51 @@ def _get(url: str, token: str) -> bytes:
         return response.read()
 
 
-def unpack_source_bundle() -> None:
-    raw = os.environ.get("DATA_SOURCE_BUNDLE") or ""
-    if not raw.strip():
-        return
-    import io
-    import tarfile
+def _list_children(token: str, folder_id: str) -> list[dict]:
+    found = []
+    page = ""
+    while True:
+        query = urllib.parse.quote(f"'{folder_id}' in parents and trashed=false")
+        url = (
+            "https://www.googleapis.com/drive/v3/files"
+            f"?q={query}&fields=nextPageToken,files(id,name,mimeType)&pageSize=200"
+        )
+        if page:
+            url += "&pageToken=" + urllib.parse.quote(page)
+        payload = json.loads(_get(url, token).decode())
+        found.extend(payload.get("files") or [])
+        page = payload.get("nextPageToken") or ""
+        if not page:
+            return found
 
-    blob = base64.b64decode(raw)
-    SRC.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as archive:
-        archive.extractall(SRC, filter="data")
-    print("Unpacked the source bundle")
+
+def fetch_source_folder(token: str) -> None:
+    """Copy the non-workbook inputs. A base64 gzip of this folder is about 400 KB, over the 48 KB secret limit."""
+
+    def walk(folder_id: str, dest: Path) -> None:
+        dest.mkdir(parents=True, exist_ok=True)
+        for item in _list_children(token, folder_id):
+            name = str(item.get("name") or "")
+            if not name or name.startswith("."):
+                continue
+            if item.get("mimeType") == FOLDER:
+                walk(item["id"], dest / name)
+                continue
+            target = SRC / "kmz" / name if name.lower().endswith(".kmz") and dest == SRC else dest / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(_get(f"https://www.googleapis.com/drive/v3/files/{item['id']}?alt=media", token))
+            print(f"Fetched {target.relative_to(ROOT)}")
+
+    walk(SOURCE_FOLDER_ID, SRC)
+    missing = [name for name in REQUIRED_SOURCE if not (SRC / name).exists()]
+    if not list((SRC / "kmz").glob("*.kmz")):
+        missing.append("kmz/*.kmz")
+    if missing:
+        raise SystemExit(
+            "The Drive source folder is missing: "
+            + ", ".join(missing)
+            + f". Put them in folder {SOURCE_FOLDER_ID}."
+        )
 
 
 def export_workbook() -> None:
@@ -81,6 +125,7 @@ def export_workbook() -> None:
         raise SystemExit("GOOGLE_SERVICE_ACCOUNT_JSON is not set")
     info = json.loads(raw)
     token = _token(info)
+    fetch_source_folder(token)
     meta = json.loads(
         _get(f"https://www.googleapis.com/drive/v3/files/{FILE_ID}?fields=modifiedTime,name", token).decode()
     )
@@ -123,5 +168,4 @@ if __name__ == "__main__":
     if "--comment" in sys.argv:
         write_sync_comment(Path("/tmp/drift-comment.md"))
     else:
-        unpack_source_bundle()
         export_workbook()

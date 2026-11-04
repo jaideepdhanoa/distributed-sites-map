@@ -21,7 +21,6 @@ jobs:
       - name: Export the Sheet and rebuild
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          DATA_SOURCE_BUNDLE: ${{ secrets.DATA_SOURCE_BUNDLE }}
         run: |
           if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
             echo "GOOGLE_SERVICE_ACCOUNT_JSON is not set."

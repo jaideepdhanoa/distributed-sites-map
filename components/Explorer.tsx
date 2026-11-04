@@ -4,9 +4,10 @@ import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
+import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
-import { shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
@@ -38,7 +39,6 @@ export default function Explorer() {
   const tableOpen = params.get("table") === "1";
   const compare = params.get("disagree") === "1";
   const showDropped = params.get("ruled") === "1";
-  const sortParam = params.get("sort") || "";
   const [layersOpen, setLayersOpen] = useState(false);
   const showAreas = params.get("areas") !== "0";
   const showDepots = params.get("depots") !== "0";
@@ -78,6 +78,10 @@ export default function Explorer() {
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeParam = params.get("pstage") as PipeId | null;
   const pipeStage: PipeId = pipeParam && PIPE_STEPS.some((step) => step.id === pipeParam) ? pipeParam : "desk";
+  const listView = params.get("view") === "list";
+  const sortParam = params.get("sort") || "site:asc";
+  const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
+  const sortDesc = sortParam.endsWith(":desc");
 
   function write(next: Record<string, string | null>, history = false) {
     const url = new URLSearchParams(params.toString());
@@ -401,6 +405,70 @@ export default function Explorer() {
 
   const sheet = { expanded: sheetExpanded, onToggle: () => setSheetExpanded((value) => !value) };
   const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal));
+  const offMarketShown = funnel === "pipeline" || extra ? [] : offMarketFeatures.filter((feature) => {
+    if (!feature.geometry) return false;
+    if (stage !== "universe" && !inStage(feature.properties, stage)) return false;
+    return passesChips(feature.properties, false);
+  });
+  const universePins = showUniverse ? visibleFeatures.filter((feature) => feature.geometry) : [];
+  const pinCount = funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length;
+  const siteById = new Map(sites.map((site) => [site.site_id, site]));
+
+  function siteRow(site: SiteProps): ListRow {
+    const price = site.listed && site.asking_price_display ? `${site.asking_price_display}${site.asking_price_source ? ` · ${site.asking_price_source}` : ""}` : "";
+    return {
+      id: site.site_id,
+      site: site.name || site.address || site.site_id,
+      type: site.business_type || "Car wash",
+      city: site.city,
+      stage: plainVerdict(site.verdict),
+      tier: tierLabel(site.land_tier) || "",
+      spare: site.spare_ac_own != null ? `${site.spare_ac_own} ac` : "",
+      zoning: site.zoning || "",
+      traffic: site.aadt_count ? `${site.aadt_count}${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}` : "",
+      listed: site.listed ? `Yes${price ? ` · ${price}` : ""}` : "No",
+      lead: leadSourceLine(site, dealRows.find((deal) => deal.deal_id === site.linked_deal_id || deal.universe_id === site.site_id)),
+    };
+  }
+
+  function dealRow(deal: DealProps): ListRow {
+    const linked = deal.universe_id ? siteById.get(deal.universe_id) : undefined;
+    const price = deal.asking_price_display ? `${deal.asking_price_display}${deal.asking_price_source ? ` · ${deal.asking_price_source}` : ""}` : "";
+    return {
+      id: deal.deal_id,
+      site: deal.name || deal.address || deal.deal_id,
+      type: deal.business_type || "Other",
+      city: deal.city,
+      stage: stageDetail(deal.stage, deal.stage_group),
+      tier: linked ? tierLabel(linked.land_tier) || "" : "",
+      spare: linked?.spare_ac_own != null ? `${linked.spare_ac_own} ac` : "",
+      zoning: linked?.zoning || "",
+      traffic: linked?.aadt_count ? `${linked.aadt_count}${linked.aadt_road ? ` on ${plainRoad(linked.aadt_road)}` : ""}` : "",
+      listed: price || (deal.listed ? "Yes" : "No"),
+      lead: [deal.broker, deal.firm].filter(Boolean).join(" · "),
+    };
+  }
+
+  const listRows = [...(funnel === "pipeline"
+    ? pipelineSquares.map((feature) => dealRow(feature.properties))
+    : [...universePins.map((feature) => siteRow(feature.properties)), ...offMarketShown.map((feature) => siteRow(feature.properties))]
+  )].sort((a, b) => {
+    const left = String(a[sortKey] || "").trim();
+    const right = String(b[sortKey] || "").trim();
+    if (!left && !right) return 0;
+    if (!left) return 1;
+    if (!right) return -1;
+    const diff = left.localeCompare(right, undefined, { numeric: true });
+    return sortDesc ? -diff : diff;
+  });
+
+  function exportList() {
+    const blob = new Blob([listCsv(listRows)], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${city}-list.csv`;
+    link.click();
+  }
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
   if (businessTypes) activeFilters.push({ id: "types", label: businessTypes.join(", "), clear: () => setBusinessTypes(null) });
@@ -434,7 +502,7 @@ export default function Explorer() {
   }
 
   return (
-    <div className={`shell ${tableOpen ? "table-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage}>
+    <div className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -460,6 +528,10 @@ export default function Explorer() {
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+          </div>
+          <div className="funnel-switch only-desktop" role="group" aria-label="Map or list">
+            <button className={!listView ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
+            <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
           </div>
           <div className="user-menu only-desktop">
             <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
@@ -665,6 +737,7 @@ export default function Explorer() {
             <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
             <button type="button" onClick={exportTable}>Export CSV</button>
             <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+            <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
               <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Unplaced deals ({unplacedDeals.length.toLocaleString()})</button>
@@ -700,11 +773,7 @@ export default function Explorer() {
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
-          offMarket={funnel === "pipeline" || extra ? [] : offMarketFeatures.filter((feature) => {
-            const site = feature.properties;
-            if (stage !== "universe" && !inStage(site, stage)) return false;
-            return passesChips(site, false);
-          })}
+          offMarket={offMarketShown}
           selectedId={selected}
           showAreas={showAreas}
           showDepots={showDepots}
@@ -719,15 +788,26 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
-        {funnel === "universe" && visibleSites.length === 0 ? (
+        {funnel === "universe" && !listView && visibleSites.length === 0 ? (
           <p className="empty-map">{compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
         ) : null}
-        {(() => {
+        {!listView ? (() => {
           const missing = funnel === "pipeline"
             ? pipelineStepRows.length - pipelineSquares.length
             : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
           return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
-        })()}
+        })() : null}
+        {listView ? (
+          <ListView
+            rows={listRows}
+            selectedId={selected}
+            sort={{ id: sortKey, desc: sortDesc }}
+            onSort={(id, desc) => write({ sort: `${id}:${(desc ?? (sortKey === id ? !sortDesc : false)) ? "desc" : "asc"}` })}
+            onOpen={choose}
+            onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
+            onExport={exportList}
+          />
+        ) : null}
         <aside className={`layers ${layersOpen ? "open" : ""}`}>
           <button type="button" onClick={() => setLayersOpen((value) => !value)}>{layersOpen ? "Hide layers" : "Layers"}</button>
           {layersOpen ? (

@@ -431,7 +431,7 @@ export default function Explorer() {
             <>
               {(["any", "L10", "L4"] as const).map((item) => (
                 <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
-                  {item === "any" ? "All tiers" : TIER_NOTES[item].label}
+                  {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
                 </button>
               ))}
               {[

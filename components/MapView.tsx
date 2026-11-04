@@ -179,6 +179,54 @@ export default function MapView(props: Props) {
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
           },
           {
+            id: "tier-large-halo",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#f4f7fb",
+              "circle-stroke-width": 6,
+            },
+          },
+          {
+            id: "tier-large",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#3e4d60",
+              "circle-stroke-width": 2.6,
+            },
+          },
+          {
+            id: "tier-small-halo",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#f4f7fb",
+              "circle-stroke-width": 5,
+            },
+          },
+          {
+            id: "tier-small",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#3e4d60",
+              "circle-stroke-width": 2.2,
+            },
+          },
+          {
             id: "sites",
             type: "circle",
             source: "sites",
@@ -435,6 +483,10 @@ export default function MapView(props: Props) {
       vis("depot-labels", props.showDepots);
       vis("rings", props.showRings);
       vis("sites", props.showSites);
+      vis("tier-large", props.showSites);
+      vis("tier-large-halo", props.showSites);
+      vis("tier-small", props.showSites);
+      vis("tier-small-halo", props.showSites);
       vis("linked", props.showSites);
       vis("selected", props.showSites);
     };

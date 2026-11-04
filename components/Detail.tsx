@@ -44,8 +44,8 @@ export default function Detail({
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {site.land_tier ? <span className={`badge ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}>{tierLabel(site.land_tier)}</span> : null}
-        {site.tier_from_adjoining ? <span className="badge l4">Tier from same-owner adjoining land</span> : null}
+        {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
+        {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         {site.land_only ? <span className="badge pending">Land site</span> : null}
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
@@ -170,7 +170,7 @@ export function DealDetail({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>
         <span className="badge checked">{stageTitle(deal.stage_group)}</span>
-        {deal.listed ? <span className="badge l10">Listed</span> : null}
+        {deal.listed ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>

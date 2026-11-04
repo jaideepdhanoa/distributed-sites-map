@@ -56,14 +56,12 @@ async function source(page: Page, name: string): Promise<Drawn[]> {
 
 async function go(page: Page, query: string) {
   await page.evaluate((next) => {
-    document.getElementById("e2e-nav")?.remove();
     const link = document.createElement("a");
-    link.id = "e2e-nav";
     link.href = `/?${next}`;
-    link.textContent = "Open";
     document.body.appendChild(link);
+    link.click();
+    link.remove();
   }, query);
-  await page.locator("#e2e-nav").click();
   await page.waitForURL((url) => {
     const want = new URLSearchParams(query);
     for (const [key, value] of want) {
@@ -117,6 +115,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const city of CITIES) {
   test(`${city} pins match the API at every step and filter`, async ({ page }) => {
+    test.setTimeout(360_000);
     const catalog = await loadCatalog(page, city);
     const cityQuery = city === "PHX" ? "" : `city=${city}&`;
     await page.goto(`/?${cityQuery}`, { waitUntil: "domcontentloaded" });

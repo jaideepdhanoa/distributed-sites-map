@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from build_timeline import write_timeline  # noqa: E402
 from timeline_config import load_config  # noqa: E402
-from timeline_drive import DOC, FOLDER, files_list_url, match_materials  # noqa: E402
+from timeline_drive import DOC, FOLDER, description_marks_skip, files_list_url, match_materials  # noqa: E402
 from timeline_gmail import load_gmail_items  # noqa: E402
 from timeline_policy import blocked  # noqa: E402
 
@@ -50,13 +50,17 @@ TREE = {
         _file("f1", "2026-10-21 A - P&L 2025.pdf"),
         _file("f2", "2026-10-22 A - Sales package.pdf"),
         _folder("nested", "Nested"),
+        _file("f4", "2026-10-24 A - Extra.pdf", description="Earlier note<div>Duplicate of: 2026-10-21 A</div>"),
     ],
     "nested": [_file("f3", "2026-10-23 A - Report.pdf")],
     "legal": [
         _file("s1", "2026-10-22 A - Survey.pdf"),
         _file("s2", "2026-10-22 A - Copy.pdf", description="Duplicate of: x"),
     ],
-    "ops": [_file("p1", "A - photo 1.jpg", created="2026-10-20T12:00:00Z", mime="image/jpeg")],
+    "ops": [
+        _file("p1", "A - photo 1.jpg", created="2026-10-20T12:00:00Z", mime="image/jpeg"),
+        _file("p2", "2026-10-25 A - Extra.jpg", created="2026-10-25T12:00:00Z", mime="image/jpeg", description="<p>Misfiled: other place</p>"),
+    ],
     "fld-broadway": [_folder("src-b", "Source files")],
     "src-b": [],
     "fld-central": [_folder("src-c", "Source files")],
@@ -190,6 +194,19 @@ class TimelineTests(unittest.TestCase):
 
     def test_mail_stub_stays_empty(self):
         self.assertEqual(load_gmail_items(load_config(), ["PIPE-PHX-0001"]), [])
+
+    def test_description_markers_plain_and_html(self):
+        self.assertTrue(description_marks_skip("Duplicate of: x"))
+        self.assertTrue(description_marks_skip("  misfiled: somewhere"))
+        self.assertTrue(description_marks_skip("SUPERSEDES: older copy"))
+        self.assertTrue(description_marks_skip("Also filed under: PIPE-PHX-0003"))
+        self.assertTrue(description_marks_skip("Earlier note<div>Duplicate of: 2026-10-21 A</div>"))
+        self.assertTrue(description_marks_skip("Hello<br>Misfiled: other folder"))
+        self.assertTrue(description_marks_skip("<p>Supersedes: prior</p>"))
+        self.assertTrue(description_marks_skip("Intro</div><div>Also filed under: PIPE-PHX-0001</div>"))
+        self.assertTrue(description_marks_skip("Duplicate&nbsp;of: A &amp; B"))
+        self.assertFalse(description_marks_skip("This is not a duplicate of: something"))
+        self.assertFalse(description_marks_skip("<div>See the survey.</div>"))
 
     def test_added_plural_terms_are_blocked(self):
         payload = json.loads((ROOT / "config" / "timeline-terms.json").read_text())

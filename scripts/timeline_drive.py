@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import urllib.parse
@@ -117,12 +118,31 @@ def _skip_file(child: dict) -> bool:
     return False
 
 
-def _described_out(child: dict) -> bool:
-    for line in str(child.get("description") or "").splitlines():
-        lowered = line.strip().casefold()
-        if lowered.startswith("duplicate of:") or lowered.startswith("misfiled:"):
+# Drive stores description notes as HTML on one line, so a marker can sit
+# inside a tag after other text. Break block tags into lines before matching.
+_BLOCK_BREAK = re.compile(r"(?is)<\s*br\b[^>]*?/?>|<\s*/?\s*(?:div|p)\b[^>]*>")
+_TAG = re.compile(r"(?is)<[^>]+>")
+_SKIP_MARKERS = ("duplicate of:", "misfiled:", "supersedes:", "also filed under:")
+
+
+def description_lines(value: str) -> list[str]:
+    text = html.unescape(str(value or ""))
+    text = text.replace("\xa0", " ")
+    text = _BLOCK_BREAK.sub("\n", text)
+    text = _TAG.sub("", text)
+    return text.splitlines()
+
+
+def description_marks_skip(value: str) -> bool:
+    for line in description_lines(value):
+        lowered = re.sub(r"\s+", " ", line).strip().casefold()
+        if lowered.startswith(_SKIP_MARKERS):
             return True
     return False
+
+
+def _described_out(child: dict) -> bool:
+    return description_marks_skip(str(child.get("description") or ""))
 
 
 def _walk_files(lister, folder_id: str, site_id: str, warnings: list[str]) -> tuple[int, str]:

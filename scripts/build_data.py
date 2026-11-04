@@ -2898,6 +2898,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "last_sale_price_display": "",
             "year_built": "",
             "assessor_source": "",
+            "zoning_source": "",
+            "aadt_count": "",
+            "aadt_road": "",
+            "aadt_year": "",
+            "aadt_source": "",
             "verdict_disagreement": False,
             "acreage_note": "",
             "scale_note": "",
@@ -3627,6 +3632,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         from enrich_public import apply_public_records
 
         public_records = apply_public_records(sites, norm_apn)
+        from enrich_context import apply_context
+
+        public_records["context"] = apply_context(sites)
 
     site_features = []
     for site in sites:
@@ -3721,6 +3729,33 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         ],
     }
 
+    changes = {"note": "No earlier build to compare."}
+    previous_sites = OUT / "sites.geojson"
+    if write and previous_sites.exists():
+        old_features = json.loads(previous_sites.read_text()).get("features") or []
+        old_by_id = {(item.get("properties") or {}).get("site_id"): item.get("properties") or {} for item in old_features}
+        new_by_id = {site["site_id"]: site for site in sites}
+        added = sorted(set(new_by_id) - set(old_by_id))
+        removed = sorted(set(old_by_id) - set(new_by_id))
+        verdict_changes = []
+        stage_moves = []
+        for sid, site in new_by_id.items():
+            old = old_by_id.get(sid)
+            if not old:
+                continue
+            if (old.get("verdict") or None) != (site.get("verdict") or None):
+                verdict_changes.append({"site_id": sid, "before": old.get("verdict"), "after": site.get("verdict")})
+            if (old.get("pipeline_stage") or "") != (site.get("pipeline_stage") or ""):
+                stage_moves.append({"site_id": sid, "before": old.get("pipeline_stage") or "", "after": site.get("pipeline_stage") or ""})
+        changes = {
+            "new_sites": len(added),
+            "removed_sites": len(removed),
+            "verdict_changes": len(verdict_changes),
+            "stage_moves": len(stage_moves),
+            "sample_new": added[:12],
+            "sample_verdicts": verdict_changes[:12],
+            "sample_stages": stage_moves[:12],
+        }
     if write:
         OUT.mkdir(parents=True, exist_ok=True)
         PARCEL_CACHE.parent.mkdir(parents=True, exist_ok=True)
@@ -3736,6 +3771,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             }
             (OUT / f"parcels-{city_code}.geojson").write_text(json.dumps(city_fc))
         (OUT / "funnel.json").write_text(json.dumps(funnel, indent=2))
+        (OUT / "changes.json").write_text(json.dumps(changes, indent=2))
+        report["changes"] = changes
         (OUT / "build_report.json").write_text(json.dumps(report, indent=2))
         with (OUT / "crosswalk.csv").open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=["site_id", "source", "source_key"])

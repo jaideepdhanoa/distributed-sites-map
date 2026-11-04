@@ -17,6 +17,7 @@ export async function GET() {
         warnings: report.warnings,
         parcel_note: report.parcels?.note,
         land_tiers: report.land_tiers,
+        changes: report.changes,
       },
     },
     { headers: privateHeaders },

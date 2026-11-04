@@ -39,6 +39,7 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "spare_ac_own", header: "Own ac" },
   { accessorKey: "spare_ac_adjoining", header: "Adjoining ac" },
   { accessorKey: "tenure", header: "Tenure" },
+  { accessorKey: "confidence", header: "Confidence" },
   { accessorKey: "listed", header: "Listed", cell: ({ getValue }) => yesNo(getValue()) },
   { accessorKey: "contacted", header: "Contacted", cell: ({ getValue }) => yesNo(getValue()) },
   { accessorKey: "asking_price_display", header: "Asking" },

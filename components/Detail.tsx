@@ -25,6 +25,8 @@ export default function Detail({
   lat,
   lng,
   onOpenDeal,
+  onAddCompare,
+  sameOwner,
   onClose,
 }: {
   site: SiteProps | null;
@@ -32,6 +34,8 @@ export default function Detail({
   lat?: number | null;
   lng?: number | null;
   onOpenDeal?: () => void;
+  onAddCompare?: () => void;
+  sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
 }) {
   if (!site) return null;
@@ -43,6 +47,7 @@ export default function Detail({
       <h3>Summary</h3>
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
+      {onAddCompare ? <button type="button" onClick={onAddCompare}>Add to compare</button> : null}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -59,13 +64,20 @@ export default function Detail({
       <h3>Owner</h3>
       <p>{site.owner || "—"}</p>
       {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}
+      {sameOwner && sameOwner.length ? (
+        <>
+          <h3>Other sites with this owner</h3>
+          <ul>{sameOwner.map((item) => <li key={item.site_id}>{item.name || item.site_id}</li>)}</ul>
+        </>
+      ) : null}
       {site.assessor_source ? <p className="note">{site.assessor_source}</p> : null}
       <h3>Land</h3>
       <div className="kv">
         <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
         <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
         <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
-        <span>Zoning</span><div>{site.zoning || "—"}</div>
+        <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
+        <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${site.aadt_road}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
         <span>Flood</span><div>{site.flood_zone || "—"}</div>
         <span>Year built</span><div>{site.year_built || "—"}</div>
         <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>

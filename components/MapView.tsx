@@ -126,7 +126,7 @@ export default function MapView(props: Props) {
           areas: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           parcels: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "area-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-          sites: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          sites: { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterRadius: 48, clusterMaxZoom: 11 },
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -177,6 +177,21 @@ export default function MapView(props: Props) {
             source: "offmarket",
             filter: ["==", ["get", "site_id"], ""],
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
+          },
+          {
+            id: "clusters",
+            type: "circle",
+            source: "sites",
+            filter: ["has", "point_count"],
+            paint: { "circle-color": "#1c1914", "circle-radius": ["step", ["get", "point_count"], 14, 20, 18, 80, 24], "circle-opacity": 0.88 },
+          },
+          {
+            id: "cluster-count",
+            type: "symbol",
+            source: "sites",
+            filter: ["has", "point_count"],
+            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 11 },
+            paint: { "text-color": "#faf7f1" },
           },
           {
             id: "tier-large-halo",
@@ -230,6 +245,7 @@ export default function MapView(props: Props) {
             id: "sites",
             type: "circle",
             source: "sites",
+            filter: ["!", ["has", "point_count"]],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 12, 7, 15, 10],
               "circle-color": [
@@ -380,6 +396,16 @@ export default function MapView(props: Props) {
         if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });
       }
       if (!map.hasImage("tri-land")) map.addImage("tri-land", { width: size, height: size, data: triangle });
+      map.on("click", "clusters", (event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0];
+        const clusterId = feature?.properties?.cluster_id;
+        const source = map.getSource("sites") as GeoJSONSource;
+        const center = (feature?.geometry && feature.geometry.type === "Point" ? feature.geometry.coordinates : null) as [number, number] | null;
+        if (clusterId == null || !center) return;
+        source.getClusterExpansionZoom(clusterId).then((zoom) => {
+          map.easeTo({ center, zoom });
+        }).catch(() => undefined);
+      });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const feature = event.features?.[0];
@@ -483,6 +509,8 @@ export default function MapView(props: Props) {
       vis("depot-labels", props.showDepots);
       vis("rings", props.showRings);
       vis("sites", props.showSites);
+      vis("clusters", props.showSites);
+      vis("cluster-count", props.showSites);
       vis("tier-large", props.showSites);
       vis("tier-large-halo", props.showSites);
       vis("tier-small", props.showSites);

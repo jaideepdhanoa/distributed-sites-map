@@ -507,6 +507,7 @@ export default function Explorer() {
           >
             {summaryText()}
           </span>
+          {data.funnel.workbook_as_of ? <span className="summary-chip">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
             {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}

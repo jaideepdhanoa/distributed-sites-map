@@ -1,0 +1,60 @@
+name: Workbook sync
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt cryptography
+      - name: Export the Sheet and rebuild
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DATA_SOURCE_BUNDLE: ${{ secrets.DATA_SOURCE_BUNDLE }}
+        run: |
+          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "GOOGLE_SERVICE_ACCOUNT_JSON is not set."
+            exit 1
+          fi
+          python scripts/sync_workbook.py
+          python scripts/build_data.py
+      - name: Open or update the sync pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- data/generated data/drift_report.csv data/workbook_stages.json; then
+            echo "No data change."
+            exit 0
+          fi
+          DATE=$(date -u +%Y-%m-%d)
+          BRANCH="workbook-sync-$DATE"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -B "$BRANCH"
+          git add data/generated data/drift_report.csv data/workbook_stages.json
+          git commit -m "Workbook sync $DATE"
+          git push --force-with-lease -u origin "$BRANCH"
+          TITLE="Workbook sync $DATE"
+          BODY="Automatic read-only export of the Pipeline workbook. Not merged.
+
+          The build compared this export with the previous published data. The comment has the knock-out drift report. Nothing was written back to the Sheet."
+          EXISTING=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number')
+          if [ -z "$EXISTING" ]; then
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
+            EXISTING=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number')
+          else
+            gh pr edit "$EXISTING" --title "$TITLE" --body "$BODY"
+          fi
+          python scripts/sync_workbook.py --comment
+          gh pr comment "$EXISTING" --body-file /tmp/drift-comment.md

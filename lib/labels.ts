@@ -55,9 +55,20 @@ export function stageTitle(group: string) {
   return STAGE_TITLES[group] || "Deal";
 }
 
+function unwrapReason(value: string) {
+  let text = value.trim();
+  while (text.startsWith("(") && text.endsWith(")") && text.length > 2) {
+    const inner = text.slice(1, -1).trim();
+    if (!inner) break;
+    text = inner;
+  }
+  return text;
+}
+
 export function stageDetail(stage: string, group: string) {
   const name = stageTitle(group);
-  const raw = (stage || "").replace(/^(?:dropped|\d+)\b\s*/i, "").trim();
+  const stripped = (stage || "").replace(/^(?:dropped|\d+)\b\s*/i, "").trim();
+  const raw = unwrapReason(stripped);
   if (!raw || raw.toLowerCase() === name.toLowerCase()) return name;
   return `${name} (${raw.charAt(0).toLowerCase()}${raw.slice(1)})`;
 }

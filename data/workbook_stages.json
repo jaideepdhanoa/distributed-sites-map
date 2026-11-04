@@ -1,0 +1,287 @@
+{
+  "workbook_as_of": "2026-11-04",
+  "pipeline": {
+    "Dropped": 11,
+    "1 Desk screen": 19
+  },
+  "land": {
+    "1 Desk screen": 25
+  },
+  "rows": [
+    {
+      "deal_id": "PIPE-PHX-0001",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-SNA-0002",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0003",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0004",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0005",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0006",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0007",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0008",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0009",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0010",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0011",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-MIA-0012",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-MIA-0013",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0014",
+      "kind": "pipeline",
+      "stage": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-LAS-0015",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0016",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0017",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0018",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0067",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0068",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0069",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0070",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0071",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0072",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0073",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-MIA-0074",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-MIA-0075",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-MIA-0076",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-MIA-0077",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-MIA-0079",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0001",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0002",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0003",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0004",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0005",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-MIA-0006",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0007",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0008",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0009",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0010",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0011",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0012",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0013",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0014",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0015",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0033",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0034",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0035",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0036",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0037",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0038",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0039",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0040",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0041",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0042",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    }
+  ]
+}

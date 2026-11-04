@@ -15,3 +15,52 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: python scripts/build_data.py --check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --experimental-strip-types scripts/test-stage-detail.ts
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Check browser-test secrets
+        id: gate
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          if [ -z "$E2E_USERNAME" ] || [ -z "$E2E_PASSWORD" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Browser tests skipped. Add secrets E2E_USERNAME and E2E_PASSWORD."
+            echo "Optional: VERCEL_AUTOMATION_BYPASS_SECRET and variable E2E_BASE_URL for a Vercel preview."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.gate.outputs.run == 'true'
+        run: npm ci
+      - if: steps.gate.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.gate.outputs.run == 'true'
+        name: Browser checks
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "$E2E_BASE_URL" ]; then
+            node scripts/write-e2e-env.mjs
+            npm run build
+            npx next start -p 3456 &
+            for i in $(seq 1 40); do
+              curl -sf -o /dev/null http://127.0.0.1:3456/login && break
+              sleep 2
+            done
+            export E2E_BASE_URL=http://127.0.0.1:3456
+          fi
+          npx playwright test

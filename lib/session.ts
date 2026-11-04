@@ -1,9 +1,10 @@
+import { resolveActionRole, type ActionRole } from "./actions/roles";
 import { getUsers } from "./users";
 
 export const SESSION_COOKIE = "sites_session";
 const WEEK = 60 * 60 * 24 * 7;
 
-export type SessionUser = { u: string; role: "admin" | "user" };
+export type SessionUser = { u: string; role: "admin" | "user"; actionRole: ActionRole };
 
 type TokenBody = { u: string; iat: number; exp: number };
 
@@ -79,5 +80,5 @@ export async function readSession(token: string | undefined): Promise<SessionUse
   if (!parsed.u || !parsed.exp || parsed.exp < Math.floor(Date.now() / 1000)) return null;
   const user = getUsers().find((item) => item.u === parsed.u);
   if (!user) return null;
-  return { u: user.u, role: user.role };
+  return { u: user.u, role: user.role, actionRole: resolveActionRole(user) };
 }

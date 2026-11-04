@@ -1,4 +1,12 @@
-export type AuthUser = { u: string; h: string; role: "admin" | "user" };
+export type AuthUser = {
+  u: string;
+  h: string;
+  role: "admin" | "user";
+  roleLabel: string;
+  actionRole: "viewer" | "contributor" | "reviewer" | null;
+};
+
+const ACTION = new Set(["viewer", "contributor", "reviewer"]);
 
 export function getUsers(): AuthUser[] {
   const raw = process.env.AUTH_USERS;
@@ -16,8 +24,11 @@ export function getUsers(): AuthUser[] {
     const row = item as Record<string, unknown>;
     const u = String(row.u ?? row.username ?? "").trim().toLowerCase();
     const h = String(row.h ?? row.hash ?? row.passwordHash ?? "");
-    const role = row.role === "admin" ? "admin" : "user";
-    if (u && h.startsWith("$2")) users.push({ u, h, role });
+    const roleLabel = String(row.role ?? "user").trim().toLowerCase() || "user";
+    const role = roleLabel === "admin" ? "admin" : "user";
+    const explicit = String(row.actionRole ?? "").trim().toLowerCase();
+    const actionRole = ACTION.has(explicit) ? (explicit as AuthUser["actionRole"]) : ACTION.has(roleLabel) ? (roleLabel as AuthUser["actionRole"]) : null;
+    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole });
   }
   return users;
 }

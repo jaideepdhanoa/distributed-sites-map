@@ -69,16 +69,18 @@ A scheduled workflow exports the Pipeline Sheet and reads the other build inputs
 
 The service account needs Viewer on exactly three things: the Pipeline workbook, Map sync inputs, and the 2 Sites folder (`TIMELINE_SITES_FOLDER_ID`). It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request.
 
-Map sync inputs must contain these files, plus the service-area `.kmz` files, as real files in the top level:
+Map sync inputs sits in the Moove root, next to 2 Sites. Its top level holds:
 
 - `universe_v3.csv`
-- `las_ring100_screen.csv`
 - `listings_match_v3.csv`
 - `depots.csv`
-- `note_rewrites.json`
-- `reconciliation_final.xlsx`
+- `las_ring100_screen.csv`
+- `reconciliation_final`, a Google Sheet, exported to xlsx when the sync reads it
+- `service-area-PHX.kmz`, `service-area-LAS.kmz`, and `service-area-MIA.kmz`
 
-A Google Sheet may replace a `.csv` or `.xlsx` only when it is the only copy and its name is the file name without the extension. A csv export must be a one-tab Sheet. A Google Doc never counts. Anything else in the folder is skipped.
+Any file ending in `.kmz` is kept. The three names above are the ones this folder uses. A Google Doc never counts. A csv Sheet export must have one tab. Anything else in the folder is skipped.
+
+`note_rewrites.json` is map configuration, committed at `data/note_rewrites.json`. It is not a Drive input. The build still runs if that file is missing.
 
 ## Counts from this data drop
 

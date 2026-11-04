@@ -30,7 +30,6 @@ REQUIRED_SOURCE = (
     "las_ring100_screen.csv",
     "listings_match_v3.csv",
     "depots.csv",
-    "note_rewrites.json",
     "reconciliation_final.xlsx",
 )
 _REQUIRED = set(REQUIRED_SOURCE)

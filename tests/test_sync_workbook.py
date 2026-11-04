@@ -34,8 +34,7 @@ def _files(extra: list[dict] | None = None, *, include_universe: bool = True, re
             {"id": "id-ring", "name": "las_ring100_screen.csv", "mimeType": FILE},
             {"id": "id-listings", "name": "listings_match_v3.csv", "mimeType": FILE},
             {"id": "id-depots", "name": "depots.csv", "mimeType": FILE},
-            {"id": "id-notes", "name": "note_rewrites.json", "mimeType": FILE},
-            {"id": "id-kmz", "name": "service-area.kmz", "mimeType": FILE},
+            {"id": "id-kmz", "name": "service-area-PHX.kmz", "mimeType": FILE},
             {"id": CHILD_FOLDER, "name": "Seller files", "mimeType": FOLDER},
             {"id": DECOY_ID, "name": DECOY, "mimeType": FILE},
         ]
@@ -169,6 +168,36 @@ class SyncFetchTest(unittest.TestCase):
         self.assertTrue(any("spreadsheets/id-universe-sheet" in url for url in listing))
         self.assertTrue(any("id-universe-sheet/export" in url and "text/csv" in url for url in listing))
 
+    def test_note_rewrites_and_extra_kmz_names(self) -> None:
+        files = _files(
+            [
+                {"id": "id-notes", "name": "note_rewrites.json", "mimeType": FILE},
+                {"id": "id-las", "name": "service-area-LAS.kmz", "mimeType": FILE},
+                {"id": "id-mia", "name": "service-area-MIA.kmz", "mimeType": FILE},
+            ]
+        )
+        listing = Listing(files)
+        sync._get = listing.get
+        with tempfile.TemporaryDirectory() as tmp:
+            sync.fetch_source_folder("token", Path(tmp))
+            root = Path(tmp)
+            self.assertFalse((root / "note_rewrites.json").exists())
+            self.assertEqual((root / "kmz" / "service-area-LAS.kmz").read_bytes(), b"media")
+            self.assertEqual((root / "kmz" / "service-area-MIA.kmz").read_bytes(), b"media")
+        self.assertNotIn("id-notes", "".join(listing))
+        self.assertNotIn("note_rewrites.json", self.stdout.getvalue())
+
+    def test_missing_rewrites_are_empty(self) -> None:
+        import scripts.build_data as build
+
+        original = build._rewrite_paths
+        build._rewrite_paths = lambda: [Path("/tmp/does-not-exist-note-rewrites.json")]
+        try:
+            self.assertEqual(build._load_rewrites("notes"), {})
+            self.assertEqual(build._load_rewrites("deals"), {})
+        finally:
+            build._rewrite_paths = original
+
     def test_logs_do_not_name_skipped_files(self) -> None:
         listing = Listing(_files())
         sync._get = listing.get
@@ -178,7 +207,7 @@ class SyncFetchTest(unittest.TestCase):
         self.assertNotIn(DECOY, log)
         self.assertNotIn("Seller files", log)
         self.assertIn("Fetched universe_v3.csv", log)
-        self.assertIn("Fetched service-area.kmz", log)
+        self.assertIn("Fetched service-area-PHX.kmz", log)
 
 
 class ExportLimitTest(unittest.TestCase):

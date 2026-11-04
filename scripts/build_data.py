@@ -205,16 +205,23 @@ _NOTE_FILE = re.compile(
 )
 
 # Exact source sentences, plus the plain line a reader should see.
+def _rewrite_paths() -> list[Path]:
+    # Committed map configuration. A copy under data/source still works for a local build.
+    return [ROOT / "data" / "note_rewrites.json", SRC / "note_rewrites.json"]
+
+
 def _load_rewrites(kind: str) -> dict:
-    path = SRC / "note_rewrites.json"
-    if not path.exists():
-        return {}
-    try:
-        payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return {}
-    table = payload.get(kind) or {}
-    return table if isinstance(table, dict) else {}
+    for path in _rewrite_paths():
+        if not path.exists():
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        table = payload.get(kind) or {}
+        if isinstance(table, dict):
+            return table
+    return {}
 
 
 EXPLICIT_NOTES = _load_rewrites("notes")

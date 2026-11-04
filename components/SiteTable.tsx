@@ -98,6 +98,17 @@ export default function SiteTable({
           ))}
         </tbody>
       </table>
+      <ul className="stack-list">
+        {rows.map((row) => (
+          <li key={row.site_id}>
+            <button type="button" className={row.site_id === selectedId ? "on" : ""} onClick={() => onSelect(row.site_id)}>
+              <strong>{row.name || row.address || row.site_id}</strong>
+              <span>{row.site_id} · {plainVerdict(row.verdict)}{row.land_tier ? ` · ${tierLabel(row.land_tier)}` : ""}</span>
+              {row.summary_why ? <span className="why">{row.summary_why}</span> : null}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -161,6 +172,17 @@ export function DealTable({
           ))}
         </tbody>
       </table>
+      <ul className="stack-list">
+        {rows.map((row) => (
+          <li key={row.deal_id}>
+            <button type="button" className={row.deal_id === selectedId ? "on" : ""} onClick={() => onSelect(row.deal_id)}>
+              <strong>{row.name || row.address || row.deal_id}</strong>
+              <span>{stageDetail(row.stage, row.stage_group)}{row.asking_price_display ? ` · ${row.asking_price_display}` : ""}</span>
+              <span>{row.address}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

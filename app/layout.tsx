@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Newsreader, Outfit } from "next/font/google";
 import "./globals.css";
 
@@ -8,6 +8,11 @@ const serif = Newsreader({ subsets: ["latin"], variable: "--font-serif" });
 export const metadata: Metadata = {
   title: "Sites",
   robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

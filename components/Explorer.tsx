@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle } from "@/lib/labels";
+import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -37,7 +37,7 @@ export default function Explorer() {
   const [tableOpen, setTableOpen] = useState(false);
   const [compare, setCompare] = useState(false);
   const [showDropped, setShowDropped] = useState(false);
-  const [layersOpen, setLayersOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
   const showAreas = params.get("areas") !== "0";
   const showDepots = params.get("depots") !== "0";
   const showUniverse = params.get("pins") !== "0";
@@ -54,7 +54,14 @@ export default function Explorer() {
   const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
   const [changesNote, setChangesNote] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
-  const [legendOpen, setLegendOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [unplacedOpen, setUnplacedOpen] = useState(false);
 
   const city = params.get("city") || "PHX";
   const stageParam = params.get("stage") as StageId | null;
@@ -129,6 +136,31 @@ export default function Explorer() {
       cancel = true;
     };
   }, [city]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1100px)");
+    const apply = () => setLayersOpen(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    setSheetExpanded(false);
+  }, [selected]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setFiltersOpen(false);
+      setMoreOpen(false);
+      setUserOpen(false);
+      setMenuOpen(false);
+      setUnplacedOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const features = data?.sites.features ?? [];
   const featureById = useMemo(() => {
@@ -330,7 +362,27 @@ export default function Explorer() {
 
   const focus = CITY_VIEW[city] ?? CITY_VIEW.PHX;
   const dropCount = sites.filter((site) => droppedAt(site, stage) && site.city === city).length;
-  const place = city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami";
+
+  const sheet = { expanded: sheetExpanded, onToggle: () => setSheetExpanded((value) => !value) };
+  const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal));
+
+  const activeFilters: { id: string; label: string; clear: () => void }[] = [];
+  if (businessTypes) activeFilters.push({ id: "types", label: businessTypes.join(", "), clear: () => setBusinessTypes(null) });
+  if (landTier !== "any") activeFilters.push({ id: "tier", label: tierLabel(landTier) || "Spare land", clear: () => write({ tier: null }) });
+  if (verdict !== "any") activeFilters.push({ id: "verdict", label: plainVerdict(verdict), clear: () => write({ verdict: null }) });
+  if (listed === "yes") activeFilters.push({ id: "listed", label: "Listed", clear: () => write({ listed: null }) });
+  if (landSites) activeFilters.push({ id: "land", label: "Land sites", clear: () => write({ land: null }) });
+  if (compare) activeFilters.push({ id: "compare", label: "Reviews disagree", clear: () => setCompare(false) });
+  if (showDropped) activeFilters.push({ id: "ruled", label: "Ruled out", clear: () => setShowDropped(false) });
+  if (extra === "held") activeFilters.push({ id: "held", label: "Held outside the service area", clear: () => write({ extra: null }) });
+
+  function closeMenus() {
+    setFiltersOpen(false);
+    setMoreOpen(false);
+    setUserOpen(false);
+    setMenuOpen(false);
+    setUnplacedOpen(false);
+  }
 
   function summaryText() {
     if (funnel === "pipeline") {
@@ -338,154 +390,115 @@ export default function Explorer() {
       const desk = rows.filter((deal) => deal.stage_group === "desk").length;
       const dropped = rows.filter((deal) => deal.stage_group === "dropped").length;
       const active = rows.length - dropped;
-      return `${place}: ${active} active deals (${desk} desk screen), ${dropped} dropped`;
+      return `${active} active deals (${desk} desk screen), ${dropped} dropped`;
     }
     const candidates = sites.filter((site) => site.city === city && inStage(site, "land")).length;
     const cleared = sites.filter((site) => site.city === city && inStage(site, "cleared")).length;
-    return `${place}: ${candidates} candidates, ${cleared} cleared`;
+    return `${candidates} candidates, ${cleared} cleared`;
   }
 
   return (
     <div className={`shell ${tableOpen ? "table-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage}>
+      {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
+        <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
+      ) : null}
       <header className="bar">
-        <div className="bar-row">
+        <div className="top">
           <h1 className="word">Sites</h1>
-          <div className="cities">
+          <div className="cities only-desktop" role="group" aria-label="City">
             {CITIES.map((item) => (
               <button key={item} className={city === item ? "on" : ""} type="button" onClick={() => jump(item)}>
                 {item === "PHX" ? "Phoenix" : item === "LAS" ? "Las Vegas" : "Miami"}
               </button>
             ))}
           </div>
-          <input className="search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
-          <div className="who">
-            <span>{me?.u}</span>
-            {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
-            <button type="button" onClick={logout}>Sign out</button>
+          <label className="city-pick only-mobile">
+            <span className="sr">City</span>
+            <select aria-label="City" value={city} onChange={(event) => jump(event.target.value)}>
+              <option value="PHX">Phoenix</option>
+              <option value="LAS">Las Vegas</option>
+              <option value="MIA">Miami</option>
+            </select>
+          </label>
+          <input className="search only-desktop" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
+          <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
+            <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
+            <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           </div>
+          <div className="user-menu only-desktop">
+            <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
+              {(me?.u || "?").slice(0, 1).toUpperCase()}
+            </button>
+            {userOpen ? (
+              <div className="menu" role="menu">
+                <p className="menu-note">{me?.u}</p>
+                {me?.role === "admin" ? <a role="menuitem" href="/admin">Accounts</a> : null}
+                <button type="button" role="menuitem" onClick={logout}>Sign out</button>
+              </div>
+            ) : null}
+          </div>
+          <button className="icon-btn only-mobile" type="button" aria-pressed={searchOpen} aria-label={searchOpen ? "Hide search" : "Search"} onClick={() => setSearchOpen((value) => !value)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M16 16l5 5" /></svg>
+          </button>
+          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => !value); setFiltersOpen(false); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
         </div>
-        <div className="funnel-switch">
-          <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe funnel</button>
-          <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline funnel</button>
-        </div>
-        {funnel === "universe" ? (
-          <p className="census-note" title={CENSUS_NOTE} onMouseEnter={() => setTip(CENSUS_NOTE)} onMouseLeave={() => setTip("")}>Car washes</p>
+        {searchOpen ? (
+          <input className="search mobile-search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
         ) : null}
-        {changesNote ? <p className="note">{changesNote}</p> : null}
-        <div className="type-filters" aria-label="Business type">
-          <button type="button" className={businessTypes === null ? "on" : ""} onClick={() => setBusinessTypes(null)}>All types</button>
-          {BUSINESS_TYPES.map((type) => {
-            const inStep = sites.filter((site) => site.city === city && inStage(site, stage) && (site.business_type || "Car wash") === type).length;
-            const offCount = offMarketFeatures.filter((feature) => (feature.properties.business_type || "Other") === type).length;
-            const count = funnel === "pipeline"
-              ? dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === pipeStage && (deal.business_type || "Other") === type && Boolean(dealPoint(deal))).length
-              : inStep || offCount;
-            if (count === 0 && type !== "Car wash") return null;
-            return (
-              <button key={type} type="button" className={typeOn(type) && businessTypes !== null ? "on" : businessTypes === null ? "on" : ""} onClick={() => toggleType(type)}>
-                {type} {count.toLocaleString()}
+        <div className="funnel-row">
+          <nav className="funnel" aria-label="Funnel">
+            {funnel === "universe" ? STEPS.map((step, index) => {
+              const listedHere = subcount(step.id, "listed");
+              const contactedHere = subcount(step.id, "contacted");
+              const note = step.id === "universe"
+                ? `Built from ${censusForCity.toLocaleString()} census records. The count keeps the rows the workbook includes.`
+                : FUNNEL_NOTES[step.id];
+              return (
+                <Fragment key={step.id}>
+                  {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
+                  <span className="step">
+                    <button className={stage === step.id && extra !== "listed" && extra !== "contacted" ? "on" : ""} type="button" aria-current={stage === step.id && !extra ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id, extra: null }); }}>
+                      <span>{step.label}</span>
+                      <strong>{count(step.id).toLocaleString()}</strong>
+                    </button>
+                    {listedHere > 0 ? (
+                      <button className={`sub ${extra === "listed" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.listed} onMouseEnter={() => setTip(FUNNEL_NOTES.listed)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "listed" ? null : "listed" })}>
+                        {listedHere.toLocaleString()} listed
+                      </button>
+                    ) : null}
+                    {contactedHere > 0 ? (
+                      <button className={`sub ${extra === "contacted" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.contacted} onMouseEnter={() => setTip(FUNNEL_NOTES.contacted)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "contacted" ? null : "contacted" })}>
+                        {contactedHere.toLocaleString()} contacted
+                      </button>
+                    ) : null}
+                  </span>
+                </Fragment>
+              );
+            }) : PIPE_STEPS.map((step, index) => {
+              const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === step.id && typeOn(deal.business_type || "Other"));
+              const squares = rows.filter((deal) => dealPoint(deal)).length;
+              const unmapped = rows.length - squares;
+              return (
+                <Fragment key={step.id}>
+                  {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
+                  <span className="step">
+                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id })}>
+                      <span>{step.label}</span>
+                      <strong>{squares.toLocaleString()}</strong>
+                    </button>
+                    {unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
+                  </span>
+                </Fragment>
+              );
+            })}
+            {funnel === "pipeline" && unplacedDeals.length > 0 ? (
+              <button className={`aside ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setMoreOpen(false); setFiltersOpen(false); }}>
+                {unplacedDeals.length.toLocaleString()} unplaced
               </button>
-            );
-          })}
-        </div>
-        <nav className="funnel" aria-label="Funnel">
-          {funnel === "universe" ? STEPS.map((step, index) => {
-            const listedHere = subcount(step.id, "listed");
-            const contactedHere = subcount(step.id, "contacted");
-            const note = step.id === "universe"
-              ? `Built from ${censusForCity.toLocaleString()} census records. The count keeps the rows the workbook includes.`
-              : FUNNEL_NOTES[step.id];
-            return (
-              <Fragment key={step.id}>
-                {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
-                <span className="step">
-                  <button className={stage === step.id && extra !== "listed" && extra !== "contacted" ? "on" : ""} type="button" aria-current={stage === step.id && !extra ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id, extra: null }); }}>
-                    <span>{step.label}</span>
-                    <strong>{count(step.id).toLocaleString()}</strong>
-                  </button>
-                  {listedHere > 0 ? (
-                    <button className={`sub ${extra === "listed" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.listed} onMouseEnter={() => setTip(FUNNEL_NOTES.listed)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "listed" ? null : "listed" })}>
-                      · {listedHere.toLocaleString()} listed
-                    </button>
-                  ) : null}
-                  {contactedHere > 0 ? (
-                    <button className={`sub ${extra === "contacted" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.contacted} onMouseEnter={() => setTip(FUNNEL_NOTES.contacted)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "contacted" ? null : "contacted" })}>
-                      · {contactedHere.toLocaleString()} contacted
-                    </button>
-                  ) : null}
-                </span>
-                {step.id === "land" && heldCount > 0 ? (
-                  <button className={`aside ${extra === "held" ? "on" : ""}`} type="button" onClick={() => write({ stage: null, extra: extra === "held" ? null : "held" })}>
-                    {heldCount} held outside the service area
-                  </button>
-                ) : null}
-              </Fragment>
-            );
-          }) : PIPE_STEPS.map((step, index) => {
-            const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === step.id && typeOn(deal.business_type || "Other"));
-            const squares = rows.filter((deal) => dealPoint(deal)).length;
-            const unmapped = rows.length - squares;
-            return (
-              <Fragment key={step.id}>
-                {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
-                <span className="step">
-                  <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id })}>
-                    <span>{step.label}</span>
-                    <strong>{squares.toLocaleString()}</strong>
-                  </button>
-                  {unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
-                </span>
-              </Fragment>
-            );
-          })}
-        </nav>
-        {funnel === "pipeline" ? (
-          <details className="unplaced">
-            <summary>
-              {dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal)).length.toLocaleString()} unplaced deals
-            </summary>
-            <ul>
-              {dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal)).map((deal) => (
-                <li key={deal.deal_id}>
-                  <button type="button" className="text-link" onClick={() => choose(deal.deal_id)}>{deal.name || deal.address || deal.deal_id}</button>
-                  {" · "}{stageTitle(deal.stage_group)}
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
-        <div className="chips">
-          {funnel === "universe" ? (
-            <>
-              {(["any", "L10", "L4"] as const).map((item) => (
-                <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
-                  {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
-                </button>
-              ))}
-              {[
-                ["any", "All statuses"],
-                ["PASS", "Cleared"],
-                ["MAYBE", "Possible"],
-                ["UNRESOLVED", "Unresolved"],
-              ].map(([item, label]) => (
-                <button key={item} className={verdict === item ? "on" : ""} type="button" onClick={() => write({ verdict: item === "any" ? null : item })}>
-                  {label}
-                </button>
-              ))}
-              <button className={listed === "yes" ? "on" : ""} type="button" onClick={() => write({ listed: listed === "yes" ? null : "yes" })}>Listed</button>
-              <button className={landSites ? "on" : ""} type="button" onClick={() => write({ land: landSites ? null : "1" })}>Land sites</button>
-              <button className={compare ? "on" : ""} type="button" onClick={() => setCompare((value) => !value)}>Reviews disagree</button>
-              <button type="button" onClick={exportTable}>Export CSV</button>
-              {dropCount > 0 ? (
-                <button className={showDropped ? "on" : ""} type="button" onClick={() => setShowDropped((value) => !value)}>
-                  Ruled out ({dropCount.toLocaleString()})
-                </button>
-              ) : null}
-            </>
-          ) : null}
-          <button className={tableOpen ? "on" : ""} type="button" onClick={() => setTableOpen((value) => !value)}>Table</button>
-          <button type="button" onClick={() => setGuideOpen((value) => !value)}>How to read this</button>
-          <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+            ) : null}
+          </nav>
           <span
             className="summary-chip"
             title={funnel === "pipeline" ? SUMMARY_NOTES.pipeline : SUMMARY_NOTES.universe}
@@ -494,8 +507,141 @@ export default function Explorer() {
           >
             {summaryText()}
           </span>
+          <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
+            Filters
+            {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
+          </button>
+          <div className="more-wrap only-desktop">
+            <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
+            {moreOpen ? (
+              <div className="menu" role="menu">
+                <button type="button" onClick={exportTable}>Export CSV</button>
+                <button type="button" onClick={() => { setTableOpen((value) => !value); setMoreOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
+                <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+                <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }}>How to read this</button>
+                {changesNote ? <p className="menu-note">{changesNote}</p> : null}
+              </div>
+            ) : null}
+          </div>
         </div>
+        {activeFilters.length ? (
+          <div className="active-row" aria-label="Active filters">
+            {activeFilters.map((item) => (
+              <button key={item.id} className="removable" type="button" onClick={item.clear}>
+                {item.label}
+                <span aria-hidden="true">×</span>
+                <span className="sr">Remove</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {filtersOpen ? (
+          <div className="popover" role="dialog" aria-label="Filters">
+            <div className="popover-head">
+              <h2>Filters</h2>
+              <button type="button" onClick={() => setFiltersOpen(false)}>Close</button>
+            </div>
+            <h3>Business type</h3>
+            <div className="type-filters">
+              <button type="button" className={businessTypes === null ? "on" : ""} onClick={() => setBusinessTypes(null)}>All types</button>
+              {BUSINESS_TYPES.map((type) => {
+                const inStep = sites.filter((site) => site.city === city && inStage(site, stage) && (site.business_type || "Car wash") === type).length;
+                const offCount = offMarketFeatures.filter((feature) => (feature.properties.business_type || "Other") === type).length;
+                const shown = funnel === "pipeline"
+                  ? dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === pipeStage && (deal.business_type || "Other") === type && Boolean(dealPoint(deal))).length
+                  : inStep || offCount;
+                if (shown === 0 && type !== "Car wash") return null;
+                return (
+                  <button key={type} type="button" title={type === "Car wash" ? CENSUS_NOTE : undefined} className={typeOn(type) && businessTypes !== null ? "on" : businessTypes === null ? "on" : ""} onClick={() => toggleType(type)}>
+                    {type} {shown.toLocaleString()}
+                  </button>
+                );
+              })}
+            </div>
+            {funnel === "universe" ? (
+              <>
+                <h3>Spare land</h3>
+                <div className="chips">
+                  {(["any", "L10", "L4"] as const).map((item) => (
+                    <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
+                      {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
+                    </button>
+                  ))}
+                </div>
+                <h3>Status</h3>
+                <div className="chips">
+                  {[
+                    ["any", "All statuses"],
+                    ["PASS", "Cleared"],
+                    ["MAYBE", "Possible"],
+                    ["UNRESOLVED", "Unresolved"],
+                  ].map(([item, label]) => (
+                    <button key={item} className={verdict === item ? "on" : ""} type="button" onClick={() => write({ verdict: item === "any" ? null : item })}>
+                      {label}
+                    </button>
+                  ))}
+                  <button className={listed === "yes" ? "on" : ""} type="button" onClick={() => write({ listed: listed === "yes" ? null : "yes" })}>Listed</button>
+                  <button className={landSites ? "on" : ""} type="button" onClick={() => write({ land: landSites ? null : "1" })}>Land sites</button>
+                  <button className={compare ? "on" : ""} type="button" onClick={() => setCompare((value) => !value)}>Reviews disagree</button>
+                  {dropCount > 0 ? (
+                    <button className={showDropped ? "on" : ""} type="button" onClick={() => setShowDropped((value) => !value)}>
+                      Ruled out ({dropCount.toLocaleString()})
+                    </button>
+                  ) : null}
+                  {heldCount > 0 ? (
+                    <button className={extra === "held" ? "on" : ""} type="button" onClick={() => write({ stage: null, extra: extra === "held" ? null : "held" })}>
+                      Held outside the service area ({heldCount.toLocaleString()})
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+        {menuOpen ? (
+          <div className="popover menu-sheet" role="dialog" aria-label="Menu">
+            <div className="popover-head">
+              <h2>Menu</h2>
+              <button type="button" onClick={() => setMenuOpen(false)}>Close</button>
+            </div>
+            <div className="funnel-switch" role="group" aria-label="Which funnel">
+              <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
+              <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+            </div>
+            <button type="button" onClick={() => { setFiltersOpen(true); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
+            <button type="button" onClick={() => { setLayersOpen(true); setMenuOpen(false); }}>Layers</button>
+            <button type="button" onClick={() => { setLegendOpen(true); setMenuOpen(false); }}>Legend</button>
+            <button type="button" onClick={() => { setTableOpen((value) => !value); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
+            <button type="button" onClick={exportTable}>Export CSV</button>
+            <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+            <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
+            {funnel === "pipeline" && unplacedDeals.length > 0 ? (
+              <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Unplaced deals ({unplacedDeals.length.toLocaleString()})</button>
+            ) : null}
+            {changesNote ? <p className="menu-note">{changesNote}</p> : null}
+            <p className="menu-note">{me?.u}</p>
+            {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
+            <button type="button" onClick={logout}>Sign out</button>
+          </div>
+        ) : null}
+        {unplacedOpen ? (
+          <div className="popover" role="dialog" aria-label="Unplaced deals">
+            <div className="popover-head">
+              <h2>{unplacedDeals.length.toLocaleString()} unplaced deals</h2>
+              <button type="button" onClick={() => setUnplacedOpen(false)}>Close</button>
+            </div>
+            <ul className="unplaced-list">
+              {unplacedDeals.map((deal) => (
+                <li key={deal.deal_id}>
+                  <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
+                  {" · "}{stageTitle(deal.stage_group)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </header>
+
       <div className="map-stage">
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
@@ -518,8 +664,8 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
-        <aside className="layers">
-          <button type="button" onClick={() => setLayersOpen((value) => !value)}>{layersOpen ? "Layers" : "Layers"}</button>
+        <aside className={`layers ${layersOpen ? "open" : ""}`}>
+          <button type="button" onClick={() => setLayersOpen((value) => !value)}>{layersOpen ? "Hide layers" : "Layers"}</button>
           {layersOpen ? (
             <>
               <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
@@ -532,19 +678,19 @@ export default function Explorer() {
             </>
           ) : null}
         </aside>
-        <div className="legend" onMouseLeave={() => setTip("")}>
+        <div className={`legend ${legendOpen ? "open" : ""}`} onMouseLeave={() => setTip("")}>
           <button type="button" onClick={() => setLegendOpen((value) => !value)}>{legendOpen ? "Hide legend" : "Legend"}</button>
           {legendOpen ? (
             <ul>
               {STATUS_NOTES.map((item) => (
-                <li key={item.id} onMouseEnter={() => setTip(item.note)} onMouseLeave={() => setTip("")}>
+                <li key={item.id} onMouseEnter={() => setTip(item.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(item.note)}>
                   <i className={`swatch ${item.id}`} /> {item.label}
                 </li>
               ))}
-              <li onMouseEnter={() => setTip(TIER_NOTES.L10.note)} onMouseLeave={() => setTip("")}><i className="swatch l10" /> {TIER_NOTES.L10.label}</li>
-              <li onMouseEnter={() => setTip(TIER_NOTES.L4.note)} onMouseLeave={() => setTip("")}><i className="swatch l4" /> {TIER_NOTES.L4.label}</li>
-              <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")}><i className="swatch current-area" /> Current area</li>
-              <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")}><i className="swatch later-area" /> Later expansion</li>
+              <li onMouseEnter={() => setTip(TIER_NOTES.L10.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(TIER_NOTES.L10.note)}><i className="swatch l10" /> {TIER_NOTES.L10.label}</li>
+              <li onMouseEnter={() => setTip(TIER_NOTES.L4.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(TIER_NOTES.L4.note)}><i className="swatch l4" /> {TIER_NOTES.L4.label}</li>
+              <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.current)}><i className="swatch current-area" /> Current area</li>
+              <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.later)}><i className="swatch later-area" /> Later expansion</li>
             </ul>
           ) : null}
           {tip ? <p className="tip">{tip}</p> : null}
@@ -570,6 +716,7 @@ export default function Explorer() {
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onClose={() => choose(null)}
+            sheet={sheet}
           />
         ) : selectedSite ? (
           <Detail
@@ -586,6 +733,7 @@ export default function Explorer() {
             onAddCompare={() => addCompare(selectedSite.site_id)}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
+            sheet={sheet}
           />
         ) : null}
         {compareIds.length >= 2 ? (
@@ -613,6 +761,7 @@ export default function Explorer() {
       {tableOpen ? (
         <section className="dock">
           <div className="dock-tabs">
+            <button className="only-mobile" type="button" onClick={() => setTableOpen(false)}>Map</button>
             {(["universe", "pipeline", "land"] as const).map((tab) => (
               <button key={tab} className={tableTab === tab ? "on" : ""} type="button" onClick={() => setTableTab(tab)}>
                 {tab === "universe" ? "Universe" : tab === "pipeline" ? "Pipeline" : "Land"}

@@ -28,6 +28,7 @@ export default function Detail({
   onAddCompare,
   sameOwner,
   onClose,
+  sheet,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -37,12 +38,14 @@ export default function Detail({
   onAddCompare?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
+  sheet?: { expanded: boolean; onToggle: () => void };
 }) {
   if (!site) return null;
   const price = site.asking_price_display;
   const why = site.summary_why || "Not screened yet.";
   return (
-    <aside className="drawer">
+    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+      <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       <button className="close" type="button" onClick={onClose}>Close</button>
       <h3>Summary</h3>
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
@@ -167,6 +170,7 @@ export function DealDetail({
   lng,
   onOpenSite,
   onClose,
+  sheet,
 }: {
   deal: DealProps;
   universeName?: string;
@@ -175,9 +179,11 @@ export function DealDetail({
   lng?: number | null;
   onOpenSite?: () => void;
   onClose?: () => void;
+  sheet?: { expanded: boolean; onToggle: () => void };
 }) {
   return (
-    <aside className="drawer">
+    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+      <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       <button className="close" type="button" onClick={onClose}>Close</button>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>

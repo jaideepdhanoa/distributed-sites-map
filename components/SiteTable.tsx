@@ -8,7 +8,7 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
-import { stageDetail } from "@/lib/labels";
+import { TIER_NOTES, plainUtility, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
@@ -19,18 +19,32 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "site_id", header: "Site" },
   { accessorKey: "name", header: "Name" },
   { accessorKey: "city", header: "City" },
-  { accessorKey: "land_tier", header: "Tier" },
-  { accessorKey: "verdict", header: "Verdict" },
+  {
+    id: "tier",
+    accessorFn: (row) => tierLabel(row.land_tier),
+    header: "Spare land",
+    cell: ({ row }) => {
+      const code = row.original.land_tier;
+      const label = tierLabel(code);
+      const note = code ? TIER_NOTES[code]?.note : "";
+      return label ? <span title={note}>{label}</span> : "—";
+    },
+  },
+  { id: "verdict", accessorFn: (row) => plainVerdict(row.verdict), header: "Verdict" },
+  { accessorKey: "zoning", header: "Zoning" },
+  { accessorKey: "flood_zone", header: "Flood" },
+  { accessorKey: "year_built", header: "Year built" },
+  { accessorKey: "miles_to_depot", header: "Depot mi" },
+  { id: "utility", accessorFn: (row) => plainUtility(row.utility_proximity), header: "Utility proximity" },
   { accessorKey: "spare_ac_own", header: "Own ac" },
   { accessorKey: "spare_ac_adjoining", header: "Adjoining ac" },
-  { accessorKey: "utility_proximity", header: "Utility proximity" },
   { accessorKey: "tenure", header: "Tenure" },
   { accessorKey: "listed", header: "Listed", cell: ({ getValue }) => yesNo(getValue()) },
   { accessorKey: "contacted", header: "Contacted", cell: ({ getValue }) => yesNo(getValue()) },
   { accessorKey: "asking_price_display", header: "Asking" },
   {
     id: "why",
-    accessorKey: "why_stopped",
+    accessorKey: "summary_why",
     header: "Why",
     cell: ({ getValue }) => {
       const value = String(getValue() || "");
@@ -49,7 +63,7 @@ export default function SiteTable({
   onSelect: (id: string) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const showWhy = rows.some((row) => row.why_stopped);
+  const showWhy = rows.some((row) => row.summary_why);
   const table = useLegacyTable({
     data: rows,
     columns: showWhy ? columns : columns.filter((column) => column.id !== "why"),

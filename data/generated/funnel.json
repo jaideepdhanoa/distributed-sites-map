@@ -1,22 +1,5 @@
 {
-  "generated_at": "2026-11-03T22:37:37Z",
-  "muse_reference": {
-    "in_area_sites": 1043,
-    "by_city": {
-      "LAS": 179,
-      "PHX": 254,
-      "MIA": 610
-    },
-    "note": "Earlier reference for the service-area step. The map shows our screen, not this reference.",
-    "unique_sites": 1640,
-    "verdict": {
-      "PASS": 10,
-      "MAYBE": 21,
-      "FAIL": 21,
-      "NOT_A_WASH": 11,
-      "UNRESOLVED": 2
-    }
-  },
+  "generated_at": "2026-11-04T00:19:31Z",
   "stages": [
     {
       "id": "census",

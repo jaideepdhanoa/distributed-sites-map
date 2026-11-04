@@ -1,5 +1,5 @@
 import type { DealProps, SiteProps } from "@/lib/types";
-import { stageDetail, stageTitle, statusOf } from "@/lib/labels";
+import { nextStepText, plainUtility, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -35,35 +35,49 @@ export default function Detail({
   onClose?: () => void;
 }) {
   if (!site) return null;
-  const reasons = [site.evidence, site.why_stopped, site.elimination_reason].filter((line, index, all) => line && all.indexOf(line) === index);
   const price = site.asking_price_display;
+  const why = site.summary_why || "Not screened yet.";
   return (
     <aside className="drawer">
       <button className="close" type="button" onClick={onClose}>Close</button>
+      <h3>Summary</h3>
+      <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
+      <p>Next step: {nextStepText(site)}</p>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {site.land_tier ? <span className={`badge ${site.land_tier === "L10" ? "l10" : "l4"}`}>{site.land_tier}</span> : null}
-        {site.tier_from_adjoining ? <span className="badge l4">Tier from same-owner adjoining land</span> : null}
+        {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
+        {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         {site.land_only ? <span className="badge pending">Land site</span> : null}
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{site.name || site.address || site.site_id}</h2>
+      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
       {mapsLinks(lat, lng)}
       <h3>Owner</h3>
       <p>{site.owner || "—"}</p>
+      {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}
+      {site.assessor_source ? <p className="note">{site.assessor_source}</p> : null}
       <h3>Land</h3>
       <div className="kv">
         <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
         <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
         <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
+        <span>Zoning</span><div>{site.zoning || "—"}</div>
+        <span>Flood</span><div>{site.flood_zone || "—"}</div>
+        <span>Year built</span><div>{site.year_built || "—"}</div>
+        <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
+        <span>County full cash value</span><div>{site.full_cash_value_display || "—"}</div>
+        <span>Last recorded sale</span><div>{[site.last_sale_date, site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
       </div>
       <h3>Verdict</h3>
       <div className="kv">
-        <span>Verdict</span><div>{site.verdict || "Not checked"}</div>
-        <span>Utility proximity</span><div>{site.utility_proximity || "Unknown"}</div>
+        <span>Verdict</span><div>{plainVerdict(site.verdict)}</div>
+        <span>Operating</span><div>{site.operating || "—"}</div>
+        <span>Utility proximity</span><div>{plainUtility(site.utility_proximity)}</div>
+        <span>Serving utility</span><div>{site.serving_utility || "—"}{site.serving_utility_source ? ` · ${site.serving_utility_source}` : ""}</div>
         <span>Tenure</span><div>{site.tenure || "—"}</div>
       </div>
       {site.research_sources ? (
@@ -73,7 +87,12 @@ export default function Detail({
           {site.research_note ? <p>{site.research_note}</p> : null}
         </>
       ) : null}
-      {reasons.length ? reasons.map((reason) => <p key={reason}>{reason}</p>) : null}
+      {site.evidence ? (
+        <details>
+          <summary>Research notes</summary>
+          <p>{site.evidence}</p>
+        </details>
+      ) : null}
       {price ? (
         <>
           <h3>Asking price</h3>
@@ -96,7 +115,9 @@ export default function Detail({
       <div className="kv">
         <span>Listed</span><div>{site.listed ? "Yes" : "No"}</div>
         <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
-        <span>Nearest depot</span><div>{depotMiles == null ? "—" : `${depotMiles.toFixed(1)} mi`}</div>
+        <span>Nearest depot</span><div>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
+        <span>County parcel</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
+        <span>Street View</span><div>{site.street_view_url ? <a href={site.street_view_url} target="_blank" rel="noopener noreferrer">Open Street View</a> : "—"}</div>
         <span>Parcel</span><div>{site.parcel_match === "none" ? "No parcel found" : site.parcel_match === "pin location" ? "Matched by pin location" : site.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
         {site.listed ? (
           <>
@@ -149,7 +170,7 @@ export function DealDetail({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>
         <span className="badge checked">{stageTitle(deal.stage_group)}</span>
-        {deal.listed ? <span className="badge l10">Listed</span> : null}
+        {deal.listed ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>

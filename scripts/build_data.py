@@ -242,7 +242,106 @@ def plain_note(value) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = re.sub(r"\s+([,.;:])", r"\1", cleaned)
     cleaned = re.sub(r"(?:\s*[,;]\s*){2,}", ", ", cleaned)
-    return cleaned.strip(" ,;:-")
+    return strip_stall(cleaned).strip(" ,;:-")
+
+
+def strip_stall(text: str) -> str:
+    """Ship no stall wording. A numbered tier becomes a land-size phrase."""
+
+    def tier(match: re.Match) -> str:
+        number = int(match.group(1))
+        return "larger land tier" if number >= 10 else "smaller land tier"
+
+    cleaned = re.sub(r"(?i)\b(\d+)\s*-?\s*stalls?\s+tier\b", tier, text or "")
+    cleaned = re.sub(r"(?i)\bstalls\b", "bays", cleaned)
+    cleaned = re.sub(r"(?i)\bstall\b", "bay", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _title_if_shouting(text: str) -> str:
+    letters = [char for char in text if char.isalpha()]
+    if letters and all(char.isupper() for char in letters):
+        return text.title()
+    return text
+
+
+def display_name_parts(raw: str) -> tuple[str, list[str]]:
+    """One business name, plus the other names a reader might search for."""
+    pieces = []
+    for piece in re.split(r"\s*\|\s*", raw or ""):
+        piece = re.sub(r"(?i)\([^)]*(?:=|fuel|car_wash)[^)]*\)", " ", piece)
+        piece = re.sub(r"(?i)\bcar_wash\s*=\s*\w+\b", " ", piece)
+        piece = re.sub(r"\s+", " ", piece).strip(" -.,")
+        if not piece:
+            continue
+        pieces.append(_title_if_shouting(piece))
+
+    def key(value: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", value.lower())
+
+    kept: list[str] = []
+    for piece in pieces:
+        token = key(piece)
+        if not token:
+            continue
+        if any(token == key(existing) or token in key(existing) for existing in kept):
+            continue
+        kept = [existing for existing in kept if key(existing) not in token]
+        kept.append(piece)
+
+    def score(value: str) -> tuple:
+        low = value.lower()
+        return (
+            1 if re.search(r"car\s*wash|carwash", low) else 0,
+            1 if re.search(r"#\s*\d+|\b\d{2,}\b", value) else 0,
+            len(value),
+        )
+
+    if not kept:
+        return "", []
+    best = max(kept, key=score)
+    alternates = [piece for piece in kept if key(piece) != key(best)]
+    return best, alternates
+
+
+def summary_why(site: dict) -> str:
+    """One or two plain sentences from the verdict and the spare-land numbers."""
+
+    def acres(value) -> str:
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+            return ""
+        rounded = round(float(value), 1)
+        if rounded <= 0:
+            return ""
+        return f"{rounded:.1f}".rstrip("0").rstrip(".")
+
+    own = acres(site.get("spare_ac_own"))
+    adjoining = acres(site.get("spare_ac_adjoining"))
+    verdict = site.get("verdict")
+    if verdict == "PASS":
+        if own and adjoining:
+            text = f"County check confirmed about {own} ac of spare land on the parcel, plus about {adjoining} ac on adjoining land with the same owner."
+        elif own:
+            text = f"County check confirmed about {own} ac of spare land on the parcel."
+        elif adjoining:
+            text = f"County check confirmed about {adjoining} ac of spare land on adjoining land with the same owner."
+        else:
+            text = "County check confirmed spare land on the parcel."
+        if site.get("network_status") == "held" or not site.get("in_area"):
+            text += " It sits outside the current service area."
+    elif verdict == "MAYBE":
+        text = f"County check found about {own} ac of spare land. It needs a closer look." if own else "County check found borderline spare land. It needs a closer look."
+    elif verdict == "FAIL":
+        text = "Not enough spare land on the parcel."
+    elif verdict == "NOT_A_WASH":
+        text = "This place is not operating as a car wash."
+    elif verdict == "UNRESOLVED":
+        text = "A key fact is still missing, so the county check is not finished."
+    elif site.get("land_tier"):
+        text = "Imagery suggests there is spare land. County records have not been checked."
+    else:
+        text = "Not screened yet."
+    return text[:200]
 
 
 def sanitize_site_notes(site: dict) -> int:
@@ -1472,8 +1571,19 @@ def deal_text_problems(deal_id: str, props: dict) -> list[str]:
 
 def _geocode_query(row: dict) -> str:
     label = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", str(row.get("Site") or "").strip(), flags=re.I)
-    if not label or "address to come" in label.lower() or not re.match(r"\d", label):
+    if not label or "address to come" in label.lower():
         return ""
+    # A house number may sit after a business name. Leads with no street number stay unplaced.
+    found = re.search(r"\b\d{2,6}\s+[A-Za-z]", label)
+    if not found:
+        name = str(row.get("Name") or "")
+        found = re.search(r"\b\d{2,6}\s+[A-Za-z]", name)
+        if found:
+            label = name[found.start() :]
+        else:
+            return ""
+    elif found.start():
+        label = label[found.start() :]
     market = str(row.get("Market") or "").strip()
     blob = f"{label} {row.get('Name') or ''}".lower()
     hinted = ""
@@ -2428,6 +2538,8 @@ def scan_obj(obj, path="$"):
         hits = banned_hits(obj)
         if hits:
             problems.append(f"banned text at {path}: {obj[:140]!r}")
+        if re.search(r"(?i)\bstalls?\b", obj):
+            problems.append(f"stall wording at {path}: {obj[:140]!r}")
     return problems
 
 
@@ -2751,6 +2863,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "site_id": sid,
             "city": city,
             "name": "",
+            "also_known_as": "",
+            "summary_why": "",
             "address": "",
             "apn": "",
             "lat": None,
@@ -2774,7 +2888,16 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "land_control": "",
             "network_status": None,
             "reconciliation_tier": "",
-            "muse_verdict": None,
+            "second_review_verdict": None,
+            "serving_utility": "",
+            "serving_utility_source": "",
+            "owner_mail": "",
+            "assessed_value_display": "",
+            "full_cash_value_display": "",
+            "last_sale_date": "",
+            "last_sale_price_display": "",
+            "year_built": "",
+            "assessor_source": "",
             "verdict_disagreement": False,
             "acreage_note": "",
             "scale_note": "",
@@ -2940,7 +3063,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         if not site:
             continue
         muse_verdict = muse_override.get(sid) or parse_muse_label(row.get("muse_updated_v4"))
-        site["muse_verdict"] = muse_verdict
+        site["second_review_verdict"] = muse_verdict
         playbook, land_tier = map_playbook(str(row.get("final_tier") or ""), muse_verdict)
         site["verdict"] = playbook
         site["land_control"] = land_tier or ""
@@ -3314,6 +3437,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         elif site["origin"] == "universe" and not site["in_area"]:
             site["why_stopped"] = "Outside the operative service area."
         sanitize_site_notes(site)
+        display, alternates = display_name_parts(site.get("name") or "")
+        if display:
+            site["name"] = display
+        site["also_known_as"] = "; ".join(alternates)
+        site["summary_why"] = summary_why(site)
 
     # Funnel numbers use records that count as a site.
     countable = [site for site in sites if site["counts_as_site"] and site["origin"] == "universe"]
@@ -3348,13 +3476,6 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     funnel = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "muse_reference": {
-            "in_area_sites": 1043,
-            "by_city": {"LAS": 179, "PHX": 254, "MIA": 610},
-            "note": "Earlier reference for the service-area step. The map shows our screen, not this reference.",
-            "unique_sites": 1640,
-            "verdict": {"PASS": 10, "MAYBE": 21, "FAIL": 21, "NOT_A_WASH": 11, "UNRESOLVED": 2},
-        },
         "stages": [
             {
                 "id": "census",
@@ -3490,7 +3611,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             f"Pipeline tab has {len(pipeline_rows)} rows (stages {dict(Counter(str(r.get('Stage')) for r in pipeline_rows))}). The older note of 79 is not in this export."
         )
     if muse_file and len(muse_override) == 0:
-        warnings.append("The muse verdict file was set but no site rows were read.")
+        warnings.append("The review file was set but no site rows were read.")
     for sid in ("PHX-U644", "PHX-U646"):
         site = by_id.get(sid)
         if site and site.get("counts_as_site"):
@@ -3500,8 +3621,12 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     depots = build_depots()
     deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"])
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
+    public_records = {"note": "Public-record fields are added when the build writes files."}
     if write:
         parcels, parcel_meta = build_parcels(sites, refresh_parcels, deals_fc["features"])
+        from enrich_public import apply_public_records
+
+        public_records = apply_public_records(sites, norm_apn)
 
     site_features = []
     for site in sites:
@@ -3536,7 +3661,6 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "unique_sites_counted": len(countable),
         "same_parcel_collapsed": duplicate_of,
         "in_area": {"total": len(in_area), "by_city": by_city(in_area), "by_class": class_breakdown(in_area)},
-        "muse_in_area_reference": funnel["muse_reference"],
         "land_tiers": {
             "L10": len(l10),
             "L4": len(l4),
@@ -3581,7 +3705,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "acreage_notes": [site["site_id"] for site in sites if site["acreage_note"]],
         "scale_notes": [site["site_id"] for site in sites if site["scale_note"]],
         "parcels": parcel_meta,
-        "muse_source": muse_file or "second review column",
+        "public_records": public_records,
+        "review_source": muse_file or "second review column",
         "warnings": warnings,
         "skipped": [
             "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -3591,6 +3716,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "The 75–250 m review band was not recomputed. The one same-parcel pair found by APN is flagged.",
             "Edge-band distance to the polygon was not recomputed.",
             "Outreach drafts are not loaded.",
+            "Place records with a phone and website were not joined. The census file has no place id, and the public places extract is too large to download here.",
             "Human verdict write-back is a later version and is not in this app.",
         ],
     }
@@ -3760,6 +3886,9 @@ def validate_committed() -> None:
                 source = row.get("source_file") or ""
                 if _NOTE_INTERNAL.search(blob) or re.search(r"(?i)\b(muse|indie|torque)\b", blob + " " + source):
                     problems.append(f"verdict note {row.get('site_id')}: {(blob + ' ' + source)[:120]!r}")
+                    break
+                if re.search(r"(?i)\bstalls?\b", blob):
+                    problems.append(f"stall wording in verdict {row.get('site_id')}")
                     break
     if len(loaded["depots.geojson"].get("features", [])) != 13:
         problems.append("expected 13 depot pins")

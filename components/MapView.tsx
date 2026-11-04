@@ -16,12 +16,32 @@ type Props = {
   showAreas: boolean;
   showDepots: boolean;
   showSites: boolean;
+  showRings: boolean;
   focusLng: number;
   focusLat: number;
   focusZoom: number;
   onSelect: (id: string) => void;
   onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
 };
+
+function ringPoint(lon: number, lat: number, miles: number, step: number): [number, number] {
+  const angle = (step / 64) * Math.PI * 2;
+  const latRad = (lat * Math.PI) / 180;
+  return [lon + (miles / (69 * Math.cos(latRad))) * Math.cos(angle), lat + (miles / 69) * Math.sin(angle)];
+}
+
+function depotRings(depots: GeoFeature[]) {
+  const features = [];
+  for (const depot of depots) {
+    const coords = depot.geometry && depot.geometry.type === "Point" ? (depot.geometry.coordinates as number[]) : null;
+    if (!coords) continue;
+    for (const miles of [5, 10]) {
+      const ring = Array.from({ length: 65 }, (_, index) => ringPoint(coords[0], coords[1], miles, index));
+      features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: { miles } });
+    }
+  }
+  return features;
+}
 
 function acresOf(coords: [number, number][]) {
   const radius = 6378137;
@@ -110,11 +130,13 @@ export default function MapView(props: Props) {
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
         },
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
+          { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f7e2a8", "line-dasharray": [1.2, 1.2], "line-width": 1.4, "line-opacity": 0.9 } },
           { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
           { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#b7f0c8", "fill-opacity": 0.14 } },
           { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#f4fff7", "line-width": 2.4 } },
@@ -155,6 +177,54 @@ export default function MapView(props: Props) {
             source: "offmarket",
             filter: ["==", ["get", "site_id"], ""],
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
+          },
+          {
+            id: "tier-large-halo",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#f4f7fb",
+              "circle-stroke-width": 6,
+            },
+          },
+          {
+            id: "tier-large",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#3e4d60",
+              "circle-stroke-width": 2.6,
+            },
+          },
+          {
+            id: "tier-small-halo",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#f4f7fb",
+              "circle-stroke-width": 5,
+            },
+          },
+          {
+            id: "tier-small",
+            type: "circle",
+            source: "sites",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#3e4d60",
+              "circle-stroke-width": 2.2,
+            },
           },
           {
             id: "sites",
@@ -381,6 +451,7 @@ export default function MapView(props: Props) {
       (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.deals.filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
+      (map.getSource("rings") as GeoJSONSource).setData({ type: "FeatureCollection", features: depotRings(props.depots) });
       (map.getSource("parcels") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.parcels });
       (map.getSource("area-labels") as GeoJSONSource).setData({ type: "FeatureCollection", features: areaLabels(props.areas) });
       if (map.getLayer("parcels-selected")) {
@@ -410,7 +481,12 @@ export default function MapView(props: Props) {
       vis("area-labels", props.showAreas);
       vis("depots", props.showDepots);
       vis("depot-labels", props.showDepots);
+      vis("rings", props.showRings);
       vis("sites", props.showSites);
+      vis("tier-large", props.showSites);
+      vis("tier-large-halo", props.showSites);
+      vis("tier-small", props.showSites);
+      vis("tier-small-halo", props.showSites);
       vis("linked", props.showSites);
       vis("selected", props.showSites);
     };

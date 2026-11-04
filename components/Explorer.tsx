@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES } from "@/lib/labels";
+import { AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, stageTitle } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -21,7 +21,7 @@ const PIPE_STEPS: { id: PipeId; label: string }[] = [
 const STEPS: { id: StageId; label: string }[] = [
   { id: "universe", label: "Universe" },
   { id: "in_area", label: "In service area" },
-  { id: "land", label: "L10 / L4" },
+  { id: "land", label: "Spare land" },
   { id: "county", label: "County-checked" },
   { id: "cleared", label: "Cleared" },
 ];
@@ -38,15 +38,19 @@ export default function Explorer() {
   const [compare, setCompare] = useState(false);
   const [showDropped, setShowDropped] = useState(false);
   const [layersOpen, setLayersOpen] = useState(true);
-  const [showAreas, setShowAreas] = useState(true);
-  const [showDepots, setShowDepots] = useState(true);
-  const [showUniverse, setShowUniverse] = useState(true);
-  const [showPipeline, setShowPipeline] = useState(true);
-  const [showLandLayer, setShowLandLayer] = useState(false);
-  const [showDroppedDeals, setShowDroppedDeals] = useState(false);
-  const [businessTypes, setBusinessTypes] = useState<string[] | null>(null);
-  const [tableTab, setTableTab] = useState<"universe" | "pipeline" | "land">("universe");
+  const showAreas = params.get("areas") !== "0";
+  const showDepots = params.get("depots") !== "0";
+  const showUniverse = params.get("pins") !== "0";
+  const showPipeline = params.get("deals") !== "0";
+  const showLandLayer = params.get("landlayer") === "1";
+  const showDroppedDeals = params.get("dropped") === "1";
+  const showRings = params.get("rings") === "1";
+  const typesParam = params.get("types");
+  const businessTypes = typesParam ? typesParam.split("|").filter(Boolean) : null;
+  const tabParam = params.get("tab");
+  const tableTab: "universe" | "pipeline" | "land" = tabParam === "pipeline" || tabParam === "land" ? tabParam : "universe";
   const [tip, setTip] = useState("");
+  const [copied, setCopied] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(true);
 
@@ -73,10 +77,20 @@ export default function Explorer() {
     router.replace(`/?${url.toString()}`, { scroll: false });
   }
 
+  function setTableTab(tab: "universe" | "pipeline" | "land") {
+    write({ tab: tab === "universe" ? null : tab });
+  }
+
+  async function copyLink() {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
   useEffect(() => {
     let cancel = false;
     Promise.all([
-      fetch("/api/data/sites"),
+      fetch(`/api/data/sites?city=${city}`),
       fetch("/api/data/areas"),
       fetch("/api/data/depots"),
       fetch(`/api/data/parcels?city=${city}`),
@@ -111,6 +125,11 @@ export default function Explorer() {
   }, [city]);
 
   const features = data?.sites.features ?? [];
+  const featureById = useMemo(() => {
+    const map = new Map<string, SiteFeature>();
+    for (const feature of features) map.set(feature.properties.site_id, feature);
+    return map;
+  }, [features]);
   const censusFeatures = features.filter((feature) => feature.properties.origin !== "off-market");
   const sites = censusFeatures.map((feature) => feature.properties);
   const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && feature.properties.city === city);
@@ -118,7 +137,7 @@ export default function Explorer() {
   function passesChips(site: SiteProps, loose: boolean) {
     if (site.city !== city) return false;
     if (query) {
-      const blob = `${site.site_id} ${site.name} ${site.address} ${site.apn} ${site.owner}`.toLowerCase();
+      const blob = `${site.site_id} ${site.name} ${site.also_known_as || ""} ${site.address} ${site.apn} ${site.owner}`.toLowerCase();
       if (!blob.includes(query.toLowerCase())) return false;
     }
     if (loose) return true;
@@ -133,6 +152,10 @@ export default function Explorer() {
     return businessTypes === null || businessTypes.includes(type);
   }
 
+  function setBusinessTypes(next: string[] | null) {
+    write({ types: next && next.length ? next.join("|") : null });
+  }
+
   function toggleType(type: string) {
     if (businessTypes === null) {
       setBusinessTypes([type]);
@@ -143,6 +166,10 @@ export default function Explorer() {
       : [...businessTypes, type];
     setBusinessTypes(next.length === 0 || next.length === BUSINESS_TYPES.length ? null : next);
   }
+
+  useEffect(() => {
+    setTip("");
+  }, [funnel, city, stage]);
 
   const visibleSites = useMemo(() => {
     const byId = new Map<string, SiteProps>();
@@ -168,7 +195,7 @@ export default function Explorer() {
   }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes]);
 
   const visibleFeatures: SiteFeature[] = visibleSites
-    .map((site) => features.find((feature) => feature.properties.site_id === site.site_id))
+    .map((site) => featureById.get(site.site_id))
     .filter((feature): feature is SiteFeature => Boolean(feature));
 
   const dealFeatures = data?.deals.features ?? [];
@@ -190,7 +217,7 @@ export default function Explorer() {
 
   function dealPoint(deal: DealProps): [number, number] | null {
     if (deal.universe_id) {
-      const site = features.find((feature) => feature.properties.site_id === deal.universe_id);
+      const site = featureById.get(deal.universe_id);
       const coords = site?.geometry?.coordinates;
       if (coords) return [coords[0], coords[1]];
     }
@@ -311,8 +338,8 @@ export default function Explorer() {
           </div>
         </div>
         <div className="funnel-switch">
-          <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => { setTableTab("universe"); write({ funnel: null }); }}>Universe funnel</button>
-          <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => { setTableTab("pipeline"); write({ funnel: "pipeline" }); }}>Pipeline funnel</button>
+          <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe funnel</button>
+          <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline funnel</button>
         </div>
         {funnel === "universe" ? (
           <p className="census-note" title={CENSUS_NOTE} onMouseEnter={() => setTip(CENSUS_NOTE)} onMouseLeave={() => setTip("")}>Car washes</p>
@@ -320,9 +347,11 @@ export default function Explorer() {
         <div className="type-filters" aria-label="Business type">
           <button type="button" className={businessTypes === null ? "on" : ""} onClick={() => setBusinessTypes(null)}>All types</button>
           {BUSINESS_TYPES.map((type) => {
-            const count = sites.filter((site) => site.city === city && (site.business_type || "Car wash") === type).length
-              + offMarketFeatures.filter((feature) => (feature.properties.business_type || "Other") === type).length
-              + dealRows.filter((deal) => deal.city === city && (deal.business_type || "Other") === type).length;
+            const inStep = sites.filter((site) => site.city === city && inStage(site, stage) && (site.business_type || "Car wash") === type).length;
+            const offCount = offMarketFeatures.filter((feature) => (feature.properties.business_type || "Other") === type).length;
+            const count = funnel === "pipeline"
+              ? dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === pipeStage && (deal.business_type || "Other") === type && Boolean(dealPoint(deal))).length
+              : inStep || offCount;
             if (count === 0 && type !== "Car wash") return null;
             return (
               <button key={type} type="button" className={typeOn(type) && businessTypes !== null ? "on" : businessTypes === null ? "on" : ""} onClick={() => toggleType(type)}>
@@ -382,12 +411,27 @@ export default function Explorer() {
             );
           })}
         </nav>
+        {funnel === "pipeline" ? (
+          <details className="unplaced">
+            <summary>
+              {dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal)).length.toLocaleString()} unplaced deals
+            </summary>
+            <ul>
+              {dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal)).map((deal) => (
+                <li key={deal.deal_id}>
+                  <button type="button" className="text-link" onClick={() => choose(deal.deal_id)}>{deal.name || deal.address || deal.deal_id}</button>
+                  {" · "}{stageTitle(deal.stage_group)}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
         <div className="chips">
           {funnel === "universe" ? (
             <>
-              {["any", "L10", "L4"].map((item) => (
-                <button key={item} className={landTier === item ? "on" : ""} type="button" onClick={() => write({ tier: item === "any" ? null : item })}>
-                  {item === "any" ? "All tiers" : item}
+              {(["any", "L10", "L4"] as const).map((item) => (
+                <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
+                  {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
                 </button>
               ))}
               {[
@@ -412,6 +456,7 @@ export default function Explorer() {
           ) : null}
           <button className={tableOpen ? "on" : ""} type="button" onClick={() => setTableOpen((value) => !value)}>Table</button>
           <button type="button" onClick={() => setGuideOpen((value) => !value)}>How to read this</button>
+          <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
           <span
             className="summary-chip"
             title={funnel === "pipeline" ? SUMMARY_NOTES.pipeline : SUMMARY_NOTES.universe}
@@ -434,6 +479,7 @@ export default function Explorer() {
           showAreas={showAreas}
           showDepots={showDepots}
           showSites={showUniverse}
+          showRings={showRings}
           focusLng={focus.center[0]}
           focusLat={focus.center[1]}
           focusZoom={focus.zoom}
@@ -447,16 +493,17 @@ export default function Explorer() {
           <button type="button" onClick={() => setLayersOpen((value) => !value)}>{layersOpen ? "Layers" : "Layers"}</button>
           {layersOpen ? (
             <>
-              <label><input type="checkbox" checked={showAreas} onChange={(event) => setShowAreas(event.target.checked)} /> Service areas</label>
-              <label><input type="checkbox" checked={showDepots} onChange={(event) => setShowDepots(event.target.checked)} /> Depots</label>
-              <label><input type="checkbox" checked={showUniverse} onChange={(event) => setShowUniverse(event.target.checked)} /> Universe sites</label>
-              <label><input type="checkbox" checked={showPipeline} onChange={(event) => setShowPipeline(event.target.checked)} /> Pipeline deals</label>
-              <label><input type="checkbox" checked={showLandLayer} onChange={(event) => setShowLandLayer(event.target.checked)} /> Land Sites</label>
-              <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => setShowDroppedDeals(event.target.checked)} /> Dropped deals</label>
+              <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
+              <label><input type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
+              <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
+              <label><input type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
+              <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: event.target.checked ? "1" : null })} /> Land Sites</label>
+              <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
+              <label><input type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
             </>
           ) : null}
         </aside>
-        <div className="legend">
+        <div className="legend" onMouseLeave={() => setTip("")}>
           <button type="button" onClick={() => setLegendOpen((value) => !value)}>{legendOpen ? "Hide legend" : "Legend"}</button>
           {legendOpen ? (
             <ul>
@@ -465,6 +512,8 @@ export default function Explorer() {
                   <i className={`swatch ${item.id}`} /> {item.label}
                 </li>
               ))}
+              <li onMouseEnter={() => setTip(TIER_NOTES.L10.note)} onMouseLeave={() => setTip("")}><i className="swatch l10" /> {TIER_NOTES.L10.label}</li>
+              <li onMouseEnter={() => setTip(TIER_NOTES.L4.note)} onMouseLeave={() => setTip("")}><i className="swatch l4" /> {TIER_NOTES.L4.label}</li>
               <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")}><i className="swatch current-area" /> Current area</li>
               <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")}><i className="swatch later-area" /> Later expansion</li>
             </ul>
@@ -476,7 +525,7 @@ export default function Explorer() {
             <button className="close" type="button" onClick={() => setGuideOpen(false)}>Close</button>
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
-            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. L10 and L4 mean there is room for about 10 or about 4 parking bays on spare land.</p>
+            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>
             <ul>
               {STATUS_NOTES.map((item) => <li key={item.id}><strong>{item.label}.</strong> {item.note}</li>)}
@@ -496,10 +545,10 @@ export default function Explorer() {
         ) : selectedSite ? (
           <Detail
             site={selectedSite}
-            lng={features.find((item) => item.properties.site_id === selectedSite.site_id)?.geometry?.coordinates?.[0]}
-            lat={features.find((item) => item.properties.site_id === selectedSite.site_id)?.geometry?.coordinates?.[1]}
+            lng={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
+            lat={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}
             depotMiles={(() => {
-              const feature = features.find((item) => item.properties.site_id === selectedSite.site_id);
+              const feature = featureById.get(selectedSite.site_id);
               const coords = feature?.geometry?.coordinates;
               if (!coords || !data) return selectedSite.miles_to_depot;
               return nearestDepot(coords[0], coords[1], data.depots.features)?.miles ?? selectedSite.miles_to_depot;

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import type { SiteFeature } from "@/lib/types";
 
@@ -56,16 +56,32 @@ const KEEP = [
   "evidence",
   "spare_ac_own_text",
   "spare_ac_adjoining_text",
-  "muse_verdict",
+  "second_review_verdict",
   "verdict_disagreement",
   "scale_note",
+  "zoning",
+  "flood_zone",
+  "county_url",
+  "operating",
+  "street_view_url",
+  "serving_utility",
+  "serving_utility_source",
+  "owner_mail",
+  "assessed_value_display",
+  "full_cash_value_display",
+  "last_sale_date",
+  "last_sale_price_display",
+  "year_built",
+  "assessor_source",
 ] as const;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await requireUser();
   if (!isSession(session)) return session;
+  const city = request.nextUrl.searchParams.get("city");
   const full = readGenerated("sites.geojson") as { features: SiteFeature[] };
-  const features = full.features.map((feature) => {
+  const chosen = city ? full.features.filter((feature) => feature.properties.city === city) : full.features;
+  const features = chosen.map((feature) => {
     const properties: Record<string, unknown> = {};
     for (const key of KEEP) properties[key] = feature.properties[key];
     return { type: "Feature", geometry: feature.geometry, properties };

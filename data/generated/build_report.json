@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T22:37:37Z",
+  "generated_at": "2026-11-04T00:04:05Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -52,23 +52,6 @@
       "Not a wash": 45,
       "Licence-only": 15,
       "Quarantined": 2
-    }
-  },
-  "muse_in_area_reference": {
-    "in_area_sites": 1043,
-    "by_city": {
-      "LAS": 179,
-      "PHX": 254,
-      "MIA": 610
-    },
-    "note": "Earlier reference for the service-area step. The map shows our screen, not this reference.",
-    "unique_sites": 1640,
-    "verdict": {
-      "PASS": 10,
-      "MAYBE": 21,
-      "FAIL": 21,
-      "NOT_A_WASH": 11,
-      "UNRESOLVED": 2
     }
   },
   "land_tiers": {
@@ -799,10 +782,9 @@
   ],
   "parcels": {
     "counts": {
-      "cache_hit": 906,
+      "cache_hit": 927,
       "not_found": 154,
       "broward_unavailable": 44,
-      "fetched": 21,
       "features": 958,
       "adjoining": 31,
       "by_city": {
@@ -2096,9 +2078,22 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 906, 'not_found': 154, 'broward_unavailable': 44, 'fetched': 21, 'features': 958, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 446, 'PHX': 277}, 'by_method': {'parcel number': 877, 'pin location': 50}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 927, 'not_found': 154, 'broward_unavailable': 44, 'features': 958, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 446, 'PHX': 277}, 'by_method': {'parcel number': 877, 'pin location': 50}}."
   },
-  "muse_source": "second review column",
+  "public_records": {
+    "utility_by_city": {
+      "LAS": 179,
+      "MIA": 610,
+      "PHX": 254
+    },
+    "assessor_by_city": {
+      "MIA": 406,
+      "PHX": 252
+    },
+    "hifld_territories": 98,
+    "note": "Serving utility is the smallest HIFLD electric retail territory containing the pin. Water and irrigation districts are left out. Miami-Dade's parcel layer has no last-sale date or price. Clark County sale and year-built fields are a later pass."
+  },
+  "review_source": "second review column",
   "warnings": [],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -2108,9 +2103,10 @@
     "The 75\u2013250 m review band was not recomputed. The one same-parcel pair found by APN is flagged.",
     "Edge-band distance to the polygon was not recomputed.",
     "Outreach drafts are not loaded.",
+    "Place records with a phone and website were not joined. The census file has no place id, and the public places extract is too large to download here.",
     "Human verdict write-back is a later version and is not in this app."
   ],
-  "verdicts_appended": 109,
+  "verdicts_appended": 0,
   "verdicts_total": 2660,
   "parcel_bytes": {
     "parcels.geojson": 496104,

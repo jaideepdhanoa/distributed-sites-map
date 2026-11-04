@@ -67,6 +67,32 @@ export const AREA_NOTES = {
   later: "Later expansion. In Las Vegas these are rings 200 and 300. Drawn dashed, with no fill.",
 };
 
+export function plainVerdict(verdict?: string | null) {
+  if (verdict === "PASS") return "Cleared";
+  if (verdict === "MAYBE") return "Possible";
+  if (verdict === "FAIL") return "Ruled out";
+  if (verdict === "NOT_A_WASH") return "Not a wash";
+  if (verdict === "UNRESOLVED") return "Unresolved";
+  return "Not checked";
+}
+
+export function plainUtility(value?: string | null) {
+  if (value === "Strong") return "Close to a substation";
+  if (value === "OK") return "Within a normal distance";
+  if (value === "Weak") return "Far from a substation";
+  return "Not measured";
+}
+
+export function nextStepText(site: { verdict?: string | null; network_status?: string | null; land_tier?: string | null }) {
+  if (site.verdict === "PASS" && site.network_status === "held") return "Hold until the service area grows.";
+  if (site.verdict === "PASS") return "Ready for a closer look.";
+  if (site.verdict === "MAYBE") return "Needs a closer look before a decision.";
+  if (site.verdict === "UNRESOLVED") return "A missing fact still blocks a decision.";
+  if (site.verdict === "FAIL" || site.verdict === "NOT_A_WASH") return "No further work on this site.";
+  if (site.land_tier) return "County records have not been checked.";
+  return "Not screened yet.";
+}
+
 export function statusOf(site: { verdict?: string | null; network_status?: string | null; tenure_fail?: boolean; verification?: string }) {
   if (site.tenure_fail || site.verdict === "FAIL" || site.verdict === "NOT_A_WASH") return STATUS_NOTES[5];
   if (site.verdict === "PASS" && site.network_status === "held") return STATUS_NOTES[1];

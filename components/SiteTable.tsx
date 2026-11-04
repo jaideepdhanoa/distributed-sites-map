@@ -8,7 +8,7 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
-import { stageDetail } from "@/lib/labels";
+import { plainUtility, plainVerdict, stageDetail } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
@@ -20,10 +20,14 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "city", header: "City" },
   { accessorKey: "land_tier", header: "Tier" },
-  { accessorKey: "verdict", header: "Verdict" },
+  { id: "verdict", accessorFn: (row) => plainVerdict(row.verdict), header: "Verdict" },
+  { accessorKey: "zoning", header: "Zoning" },
+  { accessorKey: "flood_zone", header: "Flood" },
+  { accessorKey: "year_built", header: "Year built" },
+  { accessorKey: "miles_to_depot", header: "Depot mi" },
+  { id: "utility", accessorFn: (row) => plainUtility(row.utility_proximity), header: "Utility proximity" },
   { accessorKey: "spare_ac_own", header: "Own ac" },
   { accessorKey: "spare_ac_adjoining", header: "Adjoining ac" },
-  { accessorKey: "utility_proximity", header: "Utility proximity" },
   { accessorKey: "tenure", header: "Tenure" },
   { accessorKey: "listed", header: "Listed", cell: ({ getValue }) => yesNo(getValue()) },
   { accessorKey: "contacted", header: "Contacted", cell: ({ getValue }) => yesNo(getValue()) },

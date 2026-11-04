@@ -38,7 +38,16 @@ export type SiteProps = {
   land_control: string;
   network_status: string | null;
   reconciliation_tier: string;
-  muse_verdict: string | null;
+  second_review_verdict: string | null;
+  serving_utility?: string;
+  serving_utility_source?: string;
+  owner_mail?: string;
+  assessed_value_display?: string;
+  full_cash_value_display?: string;
+  last_sale_date?: string;
+  last_sale_price_display?: string;
+  year_built?: string;
+  assessor_source?: string;
   verdict_disagreement: boolean;
   acreage_note: string;
   scale_note: string;
@@ -153,7 +162,6 @@ export type AppData = {
   deals: { type: "FeatureCollection"; features: DealFeature[] };
   funnel: {
     generated_at: string;
-    muse_reference: { in_area_sites: number; by_city: Record<string, number>; note: string };
     stages: FunnelStage[];
   };
 };

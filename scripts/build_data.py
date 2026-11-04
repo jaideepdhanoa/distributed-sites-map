@@ -1472,8 +1472,19 @@ def deal_text_problems(deal_id: str, props: dict) -> list[str]:
 
 def _geocode_query(row: dict) -> str:
     label = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", str(row.get("Site") or "").strip(), flags=re.I)
-    if not label or "address to come" in label.lower() or not re.match(r"\d", label):
+    if not label or "address to come" in label.lower():
         return ""
+    # A house number may sit after a business name. Leads with no street number stay unplaced.
+    found = re.search(r"\b\d{2,6}\s+[A-Za-z]", label)
+    if not found:
+        name = str(row.get("Name") or "")
+        found = re.search(r"\b\d{2,6}\s+[A-Za-z]", name)
+        if found:
+            label = name[found.start() :]
+        else:
+            return ""
+    elif found.start():
+        label = label[found.start() :]
     market = str(row.get("Market") or "").strip()
     blob = f"{label} {row.get('Name') or ''}".lower()
     hinted = ""
@@ -2774,7 +2785,16 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "land_control": "",
             "network_status": None,
             "reconciliation_tier": "",
-            "muse_verdict": None,
+            "second_review_verdict": None,
+            "serving_utility": "",
+            "serving_utility_source": "",
+            "owner_mail": "",
+            "assessed_value_display": "",
+            "full_cash_value_display": "",
+            "last_sale_date": "",
+            "last_sale_price_display": "",
+            "year_built": "",
+            "assessor_source": "",
             "verdict_disagreement": False,
             "acreage_note": "",
             "scale_note": "",
@@ -2940,7 +2960,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         if not site:
             continue
         muse_verdict = muse_override.get(sid) or parse_muse_label(row.get("muse_updated_v4"))
-        site["muse_verdict"] = muse_verdict
+        site["second_review_verdict"] = muse_verdict
         playbook, land_tier = map_playbook(str(row.get("final_tier") or ""), muse_verdict)
         site["verdict"] = playbook
         site["land_control"] = land_tier or ""
@@ -3348,13 +3368,6 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     funnel = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "muse_reference": {
-            "in_area_sites": 1043,
-            "by_city": {"LAS": 179, "PHX": 254, "MIA": 610},
-            "note": "Earlier reference for the service-area step. The map shows our screen, not this reference.",
-            "unique_sites": 1640,
-            "verdict": {"PASS": 10, "MAYBE": 21, "FAIL": 21, "NOT_A_WASH": 11, "UNRESOLVED": 2},
-        },
         "stages": [
             {
                 "id": "census",
@@ -3490,7 +3503,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             f"Pipeline tab has {len(pipeline_rows)} rows (stages {dict(Counter(str(r.get('Stage')) for r in pipeline_rows))}). The older note of 79 is not in this export."
         )
     if muse_file and len(muse_override) == 0:
-        warnings.append("The muse verdict file was set but no site rows were read.")
+        warnings.append("The review file was set but no site rows were read.")
     for sid in ("PHX-U644", "PHX-U646"):
         site = by_id.get(sid)
         if site and site.get("counts_as_site"):
@@ -3500,8 +3513,12 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     depots = build_depots()
     deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"])
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
+    public_records = {"note": "Public-record fields are added when the build writes files."}
     if write:
         parcels, parcel_meta = build_parcels(sites, refresh_parcels, deals_fc["features"])
+        from enrich_public import apply_public_records
+
+        public_records = apply_public_records(sites, norm_apn)
 
     site_features = []
     for site in sites:
@@ -3536,7 +3553,6 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "unique_sites_counted": len(countable),
         "same_parcel_collapsed": duplicate_of,
         "in_area": {"total": len(in_area), "by_city": by_city(in_area), "by_class": class_breakdown(in_area)},
-        "muse_in_area_reference": funnel["muse_reference"],
         "land_tiers": {
             "L10": len(l10),
             "L4": len(l4),
@@ -3581,7 +3597,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "acreage_notes": [site["site_id"] for site in sites if site["acreage_note"]],
         "scale_notes": [site["site_id"] for site in sites if site["scale_note"]],
         "parcels": parcel_meta,
-        "muse_source": muse_file or "second review column",
+        "public_records": public_records,
+        "review_source": muse_file or "second review column",
         "warnings": warnings,
         "skipped": [
             "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -3591,6 +3608,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "The 75–250 m review band was not recomputed. The one same-parcel pair found by APN is flagged.",
             "Edge-band distance to the polygon was not recomputed.",
             "Outreach drafts are not loaded.",
+            "Place records with a phone and website were not joined. The census file has no place id, and the public places extract is too large to download here.",
             "Human verdict write-back is a later version and is not in this app.",
         ],
     }

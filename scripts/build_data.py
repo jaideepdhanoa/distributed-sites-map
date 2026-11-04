@@ -886,6 +886,160 @@ def load_csv(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def _weak_zoning(text: str) -> bool:
+    value = (text or "").strip().lower()
+    return (not value) or "unknown" in value or value in {"none", "n/a"} or "unincorporated" in value
+
+
+def _format_phone(raw: str) -> str:
+    parts = []
+    for piece in re.split(r"[;|,]+", raw or ""):
+        piece = piece.strip()
+        if not piece:
+            continue
+        digits = re.sub(r"\D", "", piece)
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
+        if len(digits) == 10:
+            parts.append(f"({digits[:3]}) {digits[3:6]}-{digits[6:]}")
+        else:
+            parts.append(piece)
+    return "; ".join(parts)
+
+
+def _gap_text_ok(text: str) -> bool:
+    return bool(text) and not banned_hits(text) and not re.search(r"(?i)\bstalls?\b", text)
+
+
+def apply_gap_fills(sites: list[dict]) -> dict:
+    """Overlay the suburb zoning, Las Vegas traffic, and business phone/website files.
+
+    The files live in data/source and are not committed. Verified zoning replaces a
+    weak or empty zone. A blank traffic count does not erase a count already on the
+    site. Phone and website use high and medium matches only. A permanently closed
+    place keeps a note and does not show a phone or website.
+    """
+    by_id = {site["site_id"]: site for site in sites}
+    counts = {"zoning": 0, "aadt": 0, "aadt_kept": 0, "phone": 0, "website": 0, "closed": 0}
+    zone_names = {
+        "TEMPE": "Tempe zoning",
+        "CHANDLER": "Chandler zoning",
+        "GILBERT": "Gilbert zoning",
+        "MESA": "Mesa zoning",
+        "PHOENIX": "Phoenix zoning",
+    }
+    zoning_path = SRC / "zoning_phx_suburbs.csv"
+    if zoning_path.exists():
+        for row in load_csv(zoning_path):
+            site = by_id.get((row.get("site_id") or "").strip())
+            if not site or (row.get("status") or "").strip().lower() != "verified":
+                continue
+            if not _weak_zoning(site.get("zoning") or ""):
+                continue
+            code = (row.get("zoning_code") or "").strip()
+            description = (row.get("zoning_description") or "").strip()
+            jurisdiction = (row.get("jurisdiction") or "").strip().upper()
+            code_only = jurisdiction == "CHANDLER" or not description
+            label = code if code_only else (f"{code} — {description}" if code else description)
+            if not _gap_text_ok(label):
+                continue
+            retrieved = (row.get("retrieval_date") or "2026-11-03").strip() or "2026-11-03"
+            source_name = zone_names.get(jurisdiction, "City zoning")
+            source = f"{source_name}, retrieved {retrieved}."
+            if code_only:
+                source += " Code only."
+            site["zoning"] = label[:80]
+            site["zoning_source"] = source
+            counts["zoning"] += 1
+    traffic_path = SRC / "aadt_las.csv"
+    if traffic_path.exists():
+        for row in load_csv(traffic_path):
+            site = by_id.get((row.get("site_id") or "").strip())
+            if not site:
+                continue
+            raw_count = (row.get("aadt") or "").strip()
+            if not raw_count:
+                if not (site.get("aadt_count") or "").strip():
+                    prior = (row.get("prior_aadt") or "").strip()
+                    if prior and _gap_text_ok(prior):
+                        site["aadt_count"] = prior
+                        prior_year = (row.get("prior_year") or "").strip()[:4]
+                        if prior_year and not site.get("aadt_year"):
+                            site["aadt_year"] = prior_year
+                if (site.get("aadt_count") or "").strip():
+                    counts["aadt_kept"] += 1
+                continue
+            try:
+                number = int(float(raw_count))
+            except ValueError:
+                continue
+            if number <= 0:
+                continue
+            status = (row.get("status") or "").strip().lower()
+            if status == "verified":
+                kind = "Verified"
+            elif status == "inferred":
+                kind = "Nearby road"
+            else:
+                continue
+            road = (row.get("road_name") or "").strip()
+            year = (row.get("aadt_year") or "").strip()[:4]
+            distance = (row.get("distance_m") or "").strip()
+            meters = ""
+            found = re.match(r"(\d+)", distance)
+            if found:
+                meters = f", {int(found.group(1)):,} m to the count segment"
+            retrieved = (row.get("retrieval_date") or "2026-11-03").strip() or "2026-11-03"
+            source = f"NDOT TRINA, retrieved {retrieved}. {kind}{meters}."
+            count = f"{number:,}"
+            if not _gap_text_ok(" ".join((count, road, year, source))):
+                continue
+            site["aadt_count"] = count
+            site["aadt_road"] = road[:80]
+            site["aadt_year"] = year
+            site["aadt_source"] = source
+            counts["aadt"] += 1
+    contact_path = SRC / "phone_website_overture.csv"
+    if contact_path.exists():
+        for row in load_csv(contact_path):
+            site = by_id.get((row.get("site_id") or "").strip())
+            if not site:
+                continue
+            confidence = (row.get("match_confidence") or "").strip().lower()
+            status = (row.get("status") or "").strip().lower()
+            if confidence not in {"high", "medium"} or status not in {"verified", "inferred"}:
+                continue
+            retrieved = (row.get("retrieval_date") or "2026-11-03").strip() or "2026-11-03"
+            source = f"Overture places, release 2026-10-21.0, retrieved {retrieved}."
+            if confidence == "medium":
+                source += " Approximate."
+            if not _gap_text_ok(source):
+                continue
+            closed = (row.get("overture_operating_status") or "").strip().lower() == "permanently_closed"
+            if closed:
+                site["phone"] = ""
+                site["phone_source"] = ""
+                site["website"] = ""
+                site["website_source"] = ""
+                site["place_note"] = "Listed as permanently closed"
+                site["place_note_source"] = source
+                counts["closed"] += 1
+                continue
+            phone = _format_phone(row.get("phone") or "")
+            if phone and _gap_text_ok(phone):
+                site["phone"] = phone
+                site["phone_source"] = source
+                counts["phone"] += 1
+            website = (row.get("website") or "").strip()
+            if website and not re.match(r"(?i)^https?://", website):
+                website = "https://" + website
+            if website and re.match(r"(?i)^https?://", website) and _gap_text_ok(website):
+                site["website"] = website
+                site["website_source"] = source
+                counts["website"] += 1
+    return counts
+
+
 def sheet_rows(path: Path, sheet: str, header_row: int) -> list[dict]:
     """Read a sheet, including hyperlink targets that are not in the cell text."""
     wb = openpyxl.load_workbook(path, read_only=False, data_only=True)
@@ -3100,6 +3254,12 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "aadt_road": "",
             "aadt_year": "",
             "aadt_source": "",
+            "phone": "",
+            "phone_source": "",
+            "website": "",
+            "website_source": "",
+            "place_note": "",
+            "place_note_source": "",
             "verdict_disagreement": False,
             "acreage_note": "",
             "scale_note": "",
@@ -3833,6 +3993,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         from enrich_context import apply_context
 
         public_records["context"] = apply_context(sites)
+    public_records["gap_fills"] = apply_gap_fills(sites)
 
     site_features = []
     for site in sites:
@@ -4141,6 +4302,38 @@ def display_language_problems(loaded: dict) -> list[str]:
     return problems
 
 
+def gap_fill_problems(props: list[dict]) -> list[str]:
+    """The suburb, traffic, and contact fills have to survive in the committed file."""
+    problems = []
+    by_id = {item.get("site_id"): item for item in props}
+    tempe = by_id.get("PHX-U1006") or {}
+    if not str(tempe.get("zoning") or "").startswith("GID") or "Tempe zoning" not in (tempe.get("zoning_source") or ""):
+        problems.append("PHX-U1006 should show its Tempe zoning and the source")
+    chandler = by_id.get("PHX-U513") or {}
+    if chandler.get("zoning") != "PAD" or "Code only" not in (chandler.get("zoning_source") or ""):
+        problems.append("PHX-U513 should show the Chandler code only")
+    terrible = by_id.get("LAS-U100") or {}
+    if terrible.get("aadt_count") != "14,300" or "Verified" not in (terrible.get("aadt_source") or ""):
+        problems.append("LAS-U100 should show the verified traffic count on its own street")
+    nearby = by_id.get("LAS-U1520") or {}
+    if nearby.get("aadt_count") != "32,500" or "Nearby road" not in (nearby.get("aadt_source") or ""):
+        problems.append("LAS-U1520 should show the nearby-road traffic count")
+    kept = by_id.get("LAS-U935") or {}
+    if kept.get("aadt_count") != "6,800":
+        problems.append("LAS-U935 should keep its earlier traffic count")
+    closed = by_id.get("MIA-U1294") or {}
+    if closed.get("place_note") != "Listed as permanently closed" or closed.get("phone") or closed.get("website"):
+        problems.append("MIA-U1294 is permanently closed and should not show a phone or website")
+    approximate = by_id.get("LAS-U1531") or {}
+    if "Approximate" not in (approximate.get("phone_source") or ""):
+        problems.append("LAS-U1531 should label its phone as approximate")
+    for item in props:
+        if item.get("place_note") == "Listed as permanently closed" and (item.get("phone") or item.get("website")):
+            problems.append(f"{item.get('site_id')} shows a phone or website for a permanently closed place")
+            break
+    return problems
+
+
 def validate_committed() -> None:
     """Check the files in git. Used when the raw source folder is not present."""
     problems: list[str] = []
@@ -4255,6 +4448,7 @@ def validate_committed() -> None:
     for item in props:
         problems.extend(site_note_problems(item))
     problems.extend(funnel_subset_problems(sites, loaded["funnel.json"], loaded.get("deals.geojson", {}).get("features", [])))
+    problems.extend(gap_fill_problems(props))
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 

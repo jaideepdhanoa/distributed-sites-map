@@ -2097,14 +2097,14 @@
       "zoning_by_city": {
         "LAS": 36,
         "MIA": 144,
-        "PHX": 20
+        "PHX": 33
       },
       "traffic_by_city": {
         "LAS": 41,
         "MIA": 556,
         "PHX": 244
       },
-      "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
+      "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Scottsdale was also queried when the old zoning note named that city even if the street address did not. Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
     }
   },
   "review_source": "second review column",

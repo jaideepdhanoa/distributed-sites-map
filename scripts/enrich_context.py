@@ -165,8 +165,10 @@ def _targets(sites: list[dict]) -> list[tuple]:
         lon, lat = float(site["lon"]), float(site["lat"])
         address = (site.get("address") or "").lower()
         zoning = site.get("zoning") or ""
+        place = f"{address} {zoning.lower()}"
         if site["city"] == "PHX" and _weak(zoning):
-            if "scottsdale" in address:
+            # Street addresses often omit the city. The old zoning note still names it.
+            if "scottsdale" in place:
                 work.append((site["site_id"], "zone", "scottsdale", lon, lat))
             work.append((site["site_id"], "zone", "maricopa", lon, lat))
         elif site["city"] == "MIA" and _weak(zoning) and lat <= 25.98:

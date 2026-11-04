@@ -139,11 +139,7 @@ export default function Explorer() {
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
-    const apply = () => {
-      const roomy = media.matches;
-      setLegendOpen(roomy);
-      setLayersOpen(roomy);
-    };
+    const apply = () => setLayersOpen(media.matches);
     apply();
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);

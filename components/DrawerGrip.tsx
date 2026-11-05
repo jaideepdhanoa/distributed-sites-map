@@ -64,8 +64,8 @@ export default function DrawerGrip() {
         event.preventDefault();
         handle.setPointerCapture(event.pointerId);
         shell.classList.add("drawer-resizing");
-        const move = (ev: PointerEvent) => {
-          const next = writeWidth(shell, stage.getBoundingClientRect().right - ev.clientX);
+        const move = (pointer: PointerEvent) => {
+          const next = writeWidth(shell, stage.getBoundingClientRect().right - pointer.clientX);
           setWidth(next);
         };
         const end = () => {

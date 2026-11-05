@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
@@ -40,6 +41,7 @@ export default function Detail({
   sameOwner,
   onClose,
   sheet,
+  extras,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -51,6 +53,7 @@ export default function Detail({
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
   sheet?: { expanded: boolean; onToggle: () => void };
+  extras?: ReactNode;
 }) {
   if (!site) return null;
   const price = site.asking_price_display;
@@ -194,6 +197,7 @@ export default function Detail({
           </p>
         </>
       ) : null}
+      {extras}
     </aside>
   );
 }
@@ -207,6 +211,7 @@ export function DealDetail({
   onOpenSite,
   onClose,
   sheet,
+  extras,
 }: {
   deal: DealProps;
   universeName?: string;
@@ -216,6 +221,7 @@ export function DealDetail({
   onOpenSite?: () => void;
   onClose?: () => void;
   sheet?: { expanded: boolean; onToggle: () => void };
+  extras?: ReactNode;
 }) {
   return (
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
@@ -275,6 +281,7 @@ export function DealDetail({
           </p>
         </>
       ) : null}
+      {extras}
     </aside>
   );
 }

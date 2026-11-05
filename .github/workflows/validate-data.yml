@@ -17,6 +17,7 @@ jobs:
       - run: python scripts/build_data.py --check
       - run: python scripts/test_changes.py
       - run: python tests/test_sync_workbook.py
+      - run: python tests/test_sync_push.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

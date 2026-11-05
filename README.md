@@ -33,6 +33,42 @@ Planned accounts, none created here: `jaideep` (admin), `cindel`, `ming`, `ricar
 
 On Vercel, sign-in refuses to run if neither Redis pair is set. Locally, without Redis, lockout is skipped.
 
+## Actions
+
+Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes a stage, and it never writes to the workbook or the Google Sheet.
+
+### Neon
+
+1. In the Vercel project, add the Neon integration from the Marketplace (or create a Neon database and connect it). This repo does not provision the database.
+2. Use the pooled connection string. Neon exposes it as `DATABASE_URL`. Do not commit that string.
+3. Redeploy. The first notes, suggestions, or saved-view request applies `db/migrations`. From a machine that has the URL, `npm run db:migrate` does the same thing.
+4. After a workbook sync rebuilds `data/generated`, run `npm run reconcile-suggestions`. The suggestions panel also checks on open. A suggestion becomes `applied` only when the generated data already matches the proposed value. Accepting a suggestion does not change what the map shows.
+
+### Roles
+
+Queue access is separate from the admin page. It is read from the account list, not from names in the code.
+
+| Access | Can do |
+|---|---|
+| viewer | Read notes and suggestions. Save a personal view. Export the suggestion CSV. |
+| contributor | Viewer, plus notes, replies, and proposals. Authors can edit or remove their own posts. |
+| reviewer | Contributor, plus accept or reject an open suggestion, resolve a thread, and share a team view. |
+
+Set it in either place:
+
+- On one account: `"actionRole":"viewer"` inside that person's `AUTH_USERS` object. An optional `"name"` is the label shown in the owner list.
+- For a whole role label: `ACTION_ROLE_MAP={"admin":"reviewer","user":"contributor"}`.
+
+If you set neither, `admin` is a reviewer and `user` is a contributor. A bad `ACTION_ROLE_MAP` falls back to that default. The accounts page shows the resolved access. Every saved note, reply, edit, removal, suggestion, decision, saved view, and export is appended to `audit_log`.
+
+Free text is checked before it is stored. Text that fails the same wording rules as the map is rejected and is not written. The rejection does not repeat the blocked text.
+
+### Suggestion CSV
+
+More → Suggestions → Download CSV. A person applies those rows in the workbook. The columns are the record, the field, the current value, the proposed value, the reason, and the status (`open`, `accepted`, `rejected`, or `applied`).
+
+Approved next steps have their own download on that panel. Columns are the site id (the permanent id when the record has one), the target date, the title, the owner, and when it was approved. Approving a next step does not change the stage and does not write the workbook. A later approval leaves the earlier one in the history on the card.
+
 Failed attempts are counted for unknown usernames as well as known ones, with the same message. A separate Redis counter limits attempts per IP (10 in 15 minutes). A username locks after 5 failures in 15 minutes.
 
 Imagery uses the public Esri World Imagery tiles. No imagery key is sent to the browser.

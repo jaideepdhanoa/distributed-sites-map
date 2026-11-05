@@ -1,7 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, readSession } from "./lib/session";
 
-const OPEN = new Set(["/login", "/api/login", "/robots.txt"]);
+const OPEN = new Set([
+  "/login",
+  "/api/login",
+  "/robots.txt",
+  "/manifest.webmanifest",
+  "/favicon.ico",
+  "/icon.svg",
+  "/apple-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
+]);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,5 +36,5 @@ function privateHeaders() {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|maplibre-gl-worker\\.js).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|icon-192.png|icon-512.png|manifest.webmanifest|maplibre-gl-worker\\.js).*)"],
 };

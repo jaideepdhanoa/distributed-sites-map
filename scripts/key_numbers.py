@@ -26,6 +26,7 @@ _CAPACITY = {"strong": "Strong", "ok": "OK", "weak": "Weak", "unknown": "Unknown
 _VERIFIED = re.compile(r"(?i)\b(?:appraisal|alta|survey)\b")
 _ESTIMATED = re.compile(r"(?i)(?:imagery|aerial|satellite|rough|visual|assumes|±|\+/-)")
 _UNKNOWN = re.compile(r"(?i)(?:no address|not yet|unknown|isn.t identified|not measured)")
+_GONE = re.compile(r"(?i)delist|listing removed|not live|sold or withdrawn|withdrawn")
 
 FIGURE_FIELDS = (
     "land_acres",
@@ -129,6 +130,11 @@ def public_source(text: str) -> str:
 
 def _round_acres(value: float) -> float:
     return round(value, 2)
+
+
+def listing_gone(status) -> bool:
+    """True when the workbook says the listing is gone or no longer live."""
+    return bool(_GONE.search(str(status or "")))
 
 
 def key_figures(row: dict, kind: str) -> dict:

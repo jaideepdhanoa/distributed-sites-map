@@ -148,8 +148,36 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   margin: 10px 0 4px;
 }
 .drawer p { margin: 4px 0; font-size: 14px; }
-.map-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.map-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .map-links a { font-weight: 650; }
+a.listing-link, span.listing-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid var(--pine);
+  border-radius: 999px;
+  background: #e3efe7;
+  color: var(--pine);
+  font-weight: 650;
+  line-height: 1.2;
+  text-decoration: none;
+}
+span.listing-link.muted {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 550;
+  padding-left: 0;
+}
+.site-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.site-name-text { overflow: hidden; text-overflow: ellipsis; }
+.listing-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--pine);
+  vertical-align: middle;
+}
+.listing-icon.muted, .listing-icon.removed { color: var(--muted); }
 .legend {
   position: absolute;
   z-index: 2;
@@ -444,7 +472,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-table tr.on td { background: #e7f0ea; }
 .list-cards { display: none; list-style: none; margin: 0; padding: 0; }
 .list-cards li { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 8px 12px; }
-.list-cards button { border: 0; background: transparent; text-align: left; padding: 0; }
+.list-cards button { flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; padding: 0; }
 .list-cards strong, .list-cards span { display: block; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }

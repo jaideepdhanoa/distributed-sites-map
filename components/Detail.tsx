@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
-import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
@@ -22,14 +22,33 @@ function websiteLabel(url: string) {
   }
 }
 
-function mapsLinks(lat?: number | null, lng?: number | null) {
-  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return null;
-  const point = `${lat},${lng}`;
+function mapsLinks(
+  lat?: number | null,
+  lng?: number | null,
+  listing?: { listing_url?: string | null; listing_removed?: boolean | null } | null,
+  required = false,
+) {
+  const hasMap = lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
+  const cue = listing ? listingCue(listing) : null;
+  const showListing = Boolean(cue && (required || cue.url));
+  if (!hasMap && !showListing) return null;
+  const point = hasMap ? `${lat},${lng}` : "";
   return (
     <p className="map-links">
-      <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
-      {" · "}
-      <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}`} target="_blank" rel="noopener noreferrer">Street View</a>
+      {hasMap ? (
+        <>
+          <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+          {" · "}
+          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}`} target="_blank" rel="noopener noreferrer">Street View</a>
+        </>
+      ) : null}
+      {showListing && cue ? (
+        cue.url ? (
+          <a className="listing-link" data-testid="listing-link" href={cue.url} target="_blank" rel="noopener noreferrer">{cue.label}</a>
+        ) : (
+          <span className="listing-link muted" data-testid="listing-link">{cue.label}</span>
+        )
+      ) : null}
     </p>
   );
 }
@@ -94,7 +113,7 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
-      {mapsLinks(lat, lng)}
+      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -311,7 +330,7 @@ export function DealDetail({
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""}</p>
-      {mapsLinks(lat, lng)}
+      {mapsLinks(lat, lng, deal, true)}
       {onCompare ? (
         <label className="compare-check">
           <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
@@ -352,11 +371,9 @@ export function DealDetail({
         <span>Listing</span>
         <div>
           {deal.listing_url ? (
-            <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
-          ) : deal.source_kind === "off-market" ? (
-            "Off-market"
+            <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">{listingCue(deal).label}</a>
           ) : (
-            "No listing link on file"
+            listingCue(deal).label
           )}
         </div>
         <span>Parcel</span>

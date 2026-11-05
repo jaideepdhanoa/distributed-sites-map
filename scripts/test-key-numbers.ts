@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { listingCue } from "../lib/format.ts";
 import { cashTile, inRange, peerNote, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
@@ -57,4 +58,7 @@ assert.equal(cashTile(deal({ figures_status: "shown", stated_cash_flow_display: 
 assert.deepEqual(tileAmount(4990000, "$4,990,000"), { text: "$4.99M", title: "$4,990,000" });
 assert.deepEqual(tileAmount(7000000, "$7,000,000"), { text: "$7M", title: "$7,000,000" });
 assert.deepEqual(tileAmount(null, ""), { text: "Not provided", title: "Not provided" });
+assert.equal(listingCue({ listing_url: "https://www.loopnet.com/Listing/1" }).label, "View on LoopNet ↗");
+assert.equal(listingCue({ listing_url: "" }).label, "No listing page on file");
+assert.equal(listingCue({ listing_url: "https://www.bizbuysell.com/x", listing_removed: true }).label, "View on BizBuySell ↗ (may be removed)");
 console.log("key numbers ok");

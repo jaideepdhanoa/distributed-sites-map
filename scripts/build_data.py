@@ -31,7 +31,7 @@ import openpyxl
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from scripts.key_numbers import FIGURE_FIELDS, key_figures
+from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
 
 SRC = ROOT / "data" / "source"
 OUT = ROOT / "data" / "generated"
@@ -1629,6 +1629,7 @@ DEAL_FIELDS = (
     "coord_status",
     "miles_to_depot",
     "listed",
+    "listing_removed",
     "parcel_match",
     "parcel_acres",
     "source_line",
@@ -2240,6 +2241,7 @@ def build_deal_layer(
                 "coord_status": status,
                 "miles_to_depot": miles,
                 "listed": str(row.get("Listing status") or "").strip() == "Listed",
+                "listing_removed": listing_gone(row.get("Listing status")),
                 "parcel_match": "",
                 "parcel_acres": None,
                 "source_line": source_line,

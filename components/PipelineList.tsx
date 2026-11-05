@@ -15,7 +15,7 @@ import {
   summaryOf,
   acresTotal,
 } from "@/lib/keyNumbers";
-import { shownPriceSource } from "@/lib/format";
+import { listingCue, shownPriceSource } from "@/lib/format";
 import { stageDetail, stageTone } from "@/lib/labels";
 
 export type PipelineRow = {
@@ -221,6 +221,11 @@ export default function PipelineList({
                         <span className="no-pin">No pin</span>
                       ) : column === "stage" ? (
                         <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column)}</span>
+                      ) : column === "site" ? (
+                        <span className="site-name">
+                          <span className="site-name-text">{cell(row, column)}</span>
+                          <ListingIcon deal={row.deal} />
+                        </span>
                       ) : (
                         cell(row, column)
                       )}
@@ -242,6 +247,7 @@ export default function PipelineList({
                 <span>{dealAsking(row)} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
                 {row.noPin ? <span className="no-pin">No pin</span> : null}
               </button>
+              <ListingIcon deal={row.deal} />
             </li>
           ))}
         </ul>
@@ -252,4 +258,23 @@ export default function PipelineList({
 
 function dealAsking(row: PipelineRow) {
   return row.deal.asking_price_display || "Asking not provided";
+}
+
+function ListingIcon({ deal }: { deal: DealProps }) {
+  const cue = listingCue(deal);
+  const icon = (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+  if (!cue.url) {
+    return <span className="listing-icon muted" title={cue.label} aria-label={cue.label}>{icon}</span>;
+  }
+  return (
+    <a className={`listing-icon${deal.listing_removed ? " removed" : ""}`} href={cue.url} target="_blank" rel="noopener noreferrer" title={cue.label} aria-label={cue.label} onClick={(event) => event.stopPropagation()}>
+      {icon}
+    </a>
+  );
 }

@@ -127,6 +127,7 @@ export type DealProps = {
   broker: string;
   firm: string;
   listing_url: string;
+  listing_removed?: boolean;
   asking_price: number | null;
   asking_price_display: string | null;
   asking_price_source: string;

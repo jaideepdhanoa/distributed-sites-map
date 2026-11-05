@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.build_data import geocode_queries, scan_obj
-from scripts.key_numbers import coverage, key_figures
+from scripts.key_numbers import coverage, key_figures, listing_gone
 
 
 def _row(**extra):
@@ -119,6 +119,12 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(report["counts"]["stated_cash_flow"]["active"], 1)
         self.assertEqual(report["counts"]["stated_cash_flow"]["tracked"], 1)
         self.assertEqual(report["withheld"], [{"deal_id": "PIPE-2", "name": "Held", "note": "Package figures not shown"}])
+
+    def test_listing_gone_matches_withdrawn_status(self) -> None:
+        self.assertTrue(listing_gone("Sold or withdrawn"))
+        self.assertTrue(listing_gone("Delisted"))
+        self.assertFalse(listing_gone("Listed"))
+        self.assertFalse(listing_gone(""))
 
     def test_mcnab_query_drops_the_wrong_city(self) -> None:
         self.assertEqual(

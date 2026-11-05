@@ -1,3 +1,4 @@
+import { listingCue } from "@/lib/format";
 import { AREA_KIND_LABEL, STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 import { acresText, depotLine, openLandText } from "@/lib/keyNumbers";
 
@@ -70,6 +71,7 @@ export function dealTip(props: Record<string, unknown>): TipModel {
     { label: "Per acre", value: text(props.price_per_acre_display) || "Not provided" },
     { label: "Open land", value: open || "Not measured" },
     { label: "Depot", value: depotLine(miles, miles != null) },
+    { label: "Listing", value: listingCue({ listing_url: text(props.listing_url), listing_removed: Boolean(props.listing_removed) }).label },
   ];
   return {
     title: text(props.name) || text(props.address) || text(props.deal_id) || "Deal",

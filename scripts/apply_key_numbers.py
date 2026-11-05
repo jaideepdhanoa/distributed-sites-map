@@ -31,7 +31,7 @@ from scripts.build_data import (  # noqa: E402
     split_broker,
     stage_group,
 )
-from scripts.key_numbers import FIGURE_FIELDS, coverage, key_figures  # noqa: E402
+from scripts.key_numbers import FIGURE_FIELDS, coverage, key_figures, listing_gone  # noqa: E402
 
 DEALS = ROOT / "data" / "generated" / "deals.geojson"
 STAGES = ROOT / "data" / "workbook_stages.json"
@@ -83,6 +83,7 @@ def _new_deal(row: dict, kind: str, depots: list[dict], cache: dict) -> dict:
         "coord_status": "geocoded" if coords else "failed",
         "miles_to_depot": miles,
         "listed": str(row.get("Listing status") or "").strip() == "Listed",
+        "listing_removed": listing_gone(row.get("Listing status")),
         "parcel_match": "",
         "parcel_acres": None,
         "source_line": source_line,
@@ -143,6 +144,7 @@ def apply(workbook: Path) -> dict:
                 by_id[deal_id] = feature
             else:
                 feature["properties"].update(key_figures(row, kind))
+                feature["properties"]["listing_removed"] = listing_gone(row.get("Listing status"))
                 _place_failed(feature, row, depots, cache)
             seen.add(deal_id)
     for feature in deals["features"]:

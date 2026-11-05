@@ -50,7 +50,6 @@ export default function Explorer() {
   const showDepots = params.get("depots") !== "0";
   const showUniverse = params.get("pins") !== "0";
   const showPipeline = params.get("deals") !== "0";
-  const showLandLayer = params.get("landlayer") === "1";
   const showUnscreened = params.get("newlist") === "1";
   const showDroppedDeals = params.get("dropped") === "1";
   const showRings = params.get("rings") === "1";
@@ -82,6 +81,7 @@ export default function Explorer() {
   const landSites = params.get("land") === "1";
   const query = params.get("q") || "";
   const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
+  const showLandLayer = funnel === "pipeline" ? params.get("landlayer") !== "0" : params.get("landlayer") === "1";
   const extraParam = params.get("extra");
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeParam = params.get("pstage") as PipeId | null;
@@ -346,13 +346,12 @@ export default function Explorer() {
     return blob.includes(query.toLowerCase());
   });
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
-  const landSquares = landDeals
-    .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
-    .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
+  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || deal.stage_group === pipeStage);
+  const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const drawnDeals: DealFeature[] = funnel === "pipeline"
     ? [
         ...(showPipeline ? pipelineSquares : []),
-        ...(showLandLayer ? landSquares : []),
+        ...(showLandLayer ? stageLandSquares : []),
       ]
     : [
         ...(showPipeline ? pipelineDeals.filter((deal) => !deal.universe_id) : []),
@@ -626,7 +625,7 @@ export default function Explorer() {
           <input className="search mobile-search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
         ) : null}
         <div className="funnel-row">
-          <nav className="funnel" aria-label="Funnel">
+          <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? STEPS.map((step, index) => {
               const listedHere = subcount(step.id, "listed");
               const contactedHere = subcount(step.id, "contacted");
@@ -668,24 +667,25 @@ export default function Explorer() {
                 if (!query) return true;
                 return `${deal.deal_id} ${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase());
               });
-              const squares = rows.filter((deal) => dealPoint(deal)).length;
-              const unmapped = rows.length - squares;
+              const total = rows.length + landHere.length;
+              const unmapped = [...rows, ...landHere].filter((deal) => !dealPoint(deal)).length;
               const brokerHere = [...rows, ...landHere].filter((deal) => deal.broker_contacted).length;
+              const split = landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
               return (
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                   <span className="step">
-                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
+                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere} broker contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere} broker contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
                       <span>{step.label}</span>
-                      <strong>{squares.toLocaleString()}</strong>
+                      <strong>{total.toLocaleString()}</strong>
+                      {split ? <span className="split">{split}</span> : null}
                     </button>
-                    {landHere.length > 0 ? <span className="sub">{landHere.length.toLocaleString()} land sites</span> : null}
-                    {brokerHere > 0 ? <span className="sub" title="An outbound email or call to the broker. The date is on the deal.">{brokerHere.toLocaleString()} broker contacted</span> : null}
-                    {unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
+                    {pipeStage === step.id && unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
                   </span>
                 </Fragment>
               );
             })}
+          </nav>
             {showUnscreened && withheldHere.length > 0 ? (
               <button className={`aside ${withheldOpen ? "on" : ""}`} type="button" onClick={() => { setWithheldOpen((value) => !value); setUnplacedOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
                 {withheldHere.length.toLocaleString()} address withheld
@@ -696,7 +696,6 @@ export default function Explorer() {
                 {unplacedDeals.length.toLocaleString()} unplaced
               </button>
             ) : null}
-          </nav>
           {query && funnel === "universe" && stage !== "universe" ? (
             (() => {
               const everywhere = sites.filter((site) => site.city === city && inStage(site, "universe") && passesChips(site, false)).length;
@@ -900,7 +899,7 @@ export default function Explorer() {
         ) : null}
         {!listView ? (() => {
           const missing = funnel === "pipeline"
-            ? pipelineStepRows.length - pipelineSquares.length
+            ? [...pipelineStepRows, ...stageLandRows].filter((deal) => !dealPoint(deal)).length
             : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
           return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
         })() : null}
@@ -923,19 +922,18 @@ export default function Explorer() {
               <label><input type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
               <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
               <label><input type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
-              <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: event.target.checked ? "1" : null })} /> Land Sites</label>
+              <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land Sites</label>
               <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
               <label><input type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
               <label>
                 <input type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
-                Listed, not yet screened
-                <span className="market-counts">
-                  {(["PHX", "LAS", "MIA"] as const).map((code) => {
-                    const count = unscreened.filter((feature) => feature.properties.city === code).length;
-                    if (!count) return null;
-                    const label = code === "PHX" ? "Phoenix" : code === "LAS" ? "Las Vegas" : "Miami";
-                    return <span key={code} className="count-badge" title={`${label} ${count}`}>{code} {count}</span>;
-                  })}
+                <span>
+                  Listed, not yet screened
+                  <span className="layer-meta">
+                    {unscreened.filter((feature) => feature.properties.pinned).length.toLocaleString()} on the map
+                    {" · "}
+                    {unscreened.filter((feature) => !feature.properties.pinned).length.toLocaleString()} address withheld
+                  </span>
                 </span>
               </label>
             </>

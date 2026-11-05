@@ -59,16 +59,17 @@ export default function Detail({
   if (!site) return null;
   const price = site.asking_price_display;
   const why = site.summary_why || "Not screened yet.";
+  const next = nextStepText(site);
+  const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   return (
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
       <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       <button className="close" type="button" onClick={onClose}>Close</button>
-      <h3>Summary</h3>
-      <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
-      <p>Next step: {nextStepText(site)}</p>
-      <h3>Lead source</h3>
-      <p>{leadSourceLine(site, linkedDeal)}</p>
-        {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+      <h2>{site.name || site.address || site.site_id}</h2>
+      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
+      <p className="note">{site.address || "—"}</p>
+      <p className="note">{site.site_id}</p>
+      {mapsLinks(lat, lng)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -77,11 +78,18 @@ export default function Detail({
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
-      <h2>{site.name || site.address || site.site_id}</h2>
-      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
-      <p className="note">{site.address || "—"}</p>
-      <p className="note">{site.site_id}</p>
-      {mapsLinks(lat, lng)}
+      {unscreened ? (
+        <p>Not screened yet.</p>
+      ) : (
+        <>
+          <h3>Summary</h3>
+          <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
+          <p>Next step: {next}</p>
+        </>
+      )}
+      <h3>Lead source</h3>
+      <p>{leadSourceLine(site, linkedDeal)}</p>
+      {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       {site.place_note ? (
         <>
           <h3>Contact</h3>

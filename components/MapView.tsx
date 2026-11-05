@@ -405,6 +405,8 @@ export default function MapView(props: Props) {
       }
     }
     map.on("load", () => {
+      map.resize();
+      requestAnimationFrame(() => map.resize());
       if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
       const squares: Record<string, [number, number, number]> = {
         sourced: [36, 88, 166],
@@ -580,6 +582,7 @@ export default function MapView(props: Props) {
       if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["==", ["get", "site_id"], props.selectedId || ""]);
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
+      map.resize();
       if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });

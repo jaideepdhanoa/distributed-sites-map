@@ -173,20 +173,28 @@ function placed(deal: Feature<Deal>, sites: Map<string, Feature<Site>>) {
   return Boolean(deal.geometry);
 }
 
+function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+  return catalog.deals.filter((feature) => {
+    const deal = feature.properties;
+    if ((deal.kind !== "pipeline" && deal.kind !== "land") || deal.city !== city || deal.stage_group !== step) return false;
+    if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
+    if (options.query) {
+      const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();
+      if (!text.includes(options.query.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
 export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
   const sites = new Map(catalog.sites.map((feature) => [feature.properties.site_id, feature]));
-  return catalog.deals
-    .filter((feature) => {
-      const deal = feature.properties;
-      if (deal.kind !== "pipeline" || deal.city !== city || deal.stage_group !== step) return false;
-      if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
-      if (options.query) {
-        const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();
-        if (!text.includes(options.query.toLowerCase())) return false;
-      }
-      return placed(feature, sites);
-    })
+  return stageDeals(catalog, city, step, options)
+    .filter((feature) => placed(feature, sites))
     .map((feature) => feature.properties.deal_id);
+}
+
+export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+  return stageDeals(catalog, city, step, options).length;
 }
 
 export function unfilteredCount(catalog: Catalog, city: string, stage: string) {

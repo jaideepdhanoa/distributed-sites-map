@@ -136,6 +136,7 @@ export default function Explorer() {
   const pipelineColumns = parseColumns(params.get("cols"));
   const pillParam = params.get("pill");
   const [rememberedPill, setRememberedPill] = useState<PinLabel>("none");
+  const [basemap, setBasemap] = useState<"positron" | "satellite">("positron");
   const pinLabel: PinLabel = pillParam === "asking" || pillParam === "acres" || pillParam === "peracre" || pillParam === "none"
     ? pillParam
     : rememberedPill;
@@ -144,12 +145,19 @@ export default function Explorer() {
   useEffect(() => {
     const stored = window.localStorage.getItem("pin-label");
     if (stored === "asking" || stored === "acres" || stored === "peracre" || stored === "none") setRememberedPill(stored);
+    const base = window.localStorage.getItem("basemap");
+    if (base === "satellite" || base === "positron") setBasemap(base);
   }, []);
 
   function setPinLabel(next: PinLabel) {
     window.localStorage.setItem("pin-label", next);
     setRememberedPill(next);
     write({ pill: next });
+  }
+
+  function chooseBasemap(next: "positron" | "satellite") {
+    window.localStorage.setItem("basemap", next);
+    setBasemap(next);
   }
 
   function write(next: Record<string, string | null>, history = false) {
@@ -804,7 +812,7 @@ export default function Explorer() {
             <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           </div>
-          <div className="funnel-switch only-desktop" role="group" aria-label="Map or list">
+          <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
             <button className={listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
           </div>
@@ -1165,6 +1173,8 @@ export default function Explorer() {
           reviewFocus={reviewFocus}
           pinLabel={pinLabel}
           onPinLabel={setPinLabel}
+          basemap={basemap}
+          onBasemap={chooseBasemap}
           onSelect={(id) => {
             if (reviewing) {
               const at = visibleFeed.findIndex((site) => site.siteId === id);

@@ -9,6 +9,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   const name = info.project.name;
   await page.goto("/?stage=in_area&site=PHX-U189", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
+  await page.waitForSelector(".maplibregl-canvas");
   await expect(page.locator("aside.drawer")).toContainText("Lead source");
   await expect(page.locator("aside.drawer")).toContainText("Off-market");
   await expect(page.locator("aside.drawer")).toContainText("County record not reviewed");

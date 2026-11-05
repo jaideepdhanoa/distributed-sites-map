@@ -22,6 +22,8 @@ type Props = {
   focusLng: number;
   focusLat: number;
   focusZoom: number;
+  reviewMarkers?: { id: string; lng: number; lat: number; n: number; current: boolean }[];
+  reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   onSelect: (id: string) => void;
   onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
 };
@@ -136,6 +138,8 @@ export default function MapView(props: Props) {
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          "review-ring": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          "review-marks": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
         },
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
@@ -350,6 +354,30 @@ export default function MapView(props: Props) {
             paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 },
           },
           { id: "measure", type: "line", source: "measure", paint: { "line-color": "#f4efe6", "line-width": 2 } },
+          {
+            id: "review-ring",
+            type: "circle",
+            source: "review-ring",
+            paint: { "circle-radius": 18, "circle-color": "transparent", "circle-stroke-color": "#f3d48a", "circle-stroke-width": 3, "circle-stroke-opacity": 0.9 },
+          },
+          {
+            id: "review-marks",
+            type: "circle",
+            source: "review-marks",
+            paint: {
+              "circle-radius": ["case", ["==", ["get", "current"], 1], 16, 13],
+              "circle-color": "#1e4636",
+              "circle-stroke-color": "#faf7f1",
+              "circle-stroke-width": 2,
+            },
+          },
+          {
+            id: "review-numbers",
+            type: "symbol",
+            source: "review-marks",
+            layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-allow-overlap": true },
+            paint: { "text-color": "#faf7f1" },
+          },
         ],
       },
       center: [props.focusLng, props.focusLat],
@@ -443,6 +471,11 @@ export default function MapView(props: Props) {
       map.on("click", "offmarket", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const id = event.features?.[0]?.properties?.site_id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
+      map.on("click", "review-marks", (event: MapLayerMouseEvent) => {
+        if (measureRef.current) return;
+        const id = event.features?.[0]?.properties?.id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "deals-pipe", (event: MapLayerMouseEvent) => {
@@ -560,12 +593,18 @@ export default function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const reviewFocusRef = useRef(props.reviewFocus);
+  reviewFocusRef.current = props.reviewFocus;
   const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom}`;
+  const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");
+  const appliedReview = useRef("");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    let cancel = false;
     const push = () => {
+      if (cancel) return;
       clusterLeaves.current.clear();
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });
@@ -583,14 +622,21 @@ export default function MapView(props: Props) {
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
-      if (appliedFocus.current !== focusToken) {
+      if (reviewToken) {
+        appliedReview.current = reviewToken;
+      } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
+        appliedReview.current = "";
         map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
       }
     };
     if (map.isStyleLoaded()) push();
     else map.once("load", push);
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, focusToken, props.focusLng, props.focusLat, props.focusZoom]);
+    return () => {
+      cancel = true;
+      map.off("load", push);
+    };
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -629,7 +675,7 @@ export default function MapView(props: Props) {
     if (!map) return;
     let cancel = false;
     const go = () => {
-      if (cancel) return;
+      if (cancel || reviewFocusRef.current) return;
       if (!props.selectedId) {
         map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
         return;
@@ -641,13 +687,113 @@ export default function MapView(props: Props) {
       if (!geometry) return;
       map.jumpTo({ center: geometry.coordinates, zoom: 16 });
     };
+    if (props.reviewFocus) return;
     if (props.selectedId && !selectedOnMap) return;
     go();
     if (props.selectedId) map.once("idle", go);
     return () => {
       cancel = true;
+      map.off("idle", go);
     };
-  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom]);
+  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const focus = props.reviewFocus;
+    if (!map || !focus) return;
+    let cancel = false;
+    const go = () => {
+      if (cancel || !mapRef.current) return;
+      const center = map.getCenter();
+      const near = Math.abs(map.getZoom() - focus.zoom) < 0.4
+        && Math.abs(center.lng - focus.lng) < 0.02
+        && Math.abs(center.lat - focus.lat) < 0.02;
+      if (!near) map.jumpTo({ center: [focus.lng, focus.lat], zoom: focus.zoom });
+    };
+    go();
+    map.on("idle", go);
+    const timer = window.setInterval(go, 250);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 3000);
+    return () => {
+      cancel = true;
+      map.off("idle", go);
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, [reviewToken, props.reviewFocus]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const markers = props.reviewMarkers || [];
+    const current = markers.find((marker) => marker.current) || null;
+    const marks = {
+      type: "FeatureCollection" as const,
+      features: markers.map((marker) => ({
+        type: "Feature" as const,
+        properties: { id: marker.id, n: String(marker.n), current: marker.current ? 1 : 0 },
+        geometry: { type: "Point" as const, coordinates: [marker.lng, marker.lat] },
+      })),
+    };
+    const ring = {
+      type: "FeatureCollection" as const,
+      features: current ? [{
+        type: "Feature" as const,
+        properties: {},
+        geometry: { type: "Point" as const, coordinates: [current.lng, current.lat] },
+      }] : [],
+    };
+    const dimmed = markers.length > 0;
+    let cancel = false;
+    const apply = () => {
+      if (cancel || !map.isStyleLoaded()) return;
+      const markSource = map.getSource("review-marks") as GeoJSONSource | undefined;
+      const ringSource = map.getSource("review-ring") as GeoJSONSource | undefined;
+      if (markSource) markSource.setData(marks);
+      if (ringSource) ringSource.setData(ring);
+      const set = (id: string, prop: "circle-opacity" | "circle-stroke-opacity" | "icon-opacity" | "text-opacity", value: number) => {
+        if (!map.getLayer(id)) return;
+        if (prop === "circle-opacity") map.setPaintProperty(id, "circle-opacity", value);
+        else if (prop === "circle-stroke-opacity") map.setPaintProperty(id, "circle-stroke-opacity", value);
+        else if (prop === "icon-opacity") map.setPaintProperty(id, "icon-opacity", value);
+        else map.setPaintProperty(id, "text-opacity", value);
+      };
+      set("sites", "circle-opacity", dimmed ? 0.3 : 0.95);
+      set("offmarket", "circle-opacity", dimmed ? 0.3 : 1);
+      set("clusters", "circle-opacity", dimmed ? 0.3 : 0.88);
+      set("unscreened", "circle-stroke-opacity", dimmed ? 0.3 : 1);
+      set("deals-pipe", "icon-opacity", dimmed ? 0 : 1);
+      set("deals-land", "icon-opacity", dimmed ? 0 : 1);
+      set("deal-site-badge", "text-opacity", dimmed ? 0 : 1);
+    };
+    apply();
+    const timer = window.setInterval(apply, 200);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 3000);
+    return () => {
+      cancel = true;
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, [props.reviewMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const current = (props.reviewMarkers || []).find((marker) => marker.current);
+    if (!map || !current) return;
+    let frame = 0;
+    let raf = 0;
+    const tick = () => {
+      frame += 1;
+      const turn = (frame % 70) / 70;
+      if (map.getLayer("review-ring")) {
+        map.setPaintProperty("review-ring", "circle-radius", 16 + turn * 26);
+        map.setPaintProperty("review-ring", "circle-stroke-opacity", 0.9 * (1 - turn));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [props.reviewMarkers]);
 
   return (
     <div className="stage-map">

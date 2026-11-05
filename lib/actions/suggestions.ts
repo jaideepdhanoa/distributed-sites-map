@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { getUsers } from "@/lib/users";
+import { recordAppEvent } from "@/lib/queue/events";
+import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
 import { audit } from "./audit";
 import type { Sql } from "./db";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
@@ -38,6 +40,9 @@ export type Suggestion = {
   targetOn: string | null;
   ownerId: string | null;
   ownerName: string | null;
+  doneAt: string | null;
+  doneBy: string | null;
+  mentions: Mention[];
 };
 
 type SuggestionRow = {
@@ -58,9 +63,11 @@ type SuggestionRow = {
   title: string | null;
   target_on: Date | string | null;
   owner_id: string | null;
+  done_at: Date | string | null;
+  done_by: string | null;
 };
 
-const SELECT = `id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, created_at, decided_by, decided_at, applied_at, title, target_on, owner_id`;
+const SELECT = `id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, created_at, decided_by, decided_at, applied_at, title, target_on, owner_id, done_at, done_by`;
 
 function dayOf(value: Date | string | null): string | null {
   if (!value) return null;
@@ -103,7 +110,15 @@ function present(row: SuggestionRow): Suggestion | null {
     targetOn: dayOf(row.target_on),
     ownerId: row.owner_id,
     ownerName: ownerName(row.owner_id),
+    doneAt: row.done_at ? stamp(row.done_at) : null,
+    doneBy: row.done_by,
+    mentions: [],
   };
+}
+
+async function withMentions(sql: Sql, rows: Suggestion[]): Promise<Suggestion[]> {
+  const map = await mentionsBySource(sql, "suggestion", rows.map((row) => row.id));
+  return rows.map((row) => ({ ...row, mentions: map.get(row.id) || [] }));
 }
 
 export function permanentSiteId(kind: TargetKind, id: string, lookup: RecordLookup = fileLookup()): string {
@@ -134,7 +149,8 @@ export async function listSuggestions(
     `SELECT ${SELECT} FROM suggestions ${where} ORDER BY created_at DESC, id DESC`,
     values,
   );
-  return rows.rows.map(present).filter((row): row is Suggestion => Boolean(row));
+  const suggestions = rows.rows.map(present).filter((row): row is Suggestion => Boolean(row));
+  return withMentions(sql, suggestions);
 }
 
 export async function createSuggestion(
@@ -150,6 +166,7 @@ export async function createSuggestion(
     title?: string | null;
     targetOn?: string | null;
     ownerId?: string | null;
+    mentions?: unknown;
   },
   lookup: RecordLookup = fileLookup(),
 ): Promise<Suggestion> {
@@ -168,6 +185,7 @@ export async function createSuggestion(
   if (ownerId && !getUsers().some((user) => user.u === ownerId)) throw new InputError("Choose an account from the list.");
   assertClean(proposedValue);
   if (reason) assertClean(reason);
+  const mentionIds = nextStep ? parseMentionIds(input.mentions) : [];
   const id = randomUUID();
   const currentValue = nextStep ? "" : safeSnapshot(recordField(record, field, detail));
   await sql.query(
@@ -183,10 +201,23 @@ export async function createSuggestion(
     targetId: target.targetId,
     after: { id, field, detail, currentValue, proposedValue, reason, status: "open", title, targetOn, ownerId },
   });
+  const siteId = permanentSiteId(target.targetKind, target.targetId, lookup);
+  if (nextStep && mentionIds.length) {
+    await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "suggestion", sourceId: id });
+  }
+  if (nextStep && title) {
+    await recordAppEvent(sql, {
+      siteId,
+      type: "next_proposed",
+      summary: `Next step proposed: ${title}`,
+      actorId: input.authorId,
+      refId: id,
+    });
+  }
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [id]);
   const suggestion = present(saved.rows[0]);
   if (!suggestion) throw new InputError("That suggestion could not be saved.");
-  return suggestion;
+  return (await withMentions(sql, [suggestion]))[0];
 }
 
 export async function decideSuggestion(
@@ -216,10 +247,47 @@ export async function decideSuggestion(
     before: { id: row.id, status: "open" },
     after: { id: row.id, status: input.status, note },
   });
+  if (row.field_name === "proposed_next_step") {
+    const title = safeSnapshot(row.title || row.proposed_value, 120);
+    if (title) {
+      await recordAppEvent(sql, {
+        siteId: permanentSiteId(row.target_kind, row.target_id),
+        type: input.status === "accepted" ? "next_accepted" : "next_rejected",
+        summary: input.status === "accepted" ? `Next step approved: ${title}` : `Next step rejected: ${title}`,
+        actorId: input.actorId,
+        refId: row.id,
+      });
+    }
+  }
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
   const suggestion = present(saved.rows[0]);
   if (!suggestion) throw new InputError("That suggestion could not be updated.");
-  return suggestion;
+  return (await withMentions(sql, [suggestion]))[0];
+}
+
+export async function completeSuggestion(
+  sql: Sql,
+  input: { id: string; actorId: string; reviewer: boolean },
+): Promise<Suggestion> {
+  const existing = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
+  const row = existing.rows[0];
+  if (!row || row.field_name !== "proposed_next_step") throw new InputError("That next step is not in the queue.", 404);
+  if (row.status !== "open" && row.status !== "accepted") throw new InputError("Only an open or approved next step can be marked done.");
+  if (row.done_at) throw new InputError("That next step is already done.");
+  if (row.owner_id !== input.actorId && !input.reviewer) throw new InputError("You do not have permission for that.", 403);
+  await sql.query(`UPDATE suggestions SET done_at = now(), done_by = $2 WHERE id = $1 AND done_at IS NULL`, [input.id, input.actorId]);
+  await audit(sql, {
+    actorId: input.actorId,
+    action: "suggestion.done",
+    targetKind: row.target_kind,
+    targetId: row.target_id,
+    before: { id: row.id, done: false },
+    after: { id: row.id, done: true },
+  });
+  const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
+  const suggestion = present(saved.rows[0]);
+  if (!suggestion) throw new InputError("That next step could not be updated.");
+  return (await withMentions(sql, [suggestion]))[0];
 }
 
 export async function reconcileSuggestions(sql: Sql, lookup: RecordLookup = fileLookup()): Promise<number> {
@@ -291,14 +359,14 @@ export function suggestionsCsv(rows: Suggestion[]): string {
 }
 
 export function nextStepsCsv(rows: Suggestion[], lookup: RecordLookup = fileLookup()): string {
-  const headers = ["site_id", "date", "title", "owner", "approved_at"];
+  const headers = ["site_id", "date", "title", "owner", "approved_at", "done_at"];
   const lines = [headers.join(",")];
   const approved = rows
     .filter((row) => row.field === "proposed_next_step" && row.status === "accepted")
     .sort((a, b) => (a.decidedAt || "").localeCompare(b.decidedAt || ""));
   for (const row of approved) {
     lines.push(
-      [permanentSiteId(row.targetKind, row.targetId, lookup), row.targetOn, row.title || row.proposedValue, row.ownerName, row.decidedAt]
+      [permanentSiteId(row.targetKind, row.targetId, lookup), row.targetOn, row.title || row.proposedValue, row.ownerName, row.decidedAt, row.doneAt]
         .map(csvCell)
         .join(","),
     );

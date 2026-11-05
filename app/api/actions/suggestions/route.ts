@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await openActions("contributor");
   if (isResponse(session)) return session;
-  let body: { targetKind?: string; targetId?: string; field?: string; detail?: string; proposedValue?: string; reason?: string; title?: string; targetOn?: string; ownerId?: string };
+  let body: { targetKind?: string; targetId?: string; field?: string; detail?: string; proposedValue?: string; reason?: string; title?: string; targetOn?: string; ownerId?: string; mentions?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
         title: body.title,
         targetOn: body.targetOn,
         ownerId: body.ownerId,
+        mentions: body.mentions,
       }),
   );
   if (isResponse(suggestion)) return suggestion;

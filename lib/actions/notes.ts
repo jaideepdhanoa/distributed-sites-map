@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { audit } from "./audit";
 import type { Sql } from "./db";
+import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
+import { recordAppEvent } from "@/lib/queue/events";
 import { fileLookup, type RecordLookup } from "./records";
+import { permanentSiteId } from "./suggestions";
 import { InputError, parseBody, parseTarget, stamp, type TargetKind } from "./text";
 
 export type ThreadKind = TargetKind | "suggestion";
@@ -19,6 +22,7 @@ export type Note = {
   deleted: boolean;
   resolvedAt: string | null;
   resolvedBy: string | null;
+  mentions: Mention[];
 };
 
 type NoteRow = {
@@ -53,7 +57,26 @@ function present(row: NoteRow): Note | null {
     deleted,
     resolvedAt: row.resolved_at ? stamp(row.resolved_at) : null,
     resolvedBy: row.resolved_by,
+    mentions: [],
   };
+}
+
+async function withMentions(sql: Sql, notes: Note[]): Promise<Note[]> {
+  const map = await mentionsBySource(sql, "note", notes.map((note) => note.id));
+  return notes.map((note) => ({ ...note, mentions: map.get(note.id) || [] }));
+}
+
+async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): Promise<string> {
+  if (targetKind === "suggestion") {
+    const found = await sql.query<{ target_kind: "site" | "deal"; target_id: string }>(
+      `SELECT target_kind, target_id FROM suggestions WHERE id = $1`,
+      [targetId],
+    );
+    const row = found.rows[0];
+    if (!row) return targetId;
+    return permanentSiteId(row.target_kind, row.target_id);
+  }
+  return permanentSiteId(targetKind, targetId);
 }
 
 async function loadNote(sql: Sql, id: string): Promise<NoteRow | null> {
@@ -66,12 +89,13 @@ export async function listNotes(sql: Sql, targetKind: ThreadKind, targetId: stri
     `SELECT ${SELECT} FROM notes WHERE target_kind = $1 AND target_id = $2 ORDER BY created_at ASC, id ASC`,
     [targetKind, targetId],
   );
-  return rows.rows.map(present).filter((row): row is Note => Boolean(row));
+  const notes = rows.rows.map(present).filter((row): row is Note => Boolean(row));
+  return withMentions(sql, notes);
 }
 
 export async function createNote(
   sql: Sql,
-  input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; parentId?: string | null },
+  input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; parentId?: string | null; mentions?: unknown },
   lookup: RecordLookup = fileLookup(),
 ): Promise<Note> {
   const parentId = input.parentId?.trim() || null;
@@ -100,6 +124,7 @@ export async function createNote(
   }
   const body = parseBody(input.body, "note", 2000);
   assertClean(body);
+  const mentionIds = parseMentionIds(input.mentions);
   const id = randomUUID();
   await sql.query(
     `INSERT INTO notes (id, target_kind, target_id, parent_id, body, author_id) VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -110,21 +135,35 @@ export async function createNote(
     action: parentId ? "note.reply" : "note.create",
     targetKind,
     targetId,
-    after: { id, parentId, body },
+    after: { id, parentId, body, mentions: mentionIds },
+  });
+  const siteId = await queueSiteId(sql, targetKind, targetId);
+  await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "note", sourceId: id });
+  await recordAppEvent(sql, {
+    siteId,
+    type: parentId ? "reply" : "note",
+    summary: parentId ? "New reply." : "New note.",
+    actorId: input.authorId,
+    refId: id,
   });
   const saved = await loadNote(sql, id);
   const note = saved ? present(saved) : null;
   if (!note) throw new InputError("That note could not be saved.");
-  return note;
+  return (await withMentions(sql, [note]))[0];
 }
 
-export async function editNote(sql: Sql, input: { id: string; body: string; actorId: string }): Promise<Note> {
+export async function editNote(sql: Sql, input: { id: string; body: string; actorId: string; mentions?: unknown }): Promise<Note> {
   const row = await loadNote(sql, input.id);
   if (!row || row.deleted_at) throw new InputError("That note is not available.", 404);
   if (row.author_id !== input.actorId) throw new InputError("You do not have permission for that.", 403);
   const body = parseBody(input.body, "note", 2000);
   assertClean(body);
+  const mentionIds = input.mentions === undefined ? null : parseMentionIds(input.mentions);
   await sql.query(`UPDATE notes SET body = $2, updated_at = now() WHERE id = $1`, [input.id, body]);
+  if (mentionIds) {
+    const siteId = await queueSiteId(sql, row.target_kind, row.target_id);
+    await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "note", sourceId: row.id });
+  }
   await audit(sql, {
     actorId: input.actorId,
     action: "note.edit",
@@ -136,7 +175,7 @@ export async function editNote(sql: Sql, input: { id: string; body: string; acto
   const saved = await loadNote(sql, input.id);
   const note = saved ? present(saved) : null;
   if (!note) throw new InputError("That note could not be saved.");
-  return note;
+  return (await withMentions(sql, [note]))[0];
 }
 
 export async function deleteNote(sql: Sql, input: { id: string; actorId: string }): Promise<void> {
@@ -171,5 +210,5 @@ export async function resolveNote(sql: Sql, input: { id: string; actorId: string
   const saved = await loadNote(sql, input.id);
   const note = saved ? present(saved) : null;
   if (!note) throw new InputError("That thread could not be resolved.");
-  return note;
+  return (await withMentions(sql, [note]))[0];
 }

@@ -8,14 +8,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const session = await openActions("contributor");
   if (isResponse(session)) return session;
   const { id } = await context.params;
-  let body: { body?: string };
+  let body: { body?: string; mentions?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return jsonError("The note could not be read.", 400);
   }
   const note = await runWrite(session, { action: "note.edit", targetId: id }, (sql) =>
-    editNote(sql, { id, body: String(body.body || ""), actorId: session.u }),
+    editNote(sql, { id, body: String(body.body || ""), actorId: session.u, mentions: body.mentions }),
   );
   if (isResponse(note)) return note;
   return jsonOk({ note });

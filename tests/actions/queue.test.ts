@@ -41,7 +41,7 @@ function blockedWord(): string {
 async function ready() {
   const sql = await memorySql();
   const applied = await migrate(sql);
-  assert.deepEqual(applied, ["001_actions.sql", "002_threads.sql"]);
+  assert.deepEqual(applied, ["001_actions.sql", "002_threads.sql", "003_queue.sql", "004_mentions.sql"]);
   assert.deepEqual(await migrate(sql), []);
   return sql;
 }

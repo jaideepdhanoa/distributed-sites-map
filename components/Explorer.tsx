@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
+import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, WhatChanged, marketLabel, type FeedSite } from "./queue/QueueView";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import Wordmark from "./Wordmark";
@@ -60,6 +61,11 @@ export default function Explorer() {
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
+  const [queueCount, setQueueCount] = useState(0);
+  const [feed, setFeed] = useState<FeedSite[]>([]);
+  const [feedLoaded, setFeedLoaded] = useState(false);
+  const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
+  const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
   const tableOpen = params.get("table") === "1";
@@ -110,6 +116,19 @@ export default function Explorer() {
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
+  const reviewing = params.get("review") === "1";
+  const queueMarket = params.get("qmarket") || city;
+  const queueStage = params.get("qstage") || (funnel === "pipeline" ? pipeStage : "any");
+  const queueViable = params.get("qviable") !== "0";
+  const queueFresh = params.get("qnew") === "1";
+  const queueFlagged = params.get("qflag") === "1";
+  const queueApproval = params.get("qapprove") === "1";
+  const queueMentions = params.get("qmention") === "1";
+  const queueAssigned = params.get("qassign") === "1";
+  const visibleFeed = feed.filter((site) => site.status !== "snoozed");
+  const reviewIndex = Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
+  const reviewCurrent = visibleFeed[reviewIndex];
+  const caughtUp = reviewing && feedLoaded && !feed.some((site) => site.status === "open");
 
   function write(next: Record<string, string | null>, history = false) {
     const url = new URLSearchParams(params.toString());
@@ -180,6 +199,44 @@ export default function Explorer() {
       cancel = true;
     };
   }, [city]);
+
+  useEffect(() => {
+    if (!me?.actionsEnabled) return;
+    const q = new URLSearchParams({
+      market: queueMarket,
+      stage: queueStage,
+      viable: queueViable ? "1" : "0",
+      fresh: queueFresh ? "1" : "0",
+      flagged: queueFlagged ? "1" : "0",
+      approve: queueApproval ? "1" : "0",
+      mentions: queueMentions ? "1" : "0",
+      assigned: queueAssigned ? "1" : "0",
+    });
+    let cancel = false;
+    fetch(`/api/queue?${q}`).then(async (response) => {
+      if (cancel || !response.ok) return;
+      const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
+      const next = (payload.items || []).map((item) => ({
+        siteId: item.siteId,
+        name: item.snapshot?.name || item.siteId,
+        city: item.snapshot?.city || item.city || "",
+        lng: item.snapshot?.lng ?? null,
+        lat: item.snapshot?.lat ?? null,
+        followed: Boolean(item.followed),
+        reasons: item.reasons || [],
+        status: "open" as const,
+        previous: null,
+      }));
+      setQueueCount(next.length);
+      if (reviewing) {
+        setFeed(next);
+        setFeedLoaded(true);
+      }
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [me?.actionsEnabled, reviewing, queueMarket, queueStage, queueViable, queueFresh, queueFlagged, queueApproval, queueMentions, queueAssigned]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
@@ -452,6 +509,29 @@ export default function Explorer() {
     window.location.href = "/login";
   }
 
+  const reviewSiteId = reviewing && !caughtUp ? reviewCurrent?.siteId : undefined;
+  useEffect(() => {
+    if (!reviewing || !feedLoaded) return;
+    if (!reviewSiteId) {
+      setSelected(null);
+      return;
+    }
+    const deal = dealFeatures.find((feature) => feature.properties.deal_id === reviewSiteId)?.properties;
+    const patch: Record<string, string | null> = { review: "1", i: String(reviewIndex + 1), site: reviewSiteId, funnel: "pipeline", tab: "pipeline", view: null, table: null };
+    if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
+    if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
+      patch.pstage = deal.stage_group === "desk" ? null : deal.stage_group;
+    }
+    setSelected(reviewSiteId);
+    const aligned = params.get("site") === reviewSiteId
+      && params.get("funnel") === "pipeline"
+      && params.get("review") === "1"
+      && (params.get("i") || "1") === String(reviewIndex + 1)
+      && (params.get("city") || null) === (patch.city ?? null)
+      && (params.get("pstage") || null) === (patch.pstage ?? null);
+    if (!aligned) write(patch);
+  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, dealFeatures.length, params]);
+
   if (error) {
     return (
       <main className="empty">
@@ -590,8 +670,84 @@ export default function Explorer() {
     return `${candidates} candidates, ${cleared} cleared`;
   }
 
+  function goReview(index: number) {
+    const count = Math.max(visibleFeed.length, 1);
+    const next = Math.min(Math.max(index, 0), count - 1);
+    write({ review: "1", i: String(next + 1), view: null });
+  }
+
+  async function markCurrentReviewed() {
+    if (!reviewCurrent || reviewCurrent.status === "reviewed") return;
+    const response = await fetch("/api/queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ siteId: reviewCurrent.siteId }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { previous?: string | null };
+    if (!response.ok) return;
+    const previous = payload.previous ?? null;
+    const siteId = reviewCurrent.siteId;
+    setFeed((items) => items.map((item) => item.siteId === siteId ? { ...item, status: "reviewed", previous } : item));
+    setUndo({ siteId, previous, index: reviewIndex });
+    const upcoming = visibleFeed.map((item) => item.siteId === siteId ? { ...item, status: "reviewed" as const } : item);
+    let next = -1;
+    for (let cursor = reviewIndex + 1; cursor < upcoming.length; cursor += 1) {
+      if (upcoming[cursor]?.status === "open") { next = cursor; break; }
+    }
+    if (next < 0) {
+      for (let cursor = 0; cursor < reviewIndex; cursor += 1) {
+        if (upcoming[cursor]?.status === "open") { next = cursor; break; }
+      }
+    }
+    if (next >= 0) goReview(next);
+    setQueueCount((count) => Math.max(0, count - 1));
+  }
+
+  async function undoReviewMark() {
+    if (!undo) return;
+    await fetch("/api/queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ undo: true, siteId: undo.siteId, previous: undo.previous }),
+    });
+    setFeed((items) => items.map((item) => item.siteId === undo.siteId ? { ...item, status: "open" } : item));
+    goReview(undo.index);
+    setUndo(null);
+    setQueueCount((count) => count + 1);
+  }
+
+  function snoozeCurrent() {
+    if (!reviewCurrent) return;
+    setFeed((items) => items.map((item) => item.siteId === reviewCurrent.siteId ? { ...item, status: "snoozed" } : item));
+  }
+
+  const filterBits = [marketLabel(queueMarket)];
+  if (queueApproval) filterBits.push("Needs my approval");
+  if (queueMentions) filterBits.push("Mentions");
+  if (queueAssigned) filterBits.push("Assigned to me");
+  if (queueFresh) filterBits.push("New sites");
+  if (queueFlagged) filterBits.push("Flagged to me");
+  if (queueViable) filterBits.push("Active");
+  const filterSummary = filterBits.join(" · ");
+  const reviewPoint = reviewCurrent ? dealRows.find((deal) => deal.deal_id === reviewCurrent.siteId) : undefined;
+  const reviewFromDeal = reviewPoint ? dealPoint(reviewPoint) : null;
+  const reviewCoords = reviewFromDeal
+    || (reviewCurrent?.lng != null && reviewCurrent.lat != null ? [reviewCurrent.lng, reviewCurrent.lat] as [number, number] : null);
+  const reviewMarket = reviewCurrent && (reviewCurrent.city === "PHX" || reviewCurrent.city === "LAS" || reviewCurrent.city === "MIA") ? reviewCurrent.city : city;
+  const reviewFocus = reviewing && reviewCurrent
+    ? (reviewCoords
+      ? { lng: reviewCoords[0], lat: reviewCoords[1], zoom: 15.5 }
+      : { lng: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[0], lat: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[1], zoom: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).zoom })
+    : null;
+  const reviewMarkers = reviewing ? visibleFeed.flatMap((site, index) => {
+    const deal = dealRows.find((row) => row.deal_id === site.siteId);
+    const point = (deal ? dealPoint(deal) : null) || (site.lng != null && site.lat != null ? [site.lng, site.lat] as [number, number] : null);
+    if (!point) return [];
+    return [{ id: site.siteId, lng: point[0], lat: point[1], n: index + 1, current: site.siteId === reviewCurrent?.siteId }];
+  }) : [];
+
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -619,9 +775,14 @@ export default function Explorer() {
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           </div>
           <div className="funnel-switch only-desktop" role="group" aria-label="Map or list">
-            <button className={!listView ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
-            <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
+            <button className={!listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
+            <button className={listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
           </div>
+          {me?.actionsEnabled ? (
+            <button className={`review-launch ${reviewing ? "on" : ""}`} type="button" onClick={() => write({ review: reviewing ? null : "1", i: reviewing ? null : "1", view: null, table: null })}>
+              Review{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
+            </button>
+          ) : null}
           <div className="user-menu only-desktop">
             <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
               {(me?.u || "?").slice(0, 1).toUpperCase()}
@@ -640,6 +801,10 @@ export default function Explorer() {
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => !value); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
+        </div>
+        <div className="funnel-switch only-mobile" role="group" aria-label="Map or list">
+          <button className={!listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
+          <button className={listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
         </div>
         {searchOpen ? (
           <input className="search mobile-search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
@@ -846,7 +1011,10 @@ export default function Explorer() {
             <button type="button" onClick={exportTable}>Export CSV</button>
             <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
             <ActionsMenuButtons close={() => setMenuOpen(false)} />
-            <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
+            <button type="button" onClick={() => { write({ view: listView ? null : "list", review: null, i: null }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
+            {me?.actionsEnabled ? (
+              <button type="button" onClick={() => { write({ review: "1", i: "1", view: null, table: null }); setMenuOpen(false); }}>Review{queueCount ? ` (${queueCount})` : ""}</button>
+            ) : null}
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
               <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
@@ -891,9 +1059,62 @@ export default function Explorer() {
           </div>
         ) : null}
       </header>
+      {reviewing && me?.actionsEnabled ? (
+        <ReviewBar
+          index={reviewIndex}
+          total={visibleFeed.length}
+          reviewed={feed.filter((site) => site.status === "reviewed").length}
+          summary={filterSummary}
+          siteId={reviewCurrent?.siteId || ""}
+          followed={Boolean(reviewCurrent?.followed)}
+          onPrev={() => goReview(reviewIndex - 1)}
+          onNext={() => goReview(reviewIndex + 1)}
+          onReviewed={() => void markCurrentReviewed()}
+          onExit={() => write({ review: null, i: null })}
+          onOpenFeed={() => setFeedSheet(true)}
+          onSnooze={snoozeCurrent}
+          filters={(
+            <FilterPopover
+              summary={filterSummary}
+              market={queueMarket}
+              stage={queueStage}
+              viable={queueViable}
+              freshOnly={queueFresh}
+              flaggedOnly={queueFlagged}
+              approvalOnly={queueApproval}
+              mentionsOnly={queueMentions}
+              assignedOnly={queueAssigned}
+              onFilter={(patch) => {
+                const next = { ...patch, review: "1", i: "1" };
+                if ("qmarket" in next && next.qmarket === city) next.qmarket = null;
+                write(next);
+              }}
+            />
+          )}
+        />
+      ) : null}
 
       <div className="map-stage">
         <ActionsDialogs />
+        {reviewing && !caughtUp ? (
+          <ReviewRail sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} />
+        ) : null}
+        {caughtUp ? (
+          <div className="review-done" data-testid="queue-empty">
+            <p>All caught up</p>
+            <button type="button" onClick={() => write({ review: null, i: null })}>Back to map</button>
+          </div>
+        ) : null}
+        {reviewing && reviewCurrent && !reviewCoords ? <p className="review-noloc" data-testid="review-noloc">No exact location yet</p> : null}
+        {undo ? (
+          <div className="review-toast" role="status">
+            Marked reviewed.
+            <button type="button" onClick={() => void undoReviewMark()}>Undo</button>
+          </div>
+        ) : null}
+        {feedSheet ? (
+          <ReviewFeedSheet sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} />
+        ) : null}
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
           deals={drawnDeals}
@@ -910,7 +1131,16 @@ export default function Explorer() {
           focusLng={focus.center[0]}
           focusLat={focus.center[1]}
           focusZoom={focus.zoom}
+          reviewMarkers={reviewMarkers}
+          reviewFocus={reviewFocus}
           onSelect={(id) => {
+            if (reviewing) {
+              const at = visibleFeed.findIndex((site) => site.siteId === id);
+              if (at >= 0) {
+                goReview(at);
+                return;
+              }
+            }
             if (dealRows.some((deal) => deal.deal_id === id)) setTableTab(dealRows.find((deal) => deal.deal_id === id)?.kind === "land" ? "land" : "pipeline");
             choose(id);
           }}
@@ -994,6 +1224,8 @@ export default function Explorer() {
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onClose={() => choose(null)}
             sheet={sheet}
+            banner={reviewing && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
+            onSwipe={reviewing ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
           />
         ) : selectedUnscreened ? (

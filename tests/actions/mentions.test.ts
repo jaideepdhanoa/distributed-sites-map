@@ -9,10 +9,13 @@ import type { RecordLookup } from "../../lib/actions/records";
 import { completeSuggestion, createSuggestion, decideSuggestion, listSuggestions, nextStepsCsv } from "../../lib/actions/suggestions";
 import { InputError } from "../../lib/actions/text";
 import { PolicyError } from "../../lib/policy/banned";
+import { loadCatalog } from "../../lib/queue/catalog";
 import { loadQueue, markAllReviewed } from "../../lib/queue/load";
 import { memorySql } from "../helpers/sql";
 
-const deal = Object.freeze({ deal_id: "PIPE-PHX-0008", stage: "1 Desk screen", name: "Sample deal" });
+const active = loadCatalog().find((item) => item.active);
+if (!active) throw new Error("expected an active pipeline deal");
+const deal = Object.freeze({ deal_id: active.id, stage: active.stage, name: "Sample deal" });
 const lookup: RecordLookup = (kind, id) => (kind === "deal" && id === deal.deal_id ? deal : null);
 const hash = "$2b$04$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuuabcdefghijk";
 

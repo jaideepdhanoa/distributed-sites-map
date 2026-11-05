@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
-const deal = "PIPE-PHX-0008";
+const deal = "PIPE-PHX-0081";
 
 test.describe.configure({ mode: "serial" });
 

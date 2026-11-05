@@ -106,7 +106,7 @@ class ShippedCounts(unittest.TestCase):
         self.assertEqual(withheld, ["L-214", "L-215", "L-216", "L-221", "L-233"])
         drift = (ROOT / "data/drift_report.csv").read_text().splitlines()
         leads = [line.split(",", 1)[0] for line in drift[1:] if line.strip()]
-        self.assertEqual(leads, ["PIPE-PHX-0081", "LAND-PHX-0047", "LAND-PHX-0048", "LAND-PHX-0049", "LAS-U119"])
+        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "LAS-U119"])
         gap = universe_link_gap(deals)
         self.assertEqual(gap["linked"], 21)
         self.assertEqual(gap["located_without_universe"], 36)

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-05T20:07:10Z",
+  "generated_at": "2026-11-05T22:02:39Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -855,7 +855,8 @@
       "by_method": {
         "parcel number": 1067,
         "pin location": 64
-      }
+      },
+      "broward_unavailable": 44
     },
     "coverage": {
       "LAS": {
@@ -1031,9 +1032,6 @@
   },
   "review_source": "second review column",
   "warnings": [
-    "Workbook county verdicts before the two Maybe holds are {'PASS': 14, 'MAYBE': 30, 'FAIL': 47, 'NOT_A_WASH': 15, 'UNRESOLVED': 4}.",
-    "Map verdicts are {'PASS': 12, 'MAYBE': 32, 'FAIL': 47, 'NOT_A_WASH': 15, 'UNRESOLVED': 4}, expected Pass 11, Maybe 32, Fail 47, Not a car wash 15, Unresolved 4 after the two holds.",
-    "Cleared on the map is 10 (['LAS-U100', 'LAS-U129', 'LAS-U877', 'MIA-U1347', 'MIA-U747', 'MIA-U753', 'PHX-U180', 'PHX-U197', 'PHX-U232', 'PHX-U535']). The two holds should leave 9.",
     "Pipeline tab has 85 rows (stages {'Dropped': 22, 'Off market (no lead)': 49, '1 Desk screen': 13, '2 Financial screen': 1}). The older note of 79 is not in this export."
   ],
   "skipped": [
@@ -1048,62 +1046,13 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "changes": {
-    "new_sites": 11,
-    "removed_sites": 2,
-    "verdict_changes": 1,
-    "stage_moves": 6,
-    "sample_new": [
-      "LAND-LAS-0050",
-      "LAND-MIA-0051",
-      "LAND-PHX-0043",
-      "LAND-PHX-0044",
-      "LAND-PHX-0045",
-      "LAND-PHX-0046",
-      "LAND-PHX-0049",
-      "PIPE-MIA-0082",
-      "PIPE-PHX-0084",
-      "PIPE-PHX-0085",
-      "PIPE-SNA-0002"
-    ],
-    "sample_verdicts": [
-      {
-        "site_id": "MIA-U747",
-        "before": null,
-        "after": "PASS"
-      }
-    ],
-    "sample_stages": [
-      {
-        "site_id": "PHX-U167",
-        "before": "",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PHX-U217",
-        "before": "",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "PHX-U432",
-        "before": "",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PHX-U501",
-        "before": "",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "LAND-LAS-0004",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "deal_id": "LAND-LAS-0004",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      }
-    ]
+    "new_sites": 0,
+    "removed_sites": 0,
+    "verdict_changes": 0,
+    "stage_moves": 0,
+    "sample_new": [],
+    "sample_verdicts": [],
+    "sample_stages": []
   },
   "verdicts_appended": 2,
   "verdicts_total": 2662,
@@ -1112,5 +1061,12 @@
     "parcels-PHX.geojson": 149715,
     "parcels-LAS.geojson": 104003,
     "parcels-MIA.geojson": 337855
+  },
+  "timeline": {
+    "matched_folders": 14,
+    "unmatched_folders": 0,
+    "sheet_links": 14,
+    "warnings": 6,
+    "drive": "ok"
   }
 }

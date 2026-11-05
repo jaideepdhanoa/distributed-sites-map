@@ -40,7 +40,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(page.locator(".funnel")).toContainText("Universe");
   await page.screenshot({ path: `review-shots/${name}-universe-bar.png`, fullPage: false });
   await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".summary-chip");
+  await page.waitForSelector(".funnel");
   await waitForBasemap(page);
   await expect(page.locator(".funnel")).toContainText("(4 deals, 11 land)");
   const chipText = async () => page.locator(".summary-chip").first().textContent();

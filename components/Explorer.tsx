@@ -607,7 +607,7 @@ export default function Explorer() {
               );
             })}
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button className={`aside ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setMoreOpen(false); setFiltersOpen(false); }}>
+              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setMoreOpen(false); setFiltersOpen(false); }}>
                 All stages not on the map ({unplacedDeals.length.toLocaleString()})
               </button>
             ) : null}
@@ -629,7 +629,7 @@ export default function Explorer() {
           >
             {summaryText()}
           </span>
-          {data.funnel.workbook_as_of ? <span className="summary-chip as-of only-desktop">Data as of {data.funnel.workbook_as_of}</span> : null}
+          {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
             {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
@@ -647,7 +647,6 @@ export default function Explorer() {
             ) : null}
           </div>
         </div>
-        {data.funnel.workbook_as_of ? <p className="as-of-line only-mobile">Data as of {data.funnel.workbook_as_of}</p> : null}
         {activeFilters.length ? (
           <div className="active-row" aria-label="Active filters">
             {activeFilters.map((item) => (
@@ -795,12 +794,6 @@ export default function Explorer() {
         {funnel === "universe" && !listView && visibleSites.length === 0 ? (
           <p className="empty-map">{compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
         ) : null}
-        {!listView ? (() => {
-          const missing = funnel === "pipeline"
-            ? pipelineStepRows.length - pipelineSquares.length
-            : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
-          return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
-        })() : null}
         {listView ? (
           <ListView
             rows={listRows}

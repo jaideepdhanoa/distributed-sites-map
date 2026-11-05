@@ -51,6 +51,7 @@ a { color: var(--pine); }
 .funnel {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 2px;
   overflow-x: auto;
   margin: 0;
@@ -58,6 +59,11 @@ a { color: var(--pine); }
   min-width: 0;
   scrollbar-width: thin;
 }
+.funnel .split { color: #3f3832; font-size: 12px; white-space: nowrap; }
+.funnel.compact { flex: 1 0 100%; gap: 0; overflow: visible; }
+.funnel.compact button { padding: 2px 5px; gap: 4px; font-size: 12px; }
+.funnel.compact .sub { font-size: 11px; padding: 2px; }
+.funnel.compact .split { font-size: 11px; }
 .funnel button {
   display: flex;
   align-items: baseline;
@@ -75,7 +81,7 @@ a { color: var(--pine); }
 .funnel button.on { color: var(--ink); border-bottom-color: var(--pine); background: #e7f0ea; }
 .funnel strong { font-variant-numeric: tabular-nums; color: var(--ink); font-size: 14px; }
 .funnel .merge { color: #3f3832; font-size: 12px; white-space: nowrap; }
-.funnel .aside {
+.funnel .aside, .funnel-row > .aside {
   border: 0;
   background: transparent;
   color: #3f3832;
@@ -214,7 +220,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   z-index: 3;
   top: 10px;
   right: 52px;
-  width: 190px;
+  width: 228px;
   background: rgba(250, 247, 241, 0.96);
   border: 1px solid #8d8376;
   border-radius: 12px;
@@ -224,7 +230,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-size: 13px;
 }
 .layers strong { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
-.layers label { display: flex; align-items: center; gap: 8px; }
+.layers label { display: flex; align-items: flex-start; gap: 8px; }
+.layers label input { margin-top: 2px; flex: none; }
+.layer-meta { display: block; margin-top: 2px; color: #4e463d; font-size: 11px; line-height: 1.3; }
 .census-note { margin: 8px 0 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #4e463d; }
 .compare-panel {
   position: absolute; z-index: 4; left: 12px; right: 220px; bottom: 96px;

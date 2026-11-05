@@ -9,6 +9,7 @@ import {
   expectedOffMarket,
   expectedSites,
   expectedSquares,
+  expectedStageTotal,
   stageGroupFromText,
   unfilteredCount,
   type Catalog,
@@ -251,12 +252,12 @@ for (const city of CITIES) {
       const drawn = await source(page, "deals");
       same(`${city} pipeline ${step}`, drawn.map((pin) => pin.id), expected);
       for (const pin of drawn) {
-        expect(pin.kind, pin.id).toBe("pipeline");
+        expect(["pipeline", "land"], pin.id).toContain(pin.kind);
         expect(pin.stage_group, pin.id).toBe(step);
       }
       expect((await source(page, "offmarket")).length, `${city} ${step} off-market hidden`).toBe(0);
       const count = await badge(page, PIPE_LABEL[step]);
-      expect(count.shown, `${city} ${step} badge`).toBe(expected.length);
+      expect(count.shown, `${city} ${step} badge`).toBe(expectedStageTotal(catalog, city, step));
       await expect(page.locator(".map[data-deal-markers='square']"), "deal marker").toBeAttached();
     }
 
@@ -268,7 +269,7 @@ for (const city of CITIES) {
       { timeout: 20_000 },
     );
     same(`${city} pipeline type`, (await source(page, "deals")).map((pin) => pin.id), repair);
-    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(repair.length);
+    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { types: ["Auto repair"] }));
   });
 }
 

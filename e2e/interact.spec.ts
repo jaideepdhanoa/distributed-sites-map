@@ -10,6 +10,8 @@ function bannedHits(text: string) {
     const word = match[0].toLowerCase();
     const around = text.slice(Math.max(0, (match.index || 0) - 30), (match.index || 0) + match[0].length + 30);
     if (word === "power" && /\bpower\s+(rd|road)\b/i.test(around)) continue;
+    // Stage 4 is labeled "Offer and close". The count is glued on in the bar text ("Offer and close0"), so this phrase is not an offer price.
+    if (word === "offer" && /\boffer\s+and\s+close/i.test(around)) continue;
     hits.add(match[0]);
   }
   return [...hits];

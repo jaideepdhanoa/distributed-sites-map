@@ -1283,7 +1283,7 @@ def workbook_stage_rows() -> tuple[list[dict], list[dict]]:
                 continue
             city = str(row.get("Market") or "").strip() or "UNK"
             deal_id = f"{'PIPE' if kind == 'pipeline' else 'LAND'}-{city}-{index:04d}"
-            stage = scrub(str(row.get("Stage") or ""))[:80]
+            stage = display_stage(row.get("Stage"))
             shipped.append({"deal_id": deal_id, "kind": kind, "stage": stage})
             reason, rule = knockout_for_report(row, _row_delist(row, delist_index))
             if reason and not stage.lower().startswith("dropped"):
@@ -1299,8 +1299,72 @@ def workbook_stage_rows() -> tuple[list[dict], list[dict]]:
     return shipped, drift
 
 
-def write_workbook_stage_files() -> dict:
+def listed_flag_drift(sites: list[dict]) -> list[dict]:
+    """Sites whose source file says listed, but the only listing row is off-market."""
+    rows = []
+    for site in sites:
+        if site.get("origin") != "universe" or not site.get("counts_as_site") or site.get("duplicate_of"):
+            continue
+        if not site.get("in_area"):
+            continue
+        if site.get("_source_listed") and not site.get("listed"):
+            rows.append(
+                {
+                    "lead id": site["site_id"],
+                    "workbook Stage": "",
+                    "KO reason": "Source flag said listed but the only listing row is off-market",
+                    "map stage": "not listed",
+                    "rule applied": "Live listing or workbook Listing status of Listed",
+                }
+            )
+    return rows
+
+
+_DEAD_LISTING = re.compile(r"(?i)\b(gone|expired|stale|delist|withdrawn|sold|unverified)\b|no longer exists|dead on arrival")
+
+
+def classify_register_row(row: dict, on_tab: bool) -> str:
+    """Return pin, list, or skip for a Listings Register row.
+
+    pin and list are the 'Listed, not yet screened' layer. list has no coordinates.
+    """
+    flow = str(row.get("flow") or "")
+    status = str(row.get("listing_status") or "")
+    funnel = str(row.get("funnel_stage") or "")
+    nxt = str(row.get("next_step") or "")
+    blob = " ".join([flow, status, funnel])
+    if re.search(r"(?i)off[\s-]*market", blob):
+        return "skip"
+    if str(row.get("ko_reason") or "").strip():
+        return "skip"
+    if re.search(r"(?i)knocked out|routed", funnel):
+        return "skip"
+    if re.search(r"(?i)duplicate", f"{row.get('ko_reason') or ''} {row.get('match_status') or ''}"):
+        return "skip"
+    if on_tab:
+        return "skip"
+    if _DEAD_LISTING.search(status) or _DEAD_LISTING.search(nxt):
+        return "skip"
+    address = str(row.get("address") or "")
+    if re.search(r"(?i)address withheld", address) and not re.search(r"approx\s+-?\d", address):
+        return "list"
+    return "pin"
+
+
+def broker_outreach(path: Path) -> dict[str, str]:
+    """Latest broker email or call date per Site ID.
+
+    Uses the Activity tab the timeline is built from. Outbound and internal rows
+    both count. The message text is never returned.
+    """
+    from timeline_activity import broker_contact_dates
+
+    return broker_contact_dates(path)
+
+
+def write_workbook_stage_files(extra: list[dict] | None = None) -> dict:
     shipped, drift = workbook_stage_rows()
+    drift.extend(extra or [])
     pipeline = Counter(row["stage"] for row in shipped if row["kind"] == "pipeline")
     land = Counter(row["stage"] for row in shipped if row["kind"] == "land")
     payload = {"workbook_as_of": workbook_as_of(), "pipeline": dict(pipeline), "land": dict(land), "rows": shipped}
@@ -1566,6 +1630,8 @@ DEAL_FIELDS = (
     "source_line",
     "source_kind",
     "business_type",
+    "broker_contacted",
+    "last_broker_contact",
 )
 
 
@@ -1589,6 +1655,7 @@ def deal_street_signature(value: str) -> str:
 
 
 def stage_group(stage) -> str:
+    """Workbook stages. There is no Contacted stage."""
     text = str(stage or "").strip().lower()
     if text.startswith("dropped"):
         return "dropped"
@@ -1598,8 +1665,55 @@ def stage_group(stage) -> str:
     if number == 1:
         return "desk"
     if number == 2:
-        return "contacted"
-    return "later"
+        return "financial"
+    if number == 3:
+        return "checks"
+    return "close"
+
+
+def display_stage(stage) -> str:
+    """Stage 3's workbook label is shortened before it is stored or shown."""
+    if stage_number(stage) == 3:
+        return "3 Site checks"
+    return scrub(str(stage or ""))[:80]
+
+
+def universe_match_index(sites: list[dict]) -> tuple[dict, dict]:
+    by_apn: dict[tuple[str, str], set[str]] = {}
+    by_street: dict[tuple[str, str], set[str]] = {}
+    for site in sites:
+        if site.get("origin") != "universe":
+            continue
+        city = site.get("city") or ""
+        for token in apn_tokens(site.get("apn")):
+            by_apn.setdefault((city, token), set()).add(site["site_id"])
+        for field in ("address", "name"):
+            for key in loose_street_keys(site.get(field) or ""):
+                by_street.setdefault((city, key), set()).add(site["site_id"])
+    return by_apn, by_street
+
+
+def match_workbook_site(city: str, apn_value, address_text: str, by_apn: dict, by_street: dict) -> str | None:
+    """One matcher for a deal row and for the site it attaches to.
+
+    A unique street match wins when the parcel number points at a different site.
+    Otherwise one parcel match is used, then a unique street match.
+    """
+    street: set[str] = set()
+    for key in loose_street_keys(address_text or ""):
+        street |= by_street.get((city, key), set())
+    parcels: set[str] = set()
+    for token in apn_tokens(apn_value):
+        parcels |= by_apn.get((city, token), set())
+    if len(street) == 1 and len(parcels) == 1 and next(iter(street)) != next(iter(parcels)):
+        return next(iter(street))
+    if len(parcels) == 1:
+        return next(iter(parcels))
+    if len(street) == 1:
+        return next(iter(street))
+    if len(parcels) > 1:
+        return sorted(parcels)[0]
+    return None
 
 
 EXPLICIT_DEAL_NOTES = _load_rewrites("deals")
@@ -2018,37 +2132,24 @@ def haversine_miles(lon1: float, lat1: float, lon2: float, lat2: float) -> float
     return 2 * radius * math.asin(math.sqrt(arc))
 
 
-def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: list[dict], depots: list[dict], reg: dict | None = None) -> tuple[dict, dict]:
+def build_deal_layer(
+    pipeline_rows: list[dict],
+    land_rows: list[dict],
+    sites: list[dict],
+    depots: list[dict],
+    reg: dict | None = None,
+    outreach: dict[str, str] | None = None,
+) -> tuple[dict, dict]:
     reg = reg if reg is not None else registry_load()
     cache = {}
     if GEOCODE_CACHE.exists():
         cache = json.loads(GEOCODE_CACHE.read_text())
-    by_apn: dict[tuple[str, str], set[str]] = {}
-    by_street: dict[tuple[str, str], set[str]] = {}
-    for site in sites:
-        if site.get("origin") != "universe":
-            continue
-        for token in apn_tokens(site.get("apn")):
-            by_apn.setdefault((site["city"], token), set()).add(site["site_id"])
-        for field in ("address", "name"):
-            signature = deal_street_signature(site.get(field) or "")
-            if signature:
-                by_street.setdefault((site["city"], signature), set()).add(site["site_id"])
+    by_apn, by_street = universe_match_index(sites)
+    outreach = outreach or {}
 
     def match_row(row: dict) -> str | None:
         city = str(row.get("Market") or "").strip()
-        found: set[str] = set()
-        for token in apn_tokens(row.get("APN or folio")):
-            found |= by_apn.get((city, token), set())
-        if len(found) == 1:
-            return next(iter(found))
-        if len(found) > 1:
-            return sorted(found)[0]
-        signature = deal_street_signature(str(row.get("Site") or ""))
-        hits = by_street.get((city, signature), set()) if signature else set()
-        if len(hits) == 1:
-            return next(iter(hits))
-        return None
+        return match_workbook_site(city, row.get("APN or folio"), str(row.get("Site") or ""), by_apn, by_street)
 
     features = []
     failed = []
@@ -2091,7 +2192,7 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 "name": scrub(row.get("Name") or address)[:160],
                 "address": scrub(address)[:180],
                 "city": city,
-                "stage": scrub(row.get("Stage"))[:80],
+                "stage": display_stage(row.get("Stage")),
                 "stage_group": stage_group(row.get("Stage")),
                 "broker": broker[:120],
                 "firm": firm[:160],
@@ -2109,6 +2210,8 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
                 "source_line": source_line,
                 "source_kind": source_kind,
                 "business_type": business_type_from_row(row),
+                "broker_contacted": bool(outreach.get(deal_id)),
+                "last_broker_contact": outreach.get(deal_id) or "",
             }
             if props["business_type"] not in BUSINESS_TYPES:
                 raise SystemExit(f"{deal_id} business type is not allowed: {props['business_type']}")
@@ -2145,15 +2248,18 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
         "land_by_group": dict(Counter(item["properties"]["stage_group"] for item in land)),
     }
     # Prefer a live pipeline deal when several rows point at one universe site.
-    rank = {"desk": 0, "sourced": 1, "contacted": 2, "later": 3, "dropped": 4}
+    rank = {"desk": 0, "sourced": 1, "financial": 2, "checks": 3, "close": 4, "contacted": 2, "later": 4, "dropped": 5}
     best: dict[str, dict] = {}
     for feature in features:
         props = feature["properties"]
         universe_id = props["universe_id"]
-        if not universe_id or props["kind"] != "pipeline":
+        if not universe_id:
             continue
+        # A pipeline deal outranks a land deal in the same stage. Land deals still link.
+        score = rank.get(props["stage_group"], 9) + (0 if props["kind"] == "pipeline" else 0.5)
         current = best.get(universe_id)
-        if current is None or rank.get(props["stage_group"], 9) < rank.get(current["stage_group"], 9):
+        current_score = rank.get(current["stage_group"], 9) + (0 if current and current["kind"] == "pipeline" else 0.5) if current else 99
+        if current is None or score < current_score:
             best[universe_id] = props
     by_universe: dict[str, list[dict]] = {}
     for feature in features:
@@ -2165,6 +2271,7 @@ def build_deal_layer(pipeline_rows: list[dict], land_rows: list[dict], sites: li
         site["linked_deal_id"] = link["deal_id"] if link else ""
         site["linked_deal_name"] = link["name"] if link else ""
         site["linked_deal_stage"] = link["stage"] if link else ""
+        site["contacted"] = bool(link and link.get("broker_contacted"))
         listing = ""
         if site.get("listed"):
             if link and link.get("listing_url"):
@@ -2426,7 +2533,7 @@ def fetch_parcel(city: str, apn: str, address: str, lon: float | None = None, la
                 + urllib.parse.urlencode(
                     {
                         "where": f"FOLIO='{folio}'",
-                        "outFields": "FOLIO,TRUE_OWNER1",
+                        "outFields": "FOLIO,TRUE_OWNER1,LOT_SIZE,DOR_DESC",
                         "returnGeometry": "true",
                         "outSR": "4326",
                         "f": "geojson",
@@ -2435,10 +2542,14 @@ def fetch_parcel(city: str, apn: str, address: str, lon: float | None = None, la
             )
             feat = http_geojson(url)
             if feat:
+                props = feat.get("properties") or {}
                 feat["county"] = "Miami-Dade"
                 feat["apn"] = folio
                 feat["match"] = "parcel number"
-                feat["owner"] = (feat.get("properties") or {}).get("TRUE_OWNER1") or ""
+                lot = first_number(props.get("LOT_SIZE"))
+                feat["acres"] = round(lot / 43560, 3) if lot else None
+                feat["owner"] = props.get("TRUE_OWNER1") or ""
+                feat["land_use"] = str(props.get("DOR_DESC") or "")
                 return feat
     if lon is not None and lat is not None:
         return fetch_parcel_at_point(city, lon, lat, address)
@@ -2467,8 +2578,8 @@ def fetch_parcel_at_point(city: str, lon: float, lat: float, address: str) -> di
         county, apn_key, acres_key, owner_key = "Maricopa", "APN", "LotSize_Acre", "OwnerName"
     elif city == "MIA":
         base = "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query"
-        params["outFields"] = "FOLIO,TRUE_OWNER1"
-        county, apn_key, acres_key, owner_key = "Miami-Dade", "FOLIO", "", "TRUE_OWNER1"
+        params["outFields"] = "FOLIO,TRUE_OWNER1,LOT_SIZE,DOR_DESC"
+        county, apn_key, acres_key, owner_key = "Miami-Dade", "FOLIO", "LOT_SIZE", "TRUE_OWNER1"
     else:
         return None
     feat = http_geojson(base + "?" + urllib.parse.urlencode(params))
@@ -2478,8 +2589,13 @@ def fetch_parcel_at_point(city: str, lon: float, lat: float, address: str) -> di
     feat["county"] = county
     feat["apn"] = str(props.get(apn_key) or "")
     feat["match"] = "pin location"
-    feat["acres"] = first_number(props.get(acres_key)) if acres_key else None
+    raw_acres = first_number(props.get(acres_key)) if acres_key else None
+    if county == "Miami-Dade" and raw_acres:
+        raw_acres = round(raw_acres / 43560, 3)
+    feat["acres"] = raw_acres
     feat["owner"] = props.get(owner_key) or ""
+    if props.get("DOR_DESC"):
+        feat["land_use"] = str(props.get("DOR_DESC") or "")
     return feat
 
 
@@ -2681,6 +2797,9 @@ def _stamp_parcel(record: dict, found: dict) -> None:
         record["parcel_acres"] = round(float(acres), 3)
         if record.get("site_id"):
             record["lot_ac_source"] = "County assessor"
+    land_use = scrub(found.get("land_use") or "")
+    if land_use and record.get("site_id"):
+        record["land_use"] = land_use[:160]
 
 
 def _target_point(target: dict) -> tuple[float | None, float | None]:
@@ -3407,8 +3526,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             site["in_area"] = not is_out_of_area(row)
             site["service_ring"] = "service" if site["in_area"] else "outside"
         site["county_url"] = county_url(city, site["apn"], site["address"])
-        if (row.get("listed_post") or "").strip() == "True" or (row.get("public_listing_freshscan") or "").strip() == "True":
-            site["listed"] = True
+        # listed_post counts off-market targets. A live listing is applied later.
+        site["_source_listed"] = (row.get("listed_post") or "").strip() == "True" or (row.get("public_listing_freshscan") or "").strip() == "True"
         aerial = (row.get("aerial_verdict") or "").strip().lower()
         if aerial and "not reviewed" not in aerial:
             verdict_rows.append(
@@ -3638,23 +3757,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         site["asking_price_date"] = str(date or "")[:10]
         site["asking_price_status"] = status
 
+    match_apn, match_street = universe_match_index(sites)
+
     def match_universe(city: str, apn_value, address_text: str) -> str | None:
-        for token in apn_tokens(apn_value):
-            ids = by_apn.get((city, token), [])
-            if ids:
-                return sorted(ids, key=lambda sid: sid in duplicate_of)[0]
-        sig = street_signature(address_text)
-        if not sig:
-            return None
-        hits = []
-        for site in sites:
-            if site["city"] != city or site["origin"] != "universe":
-                continue
-            if street_signature(site["address"]) == sig or street_signature(site["name"]) == sig:
-                hits.append(site["site_id"])
-        if len(hits) == 1:
-            return hits[0]
-        return None
+        return match_workbook_site(city, apn_value, address_text, match_apn, match_street)
 
     off_market_matched: list[dict] = []
     off_market_unmatched: list[dict] = []
@@ -3735,8 +3841,6 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         attach_price(site, price, source or "Pipeline workbook", url, row.get("Last checked live"), status)
         if str(row.get("Listing status") or "").strip() == "Listed":
             site["listed"] = True
-        if contacted_from_stage(stage):
-            site["contacted"] = True
         crosswalk.append({"site_id": site["site_id"], "source": "Pipeline" if kind == "pipeline" else "Land Sites", "source_key": label})
 
     off_market_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
@@ -4013,7 +4117,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 "pipeline_any": len(contacted_any),
                 "by_city": by_city(contacted_candidates),
                 "of": len(candidates),
-                "note": "Contacted means Pipeline stage 2 or later. Stage 0 and stage 1 are not contacted. The workbook currently has only stages 0, 1, and Dropped, so this count is 0.",
+                "note": "Broker contacted means an outbound email or call to the broker is on file. It is not a workbook stage.",
             },
         ],
         "candidates": {
@@ -4042,8 +4146,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         warnings.append("Counted sites with no pin: " + ", ".join(live_universe["missing_point"][:12]))
     if screening["conflicts"]:
         warnings.append(f"Screening rows with more than one aerial verdict for the same parcel: {len(screening['conflicts'])}.")
-    if len(contacted_any) != 0:
-        warnings.append(f"Contacted count is {len(contacted_any)}, expected 0 with the current stages.")
+    if len(contacted_any) and not any(site.get("contacted") for site in sites):
+        warnings.append("Broker contact flags did not land on any site.")
     if len(pipeline_rows) != 79:
         warnings.append(
             f"Pipeline tab has {len(pipeline_rows)} rows (stages {dict(Counter(str(r.get('Stage')) for r in pipeline_rows))}). The older note of 79 is not in this export."
@@ -4057,7 +4161,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     areas_fc = {"type": "FeatureCollection", "features": areas}
     depots = build_depots()
-    deals_fc, deal_report = build_deal_layer(pipeline_rows, land_rows, sites, depots["features"], reg)
+    deals_fc, deal_report = build_deal_layer(
+        pipeline_rows, land_rows, sites, depots["features"], reg, broker_outreach(workbook)
+    )
+    listed_drift = listed_flag_drift(sites)
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     public_records = {"note": "Public-record fields are added when the build writes files."}
     if write:
@@ -4075,7 +4182,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         geom = None
         if site["lat"] is not None and site["lon"] is not None:
             geom = {"type": "Point", "coordinates": [site["lon"], site["lat"]]}
-        props = {k: v for k, v in site.items() if k not in {"lat", "lon", "utility_proximity", "serving_utility", "serving_utility_source"}}
+        props = {k: v for k, v in site.items() if k not in {"lat", "lon", "utility_proximity", "serving_utility", "serving_utility_source", "_source_listed"}}
         site_features.append({"type": "Feature", "geometry": geom, "properties": props})
     sites_fc = {"type": "FeatureCollection", "features": site_features}
     parcels_fc = {"type": "FeatureCollection", "features": parcels}
@@ -4172,7 +4279,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         deals_fc.get("features") or [],
     )
     if write:
-        write_workbook_stage_files()
+        write_workbook_stage_files(listed_drift)
         OUT.mkdir(parents=True, exist_ok=True)
         PARCEL_CACHE.parent.mkdir(parents=True, exist_ok=True)
         (OUT / "sites.geojson").write_text(json.dumps(sites_fc))
@@ -4423,6 +4530,7 @@ def validate_committed() -> None:
         "deals.geojson",
         "funnel.json",
         "build_report.json",
+        "unscreened.geojson",
     ]
     loaded = {}
     for name in required:
@@ -4508,6 +4616,14 @@ def validate_committed() -> None:
     deal_report = report.get("deals") or {}
     if len(deal_features) != deal_report.get("pipeline", 0) + deal_report.get("land", 0):
         problems.append("deal count does not match the build report")
+    unscreened = loaded.get("unscreened.geojson") or {}
+    unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
+    pinned = sorted(item[0] for item in unscreened_rows if item[1])
+    withheld = sorted(item[0] for item in unscreened_rows if not item[1])
+    if pinned != ["L-013", "L-236", "L-239"]:
+        problems.append(f"unscreened pins are {pinned}")
+    if withheld != ["L-214", "L-215", "L-216", "L-221", "L-233"]:
+        problems.append(f"unscreened list-only rows are {withheld}")
     allowed_deal = set(DEAL_FIELDS)
     for feature in deal_features:
         extra = set((feature.get("properties") or {})) - allowed_deal

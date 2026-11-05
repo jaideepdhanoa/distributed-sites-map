@@ -1,6 +1,6 @@
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const STEPS = ["universe", "in_area", "land", "county", "cleared"] as const;
-export const PIPE_STEPS = ["desk", "contacted", "later", "dropped"] as const;
+export const PIPE_STEPS = ["desk", "financial", "checks", "close", "dropped"] as const;
 export const HOLDS = ["PHX-U180", "LAS-U1516", "PHX-U519"] as const;
 const HOLD_SET = new Set<string>(HOLDS);
 const ELIMINATED = new Set(["FAIL", "NOT_A_WASH"]);
@@ -15,8 +15,9 @@ export const STEP_LABEL: Record<(typeof STEPS)[number], string> = {
 
 export const PIPE_LABEL: Record<(typeof PIPE_STEPS)[number], string> = {
   desk: "Desk screen",
-  contacted: "Contacted",
-  later: "Later stages",
+  financial: "Financial screen",
+  checks: "Site checks",
+  close: "Offer and close",
   dropped: "Dropped",
 };
 
@@ -73,8 +74,9 @@ export function stageGroupFromText(stage: string | undefined): string {
   const number = Number(match[1]);
   if (number <= 0) return "sourced";
   if (number === 1) return "desk";
-  if (number === 2) return "contacted";
-  return "later";
+  if (number === 2) return "financial";
+  if (number === 3) return "checks";
+  return "close";
 }
 
 function present(site: Site): Site {
@@ -171,20 +173,28 @@ function placed(deal: Feature<Deal>, sites: Map<string, Feature<Site>>) {
   return Boolean(deal.geometry);
 }
 
+function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+  return catalog.deals.filter((feature) => {
+    const deal = feature.properties;
+    if ((deal.kind !== "pipeline" && deal.kind !== "land") || deal.city !== city || deal.stage_group !== step) return false;
+    if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
+    if (options.query) {
+      const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();
+      if (!text.includes(options.query.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
 export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
   const sites = new Map(catalog.sites.map((feature) => [feature.properties.site_id, feature]));
-  return catalog.deals
-    .filter((feature) => {
-      const deal = feature.properties;
-      if (deal.kind !== "pipeline" || deal.city !== city || deal.stage_group !== step) return false;
-      if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
-      if (options.query) {
-        const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();
-        if (!text.includes(options.query.toLowerCase())) return false;
-      }
-      return placed(feature, sites);
-    })
+  return stageDeals(catalog, city, step, options)
+    .filter((feature) => placed(feature, sites))
     .map((feature) => feature.properties.deal_id);
+}
+
+export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+  return stageDeals(catalog, city, step, options).length;
 }
 
 export function unfilteredCount(catalog: Catalog, city: string, stage: string) {

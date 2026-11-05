@@ -66,20 +66,58 @@ export function plainRoad(value?: string | null) {
   return text.split(/\s+/).map(roadWord).join(" ").replace(/\s+/g, " ").trim();
 }
 
+const LISTING_HOSTS: Record<string, string> = {
+  "loopnet.com": "LoopNet",
+  "crexi.com": "Crexi",
+  "bizbuysell.com": "BizBuySell",
+  "matthews.com": "Matthews",
+  "carwashbrokers.com": "Car Wash Brokers",
+  "realmo.com": "Realmo",
+  "carwashesforsale.com": "carwashesforsale.com",
+  "brevitas.com": "Brevitas",
+  "ppirfl.com": "Listing",
+};
+
+function hostLabel(url?: string | null) {
+  const host = (url || "").replace(/^https?:\/\/(?:www\.)?/i, "").split("/")[0].toLowerCase();
+  return LISTING_HOSTS[host] || "";
+}
+
+/** A public listing name. Internal scan labels are not a source. */
+export function publicListingSource(value?: string | null) {
+  const text = (value || "").trim();
+  if (!text) return "";
+  if (/listings_v2|fresh scan|re-scan|signed-in|not shown|our own research|^broker$/i.test(text)) return "";
+  return text.split("—")[0].trim();
+}
+
+function offMarketLead(value?: string | null) {
+  return /off[\s-]*market|own research|no lead/i.test(value || "");
+}
+
+/**
+ * Off-market only when the workbook lead source says so.
+ * Otherwise a listing source, a broker whose name is hidden, or the census.
+ */
 export function leadSourceLine(site: SiteProps, deal?: DealProps | null) {
   const kind = (deal?.source_kind || "").toLowerCase();
-  if (kind.includes("broker")) {
-    const firm = shownFirm(deal as DealProps);
+  const dealLead = deal?.lead_source || "";
+  if (kind === "off-market" || offMarketLead(dealLead)) return "Off-market";
+  if (deal && (kind.includes("broker") || kind.includes("listing") || /^(broker|listing)$/i.test(dealLead))) {
+    const firm = shownFirm(deal);
     if (firm) return firm;
+    const listing = hostLabel(deal.listing_url)
+      || (isListingSite(deal.broker) ? deal.broker : "")
+      || (isListingSite(deal.firm) ? deal.firm : "")
+      || publicListingSource(deal.source_line);
+    if (listing) return listing;
+    return "Broker (name not shown)";
   }
-  const research = `${site.research_sources || ""} ${site.verification || ""}`;
-  let source = "County records";
-  if (/aerial/i.test(site.verification || "") && !/county|parcel|assessor|appraiser/i.test(site.research_sources || "")) {
-    source = "Aerial review";
-  } else if (/county|parcel|assessor|appraiser/i.test(research)) {
-    source = "County records";
-  }
-  return `Off-market lead (our own research) · ${source}`;
+  if (site.origin === "off-market" || offMarketLead(site.lead_source)) return "Off-market";
+  const listing = hostLabel(site.listing_url) || publicListingSource(site.asking_price_source);
+  if (site.listed && listing) return listing;
+  if (!site.listed && site.research_sources) return "Off-market";
+  return "Census site";
 }
 
 export function shownPriceSource(deal: DealProps) {

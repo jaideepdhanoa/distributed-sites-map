@@ -5,21 +5,22 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { RecordActions } from "./actions/RecordActions";
-import Detail, { DealDetail } from "./Detail";
+import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
-import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
+import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
 
 const PIPE_STEPS: { id: PipeId; label: string }[] = [
   { id: "desk", label: "Desk screen" },
-  { id: "contacted", label: "Contacted" },
-  { id: "later", label: "Later stages" },
+  { id: "financial", label: "Financial screen" },
+  { id: "checks", label: "Site checks" },
+  { id: "close", label: "Offer and close" },
   { id: "dropped", label: "Dropped" },
 ];
 
@@ -36,6 +37,7 @@ export default function Explorer() {
   const router = useRouter();
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
+  const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
   const [error, setError] = useState("");
@@ -48,7 +50,7 @@ export default function Explorer() {
   const showDepots = params.get("depots") !== "0";
   const showUniverse = params.get("pins") !== "0";
   const showPipeline = params.get("deals") !== "0";
-  const showLandLayer = params.get("landlayer") === "1";
+  const showUnscreened = params.get("newlist") === "1";
   const showDroppedDeals = params.get("dropped") === "1";
   const showRings = params.get("rings") === "1";
   const typesParam = params.get("types");
@@ -68,6 +70,7 @@ export default function Explorer() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
+  const [withheldOpen, setWithheldOpen] = useState(false);
 
   const city = params.get("city") || "PHX";
   const stageParam = params.get("stage") as StageId | null;
@@ -78,6 +81,7 @@ export default function Explorer() {
   const landSites = params.get("land") === "1";
   const query = params.get("q") || "";
   const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
+  const showLandLayer = funnel === "pipeline" ? params.get("landlayer") !== "0" : params.get("landlayer") === "1";
   const extraParam = params.get("extra");
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeParam = params.get("pstage") as PipeId | null;
@@ -117,14 +121,15 @@ export default function Explorer() {
       fetch(`/api/data/parcels?city=${city}`),
       fetch("/api/data/funnel"),
       fetch("/api/data/deals"),
-      fetch("/api/me"),
+      fetch("/api/data/unscreened"),
       fetch("/api/data/timeline/summary"),
-    ]).then(async ([sitesRes, areasRes, depotsRes, parcelsRes, funnelRes, dealsRes, meRes, summaryRes]) => {
+      fetch("/api/me"),
+    ]).then(async ([sitesRes, areasRes, depotsRes, parcelsRes, funnelRes, dealsRes, unscreenedRes, summaryRes, meRes]) => {
       if (sitesRes.status === 401) {
         window.location.href = "/login";
         return;
       }
-      if (!sitesRes.ok || !areasRes.ok || !depotsRes.ok || !parcelsRes.ok || !funnelRes.ok || !dealsRes.ok) {
+      if (!sitesRes.ok || !areasRes.ok || !depotsRes.ok || !parcelsRes.ok || !funnelRes.ok || !dealsRes.ok || !unscreenedRes.ok) {
         setError("The site data could not be loaded.");
         return;
       }
@@ -138,6 +143,8 @@ export default function Explorer() {
           deals: await dealsRes.json(),
           funnel: funnelPayload.funnel,
         });
+        const unscreenedPayload = await unscreenedRes.json();
+        setUnscreened(Array.isArray(unscreenedPayload.features) ? unscreenedPayload.features : []);
         setMe(meRes.ok ? await meRes.json() : null);
         if (summaryRes.ok) {
           const summary = (await summaryRes.json()) as { records?: ActivitySummary };
@@ -339,8 +346,13 @@ export default function Explorer() {
     return blob.includes(query.toLowerCase());
   });
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
+  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || deal.stage_group === pipeStage);
+  const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const drawnDeals: DealFeature[] = funnel === "pipeline"
-    ? (showPipeline ? pipelineSquares : [])
+    ? [
+        ...(showPipeline ? pipelineSquares : []),
+        ...(showLandLayer ? stageLandSquares : []),
+      ]
     : [
         ...(showPipeline ? pipelineDeals.filter((deal) => !deal.universe_id) : []),
         ...(showLandLayer ? landDeals : []),
@@ -359,6 +371,8 @@ export default function Explorer() {
       ?? offMarketFeatures.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
+  const withheldHere = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && !feature.properties.pinned) : [];
 
   useEffect(() => {
     if (!selected) return;
@@ -446,7 +460,8 @@ export default function Explorer() {
     return passesChips(feature.properties, false);
   });
   const universePins = showUniverse ? visibleFeatures.filter((feature) => feature.geometry) : [];
-  const pinCount = funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length;
+  const unscreenedPins = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : [];
+  const pinCount = (funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map(sites.map((site) => [site.site_id, site]));
 
   function siteRow(site: SiteProps): ListRow {
@@ -484,10 +499,27 @@ export default function Explorer() {
     };
   }
 
+  function unscreenedRow(row: UnscreenedProps): ListRow {
+    const price = row.asking_price_display ? `${row.asking_price_display}${row.asking_price_source ? ` · ${row.asking_price_source}` : ""}` : "";
+    return {
+      id: row.listing_id,
+      site: row.name || row.address || row.listing_id,
+      type: row.kind,
+      city: row.city,
+      stage: row.approximate ? "Approximate location" : row.pinned ? "Listed" : "Address withheld",
+      tier: "",
+      spare: row.acres_text || (row.acres != null ? `${row.acres} ac` : ""),
+      zoning: "",
+      traffic: "",
+      listed: price || "Yes",
+      lead: row.asking_price_source || "Listing",
+    };
+  }
+
   const listRows = [...(funnel === "pipeline"
     ? pipelineSquares.map((feature) => dealRow(feature.properties))
     : [...universePins.map((feature) => siteRow(feature.properties)), ...offMarketShown.map((feature) => siteRow(feature.properties))]
-  )].sort((a, b) => {
+  ), ...(showUnscreened ? unscreened.filter((feature) => feature.properties.city === city).map((feature) => unscreenedRow(feature.properties)) : [])].sort((a, b) => {
     const left = String(a[sortKey] || "").trim();
     const right = String(b[sortKey] || "").trim();
     if (!left && !right) return 0;
@@ -525,11 +557,13 @@ export default function Explorer() {
 
   function summaryText() {
     if (funnel === "pipeline") {
-      const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city);
-      const desk = rows.filter((deal) => deal.stage_group === "desk").length;
-      const dropped = rows.filter((deal) => deal.stage_group === "dropped").length;
-      const active = rows.length - dropped;
-      return `${active} active deals (${desk} desk screen), ${dropped} dropped`;
+      const deals = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city);
+      const land = dealRows.filter((deal) => deal.kind === "land" && deal.city === city);
+      const activeDeals = deals.filter((deal) => deal.stage_group !== "dropped").length;
+      const droppedDeals = deals.length - activeDeals;
+      const activeLand = land.filter((deal) => deal.stage_group !== "dropped").length;
+      const droppedLand = land.length - activeLand;
+      return `${activeDeals} deals + ${activeLand} land sites, ${droppedDeals} dropped deals + ${droppedLand} dropped land sites`;
     }
     const candidates = sites.filter((site) => site.city === city && inStage(site, "land")).length;
     const cleared = sites.filter((site) => site.city === city && inStage(site, "cleared")).length;
@@ -591,7 +625,7 @@ export default function Explorer() {
           <input className="search mobile-search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
         ) : null}
         <div className="funnel-row">
-          <nav className="funnel" aria-label="Funnel">
+          <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? STEPS.map((step, index) => {
               const listedHere = subcount(step.id, "listed");
               const contactedHere = subcount(step.id, "contacted");
@@ -613,7 +647,7 @@ export default function Explorer() {
                     ) : null}
                     {contactedHere > 0 ? (
                       <button className={`sub ${extra === "contacted" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.contacted} onMouseEnter={() => setTip(FUNNEL_NOTES.contacted)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "contacted" ? null : "contacted" })}>
-                        {contactedHere.toLocaleString()} contacted
+                        {contactedHere.toLocaleString()} broker contacted
                       </button>
                     ) : null}
                   </span>
@@ -627,26 +661,41 @@ export default function Explorer() {
                 const blob = `${deal.deal_id} ${deal.name} ${deal.address} ${deal.broker} ${deal.firm} ${deal.universe_id}`.toLowerCase();
                 return blob.includes(query.toLowerCase());
               });
-              const squares = rows.filter((deal) => dealPoint(deal)).length;
-              const unmapped = rows.length - squares;
+              const landHere = dealRows.filter((deal) => {
+                if (deal.kind !== "land" || deal.city !== city || deal.stage_group !== step.id) return false;
+                if (!typeOn(deal.business_type || "Other")) return false;
+                if (!query) return true;
+                return `${deal.deal_id} ${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase());
+              });
+              const total = rows.length + landHere.length;
+              const unmapped = [...rows, ...landHere].filter((deal) => !dealPoint(deal)).length;
+              const brokerHere = [...rows, ...landHere].filter((deal) => deal.broker_contacted).length;
+              const split = landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
               return (
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                   <span className="step">
-                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
+                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere} broker contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere} broker contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
                       <span>{step.label}</span>
-                      <strong data-count={squares}>{unmapped > 0 ? `${rows.length.toLocaleString()} (${unmapped.toLocaleString()} not on map)` : rows.length.toLocaleString()}</strong>
+                      <strong>{total.toLocaleString()}</strong>
+                      {split ? <span className="split">{split}</span> : null}
                     </button>
+                    {pipeStage === step.id && unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
                   </span>
                 </Fragment>
               );
             })}
+          </nav>
+            {showUnscreened && withheldHere.length > 0 ? (
+              <button className={`aside ${withheldOpen ? "on" : ""}`} type="button" onClick={() => { setWithheldOpen((value) => !value); setUnplacedOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
+                {withheldHere.length.toLocaleString()} address withheld
+              </button>
+            ) : null}
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setMoreOpen(false); setFiltersOpen(false); }}>
+              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
                 All stages not on the map ({unplacedDeals.length.toLocaleString()})
               </button>
             ) : null}
-          </nav>
           {query && funnel === "universe" && stage !== "universe" ? (
             (() => {
               const everywhere = sites.filter((site) => site.city === city && inStage(site, "universe") && passesChips(site, false)).length;
@@ -788,6 +837,23 @@ export default function Explorer() {
             <button type="button" onClick={logout}>Sign out</button>
           </div>
         ) : null}
+        {withheldOpen ? (
+          <div className="popover" role="dialog" aria-label="Address withheld">
+            <div className="popover-head">
+              <h2>{withheldHere.length.toLocaleString()} address withheld</h2>
+              <button type="button" onClick={() => setWithheldOpen(false)}>Close</button>
+            </div>
+            <ul className="unplaced-list">
+              {withheldHere.map((feature) => (
+                <li key={feature.properties.listing_id}>
+                  <button type="button" className="text-link" onClick={() => { choose(feature.properties.listing_id); setWithheldOpen(false); }}>{feature.properties.name}</button>
+                  {" · "}{feature.properties.kind}
+                  {feature.properties.asking_price_display ? ` · ${feature.properties.asking_price_display}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {unplacedOpen ? (
           <div className="popover" role="dialog" aria-label="Unplaced deals">
             <div className="popover-head">
@@ -815,6 +881,7 @@ export default function Explorer() {
           depots={data.depots.features}
           parcels={data.parcels.features}
           offMarket={offMarketShown}
+          unscreened={showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : []}
           selectedId={selected}
           showAreas={showAreas}
           showDepots={showDepots}
@@ -851,9 +918,20 @@ export default function Explorer() {
               <label><input type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
               <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
               <label><input type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
-              <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: event.target.checked ? "1" : null })} /> Land Sites</label>
+              <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land Sites</label>
               <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
               <label><input type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
+              <label>
+                <input type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
+                <span>
+                  Listed, not yet screened
+                  <span className="layer-meta">
+                    {unscreened.filter((feature) => feature.properties.pinned).length.toLocaleString()} on the map
+                    {" · "}
+                    {unscreened.filter((feature) => !feature.properties.pinned).length.toLocaleString()} address withheld
+                  </span>
+                </span>
+              </label>
             </>
           ) : null}
         </aside>
@@ -897,6 +975,14 @@ export default function Explorer() {
             onClose={() => choose(null)}
             sheet={sheet}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
+          />
+        ) : selectedUnscreened ? (
+          <UnscreenedDetail
+            row={selectedUnscreened}
+            lng={unscreened.find((feature) => feature.properties.listing_id === selectedUnscreened.listing_id)?.geometry?.coordinates?.[0]}
+            lat={unscreened.find((feature) => feature.properties.listing_id === selectedUnscreened.listing_id)?.geometry?.coordinates?.[1]}
+            onClose={() => choose(null)}
+            sheet={sheet}
           />
         ) : selectedSite ? (
           <Detail

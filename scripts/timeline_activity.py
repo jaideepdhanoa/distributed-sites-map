@@ -94,3 +94,58 @@ def read_activity(workbook: Path | None, config: dict, known_ids: set[str] | Non
             continue
         items.append({"record_id": record_id, "event_id": event_id, "date": when, "type": kind, "summary": summary})
     return items, warnings
+
+
+def broker_contact_dates(workbook: Path | None, config: dict | None = None) -> dict[str, str]:
+    """Latest broker email or call per Site ID.
+
+    The same Activity tab feeds the timeline. Outbound rows and internal rows
+    both count. Only the date is returned. Summary text is never copied out.
+    """
+    if workbook is None or not workbook.exists():
+        return {}
+    if config is None:
+        from timeline_config import load_config
+
+        config = load_config()
+    sheet_name = (config.get("activity") or {}).get("sheet") or "Activity"
+    wb = openpyxl.load_workbook(workbook, read_only=True, data_only=True)
+    if sheet_name not in wb.sheetnames:
+        wb.close()
+        return {}
+    rows = list(wb[sheet_name].iter_rows(values_only=True))
+    wb.close()
+    header_at = int((config.get("activity") or {}).get("headerRow") or 1) - 1
+    if header_at < 0 or header_at >= len(rows):
+        return {}
+    headers = [_norm(cell) for cell in rows[header_at]]
+
+    def col(*names: str) -> int | None:
+        for name in names:
+            if name in headers:
+                return headers.index(name)
+        return None
+
+    site_at = col("site id", "site_id", "record id")
+    type_at = col("type", "kind")
+    date_at = col("date", "when")
+    direction_at = col("direction")
+    role_at = col("counterparty role", "counterparty", "role")
+    if site_at is None or type_at is None or date_at is None:
+        return {}
+    latest: dict[str, str] = {}
+    for row in rows[header_at + 1 :]:
+        if not row:
+            continue
+        kind = _norm(row[type_at] if type_at < len(row) else "")
+        if kind not in {"email", "call"}:
+            continue
+        direction = _norm(row[direction_at] if direction_at is not None and direction_at < len(row) else "")
+        role = _norm(row[role_at] if role_at is not None and role_at < len(row) else "")
+        if direction not in {"out", "internal"} or role != "broker":
+            continue
+        record_id = str(row[site_at] if site_at < len(row) else "").strip().upper()
+        when = _date(row[date_at] if date_at < len(row) else "")
+        if record_id and when and when > latest.get(record_id, ""):
+            latest[record_id] = when
+    return latest

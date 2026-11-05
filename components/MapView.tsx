@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
-import type { DealFeature, GeoFeature, SiteFeature } from "@/lib/types";
+import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 
 type Props = {
   sites: SiteFeature[];
@@ -13,6 +13,7 @@ type Props = {
   depots: GeoFeature[];
   parcels: GeoFeature[];
   offMarket: SiteFeature[];
+  unscreened?: UnscreenedFeature[];
   selectedId: string | null;
   showAreas: boolean;
   showDepots: boolean;
@@ -131,6 +132,7 @@ export default function MapView(props: Props) {
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterRadius: 48, clusterMaxZoom: 11 },
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          unscreened: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -302,6 +304,24 @@ export default function MapView(props: Props) {
             paint: { "text-color": "#1c1914", "text-halo-color": "#f4efe6", "text-halo-width": 1.2 },
           },
           {
+            id: "unscreened",
+            type: "circle",
+            source: "unscreened",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 7, 12, 9, 15, 12],
+              "circle-color": "transparent",
+              "circle-stroke-color": "#f4efe6",
+              "circle-stroke-width": 2.4,
+            },
+          },
+          {
+            id: "unscreened-selected",
+            type: "circle",
+            source: "unscreened",
+            filter: ["==", ["get", "listing_id"], ""],
+            paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
+          },
+          {
             id: "deals-land",
             type: "symbol",
             source: "deals",
@@ -385,10 +405,15 @@ export default function MapView(props: Props) {
       }
     }
     map.on("load", () => {
+      map.resize();
+      requestAnimationFrame(() => map.resize());
       if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
       const squares: Record<string, [number, number, number]> = {
         sourced: [36, 88, 166],
         desk: [196, 132, 29],
+        financial: [31, 122, 77],
+        checks: [47, 111, 138],
+        close: [107, 76, 154],
         contacted: [31, 122, 77],
         later: [107, 76, 154],
         dropped: [122, 46, 40],
@@ -430,8 +455,13 @@ export default function MapView(props: Props) {
         const id = event.features?.[0]?.properties?.deal_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
+      map.on("click", "unscreened", (event: MapLayerMouseEvent) => {
+        if (measureRef.current) return;
+        const id = event.features?.[0]?.properties?.listing_id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
       const popup = new Popup({ closeButton: false, closeOnClick: false, closeOnMove: false, maxWidth: "280px", className: "map-tip-popup", offset: 14 });
-      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "depots", "expansion-line", "areas-op"];
+      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "expansion-line", "areas-op"];
       const areaLayers = new Set(["expansion-line", "areas-op"]);
       let shownKey = "";
       let request = 0;
@@ -485,7 +515,9 @@ export default function MapView(props: Props) {
           }).catch(() => undefined);
           return;
         }
-        const model = layer === "offmarket"
+        const model = layer === "unscreened"
+          ? { title: String(props.name || props.address || props.listing_id || "Listing"), marks: [{ swatch: "listing", label: "Listed, not yet screened" }] }
+          : layer === "offmarket"
           ? siteTip(props, true)
           : layer === "sites"
             ? siteTip(props)
@@ -538,6 +570,7 @@ export default function MapView(props: Props) {
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });
       (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.deals.filter((f) => f.geometry) });
+      (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
       (map.getSource("rings") as GeoJSONSource).setData({ type: "FeatureCollection", features: depotRings(props.depots) });
@@ -548,6 +581,8 @@ export default function MapView(props: Props) {
       }
       if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["==", ["get", "site_id"], props.selectedId || ""]);
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
+      if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
+      map.resize();
       if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
@@ -555,7 +590,7 @@ export default function MapView(props: Props) {
     };
     if (map.isStyleLoaded()) push();
     else map.once("load", push);
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.selectedId, focusToken, props.focusLng, props.focusLat, props.focusZoom]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, focusToken, props.focusLng, props.focusLat, props.focusZoom]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -52,6 +52,10 @@ export function parseField(value: unknown): SuggestionField {
 }
 
 export function parseDetail(field: SuggestionField, value: unknown): string | null {
+  if (field === "proposed_next_step") {
+    const detail = String(value ?? "").trim();
+    return detail || null;
+  }
   if (field !== "correction") return null;
   const detail = String(value ?? "").trim();
   if (!detail) return null;

@@ -126,9 +126,9 @@ test("an assignment shows under Assigned to me, and Done is limited to the owner
   await completeSuggestion(sql, { id: owned.id, actorId: "contributor", reviewer: false });
   await decideSuggestion(sql, { id: owned.id, status: "accepted", actorId: "reviewer" });
   const csv = nextStepsCsv(await listSuggestions(sql), lookup);
-  assert.equal(csv.split("\n")[0], "site_id,date,title,owner,approved_at,done_at");
+  assert.equal(csv.split("\n")[0], "site_id,date,title,owner,approved_at,done_at,type,stage");
   assert.match(csv, /Schedule a site visit/);
   assert.match(csv, /done_at/);
   const line = csv.split("\n").find((item) => item.includes("Schedule a site visit"));
-  assert.ok(line && !line.endsWith(`""`));
+  assert.match(line || "", /T\d{2}:\d{2}:\d{2}\.\d+Z","work_item"/);
 });

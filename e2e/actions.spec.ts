@@ -202,12 +202,37 @@ test("a reviewer approval shows the next step on the card", async ({ page, reque
   await page.setViewportSize({ width: 1440, height: 900 });
   const next = page.getByTestId("next-step");
   await expect(next).toContainText("Ask the broker for the sales package");
-  await expect(next).toContainText("2026-11-20");
+  await expect(next).toContainText("Nov 20");
   await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   const more = page.getByRole("button", { name: "Show more" });
   if (await more.isVisible()) await more.click();
   await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-mobile.png" });
+});
+
+test("discussion stays a comment box, and a reviewer can accept a knock off", async ({ page, request }) => {
+  const target = "PIPE-PHX-0067";
+  await login(request, "contributor");
+  const before = await request.get("/api/data/deals");
+  const beforeBody = await before.text();
+  await openAs(page, "contributor", `/?funnel=pipeline&site=${target}`);
+  await page.getByTestId("panel-tab-discussion").click();
+  await expect(page.getByRole("checkbox", { name: "Propose next step" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Propose next step" }).click();
+  await page.getByRole("button", { name: "Knock off" }).click();
+  await page.getByLabel("Reason").fill("The broker confirmed another buyer.");
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await expect(page.getByTestId("proposed-next-step")).toContainText("Drop from pipeline");
+  await expect(page.getByTestId("proposed-next-step")).toContainText("Waiting for");
+
+  await openAs(page, "reviewer", `/?funnel=pipeline&site=${target}`);
+  const card = page.getByTestId("proposed-next-step");
+  await expect(card.getByRole("button", { name: "Accept" })).toBeVisible();
+  await card.getByRole("button", { name: "Accept" }).click();
+  await expect(page.getByTestId("next-step")).toContainText("Drop from pipeline");
+  await expect(page.getByTestId("next-step")).toContainText("Dropped");
+  const after = await request.get("/api/data/deals");
+  expect(await after.text()).toBe(beforeBody);
 });
 
 test("a saved view round-trips the current link", async ({ request }) => {

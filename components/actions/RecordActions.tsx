@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { APPROVER_LABEL } from "@/lib/actions/approver";
 import { formatPacific } from "@/lib/actions/time";
 import { MentionChips, MentionField, type MentionAccount } from "./MentionField";
 import { canReview, canWrite, useActionStatus, type ActionRole } from "./panel";
@@ -84,7 +83,6 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [proposeNext, setProposeNext] = useState(false);
   const writable = canWrite(status.actionRole);
   const reviewer = canReview(status.actionRole);
 
@@ -150,13 +148,10 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     return item.field === "proposed_next_step" && !item.doneAt && (item.status === "open" || item.status === "accepted") && (reviewer || item.ownerId === status.username);
   }
 
-  const openCount = suggestions.filter((item) => item.status === "open").length;
-  const openProposals = suggestions.filter((item) => item.field === "proposed_next_step" && item.status === "open").length;
   const approvedSteps = suggestions
     .filter((item) => item.field === "proposed_next_step" && item.status === "accepted")
     .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""));
   const currentStep = approvedSteps[0];
-  const earlierSteps = approvedSteps.slice(1);
   const roots = notes.filter((item) => !item.parentId);
   const pendingSteps = suggestions.filter((item) => item.field === "proposed_next_step" && item.status === "open");
 
@@ -304,36 +299,6 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
 
   return (
     <section className="act" data-testid="record-actions">
-      <div data-testid="next-step" className={currentStep ? "pin" : ""}>
-        <p className="who">Approved next step</p>
-        {currentStep ? (
-          <p>
-            <strong>{currentStep.title || currentStep.proposedValue}</strong>
-            {currentStep.targetOn ? ` · ${currentStep.targetOn}` : ""}
-            {currentStep.ownerName ? ` · ${currentStep.ownerName}` : ""}
-            {currentStep.doneAt ? ` · Done ${formatPacific(currentStep.doneAt)}` : ""}
-            <MentionChips mentions={currentStep.mentions} />
-            {canFinish(currentStep) ? (
-              <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${currentStep.id}/done`, {}, () => undefined)}>Done</button>
-            ) : null}
-          </p>
-        ) : (
-          <p className="note">No approved next step.</p>
-        )}
-        {earlierSteps.length ? (
-          <details>
-            <summary>Earlier next steps ({earlierSteps.length})</summary>
-            <ul className="act-list">
-              {earlierSteps.map((item) => (
-                <li key={item.id}>
-                  <p>{item.title || item.proposedValue}{item.targetOn ? ` · ${item.targetOn}` : ""}</p>
-                  <p className="note">{item.ownerName || item.authorId} · approved {item.decidedAt ? formatPacific(item.decidedAt) : ""}</p>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
-      </div>
       <div className="act-threads" data-testid="note-threads">
         {roots.map((item) => (
           <NoteThread
@@ -352,41 +317,11 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
             actor={status.username}
           />
         ))}
-        {pendingSteps.map((item) => (
-          <article key={item.id} className="thread proposal" data-testid="proposed-next-step">
-            <p className="tag">Proposed next step · waiting for {APPROVER_LABEL}</p>
-            <p className="who"><strong>{accounts.find((account) => account.id === item.authorId)?.name || item.authorId}</strong> · {formatPacific(item.createdAt)}</p>
-            <p>{item.title || item.proposedValue}</p>
-            {reviewer ? (
-              <div className="act-row">
-                <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
-                <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "rejected" }, () => undefined)}>Reject</button>
-              </div>
-            ) : null}
-          </article>
-        ))}
       </div>
       {writable ? (
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            const text = note.trim();
-            if (!text) return;
-            if (proposeNext) {
-              void submit("/api/actions/suggestions", {
-                targetKind: kind,
-                targetId: id,
-                field: "proposed_next_step",
-                title: text,
-                proposedValue: text,
-                mentions: noteMentions.map((item) => item.id),
-              }, () => {
-                setNote("");
-                setNoteMentions([]);
-                setProposeNext(false);
-              });
-              return;
-            }
             void submit("/api/actions/notes", { targetKind: kind, targetId: id, body: note, mentions: noteMentions.map((item) => item.id) }, () => {
               setNote("");
               setNoteMentions([]);
@@ -405,15 +340,10 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
             rows={3}
             maxLength={2000}
           />
-          <p className="hint">Type @ to mention someone. Mentions surface the site in their Review queue.</p>
+          <p className="hint">Type @ to mention someone.</p>
           <div className="act-row">
-            <label className="act-check">
-              <input type="checkbox" checked={proposeNext} onChange={(event) => setProposeNext(event.target.checked)} />
-              Propose next step
-            </label>
             <button type="submit" disabled={pending}>Comment</button>
           </div>
-          <p className="note">{APPROVER_LABEL} approves a next step before it changes the record.</p>
         </form>
       ) : (
         <p className="note">Notes are read only for this login.</p>

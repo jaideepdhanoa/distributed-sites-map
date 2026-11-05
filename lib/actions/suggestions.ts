@@ -5,6 +5,7 @@ import { recordAppEvent } from "@/lib/queue/events";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
 import { audit } from "./audit";
 import type { Sql } from "./db";
+import { allowsAssignee, allowsDate, exportStage, normalizeNextStep } from "./nextStep";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
 import {
   csvCell,
@@ -174,17 +175,28 @@ export async function createSuggestion(
   const record = lookup(target.targetKind, target.targetId);
   if (!record) throw new InputError("That site or deal is not on the map.", 404);
   const field = parseField(input.field);
-  const detail = parseDetail(field, input.detail);
+  const parsedDetail = parseDetail(field, input.detail);
   const nextStep = field === "proposed_next_step";
-  const title = nextStep ? parseBody(input.title || input.proposedValue, "title", 120) : null;
-  const proposedValue = nextStep ? title! : parseBody(input.proposedValue, "proposed value", 500);
-  const reasonText = String(input.reason || "").trim();
-  const reason = nextStep ? (reasonText ? parseBody(reasonText, "note", 2000) : "") : parseBody(input.reason, "reason", 2000);
-  const targetOn = nextStep ? parseDate(input.targetOn) : null;
-  const ownerId = nextStep && String(input.ownerId || "").trim() ? String(input.ownerId).trim().toLowerCase() : null;
-  if (ownerId && !getUsers().some((user) => user.u === ownerId)) throw new InputError("Choose an account from the list.");
-  assertClean(proposedValue);
-  if (reason) assertClean(reason);
+  const normalized = nextStep
+    ? normalizeNextStep({
+      detail: parsedDetail,
+      title: input.title,
+      proposedValue: input.proposedValue,
+      reason: input.reason,
+      targetOn: input.targetOn,
+      ownerId: input.ownerId,
+    }, getUsers())
+    : null;
+  const title = normalized ? normalized.title : null;
+  const proposedValue = normalized ? normalized.proposedValue : parseBody(input.proposedValue, "proposed value", 500);
+  const reason = normalized ? normalized.reason : parseBody(input.reason, "reason", 2000);
+  const targetOn = normalized ? normalized.targetOn : null;
+  const ownerId = normalized ? normalized.ownerId : null;
+  const detail = normalized ? normalized.detail : parsedDetail;
+  if (!normalized) {
+    assertClean(proposedValue);
+    if (reason) assertClean(reason);
+  }
   const mentionIds = nextStep ? parseMentionIds(input.mentions) : [];
   const id = randomUUID();
   const currentValue = nextStep ? "" : safeSnapshot(recordField(record, field, detail));
@@ -290,6 +302,74 @@ export async function completeSuggestion(
   return (await withMentions(sql, [suggestion]))[0];
 }
 
+export async function reviseSuggestion(
+  sql: Sql,
+  input: {
+    id: string;
+    actorId: string;
+    reviewer: boolean;
+    title?: string | null;
+    proposedValue?: string | null;
+    reason?: string | null;
+    detail?: string | null;
+    targetOn?: string | null;
+    ownerId?: string | null;
+  },
+): Promise<Suggestion> {
+  const existing = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
+  const row = existing.rows[0];
+  if (!row || row.field_name !== "proposed_next_step") throw new InputError("That next step is not in the queue.", 404);
+  if (row.done_at) throw new InputError("That next step is already done.");
+  if (row.status === "accepted") {
+    if (!input.reviewer && row.owner_id !== input.actorId && row.author_id !== input.actorId) {
+      throw new InputError("You do not have permission for that.", 403);
+    }
+    const date = allowsDate(row.detail) ? parseDate(input.targetOn === undefined ? dayOf(row.target_on) : input.targetOn) : null;
+    let owner: string | null = null;
+    if (allowsAssignee(row.detail)) {
+      owner = input.ownerId === undefined ? row.owner_id : (String(input.ownerId || "").trim().toLowerCase() || null);
+      if (owner && !getUsers().some((user) => user.u === owner)) throw new InputError("Choose an account from the list.");
+    }
+    await sql.query(`UPDATE suggestions SET target_on = $2, owner_id = $3 WHERE id = $1`, [input.id, date, owner]);
+    await audit(sql, {
+      actorId: input.actorId,
+      action: "suggestion.revise",
+      targetKind: row.target_kind,
+      targetId: row.target_id,
+      before: { id: row.id, targetOn: dayOf(row.target_on), ownerId: row.owner_id },
+      after: { id: row.id, targetOn: date, ownerId: owner },
+    });
+  } else if (row.status === "open") {
+    if (!input.reviewer && row.author_id !== input.actorId) throw new InputError("You do not have permission for that.", 403);
+    const normalized = normalizeNextStep({
+      detail: input.detail === undefined ? row.detail : input.detail,
+      title: input.title === undefined ? row.title : input.title,
+      proposedValue: input.proposedValue === undefined ? row.proposed_value : input.proposedValue,
+      reason: input.reason === undefined ? row.reason : input.reason,
+      targetOn: input.targetOn === undefined ? dayOf(row.target_on) : input.targetOn,
+      ownerId: input.ownerId === undefined ? row.owner_id : input.ownerId,
+    }, getUsers());
+    await sql.query(
+      `UPDATE suggestions SET detail = $2, title = $3, proposed_value = $4, reason = $5, target_on = $6, owner_id = $7 WHERE id = $1 AND status = 'open'`,
+      [input.id, normalized.detail, normalized.title, normalized.proposedValue, normalized.reason, normalized.targetOn, normalized.ownerId],
+    );
+    await audit(sql, {
+      actorId: input.actorId,
+      action: "suggestion.revise",
+      targetKind: row.target_kind,
+      targetId: row.target_id,
+      before: { id: row.id, status: "open" },
+      after: { id: row.id, title: normalized.title, detail: normalized.detail },
+    });
+  } else {
+    throw new InputError("Only an open or approved next step can be edited.");
+  }
+  const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
+  const suggestion = present(saved.rows[0]);
+  if (!suggestion) throw new InputError("That next step could not be updated.");
+  return (await withMentions(sql, [suggestion]))[0];
+}
+
 export async function reconcileSuggestions(sql: Sql, lookup: RecordLookup = fileLookup()): Promise<number> {
   const rows = await sql.query<SuggestionRow>(
     `SELECT ${SELECT} FROM suggestions WHERE status IN ('open', 'accepted')`,
@@ -359,16 +439,23 @@ export function suggestionsCsv(rows: Suggestion[]): string {
 }
 
 export function nextStepsCsv(rows: Suggestion[], lookup: RecordLookup = fileLookup()): string {
-  const headers = ["site_id", "date", "title", "owner", "approved_at", "done_at"];
+  const headers = ["site_id", "date", "title", "owner", "approved_at", "done_at", "type", "stage"];
   const lines = [headers.join(",")];
   const approved = rows
     .filter((row) => row.field === "proposed_next_step" && row.status === "accepted")
     .sort((a, b) => (a.decidedAt || "").localeCompare(b.decidedAt || ""));
   for (const row of approved) {
     lines.push(
-      [permanentSiteId(row.targetKind, row.targetId, lookup), row.targetOn, row.title || row.proposedValue, row.ownerName, row.decidedAt, row.doneAt]
-        .map(csvCell)
-        .join(","),
+      [
+        permanentSiteId(row.targetKind, row.targetId, lookup),
+        row.targetOn,
+        row.title || row.proposedValue,
+        row.ownerName,
+        row.decidedAt,
+        row.doneAt,
+        row.detail || "work_item",
+        exportStage(row.detail, row.proposedValue),
+      ].map(csvCell).join(","),
     );
   }
   return `${lines.join("\n")}\n`;

@@ -163,8 +163,8 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   await page.getByTestId("panel-tab-discussion").click();
   const panel = page.locator(".drawer");
   await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");
-  await expect(panel.getByTestId("next-step")).toContainText("2026-12-15");
-  await panel.getByRole("button", { name: "Done" }).click();
+  await expect(panel.getByTestId("next-step")).toContainText("Dec 15");
+  await panel.getByRole("button", { name: "Mark done" }).click();
   await expect.poll(async () => {
     const again = await queue(request, "market=all&stage=any&viable=1&assigned=1");
     return again.items.some((item) => item.snapshot?.assignments?.some((row) => row.title === "Schedule a site visit"));
@@ -173,7 +173,7 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   const csv = await request.get("/api/actions/suggestions/export?kind=next");
   expect(csv.ok()).toBeTruthy();
   const text = await csv.text();
-  expect(text.split("\n")[0]).toBe("site_id,date,title,owner,approved_at,done_at");
+  expect(text.split("\n")[0]).toBe("site_id,date,title,owner,approved_at,done_at,type,stage");
   const line = text.split("\n").find((item) => item.includes("Schedule a site visit"));
   expect(line).toBeTruthy();
   expect(line).toMatch(/T\d{2}:/);

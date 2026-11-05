@@ -27,6 +27,7 @@ jobs:
       - run: node --experimental-strip-types scripts/test-stage-detail.ts
       - run: node --experimental-strip-types scripts/test-drawer-width.ts
       - run: node --experimental-strip-types scripts/test-key-numbers.ts
+      - run: node --experimental-strip-types scripts/test-contacted-deals.ts
 
   e2e:
     runs-on: ubuntu-latest

@@ -308,17 +308,15 @@
     },
     {
       "id": "contacted",
-      "name": "Of which contacted",
-      "unit": "sites",
-      "total": 0,
-      "pipeline_any": 1,
+      "name": "Deals contacted",
+      "unit": "deals",
+      "total": 17,
       "by_city": {
-        "LAS": 0,
-        "PHX": 0,
-        "MIA": 0
+        "LAS": 9,
+        "PHX": 3,
+        "MIA": 5
       },
-      "of": 38,
-      "note": "Contacted means a conversation has started on a universe site. No universe site is in that step. One pipeline row is in Financial screen."
+      "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
     }
   ],
   "candidates": {

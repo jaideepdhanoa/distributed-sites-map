@@ -13,7 +13,7 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
-import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
+import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { PIPELINE_COLUMNS, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
@@ -534,6 +534,16 @@ export default function Explorer() {
     return sites.filter((site) => site.city === city && inStage(site, step) && site[field] && passesChips(site, false)).length;
   }
 
+  function countLiveContactedDeals() {
+    return dealRows.filter((deal) => {
+      if (!isLiveContactedDeal(deal) || deal.city !== city) return false;
+      if (!typeOn(deal.business_type || "Other")) return false;
+      if (!query) return true;
+      const blob = `${deal.deal_id} ${deal.name} ${deal.address} ${deal.broker} ${deal.firm} ${deal.universe_id}`.toLowerCase();
+      return blob.includes(query.toLowerCase());
+    }).length;
+  }
+
   const heldCount = sites.filter((site) => site.city === city && heldOutside(site)).length;
   const censusForCity = data?.funnel.stages.find((item) => item.id === "census")?.by_city?.[city] ?? 0;
 
@@ -851,7 +861,7 @@ export default function Explorer() {
           <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? STEPS.map((step, index) => {
               const listedHere = subcount(step.id, "listed");
-              const contactedHere = subcount(step.id, "contacted");
+              const dealsContacted = step.id === "universe" ? countLiveContactedDeals() : 0;
               const note = step.id === "universe"
                 ? `Built from ${censusForCity.toLocaleString()} census records. The count keeps the rows the workbook includes.`
                 : FUNNEL_NOTES[step.id];
@@ -868,9 +878,9 @@ export default function Explorer() {
                         {listedHere.toLocaleString()} listed
                       </button>
                     ) : null}
-                    {contactedHere > 0 ? (
-                      <button className={`sub ${extra === "contacted" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.contacted} onMouseEnter={() => setTip(FUNNEL_NOTES.contacted)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "contacted" ? null : "contacted" })}>
-                        {contactedHere.toLocaleString()} broker contacted
+                    {dealsContacted > 0 ? (
+                      <button className="sub" type="button" data-testid="deals-contacted" title={FUNNEL_NOTES.contacted} onMouseEnter={() => setTip(FUNNEL_NOTES.contacted)} onMouseLeave={() => setTip("")} onClick={() => setTip(FUNNEL_NOTES.contacted)}>
+                        {dealsContacted.toLocaleString()} deals contacted
                       </button>
                     ) : null}
                   </span>
@@ -898,7 +908,7 @@ export default function Explorer() {
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                   <span className="step">
-                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere} broker contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere} broker contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
+                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
                       <span>{step.label}</span>
                       <strong>{total.toLocaleString()}</strong>
                       {split ? <span className="split">{split}</span> : null}
@@ -1276,6 +1286,7 @@ export default function Explorer() {
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
             <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000.</p>
+            <p>Deals contacted, beside Universe, counts Pipeline and Land deals in this city with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>
             <ul>
               {STATUS_NOTES.map((item) => <li key={item.id}><strong>{item.label}.</strong> {item.note}</li>)}

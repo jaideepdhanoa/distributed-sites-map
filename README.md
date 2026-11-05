@@ -149,7 +149,7 @@ Muse's in-area reference, shown in the app and not used as our count, is 1,043 (
 
 Aerial screening alone had 25 in-area L10 sites. County-checked sites that are not FAIL or not-a-wash, and that have no aerial code, take L10 at 10,000 sq ft of spare land and L4 at 4,000 sq ft. Same-owner adjoining land counts toward that line. In-area L10 is 22 after dropping eliminated sites. L4 remains 44 against an expected figure near 48. The screening tab has 61 partial-fit rows: 57 joined to a site, 44 are inside the operative area, 13 are in the Las Vegas 200/300 rings, and 4 did not join a site.
 
-Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The step stays on screen.
+The Universe bar counts Pipeline and Land deals in the city with an outbound email or call on file. Dropped deals stay out of that count. The current split is the `contacted` stage in `data/generated/funnel.json`.
 
 ## Activity timeline
 

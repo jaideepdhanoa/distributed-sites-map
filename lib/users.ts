@@ -4,6 +4,7 @@ export type AuthUser = {
   role: "admin" | "user";
   roleLabel: string;
   actionRole: "viewer" | "contributor" | "reviewer" | null;
+  displayName: string;
 };
 
 const ACTION = new Set(["viewer", "contributor", "reviewer"]);
@@ -28,7 +29,9 @@ export function getUsers(): AuthUser[] {
     const role = roleLabel === "admin" ? "admin" : "user";
     const explicit = String(row.actionRole ?? "").trim().toLowerCase();
     const actionRole = ACTION.has(explicit) ? (explicit as AuthUser["actionRole"]) : ACTION.has(roleLabel) ? (roleLabel as AuthUser["actionRole"]) : null;
-    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole });
+    const named = String(row.name ?? row.displayName ?? "").trim();
+    const displayName = named || u;
+    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole, displayName });
   }
   return users;
 }

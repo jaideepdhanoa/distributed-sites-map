@@ -9,9 +9,13 @@ export async function GET(request: Request) {
   const session = await openActions("viewer");
   if (isResponse(session)) return session;
   const url = new URL(request.url);
-  let target;
+  let target: { targetKind: "site" | "deal" | "suggestion"; targetId: string };
   try {
-    target = parseTarget(url.searchParams.get("targetKind"), url.searchParams.get("targetId"));
+    const kind = url.searchParams.get("targetKind");
+    const id = String(url.searchParams.get("targetId") || "");
+    target = kind === "suggestion"
+      ? { targetKind: "suggestion", targetId: id }
+      : parseTarget(kind, id);
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Choose a site or a deal.", 400);
   }
@@ -23,7 +27,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await openActions("contributor");
   if (isResponse(session)) return session;
-  let body: { targetKind?: string; targetId?: string; body?: string };
+  let body: { targetKind?: string; targetId?: string; body?: string; parentId?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -31,10 +35,11 @@ export async function POST(request: Request) {
   }
   const note = await runWrite(session, { action: "note", targetKind: body.targetKind, targetId: body.targetId }, (sql) =>
     createNote(sql, {
-      targetKind: body.targetKind as "site",
+      targetKind: (body.targetKind === "suggestion" ? "suggestion" : body.targetKind) as "site",
       targetId: String(body.targetId || ""),
       body: String(body.body || ""),
       authorId: session.u,
+      parentId: body.parentId,
     }),
   );
   if (isResponse(note)) return note;

@@ -25,7 +25,7 @@ async function main() {
       AUTH_USERS: JSON.stringify(users),
       DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:55433/postgres",
       DATABASE_SSL: "disable",
-      ACTION_ROLE_MAP: JSON.stringify({ admin: "reviewer", user: "viewer" }),
+      ACTION_ROLE_MAP: JSON.stringify({ admin: "reviewer", user: "contributor" }),
     },
   });
 

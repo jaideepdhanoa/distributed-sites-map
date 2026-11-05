@@ -18,7 +18,7 @@ export type RoleSource = {
  * The map keys are role labels, never account names.
  */
 export function loadRoleMap(): Record<string, ActionRole> {
-  const map: Record<string, ActionRole> = { admin: "reviewer", user: "viewer" };
+  const map: Record<string, ActionRole> = { admin: "reviewer", user: "contributor" };
   const raw = process.env.ACTION_ROLE_MAP;
   if (!raw) return map;
   try {
@@ -30,7 +30,7 @@ export function loadRoleMap(): Record<string, ActionRole> {
       map[label] = value;
     }
   } catch {
-    return { admin: "reviewer", user: "viewer" };
+    return { admin: "reviewer", user: "contributor" };
   }
   return map;
 }

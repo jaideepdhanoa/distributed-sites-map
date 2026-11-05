@@ -3,18 +3,18 @@ import test from "node:test";
 import { canDecide, canWriteContent, resolveActionRole, roleAllows } from "../../lib/actions/roles";
 import { getUsers } from "../../lib/users";
 
-test("defaults keep admin as reviewer and user as viewer", () => {
+test("defaults keep admin as reviewer and user as contributor", () => {
   delete process.env.ACTION_ROLE_MAP;
   assert.equal(resolveActionRole({ role: "admin", roleLabel: "admin", actionRole: null }), "reviewer");
-  assert.equal(resolveActionRole({ role: "user", roleLabel: "user", actionRole: null }), "viewer");
+  assert.equal(resolveActionRole({ role: "user", roleLabel: "user", actionRole: null }), "contributor");
 });
 
 test("the role map changes labels and ignores account names", () => {
-  process.env.ACTION_ROLE_MAP = JSON.stringify({ user: "contributor", "some-person": "reviewer" });
-  assert.equal(resolveActionRole({ role: "user", roleLabel: "user", actionRole: null }), "contributor");
+  process.env.ACTION_ROLE_MAP = JSON.stringify({ user: "viewer", "some-person": "reviewer" });
+  assert.equal(resolveActionRole({ role: "user", roleLabel: "user", actionRole: null }), "viewer");
   assert.equal(
     resolveActionRole({ role: "user", roleLabel: "user", actionRole: null }),
-    "contributor",
+    "viewer",
   );
   delete process.env.ACTION_ROLE_MAP;
 });
@@ -29,7 +29,7 @@ test("an account actionRole wins over the map", () => {
 test("a broken map falls back to the defaults", () => {
   process.env.ACTION_ROLE_MAP = "{";
   assert.equal(resolveActionRole({ role: "admin", roleLabel: "admin" }), "reviewer");
-  assert.equal(resolveActionRole({ role: "user", roleLabel: "user" }), "viewer");
+  assert.equal(resolveActionRole({ role: "user", roleLabel: "user" }), "contributor");
   delete process.env.ACTION_ROLE_MAP;
 });
 

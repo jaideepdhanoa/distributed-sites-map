@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await openActions("contributor");
   if (isResponse(session)) return session;
-  let body: { targetKind?: string; targetId?: string; field?: string; detail?: string; proposedValue?: string; reason?: string };
+  let body: { targetKind?: string; targetId?: string; field?: string; detail?: string; proposedValue?: string; reason?: string; title?: string; targetOn?: string; ownerId?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -47,9 +47,12 @@ export async function POST(request: Request) {
         targetId: String(body.targetId || ""),
         field: String(body.field || ""),
         detail: body.detail,
-        proposedValue: String(body.proposedValue || ""),
+        proposedValue: String(body.proposedValue || body.title || ""),
         reason: String(body.reason || ""),
         authorId: session.u,
+        title: body.title,
+        targetOn: body.targetOn,
+        ownerId: body.ownerId,
       }),
   );
   if (isResponse(suggestion)) return suggestion;

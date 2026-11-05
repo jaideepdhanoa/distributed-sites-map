@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { assertClean, safeSnapshot } from "@/lib/policy/banned";
+import { getUsers } from "@/lib/users";
 import { audit } from "./audit";
 import type { Sql } from "./db";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
@@ -7,6 +8,7 @@ import {
   csvCell,
   InputError,
   parseBody,
+  parseDate,
   parseDetail,
   parseField,
   parseTarget,
@@ -32,6 +34,10 @@ export type Suggestion = {
   decidedBy: string | null;
   decidedAt: string | null;
   appliedAt: string | null;
+  title: string | null;
+  targetOn: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
 };
 
 type SuggestionRow = {
@@ -49,14 +55,35 @@ type SuggestionRow = {
   decided_by: string | null;
   decided_at: Date | string | null;
   applied_at: Date | string | null;
+  title: string | null;
+  target_on: Date | string | null;
+  owner_id: string | null;
 };
 
-const SELECT = `id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, created_at, decided_by, decided_at, applied_at`;
+const SELECT = `id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, created_at, decided_by, decided_at, applied_at, title, target_on, owner_id`;
+
+function dayOf(value: Date | string | null): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  return `${value.getUTCFullYear()}-${month}-${day}`;
+}
+
+function ownerName(id: string | null): string | null {
+  if (!id) return null;
+  const account = getUsers().find((user) => user.u === id);
+  if (!account) return id;
+  const named = safeSnapshot(account.displayName, 80);
+  return named || account.u;
+}
 
 function present(row: SuggestionRow): Suggestion | null {
   const proposedValue = safeSnapshot(row.proposed_value, 500);
   const reason = safeSnapshot(row.reason, 2000);
-  if (!proposedValue || !reason) return null;
+  const title = safeSnapshot(row.title || "", 120) || null;
+  if (!proposedValue) return null;
+  if (!reason && row.field_name !== "proposed_next_step") return null;
   return {
     id: row.id,
     targetKind: row.target_kind,
@@ -72,7 +99,20 @@ function present(row: SuggestionRow): Suggestion | null {
     decidedBy: row.decided_by,
     decidedAt: row.decided_at ? stamp(row.decided_at) : null,
     appliedAt: row.applied_at ? stamp(row.applied_at) : null,
+    title,
+    targetOn: dayOf(row.target_on),
+    ownerId: row.owner_id,
+    ownerName: ownerName(row.owner_id),
   };
+}
+
+export function permanentSiteId(kind: TargetKind, id: string, lookup: RecordLookup = fileLookup()): string {
+  const record = lookup(kind, id);
+  if (!record) return id;
+  if (kind === "deal") return String(record.deal_id || id);
+  const linked = String(record.linked_deal_id || "");
+  if (/^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/.test(linked)) return linked;
+  return id;
 }
 
 export async function listSuggestions(
@@ -107,6 +147,9 @@ export async function createSuggestion(
     proposedValue: string;
     reason: string;
     authorId: string;
+    title?: string | null;
+    targetOn?: string | null;
+    ownerId?: string | null;
   },
   lookup: RecordLookup = fileLookup(),
 ): Promise<Suggestion> {
@@ -115,24 +158,30 @@ export async function createSuggestion(
   if (!record) throw new InputError("That site or deal is not on the map.", 404);
   const field = parseField(input.field);
   const detail = parseDetail(field, input.detail);
-  const proposedValue = parseBody(input.proposedValue, "proposed value", 500);
-  const reason = parseBody(input.reason, "reason", 2000);
+  const nextStep = field === "proposed_next_step";
+  const title = nextStep ? parseBody(input.title || input.proposedValue, "title", 120) : null;
+  const proposedValue = nextStep ? title! : parseBody(input.proposedValue, "proposed value", 500);
+  const reasonText = String(input.reason || "").trim();
+  const reason = nextStep ? (reasonText ? parseBody(reasonText, "note", 2000) : "") : parseBody(input.reason, "reason", 2000);
+  const targetOn = nextStep ? parseDate(input.targetOn) : null;
+  const ownerId = nextStep && String(input.ownerId || "").trim() ? String(input.ownerId).trim().toLowerCase() : null;
+  if (ownerId && !getUsers().some((user) => user.u === ownerId)) throw new InputError("Choose an account from the list.");
   assertClean(proposedValue);
-  assertClean(reason);
+  if (reason) assertClean(reason);
   const id = randomUUID();
-  const currentValue = safeSnapshot(recordField(record, field, detail));
+  const currentValue = nextStep ? "" : safeSnapshot(recordField(record, field, detail));
   await sql.query(
     `INSERT INTO suggestions (
-      id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open', $9)`,
-    [id, target.targetKind, target.targetId, field, detail, currentValue, proposedValue, reason, input.authorId],
+      id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, title, target_on, owner_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open', $9, $10, $11, $12)`,
+    [id, target.targetKind, target.targetId, field, detail, currentValue, proposedValue, reason, input.authorId, title, targetOn, ownerId],
   );
   await audit(sql, {
     actorId: input.authorId,
     action: "suggestion.create",
     targetKind: target.targetKind,
     targetId: target.targetId,
-    after: { id, field, detail, currentValue, proposedValue, reason, status: "open" },
+    after: { id, field, detail, currentValue, proposedValue, reason, status: "open", title, targetOn, ownerId },
   });
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [id]);
   const suggestion = present(saved.rows[0]);
@@ -236,6 +285,22 @@ export function suggestionsCsv(rows: Suggestion[]): string {
         row.decidedAt,
         row.appliedAt,
       ].map(csvCell).join(","),
+    );
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function nextStepsCsv(rows: Suggestion[], lookup: RecordLookup = fileLookup()): string {
+  const headers = ["site_id", "date", "title", "owner", "approved_at"];
+  const lines = [headers.join(",")];
+  const approved = rows
+    .filter((row) => row.field === "proposed_next_step" && row.status === "accepted")
+    .sort((a, b) => (a.decidedAt || "").localeCompare(b.decidedAt || ""));
+  for (const row of approved) {
+    lines.push(
+      [permanentSiteId(row.targetKind, row.targetId, lookup), row.targetOn, row.title || row.proposedValue, row.ownerName, row.decidedAt]
+        .map(csvCell)
+        .join(","),
     );
   }
   return `${lines.join("\n")}\n`;

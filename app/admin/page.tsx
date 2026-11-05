@@ -29,7 +29,7 @@ export default async function AdminPage() {
         run <code>npm run add-user -- name</code>, paste the printed JSON into AUTH_USERS, and redeploy.
         Removing a name from that list signs them out on the next request. Queue access
         (viewer, contributor, reviewer) comes from <code>actionRole</code> on that account, or from
-        <code>ACTION_ROLE_MAP</code>. The default is admin to reviewer and user to viewer.
+        <code>ACTION_ROLE_MAP</code>. The default is admin to reviewer and user to contributor.
       </p>
       <table>
         <thead>

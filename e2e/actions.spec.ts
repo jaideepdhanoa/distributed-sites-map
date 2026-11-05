@@ -121,6 +121,76 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   await page.getByTestId("suggestions-panel").screenshot({ path: "/opt/cursor/artifacts/actions-suggestions-mobile.png" });
 });
 
+test("a contributor can reply, and a non-reviewer cannot approve a next step", async ({ page, request }) => {
+  await login(request, "contributor");
+  const note = await request.post("/api/actions/notes", {
+    data: { targetKind: "site", targetId: site, body: "The frontage needs another look." },
+  });
+  expect(note.status()).toBe(201);
+  const root = ((await note.json()) as { note: { id: string } }).note;
+  const reply = await request.post("/api/actions/notes", {
+    data: { targetKind: "site", targetId: site, parentId: root.id, body: "The driveway is the tight part." },
+  });
+  expect(reply.status()).toBe(201);
+
+  const proposal = await request.post("/api/actions/suggestions", {
+    data: {
+      targetKind: "site",
+      targetId: site,
+      field: "proposed_next_step",
+      title: "Ask the broker for the sales package",
+      targetOn: "2026-11-20",
+      ownerId: "contributor",
+    },
+  });
+  expect(proposal.status()).toBe(201);
+  const created = ((await proposal.json()) as { suggestion: { id: string } }).suggestion;
+  const denied = await request.post(`/api/actions/suggestions/${created.id}`, { data: { status: "accepted" } });
+  expect(denied.status()).toBe(403);
+
+  await openAs(page, "contributor", `/?site=${site}`);
+  await expect(page.getByTestId("note-threads")).toContainText("The driveway is the tight part.");
+  await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const more = page.getByRole("button", { name: "Show more" });
+  if (await more.isVisible()) await more.click();
+  await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-mobile.png" });
+});
+
+test("a reviewer approval shows the next step on the card", async ({ page, request }) => {
+  await login(request, "contributor");
+  const proposalResponse = await request.post("/api/actions/suggestions", {
+    data: {
+      targetKind: "site",
+      targetId: site,
+      field: "proposed_next_step",
+      title: "Ask the broker for the sales package",
+      targetOn: "2026-11-20",
+      ownerId: "contributor",
+    },
+  });
+  expect(proposalResponse.status()).toBe(201);
+  const proposal = ((await proposalResponse.json()) as { suggestion: { id: string } }).suggestion;
+  const before = await request.get("/api/data/deals");
+  const beforeBody = await before.text();
+  await login(request, "reviewer");
+  const accepted = await request.post(`/api/actions/suggestions/${proposal.id}`, { data: { status: "accepted", note: "Approved." } });
+  expect(accepted.ok()).toBeTruthy();
+  const after = await request.get("/api/data/deals");
+  expect(await after.text()).toBe(beforeBody);
+
+  await openAs(page, "reviewer", `/?site=${site}`);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const next = page.getByTestId("next-step");
+  await expect(next).toContainText("Ask the broker for the sales package");
+  await expect(next).toContainText("2026-11-20");
+  await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const more = page.getByRole("button", { name: "Show more" });
+  if (await more.isVisible()) await more.click();
+  await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-mobile.png" });
+});
+
 test("a saved view round-trips the current link", async ({ request }) => {
   await login(request, "viewer");
   const saved = await request.post("/api/actions/views", {

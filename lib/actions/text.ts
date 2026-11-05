@@ -11,6 +11,7 @@ export const SUGGESTION_FIELDS = [
   "contacted",
   "asking_price_display",
   "asking_price_source",
+  "proposed_next_step",
 ] as const;
 
 export type SuggestionField = (typeof SUGGESTION_FIELDS)[number];
@@ -56,6 +57,13 @@ export function parseDetail(field: SuggestionField, value: unknown): string | nu
   if (!detail) return null;
   if (!(CORRECTION_KEYS as readonly string[]).includes(detail)) throw new InputError("That column cannot be suggested.");
   return detail;
+}
+
+export function parseDate(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new InputError("Use a calendar date.");
+  return text;
 }
 
 export function parseBody(value: unknown, label: string, max: number): string {

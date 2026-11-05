@@ -51,21 +51,23 @@ Queue access is separate from the admin page. It is read from the account list, 
 | Access | Can do |
 |---|---|
 | viewer | Read notes and suggestions. Save a personal view. Export the suggestion CSV. |
-| contributor | Viewer, plus notes and suggestions. |
-| reviewer | Contributor, plus accept or reject an open suggestion, and share a team view. |
+| contributor | Viewer, plus notes, replies, and proposals. Authors can edit or remove their own posts. |
+| reviewer | Contributor, plus accept or reject an open suggestion, resolve a thread, and share a team view. |
 
 Set it in either place:
 
-- On one account: `"actionRole":"contributor"` inside that person's `AUTH_USERS` object.
+- On one account: `"actionRole":"viewer"` inside that person's `AUTH_USERS` object. An optional `"name"` is the label shown in the owner list.
 - For a whole role label: `ACTION_ROLE_MAP={"admin":"reviewer","user":"contributor"}`.
 
-If you set neither, `admin` is a reviewer and `user` is a viewer. A bad `ACTION_ROLE_MAP` falls back to that default. The accounts page shows the resolved access. Every saved note, suggestion, decision, saved view, and export is appended to `audit_log`.
+If you set neither, `admin` is a reviewer and `user` is a contributor. A bad `ACTION_ROLE_MAP` falls back to that default. The accounts page shows the resolved access. Every saved note, reply, edit, removal, suggestion, decision, saved view, and export is appended to `audit_log`.
 
 Free text is checked before it is stored. Text that fails the same wording rules as the map is rejected and is not written. The rejection does not repeat the blocked text.
 
 ### Suggestion CSV
 
 More → Suggestions → Download CSV. A person applies those rows in the workbook. The columns are the record, the field, the current value, the proposed value, the reason, and the status (`open`, `accepted`, `rejected`, or `applied`).
+
+Approved next steps have their own download on that panel. Columns are the site id (the permanent id when the record has one), the target date, the title, the owner, and when it was approved. Approving a next step does not change the stage and does not write the workbook. A later approval leaves the earlier one in the history on the card.
 
 Failed attempts are counted for unknown usernames as well as known ones, with the same message. A separate Redis counter limits attempts per IP (10 in 15 minutes). A username locks after 5 failures in 15 minutes.
 

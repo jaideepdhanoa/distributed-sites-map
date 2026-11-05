@@ -76,6 +76,7 @@ function SuggestionsDialog() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const openProposals = rows.filter((row) => row.field === "proposed_next_step" && row.status === "open").length;
   const shown = filter === "all" ? rows : rows.filter((row) => row.status === filter);
 
   async function decide(id: string, next: "accepted" | "rejected") {
@@ -98,13 +99,14 @@ function SuggestionsDialog() {
       <button className="backdrop" type="button" aria-label="Close suggestions" onClick={() => openPanel(null)} />
       <section className="act-dialog" role="dialog" aria-modal="true" aria-labelledby="suggestions-title" data-testid="suggestions-panel">
         <button className="close" type="button" onClick={() => openPanel(null)}>Close</button>
-        <h2 id="suggestions-title">Suggestions</h2>
+        <h2 id="suggestions-title">Suggestions{openProposals ? ` · ${openProposals} open proposals` : ""}</h2>
         <p className="note">Accepting a row does not change the map. Apply it in the workbook. When a later sync matches, the row is marked applied.</p>
         <div className="act-row">
           {FILTERS.map((item) => (
             <button key={item} type="button" className={filter === item ? "on" : ""} onClick={() => setFilter(item)}>{item}</button>
           ))}
           <a href="/api/actions/suggestions/export">Download CSV</a>
+          <a href="/api/actions/suggestions/export?kind=next">Approved next steps</a>
         </div>
         {error ? <p className="err" role="alert">{error}</p> : null}
         {shown.length ? (

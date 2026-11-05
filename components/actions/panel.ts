@@ -5,11 +5,11 @@ import { useSyncExternalStore } from "react";
 export type ActionRole = "viewer" | "contributor" | "reviewer";
 export type PanelName = "suggestions" | "views" | null;
 
-type Status = { enabled: boolean; actionRole: ActionRole };
+type Status = { enabled: boolean; actionRole: ActionRole; username: string };
 
 let panel: PanelName = null;
 const panelListeners = new Set<() => void>();
-let status: Status = { enabled: false, actionRole: "viewer" };
+let status: Status = { enabled: false, actionRole: "viewer", username: "" };
 let statusState: "idle" | "loading" | "ready" = "idle";
 const statusListeners = new Set<() => void>();
 
@@ -42,16 +42,16 @@ function loadStatus() {
   statusState = "loading";
   fetch("/api/actions/status")
     .then(async (response) => {
-      if (!response.ok) return { enabled: false, actionRole: "viewer" as const };
+      if (!response.ok) return { enabled: false, actionRole: "viewer" as const, username: "" };
       return (await response.json()) as Status;
     })
     .then((next) => {
-      status = { enabled: Boolean(next.enabled), actionRole: next.actionRole || "viewer" };
+      status = { enabled: Boolean(next.enabled), actionRole: next.actionRole || "viewer", username: next.username || "" };
       statusState = "ready";
       emitStatus();
     })
     .catch(() => {
-      status = { enabled: false, actionRole: "viewer" };
+      status = { enabled: false, actionRole: "viewer", username: "" };
       statusState = "ready";
       emitStatus();
     });
@@ -65,7 +65,7 @@ export function useActionStatus(): Status {
       return () => statusListeners.delete(listener);
     },
     () => status,
-    () => ({ enabled: false, actionRole: "viewer" }),
+    () => ({ enabled: false, actionRole: "viewer", username: "" }),
   );
 }
 

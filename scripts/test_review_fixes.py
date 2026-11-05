@@ -91,7 +91,7 @@ class ShippedCounts(unittest.TestCase):
             if props.get("origin") == "universe" and props.get("counts_as_site") and not props.get("duplicate_of") and props.get("in_area") and not props.get("land_only") and props.get("listed"):
                 listed.append(props["city"])
         from collections import Counter
-        self.assertEqual(dict(Counter(listed)), {"PHX": 3, "LAS": 7, "MIA": 9})
+        self.assertEqual(dict(Counter(listed)), {"PHX": 4, "LAS": 6, "MIA": 9})
         stars = next(item["properties"] for item in deals if item["properties"]["deal_id"] == "PIPE-MIA-0080")
         self.assertEqual(stars["folder_url"], "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ")
         self.assertEqual(by_id["MIA-U747"]["folder_url"], stars["folder_url"])
@@ -104,6 +104,6 @@ class ShippedCounts(unittest.TestCase):
         withheld = sorted(item["properties"]["listing_id"] for item in layer if not item.get("geometry"))
         self.assertEqual(pinned, ["L-013", "L-236", "L-239"])
         self.assertEqual(withheld, ["L-214", "L-215", "L-216", "L-221", "L-233"])
-        drift = (ROOT / "data/drift_report.csv").read_text()
-        for sid in false_listed:
-            self.assertIn(sid, drift)
+        drift = (ROOT / "data/drift_report.csv").read_text().splitlines()
+        leads = [line.split(",", 1)[0] for line in drift[1:] if line.strip()]
+        self.assertEqual(leads, ["PIPE-PHX-0081", "LAND-PHX-0047", "LAND-PHX-0048", "LAND-PHX-0049", "LAS-U119"])

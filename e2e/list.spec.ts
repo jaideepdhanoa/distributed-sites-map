@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { cityPipelineCounts } from "./pipeline-counts";
 
 const username = process.env.E2E_USERNAME || "";
 const password = process.env.E2E_PASSWORD || "";
@@ -36,6 +37,6 @@ test("list rows match map pins for each city, step, and filter", async ({ page }
     await page.waitForSelector(".shell.list-open");
     const rows = Number(await page.locator(".shell").getAttribute("data-list-count"));
     expect(rows).toBeGreaterThanOrEqual(pins);
-    if (!city) expect(rows).toBe(15);
+    if (!city) expect(rows).toBe(cityPipelineCounts("PHX").deskTotal);
   }
 });

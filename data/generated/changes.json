@@ -1,68 +1,56 @@
 {
-  "new_sites": 0,
-  "removed_sites": 0,
-  "verdict_changes": 0,
-  "stage_moves": 26,
-  "sample_new": [],
-  "sample_verdicts": [],
-  "sample_stages": [
-    {
-      "site_id": "LAS-U53",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "LAS-U829",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "LAS-U977",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
+  "new_sites": 11,
+  "removed_sites": 2,
+  "verdict_changes": 1,
+  "stage_moves": 6,
+  "sample_new": [
+    "LAND-LAS-0050",
+    "LAND-MIA-0051",
+    "LAND-PHX-0043",
+    "LAND-PHX-0044",
+    "LAND-PHX-0045",
+    "LAND-PHX-0046",
+    "LAND-PHX-0049",
+    "PIPE-MIA-0082",
+    "PIPE-PHX-0084",
+    "PIPE-PHX-0085",
+    "PIPE-SNA-0002"
+  ],
+  "sample_verdicts": [
     {
       "site_id": "MIA-U747",
-      "before": "",
-      "after": "2 Financial screen"
-    },
+      "before": null,
+      "after": "PASS"
+    }
+  ],
+  "sample_stages": [
     {
-      "site_id": "PHX-U309",
-      "before": "1 Desk screen",
+      "site_id": "PHX-U167",
+      "before": "",
       "after": "Dropped"
     },
     {
-      "site_id": "PHX-U326",
+      "site_id": "PHX-U217",
       "before": "",
       "after": "1 Desk screen"
     },
     {
-      "site_id": "PHX-U633",
+      "site_id": "PHX-U432",
+      "before": "",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PHX-U501",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "site_id": "LAND-LAS-0004",
       "before": "1 Desk screen",
       "after": "Dropped"
     },
     {
-      "site_id": "PIPE-PHX-0008",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "PIPE-PHX-0009",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "PIPE-LAS-0015",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "PIPE-PHX-0018",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "PIPE-LAS-0072",
+      "deal_id": "LAND-LAS-0004",
       "before": "1 Desk screen",
       "after": "Dropped"
     }

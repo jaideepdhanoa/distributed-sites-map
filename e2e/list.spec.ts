@@ -20,19 +20,19 @@ test("list rows match map pins for each city, step, and filter", async ({ page }
     for (const step of steps) {
       for (const filter of filters) {
         const query = `${city}stage=${step}${filter ? `&${filter}` : ""}`;
-        await page.goto(`/?${query}`);
+        await page.goto(`/?${query}`, { waitUntil: "domcontentloaded" });
         await page.waitForSelector(".shell");
         const pins = await page.locator(".shell").getAttribute("data-pin-count");
-        await page.goto(`/?${query}&view=list`);
+        await page.goto(`/?${query}&view=list`, { waitUntil: "domcontentloaded" });
         await page.waitForSelector(".shell.list-open");
         const rows = await page.locator(".shell").getAttribute("data-list-count");
         expect(rows, query).toBe(pins);
       }
     }
-    await page.goto(`/?${city}funnel=pipeline&pstage=desk`);
+    await page.goto(`/?${city}funnel=pipeline&pstage=desk`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
     const pins = await page.locator(".shell").getAttribute("data-pin-count");
-    await page.goto(`/?${city}funnel=pipeline&pstage=desk&view=list`);
+    await page.goto(`/?${city}funnel=pipeline&pstage=desk&view=list`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell.list-open");
     expect(await page.locator(".shell").getAttribute("data-list-count")).toBe(pins);
   }

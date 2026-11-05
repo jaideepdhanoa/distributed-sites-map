@@ -36,6 +36,11 @@ async function queue(request: APIRequestContext, query = "market=all&stage=any&v
 test("a new site can be reviewed, and a later note puts it back", async ({ page, request }) => {
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await login(request, "contributor");
+  // A failed later test retries this whole file, which can leave the site reviewed or snoozed.
+  const unsnooze = await request.post("/api/queue/snooze", { data: { siteId: deal, until: "2000-01-01" } });
+  expect(unsnooze.ok()).toBeTruthy();
+  const reset = await request.post("/api/queue", { data: { siteId: deal, undo: true } });
+  expect(reset.ok()).toBeTruthy();
   const before = await queue(request);
   expect(before.items.some((item) => item.siteId === deal)).toBeTruthy();
 
@@ -95,7 +100,8 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
   await openAs(page, "reviewer", `/?review=1&qmarket=all&qstage=any&qapprove=1&i=${at + 1}`);
   const panel = page.locator(".drawer");
   await expect(panel).toBeVisible();
-  const proposal = panel.locator("li", { hasText: "Ask for the sales package" }).filter({ has: page.getByRole("button", { name: "Accept" }) });
+  await panel.getByTestId("panel-tab-discussion").click();
+  const proposal = panel.getByTestId("proposed-next-step").filter({ hasText: "Ask for the sales package" });
   await expect(proposal).toBeVisible();
   await proposal.getByRole("button", { name: "Accept" }).click();
   await expect.poll(async () => {
@@ -109,6 +115,7 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 
 test("a mention is queued only for the mentioned account", async ({ page, request }) => {
   await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any");
+  await page.getByTestId("panel-tab-discussion").click();
   const body = page.getByTestId("note-body");
   await body.click();
   await body.fill("Please look at the frontage ");
@@ -116,7 +123,7 @@ test("a mention is queued only for the mentioned account", async ({ page, reques
   await expect(page.getByTestId("mention-menu")).toBeVisible();
   await page.getByTestId("mention-menu").getByRole("option", { name: "Reviewer" }).click();
   await expect(page.getByTestId("note-body")).not.toHaveValue(/@/);
-  await page.getByRole("button", { name: "Save note" }).click();
+  await page.getByRole("button", { name: "Comment" }).click();
   await expect(page.getByTestId("mention-chip").first()).toContainText("Reviewer");
 
   await login(request, "reviewer");
@@ -153,10 +160,11 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any&qassign=1");
+  await page.getByTestId("panel-tab-discussion").click();
   const panel = page.locator(".drawer");
   await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");
   await expect(panel.getByTestId("next-step")).toContainText("2026-12-15");
-  await panel.locator("li", { hasText: "Schedule a site visit" }).getByRole("button", { name: "Done" }).click();
+  await panel.getByRole("button", { name: "Done" }).click();
   await expect.poll(async () => {
     const again = await queue(request, "market=all&stage=any&viable=1&assigned=1");
     return again.items.some((item) => item.snapshot?.assignments?.some((row) => row.title === "Schedule a site visit"));

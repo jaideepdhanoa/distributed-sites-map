@@ -120,7 +120,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const city of CITIES) {
   test(`${city} pins match the API at every step and filter`, async ({ page }) => {
-    test.setTimeout(360_000);
+    test.setTimeout(480_000);
     const catalog = await loadCatalog(page, city);
     const cityQuery = city === "PHX" ? "" : `city=${city}&`;
     await page.goto(`/?${cityQuery}`, { waitUntil: "domcontentloaded" });

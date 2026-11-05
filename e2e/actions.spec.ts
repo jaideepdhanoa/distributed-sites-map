@@ -46,6 +46,7 @@ test("viewer is read only on the server and in the card", async ({ page, request
   expect(decision.status()).toBe(403);
 
   await openAs(page, "viewer", `/?site=${site}`);
+  await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByText("Notes are read only for this login.")).toBeVisible();
   await expect(page.getByTestId("suggest-change")).toHaveCount(0);
   await mkdir("/opt/cursor/artifacts", { recursive: true });
@@ -68,7 +69,9 @@ test("blocked wording is rejected and is not echoed", async ({ page, request }) 
   expect(JSON.stringify(payload).includes(word)).toBe(false);
 
   await openAs(page, "contributor", `/?site=${site}`);
-  await expect(page.getByTestId("suggest-change")).toBeVisible();
+  await page.getByTestId("panel-tab-discussion").click();
+  await expect(page.getByTestId("note-body")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Comment" })).toBeVisible();
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -77,7 +80,7 @@ test("blocked wording is rejected and is not echoed", async ({ page, request }) 
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByTestId("note-body").fill(`Please check ${word} before Friday.`);
-  await page.getByRole("button", { name: "Save note" }).click();
+  await page.getByRole("button", { name: "Comment" }).click();
   const alert = page.getByTestId("action-error");
   await expect(alert).toContainText("not allowed on the map");
   await expect(alert).not.toContainText(word);
@@ -119,6 +122,7 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   expect(dealStage(await after.json(), targetId)).toBe(beforeStage);
 
   await openAs(page, "reviewer", `/?site=${targetId}`);
+  await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByTestId("record-actions")).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "More" }).click();
@@ -162,6 +166,7 @@ test("a contributor can reply, and a non-reviewer cannot approve a next step", a
   expect(denied.status()).toBe(403);
 
   await openAs(page, "contributor", `/?site=${site}`);
+  await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByTestId("note-threads")).toContainText("The driveway is the tight part.");
   await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -193,6 +198,7 @@ test("a reviewer approval shows the next step on the card", async ({ page, reque
   expect(await after.text()).toBe(beforeBody);
 
   await openAs(page, "reviewer", `/?site=${site}`);
+  await page.getByTestId("panel-tab-discussion").click();
   await page.setViewportSize({ width: 1440, height: 900 });
   const next = page.getByTestId("next-step");
   await expect(next).toContainText("Ask the broker for the sales package");

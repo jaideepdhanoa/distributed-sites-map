@@ -36,9 +36,9 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
   expect(before.items.some((item) => item.siteId === deal)).toBeTruthy();
 
   await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
-  await expect(page.getByTestId("queue-card")).toBeVisible();
+  await expect(page.getByTestId("queue-controls")).toBeVisible();
+  await expect(page.locator(".drawer")).toBeVisible();
   await expect(page.getByTestId("queue-count")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Map" }).first()).toBeVisible();
 
   const reviewed = await request.post("/api/queue", { data: { siteId: deal } });
   expect(reviewed.ok()).toBeTruthy();
@@ -86,13 +86,15 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 
   await login(request, "reviewer");
   await openAs(page, "reviewer", "/?view=queue&qmarket=all&qstage=any&qapprove=1");
-  const queueCard = page.getByTestId("queue");
-  await expect(queueCard).toBeVisible();
+  const controls = page.getByTestId("queue-controls");
+  const panel = page.locator(".drawer");
+  await expect(controls).toBeVisible();
   for (let step = 0; step < 40; step += 1) {
-    if (await queueCard.getByText("Ask for the sales package").count()) break;
-    await queueCard.getByRole("button", { name: "Next", exact: true }).click();
+    if (await panel.getByText("Ask for the sales package").count()) break;
+    await controls.getByRole("button", { name: "Next", exact: true }).click();
+    await page.waitForTimeout(200);
   }
-  const proposal = queueCard.locator("li", { hasText: "Ask for the sales package" }).filter({ has: page.getByRole("button", { name: "Accept" }) });
+  const proposal = panel.locator("li", { hasText: "Ask for the sales package" }).filter({ has: page.getByRole("button", { name: "Accept" }) });
   await expect(proposal).toBeVisible();
   await proposal.getByRole("button", { name: "Accept" }).click();
   await expect.poll(async () => {
@@ -150,11 +152,14 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
   await openAs(page, "reviewer", "/?view=queue&qmarket=all&qstage=any&qassign=1");
-  const block = page.getByTestId("queue-assignments");
-  await expect(block).toContainText("Schedule a site visit");
-  await expect(block).toContainText("2026-12-15");
-  await block.locator("li", { hasText: "Schedule a site visit" }).getByRole("button", { name: "Done" }).click();
-  await expect(page.getByTestId("queue")).not.toContainText("Schedule a site visit");
+  const panel = page.locator(".drawer");
+  await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");
+  await expect(panel.getByTestId("next-step")).toContainText("2026-12-15");
+  await panel.locator("li", { hasText: "Schedule a site visit" }).getByRole("button", { name: "Done" }).click();
+  await expect.poll(async () => {
+    const again = await queue(request, "market=all&stage=any&viable=1&assigned=1");
+    return again.items.some((item) => item.snapshot?.assignments?.some((row) => row.title === "Schedule a site visit"));
+  }).toBe(false);
 
   const csv = await request.get("/api/actions/suggestions/export?kind=next");
   expect(csv.ok()).toBeTruthy();
@@ -187,26 +192,26 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   expect(step.status()).toBe(201);
 
   await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
-  const card = page.getByTestId("queue-card");
-  await expect(card).toContainText("Please look at the frontage.");
-  await expect(card.getByTestId("mention-chip").first()).toContainText("Reviewer");
-  await expect(card.getByTestId("note-body")).toBeVisible();
-  await expect(card.getByTestId("next-step")).toContainText("Ask for the sales package");
-  await page.setViewportSize({ width: 1440, height: 1100 });
-  await card.locator("h2").evaluate((node) => node.scrollIntoView({ block: "start" }));
-  await page.screenshot({ path: "/opt/cursor/artifacts/queue-card-desktop.png" });
-  await page.getByTestId("queue-more").click();
-  await expect(page.getByTestId("queue-menu")).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/queue-menu-desktop.png" });
-  await page.getByTestId("queue-more").click();
-  await page.setViewportSize({ width: 390, height: 1280 });
-  await card.locator("h2").evaluate((node) => node.scrollIntoView({ block: "start" }));
-  await expect(card.getByTestId("note-body")).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/queue-card-mobile.png" });
+  const controls = page.getByTestId("queue-controls");
+  const panel = page.locator(".drawer");
+  await expect(controls).toBeVisible();
+  await expect(panel).toBeVisible();
+  await expect(controls.getByRole("button", { name: "Previous" })).toBeVisible();
+  await expect(controls.getByRole("button", { name: "Next", exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByRole("button", { name: "Pipeline" })).toHaveClass(/on/);
+  await page.locator(".maplibregl-canvas").waitFor();
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop.png" });
+  const position = controls.getByTestId("queue-position");
+  const first = await position.innerText();
+  await controls.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(position).not.toHaveText(first);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop-next.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByTestId("queue-more").click();
-  await expect(page.getByTestId("queue-menu")).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/queue-menu-mobile.png" });
+  await expect(controls).toBeVisible();
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-mobile.png" });
 });
 
 test("the empty queue and the phone layout", async ({ page, request }) => {

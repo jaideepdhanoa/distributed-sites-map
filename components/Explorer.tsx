@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
-import QueueView from "./queue/QueueView";
+import { QueueBar, QueueControls, QueueEmpty, type QueueItem } from "./queue/QueueView";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import Wordmark from "./Wordmark";
@@ -62,6 +62,9 @@ export default function Explorer() {
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
   const [queueCount, setQueueCount] = useState(0);
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  const [queueFirst, setQueueFirst] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
   const tableOpen = params.get("table") === "1";
@@ -214,8 +217,12 @@ export default function Explorer() {
     let cancel = false;
     fetch(`/api/queue?${q}`).then(async (response) => {
       if (cancel || !response.ok) return;
-      const payload = (await response.json()) as { items?: unknown[] };
-      setQueueCount(payload.items?.length || 0);
+      const payload = (await response.json()) as { firstTime?: boolean; items?: QueueItem[] };
+      const next = payload.items || [];
+      setQueueItems(next);
+      setQueueCount(next.length);
+      setQueueFirst(Boolean(payload.firstTime));
+      setQueueIndex((current) => Math.min(current, Math.max(next.length - 1, 0)));
     }).catch(() => undefined);
     return () => {
       cancel = true;
@@ -493,6 +500,23 @@ export default function Explorer() {
     window.location.href = "/login";
   }
 
+  const queueSiteId = queueOpen ? queueItems[queueIndex]?.siteId : undefined;
+  useEffect(() => {
+    if (!queueOpen) return;
+    if (!queueSiteId) {
+      setSelected(null);
+      return;
+    }
+    const deal = dealFeatures.find((feature) => feature.properties.deal_id === queueSiteId)?.properties;
+    const patch: Record<string, string | null> = { site: queueSiteId, view: "queue", funnel: "pipeline", tab: "pipeline", table: null };
+    if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
+    if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
+      patch.pstage = deal.stage_group === "desk" ? null : deal.stage_group;
+    }
+    setSelected(queueSiteId);
+    write(patch);
+  }, [queueOpen, queueSiteId]);
+
   if (error) {
     return (
       <main className="empty">
@@ -663,8 +687,8 @@ export default function Explorer() {
             <button className={!listView && !queueOpen ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
             <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
             {me?.actionsEnabled ? (
-              <button className={queueOpen ? "on" : ""} type="button" onClick={() => write({ view: queueOpen ? null : "queue" })}>
-                Queue{queueCount ? <span className="count-badge">{queueCount}</span> : null}
+              <button className={queueOpen ? "on" : ""} type="button" onClick={() => { setQueueIndex(0); write({ view: queueOpen ? null : "queue" }); }}>
+                Queue{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
               </button>
             ) : null}
           </div>
@@ -686,6 +710,15 @@ export default function Explorer() {
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => !value); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
+        </div>
+        <div className="funnel-switch only-mobile" role="group" aria-label="Map, list, or queue">
+          <button className={!listView && !queueOpen ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
+          <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
+          {me?.actionsEnabled ? (
+            <button className={queueOpen ? "on" : ""} type="button" onClick={() => { setQueueIndex(0); write({ view: queueOpen ? null : "queue" }); }}>
+              Queue{queueCount ? <span className="count-badge">{queueCount}</span> : null}
+            </button>
+          ) : null}
         </div>
         {searchOpen ? (
           <input className="search mobile-search" placeholder="Address, APN, owner, id" value={query} onChange={(event) => write({ q: event.target.value || null })} />
@@ -944,7 +977,9 @@ export default function Explorer() {
       <div className="map-stage">
         <ActionsDialogs />
         {queueOpen && me?.actionsEnabled ? (
-          <QueueView
+          <QueueBar
+            count={queueItems.length}
+            firstTime={queueFirst}
             market={queueMarket}
             stage={queueStage}
             viable={queueViable}
@@ -953,17 +988,32 @@ export default function Explorer() {
             approvalOnly={queueApproval}
             mentionsOnly={queueMentions}
             assignedOnly={queueAssigned}
-            onCount={setQueueCount}
             onFilter={(patch) => {
               const next = { ...patch, view: "queue" };
               if ("qmarket" in next && next.qmarket === city) next.qmarket = null;
+              setQueueIndex(0);
               write(next);
             }}
-            onMap={() => { setTableOpen(false); write({ view: null }); }}
-            onList={() => { setTableOpen(true); write({ view: null }); }}
-            onOpenMap={(siteId) => { setTableOpen(false); setSelected(siteId); write({ view: null, site: siteId }); }}
+            onMarkAll={() => {
+              void fetch("/api/queue", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  all: true,
+                  market: queueMarket,
+                  stage: queueStage,
+                  viable: queueViable,
+                  fresh: queueFresh,
+                  flagged: queueFlagged,
+                  approve: queueApproval,
+                  mentions: queueMentions,
+                  assigned: queueAssigned,
+                }),
+              }).then(() => window.dispatchEvent(new Event("queue-refresh")));
+            }}
           />
         ) : null}
+        {queueOpen && me?.actionsEnabled && queueItems.length === 0 ? <QueueEmpty /> : null}
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
           deals={drawnDeals}
@@ -1064,6 +1114,24 @@ export default function Explorer() {
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onClose={() => choose(null)}
             sheet={sheet}
+            banner={queueOpen && queueItems[queueIndex]?.siteId === selectedDeal.deal_id ? (
+              <QueueControls
+                item={queueItems[queueIndex]}
+                index={queueIndex}
+                total={queueItems.length}
+                onPrev={() => setQueueIndex((current) => Math.max(0, current - 1))}
+                onNext={() => setQueueIndex((current) => Math.min(queueItems.length - 1, current + 1))}
+                onReviewed={() => {
+                  const id = queueItems[queueIndex]?.siteId;
+                  if (!id) return;
+                  void fetch("/api/queue", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ siteId: id }),
+                  }).then(() => window.dispatchEvent(new Event("queue-refresh")));
+                }}
+              />
+            ) : null}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
           />
         ) : selectedUnscreened ? (

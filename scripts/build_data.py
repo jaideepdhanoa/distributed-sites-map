@@ -4149,13 +4149,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             },
             {
                 "id": "contacted",
-                "name": "Of which contacted",
-                "unit": "sites",
-                "total": len(contacted_candidates),
-                "pipeline_any": len(contacted_any),
-                "by_city": by_city(contacted_candidates),
-                "of": len(candidates),
-                "note": "Broker contacted means an outbound email or call to the broker is on file. It is not a workbook stage.",
+                "name": "Deals contacted",
+                "unit": "deals",
+                "total": 0,
+                "by_city": {"LAS": 0, "PHX": 0, "MIA": 0},
+                "note": CONTACTED_DEAL_NOTE,
             },
         ],
         "candidates": {
@@ -4202,6 +4200,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     deals_fc, deal_report = build_deal_layer(
         pipeline_rows, land_rows, sites, depots["features"], reg, broker_outreach(workbook)
     )
+    apply_contacted_deal_stage(funnel, deals_fc["features"])
     listed_drift = listed_flag_drift(sites)
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     public_records = {"note": "Public-record fields are added when the build writes files."}
@@ -4683,6 +4682,72 @@ def validate_committed() -> None:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 
 
+CONTACTED_DEAL_NOTE = (
+    "Pipeline and Land deals in this city with an outbound email or call to the broker on file. "
+    "Dropped deals stay out. Census sites are a separate count."
+)
+
+
+def live_contacted_deal_props(features: list[dict]) -> list[dict]:
+    """Active Pipeline and Land deals with broker outreach. Dropped deals stay out."""
+    rows = []
+    for feature in features:
+        props = feature.get("properties") if isinstance(feature, dict) and "properties" in feature else feature
+        if not isinstance(props, dict):
+            continue
+        if props.get("kind") not in {"pipeline", "land"}:
+            continue
+        if props.get("stage_group") == "dropped":
+            continue
+        if not props.get("broker_contacted"):
+            continue
+        rows.append(props)
+    return rows
+
+
+def apply_contacted_deal_stage(funnel: dict, features: list[dict]) -> None:
+    """Point the contacted funnel stage at live deal outreach, matching the Universe bar."""
+    live = live_contacted_deal_props(features)
+    by_city = {city: sum(1 for row in live if row.get("city") == city) for city in ("LAS", "PHX", "MIA")}
+    for stage in funnel.get("stages", []):
+        if stage.get("id") != "contacted":
+            continue
+        stage.clear()
+        stage.update(
+            {
+                "id": "contacted",
+                "name": "Deals contacted",
+                "unit": "deals",
+                "total": len(live),
+                "by_city": by_city,
+                "note": CONTACTED_DEAL_NOTE,
+            }
+        )
+        return
+    raise SystemExit("funnel is missing the contacted stage")
+
+
+def contacted_stage_problems(funnel: dict, deals: list[dict]) -> list[str]:
+    stage = next((item for item in funnel.get("stages", []) if item.get("id") == "contacted"), None)
+    if not stage:
+        return ["funnel is missing deals contacted"]
+    live = live_contacted_deal_props(deals)
+    by_city = {city: sum(1 for row in live if row.get("city") == city) for city in ("LAS", "PHX", "MIA")}
+    problems = []
+    if stage.get("unit") != "deals":
+        problems.append(f"contacted stage unit is {stage.get('unit')}, expected deals")
+    if stage.get("total") != len(live):
+        problems.append(f"contacted deals total is {len(live)}, funnel says {stage.get('total')}")
+    if stage.get("by_city") != by_city:
+        problems.append(f"contacted deals by city are {by_city}, funnel says {stage.get('by_city')}")
+    note = stage.get("note") or ""
+    if "Dropped" not in note or "deal" not in note.lower():
+        problems.append("contacted stage note does not describe live deal outreach")
+    if "universe site" in note.lower():
+        problems.append("contacted stage note still describes a universe site")
+    return problems
+
+
 def _universe_stage(site: dict, stage: str) -> bool:
     """Mirror lib/filter.ts inStage. Each step is a subset of the previous one."""
     props = site.get("properties") or {}
@@ -4711,7 +4776,8 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     """Universe through Cleared: each step is a subset of the previous one and matches its pins.
 
     Universe is the unique-site count. The census row count stays in the hover note.
-    Listed and contacted are sub-counts on each step, and each listed sub-count matches its pins.
+    Listed is a sub-count on each step, and each listed sub-count matches its pins.
+    The contacted stage counts live Pipeline and Land deals, not census sites.
     """
     order = ["universe", "in_area", "land", "county", "cleared"]
     problems = []
@@ -4805,6 +4871,8 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     if held_pass != ["LAS-U15", "LAS-U866"]:
         problems.append(f"Pass rows outside the service area are {held_pass}, expected LAS-U15 and LAS-U866")
     problems.extend(pipeline_pin_problems(deals or [], features))
+    if deals is not None:
+        problems.extend(contacted_stage_problems(funnel, deals))
     return problems
 
 

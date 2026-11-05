@@ -20,7 +20,7 @@ export const FUNNEL_NOTES: Record<string, string> = {
   county: "In-area sites with enough spare land that also have a county verdict. The workbook checked 109 sites in all: 13 cleared, 30 possible, 47 ruled out, 15 not a car wash, and 4 unresolved. That full set includes sites outside the service area and sites without enough spare land.",
   cleared: "County records confirm an operating wash with enough spare land on its own parcel. The workbook clears 11. Charleston Car Wash and the Chandler Quick Quack stay Possible until review, so the map shows 9.",
   listed: "Sites on this step that are on the market.",
-  contacted: "An outbound email or call to the broker is on file for a site on this step. The date is the last one.",
+  contacted: "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count.",
   desk: "A first review of the listing or lead.",
   financial: "The workbook's financial screen.",
   checks: "The workbook's site checks.",
@@ -44,7 +44,7 @@ export const CENSUS_NOTE = "Car washes. Other categories will get their own cens
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have spare land inside the service area. Cleared sites passed the county check.",
-  pipeline: "Pipeline deals and Land Sites, with a split when both are in the step. Desk screen is the first step. Dropped deals are no longer pursued. Broker contacted is an outbound email or call, not a stage.",
+  pipeline: "Pipeline deals and Land Sites, with a split when both are in the step. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
 };
 
 const STAGE_TITLES: Record<string, string> = {

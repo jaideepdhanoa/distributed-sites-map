@@ -66,7 +66,8 @@ export function landFit(site: SiteProps): boolean {
 // Universe > In service area > L10/L4 > County-checked > Cleared.
 // Held fits sit outside the operative service area (the Las Vegas 200/300 rings). They are
 // excluded from In service area and every later step, and are offered only as a separate note
-// on L10/L4. Listed and contacted are counts on each step, not steps of their own.
+// on L10/L4. Listed is a count on each step, not a step of its own.
+// Live broker outreach is a deal count on the Universe step, not a census-site flag.
 export function inStage(site: SiteProps, stage: StageId): boolean {
   if (site.land_only || site.origin !== "universe") return false;
   const unique = Boolean(site.counts_as_site) && !site.duplicate_of;
@@ -107,6 +108,13 @@ export function listedEarlier(site: SiteProps): boolean {
 
 export function contactedEarlier(site: SiteProps): boolean {
   return inStage(site, "land") && Boolean(site.contacted) && !inStage(site, "contacted");
+}
+
+/** Pipeline or Land deal with broker outreach that is still being pursued. Dropped deals stay out. */
+export function isLiveContactedDeal(deal: { kind?: string; stage_group?: string; broker_contacted?: boolean }): boolean {
+  if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
+  if (deal.stage_group === "dropped") return false;
+  return Boolean(deal.broker_contacted);
 }
 
 export function droppedAt(site: SiteProps, stage: StageId): boolean {

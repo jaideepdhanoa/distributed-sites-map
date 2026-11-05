@@ -22,6 +22,7 @@ jobs:
         with:
           node-version: "22"
       - run: node --experimental-strip-types scripts/test-stage-detail.ts
+      - run: node --experimental-strip-types scripts/test-drawer-width.ts
 
   e2e:
     runs-on: ubuntu-latest

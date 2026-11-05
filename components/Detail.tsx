@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import DrawerGrip from "./DrawerGrip";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
@@ -61,6 +62,7 @@ export default function Detail({
   const why = site.summary_why || "Not screened yet.";
   return (
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+      <DrawerGrip />
       <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       <button className="close" type="button" onClick={onClose}>Close</button>
       <h3>Summary</h3>
@@ -227,6 +229,7 @@ export function DealDetail({
 }) {
   return (
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+      <DrawerGrip />
       <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       <button className="close" type="button" onClick={onClose}>Close</button>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

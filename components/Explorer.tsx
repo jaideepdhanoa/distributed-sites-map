@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { RecordActions } from "./actions/RecordActions";
@@ -9,6 +9,7 @@ import Detail, { DealDetail } from "./Detail";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
+import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
@@ -34,6 +35,25 @@ const STEPS: { id: StageId; label: string }[] = [
 export default function Explorer() {
   const params = useSearchParams();
   const router = useRouter();
+  const shellRef = useRef<HTMLDivElement>(null);
+  const applyDrawerWidth = useCallback(() => {
+    const node = shellRef.current;
+    if (!node) return;
+    const stored = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    const width = Number.isFinite(stored) && stored > 0
+      ? clampDrawerWidth(stored, window.innerWidth)
+      : DRAWER_DEFAULT;
+    node.style.setProperty("--drawer-width", `${width}px`);
+    node.dataset.drawerWidth = String(width);
+  }, []);
+  const bindShell = useCallback((node: HTMLDivElement | null) => {
+    shellRef.current = node;
+    applyDrawerWidth();
+  }, [applyDrawerWidth]);
+  useEffect(() => {
+    window.addEventListener("resize", applyDrawerWidth);
+    return () => window.removeEventListener("resize", applyDrawerWidth);
+  }, [applyDrawerWidth]);
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
   const [detail, setDetail] = useState<SiteProps | null>(null);
@@ -537,7 +557,7 @@ export default function Explorer() {
   }
 
   return (
-    <div className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}

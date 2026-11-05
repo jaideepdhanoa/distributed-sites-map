@@ -1,5 +1,5 @@
 import type { DealProps } from "@/lib/types";
-import { basisLabel, cashTile, checkedPhrase, depotLine, openLandText, peerNote } from "@/lib/keyNumbers";
+import { basisLabel, cashTile, checkedPhrase, depotLine, fullMoney, openLandText, peerNote, tileAmount } from "@/lib/keyNumbers";
 import { shownPriceSource } from "@/lib/format";
 import { stageDetail, stageTone } from "@/lib/labels";
 
@@ -16,15 +16,24 @@ export default function KeyStrip({
   const rank = peerNote(deal, peers);
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "Not provided";
-  const open = deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
-  const perAcre = deal.price_per_acre_display || "Not provided";
-  const asking = deal.asking_price_display || "Not provided";
+  const openTile = deal.open_land_sqft != null
+    ? { text: Math.round(deal.open_land_sqft).toLocaleString(), title: openLandText(deal.open_land_sqft) }
+    : { text: "Not measured", title: "Not measured" };
+  const perAcreTile = deal.price_per_acre != null
+    ? tileAmount(deal.price_per_acre, fullMoney(deal.price_per_acre))
+    : { text: "Not provided", title: "Not provided" };
+  const askingTile = tileAmount(deal.asking_price, deal.asking_price_display);
+  const cashView = deal.stated_cash_flow != null
+    ? tileAmount(deal.stated_cash_flow, deal.stated_cash_flow_display)
+    : deal.stated_revenue != null && !deal.stated_cash_flow_display
+      ? tileAmount(deal.stated_revenue, deal.stated_revenue_display)
+      : { text: cash.value, title: cash.value };
   return (
     <section className="key-strip" data-testid="key-strip">
       <div className="metrics">
         <article>
           <span>Asking</span>
-          <strong>{asking}</strong>
+          <strong title={askingTile.title}>{askingTile.text}</strong>
           <small>{shownPriceSource(deal) || (deal.asking_price_display ? "Listing" : "")}</small>
           {deal.asking_price_display ? <em>Broker-stated</em> : null}
         </article>
@@ -35,13 +44,13 @@ export default function KeyStrip({
         </article>
         <article>
           <span>Per acre</span>
-          <strong>{perAcre}</strong>
+          <strong title={perAcreTile.title}>{perAcreTile.text}</strong>
           <small>{rank?.label || (deal.land_acres_basis === "Unknown" ? "From the listing acreage" : deal.land_acres != null ? "From the acreage on file" : "")}</small>
         </article>
         <article>
           <span>Open land</span>
-          <strong>{open}</strong>
-          <small>{deal.open_land_sqft != null ? "aerial" : "No aerial check yet"}</small>
+          <strong title={openTile.title}>{openTile.text}</strong>
+          <small>{deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet"}</small>
           {deal.open_land_sqft != null ? <em>Estimated</em> : null}
         </article>
         <article>
@@ -51,7 +60,7 @@ export default function KeyStrip({
         </article>
         <article className="wide">
           <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
-          <strong>{cash.value}</strong>
+          <strong title={cashView.title}>{cashView.text}</strong>
           <small>{cash.note}{cash.extra ? ` · ${cash.extra}` : ""}</small>
           {cash.basis ? <em>{cash.basis}</em> : null}
         </article>

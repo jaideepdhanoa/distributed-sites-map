@@ -739,7 +739,7 @@ tr { cursor: pointer; }
 .key-strip { margin: 8px 0 12px; }
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: 8px;
 }
 .metrics article, .summary-row > div, .compare-grid article {
@@ -748,15 +748,26 @@ tr { cursor: pointer; }
   border-radius: 12px;
   padding: 8px 10px;
   min-width: 0;
+  overflow: visible;
+  container-type: inline-size;
 }
 .metrics span, .summary-row span, .map-tip-fact em {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.metrics strong, .summary-row strong { display: block; font-variant-numeric: tabular-nums; font-size: 18px; }
+.metrics strong, .summary-row strong {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(14px, 12cqi, 20px);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: visible;
+}
 .metrics small, .summary-row small { display: block; color: var(--muted); font-size: 12px; }
 .metrics em, .stage-pill {
   display: inline-block;
@@ -768,7 +779,7 @@ tr { cursor: pointer; }
   font-style: normal;
   font-size: 11px;
 }
-.metrics .wide { grid-column: span 2; }
+.metrics .wide { grid-column: 1 / -1; }
 .rank-bar { display: grid; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .rank-bar i, .open-land i {
   position: relative;
@@ -830,8 +841,8 @@ tr { cursor: pointer; }
 .map-tip-fact { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .map-tip { min-width: 210px; }
 @media (max-width: 720px) {
-  .summary-row, .metrics { grid-template-columns: 1fr 1fr; }
-  .metrics .wide { grid-column: span 2; }
+  .summary-row { grid-template-columns: 1fr 1fr; }
+  .metrics { grid-template-columns: 1fr 1fr; }
   .drawer:has(.key-strip) { height: 52vh; }
   .list-cards span { font-variant-numeric: tabular-nums; }
 }

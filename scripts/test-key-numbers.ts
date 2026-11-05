@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cashTile, inRange, peerNote, rangesFromSearch, summaryOf } from "../lib/keyNumbers.ts";
+import { cashTile, inRange, peerNote, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -54,4 +54,7 @@ assert.equal(note?.label, "1st lowest of 2 Phoenix pipeline");
 
 assert.equal(cashTile(deal({ figures_status: "withheld" })).value, "Package figures not shown");
 assert.equal(cashTile(deal({ figures_status: "shown", stated_cash_flow_display: "$400,000", cash_multiple_display: "6.2x cash flow", figures_basis: "Claimed", figures_source: "BizBuySell listing" })).extra, "6.2x cash flow");
+assert.deepEqual(tileAmount(4990000, "$4,990,000"), { text: "$4.99M", title: "$4,990,000" });
+assert.deepEqual(tileAmount(7000000, "$7,000,000"), { text: "$7M", title: "$7,000,000" });
+assert.deepEqual(tileAmount(null, ""), { text: "Not provided", title: "Not provided" });
 console.log("key numbers ok");

@@ -59,6 +59,18 @@ export function fullMoney(value?: number | null) {
   return `$${Math.round(value).toLocaleString()}`;
 }
 
+/** Short figure for a tile. The exact text stays in the tooltip and the overview. */
+export function tileAmount(amount?: number | null, exact?: string | null) {
+  const full = (exact || "").trim();
+  if (amount == null || !Number.isFinite(amount) || !full) {
+    return { text: full || "Not provided", title: full || "Not provided" };
+  }
+  if (Math.abs(amount) >= 10_000) {
+    return { text: compactMoney(amount), title: full };
+  }
+  return { text: full, title: full };
+}
+
 export function acresText(value?: number | null) {
   if (value == null) return "";
   return `${value} ac`;

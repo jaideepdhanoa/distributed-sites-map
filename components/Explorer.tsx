@@ -692,8 +692,8 @@ export default function Explorer() {
               </button>
             ) : null}
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button className={`aside ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
-                {unplacedDeals.length.toLocaleString()} unplaced
+              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
+                All stages not on the map ({unplacedDeals.length.toLocaleString()})
               </button>
             ) : null}
           {query && funnel === "universe" && stage !== "universe" ? (
@@ -809,10 +809,13 @@ export default function Explorer() {
         {menuOpen ? (
           <div className="popover menu-sheet" role="dialog" aria-label="Menu">
             <div className="popover-head">
-              <h2>Menu</h2>
+              <div>
+                <h2>Menu</h2>
+                {data.funnel.workbook_as_of ? <p className="as-of-line">Data as of {data.funnel.workbook_as_of}</p> : null}
+              </div>
               <button type="button" onClick={() => setMenuOpen(false)}>Close</button>
             </div>
-            <div className="funnel-switch" role="group" aria-label="Which funnel">
+            <div className="funnel-switch segment" role="group" aria-label="Which funnel">
               <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
               <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
             </div>
@@ -826,9 +829,8 @@ export default function Explorer() {
             <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Unplaced deals ({unplacedDeals.length.toLocaleString()})</button>
+              <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
             ) : null}
-            {data.funnel.workbook_as_of ? <p className="menu-note">Data as of {data.funnel.workbook_as_of}</p> : null}
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
             <p className="menu-note">{me?.u}</p>
             {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
@@ -855,7 +857,7 @@ export default function Explorer() {
         {unplacedOpen ? (
           <div className="popover" role="dialog" aria-label="Unplaced deals">
             <div className="popover-head">
-              <h2>{unplacedDeals.length.toLocaleString()} unplaced deals</h2>
+              <h2>{unplacedDeals.length.toLocaleString()} deals not on the map</h2>
               <button type="button" onClick={() => setUnplacedOpen(false)}>Close</button>
             </div>
             <ul className="unplaced-list">
@@ -897,12 +899,6 @@ export default function Explorer() {
         {funnel === "universe" && !listView && visibleSites.length === 0 ? (
           <p className="empty-map">{compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
         ) : null}
-        {!listView ? (() => {
-          const missing = funnel === "pipeline"
-            ? [...pipelineStepRows, ...stageLandRows].filter((deal) => !dealPoint(deal)).length
-            : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
-          return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
-        })() : null}
         {listView ? (
           <ListView
             rows={listRows}

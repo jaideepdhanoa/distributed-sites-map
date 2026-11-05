@@ -101,12 +101,16 @@ async function openMap(page: Page, query: string, ready: { city: string; stage?:
 }
 
 async function badge(page: Page, label: string) {
-  const text = (await page.locator(".funnel .step").filter({ hasText: label }).locator("strong").first().innerText()).replace(/,/g, "").replace(/\s+/g, " ").trim();
+  const strong = page.locator(".funnel .step").filter({ hasText: label }).locator("strong").first();
+  const text = (await strong.innerText()).replace(/,/g, "").replace(/\s+/g, " ").trim();
   const of = /^(\d+) of (\d+)$/.exec(text);
   if (of) return { shown: Number(of[1]), total: Number(of[2]), filtered: true, text };
   const plain = /^(\d+)$/.exec(text);
-  expect(plain, `badge ${label}: ${text}`).not.toBeNull();
-  return { shown: Number(plain?.[1]), total: Number(plain?.[1]), filtered: false, text };
+  if (plain) return { shown: Number(plain[1]), total: Number(plain[1]), filtered: false, text };
+  const count = await strong.getAttribute("data-count");
+  expect(count, `badge ${label}: ${text}`).toMatch(/^\d+$/);
+  const shown = Number(count);
+  return { shown, total: shown, filtered: false, text };
 }
 
 test.beforeEach(async ({ page }) => {

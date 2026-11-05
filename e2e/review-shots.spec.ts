@@ -43,8 +43,9 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.waitForSelector(".summary-chip");
   await waitForBasemap(page);
   await expect(page.locator(".funnel")).toContainText("(4 deals, 11 land)");
-  await expect(page.locator(".summary-chip").first()).toContainText("4 deals + 11 land sites");
-  await expect(page.locator(".summary-chip").first()).toContainText("11 dropped deals + 2 dropped land sites");
+  const chipText = async () => page.locator(".summary-chip").first().textContent();
+  await expect.poll(chipText).toContain("4 deals + 11 land sites");
+  await expect.poll(chipText).toContain("11 dropped deals + 2 dropped land sites");
   await page.screenshot({ path: `review-shots/${name}-pipeline.png`, fullPage: false });
   await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");

@@ -45,6 +45,7 @@ export default function Detail({
   sheet,
   extras,
   banner,
+  onSwipe,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -58,6 +59,7 @@ export default function Detail({
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
   banner?: ReactNode;
+  onSwipe?: (direction: "next" | "prev") => void;
 }) {
   if (!site) return null;
   const price = site.asking_price_display;
@@ -65,7 +67,23 @@ export default function Detail({
   const next = nextStepText(site);
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   return (
-    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+    <aside
+      className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
+      onTouchStart={(event) => {
+        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
+        (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
+        (event.currentTarget as HTMLElement).dataset.y = String(event.changedTouches[0]?.clientY ?? "");
+      }}
+      onTouchEnd={(event) => {
+        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
+        const startX = Number((event.currentTarget as HTMLElement).dataset.x || "");
+        const startY = Number((event.currentTarget as HTMLElement).dataset.y || "");
+        const dx = (event.changedTouches[0]?.clientX ?? startX) - startX;
+        const dy = (event.changedTouches[0]?.clientY ?? startY) - startY;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+        onSwipe?.(dx < 0 ? "next" : "prev");
+      }}
+    >
       <DrawerGrip />
       <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       {banner}
@@ -240,6 +258,7 @@ export function DealDetail({
   sheet,
   extras,
   banner,
+  onSwipe,
 }: {
   deal: DealProps;
   universeName?: string;
@@ -251,9 +270,26 @@ export function DealDetail({
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
   banner?: ReactNode;
+  onSwipe?: (direction: "next" | "prev") => void;
 }) {
   return (
-    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+    <aside
+      className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
+      onTouchStart={(event) => {
+        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
+        (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
+        (event.currentTarget as HTMLElement).dataset.y = String(event.changedTouches[0]?.clientY ?? "");
+      }}
+      onTouchEnd={(event) => {
+        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
+        const startX = Number((event.currentTarget as HTMLElement).dataset.x || "");
+        const startY = Number((event.currentTarget as HTMLElement).dataset.y || "");
+        const dx = (event.changedTouches[0]?.clientX ?? startX) - startX;
+        const dy = (event.changedTouches[0]?.clientY ?? startY) - startY;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+        onSwipe?.(dx < 0 ? "next" : "prev");
+      }}
+    >
       <DrawerGrip />
       <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
       {banner}

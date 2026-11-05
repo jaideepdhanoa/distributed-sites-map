@@ -1,7 +1,7 @@
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 import { canDecide } from "@/lib/actions/roles";
 import { InputError } from "@/lib/actions/text";
-import { loadQueue, markAllReviewed, markReviewed } from "@/lib/queue/load";
+import { loadQueue, markAllReviewed, markReviewed, undoReview } from "@/lib/queue/load";
 import type { QueueFilters } from "@/lib/queue/order";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await openActions("viewer");
   if (isResponse(session)) return session;
-  let body: { all?: boolean; siteId?: string; market?: string; stage?: string; viable?: boolean; fresh?: boolean; flagged?: boolean; approve?: boolean; mentions?: boolean; assigned?: boolean };
+  let body: { all?: boolean; undo?: boolean; previous?: string | null; siteId?: string; market?: string; stage?: string; viable?: boolean; fresh?: boolean; flagged?: boolean; approve?: boolean; mentions?: boolean; assigned?: boolean };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -55,13 +55,18 @@ export async function POST(request: Request) {
         mentionsOnly: Boolean(body.mentions),
         assignedOnly: Boolean(body.assigned),
       }, canDecide(session.actionRole));
-      return markAllReviewed(sql, session.u, queue.items.map((item) => item.siteId));
+      const count = await markAllReviewed(sql, session.u, queue.items.map((item) => item.siteId));
+      return { count };
     }
     const siteId = String(body.siteId || "").trim();
     if (!siteId) throw new InputError("Choose a site.");
-    await markReviewed(sql, session.u, siteId);
-    return 1;
+    if (body.undo) {
+      await undoReview(sql, session.u, siteId, body.previous ?? null);
+      return { previous: null };
+    }
+    const previous = await markReviewed(sql, session.u, siteId);
+    return { previous };
   });
   if (isResponse(result)) return result;
-  return jsonOk({ ok: true, count: result });
+  return jsonOk({ ok: true, ...result });
 }

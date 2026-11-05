@@ -25,7 +25,7 @@ async function queue(request: APIRequestContext, query = "market=all&stage=any&v
   const response = await request.get(`/api/queue?${query}`);
   expect(response.ok()).toBeTruthy();
   return (await response.json()) as {
-    items: { siteId: string; reasons: { summary: string; type: string }[]; snapshot: { assignments?: { title: string; date: string }[] } | null }[];
+    items: { siteId: string; reasons: { summary: string; type: string }[]; snapshot: { lng?: number | null; lat?: number | null; assignments?: { title: string; date: string }[] } | null }[];
   };
 }
 
@@ -35,8 +35,8 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
   const before = await queue(request);
   expect(before.items.some((item) => item.siteId === deal)).toBeTruthy();
 
-  await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
-  await expect(page.getByTestId("queue-controls")).toBeVisible();
+  await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any");
+  await expect(page.getByTestId("review-bar")).toBeVisible();
   await expect(page.locator(".drawer")).toBeVisible();
   await expect(page.getByTestId("queue-count")).toBeVisible();
 
@@ -85,15 +85,12 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
   expect(created.status()).toBe(201);
 
   await login(request, "reviewer");
-  await openAs(page, "reviewer", "/?view=queue&qmarket=all&qstage=any&qapprove=1");
-  const controls = page.getByTestId("queue-controls");
+  const pending = await queue(request, "market=all&stage=any&viable=1&approve=1");
+  const at = pending.items.findIndex((item) => item.siteId === deal);
+  expect(at).toBeGreaterThanOrEqual(0);
+  await openAs(page, "reviewer", `/?review=1&qmarket=all&qstage=any&qapprove=1&i=${at + 1}`);
   const panel = page.locator(".drawer");
-  await expect(controls).toBeVisible();
-  for (let step = 0; step < 40; step += 1) {
-    if (await panel.getByText("Ask for the sales package").count()) break;
-    await controls.getByRole("button", { name: "Next", exact: true }).click();
-    await page.waitForTimeout(200);
-  }
+  await expect(panel).toBeVisible();
   const proposal = panel.locator("li", { hasText: "Ask for the sales package" }).filter({ has: page.getByRole("button", { name: "Accept" }) });
   await expect(proposal).toBeVisible();
   await proposal.getByRole("button", { name: "Accept" }).click();
@@ -107,7 +104,7 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 });
 
 test("a mention is queued only for the mentioned account", async ({ page, request }) => {
-  await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
+  await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any");
   const body = page.getByTestId("note-body");
   await body.click();
   await body.fill("Please look at the frontage ");
@@ -151,7 +148,7 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   const card = assigned.items.find((item) => item.siteId === deal);
   expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
-  await openAs(page, "reviewer", "/?view=queue&qmarket=all&qstage=any&qassign=1");
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any&qassign=1");
   const panel = page.locator(".drawer");
   await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");
   await expect(panel.getByTestId("next-step")).toContainText("2026-12-15");
@@ -191,36 +188,62 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   });
   expect(step.status()).toBe(201);
 
-  await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
-  const controls = page.getByTestId("queue-controls");
+  const fresh = await queue(request);
+  const placed = fresh.items.findIndex((item) => typeof item.snapshot?.lng === "number");
+  const missing = fresh.items.findIndex((item) => item.snapshot?.lng == null);
+  expect(placed).toBeGreaterThanOrEqual(0);
+  expect(missing).toBeGreaterThanOrEqual(0);
+
+  await openAs(page, "contributor", `/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
+  const controls = page.getByTestId("review-bar");
   const panel = page.locator(".drawer");
   await expect(controls).toBeVisible();
   await expect(panel).toBeVisible();
+  await expect(page.getByTestId("review-noloc")).toHaveCount(0);
   await expect(controls.getByRole("button", { name: "Previous" })).toBeVisible();
   await expect(controls.getByRole("button", { name: "Next", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByRole("button", { name: "Pipeline" })).toHaveClass(/on/);
   await page.locator(".maplibregl-canvas").waitFor();
-  await page.waitForTimeout(2000);
+  await expect.poll(async () => page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
+    return map?.getZoom() ?? 0;
+  })).toBeGreaterThan(14);
+  await page.waitForTimeout(800);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop.png" });
-  const position = controls.getByTestId("queue-position");
+  const position = page.getByTestId("review-position");
   const first = await position.innerText();
-  await controls.getByRole("button", { name: "Next", exact: true }).click();
+  const move = placed < fresh.items.length - 1 ? "Next" : "Previous";
+  await controls.getByRole("button", { name: move, exact: true }).click();
   await expect(position).not.toHaveText(first);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop-next.png" });
+
+  await page.goto(`/?review=1&qmarket=all&qstage=any&i=${missing + 1}`);
+  await expect(page.getByTestId("review-noloc")).toBeVisible();
+  await page.locator(".maplibregl-canvas").waitFor();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-noloc.png" });
+
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
   await expect(controls).toBeVisible();
+  await expect(page.getByTestId("review-noloc")).toHaveCount(0);
+  await page.locator(".maplibregl-canvas").waitFor();
+  await page.waitForTimeout(1000);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-mobile.png" });
+  await page.getByTestId("review-position").click();
+  await expect(page.getByTestId("review-feed")).toBeVisible();
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-mobile-feed.png" });
 });
 
 test("the empty queue and the phone layout", async ({ page, request }) => {
   await login(request, "contributor");
   const cleared = await request.post("/api/queue", { data: { all: true, market: "all", stage: "any", viable: true } });
   expect(cleared.ok()).toBeTruthy();
-  await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
+  await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any");
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.getByTestId("queue-empty")).toHaveText("You're all caught up.");
+  await expect(page.getByTestId("queue-empty")).toContainText("All caught up");
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-empty-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId("queue-empty")).toBeVisible();

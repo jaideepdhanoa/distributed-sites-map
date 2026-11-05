@@ -15,7 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   globalSetup: actionsOnly ? undefined : "./e2e/global-setup.ts",
   reporter: process.env.CI ? [["line"], ["github"]] : "line",
-  testIgnore: actionsOnly ? undefined : /actions\.spec\.ts/,
+  testIgnore: actionsOnly ? undefined : /(?:actions|queue)\.spec\.ts/,
   use: actionsOnly
     ? {
         baseURL: "http://127.0.0.1:3456",
@@ -28,7 +28,7 @@ export default defineConfig({
         extraHTTPHeaders: authHeaders,
       },
   projects: actionsOnly
-    ? [{ name: "actions", testMatch: /actions\.spec\.ts/ }]
+    ? [{ name: "actions", testMatch: /(?:actions|queue)\.spec\.ts/ }]
     : [
         { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },
         {

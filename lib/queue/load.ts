@@ -14,7 +14,12 @@ export function pacificDay(now = new Date()): string {
   return pacificToday(now);
 }
 
-export async function markReviewed(sql: Sql, userId: string, siteId: string): Promise<void> {
+export async function markReviewed(sql: Sql, userId: string, siteId: string): Promise<string | null> {
+  const prior = await sql.query<{ reviewed_at: Date | string }>(
+    `SELECT reviewed_at FROM queue_reviews WHERE user_id = $1 AND site_id = $2`,
+    [userId, siteId],
+  );
+  const previous = prior.rows[0] ? stamp(prior.rows[0].reviewed_at) : null;
   await sql.query(
     `INSERT INTO queue_reviews (user_id, site_id, reviewed_at) VALUES ($1, $2, now())
      ON CONFLICT (user_id, site_id) DO UPDATE SET reviewed_at = now()`,
@@ -25,6 +30,19 @@ export async function markReviewed(sql: Sql, userId: string, siteId: string): Pr
     [userId, siteId],
   );
   await clearMentionsForSite(sql, userId, siteId);
+  return previous;
+}
+
+export async function undoReview(sql: Sql, userId: string, siteId: string, previous: string | null): Promise<void> {
+  if (previous) {
+    await sql.query(
+      `INSERT INTO queue_reviews (user_id, site_id, reviewed_at) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, site_id) DO UPDATE SET reviewed_at = EXCLUDED.reviewed_at`,
+      [userId, siteId, previous],
+    );
+    return;
+  }
+  await sql.query(`DELETE FROM queue_reviews WHERE user_id = $1 AND site_id = $2`, [userId, siteId]);
 }
 
 export async function markAllReviewed(sql: Sql, userId: string, siteIds: string[]): Promise<number> {

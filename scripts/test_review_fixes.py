@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from build_data import classify_register_row, match_workbook_site, stage_group, universe_match_index
+from build_data import classify_register_row, match_workbook_site, stage_group, universe_link_gap, universe_match_index
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -107,3 +107,20 @@ class ShippedCounts(unittest.TestCase):
         drift = (ROOT / "data/drift_report.csv").read_text().splitlines()
         leads = [line.split(",", 1)[0] for line in drift[1:] if line.strip()]
         self.assertEqual(leads, ["PIPE-PHX-0081", "LAND-PHX-0047", "LAND-PHX-0048", "LAND-PHX-0049", "LAS-U119"])
+        gap = universe_link_gap(deals)
+        self.assertEqual(gap["linked"], 21)
+        self.assertEqual(gap["located_without_universe"], 36)
+        self.assertEqual(gap["unlocated_without_universe"], 13)
+        by_apn, by_street = universe_match_index([item["properties"] for item in sites])
+        deal_by_id = {item["properties"]["deal_id"]: item["properties"] for item in deals}
+        for entry in gap["located_missing"]:
+            row = deal_by_id[entry["deal_id"]]
+            self.assertIsNone(
+                match_workbook_site(row["city"], "", row.get("address") or "", by_apn, by_street),
+                entry["deal_id"],
+            )
+            self.assertTrue(row.get("address") or row.get("name"))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.parse
 import urllib.request
 import zipfile
@@ -124,6 +125,15 @@ BROWARD_HINTS = (
     "west park",
     "southwest ranches",
 )
+
+# Pins north of this are outside the Miami-Dade parcel layer. Broward is the
+# assessor layer there. The cutoff matches the old "outside Miami-Dade" miss.
+BROWARD_NORTH_OF = 25.98
+BROWARD_PARCEL_QUERY = (
+    "https://services.arcgis.com/JMAJrTsHNLrSsWf5/arcgis/rest/services/"
+    "PARCEL_POLY_BCPA_TAXROLL/FeatureServer/0/query"
+)
+BROWARD_PARCEL_FIELDS = "FOLIO,GIS_SQUARE_FOOT,NAME_LINE_1"
 
 VERDICT_FIELDS = [
     "verdict_id",
@@ -1702,6 +1712,45 @@ def universe_match_index(sites: list[dict]) -> tuple[dict, dict]:
     return by_apn, by_street
 
 
+def universe_link_gap(features: list[dict]) -> dict:
+    """Pipeline and land deals that still have no universe site.
+
+    A listing joins the universe only when the Universe tab has a counted row for that
+    place. This does not mint a row, and it does not invent a coordinate or a parcel number.
+    """
+    linked = 0
+    located_missing: list[dict] = []
+    unlocated_missing: list[dict] = []
+    for feature in features:
+        props = feature.get("properties") or {}
+        if props.get("kind") not in {"pipeline", "land"}:
+            continue
+        uid = str(props.get("universe_id") or "").strip()
+        geometry = feature.get("geometry") or {}
+        located = bool(geometry.get("coordinates"))
+        if uid:
+            linked += 1
+            continue
+        entry = {
+            "deal_id": props.get("deal_id") or "",
+            "kind": props.get("kind") or "",
+            "city": props.get("city") or "",
+            "stage_group": props.get("stage_group") or "",
+            "coord_status": props.get("coord_status") or "",
+        }
+        if located:
+            located_missing.append(entry)
+        else:
+            unlocated_missing.append(entry)
+    return {
+        "linked": linked,
+        "located_without_universe": len(located_missing),
+        "unlocated_without_universe": len(unlocated_missing),
+        "located_missing": located_missing,
+        "unlocated_missing": unlocated_missing,
+    }
+
+
 def match_workbook_site(city: str, apn_value, address_text: str, by_apn: dict, by_street: dict) -> str | None:
     """One matcher for a deal row and for the site it attaches to.
 
@@ -2324,11 +2373,20 @@ def build_deal_layer(
     GEOCODE_CACHE.write_text(json.dumps(cache, indent=2))
     pipeline = [item for item in features if item["properties"]["kind"] == "pipeline"]
     land = [item for item in features if item["properties"]["kind"] == "land"]
+    gap = universe_link_gap(features)
     report = {
         "pipeline": len(pipeline),
         "land": len(land),
         "matched": matched,
         "unmatched": len(features) - matched,
+        "shipped_linked": gap["linked"],
+        "located_without_universe": gap["located_without_universe"],
+        "unlocated_without_universe": gap["unlocated_without_universe"],
+        "located_without_universe_ids": [item["deal_id"] for item in gap["located_missing"]],
+        "universe_gap_note": (
+            "A deal joins the universe when the Universe tab has a counted row for that place. "
+            "The map links by parcel or a unique street and does not invent a row, a coordinate, or a parcel number."
+        ),
         "geocode_failed": failed,
         "pipeline_by_city": dict(Counter(item["properties"]["city"] for item in pipeline)),
         "pipeline_by_stage": dict(Counter(item["properties"]["stage"] for item in pipeline)),
@@ -2525,6 +2583,132 @@ def looks_broward(address: str) -> bool:
     return any(hint in blob for hint in BROWARD_HINTS)
 
 
+def prefer_broward(address: str, lat) -> bool:
+    """Broward street cities, and pins north of the Miami-Dade parcel layer."""
+    if looks_broward(address):
+        return True
+    return isinstance(lat, (int, float)) and not isinstance(lat, bool) and lat > BROWARD_NORTH_OF
+
+
+def _broward_folio(token: str) -> str:
+    """Broward folios are 12 characters. A 13-digit value is a Miami-Dade folio."""
+    if not token:
+        return ""
+    if token.isdigit():
+        if len(token) > 12:
+            return ""
+        return token.zfill(12)
+    return token if len(token) >= 6 else ""
+
+
+def _annotate_broward(feat: dict, match: str) -> dict:
+    props = feat.get("properties") or {}
+    sqft = first_number(props.get("GIS_SQUARE_FOOT"))
+    feat["county"] = "Broward"
+    feat["apn"] = str(props.get("FOLIO") or "")
+    feat["match"] = match
+    feat["acres"] = round(sqft / 43560, 3) if sqft else None
+    feat["owner"] = props.get("NAME_LINE_1") or ""
+    return feat
+
+
+def _broward_query(params: dict) -> dict | None:
+    return http_geojson(BROWARD_PARCEL_QUERY + "?" + urllib.parse.urlencode(params))
+
+
+def fetch_broward_by_apn(apn: str) -> dict | None:
+    for token in apn_tokens(apn):
+        folio = _broward_folio(token)
+        if not folio:
+            continue
+        feat = _broward_query(
+            {
+                "where": f"FOLIO='{folio.replace(chr(39), chr(39) * 2)}'",
+                "outFields": BROWARD_PARCEL_FIELDS,
+                "returnGeometry": "true",
+                "outSR": "4326",
+                "f": "geojson",
+            }
+        )
+        if feat:
+            return _annotate_broward(feat, "parcel number")
+    return None
+
+
+def fetch_broward_at_point(lon: float, lat: float) -> dict | None:
+    feat = _broward_query(
+        {
+            "geometry": f"{lon},{lat}",
+            "geometryType": "esriGeometryPoint",
+            "inSR": "4326",
+            "spatialRel": "esriSpatialRelIntersects",
+            "outFields": BROWARD_PARCEL_FIELDS,
+            "returnGeometry": "true",
+            "outSR": "4326",
+            "f": "geojson",
+        }
+    )
+    if not feat:
+        return None
+    return _annotate_broward(feat, "pin location")
+
+
+def fetch_dade_by_apn(apn: str) -> dict | None:
+    for token in apn_tokens(apn):
+        folio = token.zfill(13) if token.isdigit() else token
+        url = (
+            "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query?"
+            + urllib.parse.urlencode(
+                {
+                    "where": f"FOLIO='{folio}'",
+                    "outFields": "FOLIO,TRUE_OWNER1,LOT_SIZE,DOR_DESC",
+                    "returnGeometry": "true",
+                    "outSR": "4326",
+                    "f": "geojson",
+                }
+            )
+        )
+        feat = http_geojson(url)
+        if feat:
+            props = feat.get("properties") or {}
+            feat["county"] = "Miami-Dade"
+            feat["apn"] = folio
+            feat["match"] = "parcel number"
+            lot = first_number(props.get("LOT_SIZE"))
+            feat["acres"] = round(lot / 43560, 3) if lot else None
+            feat["owner"] = props.get("TRUE_OWNER1") or ""
+            feat["land_use"] = str(props.get("DOR_DESC") or "")
+            return feat
+    return None
+
+
+def fetch_dade_at_point(lon: float, lat: float) -> dict | None:
+    params = {
+        "geometry": f"{lon},{lat}",
+        "geometryType": "esriGeometryPoint",
+        "inSR": "4326",
+        "spatialRel": "esriSpatialRelIntersects",
+        "returnGeometry": "true",
+        "outSR": "4326",
+        "f": "geojson",
+        "outFields": "FOLIO,TRUE_OWNER1,LOT_SIZE,DOR_DESC",
+    }
+    base = "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query"
+    feat = http_geojson(base + "?" + urllib.parse.urlencode(params))
+    if not feat:
+        return None
+    props = feat.get("properties") or {}
+    feat["county"] = "Miami-Dade"
+    feat["apn"] = str(props.get("FOLIO") or "")
+    feat["match"] = "pin location"
+    raw_acres = first_number(props.get("LOT_SIZE"))
+    feat["acres"] = round(raw_acres / 43560, 3) if raw_acres else None
+    feat["owner"] = props.get("TRUE_OWNER1") or ""
+    if props.get("DOR_DESC"):
+        feat["land_use"] = str(props.get("DOR_DESC") or "")
+    return feat
+
+
 def _simplify_geom(geom: dict, tolerance: float = 0.00008) -> dict:
     if not geom:
         return geom
@@ -2629,40 +2813,28 @@ def fetch_parcel(city: str, apn: str, address: str, lon: float | None = None, la
                 feat["acres"] = first_number((feat.get("properties") or {}).get("LotSize_Acre"))
                 feat["owner"] = (feat.get("properties") or {}).get("OwnerName") or ""
                 return feat
-    elif city == "MIA" and not looks_broward(address):
-        for token in tokens:
-            folio = token.zfill(13) if token.isdigit() else token
-            url = (
-                "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query?"
-                + urllib.parse.urlencode(
-                    {
-                        "where": f"FOLIO='{folio}'",
-                        "outFields": "FOLIO,TRUE_OWNER1,LOT_SIZE,DOR_DESC",
-                        "returnGeometry": "true",
-                        "outSR": "4326",
-                        "f": "geojson",
-                    }
-                )
-            )
-            feat = http_geojson(url)
-            if feat:
-                props = feat.get("properties") or {}
-                feat["county"] = "Miami-Dade"
-                feat["apn"] = folio
-                feat["match"] = "parcel number"
-                lot = first_number(props.get("LOT_SIZE"))
-                feat["acres"] = round(lot / 43560, 3) if lot else None
-                feat["owner"] = props.get("TRUE_OWNER1") or ""
-                feat["land_use"] = str(props.get("DOR_DESC") or "")
-                return feat
+    elif city == "MIA":
+        primary = fetch_broward_by_apn(apn) if prefer_broward(address, lat) else fetch_dade_by_apn(apn)
+        if primary:
+            return primary
     if lon is not None and lat is not None:
-        return fetch_parcel_at_point(city, lon, lat, address)
+        found = fetch_parcel_at_point(city, lon, lat, address)
+        if found:
+            return found
+        if city == "MIA":
+            # The pin can sit on the other side of the county line from the address hint.
+            if prefer_broward(address, lat):
+                found = fetch_dade_by_apn(apn) or fetch_dade_at_point(lon, lat)
+            else:
+                found = fetch_broward_by_apn(apn) or fetch_broward_at_point(lon, lat)
+            if found:
+                return found
     return None
 
 
 def fetch_parcel_at_point(city: str, lon: float, lat: float, address: str) -> dict | None:
-    if city == "MIA" and looks_broward(address):
-        return None
+    if city == "MIA" and prefer_broward(address, lat):
+        return fetch_broward_at_point(lon, lat)
     params = {
         "geometry": f"{lon},{lat}",
         "geometryType": "esriGeometryPoint",
@@ -2681,9 +2853,7 @@ def fetch_parcel_at_point(city: str, lon: float, lat: float, address: str) -> di
         params["outFields"] = "APN,LotSize_Acre,OwnerName"
         county, apn_key, acres_key, owner_key = "Maricopa", "APN", "LotSize_Acre", "OwnerName"
     elif city == "MIA":
-        base = "https://gisweb.miamidade.gov/arcgis/rest/services/MD_LandInformation/MapServer/26/query"
-        params["outFields"] = "FOLIO,TRUE_OWNER1,LOT_SIZE,DOR_DESC"
-        county, apn_key, acres_key, owner_key = "Miami-Dade", "FOLIO", "LOT_SIZE", "TRUE_OWNER1"
+        return fetch_dade_at_point(lon, lat)
     else:
         return None
     feat = http_geojson(base + "?" + urllib.parse.urlencode(params))
@@ -2705,12 +2875,18 @@ def fetch_parcel_at_point(city: str, lon: float, lat: float, address: str) -> di
 
 def http_json(url: str) -> dict | None:
     req = urllib.request.Request(url, headers={"User-Agent": "sites-map-build"})
-    try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        return None
-    return payload if isinstance(payload, dict) else None
+    payload = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            payload = None
+        if isinstance(payload, dict) and not payload.get("error"):
+            return payload
+        if attempt < 2:
+            time.sleep(0.5 * (attempt + 1))
+    return None
 
 
 def http_features(url: str) -> list[dict]:
@@ -2812,8 +2988,6 @@ def build_parcels(sites: list[dict], refresh: bool, deals: list[dict] | None = N
         record = target["record"]
         city = record.get("city") or ""
         address = record.get("address") or ""
-        if looks_broward(address) and city == "MIA":
-            return key, None, "broward_unavailable"
         lon = lat = None
         geometry = target.get("geometry") or {}
         if geometry.get("type") == "Point":
@@ -2918,12 +3092,7 @@ def _target_point(target: dict) -> tuple[float | None, float | None]:
 
 
 def _miss_reason(target: dict) -> str:
-    record = target["record"]
     _lon, lat = _target_point(target)
-    if record.get("city") == "MIA" and (
-        looks_broward(record.get("address") or "") or (isinstance(lat, (int, float)) and lat > 25.98)
-    ):
-        return "outside the Miami-Dade parcel layer"
     if lat is None:
         return "no coordinates"
     return "no parcel at this pin"
@@ -2948,11 +3117,17 @@ def _bbox(geom: dict, pad: float = 0.0006):
     return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
 
 
-def lookup_owner(city: str, apn: str) -> str:
+def lookup_owner(city: str, apn: str, county: str = "") -> str:
     token = norm_apn(apn)
     if not token:
         return ""
-    if city == "LAS":
+    if county == "Broward":
+        folio = _broward_folio(token)
+        if not folio:
+            return ""
+        base = BROWARD_PARCEL_QUERY
+        where, field = f"FOLIO='{folio.replace(chr(39), chr(39) * 2)}'", "NAME_LINE_1"
+    elif city == "LAS":
         base = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CC_PARCELS_SHP/FeatureServer/1/query"
         where, field = f"PARCEL='{token}'", "OWNER"
     elif city == "PHX":
@@ -2972,7 +3147,7 @@ def lookup_owner(city: str, apn: str) -> str:
     return ""
 
 
-def fetch_adjoining(city: str, geom: dict, owner: str, apn: str) -> list[dict]:
+def fetch_adjoining(city: str, geom: dict, owner: str, apn: str, county: str = "") -> list[dict]:
     owner = (owner or "").strip()
     box = _bbox(geom)
     if not owner or not box:
@@ -2980,7 +3155,10 @@ def fetch_adjoining(city: str, geom: dict, owner: str, apn: str) -> list[dict]:
     xmin, ymin, xmax, ymax = box
     envelope = json.dumps({"xmin": xmin, "ymin": ymin, "xmax": xmax, "ymax": ymax, "spatialReference": {"wkid": 4326}})
     safe = owner.replace("'", "''")
-    if city == "LAS":
+    if county == "Broward":
+        base = BROWARD_PARCEL_QUERY
+        where, out_fields, apn_key = f"NAME_LINE_1='{safe}'", "FOLIO,NAME_LINE_1", "FOLIO"
+    elif city == "LAS":
         base = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CC_PARCELS_SHP/FeatureServer/1/query"
         where, out_fields, apn_key = f"OWNER='{safe}'", "PARCEL,OWNER", "PARCEL"
     elif city == "PHX":
@@ -3028,10 +3206,17 @@ def _attach_adjoining(target: dict, cached: dict) -> None:
     if target.get("kind") != "site" or not _needs_adjoining(record) or "adjoining" in cached:
         return
     owner = cached.get("owner") or ""
+    county = cached.get("county") or ""
     if not owner:
-        owner = lookup_owner(record.get("city") or "", cached.get("apn") or record.get("apn") or "")
+        owner = lookup_owner(record.get("city") or "", cached.get("apn") or record.get("apn") or "", county)
         cached["owner"] = owner
-    cached["adjoining"] = fetch_adjoining(record.get("city") or "", cached.get("geometry") or {}, owner, cached.get("apn") or record.get("apn") or "")
+    cached["adjoining"] = fetch_adjoining(
+        record.get("city") or "",
+        cached.get("geometry") or {},
+        owner,
+        cached.get("apn") or record.get("apn") or "",
+        county,
+    )
 
 
 def parcel_feature(target: dict, cached: dict) -> dict:
@@ -3072,7 +3257,7 @@ def adjoining_feature(target: dict, cached: dict, extra: dict) -> dict:
 
 def parcel_note(stats: Counter) -> str:
     return (
-        "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. "
+        "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. "
         "A parcel number match is tried first, then the pin location. "
         f"Counts: {dict(stats)}."
     )
@@ -4363,7 +4548,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "skipped": [
             "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
             "Nightly workbook sync is not wired; drop a new export in data/source and rerun this script.",
-            "Parcel outlines cover in-area universe sites and geocoded deals in Maricopa, Clark, and Miami-Dade. Match method is parcel number, then the pin. Sites north of Miami-Dade stay unmatched.",
+            "Parcel outlines cover in-area universe sites and geocoded deals in Maricopa, Clark, Miami-Dade, and Broward. Match method is parcel number, then the pin.",
             "Same-owner adjoining outlines are requested where the site record has adjoining spare land.",
             "The 75–250 m review band was not recomputed. The one same-parcel pair found by APN is flagged.",
             "Edge-band distance to the polygon was not recomputed.",
@@ -4731,6 +4916,12 @@ def validate_committed() -> None:
     deal_report = report.get("deals") or {}
     if len(deal_features) != deal_report.get("pipeline", 0) + deal_report.get("land", 0):
         problems.append("deal count does not match the build report")
+    gap = universe_link_gap(deal_features)
+    expect("shipped universe links", gap["linked"], deal_report.get("shipped_linked"))
+    expect("located without universe", gap["located_without_universe"], deal_report.get("located_without_universe"))
+    expect("unlocated without universe", gap["unlocated_without_universe"], deal_report.get("unlocated_without_universe"))
+    if deal_report.get("located_without_universe_ids") != [item["deal_id"] for item in gap["located_missing"]]:
+        problems.append("located_without_universe_ids does not match the deals file")
     unscreened = loaded.get("unscreened.geojson") or {}
     unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
     pinned = sorted(item[0] for item in unscreened_rows if item[1])

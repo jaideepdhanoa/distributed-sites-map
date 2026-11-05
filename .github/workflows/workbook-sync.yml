@@ -51,17 +51,11 @@ jobs:
             git add data/generated/timeline.json
           fi
           git commit -m "Workbook sync $DATE"
-          git push --force-with-lease -u origin "$BRANCH"
           TITLE="Workbook sync $DATE"
-          BODY="Automatic read-only export of the Pipeline workbook. Not merged.
+          export SYNC_PR_TITLE="$TITLE"
+          export SYNC_PR_BODY="Automatic read-only export of the Pipeline workbook. Not merged.
 
           The build compared this export with the previous published data. The comment has the knock-out drift report. Nothing was written back to the Sheet."
-          EXISTING=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number')
-          if [ -z "$EXISTING" ]; then
-            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
-            EXISTING=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number')
-          else
-            gh pr edit "$EXISTING" --title "$TITLE" --body "$BODY"
-          fi
+          bash scripts/open_sync_pr.sh "$BRANCH"
           python scripts/sync_workbook.py --comment
-          gh pr comment "$EXISTING" --body-file /tmp/drift-comment.md
+          gh pr comment "$(cat /tmp/sync-pr-number)" --body-file /tmp/drift-comment.md

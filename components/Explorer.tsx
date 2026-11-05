@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail } from "./Detail";
+import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
@@ -406,8 +407,22 @@ export default function Explorer() {
     window.location.href = "/login";
   }
 
-  if (error) return <main className="empty">{error}</main>;
-  if (!data) return <main className="empty">Loading</main>;
+  if (error) {
+    return (
+      <main className="empty">
+        <Wordmark level="p" />
+        <p>{error}</p>
+      </main>
+    );
+  }
+  if (!data) {
+    return (
+      <main className="empty">
+        <Wordmark level="p" />
+        <p>Loading</p>
+      </main>
+    );
+  }
 
   const focus = CITY_VIEW[city] ?? CITY_VIEW.PHX;
   const dropCount = sites.filter((site) => droppedAt(site, stage) && site.city === city).length;
@@ -517,7 +532,7 @@ export default function Explorer() {
       ) : null}
       <header className="bar">
         <div className="top">
-          <h1 className="word">Sites</h1>
+          <Wordmark view={tableOpen ? "list" : "map"} />
           <div className="cities only-desktop" role="group" aria-label="City">
             {CITIES.map((item) => (
               <button key={item} className={city === item ? "on" : ""} type="button" onClick={() => jump(item)}>

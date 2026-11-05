@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Wordmark from "@/components/Wordmark";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
@@ -28,6 +29,7 @@ export default function LoginPage() {
   return (
     <main className="login">
       <form className="card" onSubmit={onSubmit}>
+        <Wordmark level="p" />
         <h1>Sign in</h1>
         <label>
           Username

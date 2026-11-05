@@ -8,6 +8,7 @@ as 7520 W McNab Rd, is tried again with the state alone.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -99,6 +100,25 @@ def _new_deal(row: dict, kind: str, depots: list[dict], cache: dict) -> dict:
     }
 
 
+def _place_failed(feature: dict, row: dict, depots: list[dict], cache: dict) -> None:
+    """Retry a full street that was stored with no coordinates."""
+    if feature.get("geometry"):
+        return
+    props = feature["properties"]
+    label = _address(str(row.get("Site") or props.get("address") or ""))
+    if not re.search(r"\b\d{2,6}\s+[A-Za-z]", label):
+        return
+    city = str(props.get("city") or row.get("Market") or "")
+    place = {"PHX": "Phoenix, AZ", "LAS": "Las Vegas, NV", "MIA": "Miami, FL"}.get(city, "")
+    coords = geocode_address(f"{label}, {place}".strip(", "), cache)
+    if not coords:
+        return
+    feature["geometry"] = {"type": "Point", "coordinates": [coords[0], coords[1]]}
+    props["coord_status"] = "geocoded"
+    props["address"] = scrub(label)[:180]
+    props["miles_to_depot"] = nearest_depot_miles(coords[0], coords[1], depots)
+
+
 def apply(workbook: Path) -> dict:
     deals = json.loads(DEALS.read_text())
     by_id = {feature["properties"]["deal_id"]: feature for feature in deals["features"]}
@@ -123,6 +143,7 @@ def apply(workbook: Path) -> dict:
                 by_id[deal_id] = feature
             else:
                 feature["properties"].update(key_figures(row, kind))
+                _place_failed(feature, row, depots, cache)
             seen.add(deal_id)
     for feature in deals["features"]:
         props = feature["properties"]

@@ -36,6 +36,11 @@ async function queue(request: APIRequestContext, query = "market=all&stage=any&v
 test("a new site can be reviewed, and a later note puts it back", async ({ page, request }) => {
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await login(request, "contributor");
+  // A failed later test retries this whole file, which can leave the site reviewed or snoozed.
+  const unsnooze = await request.post("/api/queue/snooze", { data: { siteId: deal, until: "2000-01-01" } });
+  expect(unsnooze.ok()).toBeTruthy();
+  const reset = await request.post("/api/queue", { data: { siteId: deal, undo: true } });
+  expect(reset.ok()).toBeTruthy();
   const before = await queue(request);
   expect(before.items.some((item) => item.siteId === deal)).toBeTruthy();
 
@@ -95,7 +100,8 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
   await openAs(page, "reviewer", `/?review=1&qmarket=all&qstage=any&qapprove=1&i=${at + 1}`);
   const panel = page.locator(".drawer");
   await expect(panel).toBeVisible();
-  const proposal = panel.locator("li", { hasText: "Ask for the sales package" }).filter({ has: page.getByRole("button", { name: "Accept" }) });
+  await panel.getByTestId("panel-tab-discussion").click();
+  const proposal = panel.getByTestId("proposed-next-step").filter({ hasText: "Ask for the sales package" });
   await expect(proposal).toBeVisible();
   await proposal.getByRole("button", { name: "Accept" }).click();
   await expect.poll(async () => {

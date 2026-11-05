@@ -353,7 +353,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
           />
         ))}
         {pendingSteps.map((item) => (
-          <article key={item.id} className="thread proposal">
+          <article key={item.id} className="thread proposal" data-testid="proposed-next-step">
             <p className="tag">Proposed next step · waiting for {APPROVER_LABEL}</p>
             <p className="who"><strong>{accounts.find((account) => account.id === item.authorId)?.name || item.authorId}</strong> · {formatPacific(item.createdAt)}</p>
             <p>{item.title || item.proposedValue}</p>

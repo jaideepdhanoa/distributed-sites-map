@@ -11,6 +11,7 @@ for (const panel of panels) {
     test(`key tiles fit ${panel.id} at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
       await page.goto(`/?${panel.city}funnel=pipeline&pstage=${panel.stage}&site=${panel.id}`);
+      await page.getByTestId("panel-tab-numbers").click();
       await page.waitForSelector("[data-testid=key-strip] strong");
       const strip = page.getByTestId("key-strip");
       await expect(strip).toContainText(panel.exact === "$7,000,000" ? "$7M" : "$4.99M");

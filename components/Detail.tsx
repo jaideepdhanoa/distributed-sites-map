@@ -4,7 +4,7 @@ import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, plainRoad, s
 import DrawerGrip from "./DrawerGrip";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { checkedPhrase } from "@/lib/keyNumbers";
+import { checkedPhrase, fullMoney, openLandText } from "@/lib/keyNumbers";
 import KeyStrip from "./KeyStrip";
 import PanelSections from "./PanelSections";
 
@@ -366,7 +366,28 @@ export function DealDetail({
             ) : null}
           </>
         }
-        numbers={<KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />}
+        numbers={
+          <>
+            <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />
+            <div className="kv">
+              <span>Asking price</span>
+              <div>
+                {deal.asking_price_display || "Not provided"}
+                {shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
+              </div>
+              <span>Per acre</span>
+              <div>{deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "Not provided"}</div>
+              <span>Open land</span>
+              <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
+              <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
+              <div>
+                {deal.figures_status === "withheld"
+                  ? "Package figures not shown"
+                  : deal.stated_cash_flow_display || deal.stated_revenue_display || (deal.kind === "land" ? "Vacant land, no business" : "Not provided")}
+              </div>
+            </div>
+          </>
+        }
         activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />}
         discussion={extras}
       />

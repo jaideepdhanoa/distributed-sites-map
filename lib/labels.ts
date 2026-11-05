@@ -107,13 +107,6 @@ export function plainVerdict(verdict?: string | null) {
   return "Not checked";
 }
 
-export function plainUtility(value?: string | null) {
-  if (value === "Strong") return "Close to a substation";
-  if (value === "OK") return "Within a normal distance";
-  if (value === "Weak") return "Far from a substation";
-  return "Not measured";
-}
-
 export function nextStepText(site: { verdict?: string | null; network_status?: string | null; land_tier?: string | null }) {
   if (site.verdict === "PASS" && site.network_status === "held") return "Hold until the service area grows.";
   if (site.verdict === "PASS") return "Ready for a closer look.";

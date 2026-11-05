@@ -2092,7 +2092,7 @@
       "PHX": 252
     },
     "hifld_territories": 98,
-    "note": "Serving utility is the smallest HIFLD electric retail territory containing the pin. Water and irrigation districts are left out. Miami-Dade's parcel layer has no last-sale date or price. Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value.",
+    "note": "County parcel records supply the mailing address and the last recorded sale when the layer includes them. Miami-Dade's parcel layer has no last-sale date or price. Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value.",
     "context": {
       "zoning_by_city": {
         "LAS": 36,

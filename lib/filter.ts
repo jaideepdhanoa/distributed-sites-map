@@ -36,6 +36,23 @@ export const CITY_VIEW: Record<string, { center: [number, number]; zoom: number 
 
 const ELIMINATED = new Set(["FAIL", "NOT_A_WASH"]);
 
+/** Sites a reviewer is still looking at. They stay Possible and are never shown as Cleared. */
+export const REVIEW_HOLDS = new Set(["PHX-U180", "LAS-U1516", "PHX-U519"]);
+
+export function presentSite<T extends SiteProps>(site: T): T {
+  if (!REVIEW_HOLDS.has(site.site_id)) return site;
+  const summary =
+    site.site_id === "PHX-U180"
+      ? "County records show about 0.38 ac of spare land; the aerial review could not confirm it, so it is held for a closer look."
+      : site.summary_why;
+  return {
+    ...site,
+    verdict: "MAYBE",
+    network_status: site.network_status === "cleared" ? null : site.network_status,
+    summary_why: summary,
+  };
+}
+
 export function eliminated(site: SiteProps): boolean {
   return ELIMINATED.has(site.verdict || "") || Boolean(site.tenure_fail);
 }
@@ -56,7 +73,7 @@ export function inStage(site: SiteProps, stage: StageId): boolean {
   const inArea = unique && Boolean(site.in_area);
   const land = inArea && landFit(site) && !eliminated(site);
   const county = land && site.verification === "county-checked";
-  const cleared = county && site.verdict === "PASS" && site.network_status === "cleared";
+  const cleared = county && site.verdict === "PASS" && site.network_status === "cleared" && !REVIEW_HOLDS.has(site.site_id);
   const listed = cleared && Boolean(site.listed);
   const contacted = listed && Boolean(site.contacted);
   switch (stage) {
@@ -101,22 +118,15 @@ export function droppedAt(site: SiteProps, stage: StageId): boolean {
   return false;
 }
 
-const GRID: Record<string, number> = { Strong: 0, OK: 1, Weak: 2, Unknown: 3 };
 const TENURE: Record<string, number> = { OK: 0, Unknown: 1, "Tenant-risk": 2 };
 const TIER: Record<string, number> = { L10: 0, L4: 1 };
 
 export function compareSites(a: SiteProps, b: SiteProps): number {
-  const keys = ["tier", "spare", "grid", "tenure"] as const;
-  for (const key of keys) {
-    const diff =
-      key === "tier"
-        ? (TIER[a.land_tier || ""] ?? 9) - (TIER[b.land_tier || ""] ?? 9)
-        : key === "spare"
-          ? (b.spare_ac_own ?? -1) - (a.spare_ac_own ?? -1)
-          : key === "grid"
-            ? (GRID[a.utility_proximity] ?? 9) - (GRID[b.utility_proximity] ?? 9)
-            : (TENURE[a.tenure] ?? 9) - (TENURE[b.tenure] ?? 9);
-    if (diff) return diff;
-  }
+  const tier = (TIER[a.land_tier || ""] ?? 9) - (TIER[b.land_tier || ""] ?? 9);
+  if (tier) return tier;
+  const spare = (b.spare_ac_own ?? -1) - (a.spare_ac_own ?? -1);
+  if (spare) return spare;
+  const tenure = (TENURE[a.tenure] ?? 9) - (TENURE[b.tenure] ?? 9);
+  if (tenure) return tenure;
   return a.site_id.localeCompare(b.site_id);
 }

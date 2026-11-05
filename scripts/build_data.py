@@ -15,6 +15,7 @@ import json
 import math
 import os
 import re
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -2722,6 +2723,8 @@ def scan_obj(obj, path="$"):
     if isinstance(obj, dict):
         for key, value in obj.items():
             folded = key.lower().replace("-", "_")
+            if folded in {"utility_proximity", "serving_utility", "serving_utility_source"}:
+                problems.append(f"removed field still shipped at {path}.{key}")
             if folded in FORBIDDEN_KEYS or "ebitda" in folded or "most_can_pay" in folded:
                 problems.append(f"forbidden key {path}.{key}")
             problems.extend(scan_obj(value, f"{path}.{key}"))
@@ -3836,7 +3839,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         geom = None
         if site["lat"] is not None and site["lon"] is not None:
             geom = {"type": "Point", "coordinates": [site["lon"], site["lat"]]}
-        props = {k: v for k, v in site.items() if k not in {"lat", "lon"}}
+        props = {k: v for k, v in site.items() if k not in {"lat", "lon", "utility_proximity", "serving_utility", "serving_utility_source"}}
         site_features.append({"type": "Feature", "geometry": geom, "properties": props})
     sites_fc = {"type": "FeatureCollection", "features": site_features}
     parcels_fc = {"type": "FeatureCollection", "features": parcels}
@@ -3924,33 +3927,14 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         ],
     }
 
-    changes = {"note": "No earlier build to compare."}
-    previous_sites = OUT / "sites.geojson"
-    if write and previous_sites.exists():
-        old_features = json.loads(previous_sites.read_text()).get("features") or []
-        old_by_id = {(item.get("properties") or {}).get("site_id"): item.get("properties") or {} for item in old_features}
-        new_by_id = {site["site_id"]: site for site in sites}
-        added = sorted(set(new_by_id) - set(old_by_id))
-        removed = sorted(set(old_by_id) - set(new_by_id))
-        verdict_changes = []
-        stage_moves = []
-        for sid, site in new_by_id.items():
-            old = old_by_id.get(sid)
-            if not old:
-                continue
-            if (old.get("verdict") or None) != (site.get("verdict") or None):
-                verdict_changes.append({"site_id": sid, "before": old.get("verdict"), "after": site.get("verdict")})
-            if (old.get("pipeline_stage") or "") != (site.get("pipeline_stage") or ""):
-                stage_moves.append({"site_id": sid, "before": old.get("pipeline_stage") or "", "after": site.get("pipeline_stage") or ""})
-        changes = {
-            "new_sites": len(added),
-            "removed_sites": len(removed),
-            "verdict_changes": len(verdict_changes),
-            "stage_moves": len(stage_moves),
-            "sample_new": added[:12],
-            "sample_verdicts": verdict_changes[:12],
-            "sample_stages": stage_moves[:12],
-        }
+    # Diff against the last committed build, not the working file this run overwrites.
+    # A second local build would otherwise compare the new file to itself and report zeros.
+    changes = summarize_changes(
+        published_features("data/generated/sites.geojson"),
+        sites,
+        published_features("data/generated/deals.geojson"),
+        deals_fc.get("features") or [],
+    )
     if write:
         write_workbook_stage_files()
         OUT.mkdir(parents=True, exist_ok=True)
@@ -3995,6 +3979,79 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 LAST_CACHE = None
 
 
+def _record_props(item) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+    props = item.get("properties") if "properties" in item else item
+    return props if isinstance(props, dict) else None
+
+
+def published_features(rel: str) -> list:
+    """Features from the last committed build. The working copy is not the baseline."""
+    try:
+        raw = subprocess.check_output(
+            ["git", "show", f"HEAD:{rel}"],
+            cwd=ROOT,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        path = ROOT / rel
+        if not path.exists():
+            return []
+        raw = path.read_bytes()
+    try:
+        return json.loads(raw).get("features") or []
+    except json.JSONDecodeError:
+        return []
+
+
+def summarize_changes(old_sites, new_sites, old_deals=None, new_deals=None) -> dict:
+    """Count sites and stage moves since the previous published build."""
+
+    def index(rows, key):
+        found = {}
+        for item in rows or []:
+            props = _record_props(item)
+            if not props or not props.get(key):
+                continue
+            found[props[key]] = props
+        return found
+
+    old_by = index(old_sites, "site_id")
+    new_by = index(new_sites, "site_id")
+    added = sorted(set(new_by) - set(old_by))
+    removed = sorted(set(old_by) - set(new_by))
+    verdict_changes = []
+    stage_moves = []
+    for sid, site in new_by.items():
+        old = old_by.get(sid)
+        if not old:
+            continue
+        if (old.get("verdict") or None) != (site.get("verdict") or None):
+            verdict_changes.append({"site_id": sid, "before": old.get("verdict"), "after": site.get("verdict")})
+        if (old.get("pipeline_stage") or "") != (site.get("pipeline_stage") or ""):
+            stage_moves.append(
+                {"site_id": sid, "before": old.get("pipeline_stage") or "", "after": site.get("pipeline_stage") or ""}
+            )
+    old_deal_by = index(old_deals, "deal_id")
+    new_deal_by = index(new_deals, "deal_id")
+    for deal_id, deal in new_deal_by.items():
+        old = old_deal_by.get(deal_id)
+        if not old:
+            continue
+        if (old.get("stage") or "") != (deal.get("stage") or ""):
+            stage_moves.append({"deal_id": deal_id, "before": old.get("stage") or "", "after": deal.get("stage") or ""})
+    return {
+        "new_sites": len(added),
+        "removed_sites": len(removed),
+        "verdict_changes": len(verdict_changes),
+        "stage_moves": len(stage_moves),
+        "sample_new": added[:12],
+        "sample_verdicts": verdict_changes[:12],
+        "sample_stages": stage_moves[:12],
+    }
+
+
 def save_parcel_cache_from_last():
     if LAST_CACHE is None:
         return
@@ -4037,6 +4094,53 @@ def sources_present() -> bool:
     return (SRC / "universe_v3.csv").exists() and any(SRC.glob("*.xlsx"))
 
 
+_DISPLAY_TERMS = re.compile(
+    r"\b(?:charging|ev|av|stalls?|power|utility|electric|kw|cindel|ming|ricardo|yuka|jaideep|jesse|muse|torque|indie|grok)\b",
+    re.I,
+)
+
+
+def display_language_problems(loaded: dict) -> list[str]:
+    """Shipped files and app text stay free of the private term list."""
+    problems = []
+
+    def walk(obj, path):
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                folded = key.lower().replace("-", "_")
+                if folded in {"utility_proximity", "serving_utility", "serving_utility_source"}:
+                    problems.append(f"removed field still shipped at {path}.{key}")
+                walk(value, f"{path}.{key}")
+        elif isinstance(obj, list):
+            for index, value in enumerate(obj[:8000]):
+                walk(value, f"{path}[{index}]")
+        elif isinstance(obj, str):
+            key = path.rsplit(".", 1)[-1]
+            for found in _DISPLAY_TERMS.finditer(obj):
+                word = found.group(0).lower()
+                # Avenue abbreviations and a business named Power are not the private terms.
+                if word == "av" and key in {"aadt_road", "address", "name"}:
+                    continue
+                if word == "power" and (
+                    key in {"name", "owner", "also_known_as", "broker", "firm", "address", "aadt_road"}
+                    or re.search(r"(?i)\bpower\s+(rd|road)\b", obj)
+                ):
+                    continue
+                problems.append(f"banned term {found.group(0)!r} in {path}: {obj[:120]!r}")
+                break
+
+    for name, blob in loaded.items():
+        walk(blob, name)
+    for folder in ("app", "components", "lib"):
+        for path in (ROOT / folder).rglob("*"):
+            if path.suffix not in {".ts", ".tsx"}:
+                continue
+            found = _DISPLAY_TERMS.search(path.read_text())
+            if found:
+                problems.append(f"banned term {found.group(0)!r} in {path.relative_to(ROOT)}")
+    return problems
+
+
 def validate_committed() -> None:
     """Check the files in git. Used when the raw source folder is not present."""
     problems: list[str] = []
@@ -4064,6 +4168,7 @@ def validate_committed() -> None:
             problems.append(f"{name} is not valid JSON")
     for name, blob in loaded.items():
         problems.extend(scan_obj(blob, name))
+    problems.extend(display_language_problems(loaded))
     for folder in ("components", "lib", "app"):
         for path in (ROOT / folder).rglob("*"):
             if path.suffix not in {".ts", ".tsx"}:

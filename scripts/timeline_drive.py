@@ -261,9 +261,11 @@ def match_materials(lister, root_id: str, records: list[dict]) -> tuple[dict, li
     warnings: list[str] = []
     if not lister or not root_id:
         materials: dict[str, dict] = {}
-        for site_id, url in workbook_folder_urls(records).items():
+        sheet = workbook_folder_urls(records)
+        for site_id, url in sheet.items():
             materials[site_id] = {"folder_url": url, "materials": []}
-        return materials, warnings, {"matched": len(materials), "unmatched": 0}
+        # No Drive listing ran. Sheet links are not matches.
+        return materials, warnings, {"matched": 0, "unmatched": 0, "sheet_links": len(sheet)}
     by_site = {row["site_id"]: row for row in records if row.get("site_id")}
     by_folder = {row["folder_id"]: row for row in records if row.get("folder_id")}
     grouped: dict[str, list[dict]] = {}
@@ -322,7 +324,12 @@ def match_materials(lister, root_id: str, records: list[dict]) -> tuple[dict, li
         else:
             materials = counted
         records_out[site_id] = {"folder_url": url, "materials": materials}
-    return records_out, warnings, {"matched": len(records_out), "unmatched": unmatched}
+    # matched is the root listing only. Sheet links stay a separate count.
+    return records_out, warnings, {
+        "matched": len(chosen),
+        "unmatched": unmatched,
+        "sheet_links": len(workbook_folder_urls(records)),
+    }
 
 
 class GoogleDriveLister:

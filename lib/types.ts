@@ -97,6 +97,8 @@ export type SiteProps = {
   parcel_acres?: number | null;
   lot_ac_source?: string;
   listing_url?: string;
+  /** Workbook Folder column, copied from the linked deal. */
+  folder_url?: string;
   research_sources?: string;
   research_note?: string;
   business_type?: string;

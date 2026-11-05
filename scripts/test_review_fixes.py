@@ -94,6 +94,7 @@ class ShippedCounts(unittest.TestCase):
         self.assertEqual(dict(Counter(listed)), {"PHX": 3, "LAS": 7, "MIA": 9})
         stars = next(item["properties"] for item in deals if item["properties"]["deal_id"] == "PIPE-MIA-0080")
         self.assertEqual(stars["folder_url"], "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ")
+        self.assertEqual(by_id["MIA-U747"]["folder_url"], stars["folder_url"])
         self.assertEqual(stars["universe_id"], "MIA-U747")
         self.assertEqual(stars["stage_group"], "financial")
         self.assertTrue(stars["broker_contacted"])

@@ -122,7 +122,7 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}{price ? ` · Asking ${price}` : ""}</p>
-      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, linkedDeal?.folder_url)}
+      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}

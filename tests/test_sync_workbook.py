@@ -210,6 +210,20 @@ class SyncFetchTest(unittest.TestCase):
         self.assertIn("Fetched service-area-PHX.kmz", log)
 
 
+class TimelineCommentTest(unittest.TestCase):
+    def test_sheet_links_are_not_called_drive_matches(self) -> None:
+        lines = sync.timeline_comment_lines(
+            14,
+            2,
+            65,
+            {"matched_folders": 2, "sheet_links": 14, "warnings": 1},
+        )
+        self.assertEqual(lines[0], "Matched folders: 2.")
+        self.assertEqual(lines[1], "Sheet folder links: 14.")
+        self.assertIn("Records with materials: 2.", lines)
+        self.assertIn("Timeline warnings: 1.", lines)
+
+
 class DriftReasonTest(unittest.TestCase):
     def test_stall_phrase_becomes_lot_too_small(self) -> None:
         import scripts.build_data as build

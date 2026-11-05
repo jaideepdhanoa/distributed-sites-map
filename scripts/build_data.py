@@ -1976,6 +1976,44 @@ def folder_url_from_row(row: dict) -> str:
     return folder_url_for(folder_id_from_row(row))
 
 
+def folder_link_problems(expected: list[tuple[str, str, str]], features: list[dict], sites: list[dict]) -> list[str]:
+    """A Folder column URL must survive on the deal and on the site the panel opens.
+
+    expected is (deal id, folder URL, universe site id). An empty universe id means the deal has no site.
+    """
+    by_deal: dict[str, dict] = {}
+    by_universe: dict[str, list[dict]] = {}
+    for feature in features:
+        props = feature.get("properties") or {}
+        deal_id = str(props.get("deal_id") or "")
+        if deal_id:
+            by_deal[deal_id] = props
+        universe_id = str(props.get("universe_id") or "")
+        if universe_id:
+            by_universe.setdefault(universe_id, []).append(props)
+    problems = []
+    seen: set[str] = set()
+    for deal_id, url, _universe_id in expected:
+        if not url or deal_id in seen:
+            continue
+        seen.add(deal_id)
+        props = by_deal.get(deal_id)
+        if not props or (props.get("folder_url") or "") != url:
+            problems.append(f"{deal_id} dropped its Folder URL")
+    for site in sites:
+        site_id = str(site.get("site_id") or "")
+        linked = by_deal.get(str(site.get("linked_deal_id") or "")) or {}
+        wanted = linked.get("folder_url") or ""
+        if not wanted:
+            for props in by_universe.get(site_id, []):
+                if props.get("folder_url"):
+                    wanted = props["folder_url"]
+                    break
+        if (site.get("folder_url") or "") != wanted:
+            problems.append(f"{site_id or '?'} dropped its Folder URL")
+    return problems
+
+
 def split_broker(value) -> tuple[str, str]:
     text = scrub(value)
     match = re.match(r"^(.*?)\s*\(([^)]+)\)", text)
@@ -2197,6 +2235,7 @@ def build_deal_layer(
     features = []
     failed = []
     matched = 0
+    expected_folders: list[tuple[str, str, str]] = []
     for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
         for index, row in enumerate(rows, start=1):
             city = str(row.get("Market") or "").strip() or "UNK"
@@ -2229,6 +2268,9 @@ def build_deal_layer(
                 failed.append({"deal_id": deal_id, "city": city, "kind": kind, "label": label, "stage": str(row.get("Stage") or "")})
             address = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I)
             source = firm or broker or ("Listing" if url else "")
+            folder = folder_url_from_row(row)
+            if folder:
+                expected_folders.append((deal_id, folder, universe_id or ""))
             props = {
                 "deal_id": deal_id,
                 "kind": kind,
@@ -2240,7 +2282,7 @@ def build_deal_layer(
                 "broker": broker[:120],
                 "firm": firm[:160],
                 "listing_url": url[:400],
-                "folder_url": folder_url_from_row(row),
+                "folder_url": folder,
                 "asking_price": price,
                 "asking_price_display": money(price) if price else None,
                 "asking_price_source": scrub(source)[:160],
@@ -2328,6 +2370,21 @@ def build_deal_layer(
                         listing = props["listing_url"]
                         break
         site["listing_url"] = listing
+        folder = ""
+        if link and link.get("folder_url"):
+            folder = link["folder_url"]
+        else:
+            for props in by_universe.get(site["site_id"], []):
+                if props.get("folder_url"):
+                    folder = props["folder_url"]
+                    break
+        if folder:
+            site["folder_url"] = folder
+        elif "folder_url" in site:
+            site.pop("folder_url", None)
+    problems = folder_link_problems(expected_folders, features, sites)
+    if problems:
+        raise SystemExit("A Folder URL was dropped.\n" + "\n".join(problems[:20]))
     report["listing_links"] = {
         "pipeline": _listing_split(pipeline),
         "land": _listing_split(land),
@@ -4977,6 +5034,17 @@ def _write_timeline() -> None:
     summary = build_timeline.write_timeline(workbook)
     if summary.get("drive") == "error":
         raise SystemExit("drive: error")
+    report_path = OUT / "build_report.json"
+    if report_path.exists():
+        report = json.loads(report_path.read_text())
+        report["timeline"] = {
+            "matched_folders": int(summary.get("matched_folders") or 0),
+            "unmatched_folders": int(summary.get("unmatched_folders") or 0),
+            "sheet_links": int(summary.get("sheet_links") or 0),
+            "warnings": len(summary.get("warnings") or []),
+            "drive": summary.get("drive") or "skipped",
+        }
+        report_path.write_text(json.dumps(report, indent=2))
     print(json.dumps({"timeline": {key: value for key, value in summary.items() if key != "warnings"}}))
 
 

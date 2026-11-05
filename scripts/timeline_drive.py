@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -14,7 +15,11 @@ DOC = "application/vnd.google-apps.document"
 SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 SITE_ID = re.compile(r"^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$")
 FOLDER_URL = re.compile(r"https://drive\.google\.com/drive/folders/([A-Za-z0-9_-]+)")
+FOLDER_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 FILED_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})\s")
+# Viewer on the parent is not enough when a site folder has limited access.
+SITES_ROOT = "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk"
+SYNC_ACCOUNT = "sites-map-sync@sites-map-sync.iam.gserviceaccount.com"
 
 CATEGORIES = (
     ("1 ", "financials", "Financials"),
@@ -62,6 +67,36 @@ def folder_id_from_row(row: dict) -> str:
                 return match.group(1)
     match = FOLDER_URL.search(str(row.get("Folder") or ""))
     return match.group(1) if match else ""
+
+
+def folder_url_for(folder_id: str) -> str:
+    text = str(folder_id or "").strip()
+    if not FOLDER_ID.fullmatch(text):
+        return ""
+    return f"https://drive.google.com/drive/folders/{text}"
+
+
+def workbook_folder_urls(records: list[dict]) -> dict[str, str]:
+    """Site ID to the Folder column. The first row wins."""
+    out: dict[str, str] = {}
+    for row in records:
+        site_id = str(row.get("site_id") or "")
+        url = folder_url_for(str(row.get("folder_id") or ""))
+        if site_id and url and site_id not in out:
+            out[site_id] = url
+    return out
+
+
+def _hidden_folder(site_id: str, folder_id: str) -> str:
+    return (
+        f"{site_id} folder {folder_id} is not visible to the map sync account. "
+        f"Share 2 Sites ({SITES_ROOT}) with {SYNC_ACCOUNT} as Viewer, "
+        "and do not limit access on the site folder."
+    )
+
+
+def _folder_hidden(exc: BaseException) -> bool:
+    return isinstance(exc, urllib.error.HTTPError) and exc.code in (403, 404)
 
 
 def read_workbook_records(path: Path | None) -> list[dict]:
@@ -206,11 +241,31 @@ def materials_for_folder(lister, folder_id: str, site_id: str, warnings: list[st
     return [counts[key] for _prefix, key, _label in CATEGORIES if key in counts]
 
 
+def _materials_or_hidden(lister, folder_id: str, site_id: str, warnings: list[str]) -> list[dict] | None:
+    """Counts for one folder. None means the account cannot open it."""
+    try:
+        return materials_for_folder(lister, folder_id, site_id, warnings)
+    except urllib.error.HTTPError as exc:
+        if not _folder_hidden(exc):
+            raise
+        warnings.append(_hidden_folder(site_id, folder_id))
+        return None
+
+
 def match_materials(lister, root_id: str, records: list[dict]) -> tuple[dict, list[str], dict]:
-    """Return record materials, warnings, and log counts. Names are not returned."""
+    """Return record materials, warnings, and log counts. Names are not returned.
+
+    The Folder column is the link. A root listing that omits a site folder still
+    keeps that URL, and the folder id is opened for counts when the account can see it.
+    """
     warnings: list[str] = []
     if not lister or not root_id:
-        return {}, warnings, {"matched": 0, "unmatched": 0}
+        materials: dict[str, dict] = {}
+        sheet = workbook_folder_urls(records)
+        for site_id, url in sheet.items():
+            materials[site_id] = {"folder_url": url, "materials": []}
+        # No Drive listing ran. Sheet links are not matches.
+        return materials, warnings, {"matched": 0, "unmatched": 0, "sheet_links": len(sheet)}
     by_site = {row["site_id"]: row for row in records if row.get("site_id")}
     by_folder = {row["folder_id"]: row for row in records if row.get("folder_id")}
     grouped: dict[str, list[dict]] = {}
@@ -249,12 +304,32 @@ def match_materials(lister, root_id: str, records: list[dict]) -> tuple[dict, li
     records_out: dict[str, dict] = {}
     for site_id, folder in chosen.items():
         folder_id = str(folder.get("id") or "")
-        materials = materials_for_folder(lister, folder_id, site_id, warnings)
+        counted = _materials_or_hidden(lister, folder_id, site_id, warnings)
         records_out[site_id] = {
-            "folder_url": f"https://drive.google.com/drive/folders/{folder_id}",
-            "materials": materials,
+            "folder_url": folder_url_for(folder_id),
+            "materials": counted or [],
         }
-    return records_out, warnings, {"matched": len(chosen), "unmatched": unmatched}
+    # The workbook Folder cell is the link even when the root listing missed that folder.
+    for site_id, url in workbook_folder_urls(records).items():
+        folder_id = url.rsplit("/", 1)[-1]
+        current = records_out.get(site_id)
+        if current and current.get("folder_url") == url:
+            continue
+        if current and current.get("folder_url"):
+            listed = str(current["folder_url"]).rsplit("/", 1)[-1]
+            warnings.append(f"{site_id} folder cell {folder_id} differs from listed folder {listed}")
+        counted = _materials_or_hidden(lister, folder_id, site_id, warnings)
+        if counted is None:
+            materials = list((current or {}).get("materials") or [])
+        else:
+            materials = counted
+        records_out[site_id] = {"folder_url": url, "materials": materials}
+    # matched is the root listing only. Sheet links stay a separate count.
+    return records_out, warnings, {
+        "matched": len(chosen),
+        "unmatched": unmatched,
+        "sheet_links": len(workbook_folder_urls(records)),
+    }
 
 
 class GoogleDriveLister:

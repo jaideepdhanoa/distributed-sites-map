@@ -53,15 +53,16 @@ def write_timeline(workbook: Path | None = None, lister=None, drive_state: str |
         lister, drive_state, drive_error = _drive_lister(config)
     materials: dict = {}
     drive_warnings: list[str] = []
-    log = {"matched": 0, "unmatched": 0}
+    log = {"matched": 0, "unmatched": 0, "sheet_links": 0}
     if drive_state == "error":
         raise SystemExit(f"drive: error: {drive_error or 'the Drive client could not be created'}")
-    if lister is not None:
-        try:
-            materials, drive_warnings, log = match_materials(lister, (config.get("drive") or {}).get("rootFolderId") or "", records)
+    try:
+        # A missing Drive client still keeps Folder-column links. Counts need the listing.
+        materials, drive_warnings, log = match_materials(lister, (config.get("drive") or {}).get("rootFolderId") or "", records)
+        if lister is not None:
             drive_state = drive_state or "ok"
-        except Exception as exc:
-            raise SystemExit(f"drive: error: {exc}") from exc
+    except Exception as exc:
+        raise SystemExit(f"drive: error: {exc}") from exc
     load_gmail_items(config, [])
     by_record: dict[str, list[dict]] = {}
     for item in activity:
@@ -84,7 +85,12 @@ def write_timeline(workbook: Path | None = None, lister=None, drive_state: str |
     for warning in activity_warnings + drive_warnings:
         print(warning, file=sys.stderr)
     print(
-        json.dumps({"matched_folders": log["matched"], "unmatched_folders": log["unmatched"], "activity_rows": len(items)}),
+        json.dumps({
+            "matched_folders": log["matched"],
+            "unmatched_folders": log["unmatched"],
+            "sheet_links": log.get("sheet_links", 0),
+            "activity_rows": len(items),
+        }),
         file=sys.stderr,
     )
     target = destination or OUT
@@ -99,6 +105,7 @@ def write_timeline(workbook: Path | None = None, lister=None, drive_state: str |
         "activity": len(items),
         "matched_folders": log["matched"],
         "unmatched_folders": log["unmatched"],
+        "sheet_links": log.get("sheet_links", 0),
         "records": len(payload_records),
         "mail": "not_built",
         "drive": drive_state or "skipped",

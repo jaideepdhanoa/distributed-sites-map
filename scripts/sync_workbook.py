@@ -209,8 +209,36 @@ def export_workbook() -> None:
     print(f"Exported workbook read-only. Modified {modified or 'unknown'}.")
 
 
+def timeline_comment_lines(folder_urls: int, materials: int, rows: int, timeline: dict | None) -> list[str]:
+    """Matched folders counts the Drive listing. Sheet links are a separate line.
+
+    A Folder URL copied from the workbook is not a Drive match. Counting those
+    as matches would hide a service account that cannot see 2 Sites.
+    """
+    matched = folder_urls
+    sheet_links = None
+    warnings = 0
+    if isinstance(timeline, dict) and timeline.get("matched_folders") is not None:
+        matched = int(timeline["matched_folders"])
+        if timeline.get("sheet_links") is not None:
+            sheet_links = int(timeline["sheet_links"])
+    if isinstance(timeline, dict) and timeline.get("warnings") is not None:
+        warnings = int(timeline["warnings"])
+    lines = [f"Matched folders: {matched}."]
+    if sheet_links is not None:
+        lines.append(f"Sheet folder links: {sheet_links}.")
+    lines.extend(
+        [
+            f"Records with materials: {materials}.",
+            f"Activity rows: {rows}.",
+            f"Timeline warnings: {warnings}.",
+        ]
+    )
+    return lines
+
+
 def _timeline_lines() -> list[str]:
-    matched = materials = rows = warnings = 0
+    materials = rows = folder_urls = 0
     timeline_path = ROOT / "data" / "generated" / "timeline.json"
     if timeline_path.exists():
         payload = json.loads(timeline_path.read_text())
@@ -220,23 +248,17 @@ def _timeline_lines() -> list[str]:
                 if not isinstance(record, dict):
                     continue
                 if record.get("folder_url"):
-                    matched += 1
+                    folder_urls += 1
                 if record.get("materials"):
                     materials += 1
         items = payload.get("items") or []
         if isinstance(items, list):
             rows = len(items)
+    report_timeline = None
     report_path = ROOT / "data" / "generated" / "build_report.json"
     if report_path.exists():
-        timeline = (json.loads(report_path.read_text()).get("timeline") or {})
-        if isinstance(timeline, dict) and timeline.get("warnings") is not None:
-            warnings = int(timeline["warnings"])
-    return [
-        f"Matched folders: {matched}.",
-        f"Records with materials: {materials}.",
-        f"Activity rows: {rows}.",
-        f"Timeline warnings: {warnings}.",
-    ]
+        report_timeline = (json.loads(report_path.read_text()).get("timeline") or {})
+    return timeline_comment_lines(folder_urls, materials, rows, report_timeline)
 
 
 def write_sync_comment(path: Path) -> None:

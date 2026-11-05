@@ -113,7 +113,11 @@ Verdict rows are append-only in `data/verdicts/verdicts.csv`. Pull requests run 
 
 A scheduled workflow exports the Pipeline Sheet and reads the other build inputs from a Drive folder named Map sync inputs. The folder id is the repository variable `MAP_SYNC_INPUTS_FOLDER_ID`. There is no default, and the sync does not look in the program root. It lists only the top level of that folder.
 
-The service account needs Viewer on exactly three things: the Pipeline workbook, Map sync inputs, and the 2 Sites folder (`TIMELINE_SITES_FOLDER_ID`). It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request.
+The service account needs Viewer on the Pipeline workbook and on Map sync inputs. That is enough for the Open site folder link: each sync copies column AE onto the deal and onto the universe site the panel opens. It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request.
+
+Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk`) must be shared with `sites-map-sync@sites-map-sync.iam.gserviceaccount.com` as Viewer, and each site folder must inherit that access. A site folder set to limited access stays invisible. The card link still ships from column AE. The sync comment's "Matched folders" counts only folders that account listed under 2 Sites. "Sheet folder links" counts column AE. Those two numbers differ when the account cannot see a folder.
+
+`python scripts/build_data.py --check` rebuilds from the export when `data/source` is present and fails if a Pipeline or Land Sites row has a Folder URL that the generated deal or linked site dropped.
 
 Map sync inputs sits in the Moove root, next to 2 Sites. Its top level holds:
 
@@ -153,7 +157,7 @@ The Universe bar counts Pipeline and Land deals in the city with an outbound ema
 
 ## Activity timeline
 
-Each site and deal card has an Activity section: one link to the site folder, a count and latest date for each materials category, a last-touched date, and the activity lines marked Map. The app does not write the workbook or Drive, and it does not read file contents.
+Each site and deal card has an Activity section: one link to the site folder, a count and latest date for each materials category, a last-touched date, and the activity lines marked Map. When the workbook Folder column has a link, that same link also sits with Open in Google Maps and the listing, under the address. The app does not write the workbook or Drive, and it does not read file contents.
 
 `config/timeline.json` holds the names. `ui.showActivityLines` defaults to true. Set it to false to keep the folder link, the counts and the last-touched date, and hide the lines. `GOOGLE_DRIVE_ROOT_FOLDER_ID` overrides `drive.rootFolderId`. `ACTIVITY_SHEET` and `ACTIVITY_HEADER_ROW` override the activity tab.
 
@@ -167,17 +171,21 @@ Header on row 1. The map reads Event ID, Date, Site ID, Type, Summary and Visibi
 
 ### Drive folders
 
-The parent folder is `2 Sites`. Its id is the default `drive.rootFolderId`. Share it with the read-only service account in `GOOGLE_SERVICE_ACCOUNT_JSON`.
+The parent folder is `2 Sites` (`1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk`). Its id is the default `drive.rootFolderId`.
 
-Each site folder is named `{Site ID} {column A label}`, for example `PIPE-PHX-0001 PHX 1523 E Southern Ave`. The map matches the first token to Site ID. If the name has no id, it uses the folder id in the Folder column (column AE), including a hyperlink whose text is `Open folder`. A label that does not match column A is a warning, not a failure.
+The card link comes from the Folder column (column AE) on Pipeline and Land Sites. The cell may be the URL itself or a hyperlink whose text is `Open folder`. Every workbook sync copies that URL onto the deal as `folder_url` and onto the linked universe site. The card shows it as Open site folder, next to Open in Google Maps and the listing. A build with no Drive credential still ships those links. Counts stay empty until a listing can open the folder. The build stops if a row's Folder URL is missing from the deal or from the site the panel opens.
 
-Inside the site folder, only `Source files` is opened. Its categories are `1 Financials`, `2 Property and legal` and `3 Operations`, including nested folders. The fourth category is never listed. Loose files and memos are not counted. The filed date is the `YYYY-MM-DD` at the start of a file name. The card shows counts and dates, never a file name or a file link.
+Each site folder is named `{Site ID} {column A label}`, for example `PIPE-MIA-0080 MIA 7520 W McNab Rd`. The map matches the first token to Site ID. If the name has no id, it uses the folder id in column AE. A label that does not match column A is a warning, not a failure. When the root listing omits a folder that column AE points at, the build opens that folder id directly and still keeps the link.
+
+Inside the site folder, only `Source files` is opened. Its categories are `1 Financials`, `2 Property and legal` and `3 Operations`, including nested folders. The fourth category, `4 Emails and calls`, is never listed. Loose files and memos are not counted. The filed date is the `YYYY-MM-DD` at the start of a file name. The card shows counts and dates, never a file name or a file link.
+
+Share `2 Sites` with `sites-map-sync@sites-map-sync.iam.gserviceaccount.com` as Viewer. Site folders have to inherit that access. A site folder set to limited access is invisible to the account even though the parent is shared: the card still shows the column AE link, the counts stay empty, and the build log names the folder id and this share.
 
 ```bash
 python3 scripts/build_timeline.py --workbook path/to/export.xlsx
 ```
 
-That command only reads. It writes `data/generated/timeline.json`. The column and the renamed folders are not in the workbook yet, so a build before they exist ships no folder matches.
+That command only reads. It writes `data/generated/timeline.json`.
 
 ## Not in this version
 

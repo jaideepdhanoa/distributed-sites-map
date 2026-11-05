@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 import openpyxl
@@ -12,7 +13,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from build_timeline import write_timeline  # noqa: E402
 from timeline_config import load_config  # noqa: E402
-from timeline_drive import DOC, FOLDER, description_marks_skip, files_list_url, match_materials  # noqa: E402
+from timeline_drive import DOC, FOLDER, description_marks_skip, files_list_url, folder_url_for, match_materials  # noqa: E402
 from timeline_gmail import load_gmail_items  # noqa: E402
 from timeline_policy import blocked, status_line  # noqa: E402
 
@@ -238,6 +239,136 @@ class TimelineTests(unittest.TestCase):
         materials, _warnings, log = match_materials(Lister(), "root", records)
         self.assertEqual(log["matched"], 1)
         self.assertEqual(materials["PIPE-PHX-0005"]["materials"], [])
+
+    def test_workbook_folder_is_kept_when_the_root_listing_omits_it(self):
+        class Lister:
+            def list_children(self, folder_id):
+                tree = {
+                    "root": [_folder("southern", "PIPE-PHX-0001 PHX 1523 E Southern Ave")],
+                    "southern": [],
+                    "mia": [_folder("src", "Source files")],
+                    "src": [_folder("fin", "1 Financials")],
+                    "fin": [_file("pnl", "2026-11-04 A - Profit and loss.pdf")],
+                }
+                return tree.get(folder_id, [])
+
+        records = [
+            {"site_id": "PIPE-PHX-0001", "label": "PHX 1523 E Southern Ave", "folder_id": "southern"},
+            {"site_id": "PIPE-MIA-0080", "label": "MIA 7520 W McNab Rd", "folder_id": "mia"},
+        ]
+        materials, warnings, log = match_materials(Lister(), "root", records)
+        self.assertEqual(materials["PIPE-MIA-0080"]["folder_url"], "https://drive.google.com/drive/folders/mia")
+        self.assertEqual(materials["PIPE-MIA-0080"]["materials"][0]["category"], "financials")
+        self.assertEqual(materials["PIPE-MIA-0080"]["materials"][0]["count"], 1)
+        self.assertEqual(log["matched"], 1)
+        self.assertEqual(log["sheet_links"], 2)
+        self.assertEqual(warnings, [])
+        self.assertEqual(folder_url_for("mia"), "https://drive.google.com/drive/folders/mia")
+
+    def test_hidden_workbook_folder_still_keeps_the_link(self):
+        hidden = "1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ"
+
+        class Lister:
+            def list_children(self, folder_id):
+                if folder_id != hidden:
+                    return []
+                raise urllib.error.HTTPError("https://www.googleapis.com/drive/v3/files", 403, "Forbidden", hdrs=None, fp=None)
+
+        records = [{"site_id": "PIPE-MIA-0080", "label": "MIA 7520 W McNab Rd", "folder_id": "1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "timeline.json"
+            summary = write_timeline(None, lister=Lister(), drive_state="ok", destination=dest, records=records)
+            payload = json.loads(dest.read_text())
+        stars = payload["records"]["PIPE-MIA-0080"]
+        self.assertEqual(stars["folder_url"], "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ")
+        self.assertEqual(stars["materials"], [])
+        self.assertEqual(summary["matched_folders"], 0)
+        self.assertEqual(summary["sheet_links"], 1)
+        warning_blob = "\n".join(summary["warnings"])
+        self.assertIn("1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ", warning_blob)
+        self.assertIn("sites-map-sync@sites-map-sync.iam.gserviceaccount.com", warning_blob)
+        self.assertIn("1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk", warning_blob)
+
+    def test_folder_column_text_and_hyperlink(self):
+        from build_data import folder_url_from_row
+
+        self.assertEqual(
+            folder_url_from_row({"Folder": "https://drive.google.com/drive/folders/abc?usp=sharing"}),
+            "https://drive.google.com/drive/folders/abc",
+        )
+        self.assertEqual(
+            folder_url_from_row({"Folder": "Open folder", "_links": [("Folder", "https://drive.google.com/drive/folders/xyz")]}),
+            "https://drive.google.com/drive/folders/xyz",
+        )
+        self.assertEqual(folder_url_from_row({"Folder": ""}), "")
+
+    def test_skipped_drive_still_ships_the_folder_column(self):
+        records = [{"site_id": "PIPE-MIA-0080", "label": "MIA 7520 W McNab Rd", "folder_id": "1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "timeline.json"
+            summary = write_timeline(None, lister=None, drive_state="skipped", destination=dest, records=records)
+            payload = json.loads(dest.read_text())
+        self.assertEqual(summary["drive"], "skipped")
+        self.assertEqual(summary["matched_folders"], 0)
+        self.assertEqual(summary["sheet_links"], 1)
+        self.assertEqual(
+            payload["records"]["PIPE-MIA-0080"]["folder_url"],
+            "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ",
+        )
+
+    def test_sync_build_keeps_the_folder_column_on_the_deal_and_site(self):
+        import build_data
+
+        stars = "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ"
+        land = "https://drive.google.com/drive/folders/1ShPLMtYezrdSoKCCeR3NIdIVsJ21Fo_b"
+        pipeline = {
+            "Site": "MIA folder check",
+            "Market": "MIA",
+            "Name": "Stars",
+            "Stage": "2 Financial screen",
+            "Site ID": "PIPE-MIA-0080",
+            "Folder": stars,
+            "APN or folio": "514201001",
+            "Segment": "Car wash",
+            "_excel_row": 5,
+        }
+        land_row = {
+            "Site": "PHX land folder",
+            "Market": "PHX",
+            "Name": "Baseline",
+            "Stage": "1 Desk screen",
+            "Site ID": "LAND-PHX-0044",
+            "Folder": "Open folder",
+            "_links": [("Folder", land)],
+            "APN or folio": "999888777",
+            "Segment": "Land",
+            "_excel_row": 5,
+        }
+        sites = [
+            {"site_id": "MIA-U747", "origin": "universe", "city": "MIA", "apn": "514201001", "address": "", "name": "", "listed": False},
+            {"site_id": "PHX-U1", "origin": "universe", "city": "PHX", "apn": "999888777", "address": "", "name": "", "listed": False},
+        ]
+        old_cache = build_data.GEOCODE_CACHE
+        with tempfile.TemporaryDirectory() as tmp:
+            build_data.GEOCODE_CACHE = Path(tmp) / "geocode.json"
+            try:
+                deals, _report = build_data.build_deal_layer([pipeline], [land_row], sites, [])
+            finally:
+                build_data.GEOCODE_CACHE = old_cache
+        by_id = {item["properties"]["deal_id"]: item["properties"] for item in deals["features"]}
+        self.assertEqual(by_id["PIPE-MIA-0080"]["folder_url"], stars)
+        self.assertEqual(by_id["LAND-PHX-0044"]["folder_url"], land)
+        self.assertEqual(sites[0]["folder_url"], stars)
+        self.assertEqual(sites[1]["folder_url"], land)
+        expected = [("PIPE-MIA-0080", stars, "MIA-U747"), ("LAND-PHX-0044", land, "PHX-U1")]
+        by_id["PIPE-MIA-0080"]["folder_url"] = ""
+        problems = build_data.folder_link_problems(expected, deals["features"], sites)
+        self.assertIn("PIPE-MIA-0080 dropped its Folder URL", problems)
+        by_id["PIPE-MIA-0080"]["folder_url"] = stars
+        sites[0]["folder_url"] = ""
+        problems = build_data.folder_link_problems(expected, deals["features"], sites)
+        self.assertIn("MIA-U747 dropped its Folder URL", problems)
+        self.assertNotIn("PIPE-MIA-0080 dropped its Folder URL", problems)
 
     def test_stage_line_drops_a_parenthetical(self):
         self.assertEqual(status_line("stage", "Stage set to Dropped (date approximate)"), "Stage set to Dropped")

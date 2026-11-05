@@ -24,16 +24,20 @@ function websiteLabel(url: string) {
   }
 }
 
+const FOLDER_URL = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/;
+
 function mapsLinks(
   lat?: number | null,
   lng?: number | null,
   listing?: { listing_url?: string | null; listing_removed?: boolean | null } | null,
   required = false,
+  folderUrl?: string | null,
 ) {
   const hasMap = lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
   const cue = listing ? listingCue(listing) : null;
   const showListing = Boolean(cue && (required || cue.url));
-  if (!hasMap && !showListing) return null;
+  const folder = folderUrl && FOLDER_URL.test(folderUrl) ? folderUrl : "";
+  if (!hasMap && !showListing && !folder) return null;
   const point = hasMap ? `${lat},${lng}` : "";
   return (
     <p className="map-links">
@@ -50,6 +54,9 @@ function mapsLinks(
         ) : (
           <span className="listing-link muted" data-testid="listing-link">{cue.label}</span>
         )
+      ) : null}
+      {folder ? (
+        <a className="listing-link" data-testid="site-folder-link" href={folder} target="_blank" rel="noopener noreferrer">Open site folder ↗</a>
       ) : null}
     </p>
   );
@@ -115,7 +122,7 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}{price ? ` · Asking ${price}` : ""}</p>
-      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null)}
+      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -329,7 +336,7 @@ export function DealDetail({
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
-      {mapsLinks(lat, lng, deal, true)}
+      {mapsLinks(lat, lng, deal, true, deal.folder_url)}
       {onCompare ? (
         <label className="compare-check">
           <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />

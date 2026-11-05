@@ -51,6 +51,7 @@ const KEEP = [
   "parcel_acres",
   "lot_ac_source",
   "listing_url",
+  "folder_url",
   "research_sources",
   "research_note",
   "business_type",

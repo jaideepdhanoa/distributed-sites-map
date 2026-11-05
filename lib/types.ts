@@ -97,6 +97,8 @@ export type SiteProps = {
   parcel_acres?: number | null;
   lot_ac_source?: string;
   listing_url?: string;
+  /** Workbook Folder column, copied from the linked deal. */
+  folder_url?: string;
   research_sources?: string;
   research_note?: string;
   business_type?: string;
@@ -127,6 +129,8 @@ export type DealProps = {
   broker: string;
   firm: string;
   listing_url: string;
+  /** Workbook Folder column. Empty when the row has no site folder. */
+  folder_url?: string;
   listing_removed?: boolean;
   asking_price: number | null;
   asking_price_display: string | null;

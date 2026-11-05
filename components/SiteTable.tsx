@@ -9,6 +9,7 @@ import {
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
 import { shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { readCapacity } from "@/lib/keyNumbers";
 import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
@@ -61,16 +62,29 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   },
 ];
 
-export function siteExportHeaders() {
-  return ["Site", "Name", "City", "Spare land", "Verdict", "Zoning", "Flood", "Year built", "Depot mi", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Why"];
+function dealForSite(row: SiteProps, deals: DealProps[]) {
+  if (row.linked_deal_id) {
+    const linked = deals.find((deal) => deal.deal_id === row.linked_deal_id);
+    if (linked) return linked;
+  }
+  return deals.find((deal) => deal.universe_id === row.site_id);
 }
 
-export function siteExportRow(row: SiteProps) {
+export function siteCapacityText(row: SiteProps, deals: DealProps[] = []) {
+  return readCapacity({ siteGrade: row.site_capacity, dealGrade: dealForSite(row, deals)?.site_capacity }).grade;
+}
+
+export function siteExportHeaders() {
+  return ["Site", "Name", "City", "Spare land", "Site capacity", "Verdict", "Zoning", "Flood", "Year built", "Depot mi", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Why"];
+}
+
+export function siteExportRow(row: SiteProps, deals: DealProps[] = []) {
   return [
     row.site_id,
     row.name,
     row.city,
     tierLabel(row.land_tier),
+    siteCapacityText(row, deals),
     plainVerdict(row.verdict),
     row.zoning,
     row.flood_zone,
@@ -89,6 +103,7 @@ export function siteExportRow(row: SiteProps) {
 
 export default function SiteTable({
   rows,
+  deals = [],
   selectedId,
   onSelect,
   sorting,
@@ -96,6 +111,7 @@ export default function SiteTable({
   activity = {},
 }: {
   rows: SiteProps[];
+  deals?: DealProps[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   sorting?: SortingState;
@@ -110,6 +126,16 @@ export default function SiteTable({
     else setLocalSorting(resolved);
   }
   const showWhy = rows.some((row) => row.summary_why);
+  const capacityColumn: LegacyColumnDef<SiteProps> = {
+    id: "site_capacity",
+    header: "Site capacity",
+    accessorFn: (row) => siteCapacityText(row, deals),
+    cell: ({ row }) => {
+      const read = readCapacity({ siteGrade: row.original.site_capacity, dealGrade: dealForSite(row.original, deals)?.site_capacity });
+      return <span className={read.grade === "Unknown" ? "unknown-grade" : ""} title={read.basis}>{read.grade}</span>;
+    },
+  };
+  const baseColumns = columns.flatMap((column) => (column.id === "tier" ? [column, capacityColumn] : [column]));
   const activityColumns: LegacyColumnDef<SiteProps>[] = [
     {
       id: "last_touched",
@@ -124,7 +150,7 @@ export default function SiteTable({
   ];
   const table = useLegacyTable({
     data: rows,
-    columns: [...(showWhy ? columns : columns.filter((column) => column.id !== "why")), ...activityColumns],
+    columns: [...(showWhy ? baseColumns : baseColumns.filter((column) => column.id !== "why")), ...activityColumns],
     state: { sorting: sortingState },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -165,7 +191,7 @@ export default function SiteTable({
           <li key={row.site_id}>
             <button type="button" className={row.site_id === selectedId ? "on" : ""} onClick={() => onSelect(row.site_id)}>
               <strong>{row.name || row.address || row.site_id}</strong>
-              <span>{row.site_id} · {plainVerdict(row.verdict)}{row.land_tier ? ` · ${tierLabel(row.land_tier)}` : ""}</span>
+              <span>{row.site_id} · {plainVerdict(row.verdict)}{row.land_tier ? ` · ${tierLabel(row.land_tier)}` : ""} · Site capacity {siteCapacityText(row, deals)}</span>
               {row.summary_why ? <span className="why">{row.summary_why}</span> : null}
               {touchOf(activity, row.linked_deal_id)?.lastTouched || touchOf(activity, row.linked_deal_id)?.materials ? (
                 <span>{touchOf(activity, row.linked_deal_id)?.materials || 0} materials · {touchOf(activity, row.linked_deal_id)?.lastTouched || "—"}</span>
@@ -194,6 +220,15 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
   { id: "acres", accessorFn: (row) => row.land_acres, header: "Acres" },
   { id: "per_acre", accessorFn: (row) => row.price_per_acre_display, header: "Per acre" },
   { id: "open_land", accessorFn: (row) => row.open_land_sqft, header: "Open land" },
+  {
+    id: "site_capacity",
+    header: "Site capacity",
+    accessorFn: (row) => readCapacity({ dealGrade: row.site_capacity }).grade,
+    cell: ({ row }) => {
+      const read = readCapacity({ dealGrade: row.original.site_capacity });
+      return <span className={read.grade === "Unknown" ? "unknown-grade" : ""} title={read.basis}>{read.grade}</span>;
+    },
+  },
   {
     id: "cash_flow",
     accessorFn: (row) => row.figures_status === "withheld" ? "Package figures not shown" : (row.stated_cash_flow_display || ""),

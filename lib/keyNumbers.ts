@@ -7,6 +7,7 @@ export const PIPELINE_COLUMNS = [
   { id: "acres", label: "Acres" },
   { id: "perAcre", label: "Per acre" },
   { id: "openLand", label: "Open land" },
+  { id: "capacity", label: "Site capacity" },
   { id: "cashFlow", label: "Cash flow" },
   { id: "depot", label: "Depot mi" },
   { id: "checked", label: "Checked" },
@@ -28,10 +29,42 @@ export type RangeFilter = {
 
 const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "omax"] as const;
 
+/** Map pins omit the rating so they are not tinted or badged. The card and the key strip still show it. */
 export function publicDeal<T extends { site_capacity?: unknown }>(props: T): Omit<T, "site_capacity"> {
   const copy = { ...props };
   delete copy.site_capacity;
   return copy;
+}
+
+export const CAPACITY_GRADES = ["Strong", "OK", "Weak", "Unknown"] as const;
+export type CapacityGrade = (typeof CAPACITY_GRADES)[number];
+
+export const CAPACITY_NOTES: Record<CapacityGrade, string> = {
+  Strong: "A Strong rating is on file.",
+  OK: "An OK rating is on file.",
+  Weak: "A Weak rating is on file.",
+  Unknown: "Not rated. This is the catch-up set.",
+};
+
+function storedGrade(value: unknown): CapacityGrade | null {
+  return value === "Strong" || value === "OK" || value === "Weak" || value === "Unknown" ? value : null;
+}
+
+/**
+ * Deal file wins when it has a stored grade, including an explicit Unknown.
+ * A site grade is used only when the deal has none. A missing grade is Unknown.
+ * The basis names that source. Shipped rows have no separate evidence note.
+ */
+export function readCapacity(input: { siteGrade?: unknown; dealGrade?: unknown }): { grade: CapacityGrade; basis: string } {
+  const deal = storedGrade(input.dealGrade);
+  if (deal) return deal === "Unknown" ? { grade: "Unknown", basis: "Not rated" } : { grade: deal, basis: "Deal file" };
+  const site = storedGrade(input.siteGrade);
+  if (site) return site === "Unknown" ? { grade: "Unknown", basis: "Not rated" } : { grade: site, basis: "Site record" };
+  return { grade: "Unknown", basis: "Not rated" };
+}
+
+export function capacitySelected(value: string | null): CapacityGrade | "any" {
+  return value === "Strong" || value === "OK" || value === "Weak" || value === "Unknown" ? value : "any";
 }
 
 export function basisLabel(basis?: string | null) {

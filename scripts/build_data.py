@@ -3728,6 +3728,19 @@ def city_class(rows: list[dict]) -> dict:
     return out
 
 
+_SITE_CAPACITY = {"Strong": "Strong", "OK": "OK", "Weak": "Weak", "Unknown": "Unknown"}
+
+
+def shipped_site_capacity(site: dict) -> str:
+    """Copy the screening grade onto the deal field name, then drop the old keys.
+
+    A blank screening value stays Unknown. That is not a guessed rating.
+    The serving-company name stays off the file.
+    """
+    raw = str(site.get("utility_proximity") or "").strip()
+    return _SITE_CAPACITY.get(raw, "Unknown")
+
+
 def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> dict:
     universe = load_csv(SRC / "universe_v3.csv")
     ring_rows = {row["site_id"]: row for row in load_csv(SRC / "las_ring100_screen.csv")}
@@ -4569,6 +4582,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         if site["lat"] is not None and site["lon"] is not None:
             geom = {"type": "Point", "coordinates": [site["lon"], site["lat"]]}
         props = {k: v for k, v in site.items() if k not in {"lat", "lon", "utility_proximity", "serving_utility", "serving_utility_source", "_source_listed"}}
+        props["site_capacity"] = shipped_site_capacity(site)
         site_features.append({"type": "Feature", "geometry": geom, "properties": props})
     sites_fc = {"type": "FeatureCollection", "features": site_features}
     parcels_fc = {"type": "FeatureCollection", "features": parcels}

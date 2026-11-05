@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
-import { cashTile, inRange, peerNote, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
+import { cashTile, inRange, peerNote, publicDeal, rangesFromSearch, readCapacity, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -61,4 +61,11 @@ assert.deepEqual(tileAmount(null, ""), { text: "Not provided", title: "Not provi
 assert.equal(listingCue({ listing_url: "https://www.loopnet.com/Listing/1" }).label, "View on LoopNet ↗");
 assert.equal(listingCue({ listing_url: "" }).label, "No listing page on file");
 assert.equal(listingCue({ listing_url: "https://www.bizbuysell.com/x", listing_removed: true }).label, "View on BizBuySell ↗ (may be removed)");
+assert.deepEqual(readCapacity({ dealGrade: "Strong" }), { grade: "Strong", basis: "Deal file" });
+assert.deepEqual(readCapacity({ dealGrade: "Unknown" }), { grade: "Unknown", basis: "Not rated" });
+assert.deepEqual(readCapacity({ siteGrade: "OK" }), { grade: "OK", basis: "Site record" });
+assert.deepEqual(readCapacity({ dealGrade: "Unknown", siteGrade: "Strong" }), { grade: "Unknown", basis: "Not rated" });
+assert.deepEqual(readCapacity({}), { grade: "Unknown", basis: "Not rated" });
+assert.equal("site_capacity" in publicDeal({ site_capacity: "Strong", name: "A" }), false);
+assert.equal(publicDeal({ site_capacity: "Strong", name: "A" }).name, "A");
 console.log("key numbers ok");

@@ -8,6 +8,7 @@ export type ListRow = {
   stage: string;
   tier: string;
   spare: string;
+  grade: string;
   zoning: string;
   traffic: string;
   listed: string;
@@ -21,6 +22,7 @@ export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id">; label: string }[] = 
   { id: "stage", label: "Stage" },
   { id: "tier", label: "Size tier" },
   { id: "spare", label: "Spare land" },
+  { id: "grade", label: "Site capacity" },
   { id: "zoning", label: "Zoning" },
   { id: "traffic", label: "Traffic count" },
   { id: "listed", label: "Listed" },
@@ -97,7 +99,9 @@ export default function ListView({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className={row.id === selectedId ? "on" : ""} onClick={() => onOpen(row.id)}>
-                {LIST_COLUMNS.map((column) => <td key={column.id} title={row[column.id] || ""}>{row[column.id] || "—"}</td>)}
+                {LIST_COLUMNS.map((column) => (
+                  <td key={column.id} className={column.id === "grade" && row.grade === "Unknown" ? "unknown-grade" : ""} title={row[column.id] || ""}>{row[column.id] || "—"}</td>
+                ))}
                 <td>
                   <button type="button" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
                 </td>
@@ -110,7 +114,7 @@ export default function ListView({
             <li key={row.id}>
               <button type="button" className={row.id === selectedId ? "on" : ""} onClick={() => onOpen(row.id)}>
                 <strong>{row.site}</strong>
-                <span>{[row.city, row.stage, row.tier].filter(Boolean).join(" · ")}</span>
+                <span>{[row.city, row.stage, row.tier, row.grade ? `Site capacity ${row.grade}` : ""].filter(Boolean).join(" · ")}</span>
               </button>
               <button type="button" onClick={() => onShowMap(row.id)}>Show on map</button>
             </li>

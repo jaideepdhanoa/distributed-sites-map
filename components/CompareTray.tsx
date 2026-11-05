@@ -1,5 +1,5 @@
 import type { DealProps, SiteProps } from "@/lib/types";
-import { acresText, cashTile, depotLine, openLandText } from "@/lib/keyNumbers";
+import { acresText, cashTile, depotLine, openLandText, readCapacity } from "@/lib/keyNumbers";
 import { stageDetail } from "@/lib/labels";
 
 export default function CompareTray({
@@ -48,6 +48,9 @@ export default function CompareTray({
                 <p>Land {acresText(deal.land_acres) || "Not provided"}</p>
                 <p>Per acre {deal.price_per_acre_display || "Not provided"}</p>
                 <p>Open land {deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</p>
+                <p className={readCapacity({ dealGrade: deal.site_capacity }).grade === "Unknown" ? "unknown-grade" : ""}>
+                  Site capacity {readCapacity({ dealGrade: deal.site_capacity }).grade} · {readCapacity({ dealGrade: deal.site_capacity }).basis}
+                </p>
                 <p>Depot {depotLine(deal.miles_to_depot, deal.miles_to_depot != null)}</p>
                 <p>Cash flow {cash.value}</p>
               </article>

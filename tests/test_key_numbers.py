@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.build_data import geocode_queries, scan_obj
+from scripts.build_data import geocode_queries, scan_obj, shipped_site_capacity
 from scripts.key_numbers import coverage, key_figures, listing_gone
 
 
@@ -125,6 +125,12 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertTrue(listing_gone("Delisted"))
         self.assertFalse(listing_gone("Listed"))
         self.assertFalse(listing_gone(""))
+
+    def test_screening_grade_ships_under_the_deal_field_name(self) -> None:
+        self.assertEqual(shipped_site_capacity({"utility_proximity": "Strong"}), "Strong")
+        self.assertEqual(shipped_site_capacity({"utility_proximity": "ok"}), "Unknown")
+        self.assertEqual(shipped_site_capacity({"utility_proximity": ""}), "Unknown")
+        self.assertEqual(shipped_site_capacity({}), "Unknown")
 
     def test_mcnab_query_drops_the_wrong_city(self) -> None:
         self.assertEqual(

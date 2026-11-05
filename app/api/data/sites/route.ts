@@ -26,6 +26,7 @@ const KEEP = [
   "spare_ac_adjoining",
   "verdict",
   "land_tier",
+  "site_capacity",
   "land_control",
   "network_status",
   "listed",

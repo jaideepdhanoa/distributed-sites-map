@@ -37,6 +37,8 @@ export type SiteProps = {
   spare_ac_adjoining_text: string;
   verdict: string | null;
   land_tier: "L10" | "L4" | null;
+  /** Screening grade, shipped under this name. Empty on older generated files. */
+  site_capacity?: "Strong" | "OK" | "Weak" | "Unknown";
   land_control: string;
   network_status: string | null;
   reconciliation_tier: string;

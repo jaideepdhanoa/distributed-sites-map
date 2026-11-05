@@ -5,7 +5,7 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { checkedPhrase, fullMoney, openLandText } from "@/lib/keyNumbers";
+import { checkedPhrase, fullMoney, openLandText, readCapacity } from "@/lib/keyNumbers";
 import KeyStrip from "./KeyStrip";
 import PanelSections from "./PanelSections";
 
@@ -13,6 +13,47 @@ function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
   if (value == null) return "—";
   return `${value} ac`;
+}
+
+function sparePeer(site?: SiteProps | null, deal?: DealProps | null, prefer: "site" | "deal" = "deal") {
+  const fromDeal = deal?.open_land_sqft != null
+    ? { value: openLandText(deal.open_land_sqft), basis: deal.open_land_basis || "Estimated" }
+    : null;
+  const tier = tierLabel(site?.land_tier);
+  const fromSite = tier
+    ? { value: tier, basis: site?.spare_ac_own != null ? `${site.spare_ac_own} ac own` : "Spare land tier" }
+    : site?.spare_ac_own != null
+      ? { value: site.spare_ac_own_text || `${site.spare_ac_own} ac`, basis: "Own spare" }
+      : null;
+  if (prefer === "site") return fromSite || fromDeal || { value: "Not measured", basis: "No aerial check yet" };
+  return fromDeal || fromSite || { value: "Not measured", basis: "No aerial check yet" };
+}
+
+function GradePair({
+  site,
+  deal,
+  prefer,
+}: {
+  site?: SiteProps | null;
+  deal?: DealProps | null;
+  prefer: "site" | "deal";
+}) {
+  const spare = sparePeer(site, deal, prefer);
+  const capacity = readCapacity({ siteGrade: site?.site_capacity, dealGrade: deal?.site_capacity });
+  return (
+    <div className="grade-pair" data-testid="grade-pair">
+      <article>
+        <span>Spare land</span>
+        <strong>{spare.value}</strong>
+        <small>{spare.basis}</small>
+      </article>
+      <article className={capacity.grade === "Unknown" ? "unknown" : ""} data-grade={capacity.grade}>
+        <span>Site capacity</span>
+        <strong>{capacity.grade}</strong>
+        <small>{capacity.basis}</small>
+      </article>
+    </div>
+  );
 }
 
 function websiteLabel(url: string) {
@@ -133,6 +174,7 @@ export default function Detail({
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
+      <GradePair site={site} deal={linkedDeal} prefer="site" />
       <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
         overview={
@@ -257,6 +299,12 @@ export default function Detail({
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
               <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
+              <span>Site capacity</span>
+              <div className={readCapacity({ siteGrade: site.site_capacity, dealGrade: linkedDeal?.site_capacity }).grade === "Unknown" ? "unknown-grade" : ""}>
+                {readCapacity({ siteGrade: site.site_capacity, dealGrade: linkedDeal?.site_capacity }).grade}
+                {" · "}
+                {readCapacity({ siteGrade: site.site_capacity, dealGrade: linkedDeal?.site_capacity }).basis}
+              </div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
               <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
               <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
@@ -290,6 +338,7 @@ export default function Detail({
 export function DealDetail({
   deal,
   peers,
+  universeSite,
   universeName,
   depotMiles,
   lat,
@@ -306,6 +355,7 @@ export function DealDetail({
 }: {
   deal: DealProps;
   peers?: DealProps[];
+  universeSite?: SiteProps | null;
   universeName?: string;
   depotMiles?: number | null;
   lat?: number | null;
@@ -352,6 +402,7 @@ export function DealDetail({
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
       {mapsLinks(lat, lng, deal, true, deal.folder_url)}
+      <GradePair site={universeSite} deal={deal} prefer="deal" />
       {onCompare ? (
         <label className="compare-check">
           <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
@@ -408,6 +459,12 @@ export function DealDetail({
               <div>{deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "Not provided"}</div>
               <span>Open land</span>
               <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
+              <span>Site capacity</span>
+              <div className={readCapacity({ dealGrade: deal.site_capacity }).grade === "Unknown" ? "unknown-grade" : ""}>
+                {readCapacity({ dealGrade: deal.site_capacity }).grade}
+                {" · "}
+                {readCapacity({ dealGrade: deal.site_capacity }).basis}
+              </div>
               <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
               <div>
                 {deal.figures_status === "withheld"

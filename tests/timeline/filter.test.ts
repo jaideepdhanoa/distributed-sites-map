@@ -42,3 +42,22 @@ test("the card merges counts and drops blocked lines", () => {
 test("activity lines stay on unless the config turns them off", () => {
   assert.equal(showActivityLines(), true);
 });
+
+test("a stage line keeps the fixed sentence and drops a parenthetical", () => {
+  const card = presentCard(
+    {
+      items: [
+        {
+          record_id: "PIPE-PHX-0005",
+          event_id: "S-1",
+          date: "2026-10-04",
+          type: "stage",
+          summary: "Stage set to Dropped (date approximate)",
+        },
+      ],
+    },
+    ["PIPE-PHX-0005"],
+  );
+  assert.equal(card.items.length, 1);
+  assert.equal(card.items[0]?.summary, "Stage set to Dropped");
+});

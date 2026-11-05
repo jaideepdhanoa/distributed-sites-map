@@ -134,11 +134,10 @@ def description_lines(value: str) -> list[str]:
 
 
 def description_marks_skip(value: str) -> bool:
-    for line in description_lines(value):
-        lowered = re.sub(r"\s+", " ", line).strip().casefold()
-        if lowered.startswith(_SKIP_MARKERS):
-            return True
-    return False
+    """A skip marker counts anywhere in the description, not only at the start of a line."""
+    text = " ".join(description_lines(value))
+    lowered = re.sub(r"\s+", " ", text).casefold()
+    return any(marker in lowered for marker in _SKIP_MARKERS)
 
 
 def _described_out(child: dict) -> bool:

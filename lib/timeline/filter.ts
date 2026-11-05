@@ -83,10 +83,15 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
+function stageLine(summary: string): string {
+  return summary.replace(/\s*\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function presentItem(row: Record<string, unknown>): TimelineItem | null {
   const type = String(row.type || "");
   if (!ALLOWED.has(type)) return null;
-  const summary = String(row.summary || "").trim();
+  const raw = String(row.summary || "").trim();
+  const summary = type === "stage" ? stageLine(raw) : raw;
   if (!summary || blockedText(summary)) return null;
   const date = String(row.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;

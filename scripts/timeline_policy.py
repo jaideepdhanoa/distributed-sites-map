@@ -70,9 +70,17 @@ def clean_link(value: str) -> str:
     return ""
 
 
+def stage_line(summary: str) -> str:
+    """Keep the fixed stage sentence and drop a parenthetical caveat."""
+    text = re.sub(r"\s*\([^)]*\)", " ", summary or "")
+    return " ".join(text.split())
+
+
 def status_line(kind: str, summary: str) -> str:
     """Neutral line for a row. Empty means the row must be dropped."""
     text = " ".join((summary or "").split())
+    if kind == "stage":
+        text = stage_line(text)
     if not text:
         return STATUS.get(kind, "")
     if "$" in text or "@" in text or blocked(text):

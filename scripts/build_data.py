@@ -4728,16 +4728,17 @@ def main():
 
 
 def _write_timeline() -> None:
-    """Read the activity tab and Drive folders. Never writes the workbook."""
-    try:
-        import build_timeline
+    """Read the activity tab and Drive folders. Never writes the workbook.
 
-        workbook = source_workbook() if sources_present() else None
-        print(json.dumps({"timeline": build_timeline.write_timeline(workbook)}))
-    except SystemExit:
-        print("Timeline step skipped.", file=sys.stderr)
-    except Exception:
-        print("Timeline step skipped.", file=sys.stderr)
+    A Drive read failure stops the build. A missing credential skips Drive and still writes the activity rows.
+    """
+    import build_timeline
+
+    workbook = source_workbook() if sources_present() else None
+    summary = build_timeline.write_timeline(workbook)
+    if summary.get("drive") == "error":
+        raise SystemExit("drive: error")
+    print(json.dumps({"timeline": {key: value for key, value in summary.items() if key != "warnings"}}))
 
 
 if __name__ == "__main__":

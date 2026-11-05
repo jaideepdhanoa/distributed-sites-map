@@ -14,7 +14,7 @@ from build_timeline import write_timeline  # noqa: E402
 from timeline_config import load_config  # noqa: E402
 from timeline_drive import DOC, FOLDER, description_marks_skip, files_list_url, match_materials  # noqa: E402
 from timeline_gmail import load_gmail_items  # noqa: E402
-from timeline_policy import blocked  # noqa: E402
+from timeline_policy import blocked, status_line  # noqa: E402
 
 ROOT_ID = "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk"
 PDF = "application/pdf"
@@ -205,8 +205,54 @@ class TimelineTests(unittest.TestCase):
         self.assertTrue(description_marks_skip("<p>Supersedes: prior</p>"))
         self.assertTrue(description_marks_skip("Intro</div><div>Also filed under: PIPE-PHX-0001</div>"))
         self.assertTrue(description_marks_skip("Duplicate&nbsp;of: A &amp; B"))
-        self.assertFalse(description_marks_skip("This is not a duplicate of: something"))
+        self.assertTrue(description_marks_skip("This is not a duplicate of: something"))
+        self.assertTrue(description_marks_skip("County copy. Misfiled: the other folder"))
+        self.assertTrue(description_marks_skip("<div>Recorded plat. Also filed under: the city set</div>"))
         self.assertFalse(description_marks_skip("<div>See the survey.</div>"))
+
+    def test_union_hills_property_and_legal_drops_to_zero(self):
+        """Survey 1ultfL and plat 15mbTv carry a skip marker after other text, so the category is empty."""
+
+        class Lister:
+            def list_children(self, folder_id):
+                tree = {
+                    "root": [_folder("uh", "PIPE-PHX-0005 PHX 515 E Union Hills Dr")],
+                    "uh": [_folder("src", "Source files")],
+                    "src": [_folder("legal", "2 Property and legal")],
+                    "legal": [
+                        _file(
+                            "1ultfLsurvey",
+                            "2026-10-01 A - Survey.pdf",
+                            description="County survey on file. Duplicate of: the recorded set",
+                        ),
+                        _file(
+                            "15mbTvplat",
+                            "2026-10-02 A - Plat.pdf",
+                            description="<div>Recorded plat. Also filed under: the city folder</div>",
+                        ),
+                    ],
+                }
+                return tree.get(folder_id, [])
+
+        records = [{"site_id": "PIPE-PHX-0005", "label": "PHX 515 E Union Hills Dr", "folder_id": "uh"}]
+        materials, _warnings, log = match_materials(Lister(), "root", records)
+        self.assertEqual(log["matched"], 1)
+        self.assertEqual(materials["PIPE-PHX-0005"]["materials"], [])
+
+    def test_stage_line_drops_a_parenthetical(self):
+        self.assertEqual(status_line("stage", "Stage set to Dropped (date approximate)"), "Stage set to Dropped")
+        self.assertEqual(status_line("stage", "Stage set to Dropped"), "Stage set to Dropped")
+
+    def test_drive_read_error_does_not_write_a_timeline(self):
+        class Boom:
+            def list_children(self, _folder_id):
+                raise RuntimeError("drive: error")
+
+        dest = Path(tempfile.mkdtemp()) / "timeline.json"
+        with self.assertRaises(SystemExit) as caught:
+            write_timeline(None, lister=Boom(), drive_state="ok", destination=dest, records=[])
+        self.assertIn("drive: error", str(caught.exception))
+        self.assertFalse(dest.exists())
 
     def test_added_plural_terms_are_blocked(self):
         payload = json.loads((ROOT / "config" / "timeline-terms.json").read_text())

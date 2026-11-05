@@ -28,11 +28,11 @@ def _drive_lister(config: dict):
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
     root = (config.get("drive") or {}).get("rootFolderId") or ""
     if not raw or not root:
-        return None, "skipped"
+        return None, "skipped", ""
     try:
-        return GoogleDriveLister(raw), "ok"
-    except Exception:
-        return None, "error"
+        return GoogleDriveLister(raw), "ok", ""
+    except Exception as exc:
+        return None, "error", str(exc)
 
 
 def _last_touched(materials: list[dict], items: list[dict]) -> str:
@@ -48,18 +48,20 @@ def write_timeline(workbook: Path | None = None, lister=None, drive_state: str |
         records = read_workbook_records(workbook)
     known = {row["site_id"] for row in records if row.get("site_id")}
     activity, activity_warnings = read_activity(workbook, config, known if workbook else None)
+    drive_error = ""
     if lister is None and drive_state is None:
-        lister, drive_state = _drive_lister(config)
+        lister, drive_state, drive_error = _drive_lister(config)
     materials: dict = {}
     drive_warnings: list[str] = []
     log = {"matched": 0, "unmatched": 0}
+    if drive_state == "error":
+        raise SystemExit(f"drive: error: {drive_error or 'the Drive client could not be created'}")
     if lister is not None:
         try:
             materials, drive_warnings, log = match_materials(lister, (config.get("drive") or {}).get("rootFolderId") or "", records)
             drive_state = drive_state or "ok"
-        except Exception:
-            materials = {}
-            drive_state = "error"
+        except Exception as exc:
+            raise SystemExit(f"drive: error: {exc}") from exc
     load_gmail_items(config, [])
     by_record: dict[str, list[dict]] = {}
     for item in activity:

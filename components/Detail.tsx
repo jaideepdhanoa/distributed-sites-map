@@ -68,6 +68,7 @@ export default function Detail({
   lat,
   lng,
   onOpenDeal,
+  onOpenParty,
   linkedDeal,
   onAddCompare,
   sameOwner,
@@ -82,6 +83,7 @@ export default function Detail({
   lat?: number | null;
   lng?: number | null;
   onOpenDeal?: () => void;
+  onOpenParty?: (name: string) => void;
   linkedDeal?: DealProps | null;
   onAddCompare?: () => void;
   sameOwner?: { site_id: string; name: string }[];
@@ -146,6 +148,17 @@ export default function Detail({
             )}
             <h3>Lead source</h3>
             <p>{leadSourceLine(site, linkedDeal)}</p>
+            {linkedDeal && (shownBroker(linkedDeal) || shownFirm(linkedDeal)) ? (
+              <>
+                <h3>Broker</h3>
+                <div className="kv">
+                  <span>Broker</span>
+                  <div>{shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : "Not provided"}</div>
+                  <span>Firm</span>
+                  <div>{shownFirm(linkedDeal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(linkedDeal))}>{shownFirm(linkedDeal)}</button> : "Not provided"}</div>
+                </div>
+              </>
+            ) : null}
             {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
             {site.place_note ? (
               <>
@@ -282,6 +295,7 @@ export function DealDetail({
   lat,
   lng,
   onOpenSite,
+  onOpenParty,
   onClose,
   onCompare,
   compared,
@@ -297,6 +311,7 @@ export function DealDetail({
   lat?: number | null;
   lng?: number | null;
   onOpenSite?: () => void;
+  onOpenParty?: (name: string) => void;
   onClose?: () => void;
   onCompare?: (on: boolean) => void;
   compared?: boolean;
@@ -349,8 +364,10 @@ export function DealDetail({
           <>
             <h3>Broker</h3>
             <div className="kv">
-              <span>Broker</span><div>{shownBroker(deal) || "Not provided"}</div>
-              <span>Firm</span><div>{shownFirm(deal) || "Not provided"}</div>
+              <span>Broker</span>
+              <div>{shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : "Not provided"}</div>
+              <span>Firm</span>
+              <div>{shownFirm(deal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(deal))}>{shownFirm(deal)}</button> : "Not provided"}</div>
               <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
               <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
               <span>Last broker contact</span><div>{deal.last_broker_contact || "—"}</div>
@@ -373,6 +390,8 @@ export function DealDetail({
                   <button className="text-link" type="button" onClick={onOpenSite}>{universeName || deal.universe_id}</button>
                 </p>
               </>
+            ) : hasPin ? (
+              <p className="note" data-testid="universe-gap">This listing has a location and is not linked to a universe site yet.</p>
             ) : null}
           </>
         }

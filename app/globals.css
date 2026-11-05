@@ -540,6 +540,7 @@ tr { cursor: pointer; }
 .removable { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
 .backdrop { position: fixed; inset: 0; z-index: 5; border: 0; background: transparent; padding: 0; }
 .summary-chip { flex: none; max-width: none; overflow: visible; white-space: nowrap; }
+.as-of-line { margin: 2px 0 0; font-size: 13px; font-weight: 650; color: var(--ink); line-height: 1.3; }
 .city-pick select { height: 44px; border: 1px solid #8d8376; border-radius: 999px; background: white; padding: 0 12px; max-width: 46vw; }
 .sheet-handle { display: none; }
 .unplaced-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -553,11 +554,20 @@ tr { cursor: pointer; }
   .mobile-search { display: block !important; width: 100%; max-width: none; height: 44px; margin-top: 6px; }
   .bar { padding: 6px 8px; }
   .top { height: 48px; }
-  .funnel-row { height: auto; flex-wrap: wrap; }
-  .funnel { flex-wrap: wrap; overflow: visible; }
-  .funnel button, .funnel .sub, .funnel .aside { min-height: 44px; align-items: center; }
+  .funnel-row { flex-wrap: nowrap; height: 40px; min-height: 0; overflow: hidden; }
+  .funnel { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+  .funnel button, .funnel .sub, .funnel .aside { min-height: 32px; height: 32px; align-items: center; padding-top: 0; padding-bottom: 0; }
   .summary-chip { display: none; }
-  .summary-chip.as-of { display: inline-flex; }
+  .summary-chip.as-of {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    height: 28px;
+    margin: 0;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 650;
+  }
   .shell.table-open { grid-template-rows: auto 1fr; }
   .shell.table-open .map-stage { display: none; }
   .dock-tabs button { min-height: 44px; }
@@ -581,6 +591,38 @@ tr { cursor: pointer; }
   .layers.open button, .legend.open button, .menu-sheet > button, .menu-sheet > a, .popover-head button,
   .popover button, .type-filters button, .chips button {
     min-height: 44px;
+  }
+  .menu-sheet .funnel-switch.segment {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 15.5rem;
+    max-width: 100%;
+    height: 36px;
+    margin: 12px 0 8px;
+    padding: 2px;
+    gap: 0;
+    background: var(--paper-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .menu-sheet .funnel-switch.segment button {
+    min-height: 32px;
+    height: 32px;
+    margin: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .menu-sheet .funnel-switch.segment button.on {
+    background: #1c1914;
+    color: #faf7f1;
   }
   .popover, .menu-sheet {
     position: fixed;

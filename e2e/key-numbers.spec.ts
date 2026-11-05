@@ -8,11 +8,13 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
   await expect(page.getByTestId("summary-row")).toContainText("Median asking");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&site=PIPE-PHX-0067");
+  await page.getByTestId("panel-tab-numbers").click();
   await expect(page.getByTestId("key-strip")).toContainText("Cash flow");
   await expect(page.getByTestId("key-strip")).toContainText("Claimed");
   await expect(page.getByTestId("key-strip")).not.toContainText("Package figures not shown");
 
   await page.goto("/?funnel=pipeline&view=list&site=LAND-PHX-0035");
+  await page.getByTestId("panel-tab-numbers").click();
   await expect(page.getByTestId("key-strip")).toContainText("104,100");
   await expect(page.getByTestId("key-strip")).toContainText("Estimated");
   await expect(page.getByTestId("key-strip")).toContainText("Site capacity");

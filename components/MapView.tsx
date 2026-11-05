@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
+import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
 import { pillText, publicDeal, type PinLabel } from "@/lib/keyNumbers";
@@ -27,6 +27,8 @@ type Props = {
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   pinLabel?: PinLabel;
   onPinLabel?: (mode: PinLabel) => void;
+  basemap?: "positron" | "satellite";
+  onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
   onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
 };
@@ -48,6 +50,11 @@ function depotRings(depots: GeoFeature[]) {
     }
   }
   return features;
+}
+
+function glide(map: Map, center: [number, number], zoom: number) {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  map.flyTo({ center, zoom, duration: reduce ? 0 : 300, essential: true });
 }
 
 function acresOf(coords: [number, number][]) {
@@ -112,11 +119,9 @@ export default function MapView(props: Props) {
   propsRef.current = props;
 
   useEffect(() => {
-    if (!node.current || mapRef.current) return;
+    if (!node.current) return;
     setWorkerUrl("/maplibre-gl-worker.js");
-    const map = new Map({
-      container: node.current,
-      style: {
+    const satelliteStyle = {
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
@@ -194,7 +199,7 @@ export default function MapView(props: Props) {
             type: "circle",
             source: "sites",
             filter: ["has", "point_count"],
-            paint: { "circle-color": "#1d4e89", "circle-radius": ["step", ["get", "point_count"], 16, 20, 20, 80, 26], "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2, "circle-opacity": 0.92 },
+            paint: { "circle-color": "#2c5d8f", "circle-radius": ["step", ["get", "point_count"], 16, 20, 20, 80, 26], "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2, "circle-opacity": 0.92 },
           },
           {
             id: "cluster-count",
@@ -261,13 +266,13 @@ export default function MapView(props: Props) {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 12, 7, 15, 10],
               "circle-color": [
                 "case",
-                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "#2f6f9f",
-                ["==", ["get", "verdict"], "PASS"], "#1f7a4d",
-                ["==", ["get", "verdict"], "MAYBE"], "#c4841d",
-                ["==", ["get", "verdict"], "UNRESOLVED"], "#b85c38",
-                ["==", ["get", "verdict"], "FAIL"], "#7a2e28",
-                ["==", ["get", "verdict"], "NOT_A_WASH"], "#5c574f",
-                "#f4efe6",
+                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "#2c5d8f",
+                ["==", ["get", "verdict"], "PASS"], "#2f6a4e",
+                ["==", ["get", "verdict"], "MAYBE"], "#a56a10",
+                ["==", ["get", "verdict"], "UNRESOLVED"], "#9b4336",
+                ["==", ["get", "verdict"], "FAIL"], "#9b4336",
+                ["==", ["get", "verdict"], "NOT_A_WASH"], "#6d655b",
+                "#e7e0d2",
               ],
               "circle-stroke-color": "#1c1914",
               "circle-stroke-width": ["case", ["==", ["get", "verdict"], "UNRESOLVED"], 3, ["!", ["has", "verdict"]], 1.6, 1.2],
@@ -397,7 +402,11 @@ export default function MapView(props: Props) {
             paint: { "text-color": "#faf7f1" },
           },
         ],
-      },
+      } as StyleSpecification;
+    const basemap = propsRef.current.basemap || "positron";
+    const map = new Map({
+      container: node.current,
+      style: basemap === "satellite" ? satelliteStyle : "https://tiles.openfreemap.org/styles/positron",
       center: [props.focusLng, props.focusLat],
       zoom: props.focusZoom,
       attributionControl: false,
@@ -443,9 +452,9 @@ export default function MapView(props: Props) {
         if (ny <= 0 && Math.abs(nx) <= -ny * 0.55) {
           const i = (y * size + x) * 4;
           const edge = ny > -0.18;
-          triangle[i] = edge ? 28 : 91;
-          triangle[i + 1] = edge ? 25 : 61;
-          triangle[i + 2] = edge ? 20 : 138;
+          triangle[i] = edge ? 28 : 44;
+          triangle[i + 1] = edge ? 25 : 93;
+          triangle[i + 2] = edge ? 20 : 143;
           triangle[i + 3] = 255;
         }
       }
@@ -453,16 +462,27 @@ export default function MapView(props: Props) {
     map.on("load", () => {
       map.resize();
       requestAnimationFrame(() => map.resize());
+      if (!map.getSource("sites")) {
+        for (const [id, source] of Object.entries(satelliteStyle.sources)) {
+          if (id === "imagery" || id === "labels") continue;
+          map.addSource(id, source);
+        }
+        for (const layer of satelliteStyle.layers) {
+          if (layer.id === "imagery" || layer.id === "labels") continue;
+          map.addLayer(layer);
+        }
+      }
       if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
       const squares: Record<string, [number, number, number]> = {
-        sourced: [36, 88, 166],
-        desk: [196, 132, 29],
-        financial: [31, 122, 77],
-        checks: [47, 111, 138],
-        close: [107, 76, 154],
-        contacted: [31, 122, 77],
-        later: [107, 76, 154],
-        dropped: [122, 46, 40],
+        sourced: [44, 93, 143],
+        desk: [165, 106, 16],
+        financial: [30, 70, 54],
+        checks: [47, 106, 78],
+        close: [18, 49, 42],
+        contacted: [30, 70, 54],
+        later: [47, 106, 78],
+        dropped: [231, 224, 210],
+      };
       };
       for (const [name, rgb] of Object.entries(squares)) {
         const id = `sq-${name}`;
@@ -607,13 +627,13 @@ export default function MapView(props: Props) {
       mapRef.current = null;
       if ((window as Window & { __sitesMap?: Map }).__sitesMap === map) delete (window as Window & { __sitesMap?: Map }).__sitesMap;
     };
-    // The map is created once. Later effects push data in.
+    // Recreate the map when the basemap changes. Later effects push data in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [props.basemap]);
 
   const reviewFocusRef = useRef(props.reviewFocus);
   reviewFocusRef.current = props.reviewFocus;
-  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom}`;
+  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom},${props.basemap || "positron"}`;
   const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");
   const appliedReview = useRef("");
@@ -651,7 +671,7 @@ export default function MapView(props: Props) {
       } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
-        map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
+        glide(map, [props.focusLng, props.focusLat], props.focusZoom);
       }
     };
     if (map.isStyleLoaded()) push();
@@ -701,7 +721,7 @@ export default function MapView(props: Props) {
     const go = () => {
       if (cancel || reviewFocusRef.current) return;
       if (!props.selectedId) {
-        map.jumpTo({ center: [props.focusLng, props.focusLat], zoom: props.focusZoom });
+        glide(map, [props.focusLng, props.focusLat], props.focusZoom);
         return;
       }
       const site = propsRef.current.sites.find((feature) => feature.properties.site_id === props.selectedId);
@@ -709,7 +729,7 @@ export default function MapView(props: Props) {
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === props.selectedId);
       const geometry = site?.geometry || off?.geometry || deal?.geometry;
       if (!geometry) return;
-      map.jumpTo({ center: geometry.coordinates, zoom: 16 });
+      glide(map, geometry.coordinates as [number, number], 16);
     };
     if (props.reviewFocus) return;
     if (props.selectedId && !selectedOnMap) return;
@@ -823,6 +843,11 @@ export default function MapView(props: Props) {
     <div className="stage-map">
       <div ref={node} className="map" />
       <div className="map-tools">
+        <div className="pin-label" role="group" aria-label="Basemap" data-testid="basemap">
+          <span>Base</span>
+          <button className={(props.basemap || "positron") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
+          <button className={props.basemap === "satellite" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
+        </div>
         <div className="pin-label" role="group" aria-label="Pin label" data-testid="pin-label">
           <span>Pin label</span>
           {(["none", "asking", "acres", "peracre"] as const).map((mode) => (
@@ -836,7 +861,7 @@ export default function MapView(props: Props) {
         </button>
         {readout ? <span className="map-readout">{readout}</span> : null}
       </div>
-      <div className="map-attrib">Powered by Esri · Earthstar Geographics, Maxar</div>
+      <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
     </div>
   );
 }

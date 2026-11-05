@@ -1,6 +1,65 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Banknote, Gauge, LandPlot, MapPin, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps } from "@/lib/types";
 import { basisLabel, cashTile, depotLine, fullMoney, openLandText, peerNote, tileAmount } from "@/lib/keyNumbers";
 import { shownPriceSource } from "@/lib/format";
+
+function CountUp({ value }: { value: string }) {
+  const [shown, setShown] = useState(value);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const match = value.match(/-?\d[\d,]*(?:\.\d+)?/);
+    if (!match || reduce || /not |package |vacant /i.test(value)) {
+      setShown(value);
+      return;
+    }
+    const target = Number(match[0].replaceAll(",", ""));
+    if (!Number.isFinite(target)) {
+      setShown(value);
+      return;
+    }
+    const decimals = match[0].includes(".") ? match[0].split(".")[1].length : 0;
+    const started = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / 300);
+      const current = target * progress;
+      const formatted = decimals ? current.toFixed(decimals) : Math.round(current).toLocaleString();
+      setShown(value.replace(match[0], formatted));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{shown}</>;
+}
+
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  title,
+  note,
+  basis,
+}: {
+  icon: typeof Wallet;
+  label: string;
+  value: string;
+  title?: string;
+  note?: string;
+  basis?: string;
+}) {
+  return (
+    <article className={label === "Cash flow" || label === "Revenue" ? "wide" : ""}>
+      <span><Icon size={15} strokeWidth={1.75} aria-hidden="true" /> {label}</span>
+      <strong title={title || value}><CountUp value={value} /></strong>
+      {note ? <small>{note}</small> : null}
+      {basis ? <em>{basis}</em> : null}
+    </article>
+  );
+}
 
 export default function KeyStrip({
   deal,
@@ -29,44 +88,13 @@ export default function KeyStrip({
   return (
     <section className="key-strip" data-testid="key-strip">
       <div className="metrics">
-        <article>
-          <span>Asking</span>
-          <strong title={askingTile.title}>{askingTile.text}</strong>
-          <small>{shownPriceSource(deal) || (deal.asking_price_display ? "Listing" : "")}</small>
-          {deal.asking_price_display ? <em>Broker-stated</em> : null}
-        </article>
-        <article>
-          <span>Land</span>
-          <strong>{acres}</strong>
-          {deal.land_acres_basis ? <em>{basisLabel(deal.land_acres_basis)}</em> : null}
-        </article>
-        <article>
-          <span>Per acre</span>
-          <strong title={perAcreTile.title}>{perAcreTile.text}</strong>
-          <small>{rank?.label || (deal.land_acres_basis === "Unknown" ? "From the listing acreage" : deal.land_acres != null ? "From the acreage on file" : "")}</small>
-        </article>
-        <article>
-          <span>Open land</span>
-          <strong title={openTile.title}>{openTile.text}</strong>
-          <small>{deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet"}</small>
-          {deal.open_land_sqft != null ? <em>Estimated</em> : null}
-        </article>
-        <article>
-          <span>Depot</span>
-          <strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
-          <small>{hasPin ? "straight line" : ""}</small>
-        </article>
-        <article className="wide">
-          <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
-          <strong title={cashView.title}>{cashView.text}</strong>
-          <small>{cash.note}{cash.extra ? ` · ${cash.extra}` : ""}</small>
-          {cash.basis ? <em>{cash.basis}</em> : null}
-        </article>
-        <article>
-          <span>Site capacity</span>
-          <strong>{deal.site_capacity || "Unknown"}</strong>
-          <small>{deal.site_capacity && deal.site_capacity !== "Unknown" ? "" : "Not rated"}</small>
-        </article>
+        <Metric icon={Wallet} label="Asking" value={askingTile.text} title={askingTile.title} note={shownPriceSource(deal) || (deal.asking_price_display ? "Listing" : "")} basis={deal.asking_price_display ? "Broker-stated" : ""} />
+        <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
+        <Metric icon={Ruler} label="Per acre" value={perAcreTile.text} title={perAcreTile.title} note={rank?.label || (deal.land_acres_basis === "Unknown" ? "From the listing acreage" : deal.land_acres != null ? "From the acreage on file" : "")} />
+        <Metric icon={Trees} label="Open land" value={openTile.text} title={openTile.title} note={deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet"} basis={deal.open_land_sqft != null ? "Estimated" : ""} />
+        <Metric icon={MapPin} label="Depot" value={depotLine(deal.miles_to_depot, hasPin)} note={hasPin ? "straight line" : ""} />
+        <Metric icon={Banknote} label={deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"} value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
+        <Metric icon={Gauge} label="Site capacity" value={deal.site_capacity || "Unknown"} note={deal.site_capacity && deal.site_capacity !== "Unknown" ? "" : "Not rated"} />
       </div>
       {rank ? (
         <div className="rank-bar" title={rank.label}>

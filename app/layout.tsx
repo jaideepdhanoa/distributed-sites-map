@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Newsreader, Outfit } from "next/font/google";
+import { Inter_Tight, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const sans = Outfit({ subsets: ["latin"], variable: "--font-sans" });
+const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans" });
 const serif = Newsreader({ subsets: ["latin"], variable: "--font-serif" });
 
 export const metadata: Metadata = {

@@ -1,7 +1,10 @@
-import { AREA_KIND_LABEL, STATUS_NOTES, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { listingCue } from "@/lib/format";
+import { AREA_KIND_LABEL, STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { acresText, depotLine, openLandText } from "@/lib/keyNumbers";
 
 export type TipMark = { swatch: string; label: string };
-export type TipModel = { title: string; marks: TipMark[]; extra?: string };
+export type TipFact = { label: string; value: string };
+export type TipModel = { title: string; marks: TipMark[]; extra?: string; facts?: TipFact[] };
 
 const AREA_NAMES: Record<string, string> = {
   "phx-service": "Phoenix service area",
@@ -58,10 +61,22 @@ export function dealTip(props: Record<string, unknown>): TipModel {
   if (props.listed) {
     marks.push({ swatch: "listing", label: STATUS_NOTES.find((item) => item.id === "listing")!.label });
   }
+  const acres = typeof props.land_acres === "number" ? acresText(props.land_acres) : "";
+  const open = typeof props.open_land_sqft === "number" ? openLandText(props.open_land_sqft) : "";
+  const miles = typeof props.miles_to_depot === "number" ? props.miles_to_depot : null;
+  const facts: TipFact[] = [
+    { label: "Stage", value: stageDetail(text(props.stage), text(props.stage_group) || "desk") },
+    { label: "Asking", value: text(props.asking_price_display) || "Not provided" },
+    { label: "Acres", value: acres || "Not provided" },
+    { label: "Per acre", value: text(props.price_per_acre_display) || "Not provided" },
+    { label: "Open land", value: open || "Not measured" },
+    { label: "Depot", value: depotLine(miles, miles != null) },
+    { label: "Listing", value: listingCue({ listing_url: text(props.listing_url), listing_removed: Boolean(props.listing_removed) }).label },
+  ];
   return {
     title: text(props.name) || text(props.address) || text(props.deal_id) || "Deal",
     marks,
-    extra: text(props.business_type),
+    facts,
   };
 }
 
@@ -105,5 +120,8 @@ export function tipHtml(tip: TipModel) {
     .map((mark) => `<span class="map-tip-row"><i class="swatch ${escapeHtml(mark.swatch)}"></i>${escapeHtml(mark.label)}</span>`)
     .join("");
   const extra = tip.extra ? `<span class="map-tip-extra">${escapeHtml(tip.extra)}</span>` : "";
-  return `<div class="map-tip"><strong>${escapeHtml(tip.title)}</strong>${rows}${extra}</div>`;
+  const facts = (tip.facts || [])
+    .map((fact) => `<span class="map-tip-fact"><em>${escapeHtml(fact.label)}</em>${escapeHtml(fact.value)}</span>`)
+    .join("");
+  return `<div class="map-tip"><strong>${escapeHtml(tip.title)}</strong>${rows}${facts}${extra}</div>`;
 }

@@ -191,7 +191,16 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
   { id: "broker", accessorFn: (row) => shownBroker(row), header: "Broker" },
   { accessorKey: "asking_price_display", header: "Asking" },
   { id: "asking_source", accessorFn: (row) => shownPriceSource(row), header: "Asking source" },
+  { id: "acres", accessorFn: (row) => row.land_acres, header: "Acres" },
+  { id: "per_acre", accessorFn: (row) => row.price_per_acre_display, header: "Per acre" },
+  { id: "open_land", accessorFn: (row) => row.open_land_sqft, header: "Open land" },
+  {
+    id: "cash_flow",
+    accessorFn: (row) => row.figures_status === "withheld" ? "Package figures not shown" : (row.stated_cash_flow_display || ""),
+    header: "Cash flow",
+  },
   { accessorKey: "miles_to_depot", header: "Depot mi" },
+  { accessorKey: "checked_live", header: "Checked" },
   { accessorKey: "universe_id", header: "Universe site" },
 ];
 

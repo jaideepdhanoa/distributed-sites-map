@@ -2,6 +2,36 @@ import type { DealProps, SiteProps } from "./types";
 
 const LISTING_SITES = /\b(bizbuysell|loopnet|crexi|realmo|carwashbrokers|matthews)\b/i;
 
+const LISTING_HOSTS: Array<[string, string]> = [
+  ["loopnet.com", "LoopNet"],
+  ["bizbuysell.com", "BizBuySell"],
+  ["crexi.com", "Crexi"],
+  ["matthews.com", "Matthews"],
+  ["carwashesforsale.com", "Car Washes For Sale"],
+  ["linkedin.com", "LinkedIn"],
+  ["carwashbrokers.com", "Car Wash Brokers"],
+  ["realmo.com", "Realmo"],
+  ["brevitas.com", "Brevitas"],
+  ["ppirfl.com", "Listing"],
+];
+
+export function listingHost(url: string) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return LISTING_HOSTS.find(([name]) => host === name || host.endsWith(`.${name}`))?.[1] || host;
+  } catch {
+    return "the listing";
+  }
+}
+
+/** Host label for the original listing, or a muted note when none is on file. */
+export function listingCue(record: { listing_url?: string | null; listing_removed?: boolean | null }) {
+  const url = (record.listing_url || "").trim();
+  const note = record.listing_removed ? " (may be removed)" : "";
+  if (!url) return { url: "", label: `No listing page on file${note}` };
+  return { url, label: `View on ${listingHost(url)} ↗${note}` };
+}
+
 export function formatRecordedDate(value?: string | null) {
   const text = (value || "").trim();
   const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
@@ -66,7 +96,7 @@ export function plainRoad(value?: string | null) {
   return text.split(/\s+/).map(roadWord).join(" ").replace(/\s+/g, " ").trim();
 }
 
-const LISTING_HOSTS: Record<string, string> = {
+const SOURCE_HOSTS: Record<string, string> = {
   "loopnet.com": "LoopNet",
   "crexi.com": "Crexi",
   "bizbuysell.com": "BizBuySell",
@@ -80,7 +110,7 @@ const LISTING_HOSTS: Record<string, string> = {
 
 function hostLabel(url?: string | null) {
   const host = (url || "").replace(/^https?:\/\/(?:www\.)?/i, "").split("/")[0].toLowerCase();
-  return LISTING_HOSTS[host] || "";
+  return SOURCE_HOSTS[host] || "";
 }
 
 /** A public listing name. Internal scan labels are not a source. */

@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
-import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
 import Timeline from "./timeline/Timeline";
-import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
+import { checkedPhrase, fullMoney, openLandText } from "@/lib/keyNumbers";
+import KeyStrip from "./KeyStrip";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -20,14 +22,33 @@ function websiteLabel(url: string) {
   }
 }
 
-function mapsLinks(lat?: number | null, lng?: number | null) {
-  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return null;
-  const point = `${lat},${lng}`;
+function mapsLinks(
+  lat?: number | null,
+  lng?: number | null,
+  listing?: { listing_url?: string | null; listing_removed?: boolean | null } | null,
+  required = false,
+) {
+  const hasMap = lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
+  const cue = listing ? listingCue(listing) : null;
+  const showListing = Boolean(cue && (required || cue.url));
+  if (!hasMap && !showListing) return null;
+  const point = hasMap ? `${lat},${lng}` : "";
   return (
     <p className="map-links">
-      <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
-      {" · "}
-      <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}`} target="_blank" rel="noopener noreferrer">Street View</a>
+      {hasMap ? (
+        <>
+          <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+          {" · "}
+          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}`} target="_blank" rel="noopener noreferrer">Street View</a>
+        </>
+      ) : null}
+      {showListing && cue ? (
+        cue.url ? (
+          <a className="listing-link" data-testid="listing-link" href={cue.url} target="_blank" rel="noopener noreferrer">{cue.label}</a>
+        ) : (
+          <span className="listing-link muted" data-testid="listing-link">{cue.label}</span>
+        )
+      ) : null}
     </p>
   );
 }
@@ -92,7 +113,7 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
-      {mapsLinks(lat, lng)}
+      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -249,29 +270,36 @@ export default function Detail({
 
 export function DealDetail({
   deal,
+  peers,
   universeName,
   depotMiles,
   lat,
   lng,
   onOpenSite,
   onClose,
+  onCompare,
+  compared,
   sheet,
   extras,
   banner,
   onSwipe,
 }: {
   deal: DealProps;
+  peers?: DealProps[];
   universeName?: string;
   depotMiles?: number | null;
   lat?: number | null;
   lng?: number | null;
   onOpenSite?: () => void;
   onClose?: () => void;
+  onCompare?: (on: boolean) => void;
+  compared?: boolean;
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
 }) {
+  const hasPin = lat != null && lng != null;
   return (
     <aside
       className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
@@ -295,29 +323,42 @@ export function DealDetail({
       {banner}
       <button className="close" type="button" onClick={onClose}>Close</button>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>
-        <span className="badge checked">{stageTitle(deal.stage_group)}</span>
+        <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
         {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
         {deal.listed ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
-      <p className="note">{deal.deal_id}</p>
-      {mapsLinks(lat, lng)}
-      <h3>Broker</h3>
+      <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""}</p>
+      {mapsLinks(lat, lng, deal, true)}
+      {onCompare ? (
+        <label className="compare-check">
+          <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
+          Compare
+        </label>
+      ) : null}
+      <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />
+      <h3>Overview</h3>
       <div className="kv">
-        <span>Broker</span><div>{shownBroker(deal) || "—"}</div>
-        <span>Firm</span><div>{shownFirm(deal) || "—"}</div>
+        <span>Broker</span><div>{shownBroker(deal) || "Not provided"}</div>
+        <span>Firm</span><div>{shownFirm(deal) || "Not provided"}</div>
         <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
-      </div>
-      <h3>Listing</h3>
-      <div className="kv">
         <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
         <span>Last broker contact</span><div>{deal.last_broker_contact || "—"}</div>
         <span>Asking price</span>
         <div>
-          {deal.asking_price_display || "—"}
+          {deal.asking_price_display || "Not provided"}
           {shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
+        </div>
+        <span>Per acre</span>
+        <div>{deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "Not provided"}</div>
+        <span>Open land</span>
+        <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
+        <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
+        <div>
+          {deal.figures_status === "withheld"
+            ? "Package figures not shown"
+            : deal.stated_cash_flow_display || deal.stated_revenue_display || (deal.kind === "land" ? "Vacant land, no business" : "Not provided")}
         </div>
         <span>Source</span>
         <div>
@@ -330,17 +371,15 @@ export function DealDetail({
         <span>Listing</span>
         <div>
           {deal.listing_url ? (
-            <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
-          ) : deal.source_kind === "off-market" ? (
-            "Off-market"
+            <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">{listingCue(deal).label}</a>
           ) : (
-            "No listing link on file"
+            listingCue(deal).label
           )}
         </div>
         <span>Parcel</span>
-        <div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
-        <span>Next step</span><div>{deal.next_step || "—"}</div>
-        <span>Nearest depot</span><div>{depotMiles == null ? "—" : `${depotMiles.toFixed(1)} mi`}</div>
+        <div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "Not matched"}</div>
+        <span>Next step</span><div>{deal.next_step || "Not provided"}</div>
+        <span>Nearest depot</span><div>{depotMiles == null ? (hasPin ? "Not provided" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
       </div>
       {deal.universe_id ? (
         <>

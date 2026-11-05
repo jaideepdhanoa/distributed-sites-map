@@ -9,10 +9,13 @@ import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
+import PipelineList, { type PipelineRow } from "./PipelineList";
+import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { PIPELINE_COLUMNS, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 
@@ -129,6 +132,25 @@ export default function Explorer() {
   const reviewIndex = Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
   const reviewCurrent = visibleFeed[reviewIndex];
   const caughtUp = reviewing && feedLoaded && !feed.some((site) => site.status === "open");
+  const ranges = rangesFromSearch(params);
+  const pipelineColumns = parseColumns(params.get("cols"));
+  const pillParam = params.get("pill");
+  const [rememberedPill, setRememberedPill] = useState<PinLabel>("none");
+  const pinLabel: PinLabel = pillParam === "asking" || pillParam === "acres" || pillParam === "peracre" || pillParam === "none"
+    ? pillParam
+    : rememberedPill;
+  const pipelineSortId = (PIPELINE_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as PipelineColumnId;
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("pin-label");
+    if (stored === "asking" || stored === "acres" || stored === "peracre" || stored === "none") setRememberedPill(stored);
+  }, []);
+
+  function setPinLabel(next: PinLabel) {
+    window.localStorage.setItem("pin-label", next);
+    setRememberedPill(next);
+    write({ pill: next });
+  }
 
   function write(next: Record<string, string | null>, history = false) {
     const url = new URLSearchParams(params.toString());
@@ -392,8 +414,11 @@ export default function Explorer() {
     }
   }
 
-  function addCompare(id: string) {
-    const next = compareIds.includes(id) ? compareIds.filter((item) => item !== id) : compareIds.length >= 4 ? compareIds : [...compareIds, id];
+  function setCompared(id: string, on?: boolean) {
+    const has = compareIds.includes(id);
+    const want = on ?? !has;
+    if (want === has) return;
+    const next = want ? (compareIds.length >= 4 ? compareIds : [...compareIds, id]) : compareIds.filter((item) => item !== id);
     write({ compare: next.length ? next.join("|") : null });
   }
 
@@ -628,6 +653,11 @@ export default function Explorer() {
     const diff = left.localeCompare(right, undefined, { numeric: true });
     return sortDesc ? -diff : diff;
   });
+  const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges));
+  const landForList = showLandLayer
+    ? landDeals.filter((deal) => deal.stage_group === pipeStage && inRange(deal, ranges))
+    : [];
+  const pipelineRows: PipelineRow[] = [...rangedPipeline, ...landForList].map((deal) => ({ deal, noPin: !dealPoint(deal) }));
 
   function exportList() {
     const blob = new Blob([listCsv(listRows)], { type: "text/csv" });
@@ -747,7 +777,7 @@ export default function Explorer() {
   }) : [];
 
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -1133,6 +1163,8 @@ export default function Explorer() {
           focusZoom={focus.zoom}
           reviewMarkers={reviewMarkers}
           reviewFocus={reviewFocus}
+          pinLabel={pinLabel}
+          onPinLabel={setPinLabel}
           onSelect={(id) => {
             if (reviewing) {
               const at = visibleFeed.findIndex((site) => site.siteId === id);
@@ -1149,7 +1181,33 @@ export default function Explorer() {
         {funnel === "universe" && !listView && visibleSites.length === 0 ? (
           <p className="empty-map">{compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
         ) : null}
-        {listView ? (
+        {!listView ? (() => {
+          const missing = funnel === "pipeline"
+            ? pipelineStepRows.length - pipelineSquares.length
+            : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
+          return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
+        })() : null}
+        {listView && funnel === "pipeline" ? (
+          <PipelineList
+            rows={pipelineRows}
+            columns={pipelineColumns}
+            selectedId={selected}
+            compareIds={compareIds}
+            sort={{ id: pipelineSortId, desc: sortDesc }}
+            ranges={ranges}
+            onSort={(id) => write({ sort: `${id}:${pipelineSortId === id && !sortDesc ? "desc" : "asc"}` })}
+            onOpen={choose}
+            onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
+            onCompare={(id, on) => setCompared(id, on)}
+            onColumns={(next) => {
+              const all = PIPELINE_COLUMNS.map((column) => column.id).join(",");
+              const value = next.join(",");
+              write({ cols: value === all ? null : value });
+            }}
+            onResetColumns={() => write({ cols: null })}
+            onRanges={(next) => write(rangeQuery(next))}
+          />
+        ) : listView ? (
           <ListView
             rows={listRows}
             selectedId={selected}
@@ -1217,12 +1275,15 @@ export default function Explorer() {
         {selectedDeal ? (
           <DealDetail
             deal={selectedDeal}
+            peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
             universeName={sites.find((site) => site.site_id === selectedDeal.universe_id)?.name}
             depotMiles={selectedDeal.miles_to_depot}
             lng={dealPoint(selectedDeal)?.[0]}
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onClose={() => choose(null)}
+            onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
+            compared={compareIds.includes(selectedDeal.deal_id)}
             sheet={sheet}
             banner={reviewing && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
             onSwipe={reviewing ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
@@ -1249,33 +1310,27 @@ export default function Explorer() {
             })()}
             linkedDeal={dealRows.find((deal) => deal.deal_id === selectedSite.linked_deal_id || deal.universe_id === selectedSite.site_id) || null}
             onOpenDeal={selectedSite.linked_deal_id ? () => choose(selectedSite.linked_deal_id || null) : undefined}
-            onAddCompare={() => addCompare(selectedSite.site_id)}
+            onAddCompare={() => setCompared(selectedSite.site_id, !compareIds.includes(selectedSite.site_id))}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
           />
         ) : null}
-        {compareIds.length >= 2 ? (
-          <aside className="compare-panel">
-            <button className="close" type="button" onClick={() => write({ compare: null })}>Close</button>
-            <h2>Side by side</h2>
-            <div className="compare-grid">
-              {compareIds.map((id) => {
-                const site = sites.find((item) => item.site_id === id);
-                if (!site) return null;
-                return (
-                  <article key={id}>
-                    <h3>{plainVerdict(site.verdict)}</h3>
-                    <p>{site.name || site.address}</p>
-                    <p className="note">{site.address}</p>
-                    <p className="note">{site.owner || "Owner not on file"}</p>
-                    <p className="note">{site.zoning || "Zoning not on file"}</p>
-                  </article>
-                );
-              })}
-            </div>
-          </aside>
+        {compareIds.length ? (
+          <CompareTray
+            deals={compareIds.flatMap((id) => {
+              const deal = dealRows.find((item) => item.deal_id === id);
+              return deal ? [deal] : [];
+            })}
+            sites={compareIds.flatMap((id) => {
+              if (dealRows.some((item) => item.deal_id === id)) return [];
+              const site = sites.find((item) => item.site_id === id);
+              return site ? [site] : [];
+            })}
+            onRemove={(id) => setCompared(id, false)}
+            onClose={() => write({ compare: null })}
+          />
         ) : null}
       </div>
       {tableOpen ? (

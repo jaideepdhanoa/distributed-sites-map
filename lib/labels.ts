@@ -77,8 +77,16 @@ export function stageDetail(stage: string, group: string) {
   if (group === "checks") return "Site checks";
   const stripped = (stage || "").replace(/^(?:dropped|\d+)\b\s*/i, "").trim();
   const raw = unwrapReason(stripped);
+  if (/^financial screen$/i.test(raw)) return "Financial screen";
   if (!raw || raw.toLowerCase() === name.toLowerCase()) return name;
   return `${name} (${raw.charAt(0).toLowerCase()}${raw.slice(1)})`;
+}
+
+export function stageTone(deal: { kind?: string; stage_group?: string }) {
+  if (deal.stage_group === "dropped") return "sand";
+  if (deal.kind === "land") return "sky";
+  if (deal.stage_group === "desk") return "brass";
+  return "pine";
 }
 
 export const AREA_NOTES = {

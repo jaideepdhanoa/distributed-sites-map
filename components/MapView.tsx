@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
+import { pillText, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 
 type Props = {
@@ -24,6 +25,8 @@ type Props = {
   focusZoom: number;
   reviewMarkers?: { id: string; lng: number; lat: number; n: number; current: boolean }[];
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
+  pinLabel?: PinLabel;
+  onPinLabel?: (mode: PinLabel) => void;
   onSelect: (id: string) => void;
   onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
 };
@@ -333,6 +336,21 @@ export default function MapView(props: Props) {
             layout: { "icon-image": "tri-land", "icon-size": 0.95, "icon-allow-overlap": true },
           },
           {
+            id: "deal-pills",
+            type: "symbol",
+            source: "deals",
+            filter: ["all", ["has", "pill"], ["!=", ["get", "pill"], ""]],
+            layout: {
+              "text-field": ["get", "pill"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 12,
+              "text-offset": [0, 1.45],
+              "text-anchor": "top",
+              "text-allow-overlap": true,
+            },
+            paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 8 },
+          },
+          {
             id: "depots",
             type: "symbol",
             source: "depots",
@@ -608,7 +626,13 @@ export default function MapView(props: Props) {
       clusterLeaves.current.clear();
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });
-      (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.deals.filter((f) => f.geometry) });
+      (map.getSource("deals") as GeoJSONSource).setData({
+        type: "FeatureCollection",
+        features: props.deals.filter((feature) => feature.geometry).map((feature) => ({
+          ...feature,
+          properties: { ...publicDeal(feature.properties), pill: pillText(feature.properties, props.pinLabel || "none") },
+        })),
+      });
       (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
@@ -636,7 +660,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -799,6 +823,14 @@ export default function MapView(props: Props) {
     <div className="stage-map">
       <div ref={node} className="map" />
       <div className="map-tools">
+        <div className="pin-label" role="group" aria-label="Pin label" data-testid="pin-label">
+          <span>Pin label</span>
+          {(["none", "asking", "acres", "peracre"] as const).map((mode) => (
+            <button key={mode} className={(props.pinLabel || "none") === mode ? "on" : ""} type="button" onClick={() => props.onPinLabel?.(mode)}>
+              {mode === "none" ? "None" : mode === "asking" ? "Asking" : mode === "acres" ? "Acres" : "Per acre"}
+            </button>
+          ))}
+        </div>
         <button className={measure ? "on" : ""} type="button" onClick={() => { setMeasure((value) => !value); points.current = []; setReadout(""); }}>
           Measure acres
         </button>

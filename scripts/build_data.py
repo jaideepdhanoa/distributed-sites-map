@@ -29,6 +29,10 @@ from pathlib import Path
 import openpyxl
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
+
 SRC = ROOT / "data" / "source"
 OUT = ROOT / "data" / "generated"
 VERDICTS = ROOT / "data" / "verdicts" / "verdicts.csv"
@@ -1625,6 +1629,7 @@ DEAL_FIELDS = (
     "coord_status",
     "miles_to_depot",
     "listed",
+    "listing_removed",
     "parcel_match",
     "parcel_acres",
     "source_line",
@@ -1632,6 +1637,7 @@ DEAL_FIELDS = (
     "business_type",
     "broker_contacted",
     "last_broker_contact",
+    *FIGURE_FIELDS,
 )
 
 
@@ -1953,6 +1959,9 @@ def listing_url_from_row(row: dict) -> str:
         preferred_col = key == "Listing link"
         return (0 if listing else 1 if not drive else 2, 0 if preferred_col else 1)
 
+    found = [item for item in found if "linkedin." not in _url_host(item[1])]
+    if not found:
+        return ""
     found.sort(key=rank)
     best = found[0][1]
     if "google." in _url_host(best):
@@ -2019,7 +2028,7 @@ def clean_deal_note(value) -> str:
 
 def deal_text_problems(deal_id: str, props: dict) -> list[str]:
     problems = []
-    for key in ("next_step", "asking_price_source", "name", "address", "source_line"):
+    for key in ("next_step", "asking_price_source", "name", "address", "source_line", "figures_source"):
         text = props.get(key) or ""
         if not isinstance(text, str) or not text:
             continue
@@ -2101,14 +2110,26 @@ def _nominatim_geocode(query: str) -> tuple[float, float] | None:
     return float(payload[0]["lon"]), float(payload[0]["lat"])
 
 
-def geocode_address(query: str, cache: dict) -> tuple[float, float] | None:
-    if not query:
-        return None
-    if query in cache:
-        found = cache[query]
-        if not found:
-            return None
-        return float(found[0]), float(found[1])
+def geocode_queries(query: str) -> list[str]:
+    """Try the market city, then the state alone.
+
+    A Broward street such as 7520 W McNab Rd does not match when the query
+    forces Miami, and the state-only query does.
+    """
+    queries = [query]
+    broader = re.sub(
+        r",\s*(?:Phoenix|Las Vegas|Miami),\s*(AZ|NV|FL)\s*$",
+        r", \1",
+        query,
+        count=1,
+        flags=re.I,
+    )
+    if broader != query:
+        queries.append(broader)
+    return queries
+
+
+def _geocode_once(query: str) -> tuple[float, float] | None:
     coords = None
     try:
         coords = _census_geocode(query)
@@ -2119,8 +2140,23 @@ def geocode_address(query: str, cache: dict) -> tuple[float, float] | None:
             coords = _nominatim_geocode(query)
         except Exception:
             coords = None
-    cache[query] = list(coords) if coords else None
     return coords
+
+
+def geocode_address(query: str, cache: dict) -> tuple[float, float] | None:
+    if not query:
+        return None
+    for attempt in geocode_queries(query):
+        if attempt in cache:
+            found = cache[attempt]
+            if not found:
+                continue
+            return float(found[0]), float(found[1])
+        coords = _geocode_once(attempt)
+        cache[attempt] = list(coords) if coords else None
+        if coords:
+            return coords
+    return None
 
 
 def haversine_miles(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -2205,6 +2241,7 @@ def build_deal_layer(
                 "coord_status": status,
                 "miles_to_depot": miles,
                 "listed": str(row.get("Listing status") or "").strip() == "Listed",
+                "listing_removed": listing_gone(row.get("Listing status")),
                 "parcel_match": "",
                 "parcel_acres": None,
                 "source_line": source_line,
@@ -2212,6 +2249,7 @@ def build_deal_layer(
                 "business_type": business_type_from_row(row),
                 "broker_contacted": bool(outreach.get(deal_id)),
                 "last_broker_contact": outreach.get(deal_id) or "",
+                **key_figures(row, kind),
             }
             if props["business_type"] not in BUSINESS_TYPES:
                 raise SystemExit(f"{deal_id} business type is not allowed: {props['business_type']}")

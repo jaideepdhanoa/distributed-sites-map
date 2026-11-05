@@ -4284,7 +4284,7 @@ def display_language_problems(loaded: dict) -> list[str]:
                     continue
                 if word == "power" and (
                     key in {"name", "owner", "also_known_as", "broker", "firm", "address", "aadt_road"}
-                    or re.search(r"(?i)\bpower\s+(rd|road)\b", obj)
+                    or re.search(r"(?i)power[\s-](?:rd|road)\b", obj)
                 ):
                     continue
                 problems.append(f"banned term {found.group(0)!r} in {path}: {obj[:120]!r}")

@@ -483,7 +483,6 @@ export default function MapView(props: Props) {
         later: [47, 106, 78],
         dropped: [231, 224, 210],
       };
-      };
       for (const [name, rgb] of Object.entries(squares)) {
         const id = `sq-${name}`;
         if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });

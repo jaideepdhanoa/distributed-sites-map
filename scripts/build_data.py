@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
+from scripts.timeline_drive import folder_id_from_row, folder_url_for
 
 SRC = ROOT / "data" / "source"
 OUT = ROOT / "data" / "generated"
@@ -1621,6 +1622,7 @@ DEAL_FIELDS = (
     "broker",
     "firm",
     "listing_url",
+    "folder_url",
     "asking_price",
     "asking_price_display",
     "asking_price_source",
@@ -1969,6 +1971,11 @@ def listing_url_from_row(row: dict) -> str:
     return best[:400]
 
 
+def folder_url_from_row(row: dict) -> str:
+    """Pipeline / Land Sites column AE. The cell text or its hyperlink."""
+    return folder_url_for(folder_id_from_row(row))
+
+
 def split_broker(value) -> tuple[str, str]:
     text = scrub(value)
     match = re.match(r"^(.*?)\s*\(([^)]+)\)", text)
@@ -2233,6 +2240,7 @@ def build_deal_layer(
                 "broker": broker[:120],
                 "firm": firm[:160],
                 "listing_url": url[:400],
+                "folder_url": folder_url_from_row(row),
                 "asking_price": price,
                 "asking_price_display": money(price) if price else None,
                 "asking_price_source": scrub(source)[:160],

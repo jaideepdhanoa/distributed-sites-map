@@ -16,6 +16,7 @@ type DealProps = {
   asking_price_source?: string;
   source_line?: string;
   firm?: string;
+  folder_url?: string;
 };
 
 type SiteProps = {
@@ -94,7 +95,7 @@ export function loadCatalog(): CatalogSite[] {
         latest: String(item.latest || ""),
       }))
       .filter((item) => item.label && item.count > 0);
-    const folder = String(record?.folder_url || "");
+    const folder = String(props.folder_url || record?.folder_url || "");
     const coords = feature.geometry?.type === "Point" ? feature.geometry.coordinates : null;
     const lng = Array.isArray(coords) ? Number(coords[0]) : null;
     const lat = Array.isArray(coords) ? Number(coords[1]) : null;

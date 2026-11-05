@@ -2,8 +2,69 @@
   "new_sites": 0,
   "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 0,
+  "stage_moves": 26,
   "sample_new": [],
   "sample_verdicts": [],
-  "sample_stages": []
+  "sample_stages": [
+    {
+      "site_id": "LAS-U53",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "LAS-U829",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "LAS-U977",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "MIA-U747",
+      "before": "",
+      "after": "2 Financial screen"
+    },
+    {
+      "site_id": "PHX-U309",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PHX-U326",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "site_id": "PHX-U633",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PIPE-PHX-0008",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PIPE-PHX-0009",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PIPE-LAS-0015",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PIPE-PHX-0018",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "PIPE-LAS-0072",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    }
+  ]
 }

@@ -53,6 +53,8 @@ export default function Detail({
       <h3>Summary</h3>
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
+      <h3>Lead source</h3>
+      <p>{leadSourceLine(site, linkedDeal)}</p>
         {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
@@ -66,8 +68,6 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
-      <h3>Lead source</h3>
-      <p>{leadSourceLine(site, linkedDeal)}</p>
       {mapsLinks(lat, lng)}
       <h3>Owner</h3>
       <p>{site.owner || "—"}</p>

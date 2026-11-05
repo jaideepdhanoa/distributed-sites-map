@@ -3,7 +3,7 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
   { id: "held", label: "Held", note: "Cleared, but outside the current service area." },
   { id: "possible", label: "Possible", note: "The county check found borderline land. It needs a closer look." },
   { id: "unresolved", label: "Unresolved", note: "County records are incomplete or conflicting." },
-  { id: "unchecked", label: "Not yet checked", note: "Satellite imagery suggests the land fits. County records have not been checked." },
+  { id: "unchecked", label: "County record not reviewed", note: "The county parcel record has not been reviewed. The aerial result is separate and does not fill in the county record." },
   { id: "ruled-out", label: "Ruled out", note: "Closed, not a wash, or no spare land. Shown only at the funnel step where it drops out." },
   { id: "listing", label: "Listing", note: "A site or deal that is on the market." },
   { id: "desk", label: "Desk screen", note: "A first review of the listing or lead." },
@@ -20,9 +20,12 @@ export const FUNNEL_NOTES: Record<string, string> = {
   county: "In-area sites with enough spare land that also have a county verdict. The workbook checked 109 sites in all: 13 cleared, 30 possible, 47 ruled out, 15 not a car wash, and 4 unresolved. That full set includes sites outside the service area and sites without enough spare land.",
   cleared: "County records confirm an operating wash with enough spare land on its own parcel. The workbook clears 11. Charleston Car Wash and the Chandler Quick Quack stay Possible until review, so the map shows 9.",
   listed: "Sites on this step that are on the market.",
-  contacted: "Sites on this step where a conversation with the owner or broker has started.",
+  contacted: "An outbound email or call to the broker is on file for a site on this step. The date is the last one.",
   desk: "A first review of the listing or lead.",
-  later: "Work past the first conversation. None are in this stage yet.",
+  financial: "The workbook's financial screen.",
+  checks: "The workbook's site checks.",
+  close: "The workbook's offer and close work.",
+  later: "The workbook's offer and close work.",
   dropped: "The deal is no longer being pursued.",
 };
 
@@ -41,13 +44,16 @@ export const CENSUS_NOTE = "Car washes. Other categories will get their own cens
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have spare land inside the service area. Cleared sites passed the county check.",
-  pipeline: "Broker and agent deals only. Off-market research stays on the universe site. Desk screen is the first step. Dropped deals are no longer pursued.",
+  pipeline: "Pipeline deals and Land Sites, with a split when both are in the step. Desk screen is the first step. Dropped deals are no longer pursued. Broker contacted is an outbound email or call, not a stage.",
 };
 
 const STAGE_TITLES: Record<string, string> = {
   desk: "Desk screen",
-  contacted: "Contacted",
-  later: "Later stages",
+  financial: "Financial screen",
+  checks: "Site checks",
+  close: "Offer and close",
+  contacted: "Financial screen",
+  later: "Offer and close",
   dropped: "Dropped",
 };
 
@@ -67,6 +73,8 @@ function unwrapReason(value: string) {
 
 export function stageDetail(stage: string, group: string) {
   const name = stageTitle(group);
+  // Stage 3's workbook label is shortened so the private term in that label never reaches the screen.
+  if (group === "checks") return "Site checks";
   const stripped = (stage || "").replace(/^(?:dropped|\d+)\b\s*/i, "").trim();
   const raw = unwrapReason(stripped);
   if (!raw || raw.toLowerCase() === name.toLowerCase()) return name;
@@ -104,7 +112,15 @@ export function plainVerdict(verdict?: string | null) {
   if (verdict === "FAIL") return "Ruled out";
   if (verdict === "NOT_A_WASH") return "Not a wash";
   if (verdict === "UNRESOLVED") return "Unresolved";
-  return "Not checked";
+  return "Not reviewed";
+}
+
+export function uncheckedNote(aerial?: string | null) {
+  const text = (aerial || "").toUpperCase();
+  if (text === "FIT_10" || text === "FIT_4") return "Aerial review shows room; county parcel record not reviewed yet";
+  if (text === "NO_FIT" || text === "NOT_A_WASH") return "Aerial review found too little spare land; county parcel record not reviewed";
+  if (text === "MARGINAL" || text === "CANNOT_TELL") return "Aerial review is not conclusive; county parcel record not reviewed";
+  return "County parcel record not reviewed";
 }
 
 export function nextStepText(site: { verdict?: string | null; network_status?: string | null; land_tier?: string | null }) {
@@ -113,15 +129,15 @@ export function nextStepText(site: { verdict?: string | null; network_status?: s
   if (site.verdict === "MAYBE") return "Needs a closer look before a decision.";
   if (site.verdict === "UNRESOLVED") return "A missing fact still blocks a decision.";
   if (site.verdict === "FAIL" || site.verdict === "NOT_A_WASH") return "No further work on this site.";
-  if (site.land_tier) return "County records have not been checked.";
+  if (site.land_tier) return "County parcel record not reviewed.";
   return "Not screened yet.";
 }
 
-export function statusOf(site: { verdict?: string | null; network_status?: string | null; tenure_fail?: boolean; verification?: string }) {
+export function statusOf(site: { verdict?: string | null; network_status?: string | null; tenure_fail?: boolean; verification?: string; aerial_fit?: string | null }) {
   if (site.tenure_fail || site.verdict === "FAIL" || site.verdict === "NOT_A_WASH") return STATUS_NOTES[5];
   if (site.verdict === "PASS" && site.network_status === "held") return STATUS_NOTES[1];
   if (site.verdict === "PASS") return STATUS_NOTES[0];
   if (site.verdict === "MAYBE") return STATUS_NOTES[2];
   if (site.verdict === "UNRESOLVED") return STATUS_NOTES[3];
-  return STATUS_NOTES[4];
+  return { ...STATUS_NOTES[4], note: uncheckedNote(site.aerial_fit) };
 }

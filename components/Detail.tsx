@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { DealProps, SiteProps } from "@/lib/types";
+import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
@@ -129,6 +129,18 @@ export default function Detail({
         <span>County full cash value</span><div>{site.full_cash_value_display || "—"}</div>
         <span>Last recorded sale</span><div>{[formatRecordedDate(site.last_sale_date), site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
       </div>
+      {site.listed && site.in_area && site.apn ? (
+        <>
+          <h3>County record</h3>
+          <span className="badge checked">County record pulled</span>
+          <div className="kv">
+            <span>Acres</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "—"}</div>
+            <span>Owner</span><div>{site.owner || "—"}</div>
+            <span>Land use</span><div>{site.land_use || site.zoning || "—"}</div>
+            <span>County link</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
+          </div>
+        </>
+      ) : null}
       <h3>Verdict</h3>
       <div className="kv">
         <span>Verdict</span><div>{plainVerdict(site.verdict)}</div>
@@ -232,6 +244,7 @@ export function DealDetail({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>
         <span className="badge checked">{stageTitle(deal.stage_group)}</span>
+        {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
         {deal.listed ? <span className="badge checked">Listed</span> : null}
       </div>
       <h2>{deal.name || deal.address}</h2>
@@ -247,6 +260,7 @@ export function DealDetail({
       <h3>Listing</h3>
       <div className="kv">
         <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
+        <span>Last broker contact</span><div>{deal.last_broker_contact || "—"}</div>
         <span>Asking price</span>
         <div>
           {deal.asking_price_display || "—"}
@@ -285,6 +299,55 @@ export function DealDetail({
       ) : null}
       {extras}
       <Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />
+    </aside>
+  );
+}
+
+export function UnscreenedDetail({
+  row,
+  lat,
+  lng,
+  onClose,
+  sheet,
+}: {
+  row: UnscreenedProps;
+  lat?: number | null;
+  lng?: number | null;
+  onClose?: () => void;
+  sheet?: { expanded: boolean; onToggle: () => void };
+}) {
+  return (
+    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
+      <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
+      <button className="close" type="button" onClick={onClose}>Close</button>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <span className="badge pending">Listed, not yet screened</span>
+        <span className="badge checked">{row.kind}</span>
+        {row.approximate ? <span className="badge pending">Approximate location</span> : null}
+        {!row.pinned ? <span className="badge pending">Address withheld</span> : null}
+      </div>
+      <h2>{row.name}</h2>
+      <p className="note">{row.address}</p>
+      <p className="note">{row.listing_id}</p>
+      {mapsLinks(lat, lng)}
+      <h3>Listing</h3>
+      <div className="kv">
+        <span>Type</span><div>{row.kind}</div>
+        <span>Asking price</span>
+        <div>
+          {row.asking_price_display || "Not published"}
+          {row.asking_price_source ? ` · ${row.asking_price_source}` : ""}
+        </div>
+        <span>Acres</span><div>{row.acres_text || (row.acres != null ? `${row.acres} ac` : "—")}</div>
+        <span>Listing</span>
+        <div>
+          {row.listing_url ? (
+            <a href={row.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
+          ) : (
+            "No listing link on file"
+          )}
+        </div>
+      </div>
     </aside>
   );
 }

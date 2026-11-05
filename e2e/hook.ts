@@ -10,7 +10,7 @@ export const PIN_HOOK = `(() => {
         window.__src[data.source] = geo.features.map((feature) => {
           const props = (feature && feature.properties) || {};
           return {
-            id: props.site_id || props.deal_id || props.id || "",
+            id: props.site_id || props.deal_id || props.listing_id || props.id || "",
             verdict: props.verdict || "",
             network_status: props.network_status || "",
             stage_group: props.stage_group || "",

@@ -1,0 +1,149 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-80.2462, 26.0096]},
+      "properties": {
+        "listing_id": "L-013",
+        "city": "MIA",
+        "name": "5-bay self-serve wash",
+        "address": "Pembroke Pines, FL 33024",
+        "kind": "Listing",
+        "asking_price_display": "$550,000",
+        "asking_price_source": "Listing",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.ppirfl.com/for-sale/mls_number/id_783442",
+        "pinned": true,
+        "approximate": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "listing_id": "L-214",
+        "city": "PHX",
+        "name": "Car wash with land, self-serve and mini express",
+        "address": "Phoenix, address withheld",
+        "kind": "Listing",
+        "asking_price_display": "$2,100,000",
+        "asking_price_source": "Car Wash Brokers",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.carwashbrokers.com/listings",
+        "pinned": false,
+        "approximate": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "listing_id": "L-215",
+        "city": "PHX",
+        "name": "Automatic car wash with land",
+        "address": "Scottsdale, address withheld",
+        "kind": "Listing",
+        "asking_price_display": "$2,100,000",
+        "asking_price_source": "Car Wash Brokers",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.carwashbrokers.com/listings",
+        "pinned": false,
+        "approximate": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "listing_id": "L-216",
+        "city": "PHX",
+        "name": "Express car wash, site 1",
+        "address": "Phoenix, address withheld",
+        "kind": "Listing",
+        "asking_price_display": "$2,600,000",
+        "asking_price_source": "Car Wash Brokers",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.carwashbrokers.com/listings",
+        "pinned": false,
+        "approximate": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "listing_id": "L-221",
+        "city": "LAS",
+        "name": "Full service car wash with a retail store",
+        "address": "Las Vegas, address withheld",
+        "kind": "Listing",
+        "asking_price_display": "$949,000",
+        "asking_price_source": "BizBuySell",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.bizbuysell.com/car-washes-for-sale/2/",
+        "pinned": false,
+        "approximate": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "listing_id": "L-233",
+        "city": "MIA",
+        "name": "Car wash in south Florida",
+        "address": "Homestead, address withheld",
+        "kind": "Listing",
+        "asking_price_display": "$80,000",
+        "asking_price_source": "BizBuySell",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.bizbuysell.com/car-washes-for-sale/2/",
+        "pinned": false,
+        "approximate": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-115.199343, 36.049886]},
+      "properties": {
+        "listing_id": "L-236",
+        "city": "LAS",
+        "name": "Land on Arville St",
+        "address": "Arville St area, Las Vegas, NV 89139",
+        "kind": "Land",
+        "asking_price_display": "$1,100,000",
+        "asking_price_source": "Brevitas",
+        "acres": 1.25,
+        "acres_text": "1.25 ac gross",
+        "listing_url": "",
+        "pinned": true,
+        "approximate": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-112.09996, 33.49344]},
+      "properties": {
+        "listing_id": "L-239",
+        "city": "PHX",
+        "name": "3926 N 19th Ave",
+        "address": "3926 N 19th Ave, Phoenix, AZ",
+        "kind": "Land",
+        "asking_price_display": null,
+        "asking_price_source": "Crexi",
+        "acres": null,
+        "acres_text": "",
+        "listing_url": "https://www.crexi.com/properties/2429307/arizona-3926-n-19th-ave",
+        "pinned": true,
+        "approximate": false
+      }
+    }
+  ]
+}

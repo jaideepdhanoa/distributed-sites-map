@@ -55,5 +55,7 @@ class ChangeCounts(unittest.TestCase):
         self.assertEqual(changes["stage_moves"], 0)
 
 
+from test_review_fixes import BrokerContactDates, OneMatcher, RegisterLayer, ShippedCounts, StageBuckets  # noqa: E402,F401
+
 if __name__ == "__main__":
     unittest.main()

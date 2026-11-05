@@ -224,7 +224,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-size: 13px;
 }
 .layers strong { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
-.layers label { display: flex; align-items: center; gap: 8px; }
+.layers label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.market-counts { display: inline-flex; gap: 4px; }
 .census-note { margin: 8px 0 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #4e463d; }
 .compare-panel {
   position: absolute; z-index: 4; left: 12px; right: 220px; bottom: 96px;
@@ -556,8 +557,7 @@ tr { cursor: pointer; }
   .funnel-row { height: auto; flex-wrap: wrap; }
   .funnel { flex-wrap: wrap; overflow: visible; }
   .funnel button, .funnel .sub, .funnel .aside { min-height: 44px; align-items: center; }
-  .summary-chip { display: none; }
-  .summary-chip.as-of { display: inline-flex; }
+    .summary-chip { display: inline-flex; white-space: normal; max-width: 100%; }
   .shell.table-open { grid-template-rows: auto 1fr; }
   .shell.table-open .map-stage { display: none; }
   .dock-tabs button { min-height: 44px; }

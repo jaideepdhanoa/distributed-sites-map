@@ -61,6 +61,8 @@ const KEEP = [
   "verdict_disagreement",
   "scale_note",
   "zoning",
+  "land_use",
+  "lead_source",
   "zoning_source",
   "aadt_count",
   "aadt_road",

@@ -1,6 +1,6 @@
 import type { GeoFeature, SiteProps } from "./types";
 
-export type PipeId = "sourced" | "desk" | "contacted" | "later" | "dropped";
+export type PipeId = "sourced" | "desk" | "financial" | "checks" | "close" | "contacted" | "later" | "dropped";
 
 export function nearestDepot(lng: number, lat: number, depots: GeoFeature[]) {
   let best: { miles: number; label: string } | null = null;

@@ -1,6 +1,6 @@
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const STEPS = ["universe", "in_area", "land", "county", "cleared"] as const;
-export const PIPE_STEPS = ["desk", "contacted", "later", "dropped"] as const;
+export const PIPE_STEPS = ["desk", "financial", "checks", "close", "dropped"] as const;
 export const HOLDS = ["PHX-U180", "LAS-U1516", "PHX-U519"] as const;
 const HOLD_SET = new Set<string>(HOLDS);
 const ELIMINATED = new Set(["FAIL", "NOT_A_WASH"]);
@@ -15,8 +15,9 @@ export const STEP_LABEL: Record<(typeof STEPS)[number], string> = {
 
 export const PIPE_LABEL: Record<(typeof PIPE_STEPS)[number], string> = {
   desk: "Desk screen",
-  contacted: "Contacted",
-  later: "Later stages",
+  financial: "Financial screen",
+  checks: "Site checks",
+  close: "Offer and close",
   dropped: "Dropped",
 };
 
@@ -73,8 +74,9 @@ export function stageGroupFromText(stage: string | undefined): string {
   const number = Number(match[1]);
   if (number <= 0) return "sourced";
   if (number === 1) return "desk";
-  if (number === 2) return "contacted";
-  return "later";
+  if (number === 2) return "financial";
+  if (number === 3) return "checks";
+  return "close";
 }
 
 function present(site: Site): Site {

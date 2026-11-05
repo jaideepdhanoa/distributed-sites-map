@@ -103,6 +103,8 @@ export type SiteProps = {
   evidence: string;
   operating: string;
   agreement: string;
+  land_use?: string;
+  lead_source?: string;
   county_url: string;
   street_view_url: string;
   why_stopped: string;
@@ -118,7 +120,10 @@ export type DealProps = {
   address: string;
   city: string;
   stage: string;
-  stage_group: "sourced" | "desk" | "contacted" | "later" | "dropped";
+  stage_group: "sourced" | "desk" | "financial" | "checks" | "close" | "contacted" | "later" | "dropped";
+  broker_contacted?: boolean;
+  last_broker_contact?: string;
+  lead_source?: string;
   broker: string;
   firm: string;
   listing_url: string;
@@ -135,6 +140,27 @@ export type DealProps = {
   source_line: string;
   source_kind?: string;
   business_type?: string;
+};
+
+export type UnscreenedProps = {
+  listing_id: string;
+  city: string;
+  name: string;
+  address: string;
+  kind: "Listing" | "Land";
+  asking_price_display: string | null;
+  asking_price_source: string;
+  acres: number | null;
+  acres_text: string;
+  listing_url: string;
+  pinned: boolean;
+  approximate: boolean;
+};
+
+export type UnscreenedFeature = {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] } | null;
+  properties: UnscreenedProps;
 };
 
 export type DealFeature = {

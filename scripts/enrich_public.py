@@ -1,6 +1,6 @@
 """Public-record fields for site cards. No purchases and no contact with anyone.
 
-Serving utility is the smallest HIFLD electric retail territory that contains the pin.
+Public records are the assessor mailing address and the last recorded sale, when the county layer includes them.
 Phoenix and Miami owner mail, county value, year built, and (Phoenix) last sale come
 from the county parcel layer, joined by parcel number.
 """
@@ -355,7 +355,7 @@ def apply_public_records(sites: list[dict], norm_apn) -> dict:
         "assessor_by_city": dict(assessor_filled),
         "hifld_territories": len(territories),
         "note": (
-            "Serving utility is the smallest HIFLD electric retail territory containing the pin. "
+            "County parcel records supply the mailing address and the last recorded sale when the layer includes them. "
             "Water and irrigation districts are left out. "
             "Miami-Dade's parcel layer has no last-sale date or price. "
             "Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value."

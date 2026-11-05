@@ -55,9 +55,20 @@ export function stageTitle(group: string) {
   return STAGE_TITLES[group] || "Deal";
 }
 
+function unwrapReason(value: string) {
+  let text = value.trim();
+  while (text.startsWith("(") && text.endsWith(")") && text.length > 2) {
+    const inner = text.slice(1, -1).trim();
+    if (!inner) break;
+    text = inner;
+  }
+  return text;
+}
+
 export function stageDetail(stage: string, group: string) {
   const name = stageTitle(group);
-  const raw = (stage || "").replace(/^(?:dropped|\d+)\b\s*/i, "").trim();
+  const stripped = (stage || "").replace(/^(?:dropped|\d+)\b\s*/i, "").trim();
+  const raw = unwrapReason(stripped);
   if (!raw || raw.toLowerCase() === name.toLowerCase()) return name;
   return `${name} (${raw.charAt(0).toLowerCase()}${raw.slice(1)})`;
 }
@@ -94,13 +105,6 @@ export function plainVerdict(verdict?: string | null) {
   if (verdict === "NOT_A_WASH") return "Not a wash";
   if (verdict === "UNRESOLVED") return "Unresolved";
   return "Not checked";
-}
-
-export function plainUtility(value?: string | null) {
-  if (value === "Strong") return "Close to a substation";
-  if (value === "OK") return "Within a normal distance";
-  if (value === "Weak") return "Far from a substation";
-  return "Not measured";
 }
 
 export function nextStepText(site: { verdict?: string | null; network_status?: string | null; land_tier?: string | null }) {

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
+import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { checkedPhrase, fullMoney, openLandText } from "@/lib/keyNumbers";
@@ -123,6 +124,7 @@ export default function Detail({
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
+      <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
         overview={
           <>
@@ -334,6 +336,7 @@ export function DealDetail({
           Compare
         </label>
       ) : null}
+      <NextStepCard kind="deal" id={deal.deal_id} />
       <PanelSections
         overview={
           <>

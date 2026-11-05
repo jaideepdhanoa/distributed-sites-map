@@ -210,6 +210,14 @@ class SyncFetchTest(unittest.TestCase):
         self.assertIn("Fetched service-area-PHX.kmz", log)
 
 
+class DriftReasonTest(unittest.TestCase):
+    def test_stall_phrase_becomes_lot_too_small(self) -> None:
+        import scripts.build_data as build
+
+        self.assertEqual(build.scrub_drift_reason("Under 4 stalls fit"), "Lot too small")
+        self.assertNotIn("stall", build.scrub_drift_reason("only 4 stalls fit").lower())
+
+
 class ExportLimitTest(unittest.TestCase):
     def test_oversized_sheet_export_asks_for_a_real_file(self) -> None:
         def boom(url: str, token: str) -> bytes:

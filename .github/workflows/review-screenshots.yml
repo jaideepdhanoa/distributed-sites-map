@@ -1,0 +1,51 @@
+name: Review screenshots
+
+on:
+  pull_request:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Check browser-test secrets
+        id: gate
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          if [ -z "$E2E_USERNAME" ] || [ -z "$E2E_PASSWORD" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Screenshots skipped. Add secrets E2E_USERNAME and E2E_PASSWORD."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.gate.outputs.run == 'true'
+        run: npm ci
+      - if: steps.gate.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.gate.outputs.run == 'true'
+        name: Screenshot the local build
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          node scripts/write-e2e-env.mjs
+          npm run build
+          npx next start -p 3456 &
+          for i in $(seq 1 40); do
+            curl -sf -o /dev/null http://localhost:3456/login && break
+            sleep 2
+          done
+          export E2E_BASE_URL=http://localhost:3456
+          npx playwright test e2e/review-shots.spec.ts
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-screenshots
+          path: review-shots/
+          if-no-files-found: error

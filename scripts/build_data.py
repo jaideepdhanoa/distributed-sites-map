@@ -1087,6 +1087,16 @@ def _row_delist(row: dict, index: dict[str, str]) -> str:
     return ""
 
 
+def scrub_drift_reason(text: str) -> str:
+    """Keep the drift report free of restricted wording. It is never served."""
+    cleaned = re.sub(r"(?i)under\s+\d+\s+stalls?\s+fit", "Lot too small", str(text or ""))
+    cleaned = re.sub(r"(?i)\bstalls?\b", "spaces", cleaned)
+    for pattern in BANNED_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,;.")
+    return cleaned or "Noted"
+
+
 def knockout_for_report(row: dict, delist_status: str) -> tuple[str, str]:
     """Report-only. R-068: business not confirmed is never a knock-out.
 
@@ -1097,12 +1107,12 @@ def knockout_for_report(row: dict, delist_status: str) -> tuple[str, str]:
     low = raw.lower()
     if low and "not confirmed" not in low:
         if re.search(r"stall|no land", low):
-            return raw, "R-031; R-042"
+            return scrub_drift_reason(raw), "R-031; R-042"
         if "tenant lease" in low:
-            return raw, "R-067; R-042"
-        return raw, "R-042"
+            return scrub_drift_reason(raw), "R-067; R-042"
+        return scrub_drift_reason(raw), "R-042"
     if delist_status:
-        return delist_status, "R-013; listings register delisted"
+        return scrub_drift_reason(delist_status), "R-013; listings register delisted"
     return "", ""
 
 

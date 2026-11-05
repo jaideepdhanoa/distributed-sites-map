@@ -549,7 +549,6 @@ function NoteThread({
       <summary>
         {note.authorId} · {formatPacific(note.createdAt)}
         {note.resolvedAt ? " · Resolved" : replies.length ? ` · ${replyCount(replies.length)}` : ""}
-        <MentionChips mentions={note.mentions} />
       </summary>
       {note.deleted ? <p className="note">Removed</p> : editing ? (
         <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
@@ -557,7 +556,13 @@ function NoteThread({
           <button type="submit" disabled={pending}>Save edit</button>
         </form>
       ) : (
-        <p>{note.body}{note.updatedAt ? <span className="note"> · edited</span> : null}</p>
+        <>
+          <p>
+            {note.body}
+            {note.updatedAt ? <span className="note"> · edited</span> : null}
+          </p>
+          {note.mentions?.length ? <p className="note">Mentioned <MentionChips mentions={note.mentions} /></p> : null}
+        </>
       )}
       <div className="act-row">
         {writable && actor === note.authorId && !note.deleted ? (
@@ -624,7 +629,10 @@ function ReplyLine({
           <button type="submit" disabled={pending}>Save edit</button>
         </form>
       ) : (
-        <p>{note.body}<MentionChips mentions={note.mentions} /></p>
+        <>
+          <p>{note.body}</p>
+          {note.mentions?.length ? <p className="note">Mentioned <MentionChips mentions={note.mentions} /></p> : null}
+        </>
       )}
       <p className="note">{note.authorId} · {formatPacific(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
       {writable && actor === note.authorId && !note.deleted ? (

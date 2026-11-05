@@ -201,14 +201,13 @@ export default function QueueView({
   };
   const snap = item?.snapshot;
   const facts = snap ? [
-    snap.askingPrice ? { label: "Asking price", value: `${snap.askingPrice}${snap.askingSource ? ` · ${snap.askingSource}` : ""}` } : null,
-    snap.leadSource ? { label: "Lead source", value: snap.leadSource } : null,
-    snap.verdict ? { label: "Verdict", value: plainVerdict(snap.verdict) } : null,
-    snap.stage ? { label: "Stage", value: snap.stage } : null,
-    snap.activity ? { label: "Latest activity", value: snap.activity } : null,
-    snap.materials.length ? { label: "Materials", value: snap.materials.map((entry) => `${entry.label} (${entry.count})`).join(", ") } : null,
-    snap.openThreads ? { label: "Open threads", value: String(snap.openThreads) } : null,
-  ].filter((row): row is { label: string; value: string } => Boolean(row)) : [];
+    { label: "Asking price", value: snap.askingPrice ? `${snap.askingPrice}${snap.askingSource ? ` · ${snap.askingSource}` : ""}` : "—" },
+    { label: "Lead source", value: snap.leadSource || "—" },
+    { label: "Verdict", value: plainVerdict(snap.verdict) },
+    { label: "Stage", value: snap.stage || "—" },
+    { label: "Latest activity", value: snap.activity || "No activity on file." },
+    { label: "Materials", value: snap.materials.length ? snap.materials.map((entry) => `${entry.label} (${entry.count})`).join(", ") : "No materials on file." },
+  ] : [];
 
   return (
     <div className="queue-scrim" data-testid="queue">
@@ -276,18 +275,6 @@ export default function QueueView({
                   </li>
                 ))}
               </ul>
-              {error ? <p className="err" role="alert">{error}</p> : null}
-              <RecordActions kind="deal" id={item.siteId} variant="queue" />
-              <div className="queue-place">
-                <div className="queue-thumb">
-                  {snap?.lng != null && snap.lat != null && !thumbFailed ? (
-                    <img src={tileUrl(snap.lng, snap.lat)} alt="" onError={() => setThumbFailed(true)} />
-                  ) : (
-                    <span className="queue-pin" />
-                  )}
-                </div>
-                <button type="button" className="text-link" onClick={() => onOpenMap(item.siteId)}>Open on map</button>
-              </div>
               {facts.length ? (
                 <div className="queue-facts">
                   {facts.map((fact) => (
@@ -301,6 +288,18 @@ export default function QueueView({
                   ))}
                 </div>
               ) : null}
+              <div className="queue-place">
+                <div className="queue-thumb">
+                  {snap?.lng != null && snap.lat != null && !thumbFailed ? (
+                    <img src={tileUrl(snap.lng, snap.lat)} alt="" onError={() => setThumbFailed(true)} />
+                  ) : (
+                    <span className="queue-pin" />
+                  )}
+                </div>
+                <button type="button" className="text-link" onClick={() => onOpenMap(item.siteId)}>Open on map</button>
+              </div>
+              {error ? <p className="err" role="alert">{error}</p> : null}
+              <RecordActions kind="deal" id={item.siteId} variant="queue" />
             </article>
           ) : null}
         </div>

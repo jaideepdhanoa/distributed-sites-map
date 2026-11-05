@@ -1,7 +1,6 @@
 import type { DealProps } from "@/lib/types";
-import { basisLabel, cashTile, checkedPhrase, depotLine, fullMoney, openLandText, peerNote, tileAmount } from "@/lib/keyNumbers";
+import { basisLabel, cashTile, depotLine, fullMoney, openLandText, peerNote, tileAmount } from "@/lib/keyNumbers";
 import { shownPriceSource } from "@/lib/format";
-import { stageDetail, stageTone } from "@/lib/labels";
 
 export default function KeyStrip({
   deal,
@@ -12,7 +11,6 @@ export default function KeyStrip({
   hasPin: boolean;
   peers: DealProps[];
 }) {
-  const tone = stageTone(deal);
   const rank = peerNote(deal, peers);
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "Not provided";
@@ -76,7 +74,6 @@ export default function KeyStrip({
           <i><b style={{ left: `${rank.pct * 100}%` }} /></i>
         </div>
       ) : null}
-      <p className={`stage-pill tone-${tone}`}>{stageDetail(deal.stage, deal.stage_group)}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""}</p>
     </section>
   );
 }

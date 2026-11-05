@@ -3,7 +3,7 @@ import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
 import Timeline from "./timeline/Timeline";
-import { nextStepText, plainVerdict, stageDetail, stageTitle, stageTone, statusOf, tierLabel } from "@/lib/labels";
+import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { checkedPhrase, fullMoney, openLandText } from "@/lib/keyNumbers";
 import KeyStrip from "./KeyStrip";
 
@@ -304,8 +304,7 @@ export function DealDetail({
       {banner}
       <button className="close" type="button" onClick={onClose}>Close</button>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <span className="badge pending">{deal.kind === "land" ? "Land site" : "Pipeline"}</span>
-        <span className="badge checked">{stageTitle(deal.stage_group)}</span>
+        <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
         {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
         {deal.listed ? <span className="badge checked">Listed</span> : null}
       </div>

@@ -1712,6 +1712,45 @@ def universe_match_index(sites: list[dict]) -> tuple[dict, dict]:
     return by_apn, by_street
 
 
+def universe_link_gap(features: list[dict]) -> dict:
+    """Pipeline and land deals that still have no universe site.
+
+    A listing joins the universe only when the Universe tab has a counted row for that
+    place. This does not mint a row, and it does not invent a coordinate or a parcel number.
+    """
+    linked = 0
+    located_missing: list[dict] = []
+    unlocated_missing: list[dict] = []
+    for feature in features:
+        props = feature.get("properties") or {}
+        if props.get("kind") not in {"pipeline", "land"}:
+            continue
+        uid = str(props.get("universe_id") or "").strip()
+        geometry = feature.get("geometry") or {}
+        located = bool(geometry.get("coordinates"))
+        if uid:
+            linked += 1
+            continue
+        entry = {
+            "deal_id": props.get("deal_id") or "",
+            "kind": props.get("kind") or "",
+            "city": props.get("city") or "",
+            "stage_group": props.get("stage_group") or "",
+            "coord_status": props.get("coord_status") or "",
+        }
+        if located:
+            located_missing.append(entry)
+        else:
+            unlocated_missing.append(entry)
+    return {
+        "linked": linked,
+        "located_without_universe": len(located_missing),
+        "unlocated_without_universe": len(unlocated_missing),
+        "located_missing": located_missing,
+        "unlocated_missing": unlocated_missing,
+    }
+
+
 def match_workbook_site(city: str, apn_value, address_text: str, by_apn: dict, by_street: dict) -> str | None:
     """One matcher for a deal row and for the site it attaches to.
 
@@ -2334,11 +2373,20 @@ def build_deal_layer(
     GEOCODE_CACHE.write_text(json.dumps(cache, indent=2))
     pipeline = [item for item in features if item["properties"]["kind"] == "pipeline"]
     land = [item for item in features if item["properties"]["kind"] == "land"]
+    gap = universe_link_gap(features)
     report = {
         "pipeline": len(pipeline),
         "land": len(land),
         "matched": matched,
         "unmatched": len(features) - matched,
+        "shipped_linked": gap["linked"],
+        "located_without_universe": gap["located_without_universe"],
+        "unlocated_without_universe": gap["unlocated_without_universe"],
+        "located_without_universe_ids": [item["deal_id"] for item in gap["located_missing"]],
+        "universe_gap_note": (
+            "A deal joins the universe when the Universe tab has a counted row for that place. "
+            "The map links by parcel or a unique street and does not invent a row, a coordinate, or a parcel number."
+        ),
         "geocode_failed": failed,
         "pipeline_by_city": dict(Counter(item["properties"]["city"] for item in pipeline)),
         "pipeline_by_stage": dict(Counter(item["properties"]["stage"] for item in pipeline)),
@@ -4868,6 +4916,12 @@ def validate_committed() -> None:
     deal_report = report.get("deals") or {}
     if len(deal_features) != deal_report.get("pipeline", 0) + deal_report.get("land", 0):
         problems.append("deal count does not match the build report")
+    gap = universe_link_gap(deal_features)
+    expect("shipped universe links", gap["linked"], deal_report.get("shipped_linked"))
+    expect("located without universe", gap["located_without_universe"], deal_report.get("located_without_universe"))
+    expect("unlocated without universe", gap["unlocated_without_universe"], deal_report.get("unlocated_without_universe"))
+    if deal_report.get("located_without_universe_ids") != [item["deal_id"] for item in gap["located_missing"]]:
+        problems.append("located_without_universe_ids does not match the deals file")
     unscreened = loaded.get("unscreened.geojson") or {}
     unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
     pinned = sorted(item[0] for item in unscreened_rows if item[1])

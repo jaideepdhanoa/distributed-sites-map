@@ -18,6 +18,10 @@ async function openAs(page: Page, username: string, path: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL((url) => url.pathname === "/");
   await page.goto(path);
+  await hideDevOverlay(page);
+}
+
+async function hideDevOverlay(page: Page) {
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
@@ -206,20 +210,35 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   await expect(page.getByRole("button", { name: "Pipeline" })).toHaveClass(/on/);
   await page.locator(".maplibregl-canvas").waitFor();
   await expect.poll(async () => page.evaluate(() => {
-    const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
-    return map?.getZoom() ?? 0;
-  })).toBeGreaterThan(14);
-  await page.waitForTimeout(800);
+    const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures?: (opts: { layers: string[] }) => unknown[] } }).__sitesMap;
+    if (!map || (map.getZoom() ?? 0) <= 14 || !map.queryRenderedFeatures) return 0;
+    try {
+      return map.queryRenderedFeatures({ layers: ["review-numbers"] }).length;
+    } catch {
+      return 0;
+    }
+  })).toBeGreaterThan(0);
+  await page.waitForTimeout(400);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop.png" });
   const position = page.getByTestId("review-position");
   const first = await position.innerText();
   const move = placed < fresh.items.length - 1 ? "Next" : "Previous";
   await controls.getByRole("button", { name: move, exact: true }).click();
   await expect(position).not.toHaveText(first);
-  await page.waitForTimeout(1500);
+  await expect.poll(async () => page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures?: (opts: { layers: string[] }) => unknown[] } }).__sitesMap;
+    if (!map || (map.getZoom() ?? 0) <= 14 || !map.queryRenderedFeatures) return 0;
+    try {
+      return map.queryRenderedFeatures({ layers: ["review-numbers"] }).length;
+    } catch {
+      return 0;
+    }
+  })).toBeGreaterThan(0);
+  await page.waitForTimeout(400);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop-next.png" });
 
   await page.goto(`/?review=1&qmarket=all&qstage=any&i=${missing + 1}`);
+  await hideDevOverlay(page);
   await expect(page.getByTestId("review-noloc")).toBeVisible();
   await page.locator(".maplibregl-canvas").waitFor();
   await page.waitForTimeout(1500);
@@ -227,10 +246,19 @@ test("the queue card shows a change, a mention, and a pending next step", async 
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
+  await hideDevOverlay(page);
   await expect(controls).toBeVisible();
   await expect(page.getByTestId("review-noloc")).toHaveCount(0);
   await page.locator(".maplibregl-canvas").waitFor();
-  await page.waitForTimeout(1000);
+  await expect.poll(async () => page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures?: (opts: { layers: string[] }) => unknown[] } }).__sitesMap;
+    if (!map || (map.getZoom() ?? 0) <= 14 || !map.queryRenderedFeatures) return 0;
+    try {
+      return map.queryRenderedFeatures({ layers: ["review-numbers"] }).length;
+    } catch {
+      return 0;
+    }
+  })).toBeGreaterThan(0);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-mobile.png" });
   await page.getByTestId("review-position").click();
   await expect(page.getByTestId("review-feed")).toBeVisible();

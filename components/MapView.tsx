@@ -744,7 +744,9 @@ export default function MapView(props: Props) {
       }] : [],
     };
     const dimmed = markers.length > 0;
+    let cancel = false;
     const apply = () => {
+      if (cancel || !map.isStyleLoaded()) return;
       const markSource = map.getSource("review-marks") as GeoJSONSource | undefined;
       const ringSource = map.getSource("review-ring") as GeoJSONSource | undefined;
       if (markSource) markSource.setData(marks);
@@ -760,12 +762,18 @@ export default function MapView(props: Props) {
       set("offmarket", "circle-opacity", dimmed ? 0.3 : 1);
       set("clusters", "circle-opacity", dimmed ? 0.3 : 0.88);
       set("unscreened", "circle-stroke-opacity", dimmed ? 0.3 : 1);
-      set("deals-pipe", "icon-opacity", dimmed ? 0.3 : 1);
-      set("deals-land", "icon-opacity", dimmed ? 0.3 : 1);
-      set("deal-site-badge", "text-opacity", dimmed ? 0.3 : 1);
+      set("deals-pipe", "icon-opacity", dimmed ? 0 : 1);
+      set("deals-land", "icon-opacity", dimmed ? 0 : 1);
+      set("deal-site-badge", "text-opacity", dimmed ? 0 : 1);
     };
-    if (map.isStyleLoaded()) apply();
-    else map.once("load", apply);
+    apply();
+    const timer = window.setInterval(apply, 200);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 3000);
+    return () => {
+      cancel = true;
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
   }, [props.reviewMarkers]);
 
   useEffect(() => {

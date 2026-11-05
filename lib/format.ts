@@ -61,7 +61,8 @@ export function plainRoad(value?: string | null) {
   text = text.replace(/^\d{5,}\s+/, "");
   text = text.replace(/^S\s+0*(\d{2,3})$/i, (_, number) => `SR-${Number(number)}`);
   text = text.replace(/^I\s+0*(\d{1,3})$/i, (_, number) => `I-${Number(number)}`);
-  text = text.replace(/\b(?:PHX|TMP|GIL|CHN)\s+(?=(?:AVE|AV|BLVD|BLV|RD|ST|DR|HWY|PKWY|PKWYW|WAY|LN|CT|PL|CIR)\b)/gi, "");
+  const suffix = ["AVE", "BLVD", "BLV", "RD", "ST", "DR", "HWY", "PKWY", "PKWYW", "WAY", "LN", "CT", "PL", "CIR", AVENUE_SHORT].join("|");
+  text = text.replace(new RegExp(`\\b(?:PHX|TMP|GIL|CHN)\\s+(?=(?:${suffix})\\b)`, "gi"), "");
   return text.split(/\s+/).map(roadWord).join(" ").replace(/\s+/g, " ").trim();
 }
 

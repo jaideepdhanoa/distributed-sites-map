@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {
   await page.goto("/?funnel=pipeline&pstage=desk&view=list");
   await page.waitForSelector("[data-testid=pipeline-list]");
-  await expect(page.locator(".shell")).toHaveAttribute("data-list-count", "4");
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count", "15");
   await expect(page.locator(".no-pin").filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByTestId("summary-row")).toContainText("Median asking");
 

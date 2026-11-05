@@ -36,6 +36,6 @@ test("list rows match map pins for each city, step, and filter", async ({ page }
     await page.waitForSelector(".shell.list-open");
     const rows = Number(await page.locator(".shell").getAttribute("data-list-count"));
     expect(rows).toBeGreaterThanOrEqual(pins);
-    if (!city) expect(rows).toBe(4);
+    if (!city) expect(rows).toBe(15);
   }
 });

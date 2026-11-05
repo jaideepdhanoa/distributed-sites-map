@@ -39,6 +39,8 @@ export type CatalogSite = {
   activity: string;
   materials: { label: string; count: number; latest: string }[];
   folderUrl: string;
+  lng: number | null;
+  lat: number | null;
 };
 
 function readJson(name: string): unknown {
@@ -56,7 +58,7 @@ function clean(value: unknown, max = 180): string {
 }
 
 export function loadCatalog(): CatalogSite[] {
-  const deals = readJson("deals.geojson") as { features?: { properties?: DealProps }[] } | null;
+  const deals = readJson("deals.geojson") as { features?: { geometry?: { type?: string; coordinates?: number[] } | null; properties?: DealProps }[] } | null;
   const sites = readJson("sites.geojson") as { features?: { properties?: SiteProps }[] } | null;
   const timeline = readJson("timeline.json") as {
     items?: { record_id?: string; event_id?: string; date?: string; summary?: string; type?: string }[];
@@ -93,6 +95,9 @@ export function loadCatalog(): CatalogSite[] {
       }))
       .filter((item) => item.label && item.count > 0);
     const folder = String(record?.folder_url || "");
+    const coords = feature.geometry?.type === "Point" ? feature.geometry.coordinates : null;
+    const lng = Array.isArray(coords) ? Number(coords[0]) : null;
+    const lat = Array.isArray(coords) ? Number(coords[1]) : null;
     out.push({
       id,
       city: String(props.city || ""),
@@ -108,6 +113,8 @@ export function loadCatalog(): CatalogSite[] {
       activity: activityBySite.get(id) || "",
       materials,
       folderUrl: /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(folder) ? folder : "",
+      lng: Number.isFinite(lng) ? lng : null,
+      lat: Number.isFinite(lat) ? lat : null,
     });
   }
   return out;

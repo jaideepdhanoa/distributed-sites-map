@@ -27,6 +27,8 @@ type Item = {
     openThreads: number;
     nextStep: { title: string; date: string } | null;
     assignments: Assignment[];
+    lng: number | null;
+    lat: number | null;
   } | null;
 };
 
@@ -38,6 +40,15 @@ function reasonWhen(at: string): string {
   return formatPacific(at);
 }
 
+function tileUrl(lng: number, lat: number): string {
+  const zoom = 16;
+  const size = 2 ** zoom;
+  const x = Math.floor(((lng + 180) / 360) * size);
+  const rad = (lat * Math.PI) / 180;
+  const y = Math.floor((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * size);
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`;
+}
+
 const STAGES = [
   { id: "any", label: "Any stage" },
   { id: "sourced", label: "Sourced" },
@@ -45,6 +56,13 @@ const STAGES = [
   { id: "contacted", label: "Contacted" },
   { id: "later", label: "Later stages" },
   { id: "dropped", label: "Dropped" },
+];
+
+const MARKETS = [
+  { id: "all", label: "All markets" },
+  { id: "PHX", label: "Phoenix" },
+  { id: "LAS", label: "Las Vegas" },
+  { id: "MIA", label: "Miami" },
 ];
 
 export default function QueueView({
@@ -58,6 +76,9 @@ export default function QueueView({
   assignedOnly,
   onCount,
   onFilter,
+  onMap,
+  onList,
+  onOpenMap,
 }: {
   market: string;
   stage: string;
@@ -69,17 +90,22 @@ export default function QueueView({
   assignedOnly: boolean;
   onCount: (count: number) => void;
   onFilter: (patch: Record<string, string | null>) => void;
+  onMap: () => void;
+  onList: () => void;
+  onOpenMap: (siteId: string) => void;
 }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [firstTime, setFirstTime] = useState(false);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState("");
+  const [menu, setMenu] = useState(false);
   const [snooze, setSnooze] = useState("");
   const [flagUser, setFlagUser] = useState("");
   const [flagNote, setFlagNote] = useState("");
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [touchX, setTouchX] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
+  const [thumbFailed, setThumbFailed] = useState(false);
 
   const query = new URLSearchParams({
     market: market || "all",
@@ -118,7 +144,13 @@ export default function QueueView({
     };
   }, [queryText, tick]);
 
+  useEffect(() => {
+    setMenu(false);
+    setThumbFailed(false);
+  }, [index, queryText]);
+
   const item = items?.[index] || null;
+  const total = items?.length || 0;
 
   async function act(path: string, body: unknown) {
     setError("");
@@ -132,23 +164,30 @@ export default function QueueView({
       setError(payload.error || "That could not be saved.");
       return;
     }
+    setMenu(false);
     window.dispatchEvent(new Event("queue-refresh"));
+  }
+
+  function move(delta: number) {
+    setIndex((current) => Math.min(Math.max(current + delta, 0), Math.max(total - 1, 0)));
   }
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")) return;
-      const last = Math.max((items?.length || 1) - 1, 0);
-      if (event.key === "j" || event.key === "J") setIndex((current) => Math.min(current + 1, last));
-      if (event.key === "k" || event.key === "K") setIndex((current) => Math.max(current - 1, 0));
+      if (event.key === "j" || event.key === "J") move(1);
+      if (event.key === "k" || event.key === "K") move(-1);
       if ((event.key === "r" || event.key === "R") && item) void act("/api/queue", { siteId: item.siteId });
       if (event.key === "c" || event.key === "C") document.querySelector<HTMLTextAreaElement>("[data-testid='note-body']")?.focus();
-      if (event.key === "s" || event.key === "S") document.querySelector<HTMLInputElement>("[data-testid='queue-snooze']")?.focus();
+      if (event.key === "s" || event.key === "S") {
+        setMenu(true);
+        window.setTimeout(() => document.querySelector<HTMLInputElement>("[data-testid='queue-snooze']")?.focus(), 0);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [items, item]);
+  }, [items, item, total]);
 
   const filters = {
     market,
@@ -160,124 +199,145 @@ export default function QueueView({
     mentions: mentionsOnly,
     assigned: assignedOnly,
   };
+  const snap = item?.snapshot;
+  const facts = snap ? [
+    snap.askingPrice ? { label: "Asking price", value: `${snap.askingPrice}${snap.askingSource ? ` · ${snap.askingSource}` : ""}` } : null,
+    snap.leadSource ? { label: "Lead source", value: snap.leadSource } : null,
+    snap.verdict ? { label: "Verdict", value: plainVerdict(snap.verdict) } : null,
+    snap.stage ? { label: "Stage", value: snap.stage } : null,
+    snap.activity ? { label: "Latest activity", value: snap.activity } : null,
+    snap.materials.length ? { label: "Materials", value: snap.materials.map((entry) => `${entry.label} (${entry.count})`).join(", ") } : null,
+    snap.openThreads ? { label: "Open threads", value: String(snap.openThreads) } : null,
+  ].filter((row): row is { label: string; value: string } => Boolean(row)) : [];
 
   return (
-    <section
-      className="queue"
-      data-testid="queue"
-      onTouchStart={(event) => setTouchX(event.changedTouches[0]?.clientX ?? null)}
-      onTouchEnd={(event) => {
-        if (touchX == null) return;
-        const delta = (event.changedTouches[0]?.clientX ?? touchX) - touchX;
-        const last = Math.max((items?.length || 1) - 1, 0);
-        if (delta < -60) setIndex((current) => Math.min(current + 1, last));
-        if (delta > 60) setIndex((current) => Math.max(current - 1, 0));
-        setTouchX(null);
-      }}
-    >
-      <div className="queue-filters">
-        <label>Market
-          <select aria-label="Queue market" value={market || "all"} onChange={(event) => onFilter({ qmarket: event.target.value })}>
-            <option value="all">All markets</option>
-            <option value="PHX">Phoenix</option>
-            <option value="LAS">Las Vegas</option>
-            <option value="MIA">Miami</option>
-          </select>
-        </label>
-        <label>Stage
-          <select aria-label="Queue stage" value={stage || "any"} onChange={(event) => onFilter({ qstage: event.target.value })}>
-            {STAGES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
-          </select>
-        </label>
-        <label className="act-check"><input type="checkbox" checked={viable} onChange={(event) => onFilter({ qviable: event.target.checked ? null : "0" })} /> Active only</label>
-        <label className="act-check"><input type="checkbox" checked={freshOnly} onChange={(event) => onFilter({ qnew: event.target.checked ? "1" : null })} /> New sites only</label>
-        <label className="act-check"><input type="checkbox" checked={flaggedOnly} onChange={(event) => onFilter({ qflag: event.target.checked ? "1" : null })} /> Flagged to me</label>
-        <label className="act-check"><input type="checkbox" checked={mentionsOnly} onChange={(event) => onFilter({ qmention: event.target.checked ? "1" : null })} /> Mentions</label>
-        <label className="act-check"><input type="checkbox" checked={assignedOnly} onChange={(event) => onFilter({ qassign: event.target.checked ? "1" : null })} /> Assigned to me</label>
-        <label className="act-check"><input type="checkbox" checked={approvalOnly} onChange={(event) => onFilter({ qapprove: event.target.checked ? "1" : null })} /> Needs my approval</label>
-      </div>
-      {items === null ? <p className="note">Loading the queue.</p> : null}
-      {items && items.length === 0 ? <p className="queue-empty" data-testid="queue-empty">You're all caught up.</p> : null}
-      {firstTime && items && items.length ? (
-        <p className="note">
-          These active pipeline sites are new until you review them.
-          <button type="button" onClick={() => void act("/api/queue", { all: true, ...filters })}>Mark all reviewed</button>
-        </p>
-      ) : null}
-      {item ? (
-        <article className="queue-card" data-testid="queue-card">
-          <p className="note">{index + 1} of {items?.length}</p>
-          <h2>{item.snapshot?.name || item.snapshot?.address || item.siteId}</h2>
-          <p className="note">{item.siteId}{item.snapshot?.address ? ` · ${item.snapshot.address}` : ""}</p>
-          <h3>What changed since you last looked</h3>
-          <ul className="act-list">
-            {item.reasons.map((reason) => (
-              <li key={`${reason.type}-${reason.at}-${reason.summary}`}>
-                <p>{reason.summary}</p>
-                <p className="note">{reasonWhen(reason.at)}</p>
-              </li>
-            ))}
-          </ul>
-          {item.snapshot ? (
-            <div className="kv">
-              <span>Asking price</span>
-              <div>{item.snapshot.askingPrice || "—"}{item.snapshot.askingSource ? ` · ${item.snapshot.askingSource}` : ""}</div>
-              <span>Lead source</span><div>{item.snapshot.leadSource || "—"}</div>
-              <span>Verdict</span><div>{item.snapshot.verdict ? plainVerdict(item.snapshot.verdict) : "—"}</div>
-              <span>Stage</span><div>{item.snapshot.stage || "—"}</div>
-              <span>Latest activity</span><div>{item.snapshot.activity || "No activity on file."}</div>
-              <span>Materials</span>
-              <div>
-                {item.snapshot.materials.length ? item.snapshot.materials.map((entry) => `${entry.label} (${entry.count})`).join(", ") : "No materials on file."}
-                {item.snapshot.folderUrl ? <> · <a href={item.snapshot.folderUrl} target="_blank" rel="noopener noreferrer">Open site folder</a></> : null}
-              </div>
-              <span>Open threads</span><div>{item.snapshot.openThreads}</div>
-              <span>Next step</span>
-              <div>{item.snapshot.nextStep ? `${item.snapshot.nextStep.title}${item.snapshot.nextStep.date ? ` · ${item.snapshot.nextStep.date}` : ""}` : "No approved next step."}</div>
-            </div>
+    <div className="queue-scrim" data-testid="queue">
+      <section
+        className="queue-panel"
+        onTouchStart={(event) => setTouchX(event.changedTouches[0]?.clientX ?? null)}
+        onTouchEnd={(event) => {
+          if (touchX == null) return;
+          const delta = (event.changedTouches[0]?.clientX ?? touchX) - touchX;
+          if (delta < -60) move(1);
+          if (delta > 60) move(-1);
+          setTouchX(null);
+        }}
+      >
+        <header className="queue-top">
+          <div className="queue-switch" role="group" aria-label="Which view">
+            <button type="button" onClick={onMap}>Map</button>
+            <button type="button" onClick={onList}>List</button>
+            <button type="button" className="on" aria-current="page">
+              Queue{total ? <span className="count-badge" data-testid="queue-count">{total}</span> : null}
+            </button>
+          </div>
+          <div className="queue-filters">
+            <button type="button" className={mentionsOnly ? "on" : ""} onClick={() => onFilter({ qmention: mentionsOnly ? null : "1" })}>Mentions</button>
+            <button type="button" className={assignedOnly ? "on" : ""} onClick={() => onFilter({ qassign: assignedOnly ? null : "1" })}>Assigned to me</button>
+            <button type="button" className={approvalOnly ? "on" : ""} onClick={() => onFilter({ qapprove: approvalOnly ? null : "1" })}>Needs my approval</button>
+            <button type="button" className={freshOnly ? "on" : ""} onClick={() => onFilter({ qnew: freshOnly ? null : "1" })}>New sites</button>
+            <button type="button" className={viable ? "on" : ""} onClick={() => onFilter({ qviable: viable ? "0" : null })}>Active</button>
+            <button type="button" className={flaggedOnly ? "on" : ""} onClick={() => onFilter({ qflag: flaggedOnly ? null : "1" })}>Flagged to me</button>
+            <select aria-label="Queue market" value={market || "all"} onChange={(event) => onFilter({ qmarket: event.target.value })}>
+              {MARKETS.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+            </select>
+            <select aria-label="Queue stage" value={stage || "any"} onChange={(event) => onFilter({ qstage: event.target.value })}>
+              {STAGES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+            </select>
+          </div>
+        </header>
+        <div className="queue-body">
+          {items === null ? <p className="queue-muted">Loading the queue.</p> : null}
+          {items && items.length === 0 ? (
+            <>
+              <p className="queue-empty" data-testid="queue-empty">You're all caught up.</p>
+              <p className="queue-muted">New notes, stage changes, and mentions will show up here.</p>
+            </>
           ) : null}
-          {item.snapshot?.assignments.length ? (
-            <div data-testid="queue-assignments">
-              <h3>Assigned to you</h3>
-              <ul className="act-list">
-                {item.snapshot.assignments.map((assignment) => (
-                  <li key={assignment.id}>
-                    <p>{assignment.title}{assignment.date ? ` · ${assignment.date}` : ""} · {assignment.status === "approved" ? "Approved" : "Open"}</p>
-                    <button type="button" data-testid="queue-done" onClick={() => void act(`/api/actions/suggestions/${assignment.id}/done`, {})}>Done</button>
+          {firstTime && items && items.length ? (
+            <p className="queue-banner">
+              These active pipeline sites are new until you review them.
+              <button type="button" onClick={() => void act("/api/queue", { all: true, ...filters })}>Mark all reviewed</button>
+            </p>
+          ) : null}
+          {item ? (
+            <article className="queue-card" data-testid="queue-card">
+              <div className="queue-progress" aria-label={`${index + 1} of ${total}`}>
+                <div className="queue-meter"><span style={{ width: `${total ? ((index + 1) / total) * 100 : 0}%` }} /></div>
+                <p>{index + 1} of {total}</p>
+              </div>
+              <h2>{snap?.name || snap?.address || item.siteId}</h2>
+              <p className="queue-id">{item.siteId}{snap?.address ? ` · ${snap.address}` : ""}</p>
+              <ul className="queue-changes">
+                {item.reasons.map((reason) => (
+                  <li key={`${reason.type}-${reason.at}-${reason.summary}`}>
+                    {reason.summary.replace(/\.$/, "")}
+                    <time dateTime={reason.at}>{reasonWhen(reason.at)}</time>
                   </li>
                 ))}
               </ul>
-            </div>
+              {error ? <p className="err" role="alert">{error}</p> : null}
+              <RecordActions kind="deal" id={item.siteId} variant="queue" />
+              <div className="queue-place">
+                <div className="queue-thumb">
+                  {snap?.lng != null && snap.lat != null && !thumbFailed ? (
+                    <img src={tileUrl(snap.lng, snap.lat)} alt="" onError={() => setThumbFailed(true)} />
+                  ) : (
+                    <span className="queue-pin" />
+                  )}
+                </div>
+                <button type="button" className="text-link" onClick={() => onOpenMap(item.siteId)}>Open on map</button>
+              </div>
+              {facts.length ? (
+                <div className="queue-facts">
+                  {facts.map((fact) => (
+                    <div key={fact.label}>
+                      <span>{fact.label}</span>
+                      <strong>
+                        {fact.value}
+                        {fact.label === "Materials" && snap?.folderUrl ? <> · <a href={snap.folderUrl} target="_blank" rel="noopener noreferrer">Open site folder</a></> : null}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </article>
           ) : null}
-          <div className="act-row">
-            <button type="button" data-testid="queue-reviewed" onClick={() => void act("/api/queue", { siteId: item.siteId })}>Mark reviewed</button>
-            <button type="button" onClick={() => setIndex((current) => Math.max(current - 1, 0))}>Previous</button>
-            <button type="button" onClick={() => setIndex((current) => Math.min(current + 1, (items?.length || 1) - 1))}>Next</button>
+        </div>
+        {item ? (
+          <footer className="queue-foot">
+            <button type="button" data-testid="queue-more" aria-expanded={menu} aria-haspopup="dialog" onClick={() => setMenu((open) => !open)}>...</button>
+            <button type="button" onClick={() => move(-1)}>Previous</button>
+            <button type="button" onClick={() => move(1)}>Next</button>
+            <span className="queue-keys">J and K move. R reviewed. C comment. S snooze.</span>
+            <button type="button" className="primary" data-testid="queue-reviewed" onClick={() => void act("/api/queue", { siteId: item.siteId })}>Mark reviewed</button>
+          </footer>
+        ) : null}
+        {menu && item ? (
+          <div className="queue-menu" data-testid="queue-menu" role="dialog" aria-label="More actions">
+            <h3>More actions</h3>
             <button type="button" onClick={() => void act("/api/queue/follow", { siteId: item.siteId, follow: !item.followed })}>{item.followed ? "Unfollow" : "Follow"}</button>
+            <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/snooze", { siteId: item.siteId, until: snooze }); }}>
+              <label>Snooze until
+                <input data-testid="queue-snooze" type="date" value={snooze} onChange={(event) => setSnooze(event.target.value)} />
+              </label>
+              <button type="submit">Snooze</button>
+            </form>
+            <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/flag", { siteId: item.siteId, toUser: flagUser, note: flagNote }); setFlagNote(""); }}>
+              <label>Flag for
+                <select aria-label="Flag for" value={flagUser} onChange={(event) => setFlagUser(event.target.value)}>
+                  <option value="">Choose an account</option>
+                  {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                </select>
+              </label>
+              <label>Note
+                <input data-testid="queue-flag-note" value={flagNote} onChange={(event) => setFlagNote(event.target.value)} maxLength={200} />
+              </label>
+              <button type="submit">Flag</button>
+            </form>
           </div>
-          <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/snooze", { siteId: item.siteId, until: snooze }); }}>
-            <label>Snooze until
-              <input data-testid="queue-snooze" type="date" value={snooze} onChange={(event) => setSnooze(event.target.value)} />
-            </label>
-            <button type="submit">Snooze</button>
-          </form>
-          <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/flag", { siteId: item.siteId, toUser: flagUser, note: flagNote }); setFlagNote(""); }}>
-            <label>Flag for
-              <select aria-label="Flag for" value={flagUser} onChange={(event) => setFlagUser(event.target.value)}>
-                <option value="">Choose an account</option>
-                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-              </select>
-            </label>
-            <label>Note
-              <input data-testid="queue-flag-note" value={flagNote} onChange={(event) => setFlagNote(event.target.value)} maxLength={200} />
-            </label>
-            <button type="submit">Flag</button>
-          </form>
-          {error ? <p className="err" role="alert">{error}</p> : null}
-          <RecordActions kind="deal" id={item.siteId} />
-        </article>
-      ) : null}
-      <p className="note">J and K move. R marks reviewed. C comments. S snoozes.</p>
-    </section>
+        ) : null}
+      </section>
+    </div>
   );
 }

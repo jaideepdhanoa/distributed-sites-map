@@ -664,7 +664,7 @@ export default function Explorer() {
             <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
             {me?.actionsEnabled ? (
               <button className={queueOpen ? "on" : ""} type="button" onClick={() => write({ view: queueOpen ? null : "queue" })}>
-                Queue{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
+                Queue{queueCount ? <span className="count-badge">{queueCount}</span> : null}
               </button>
             ) : null}
           </div>
@@ -959,6 +959,9 @@ export default function Explorer() {
               if ("qmarket" in next && next.qmarket === city) next.qmarket = null;
               write(next);
             }}
+            onMap={() => { setTableOpen(false); write({ view: null }); }}
+            onList={() => { setTableOpen(true); write({ view: null }); }}
+            onOpenMap={(siteId) => { setTableOpen(false); setSelected(siteId); write({ view: null, site: siteId }); }}
           />
         ) : null}
         <MapView

@@ -66,7 +66,7 @@ function fieldLabel(id: string) {
   return FIELDS.find((item) => item.id === id)?.label || COLUMNS.find((item) => item.id === id)?.label || id;
 }
 
-export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string }) {
+export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "deal"; id: string; variant?: "card" | "queue" }) {
   const status = useActionStatus();
   const [notes, setNotes] = useState<Note[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -133,6 +133,7 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
     }
     clear();
     await reload();
+    window.dispatchEvent(new Event("queue-refresh"));
   }
 
   function openThread(sourceId: string) {
@@ -155,6 +156,149 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
   const currentStep = approvedSteps[0];
   const earlierSteps = approvedSteps.slice(1);
   const roots = notes.filter((item) => !item.parentId);
+  const pendingSteps = suggestions.filter((item) => item.field === "proposed_next_step" && item.status === "open");
+
+  const threads = roots.length ? (
+    <div className="act-threads" data-testid="note-threads">
+      {roots.map((item) => (
+        <NoteThread
+          key={item.id}
+          note={item}
+          replies={notes.filter((reply) => reply.parentId === item.id)}
+          writable={writable}
+          reviewer={reviewer}
+          pending={pending}
+          accounts={accounts}
+          onOpen={openThread}
+          onReply={(parentId, body, mentions) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions }, () => undefined)}
+          onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
+          onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
+          onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
+          actor={status.username}
+        />
+      ))}
+    </div>
+  ) : (
+    <p className="note">No notes yet.</p>
+  );
+
+  const noteForm = writable ? (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit("/api/actions/notes", { targetKind: kind, targetId: id, body: note, mentions: noteMentions.map((item) => item.id) }, () => {
+          setNote("");
+          setNoteMentions([]);
+        });
+      }}
+    >
+      <MentionField
+        label="Note"
+        value={note}
+        onChange={setNote}
+        mentions={noteMentions}
+        onMentions={setNoteMentions}
+        accounts={accounts}
+        testId="note-body"
+        rows={variant === "queue" ? 2 : 3}
+        maxLength={2000}
+      />
+      <button type="submit" disabled={pending}>Save note</button>
+    </form>
+  ) : (
+    <p className="note">Notes are read only for this login.</p>
+  );
+
+  const proposeForm = writable ? (
+    <form
+      data-testid="next-step-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit(
+          "/api/actions/suggestions",
+          { targetKind: kind, targetId: id, field: "proposed_next_step", title: stepTitle, targetOn: stepDate, ownerId: stepOwner, proposedValue: stepTitle, mentions: stepMentions.map((item) => item.id) },
+          () => {
+            setStepTitle("");
+            setStepDate("");
+            setStepOwner("");
+            setStepMentions([]);
+          },
+        );
+      }}
+    >
+      <h3>Propose a next step</h3>
+      <MentionField
+        label="Title"
+        value={stepTitle}
+        onChange={setStepTitle}
+        mentions={stepMentions}
+        onMentions={setStepMentions}
+        accounts={accounts}
+        testId="next-step-title"
+        maxLength={120}
+      />
+      <label>
+        Target date
+        <input type="date" aria-label="Target date" value={stepDate} onChange={(event) => setStepDate(event.target.value)} />
+      </label>
+      <label>
+        Owner
+        <select aria-label="Owner" value={stepOwner} onChange={(event) => setStepOwner(event.target.value)}>
+          <option value="">Unassigned</option>
+          {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+        </select>
+      </label>
+      <button type="submit" disabled={pending}>Propose next step</button>
+    </form>
+  ) : null;
+
+  if (variant === "queue") {
+    const steps = [
+      ...(currentStep ? [currentStep] : []),
+      ...pendingSteps,
+    ];
+    return (
+      <section className="act" data-testid="record-actions">
+        <h3>Notes</h3>
+        {threads}
+        {noteForm}
+        <div data-testid="next-step">
+          <h3>Next step</h3>
+          {steps.length ? (
+            <ul className="act-list" data-testid="queue-assignments">
+              {steps.map((item) => (
+                <li key={item.id}>
+                  <p>
+                    <strong>{item.title || item.proposedValue}</strong>
+                    {item.targetOn ? ` · ${item.targetOn}` : ""}
+                    {item.ownerName ? ` · ${item.ownerName}` : ""}
+                    {" "}
+                    <span className={`badge ${item.status === "open" ? "pending" : "checked"}`}>{item.status === "accepted" ? "Approved" : "Open"}</span>
+                  </p>
+                  <MentionChips mentions={item.mentions} />
+                  <div className="act-row">
+                    {canFinish(item) ? (
+                      <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${item.id}/done`, {}, () => undefined)}>Done</button>
+                    ) : null}
+                    {reviewer && item.status === "open" ? (
+                      <>
+                        <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
+                        <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "rejected" }, () => undefined)}>Reject</button>
+                      </>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="note">No approved next step.</p>
+          )}
+          {proposeForm}
+        </div>
+        {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
+      </section>
+    );
+  }
 
   return (
     <section className="act" data-testid="record-actions">
@@ -388,6 +532,7 @@ function NoteThread({
   onOpen: (id: string) => void;
 }) {
   const [reply, setReply] = useState("");
+  const [replying, setReplying] = useState(false);
   const [replyMentions, setReplyMentions] = useState<Account[]>([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
@@ -437,10 +582,14 @@ function NoteThread({
         </ul>
       ) : null}
       {writable && !note.deleted ? (
-        <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply, replyMentions.map((item) => item.id)); setReply(""); setReplyMentions([]); }}>
-          <MentionField label="Reply" value={reply} onChange={setReply} mentions={replyMentions} onMentions={setReplyMentions} accounts={accounts} testId="note-reply" rows={2} maxLength={2000} />
-          <button type="submit" disabled={pending}>Reply</button>
-        </form>
+        replying ? (
+          <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply, replyMentions.map((item) => item.id)); setReply(""); setReplyMentions([]); setReplying(false); }}>
+            <MentionField label="Reply" value={reply} onChange={setReply} mentions={replyMentions} onMentions={setReplyMentions} accounts={accounts} testId="note-reply" rows={2} maxLength={2000} />
+            <button type="submit" disabled={pending}>Reply</button>
+          </form>
+        ) : (
+          <button type="button" onClick={() => setReplying(true)}>Reply</button>
+        )
       ) : null}
     </details>
   );

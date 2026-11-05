@@ -38,11 +38,7 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
   await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
   await expect(page.getByTestId("queue-card")).toBeVisible();
   await expect(page.getByTestId("queue-count")).toBeVisible();
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByTestId("queue-card").screenshot({ path: "/opt/cursor/artifacts/queue-card-desktop.png" });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByTestId("queue-card").screenshot({ path: "/opt/cursor/artifacts/queue-card-mobile.png" });
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByRole("button", { name: "Map" }).first()).toBeVisible();
 
   const reviewed = await request.post("/api/queue", { data: { siteId: deal } });
   expect(reviewed.ok()).toBeTruthy();
@@ -151,7 +147,7 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(accepted.ok()).toBeTruthy();
   const assigned = await queue(request, "market=all&stage=any&viable=1&assigned=1");
   const card = assigned.items.find((item) => item.siteId === deal);
-  expect(card?.snapshot?.assignments.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
+  expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
   await openAs(page, "reviewer", "/?view=queue&qmarket=all&qstage=any&qassign=1");
   const block = page.getByTestId("queue-assignments");
@@ -169,6 +165,50 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(line).toMatch(/T\d{2}:/);
 });
 
+test("the queue card shows a change, a mention, and a pending next step", async ({ page, request }) => {
+  await login(request, "contributor");
+  const listed = await queue(request);
+  const siteId = listed.items[listed.items.length - 1]?.siteId;
+  expect(siteId).toBeTruthy();
+  const note = await request.post("/api/actions/notes", {
+    data: { targetKind: "deal", targetId: siteId, body: "Please look at the frontage.", mentions: ["reviewer"] },
+  });
+  expect(note.status()).toBe(201);
+  const step = await request.post("/api/actions/suggestions", {
+    data: {
+      targetKind: "deal",
+      targetId: siteId,
+      field: "proposed_next_step",
+      title: "Ask for the sales package",
+      targetOn: "2026-12-01",
+      proposedValue: "Ask for the sales package",
+    },
+  });
+  expect(step.status()).toBe(201);
+
+  await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
+  const card = page.getByTestId("queue-card");
+  await expect(card).toContainText("Please look at the frontage.");
+  await expect(card.getByTestId("mention-chip").first()).toContainText("Reviewer");
+  await expect(card.getByTestId("note-body")).toBeVisible();
+  await expect(card.getByTestId("next-step")).toContainText("Ask for the sales package");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await card.locator("h2").evaluate((node) => node.scrollIntoView({ block: "start" }));
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-card-desktop.png" });
+  await page.getByTestId("queue-more").click();
+  await expect(page.getByTestId("queue-menu")).toBeVisible();
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-menu-desktop.png" });
+  await page.getByTestId("queue-more").click();
+  await page.setViewportSize({ width: 390, height: 1280 });
+  await card.locator("h2").evaluate((node) => node.scrollIntoView({ block: "start" }));
+  await expect(card.getByTestId("note-body")).toBeVisible();
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-card-mobile.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByTestId("queue-more").click();
+  await expect(page.getByTestId("queue-menu")).toBeVisible();
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-menu-mobile.png" });
+});
+
 test("the empty queue and the phone layout", async ({ page, request }) => {
   await login(request, "contributor");
   const cleared = await request.post("/api/queue", { data: { all: true, market: "all", stage: "any", viable: true } });
@@ -176,8 +216,8 @@ test("the empty queue and the phone layout", async ({ page, request }) => {
   await openAs(page, "contributor", "/?view=queue&qmarket=all&qstage=any");
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByTestId("queue-empty")).toHaveText("You're all caught up.");
-  await page.getByTestId("queue").screenshot({ path: "/opt/cursor/artifacts/queue-empty-desktop.png" });
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-empty-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId("queue-empty")).toBeVisible();
-  await page.getByTestId("queue").screenshot({ path: "/opt/cursor/artifacts/queue-empty-mobile.png" });
+  await page.screenshot({ path: "/opt/cursor/artifacts/queue-empty-mobile.png" });
 });

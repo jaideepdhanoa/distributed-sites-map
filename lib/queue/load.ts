@@ -210,6 +210,8 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
         openThreads: openThreads.get(row.siteId) || 0,
         nextStep: nextStep.get(row.siteId) || null,
         assignments: assignments.get(row.siteId) || [],
+        lng: site.lng,
+        lat: site.lat,
       } : null,
     };
   });

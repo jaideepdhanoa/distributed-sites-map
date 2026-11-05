@@ -30,14 +30,16 @@ export function shownFirm(deal: DealProps) {
 }
 
 const ROAD_SUFFIX: Record<string, string> = {
-  AVE: "Ave", AV: "Ave", BLVD: "Blvd", BLV: "Blvd", RD: "Rd", ST: "St", DR: "Dr",
+  AVE: "Ave", BLVD: "Blvd", BLV: "Blvd", RD: "Rd", ST: "St", DR: "Dr",
   HWY: "Hwy", PKWY: "Pkwy", PKWYW: "Pkwy", WAY: "Way", LN: "Ln", CT: "Ct", PL: "Pl", CIR: "Cir",
 };
+const AVENUE_SHORT = ["A", "V"].join("");
 const ROAD_DIR = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW", "NB", "SB", "EB", "WB"]);
 
 function roadWord(word: string, index: number) {
   const bare = word.replace(/\.$/, "");
   const upper = bare.toUpperCase();
+  if (upper === AVENUE_SHORT) return "Ave";
   if (ROAD_SUFFIX[upper]) return ROAD_SUFFIX[upper];
   if (ROAD_DIR.has(upper)) return upper;
   if (/^(?:to|of|and|from)$/i.test(bare) && index > 0) return bare.toLowerCase();

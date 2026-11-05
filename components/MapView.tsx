@@ -643,6 +643,10 @@ export default function MapView(props: Props) {
     let cancel = false;
     const push = () => {
       if (cancel) return;
+      if (!map.getSource("sites") || !map.getSource("deals") || !map.getSource("offmarket") || !map.getSource("unscreened")) {
+        if (mapRef.current === map) map.once("idle", push);
+        return;
+      }
       clusterLeaves.current.clear();
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });

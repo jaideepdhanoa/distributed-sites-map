@@ -88,13 +88,21 @@ test("blocked wording is rejected and is not echoed", async ({ page, request }) 
 test("a contributor can suggest a change and a reviewer can accept it without changing the deal", async ({ page, request }) => {
   await login(request, "contributor");
   const before = await request.get("/api/data/deals");
-  const beforeStage = dealStage(await before.json(), deal);
+  expect(before.ok()).toBeTruthy();
+  const catalog = (await before.json()) as { features?: { properties?: { deal_id?: string; stage?: string; kind?: string } }[] };
+  const openDeal = (catalog.features || [])
+    .map((item) => item.properties)
+    .find((row) => row?.kind === "pipeline" && row.deal_id && row.stage && row.stage !== "Dropped");
+  expect(openDeal?.deal_id, "a pipeline deal that is not already Dropped").toBeTruthy();
+  const targetId = openDeal!.deal_id!;
+  const beforeStage = openDeal!.stage!;
+  const proposed = "Dropped";
   const created = await request.post("/api/actions/suggestions", {
     data: {
       targetKind: "deal",
-      targetId: deal,
+      targetId,
       field: "stage",
-      proposedValue: "Dropped",
+      proposedValue: proposed,
       reason: "The lot is smaller than the screen requires.",
     },
   });
@@ -105,17 +113,22 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   await login(request, "reviewer");
   const accepted = await request.post(`/api/actions/suggestions/${suggestion.id}`, { data: { status: "accepted" } });
   expect(accepted.ok()).toBeTruthy();
+  const decision = (await accepted.json()) as { suggestion: { status: string } };
+  expect(decision.suggestion.status).toBe("accepted");
   const after = await request.get("/api/data/deals");
-  expect(dealStage(await after.json(), deal)).toBe(beforeStage);
+  expect(dealStage(await after.json(), targetId)).toBe(beforeStage);
 
-  await openAs(page, "reviewer", `/?site=${deal}`);
+  await openAs(page, "reviewer", `/?site=${targetId}`);
   await expect(page.getByTestId("record-actions")).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "More" }).click();
   await page.getByRole("button", { name: "Suggestions" }).click();
   await expect(page.getByTestId("suggestions-panel")).toBeVisible();
   await page.getByRole("button", { name: "accepted", exact: true }).click();
-  await expect(page.getByTestId("suggestions-panel")).toContainText("Dropped");
+  const panel = page.getByTestId("suggestions-panel");
+  await expect(panel).toContainText(proposed);
+  await expect(panel).toContainText(targetId);
+  await expect(panel).not.toContainText("Nothing in this filter.");
   await page.getByTestId("suggestions-panel").screenshot({ path: "/opt/cursor/artifacts/actions-suggestions-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByTestId("suggestions-panel").screenshot({ path: "/opt/cursor/artifacts/actions-suggestions-mobile.png" });

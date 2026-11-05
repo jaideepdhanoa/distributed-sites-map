@@ -8,7 +8,7 @@ import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail } from "./Detail";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
-import SiteTable, { DealTable, siteExportHeaders, siteExportRow } from "./SiteTable";
+import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
@@ -35,6 +35,7 @@ export default function Explorer() {
   const params = useSearchParams();
   const router = useRouter();
   const [data, setData] = useState<AppData | null>(null);
+  const [activity, setActivity] = useState<ActivitySummary>({});
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
   const [error, setError] = useState("");
@@ -117,7 +118,8 @@ export default function Explorer() {
       fetch("/api/data/funnel"),
       fetch("/api/data/deals"),
       fetch("/api/me"),
-    ]).then(async ([sitesRes, areasRes, depotsRes, parcelsRes, funnelRes, dealsRes, meRes]) => {
+      fetch("/api/data/timeline/summary"),
+    ]).then(async ([sitesRes, areasRes, depotsRes, parcelsRes, funnelRes, dealsRes, meRes, summaryRes]) => {
       if (sitesRes.status === 401) {
         window.location.href = "/login";
         return;
@@ -137,6 +139,10 @@ export default function Explorer() {
           funnel: funnelPayload.funnel,
         });
         setMe(meRes.ok ? await meRes.json() : null);
+        if (summaryRes.ok) {
+          const summary = (await summaryRes.json()) as { records?: ActivitySummary };
+          setActivity(summary.records || {});
+        }
         const changes = funnelPayload.meta?.changes;
         if (changes && typeof changes.new_sites === "number") {
           setChangesNote(`Since the previous published build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`);
@@ -270,15 +276,20 @@ export default function Explorer() {
   const pipelineDeals = dealRows.filter((deal) => deal.kind === "pipeline" && dealMatches(deal) && (deal.stage_group !== "dropped" || showDroppedDeals || (funnel === "pipeline" && pipeStage === "dropped")));
   const landDeals = dealRows.filter((deal) => deal.kind === "land" && deal.city === city && typeOn(deal.business_type || "Other") && (!query || `${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase())));
 
+  function activityCells(id: string | undefined) {
+    const touch = id ? activity[id] : undefined;
+    return [touch?.lastTouched || "", touch?.materials || 0];
+  }
+
   function exportTable() {
     const filterLine = `Filters: city ${city}, ${funnel === "pipeline" ? `pipeline ${pipeStage}` : `step ${stage}`}${query ? `, search ${query}` : ""}${landTier !== "any" ? `, tier ${landTier}` : ""}${verdict !== "any" ? `, verdict ${verdict}` : ""}${listed === "yes" ? ", listed" : ""}${businessTypes ? `, types ${businessTypes.join(" ")}` : ""}. As of ${new Date().toISOString().slice(0, 10)}.`;
     const headers = tableTab === "universe"
-      ? siteExportHeaders()
-      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site"];
+      ? [...siteExportHeaders(), "Last touched", "Materials"]
+      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site", "Last touched", "Materials"];
     const body = tableTab === "universe"
-      ? visibleSites.map((row) => siteExportRow(row))
+      ? visibleSites.map((row) => [...siteExportRow(row), ...activityCells(row.linked_deal_id)])
       : (tableTab === "land" ? landDeals : pipelineDeals).map((row) => [
-          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id,
+          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id, ...activityCells(row.deal_id),
         ]);
     const lines = [`# ${filterLine}`, headers.join(","), ...body.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`).join(","))];
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -944,9 +955,9 @@ export default function Explorer() {
               </button>
             ))}
           </div>
-          {tableTab === "universe" ? <SiteTable rows={visibleSites} selectedId={selected} onSelect={choose} sorting={sortParam ? [{ id: sortParam.split(":")[0], desc: sortParam.endsWith(":desc") }] : []} onSortingChange={(next) => write({ sort: next[0] ? `${next[0].id}:${next[0].desc ? "desc" : "asc"}` : null })} /> : null}
-          {tableTab === "pipeline" ? <DealTable rows={pipelineDeals} selectedId={selected} onSelect={choose} /> : null}
-          {tableTab === "land" ? <DealTable rows={landDeals} selectedId={selected} onSelect={choose} /> : null}
+          {tableTab === "universe" ? <SiteTable rows={visibleSites} selectedId={selected} onSelect={choose} activity={activity} sorting={sortParam ? [{ id: sortParam.split(":")[0], desc: sortParam.endsWith(":desc") }] : []} onSortingChange={(next) => write({ sort: next[0] ? `${next[0].id}:${next[0].desc ? "desc" : "asc"}` : null })} /> : null}
+          {tableTab === "pipeline" ? <DealTable rows={pipelineDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
+          {tableTab === "land" ? <DealTable rows={landDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
         </section>
       ) : null}
     </div>

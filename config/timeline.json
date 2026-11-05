@@ -1,0 +1,27 @@
+{
+  "activity": {
+    "sheet": "Activity",
+    "headerRow": 1,
+    "columns": {
+      "eventId": ["event id"],
+      "date": ["date", "when"],
+      "siteId": ["site id", "site_id", "record id"],
+      "type": ["type", "kind"],
+      "summary": ["summary"],
+      "visibility": ["visibility"]
+    }
+  },
+  "drive": {
+    "rootFolderId": "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk",
+    "path": [],
+    "folderTemplate": "{recordId} {site}"
+  },
+  "ui": {
+    "showActivityLines": true
+  },
+  "dropNameTerms": ["dGVybTpuZGE=", "dGVybTpsb2k="],
+  "gmail": {
+    "enabled": false,
+    "labelTemplate": "Sites/{recordId}"
+  }
+}

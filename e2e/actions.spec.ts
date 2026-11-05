@@ -124,8 +124,8 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   await page.getByRole("button", { name: "More" }).click();
   await page.getByRole("button", { name: "Suggestions" }).click();
   await expect(page.getByTestId("suggestions-panel")).toBeVisible();
-  await page.getByRole("button", { name: "accepted", exact: true }).click();
   const panel = page.getByTestId("suggestions-panel");
+  await page.getByRole("button", { name: "accepted", exact: true }).click();
   await expect(panel).toContainText(proposed);
   await expect(panel).toContainText(targetId);
   await expect(panel).not.toContainText("Nothing in this filter.");

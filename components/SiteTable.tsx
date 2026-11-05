@@ -14,6 +14,13 @@ import type { DealProps, SiteProps } from "@/lib/types";
 
 type SortingState = { id: string; desc: boolean }[];
 
+export type ActivitySummary = Record<string, { lastTouched?: string; materials?: number }>;
+
+function touchOf(activity: ActivitySummary, id: string | undefined) {
+  if (!id) return undefined;
+  return activity[id];
+}
+
 const yesNo = (value: unknown) => (value ? "Yes" : "No");
 
 const columns: LegacyColumnDef<SiteProps>[] = [
@@ -86,12 +93,14 @@ export default function SiteTable({
   onSelect,
   sorting,
   onSortingChange,
+  activity = {},
 }: {
   rows: SiteProps[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   sorting?: SortingState;
   onSortingChange?: (next: SortingState) => void;
+  activity?: ActivitySummary;
 }) {
   const [localSorting, setLocalSorting] = useState<SortingState>([]);
   const sortingState = sorting ?? localSorting;
@@ -101,9 +110,21 @@ export default function SiteTable({
     else setLocalSorting(resolved);
   }
   const showWhy = rows.some((row) => row.summary_why);
+  const activityColumns: LegacyColumnDef<SiteProps>[] = [
+    {
+      id: "last_touched",
+      accessorFn: (row) => touchOf(activity, row.linked_deal_id)?.lastTouched || "",
+      header: "Last touched",
+    },
+    {
+      id: "materials",
+      accessorFn: (row) => touchOf(activity, row.linked_deal_id)?.materials || 0,
+      header: "Materials",
+    },
+  ];
   const table = useLegacyTable({
     data: rows,
-    columns: showWhy ? columns : columns.filter((column) => column.id !== "why"),
+    columns: [...(showWhy ? columns : columns.filter((column) => column.id !== "why")), ...activityColumns],
     state: { sorting: sortingState },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -146,6 +167,9 @@ export default function SiteTable({
               <strong>{row.name || row.address || row.site_id}</strong>
               <span>{row.site_id} · {plainVerdict(row.verdict)}{row.land_tier ? ` · ${tierLabel(row.land_tier)}` : ""}</span>
               {row.summary_why ? <span className="why">{row.summary_why}</span> : null}
+              {touchOf(activity, row.linked_deal_id)?.lastTouched || touchOf(activity, row.linked_deal_id)?.materials ? (
+                <span>{touchOf(activity, row.linked_deal_id)?.materials || 0} materials · {touchOf(activity, row.linked_deal_id)?.lastTouched || "—"}</span>
+              ) : null}
             </button>
           </li>
         ))}
@@ -175,15 +199,29 @@ export function DealTable({
   rows,
   selectedId,
   onSelect,
+  activity = {},
 }: {
   rows: DealProps[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  activity?: ActivitySummary;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const activityColumns: LegacyColumnDef<DealProps>[] = [
+    {
+      id: "last_touched",
+      accessorFn: (row) => touchOf(activity, row.deal_id)?.lastTouched || "",
+      header: "Last touched",
+    },
+    {
+      id: "materials",
+      accessorFn: (row) => touchOf(activity, row.deal_id)?.materials || 0,
+      header: "Materials",
+    },
+  ];
   const table = useLegacyTable({
     data: rows,
-    columns: dealColumns,
+    columns: [...dealColumns, ...activityColumns],
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -226,6 +264,9 @@ export function DealTable({
               <strong>{row.name || row.address || row.deal_id}</strong>
               <span>{stageDetail(row.stage, row.stage_group)}{row.asking_price_display ? ` · ${row.asking_price_display}` : ""}</span>
               <span>{row.address}</span>
+              {touchOf(activity, row.deal_id)?.lastTouched || touchOf(activity, row.deal_id)?.materials ? (
+                <span>{touchOf(activity, row.deal_id)?.materials || 0} materials · {touchOf(activity, row.deal_id)?.lastTouched || "—"}</span>
+              ) : null}
             </button>
           </li>
         ))}

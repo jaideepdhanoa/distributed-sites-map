@@ -141,6 +141,34 @@ Aerial screening alone had 25 in-area L10 sites. County-checked sites that are n
 
 Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The step stays on screen.
 
+## Activity timeline
+
+Each site and deal card has an Activity section: one link to the site folder, a count and latest date for each materials category, a last-touched date, and the activity lines marked Map. The app does not write the workbook or Drive, and it does not read file contents.
+
+`config/timeline.json` holds the names. `ui.showActivityLines` defaults to true. Set it to false to keep the folder link, the counts and the last-touched date, and hide the lines. `GOOGLE_DRIVE_ROOT_FOLDER_ID` overrides `drive.rootFolderId`. `ACTIVITY_SHEET` and `ACTIVITY_HEADER_ROW` override the activity tab.
+
+### Site ID
+
+Pipeline and Land Sites gain a `Site ID` column (column CK). Values look like `PIPE-PHX-0001` and `LAND-PHX-0036`. When that cell is present and well formed, it is the deal id and the id on `linked_deal_id`. A blank or unusable cell falls back to an existing registry id, then to the row position. A prefix that does not match the tab, or a duplicate id, stops the build. Until the column exists, ids stay on row order.
+
+### Activity tab
+
+Header on row 1. The map reads Event ID, Date, Site ID, Type, Summary and Visibility. It does not read Source link, File link, Logged by, Direction, Counterparty role or Outcome. Only rows whose Visibility is `Map` are shipped, and only for `listing`, `brochure`, `om`, `financials`, `photos`, `legal`, `doc`, `visit` and `stage`. A blank summary uses a fixed line. A summary that fails the wording check, or contains a price mark, is dropped.
+
+### Drive folders
+
+The parent folder is `2 Sites`. Its id is the default `drive.rootFolderId`. Share it with the read-only service account in `GOOGLE_SERVICE_ACCOUNT_JSON`.
+
+Each site folder is named `{Site ID} {column A label}`, for example `PIPE-PHX-0001 PHX 1523 E Southern Ave`. The map matches the first token to Site ID. If the name has no id, it uses the folder id in the Folder column (column AE), including a hyperlink whose text is `Open folder`. A label that does not match column A is a warning, not a failure.
+
+Inside the site folder, only `Source files` is opened. Its categories are `1 Financials`, `2 Property and legal` and `3 Operations`, including nested folders. The fourth category is never listed. Loose files and memos are not counted. The filed date is the `YYYY-MM-DD` at the start of a file name. The card shows counts and dates, never a file name or a file link.
+
+```bash
+python3 scripts/build_timeline.py --workbook path/to/export.xlsx
+```
+
+That command only reads. It writes `data/generated/timeline.json`. The column and the renamed folders are not in the workbook yet, so a build before they exist ships no folder matches.
+
 ## Not in this version
 
 - The workbook sync opens a pull request every four hours when the data changed. It does not merge, and it does not write back to the Sheet.

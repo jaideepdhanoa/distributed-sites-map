@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
 function acres(value: number | null | undefined, text?: string) {
@@ -198,6 +199,7 @@ export default function Detail({
         </>
       ) : null}
       {extras}
+      <Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} />
     </aside>
   );
 }
@@ -282,6 +284,7 @@ export function DealDetail({
         </>
       ) : null}
       {extras}
+      <Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />
     </aside>
   );
 }

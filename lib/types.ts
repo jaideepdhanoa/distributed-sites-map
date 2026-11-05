@@ -140,6 +140,23 @@ export type DealProps = {
   source_line: string;
   source_kind?: string;
   business_type?: string;
+  land_acres?: number | null;
+  land_acres_basis?: "Verified" | "Estimated" | "Unknown" | "";
+  open_land_sqft?: number | null;
+  open_land_basis?: "Estimated" | "";
+  checked_live?: string;
+  stated_revenue?: number | null;
+  stated_revenue_display?: string | null;
+  stated_cash_flow?: number | null;
+  stated_cash_flow_display?: string | null;
+  figures_source?: string;
+  figures_basis?: "Claimed" | "";
+  figures_status?: "shown" | "withheld" | "vacant" | "absent";
+  site_capacity?: "Strong" | "OK" | "Weak" | "Unknown";
+  price_per_acre?: number | null;
+  price_per_acre_display?: string | null;
+  cash_multiple?: number | null;
+  cash_multiple_display?: string | null;
 };
 
 export type UnscreenedProps = {

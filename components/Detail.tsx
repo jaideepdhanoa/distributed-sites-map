@@ -3,7 +3,9 @@ import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
 import Timeline from "./timeline/Timeline";
-import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { nextStepText, plainVerdict, stageDetail, stageTitle, stageTone, statusOf, tierLabel } from "@/lib/labels";
+import { checkedPhrase } from "@/lib/keyNumbers";
+import KeyStrip from "./KeyStrip";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -249,29 +251,36 @@ export default function Detail({
 
 export function DealDetail({
   deal,
+  peers,
   universeName,
   depotMiles,
   lat,
   lng,
   onOpenSite,
   onClose,
+  onCompare,
+  compared,
   sheet,
   extras,
   banner,
   onSwipe,
 }: {
   deal: DealProps;
+  peers?: DealProps[];
   universeName?: string;
   depotMiles?: number | null;
   lat?: number | null;
   lng?: number | null;
   onOpenSite?: () => void;
   onClose?: () => void;
+  onCompare?: (on: boolean) => void;
+  compared?: boolean;
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
 }) {
+  const hasPin = lat != null && lng != null;
   return (
     <aside
       className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
@@ -302,21 +311,25 @@ export function DealDetail({
       </div>
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
-      <p className="note">{deal.deal_id}</p>
+      <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""}</p>
       {mapsLinks(lat, lng)}
-      <h3>Broker</h3>
+      {onCompare ? (
+        <label className="compare-check">
+          <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
+          Compare
+        </label>
+      ) : null}
+      <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />
+      <h3>Overview</h3>
       <div className="kv">
-        <span>Broker</span><div>{shownBroker(deal) || "—"}</div>
-        <span>Firm</span><div>{shownFirm(deal) || "—"}</div>
+        <span>Broker</span><div>{shownBroker(deal) || "Not provided"}</div>
+        <span>Firm</span><div>{shownFirm(deal) || "Not provided"}</div>
         <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
-      </div>
-      <h3>Listing</h3>
-      <div className="kv">
         <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
         <span>Last broker contact</span><div>{deal.last_broker_contact || "—"}</div>
         <span>Asking price</span>
         <div>
-          {deal.asking_price_display || "—"}
+          {deal.asking_price_display || "Not provided"}
           {shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
         </div>
         <span>Source</span>
@@ -338,9 +351,9 @@ export function DealDetail({
           )}
         </div>
         <span>Parcel</span>
-        <div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
-        <span>Next step</span><div>{deal.next_step || "—"}</div>
-        <span>Nearest depot</span><div>{depotMiles == null ? "—" : `${depotMiles.toFixed(1)} mi`}</div>
+        <div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "Not matched"}</div>
+        <span>Next step</span><div>{deal.next_step || "Not provided"}</div>
+        <span>Nearest depot</span><div>{depotMiles == null ? (hasPin ? "Not provided" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
       </div>
       {deal.universe_id ? (
         <>

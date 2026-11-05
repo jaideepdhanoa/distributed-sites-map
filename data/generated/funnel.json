@@ -318,7 +318,7 @@
         "MIA": 0
       },
       "of": 38,
-      "note": "Contacted means Pipeline stage 2 or later. Stage 0 and stage 1 are not contacted. The workbook currently has only stages 0, 1, and Dropped, so this count is 0."
+      "note": "Contacted means a conversation has started on a universe site. No universe site is in that step. One pipeline row is in Financial screen."
     }
   ],
   "candidates": {

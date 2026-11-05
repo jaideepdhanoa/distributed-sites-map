@@ -18,11 +18,14 @@ jobs:
       - run: python scripts/test_changes.py
       - run: python tests/test_sync_workbook.py
       - run: python tests/test_sync_push.py
+      - run: python tests/test_key_numbers.py
+      - run: python scripts/check_surface.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - run: node --experimental-strip-types scripts/test-stage-detail.ts
       - run: node --experimental-strip-types scripts/test-drawer-width.ts
+      - run: node --experimental-strip-types scripts/test-key-numbers.ts
 
   e2e:
     runs-on: ubuntu-latest

@@ -187,7 +187,7 @@ function ViewsDialog() {
       <section className="act-dialog" role="dialog" aria-modal="true" aria-labelledby="views-title" data-testid="views-panel">
         <button className="close" type="button" onClick={() => openPanel(null)}>Close</button>
         <h2 id="views-title">Saved views</h2>
-        <p className="note">A saved view stores this screen’s link. It does not copy site data.</p>
+        <p className="note">A saved view stores this screen’s link, including filters, sort, columns, and the pin label. It does not copy site data.</p>
         <form
           onSubmit={async (event) => {
             event.preventDefault();

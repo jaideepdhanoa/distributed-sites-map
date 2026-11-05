@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
+import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail } from "./Detail";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow } from "./SiteTable";
@@ -33,7 +35,7 @@ export default function Explorer() {
   const router = useRouter();
   const [data, setData] = useState<AppData | null>(null);
   const [detail, setDetail] = useState<SiteProps | null>(null);
-  const [me, setMe] = useState<{ u: string; role: string } | null>(null);
+  const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
   const tableOpen = params.get("table") === "1";
@@ -285,6 +287,13 @@ export default function Explorer() {
     link.click();
     setMoreOpen(false);
     setMenuOpen(false);
+    if (me?.actionsEnabled) {
+      void fetch("/api/actions/exports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "table" }),
+      }).catch(() => undefined);
+    }
   }
 
   function addCompare(id: string) {
@@ -642,6 +651,7 @@ export default function Explorer() {
                 <button type="button" onClick={exportTable}>Export CSV</button>
                 <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMoreOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
                 <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+                <ActionsMenuButtons close={() => setMoreOpen(false)} />
                 <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }}>How to read this</button>
                 {changesNote ? <p className="menu-note">{changesNote}</p> : null}
               </div>
@@ -738,6 +748,7 @@ export default function Explorer() {
             <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
             <button type="button" onClick={exportTable}>Export CSV</button>
             <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+            <ActionsMenuButtons close={() => setMenuOpen(false)} />
             <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
@@ -769,6 +780,7 @@ export default function Explorer() {
       </header>
 
       <div className="map-stage">
+        <ActionsDialogs />
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
           deals={drawnDeals}
@@ -863,6 +875,7 @@ export default function Explorer() {
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onClose={() => choose(null)}
             sheet={sheet}
+            extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
           />
         ) : selectedSite ? (
           <Detail
@@ -881,6 +894,7 @@ export default function Explorer() {
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
             sheet={sheet}
+            extras={<RecordActions kind="site" id={selectedSite.site_id} />}
           />
         ) : null}
         {compareIds.length >= 2 ? (

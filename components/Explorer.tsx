@@ -630,6 +630,7 @@ export default function Explorer() {
           >
             {summaryText()}
           </span>
+          {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
             {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
@@ -742,6 +743,7 @@ export default function Explorer() {
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
               <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Unplaced deals ({unplacedDeals.length.toLocaleString()})</button>
             ) : null}
+            {data.funnel.workbook_as_of ? <p className="menu-note">Data as of {data.funnel.workbook_as_of}</p> : null}
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
             <p className="menu-note">{me?.u}</p>
             {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}

@@ -47,7 +47,7 @@ a { color: var(--pine); }
 .top, .funnel-row { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .map-stage, .dock { min-width: 0; max-width: 100%; }
 .top { height: 40px; }
-.funnel-row { height: 40px; }
+.funnel-row { height: auto; min-height: 40px; flex-wrap: wrap; }
 .funnel {
   display: flex;
   align-items: center;
@@ -268,7 +268,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   .funnel { gap: 0; }
   .funnel button { padding: 4px 4px; font-size: 12px; gap: 4px; }
   .funnel .sub, .funnel .aside { font-size: 11px; padding: 4px 2px; }
-  .summary-chip { max-width: 168px; font-size: 12px; padding: 4px 8px; }
+  .summary-chip { max-width: none; font-size: 12px; padding: 4px 8px; }
   .shell.table-open { grid-template-rows: auto 1fr 200px; }
   .drawer { width: min(320px, 92vw); }
   .search { max-width: 180px; }
@@ -510,7 +510,7 @@ tr { cursor: pointer; }
 .active-row { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
 .removable { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
 .backdrop { position: fixed; inset: 0; z-index: 5; border: 0; background: transparent; padding: 0; }
-.summary-chip { flex: none; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-chip { flex: none; max-width: none; overflow: visible; white-space: nowrap; }
 .city-pick select { height: 44px; border: 1px solid #8d8376; border-radius: 999px; background: white; padding: 0 12px; max-width: 46vw; }
 .sheet-handle { display: none; }
 .unplaced-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -528,6 +528,7 @@ tr { cursor: pointer; }
   .funnel { flex-wrap: wrap; overflow: visible; }
   .funnel button, .funnel .sub, .funnel .aside { min-height: 44px; align-items: center; }
   .summary-chip { display: none; }
+  .summary-chip.as-of { display: inline-flex; }
   .shell.table-open { grid-template-rows: auto 1fr; }
   .shell.table-open .map-stage { display: none; }
   .dock-tabs button { min-height: 44px; }

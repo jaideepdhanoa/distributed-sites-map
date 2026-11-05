@@ -16,6 +16,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python scripts/build_data.py --check
       - run: python scripts/test_changes.py
+      - run: python tests/test_sync_workbook.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

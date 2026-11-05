@@ -15,8 +15,12 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
     await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.locator(".menu-sheet")).toContainText("Data as of");
     await page.screenshot({ path: `review-shots/${name}-menu.png` });
   } else {
+    await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".summary-chip");
+    await page.screenshot({ path: `review-shots/${name}-pipeline.png` });
     await page.goto("/?stage=cleared&table=1", { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".dock");
     await page.screenshot({ path: `review-shots/${name}-table.png` });

@@ -206,16 +206,23 @@ _NOTE_FILE = re.compile(
 )
 
 # Exact source sentences, plus the plain line a reader should see.
+def _rewrite_paths() -> list[Path]:
+    # Committed map configuration. A copy under data/source still works for a local build.
+    return [ROOT / "data" / "note_rewrites.json", SRC / "note_rewrites.json"]
+
+
 def _load_rewrites(kind: str) -> dict:
-    path = SRC / "note_rewrites.json"
-    if not path.exists():
-        return {}
-    try:
-        payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return {}
-    table = payload.get(kind) or {}
-    return table if isinstance(table, dict) else {}
+    for path in _rewrite_paths():
+        if not path.exists():
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        table = payload.get(kind) or {}
+        if isinstance(table, dict):
+            return table
+    return {}
 
 
 EXPLICIT_NOTES = _load_rewrites("notes")
@@ -1008,6 +1015,193 @@ def source_workbook() -> Path:
         if "Pipeline" in names and any(str(name).startswith("Screening") for name in names):
             return path
     raise SystemExit("The source folder needs the pipeline workbook.")
+
+
+def workbook_as_of() -> str:
+    """The workbook's own modified date. A sync can leave the Drive date in workbook_as_of.txt."""
+    note = SRC / "workbook_as_of.txt"
+    if note.exists():
+        text = note.read_text().strip()
+        if text:
+            return text[:10]
+    path = source_workbook()
+    try:
+        with zipfile.ZipFile(path) as archive:
+            xml = archive.read("docProps/core.xml")
+        found = re.search(br"<dcterms:modified[^>]*>([^<]+)", xml)
+        if found:
+            return found.group(1).decode()[:10]
+    except (KeyError, OSError):
+        pass
+    stamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+    return stamp.strftime("%Y-%m-%d")
+
+
+_DELISTED_STATUS = re.compile(r"(?i)delist|listing removed|stale/delisted|sold or withdrawn")
+DRIFT_PATH = ROOT / "data" / "drift_report.csv"
+STAGE_INDEX = ROOT / "data" / "workbook_stages.json"
+DRIFT_FIELDS = ["lead id", "workbook Stage", "KO reason", "map stage", "rule applied"]
+
+
+def _lead_key(value: str) -> str:
+    text = re.sub(r"^(phx|las|mia|sna)\s+", "", (value or "").lower())
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def listings_register_delists() -> dict[str, str]:
+    """Delisted listing statuses, used only for the drift report."""
+    found: dict[str, str] = {}
+    path = source_workbook()
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    if "Listings Register" not in wb.sheetnames:
+        wb.close()
+        return found
+    rows = list(wb["Listings Register"].iter_rows(values_only=True))
+    wb.close()
+    if not rows:
+        return found
+    header = [str(cell).strip() if cell else "" for cell in rows[0]]
+    idx = {name: i for i, name in enumerate(header)}
+    if "listing_status" not in idx:
+        return found
+    for row in rows[1:]:
+        if not row or not row[0]:
+            continue
+        status = str(row[idx["listing_status"]] or "").strip()
+        if not _DELISTED_STATUS.search(status):
+            continue
+        for field in ("ref", "address"):
+            if field not in idx:
+                continue
+            key = _lead_key(str(row[idx[field]] or ""))
+            if key:
+                found[key] = status
+    return found
+
+
+def _row_delist(row: dict, index: dict[str, str]) -> str:
+    for field in ("Site", "Name"):
+        key = _lead_key(str(row.get(field) or ""))
+        if key and key in index:
+            return index[key]
+    return ""
+
+
+def scrub_drift_reason(text: str) -> str:
+    """Keep the drift report free of restricted wording. It is never served."""
+    cleaned = re.sub(r"(?i)under\s+\d+\s+stalls?\s+fit", "Lot too small", str(text or ""))
+    cleaned = re.sub(r"(?i)\bstalls?\b", "spaces", cleaned)
+    for pattern in BANNED_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,;.")
+    return cleaned or "Noted"
+
+
+def knockout_for_report(row: dict, delist_status: str) -> tuple[str, str]:
+    """Report-only. R-068: business not confirmed is never a knock-out.
+
+    R-031, R-042, R-067, and R-013 are noted when they suggest Dropped.
+    The Stage column is still what the map shows.
+    """
+    raw = str(row.get("Knock-out") or row.get("KO reason") or "").strip()
+    low = raw.lower()
+    if low and "not confirmed" not in low:
+        if re.search(r"stall|no land", low):
+            return scrub_drift_reason(raw), "R-031; R-042"
+        if "tenant lease" in low:
+            return scrub_drift_reason(raw), "R-067; R-042"
+        return scrub_drift_reason(raw), "R-042"
+    if delist_status:
+        return scrub_drift_reason(delist_status), "R-013; listings register delisted"
+    return "", ""
+
+
+def workbook_stage_rows() -> tuple[list[dict], list[dict]]:
+    pipeline_rows = sheet_rows(source_workbook(), "Pipeline", 3)
+    land_rows = sheet_rows(source_workbook(), "Land Sites", 3)
+    delist_index = listings_register_delists()
+    shipped = []
+    drift = []
+    for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
+        for index, row in enumerate(rows, start=1):
+            if is_off_market_row(row):
+                continue
+            city = str(row.get("Market") or "").strip() or "UNK"
+            deal_id = f"{'PIPE' if kind == 'pipeline' else 'LAND'}-{city}-{index:04d}"
+            stage = scrub(str(row.get("Stage") or ""))[:80]
+            shipped.append({"deal_id": deal_id, "kind": kind, "stage": stage})
+            reason, rule = knockout_for_report(row, _row_delist(row, delist_index))
+            if reason and not stage.lower().startswith("dropped"):
+                drift.append(
+                    {
+                        "lead id": deal_id,
+                        "workbook Stage": stage,
+                        "KO reason": reason,
+                        "map stage": stage,
+                        "rule applied": rule,
+                    }
+                )
+    return shipped, drift
+
+
+def write_workbook_stage_files() -> dict:
+    shipped, drift = workbook_stage_rows()
+    pipeline = Counter(row["stage"] for row in shipped if row["kind"] == "pipeline")
+    land = Counter(row["stage"] for row in shipped if row["kind"] == "land")
+    payload = {"workbook_as_of": workbook_as_of(), "pipeline": dict(pipeline), "land": dict(land), "rows": shipped}
+    STAGE_INDEX.parent.mkdir(parents=True, exist_ok=True)
+    STAGE_INDEX.write_text(json.dumps(payload, indent=2))
+    with DRIFT_PATH.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=DRIFT_FIELDS)
+        writer.writeheader()
+        writer.writerows(drift)
+    return payload
+
+
+def shipped_stage_problems(deal_features: list[dict], expected_rows: list[dict] | None = None) -> list[str]:
+    if expected_rows is None:
+        if not STAGE_INDEX.exists():
+            return ["missing data/workbook_stages.json"]
+        expected_rows = json.loads(STAGE_INDEX.read_text()).get("rows") or []
+        index_counts = json.loads(STAGE_INDEX.read_text())
+    else:
+        index_counts = {
+            "pipeline": dict(Counter(row["stage"] for row in expected_rows if row["kind"] == "pipeline")),
+            "land": dict(Counter(row["stage"] for row in expected_rows if row["kind"] == "land")),
+        }
+    expected = {row.get("deal_id"): row.get("stage") for row in expected_rows}
+    problems = []
+    seen = set()
+    for feature in deal_features:
+        props = feature.get("properties") or {}
+        deal_id = props.get("deal_id")
+        seen.add(deal_id)
+        if expected.get(deal_id) != props.get("stage"):
+            problems.append(f"{deal_id} stage {props.get('stage')!r} is not the workbook Stage column {expected.get(deal_id)!r}")
+    missing = [deal_id for deal_id in expected if deal_id not in seen]
+    if missing:
+        problems.append("workbook rows missing from the map: " + ", ".join(sorted(missing)[:12]))
+    pipeline = Counter((feature.get("properties") or {}).get("stage") for feature in deal_features if (feature.get("properties") or {}).get("kind") == "pipeline")
+    land = Counter((feature.get("properties") or {}).get("stage") for feature in deal_features if (feature.get("properties") or {}).get("kind") == "land")
+    if dict(pipeline) != index_counts.get("pipeline"):
+        problems.append(f"pipeline stage counts {dict(pipeline)} != workbook {index_counts.get('pipeline')}")
+    if dict(land) != index_counts.get("land"):
+        problems.append(f"land stage counts {dict(land)} != workbook {index_counts.get('land')}")
+    return problems
+
+
+def drift_report_exposure() -> list[str]:
+    problems = []
+    if (OUT / "drift_report.csv").exists() or (ROOT / "public" / "drift_report.csv").exists():
+        problems.append("drift report is in a folder the app can serve")
+    for folder in ("app", "components", "lib"):
+        for path in (ROOT / folder).rglob("*"):
+            if path.suffix not in {".ts", ".tsx"}:
+                continue
+            if "drift_report" in path.read_text():
+                problems.append(f"{path.relative_to(ROOT)} references the drift report")
+    return problems
 
 
 def reconciliation_workbook() -> Path:
@@ -3484,6 +3678,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     funnel = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "workbook_as_of": workbook_as_of(),
         "stages": [
             {
                 "id": "census",
@@ -3741,6 +3936,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         deals_fc.get("features") or [],
     )
     if write:
+        write_workbook_stage_files()
         OUT.mkdir(parents=True, exist_ok=True)
         PARCEL_CACHE.parent.mkdir(parents=True, exist_ok=True)
         (OUT / "sites.geojson").write_text(json.dumps(sites_fc))
@@ -4035,6 +4231,12 @@ def validate_committed() -> None:
     if len(loaded["depots.geojson"].get("features", [])) != 13:
         problems.append("expected 13 depot pins")
     deal_features = loaded.get("deals.geojson", {}).get("features", [])
+    if sources_present():
+        live_rows, _drift = workbook_stage_rows()
+        problems.extend(shipped_stage_problems(deal_features, live_rows))
+    else:
+        problems.extend(shipped_stage_problems(deal_features))
+    problems.extend(drift_report_exposure())
     deal_report = report.get("deals") or {}
     if len(deal_features) != deal_report.get("pipeline", 0) + deal_report.get("land", 0):
         problems.append("deal count does not match the build report")

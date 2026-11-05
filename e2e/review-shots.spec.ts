@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
+import { cityPipelineCounts } from "./pipeline-counts";
 
 async function waitForBasemap(page: Page) {
   await page.waitForSelector(".maplibregl-canvas");
@@ -42,10 +43,11 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".funnel");
   await waitForBasemap(page);
-  await expect(page.locator(".funnel")).toContainText("(4 deals, 11 land)");
+  const counts = cityPipelineCounts("PHX");
+  await expect(page.locator(".funnel")).toContainText(`(${counts.deskDeals} deals, ${counts.deskLand} land)`);
   const chipText = async () => page.locator(".summary-chip").first().textContent();
-  await expect.poll(chipText).toContain("4 deals + 11 land sites");
-  await expect.poll(chipText).toContain("11 dropped deals + 2 dropped land sites");
+  await expect.poll(chipText).toContain(`${counts.activeDeals} deals + ${counts.activeLand} land sites`);
+  await expect.poll(chipText).toContain(`${counts.droppedDeals} dropped deals + ${counts.droppedLand} dropped land sites`);
   await page.screenshot({ path: `review-shots/${name}-pipeline.png`, fullPage: false });
   await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");

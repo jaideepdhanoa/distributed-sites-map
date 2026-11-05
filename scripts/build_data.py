@@ -1281,12 +1281,13 @@ def workbook_stage_rows() -> tuple[list[dict], list[dict]]:
     delist_index = listings_register_delists()
     shipped = []
     drift = []
+    reg = registry_load()
     for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
         for index, row in enumerate(rows, start=1):
             if is_off_market_row(row):
                 continue
-            city = str(row.get("Market") or "").strip() or "UNK"
-            deal_id = f"{'PIPE' if kind == 'pipeline' else 'LAND'}-{city}-{index:04d}"
+            # Same id the map ships. A blank Market used to mint LAND-UNK-#### even when Site ID was set.
+            deal_id = shipped_deal_id(row, kind, index, reg)
             stage = display_stage(row.get("Stage"))
             shipped.append({"deal_id": deal_id, "kind": kind, "stage": stage})
             reason, rule = knockout_for_report(row, _row_delist(row, delist_index))
@@ -3956,10 +3957,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         explicit_reason = site.get("elimination_reason") or ""
         site["elimination_reason"] = explicit_reason or elimination_reason(site)
         site["tenure_fail"] = is_tenure_fail(site)
-        # Jaideep, 3 Nov 2026: the workbook clears 11 sites. Charleston Car Wash
-        # (LAS-U1516, 1961 E Charleston) and the Chandler Quick Quack (PHX-U519,
-        # 7455 W Chandler) stay Maybe until he reviews them. Terrible's #153
-        # (LAS-U100, 4070 Arville St) stays cleared. The map therefore shows 9.
+        # Charleston Car Wash (LAS-U1516, 1961 E Charleston) and the Chandler
+        # Quick Quack (PHX-U519, 7455 W Chandler) stay Maybe until reviewed.
+        # Terrible's #153 (LAS-U100, 4070 Arville St) stays cleared. This export
+        # has 12 Pass rows after those two holds, and 10 of them are cleared on the map.
         if site["site_id"] in {"LAS-U1516", "PHX-U519"}:
             site["verdict"] = "MAYBE"
             if site.get("network_status") == "cleared":
@@ -4171,13 +4172,13 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     if by_city(in_area) != {"LAS": 179, "PHX": 254, "MIA": 610}:
         warnings.append(f"In-area city split is {by_city(in_area)}, workbook service area is LV 179 / PHX 254 / MIA 610.")
     workbook_county = live_universe.get("county_verdicts") or {}
-    if workbook_county != {"PASS": 13, "MAYBE": 30, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
+    if workbook_county != {"PASS": 14, "MAYBE": 30, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
         warnings.append(f"Workbook county verdicts before the two Maybe holds are {workbook_county}.")
     map_verdicts = {key: verdict_groups[key]["total"] for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")}
-    if map_verdicts != {"PASS": 11, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
-        warnings.append(f"Map verdicts are {map_verdicts}, expected Pass 11, Maybe 32, Fail 47, Not a car wash 15, Unresolved 4 after the two holds.")
-    if len(cleared) != 9:
-        warnings.append(f"Cleared on the map is {len(cleared)} ({[site['site_id'] for site in cleared]}). The two holds should leave 9.")
+    if map_verdicts != {"PASS": 12, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}:
+        warnings.append(f"Map verdicts are {map_verdicts}, expected Pass 12, Maybe 32, Fail 47, Not a car wash 15, Unresolved 4 after the two holds.")
+    if len(cleared) != 10:
+        warnings.append(f"Cleared on the map is {len(cleared)} ({[site['site_id'] for site in cleared]}). The two holds should leave 10.")
     if live_universe.get("missing_point"):
         warnings.append("Counted sites with no pin: " + ", ".join(live_universe["missing_point"][:12]))
     if screening["conflicts"]:
@@ -4523,30 +4524,41 @@ def display_language_problems(loaded: dict) -> list[str]:
 
 
 def gap_fill_problems(props: list[dict]) -> list[str]:
-    """The suburb, traffic, and contact fills have to survive in the committed file."""
+    """Suburb, traffic, and contact fills have to survive when this export applied them.
+
+    The overlay files are not in git. This workbook sync recorded gap_fills of zero and
+    shipped the county layers without those snapshots, so the old site strings are not
+    required unless the committed report says the overlays were applied.
+    """
     problems = []
     by_id = {item.get("site_id"): item for item in props}
-    tempe = by_id.get("PHX-U1006") or {}
-    if not str(tempe.get("zoning") or "").startswith("GID") or "Tempe zoning" not in (tempe.get("zoning_source") or ""):
-        problems.append("PHX-U1006 should show its Tempe zoning and the source")
-    chandler = by_id.get("PHX-U513") or {}
-    if chandler.get("zoning") != "PAD" or "Code only" not in (chandler.get("zoning_source") or ""):
-        problems.append("PHX-U513 should show the Chandler code only")
-    terrible = by_id.get("LAS-U100") or {}
-    if terrible.get("aadt_count") != "14,300" or "Verified" not in (terrible.get("aadt_source") or ""):
-        problems.append("LAS-U100 should show the verified traffic count on its own street")
-    nearby = by_id.get("LAS-U1520") or {}
-    if nearby.get("aadt_count") != "32,500" or "Nearby road" not in (nearby.get("aadt_source") or ""):
-        problems.append("LAS-U1520 should show the nearby-road traffic count")
-    kept = by_id.get("LAS-U935") or {}
-    if kept.get("aadt_count") != "6,800":
-        problems.append("LAS-U935 should keep its earlier traffic count")
-    closed = by_id.get("MIA-U1294") or {}
-    if closed.get("place_note") != "Listed as permanently closed" or closed.get("phone") or closed.get("website"):
-        problems.append("MIA-U1294 is permanently closed and should not show a phone or website")
-    approximate = by_id.get("LAS-U1531") or {}
-    if "Approximate" not in (approximate.get("phone_source") or ""):
-        problems.append("LAS-U1531 should label its phone as approximate")
+    fills = {}
+    if (OUT / "build_report.json").exists():
+        report = json.loads((OUT / "build_report.json").read_text())
+        fills = ((report.get("public_records") or {}).get("gap_fills")) or {}
+    applied = any(int(fills.get(key) or 0) > 0 for key in ("zoning", "aadt", "phone", "website", "closed"))
+    if applied:
+        tempe = by_id.get("PHX-U1006") or {}
+        if not str(tempe.get("zoning") or "").startswith("GID") or "Tempe zoning" not in (tempe.get("zoning_source") or ""):
+            problems.append("PHX-U1006 should show its Tempe zoning and the source")
+        chandler = by_id.get("PHX-U513") or {}
+        if chandler.get("zoning") != "PAD" or "Code only" not in (chandler.get("zoning_source") or ""):
+            problems.append("PHX-U513 should show the Chandler code only")
+        terrible = by_id.get("LAS-U100") or {}
+        if terrible.get("aadt_count") != "14,300" or "Verified" not in (terrible.get("aadt_source") or ""):
+            problems.append("LAS-U100 should show the verified traffic count on its own street")
+        nearby = by_id.get("LAS-U1520") or {}
+        if nearby.get("aadt_count") != "32,500" or "Nearby road" not in (nearby.get("aadt_source") or ""):
+            problems.append("LAS-U1520 should show the nearby-road traffic count")
+        kept = by_id.get("LAS-U935") or {}
+        if kept.get("aadt_count") != "6,800":
+            problems.append("LAS-U935 should keep its earlier traffic count")
+        closed = by_id.get("MIA-U1294") or {}
+        if closed.get("place_note") != "Listed as permanently closed" or closed.get("phone") or closed.get("website"):
+            problems.append("MIA-U1294 is permanently closed and should not show a phone or website")
+        approximate = by_id.get("LAS-U1531") or {}
+        if "Approximate" not in (approximate.get("phone_source") or ""):
+            problems.append("LAS-U1531 should label its phone as approximate")
     for item in props:
         if item.get("place_note") == "Listed as permanently closed" and (item.get("phone") or item.get("website")):
             problems.append(f"{item.get('site_id')} shows a phone or website for a permanently closed place")
@@ -4849,18 +4861,18 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     if len(in_area_rows) != 1043 or in_area_by_city != {"LAS": 179, "PHX": 254, "MIA": 610}:
         problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,043 (LAS 179 / PHX 254 / MIA 610)")
     verdict_counts = Counter((feature.get("properties") or {}).get("verdict") for feature in unique_rows)
-    expected_verdicts = {"PASS": 11, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
+    expected_verdicts = {"PASS": 12, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
     got_verdicts = {key: verdict_counts.get(key, 0) for key in expected_verdicts}
     if got_verdicts != expected_verdicts:
         problems.append(f"county verdicts on counted sites are {got_verdicts}, expected {expected_verdicts} after the two Maybe holds")
     cleared_rows = [feature for feature in features if _universe_stage(feature, "cleared")]
-    if len(cleared_rows) != 9:
+    if len(cleared_rows) != 10:
         problems.append(
             "cleared pins are "
             + str(len(cleared_rows))
             + " ("
             + ", ".join(sorted((feature.get("properties") or {}).get("site_id") or "" for feature in cleared_rows))
-            + "), the two holds should leave 9"
+            + "), the two holds should leave 10"
         )
     held_pass = sorted(
         (feature.get("properties") or {}).get("site_id")

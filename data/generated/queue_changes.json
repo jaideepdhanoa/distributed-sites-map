@@ -566,6 +566,146 @@
       "type": "materials",
       "at": "2026-11-05T20:08:41.923Z",
       "summary": "Financials count is now 6."
+    },
+    {
+      "id": "activity:LAND-PHX-0044:2026-11-05T22:04:28.943Z:A-000226",
+      "siteId": "LAND-PHX-0044",
+      "type": "activity",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:LAND-PHX-0043:2026-11-05T22:04:28.943Z:A-000224",
+      "siteId": "LAND-PHX-0043",
+      "type": "activity",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:LAND-PHX-0044:2026-11-05T22:04:28.943Z:A-000225",
+      "siteId": "LAND-PHX-0044",
+      "type": "activity",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "New activity: Site layout on file"
+    },
+    {
+      "id": "activity:PIPE-MIA-0082:2026-11-05T22:04:28.943Z:A-000221",
+      "siteId": "PIPE-MIA-0082",
+      "type": "activity",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "materials:LAND-LAS-0001:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "LAND-LAS-0001",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 2."
+    },
+    {
+      "id": "materials:LAND-LAS-0009:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "LAND-LAS-0009",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:LAND-PHX-0036:2026-11-05T22:04:28.943Z:financials",
+      "siteId": "LAND-PHX-0036",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Financials count is now 1."
+    },
+    {
+      "id": "materials:LAND-PHX-0036:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "LAND-PHX-0036",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 4."
+    },
+    {
+      "id": "materials:LAND-PHX-0036:2026-11-05T22:04:28.943Z:operations",
+      "siteId": "LAND-PHX-0036",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Operations count is now 18."
+    },
+    {
+      "id": "materials:LAND-PHX-0039:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "LAND-PHX-0039",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 2."
+    },
+    {
+      "id": "materials:LAND-PHX-0044:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "LAND-PHX-0044",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 2."
+    },
+    {
+      "id": "materials:PIPE-LAS-0016:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "PIPE-LAS-0016",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:PIPE-LAS-0016:2026-11-05T22:04:28.943Z:operations",
+      "siteId": "PIPE-LAS-0016",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Operations count is now 2."
+    },
+    {
+      "id": "materials:PIPE-LAS-0017:2026-11-05T22:04:28.943Z:property_legal",
+      "siteId": "PIPE-LAS-0017",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:PIPE-LAS-0017:2026-11-05T22:04:28.943Z:operations",
+      "siteId": "PIPE-LAS-0017",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Operations count is now 2."
+    },
+    {
+      "id": "materials:PIPE-MIA-0080:2026-11-05T22:04:28.943Z:financials",
+      "siteId": "PIPE-MIA-0080",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Financials count is now 1."
+    },
+    {
+      "id": "materials:PIPE-PHX-0003:2026-11-05T22:04:28.943Z:financials",
+      "siteId": "PIPE-PHX-0003",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Financials count is now 6."
+    },
+    {
+      "id": "materials:PIPE-PHX-0003:2026-11-05T22:04:28.943Z:operations",
+      "siteId": "PIPE-PHX-0003",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Operations count is now 13."
+    },
+    {
+      "id": "materials:PIPE-PHX-0081:2026-11-05T22:04:28.943Z:financials",
+      "siteId": "PIPE-PHX-0081",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Financials count is now 1."
+    },
+    {
+      "id": "materials:PIPE-SNA-0002:2026-11-05T22:04:28.943Z:financials",
+      "siteId": "PIPE-SNA-0002",
+      "type": "materials",
+      "at": "2026-11-05T22:04:28.943Z",
+      "summary": "Financials count is now 1."
     }
   ],
   "baseline": [
@@ -932,6 +1072,16 @@
   ],
   "activity": [
     {
+      "id": "A-000226",
+      "siteId": "LAND-PHX-0044",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000224",
+      "siteId": "LAND-PHX-0043",
+      "summary": "Stage set to Dropped"
+    },
+    {
       "id": "A-000057",
       "siteId": "PIPE-SNA-0002",
       "summary": "Stage set to Dropped"
@@ -1012,6 +1162,11 @@
       "summary": "Stage set to Dropped"
     },
     {
+      "id": "A-000225",
+      "siteId": "LAND-PHX-0044",
+      "summary": "Site layout on file"
+    },
+    {
       "id": "A-000075",
       "siteId": "LAND-PHX-0007",
       "summary": "Stage set to Dropped"
@@ -1020,6 +1175,11 @@
       "id": "A-000074",
       "siteId": "LAND-PHX-0003",
       "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000221",
+      "siteId": "PIPE-MIA-0082",
+      "summary": "Listing noted"
     },
     {
       "id": "A-000200",
@@ -1239,6 +1399,78 @@
   ],
   "materials": [
     {
+      "siteId": "LAND-LAS-0001",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 2
+    },
+    {
+      "siteId": "LAND-LAS-0009",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
+    },
+    {
+      "siteId": "LAND-PHX-0036",
+      "category": "financials",
+      "label": "Financials",
+      "count": 1
+    },
+    {
+      "siteId": "LAND-PHX-0036",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 4
+    },
+    {
+      "siteId": "LAND-PHX-0036",
+      "category": "operations",
+      "label": "Operations",
+      "count": 18
+    },
+    {
+      "siteId": "LAND-PHX-0039",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 2
+    },
+    {
+      "siteId": "LAND-PHX-0044",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 2
+    },
+    {
+      "siteId": "PIPE-LAS-0016",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
+    },
+    {
+      "siteId": "PIPE-LAS-0016",
+      "category": "operations",
+      "label": "Operations",
+      "count": 2
+    },
+    {
+      "siteId": "PIPE-LAS-0017",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
+    },
+    {
+      "siteId": "PIPE-LAS-0017",
+      "category": "operations",
+      "label": "Operations",
+      "count": 2
+    },
+    {
+      "siteId": "PIPE-MIA-0080",
+      "category": "financials",
+      "label": "Financials",
+      "count": 1
+    },
+    {
       "siteId": "PIPE-PHX-0001",
       "category": "financials",
       "label": "Financials",
@@ -1254,13 +1486,37 @@
       "siteId": "PIPE-PHX-0001",
       "category": "operations",
       "label": "Operations",
-      "count": 23
+      "count": 22
+    },
+    {
+      "siteId": "PIPE-PHX-0003",
+      "category": "financials",
+      "label": "Financials",
+      "count": 6
+    },
+    {
+      "siteId": "PIPE-PHX-0003",
+      "category": "operations",
+      "label": "Operations",
+      "count": 13
     },
     {
       "siteId": "PIPE-PHX-0005",
       "category": "financials",
       "label": "Financials",
-      "count": 6
+      "count": 5
+    },
+    {
+      "siteId": "PIPE-PHX-0081",
+      "category": "financials",
+      "label": "Financials",
+      "count": 1
+    },
+    {
+      "siteId": "PIPE-SNA-0002",
+      "category": "financials",
+      "label": "Financials",
+      "count": 1
     }
   ]
 }

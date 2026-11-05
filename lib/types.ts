@@ -74,6 +74,12 @@ export type SiteProps = {
   aadt_road?: string;
   aadt_year?: string;
   aadt_source?: string;
+  phone?: string;
+  phone_source?: string;
+  website?: string;
+  website_source?: string;
+  place_note?: string;
+  place_note_source?: string;
   tank_status: string;
   utility_proximity: string;
   aerial_fit: string;

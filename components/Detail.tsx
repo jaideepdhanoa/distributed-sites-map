@@ -9,6 +9,15 @@ function acres(value: number | null | undefined, text?: string) {
   return `${value} ac`;
 }
 
+function websiteLabel(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, "");
+  } catch {
+    return url.replace(/^https?:\/\//i, "");
+  }
+}
+
 function mapsLinks(lat?: number | null, lng?: number | null) {
   if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return null;
   const point = `${lat},${lng}`;
@@ -72,6 +81,30 @@ export default function Detail({
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
       {mapsLinks(lat, lng)}
+      {site.place_note ? (
+        <>
+          <h3>Contact</h3>
+          <div className="kv">
+            <span>Note</span><div>{site.place_note}{site.place_note_source ? ` · ${site.place_note_source}` : ""}</div>
+          </div>
+        </>
+      ) : site.phone || site.website ? (
+        <>
+          <h3>Contact</h3>
+          <div className="kv">
+            {site.phone ? <><span>Phone</span><div>{site.phone}{site.phone_source ? ` · ${site.phone_source}` : ""}</div></> : null}
+            {site.website ? (
+              <>
+                <span>Website</span>
+                <div>
+                  <a href={site.website} target="_blank" rel="noopener noreferrer">{websiteLabel(site.website)}</a>
+                  {site.website_source ? ` · ${site.website_source}` : ""}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </>
+      ) : null}
       <h3>Owner</h3>
       <p>{site.owner || "—"}</p>
       {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}

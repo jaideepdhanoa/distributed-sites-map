@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-05T03:21:39Z",
+  "generated_at": "2026-11-05T03:59:29Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -2123,6 +2123,14 @@
         "PHX": 244
       },
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
+    },
+    "gap_fills": {
+      "zoning": 120,
+      "aadt": 175,
+      "aadt_kept": 1,
+      "phone": 586,
+      "website": 473,
+      "closed": 7
     }
   },
   "review_source": "second review column",
@@ -2145,71 +2153,10 @@
     "new_sites": 0,
     "removed_sites": 0,
     "verdict_changes": 0,
-    "stage_moves": 26,
+    "stage_moves": 0,
     "sample_new": [],
     "sample_verdicts": [],
-    "sample_stages": [
-      {
-        "site_id": "LAS-U53",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "LAS-U829",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "LAS-U977",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "MIA-U747",
-        "before": "",
-        "after": "2 Financial screen"
-      },
-      {
-        "site_id": "PHX-U309",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PHX-U326",
-        "before": "",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "PHX-U633",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PIPE-PHX-0008",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PIPE-PHX-0009",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PIPE-LAS-0015",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PIPE-PHX-0018",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PIPE-LAS-0072",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      }
-    ]
+    "sample_stages": []
   },
   "verdicts_appended": 0,
   "verdicts_total": 2660,

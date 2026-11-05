@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-05T03:59:29Z",
+  "generated_at": "2026-11-05T20:07:10Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -24,7 +24,7 @@
     "new_sites": 37,
     "dropped_existing": 24,
     "county_verdicts_before_holds": {
-      "PASS": 13,
+      "PASS": 14,
       "MAYBE": 30,
       "FAIL": 47,
       "NOT_A_WASH": 15,
@@ -56,9 +56,9 @@
   },
   "land_tiers": {
     "L10": 21,
-    "L4": 17,
+    "L4": 18,
     "L10_checked": 21,
-    "L4_checked": 17,
+    "L4_checked": 18,
     "pending": 0,
     "eliminated_not_a_wash": 11,
     "held_fits": 19,
@@ -71,14 +71,14 @@
     }
   },
   "verdicts": {
-    "PASS": 11,
+    "PASS": 12,
     "MAYBE": 32,
     "FAIL": 47,
     "NOT_A_WASH": 15,
     "UNRESOLVED": 4
   },
   "verdicts_on_land_fits": {
-    "PASS": 9,
+    "PASS": 10,
     "MAYBE": 26,
     "FAIL": 0,
     "NOT_A_WASH": 0,
@@ -89,6 +89,7 @@
     "LAS-U129",
     "LAS-U877",
     "MIA-U1347",
+    "MIA-U747",
     "MIA-U753",
     "PHX-U180",
     "PHX-U197",
@@ -135,25 +136,25 @@
   ],
   "listed_of_candidates": 2,
   "contacted_of_candidates": 0,
-  "contacted_any": 1,
-  "pipeline_rows": 81,
-  "land_rows": 42,
+  "contacted_any": 0,
+  "pipeline_rows": 85,
+  "land_rows": 51,
   "pipeline_stage_counts": {
-    "Dropped": 21,
+    "Dropped": 22,
     "Off market (no lead)": 49,
-    "1 Desk screen": 10,
+    "1 Desk screen": 13,
     "2 Financial screen": 1
   },
   "land_stage_counts": {
-    "1 Desk screen": 23,
-    "Dropped": 2,
+    "1 Desk screen": 29,
+    "Dropped": 5,
     "Off market (no lead)": 17
   },
   "deals": {
-    "pipeline": 32,
-    "land": 25,
-    "matched": 40,
-    "unmatched": 17,
+    "pipeline": 36,
+    "land": 34,
+    "matched": 44,
+    "unmatched": 26,
     "geocode_failed": [
       {
         "deal_id": "PIPE-PHX-0006",
@@ -240,43 +241,44 @@
         "stage": "1 Desk screen"
       },
       {
-        "deal_id": "PIPE-MIA-0080",
+        "deal_id": "PIPE-MIA-0082",
         "city": "MIA",
         "kind": "pipeline",
-        "label": "MIA 7520 W McNab Rd",
-        "stage": "2 Financial screen"
+        "label": "MIA Clean Get Away Car Wash, Pembroke Pines, FL (street address to confirm)",
+        "stage": "1 Desk screen"
       }
     ],
     "pipeline_by_city": {
-      "PHX": 15,
+      "PHX": 18,
       "SNA": 1,
       "LAS": 8,
-      "MIA": 8
+      "MIA": 9
     },
     "pipeline_by_stage": {
-      "Dropped": 21,
-      "1 Desk screen": 10,
+      "Dropped": 22,
+      "1 Desk screen": 13,
       "2 Financial screen": 1
     },
     "pipeline_by_group": {
-      "dropped": 21,
-      "desk": 10,
-      "contacted": 1
+      "dropped": 22,
+      "desk": 13,
+      "financial": 1
     },
     "land_by_city": {
-      "LAS": 11,
-      "PHX": 13,
-      "MIA": 1
+      "LAS": 12,
+      "PHX": 19,
+      "MIA": 2,
+      "UNK": 1
     },
     "land_by_group": {
-      "desk": 23,
-      "dropped": 2
+      "desk": 29,
+      "dropped": 5
     },
     "listing_links": {
       "pipeline": {
         "PHX": {
-          "with_link": 10,
-          "without_link": 5
+          "with_link": 12,
+          "without_link": 6
         },
         "SNA": {
           "with_link": 0,
@@ -287,30 +289,34 @@
           "without_link": 3
         },
         "MIA": {
-          "with_link": 6,
-          "without_link": 2
+          "with_link": 5,
+          "without_link": 4
         }
       },
       "land": {
         "LAS": {
-          "with_link": 10,
+          "with_link": 11,
           "without_link": 1
         },
         "PHX": {
-          "with_link": 13,
-          "without_link": 0
+          "with_link": 17,
+          "without_link": 2
         },
         "MIA": {
+          "with_link": 2,
+          "without_link": 0
+        },
+        "UNK": {
           "with_link": 1,
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 12,
-      "listed_sites": 79
+      "listed_sites_with_link": 15,
+      "listed_sites": 80
     },
     "source_lines": {
-      "broker-listed": 45,
-      "broker": 12
+      "broker-listed": 53,
+      "broker": 17
     }
   },
   "off_market": {
@@ -761,7 +767,6 @@
     "note": "Matched off-market rows add research to the census site and do not add a second pin. Unmatched rows are drawn in universe mode and filtered by business type. They are not part of the car-wash census counts."
   },
   "sites_without_coordinates": [
-    "PIPE-PHX-0003",
     "PIPE-PHX-0006",
     "PIPE-PHX-0008",
     "PIPE-PHX-0009",
@@ -774,6 +779,7 @@
     "PIPE-MIA-0074",
     "PIPE-MIA-0075",
     "PIPE-MIA-0077",
+    "PIPE-MIA-0082",
     "LAND-PHX-0003"
   ],
   "disagreements": [
@@ -797,36 +803,37 @@
       "cache_hit": 927,
       "not_found": 155,
       "broward_unavailable": 44,
-      "features": 958,
+      "fetched": 12,
+      "features": 970,
       "adjoining": 31,
       "by_city": {
-        "LAS": 204,
-        "MIA": 446,
-        "PHX": 277
+        "LAS": 205,
+        "MIA": 447,
+        "PHX": 287
       },
       "by_method": {
         "parcel number": 877,
-        "pin location": 50
+        "pin location": 62
       }
     },
     "coverage": {
       "LAS": {
-        "targets": 204,
-        "matched": 204,
+        "targets": 205,
+        "matched": 205,
         "none": 0,
         "pct": 100.0
       },
       "MIA": {
-        "targets": 638,
-        "matched": 446,
-        "none": 192,
-        "pct": 69.9
+        "targets": 640,
+        "matched": 447,
+        "none": 193,
+        "pct": 69.8
       },
       "PHX": {
-        "targets": 284,
-        "matched": 277,
-        "none": 7,
-        "pct": 97.5
+        "targets": 293,
+        "matched": 287,
+        "none": 6,
+        "pct": 98.0
       }
     },
     "by_layer": {
@@ -855,11 +862,11 @@
       },
       "pipeline": {
         "PHX": {
-          "targets": 8,
-          "matched": 4,
-          "none": 4,
+          "targets": 11,
+          "matched": 8,
+          "none": 3,
           "no_geometry": 0,
-          "pct": 50.0
+          "pct": 72.7
         },
         "LAS": {
           "targets": 6,
@@ -869,31 +876,31 @@
           "pct": 100.0
         },
         "MIA": {
-          "targets": 4,
+          "targets": 5,
           "matched": 3,
-          "none": 1,
+          "none": 2,
           "no_geometry": 0,
-          "pct": 75.0
+          "pct": 60.0
         }
       },
       "land": {
         "LAS": {
-          "targets": 11,
-          "matched": 11,
+          "targets": 12,
+          "matched": 12,
           "none": 0,
           "no_geometry": 0,
           "pct": 100.0
         },
         "PHX": {
-          "targets": 13,
-          "matched": 12,
+          "targets": 19,
+          "matched": 18,
           "none": 1,
           "no_geometry": 0,
-          "pct": 92.3
+          "pct": 94.7
         },
         "MIA": {
-          "targets": 1,
-          "matched": 1,
+          "targets": 2,
+          "matched": 2,
           "none": 0,
           "no_geometry": 0,
           "pct": 100.0
@@ -2081,13 +2088,13 @@
         "id": "PIPE-MIA-0079",
         "city": "MIA",
         "kind": "pipeline",
-        "reason": "no parcel at this pin"
+        "reason": "outside the Miami-Dade parcel layer"
       },
       {
-        "id": "PIPE-PHX-0081",
-        "city": "PHX",
+        "id": "PIPE-MIA-0080",
+        "city": "MIA",
         "kind": "pipeline",
-        "reason": "no parcel at this pin"
+        "reason": "outside the Miami-Dade parcel layer"
       },
       {
         "id": "LAND-PHX-0003",
@@ -2096,7 +2103,7 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 927, 'not_found': 155, 'broward_unavailable': 44, 'features': 958, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 446, 'PHX': 277}, 'by_method': {'parcel number': 877, 'pin location': 50}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 927, 'not_found': 155, 'broward_unavailable': 44, 'fetched': 12, 'features': 970, 'adjoining': 31, 'by_city': {'LAS': 205, 'MIA': 447, 'PHX': 287}, 'by_method': {'parcel number': 877, 'pin location': 62}}."
   },
   "public_records": {
     "utility_by_city": {
@@ -2125,18 +2132,20 @@
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
     },
     "gap_fills": {
-      "zoning": 120,
-      "aadt": 175,
-      "aadt_kept": 1,
-      "phone": 586,
-      "website": 473,
-      "closed": 7
+      "zoning": 0,
+      "aadt": 0,
+      "aadt_kept": 0,
+      "phone": 0,
+      "website": 0,
+      "closed": 0
     }
   },
   "review_source": "second review column",
   "warnings": [
-    "Contacted count is 1, expected 0 with the current stages.",
-    "Pipeline tab has 81 rows (stages {'Dropped': 21, 'Off market (no lead)': 49, '1 Desk screen': 10, '2 Financial screen': 1}). The older note of 79 is not in this export."
+    "Workbook county verdicts before the two Maybe holds are {'PASS': 14, 'MAYBE': 30, 'FAIL': 47, 'NOT_A_WASH': 15, 'UNRESOLVED': 4}.",
+    "Map verdicts are {'PASS': 12, 'MAYBE': 32, 'FAIL': 47, 'NOT_A_WASH': 15, 'UNRESOLVED': 4}, expected Pass 11, Maybe 32, Fail 47, Not a car wash 15, Unresolved 4 after the two holds.",
+    "Cleared on the map is 10 (['LAS-U100', 'LAS-U129', 'LAS-U877', 'MIA-U1347', 'MIA-U747', 'MIA-U753', 'PHX-U180', 'PHX-U197', 'PHX-U232', 'PHX-U535']). The two holds should leave 9.",
+    "Pipeline tab has 85 rows (stages {'Dropped': 22, 'Off market (no lead)': 49, '1 Desk screen': 13, '2 Financial screen': 1}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -2150,20 +2159,69 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "changes": {
-    "new_sites": 0,
-    "removed_sites": 0,
-    "verdict_changes": 0,
-    "stage_moves": 0,
-    "sample_new": [],
-    "sample_verdicts": [],
-    "sample_stages": []
+    "new_sites": 11,
+    "removed_sites": 2,
+    "verdict_changes": 1,
+    "stage_moves": 6,
+    "sample_new": [
+      "LAND-LAS-0050",
+      "LAND-MIA-0051",
+      "LAND-PHX-0043",
+      "LAND-PHX-0044",
+      "LAND-PHX-0045",
+      "LAND-PHX-0046",
+      "LAND-PHX-0049",
+      "PIPE-MIA-0082",
+      "PIPE-PHX-0084",
+      "PIPE-PHX-0085",
+      "PIPE-SNA-0002"
+    ],
+    "sample_verdicts": [
+      {
+        "site_id": "MIA-U747",
+        "before": null,
+        "after": "PASS"
+      }
+    ],
+    "sample_stages": [
+      {
+        "site_id": "PHX-U167",
+        "before": "",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PHX-U217",
+        "before": "",
+        "after": "1 Desk screen"
+      },
+      {
+        "site_id": "PHX-U432",
+        "before": "",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PHX-U501",
+        "before": "",
+        "after": "1 Desk screen"
+      },
+      {
+        "site_id": "LAND-LAS-0004",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "deal_id": "LAND-LAS-0004",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      }
+    ]
   },
-  "verdicts_appended": 0,
-  "verdicts_total": 2660,
+  "verdicts_appended": 2,
+  "verdicts_total": 2662,
   "parcel_bytes": {
-    "parcels.geojson": 496104,
-    "parcels-PHX.geojson": 144851,
-    "parcels-LAS.geojson": 103539,
-    "parcels-MIA.geojson": 247800
+    "parcels.geojson": 501916,
+    "parcels-PHX.geojson": 149715,
+    "parcels-LAS.geojson": 104003,
+    "parcels-MIA.geojson": 248284
   }
 }

@@ -1,9 +1,6 @@
 lead id,workbook Stage,KO reason,map stage,rule applied
-PHX-U189,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-PHX-U234,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-PHX-U359,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-PHX-U371,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-PHX-U372,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-PHX-U462,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-LAS-U813,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
-LAS-U852,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed
+PIPE-PHX-0081,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
+LAND-PHX-0047,1 Desk screen,Gone — Crexi listing removed Nov 4,1 Desk screen,R-013; listings register delisted
+LAND-PHX-0048,1 Desk screen,Gone — Crexi listing removed Nov 4,1 Desk screen,R-013; listings register delisted
+LAND-PHX-0049,1 Desk screen,Gone — Crexi listing removed Nov 4,1 Desk screen,R-013; listings register delisted
+LAS-U119,,Source flag said listed but the only listing row is off-market,not listed,Live listing or workbook Listing status of Listed

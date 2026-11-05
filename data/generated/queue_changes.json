@@ -1,5 +1,573 @@
 {
-  "events": [],
+  "events": [
+    {
+      "id": "stage:PIPE-LAS-0015:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-LAS-0015",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-LAS-0016:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-LAS-0016",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-LAS-0017:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-LAS-0017",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-LAS-0071:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-LAS-0071",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-LAS-0072:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-LAS-0072",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-MIA-0075:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-MIA-0075",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "new_site:PIPE-MIA-0080:2026-11-05T20:08:41.923Z:new",
+      "siteId": "PIPE-MIA-0080",
+      "type": "new_site",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-MIA-0082:2026-11-05T20:08:41.923Z:new",
+      "siteId": "PIPE-MIA-0082",
+      "type": "new_site",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "stage:PIPE-PHX-0008:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-PHX-0008",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-PHX-0009:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-PHX-0009",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-PHX-0010:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-PHX-0010",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-PHX-0018:2026-11-05T20:08:41.923Z:Dropped",
+      "siteId": "PIPE-PHX-0018",
+      "type": "stage",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0081:2026-11-05T20:08:41.923Z:new",
+      "siteId": "PIPE-PHX-0081",
+      "type": "new_site",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0083:2026-11-05T20:08:41.923Z:new",
+      "siteId": "PIPE-PHX-0083",
+      "type": "new_site",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0084:2026-11-05T20:08:41.923Z:new",
+      "siteId": "PIPE-PHX-0084",
+      "type": "new_site",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0085:2026-11-05T20:08:41.923Z:new",
+      "siteId": "PIPE-PHX-0085",
+      "type": "new_site",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "activity:PIPE-SNA-0002:2026-11-05T20:08:41.923Z:A-000057",
+      "siteId": "PIPE-SNA-0002",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0018:2026-11-05T20:08:41.923Z:A-000070",
+      "siteId": "PIPE-PHX-0018",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0010:2026-11-05T20:08:41.923Z:A-000064",
+      "siteId": "PIPE-PHX-0010",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0009:2026-11-05T20:08:41.923Z:A-000063",
+      "siteId": "PIPE-PHX-0009",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0008:2026-11-05T20:08:41.923Z:A-000062",
+      "siteId": "PIPE-PHX-0008",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0005:2026-11-05T20:08:41.923Z:A-000054",
+      "siteId": "PIPE-PHX-0005",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0003:2026-11-05T20:08:41.923Z:A-000053",
+      "siteId": "PIPE-PHX-0003",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000052",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-MIA-0080:2026-11-05T20:08:41.923Z:A-000018",
+      "siteId": "PIPE-MIA-0080",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Financials on file"
+    },
+    {
+      "id": "activity:PIPE-MIA-0080:2026-11-05T20:08:41.923Z:A-000058",
+      "siteId": "PIPE-MIA-0080",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Financial screen"
+    },
+    {
+      "id": "activity:PIPE-MIA-0075:2026-11-05T20:08:41.923Z:A-000073",
+      "siteId": "PIPE-MIA-0075",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-LAS-0072:2026-11-05T20:08:41.923Z:A-000072",
+      "siteId": "PIPE-LAS-0072",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-LAS-0071:2026-11-05T20:08:41.923Z:A-000071",
+      "siteId": "PIPE-LAS-0071",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-LAS-0017:2026-11-05T20:08:41.923Z:A-000056",
+      "siteId": "PIPE-LAS-0017",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-LAS-0016:2026-11-05T20:08:41.923Z:A-000055",
+      "siteId": "PIPE-LAS-0016",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-LAS-0015:2026-11-05T20:08:41.923Z:A-000069",
+      "siteId": "PIPE-LAS-0015",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:LAND-PHX-0007:2026-11-05T20:08:41.923Z:A-000075",
+      "siteId": "LAND-PHX-0007",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:LAND-PHX-0003:2026-11-05T20:08:41.923Z:A-000074",
+      "siteId": "LAND-PHX-0003",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-MIA-0080:2026-11-05T20:08:41.923Z:A-000200",
+      "siteId": "PIPE-MIA-0080",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:PIPE-MIA-0079:2026-11-05T20:08:41.923Z:A-000198",
+      "siteId": "PIPE-MIA-0079",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:PIPE-LAS-0073:2026-11-05T20:08:41.923Z:A-000196",
+      "siteId": "PIPE-LAS-0073",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:PIPE-LAS-0071:2026-11-05T20:08:41.923Z:A-000195",
+      "siteId": "PIPE-LAS-0071",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:PIPE-LAS-0070:2026-11-05T20:08:41.923Z:A-000194",
+      "siteId": "PIPE-LAS-0070",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0039:2026-11-05T20:08:41.923Z:A-000017",
+      "siteId": "LAND-PHX-0039",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Environmental report on file"
+    },
+    {
+      "id": "activity:LAND-PHX-0036:2026-11-05T20:08:41.923Z:A-000009",
+      "siteId": "LAND-PHX-0036",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Brochure on file"
+    },
+    {
+      "id": "activity:LAND-PHX-0036:2026-11-05T20:08:41.923Z:A-000010",
+      "siteId": "LAND-PHX-0036",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Environmental report on file"
+    },
+    {
+      "id": "activity:LAND-PHX-0036:2026-11-05T20:08:41.923Z:A-000011",
+      "siteId": "LAND-PHX-0036",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Site photos on file"
+    },
+    {
+      "id": "activity:LAND-LAS-0009:2026-11-05T20:08:41.923Z:A-000016",
+      "siteId": "LAND-LAS-0009",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Preliminary title report on file"
+    },
+    {
+      "id": "activity:LAND-PHX-0042:2026-11-05T20:08:41.923Z:A-000166",
+      "siteId": "LAND-PHX-0042",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0041:2026-11-05T20:08:41.923Z:A-000165",
+      "siteId": "LAND-PHX-0041",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0040:2026-11-05T20:08:41.923Z:A-000164",
+      "siteId": "LAND-PHX-0040",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0038:2026-11-05T20:08:41.923Z:A-000163",
+      "siteId": "LAND-PHX-0038",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0035:2026-11-05T20:08:41.923Z:A-000162",
+      "siteId": "LAND-PHX-0035",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0034:2026-11-05T20:08:41.923Z:A-000161",
+      "siteId": "LAND-PHX-0034",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0033:2026-11-05T20:08:41.923Z:A-000159",
+      "siteId": "LAND-PHX-0033",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-LAS-0014:2026-11-05T20:08:41.923Z:A-000146",
+      "siteId": "LAND-LAS-0014",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-LAS-0013:2026-11-05T20:08:41.923Z:A-000145",
+      "siteId": "LAND-LAS-0013",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-LAS-0012:2026-11-05T20:08:41.923Z:A-000144",
+      "siteId": "LAND-LAS-0012",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-LAS-0011:2026-11-05T20:08:41.923Z:A-000143",
+      "siteId": "LAND-LAS-0011",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-LAS-0010:2026-11-05T20:08:41.923Z:A-000141",
+      "siteId": "LAND-LAS-0010",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:PIPE-LAS-0017:2026-11-05T20:08:41.923Z:A-000015",
+      "siteId": "PIPE-LAS-0017",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Site layout on file"
+    },
+    {
+      "id": "activity:PIPE-LAS-0016:2026-11-05T20:08:41.923Z:A-000014",
+      "siteId": "PIPE-LAS-0016",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Site layout on file"
+    },
+    {
+      "id": "activity:LAND-LAS-0001:2026-11-05T20:08:41.923Z:A-000013",
+      "siteId": "LAND-LAS-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Site layout on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000002",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Financials on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000004",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Site layout on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000006",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Site photos on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0081:2026-11-05T20:08:41.923Z:A-000020",
+      "siteId": "PIPE-PHX-0081",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Financials on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0006:2026-11-05T20:08:41.923Z:A-000060",
+      "siteId": "PIPE-PHX-0006",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0005:2026-11-05T20:08:41.923Z:A-000012",
+      "siteId": "PIPE-PHX-0005",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Brochure on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0003:2026-11-05T20:08:41.923Z:A-000007",
+      "siteId": "PIPE-PHX-0003",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Financials on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0003:2026-11-05T20:08:41.923Z:A-000008",
+      "siteId": "PIPE-PHX-0003",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Document on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000001",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Financials on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000003",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Survey on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:A-000005",
+      "siteId": "PIPE-PHX-0001",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Document on file"
+    },
+    {
+      "id": "activity:PIPE-PHX-0014:2026-11-05T20:08:41.923Z:A-000068",
+      "siteId": "PIPE-PHX-0014",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0007:2026-11-05T20:08:41.923Z:A-000061",
+      "siteId": "PIPE-PHX-0007",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-PHX-0004:2026-11-05T20:08:41.923Z:A-000059",
+      "siteId": "PIPE-PHX-0004",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-MIA-0013:2026-11-05T20:08:41.923Z:A-000067",
+      "siteId": "PIPE-MIA-0013",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-MIA-0012:2026-11-05T20:08:41.923Z:A-000066",
+      "siteId": "PIPE-MIA-0012",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-LAS-0011:2026-11-05T20:08:41.923Z:A-000065",
+      "siteId": "PIPE-LAS-0011",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Stage set to Dropped"
+    },
+    {
+      "id": "activity:PIPE-SNA-0002:2026-11-05T20:08:41.923Z:A-000019",
+      "siteId": "PIPE-SNA-0002",
+      "type": "activity",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "New activity: Brochure on file"
+    },
+    {
+      "id": "materials:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:financials",
+      "siteId": "PIPE-PHX-0001",
+      "type": "materials",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Financials count is now 11."
+    },
+    {
+      "id": "materials:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:property_legal",
+      "siteId": "PIPE-PHX-0001",
+      "type": "materials",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Property and legal count is now 5."
+    },
+    {
+      "id": "materials:PIPE-PHX-0001:2026-11-05T20:08:41.923Z:operations",
+      "siteId": "PIPE-PHX-0001",
+      "type": "materials",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Operations count is now 23."
+    },
+    {
+      "id": "materials:PIPE-PHX-0005:2026-11-05T20:08:41.923Z:financials",
+      "siteId": "PIPE-PHX-0005",
+      "type": "materials",
+      "at": "2026-11-05T20:08:41.923Z",
+      "summary": "Financials count is now 6."
+    }
+  ],
   "baseline": [
     {
       "id": "PIPE-LAS-0011",
@@ -14,32 +582,32 @@
     {
       "id": "PIPE-LAS-0015",
       "city": "LAS",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$2,615,000",
       "askingSource": "First Choice Business Brokers",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-LAS-0016",
       "city": "LAS",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$7,000,000",
       "askingSource": "Miracle",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-LAS-0017",
       "city": "LAS",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "FAIL",
       "askingPrice": "$7,000,000",
       "askingSource": "Miracle",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-LAS-0070",
@@ -54,22 +622,22 @@
     {
       "id": "PIPE-LAS-0071",
       "city": "LAS",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$3,500,000",
       "askingSource": "Ian Walker",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-LAS-0072",
       "city": "LAS",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$6,900,000",
       "askingSource": "Not shown",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-LAS-0073",
@@ -114,12 +682,12 @@
     {
       "id": "PIPE-MIA-0075",
       "city": "MIA",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$1,800,000",
       "askingSource": "Not shown",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-MIA-0076",
@@ -149,6 +717,26 @@
       "verdict": "",
       "askingPrice": "$3,999,000",
       "askingSource": "carwashesforsale.com listing",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0080",
+      "city": "MIA",
+      "stage": "2 Financial screen",
+      "stageGroup": "financial",
+      "verdict": "PASS",
+      "askingPrice": "$3,000,000",
+      "askingSource": "Matthews",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0082",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$550,000",
+      "askingSource": "Roger Pardo",
       "active": true
     },
     {
@@ -214,32 +802,32 @@
     {
       "id": "PIPE-PHX-0008",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$2,750,000",
       "askingSource": "Not shown",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0009",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$1,790,000",
       "askingSource": "Not shown",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0010",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$4,500,000",
       "askingSource": "Colton Rodgers",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0014",
@@ -254,12 +842,12 @@
     {
       "id": "PIPE-PHX-0018",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$2,100,000",
       "askingSource": "WCI Business Sales",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0067",
@@ -292,6 +880,46 @@
       "active": true
     },
     {
+      "id": "PIPE-PHX-0081",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "",
+      "askingSource": "Car Wash Brokers Inc",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0083",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$4,999,999",
+      "askingSource": "Marcus & Millichap",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0084",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,750,000",
+      "askingSource": "Incyte Realty",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0085",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "",
+      "askingSource": "Cushman & Wakefield",
+      "active": true
+    },
+    {
       "id": "PIPE-SNA-0002",
       "city": "SNA",
       "stage": "Dropped",
@@ -302,6 +930,337 @@
       "active": false
     }
   ],
-  "activity": [],
-  "materials": []
+  "activity": [
+    {
+      "id": "A-000057",
+      "siteId": "PIPE-SNA-0002",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000070",
+      "siteId": "PIPE-PHX-0018",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000064",
+      "siteId": "PIPE-PHX-0010",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000063",
+      "siteId": "PIPE-PHX-0009",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000062",
+      "siteId": "PIPE-PHX-0008",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000054",
+      "siteId": "PIPE-PHX-0005",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000053",
+      "siteId": "PIPE-PHX-0003",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000052",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000018",
+      "siteId": "PIPE-MIA-0080",
+      "summary": "Financials on file"
+    },
+    {
+      "id": "A-000058",
+      "siteId": "PIPE-MIA-0080",
+      "summary": "Stage set to Financial screen"
+    },
+    {
+      "id": "A-000073",
+      "siteId": "PIPE-MIA-0075",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000072",
+      "siteId": "PIPE-LAS-0072",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000071",
+      "siteId": "PIPE-LAS-0071",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000056",
+      "siteId": "PIPE-LAS-0017",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000055",
+      "siteId": "PIPE-LAS-0016",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000069",
+      "siteId": "PIPE-LAS-0015",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000075",
+      "siteId": "LAND-PHX-0007",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000074",
+      "siteId": "LAND-PHX-0003",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000200",
+      "siteId": "PIPE-MIA-0080",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000198",
+      "siteId": "PIPE-MIA-0079",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000196",
+      "siteId": "PIPE-LAS-0073",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000195",
+      "siteId": "PIPE-LAS-0071",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000194",
+      "siteId": "PIPE-LAS-0070",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000017",
+      "siteId": "LAND-PHX-0039",
+      "summary": "Environmental report on file"
+    },
+    {
+      "id": "A-000009",
+      "siteId": "LAND-PHX-0036",
+      "summary": "Brochure on file"
+    },
+    {
+      "id": "A-000010",
+      "siteId": "LAND-PHX-0036",
+      "summary": "Environmental report on file"
+    },
+    {
+      "id": "A-000011",
+      "siteId": "LAND-PHX-0036",
+      "summary": "Site photos on file"
+    },
+    {
+      "id": "A-000016",
+      "siteId": "LAND-LAS-0009",
+      "summary": "Preliminary title report on file"
+    },
+    {
+      "id": "A-000166",
+      "siteId": "LAND-PHX-0042",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000165",
+      "siteId": "LAND-PHX-0041",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000164",
+      "siteId": "LAND-PHX-0040",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000163",
+      "siteId": "LAND-PHX-0038",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000162",
+      "siteId": "LAND-PHX-0035",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000161",
+      "siteId": "LAND-PHX-0034",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000159",
+      "siteId": "LAND-PHX-0033",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000146",
+      "siteId": "LAND-LAS-0014",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000145",
+      "siteId": "LAND-LAS-0013",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000144",
+      "siteId": "LAND-LAS-0012",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000143",
+      "siteId": "LAND-LAS-0011",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000141",
+      "siteId": "LAND-LAS-0010",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000015",
+      "siteId": "PIPE-LAS-0017",
+      "summary": "Site layout on file"
+    },
+    {
+      "id": "A-000014",
+      "siteId": "PIPE-LAS-0016",
+      "summary": "Site layout on file"
+    },
+    {
+      "id": "A-000013",
+      "siteId": "LAND-LAS-0001",
+      "summary": "Site layout on file"
+    },
+    {
+      "id": "A-000002",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Financials on file"
+    },
+    {
+      "id": "A-000004",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Site layout on file"
+    },
+    {
+      "id": "A-000006",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Site photos on file"
+    },
+    {
+      "id": "A-000020",
+      "siteId": "PIPE-PHX-0081",
+      "summary": "Financials on file"
+    },
+    {
+      "id": "A-000060",
+      "siteId": "PIPE-PHX-0006",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000012",
+      "siteId": "PIPE-PHX-0005",
+      "summary": "Brochure on file"
+    },
+    {
+      "id": "A-000007",
+      "siteId": "PIPE-PHX-0003",
+      "summary": "Financials on file"
+    },
+    {
+      "id": "A-000008",
+      "siteId": "PIPE-PHX-0003",
+      "summary": "Document on file"
+    },
+    {
+      "id": "A-000001",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Financials on file"
+    },
+    {
+      "id": "A-000003",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Survey on file"
+    },
+    {
+      "id": "A-000005",
+      "siteId": "PIPE-PHX-0001",
+      "summary": "Document on file"
+    },
+    {
+      "id": "A-000068",
+      "siteId": "PIPE-PHX-0014",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000061",
+      "siteId": "PIPE-PHX-0007",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000059",
+      "siteId": "PIPE-PHX-0004",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000067",
+      "siteId": "PIPE-MIA-0013",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000066",
+      "siteId": "PIPE-MIA-0012",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000065",
+      "siteId": "PIPE-LAS-0011",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "id": "A-000019",
+      "siteId": "PIPE-SNA-0002",
+      "summary": "Brochure on file"
+    }
+  ],
+  "materials": [
+    {
+      "siteId": "PIPE-PHX-0001",
+      "category": "financials",
+      "label": "Financials",
+      "count": 11
+    },
+    {
+      "siteId": "PIPE-PHX-0001",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 5
+    },
+    {
+      "siteId": "PIPE-PHX-0001",
+      "category": "operations",
+      "label": "Operations",
+      "count": 23
+    },
+    {
+      "siteId": "PIPE-PHX-0005",
+      "category": "financials",
+      "label": "Financials",
+      "count": 6
+    }
+  ]
 }

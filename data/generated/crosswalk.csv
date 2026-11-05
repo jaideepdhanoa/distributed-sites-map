@@ -3067,6 +3067,7 @@ PHX-U569,Universe tab,PHX-U569
 PHX-U588,Universe tab,PHX-U588
 MIA-U688,Universe tab,MIA-U688
 MIA-U729,Universe tab,MIA-U729
+MIA-U747,Universe tab,MIA-U747
 MIA-U748,Universe tab,MIA-U748
 MIA-U753,Universe tab,MIA-U753
 MIA-U762,Universe tab,MIA-U762
@@ -3131,8 +3132,8 @@ LAS-U1625,Universe tab,LAS-U1625
 MIA-U1176,Universe tab,MIA-U1176
 WB-MIA-0008,Universe tab,WB-MIA-0008
 PHX-U193,Pipeline,PHX 1523 E Southern Ave
-PIPE-XX-0002,Pipeline,SNA 4200 Birch St
-PIPE-PHX-0003,Pipeline,PHX 16843 N 43rd Ave
+PIPE-SNA-0002,Pipeline,SNA 4200 Birch St
+PHX-U432,Pipeline,PHX 16843 N 43rd Ave
 PHX-U274,Pipeline,PHX 1220 N Horne
 PHX-U435,Pipeline,PHX 515 E Union Hills Dr
 PIPE-PHX-0006,Pipeline,"PHX Flex-serve wash, northeast Phoenix"
@@ -3162,6 +3163,10 @@ PIPE-MIA-0077,Pipeline,MIA Mechanic shop near Tamiami Airport (address to come)
 MIA-U1206,Pipeline,MIA 1080 NW 31st Ave
 MIA-U747,Pipeline,MIA 7520 W McNab Rd
 PHX-U326,Pipeline,PHX 5515 N 59th Ave
+PIPE-MIA-0082,Pipeline,"MIA Clean Get Away Car Wash, Pembroke Pines, FL (street address to confirm)"
+PHX-U167,Pipeline,"PHX Fast Lap Xpress Wash, 3830 N 51st Ave"
+PIPE-PHX-0084,Pipeline,PHX 3520 N 16th St
+PIPE-PHX-0085,Pipeline,PHX 8812-8828 N Black Canyon Hwy
 LAS-U943,Land Sites,LAS 2436 E Cheyenne Ave
 LAND-PHX-0002,Land Sites,PHX 4405 N 7th Ave
 LAND-PHX-0003,Land Sites,"PHX 3141 E Ocotillo Rd, San Tan Valley"
@@ -3187,3 +3192,12 @@ LAND-PHX-0039,Land Sites,PHX 4013-4021 S Central Ave
 LAND-PHX-0040,Land Sites,PHX 2531 S 7th Ave
 LAND-PHX-0041,Land Sites,PHX 1830 W Fillmore St
 LAND-PHX-0042,Land Sites,PHX 2220 W Indian School Rd
+LAND-PHX-0043,Land Sites,PHX 3926 N 19th Ave
+LAND-PHX-0044,Land Sites,PHX SWC 35th Ave & Baseline Rd
+LAND-PHX-0045,Land Sites,PHX 120-140 W Osborn Rd
+LAND-PHX-0046,Land Sites,"PHX South Mountain Pavilion, 2040/2050 W Baseline Rd"
+PHX-U217,Land Sites,PHX 3930 E Baseline Rd
+PHX-U501,Land Sites,PHX 1905 W Baseline Rd
+LAND-PHX-0049,Land Sites,PHX 2725 N 35th Ave
+LAND-LAS-0050,Land Sites,LAS 8355 Dean Martin Dr
+LAND-MIA-0051,Land Sites,MIA 19045 NW 2nd Ave

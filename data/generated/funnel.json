@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-05T03:21:39Z",
+  "generated_at": "2026-11-05T20:07:10Z",
   "workbook_as_of": "2026-11-05",
   "stages": [
     {
@@ -83,7 +83,7 @@
       "id": "land_tier",
       "name": "Land tier",
       "unit": "sites",
-      "total": 38,
+      "total": 39,
       "L10": {
         "total": 21,
         "by_city": {
@@ -117,13 +117,13 @@
         ]
       },
       "L4": {
-        "total": 17,
+        "total": 18,
         "by_city": {
           "LAS": 4,
           "PHX": 8,
-          "MIA": 5
+          "MIA": 6
         },
-        "county_checked": 17,
+        "county_checked": 18,
         "ids": [
           "LAS-U100",
           "LAS-U1516",
@@ -133,6 +133,7 @@
           "MIA-U1098",
           "MIA-U1174",
           "MIA-U1239",
+          "MIA-U747",
           "MIA-U762",
           "PHX-U1005",
           "PHX-U1017",
@@ -177,13 +178,13 @@
       "id": "verified",
       "name": "Verified",
       "unit": "sites",
-      "total": 38,
-      "county_checked": 38,
+      "total": 39,
+      "county_checked": 39,
       "pending": 0,
       "by_city_checked": {
         "LAS": 10,
         "PHX": 19,
-        "MIA": 9
+        "MIA": 10
       },
       "by_city_pending": {
         "LAS": 0,
@@ -196,19 +197,19 @@
       "id": "verdict",
       "name": "Verdict split",
       "unit": "sites",
-      "total": 38,
+      "total": 39,
       "by_city": {
         "LAS": 10,
         "PHX": 19,
-        "MIA": 9
+        "MIA": 10
       },
       "outcomes": {
         "PASS": {
-          "total": 9,
+          "total": 10,
           "by_city": {
             "LAS": 3,
             "PHX": 4,
-            "MIA": 2
+            "MIA": 3
           },
           "ids": [
             "LAS-U129",
@@ -218,6 +219,7 @@
             "PHX-U180",
             "PHX-U197",
             "LAS-U100",
+            "MIA-U747",
             "PHX-U232",
             "PHX-U535"
           ]
@@ -290,8 +292,8 @@
           ]
         }
       },
-      "all_county_checked": 109,
-      "note": "Verdicts for the county-checked in-area land fits. The full reconciliation file still has 109 county-checked sites, including ones that are not L10 or L4. Same-owner adjoining stays MAYBE on the playbook scale. Tenure is a flag unless the verdict itself is FAIL on tenure."
+      "all_county_checked": 110,
+      "note": "Verdicts for the county-checked in-area land fits. The full reconciliation file still has 110 county-checked sites, including ones that are not L10 or L4. Same-owner adjoining stays MAYBE on the playbook scale. Tenure is a flag unless the verdict itself is FAIL on tenure."
     },
     {
       "id": "listed",
@@ -300,21 +302,21 @@
       "total": 2,
       "by_city": {
         "LAS": 1,
-        "PHX": 1,
-        "MIA": 0
+        "PHX": 0,
+        "MIA": 1
       },
-      "of": 38,
+      "of": 39,
       "note": "Split of the in-area L10 and L4 sites that are not eliminated. Off-market rows are not listed. Nobody drops at this step."
     },
     {
       "id": "contacted",
       "name": "Deals contacted",
       "unit": "deals",
-      "total": 17,
+      "total": 29,
       "by_city": {
-        "LAS": 9,
-        "PHX": 3,
-        "MIA": 5
+        "LAS": 10,
+        "PHX": 12,
+        "MIA": 7
       },
       "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
     }
@@ -338,6 +340,7 @@
       "MIA-U1181",
       "MIA-U1239",
       "MIA-U1347",
+      "MIA-U747",
       "MIA-U753",
       "MIA-U762",
       "MIA-U777",

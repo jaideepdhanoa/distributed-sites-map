@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { nextStepText, plainUtility, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -25,20 +27,24 @@ export default function Detail({
   lat,
   lng,
   onOpenDeal,
+  linkedDeal,
   onAddCompare,
   sameOwner,
   onClose,
   sheet,
+  extras,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
   lat?: number | null;
   lng?: number | null;
   onOpenDeal?: () => void;
+  linkedDeal?: DealProps | null;
   onAddCompare?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
   sheet?: { expanded: boolean; onToggle: () => void };
+  extras?: ReactNode;
 }) {
   if (!site) return null;
   const price = site.asking_price_display;
@@ -50,7 +56,9 @@ export default function Detail({
       <h3>Summary</h3>
       <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
       <p>Next step: {nextStepText(site)}</p>
-      {onAddCompare ? <button type="button" onClick={onAddCompare}>Add to compare</button> : null}
+      <h3>Lead source</h3>
+      <p>{leadSourceLine(site, linkedDeal)}</p>
+        {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -80,19 +88,17 @@ export default function Detail({
         <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
         <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
         <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-        <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${site.aadt_road}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
+        <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
         <span>Flood</span><div>{site.flood_zone || "—"}</div>
         <span>Year built</span><div>{site.year_built || "—"}</div>
         <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
         <span>County full cash value</span><div>{site.full_cash_value_display || "—"}</div>
-        <span>Last recorded sale</span><div>{[site.last_sale_date, site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
+        <span>Last recorded sale</span><div>{[formatRecordedDate(site.last_sale_date), site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
       </div>
       <h3>Verdict</h3>
       <div className="kv">
         <span>Verdict</span><div>{plainVerdict(site.verdict)}</div>
         <span>Operating</span><div>{site.operating || "—"}</div>
-        <span>Utility proximity</span><div>{plainUtility(site.utility_proximity)}</div>
-        <span>Serving utility</span><div>{site.serving_utility || "—"}{site.serving_utility_source ? ` · ${site.serving_utility_source}` : ""}</div>
         <span>Tenure</span><div>{site.tenure || "—"}</div>
       </div>
       {site.research_sources ? (
@@ -102,10 +108,10 @@ export default function Detail({
           {site.research_note ? <p>{site.research_note}</p> : null}
         </>
       ) : null}
-      {site.evidence ? (
+      {cleanNote(site.evidence) ? (
         <details>
           <summary>Research notes</summary>
-          <p>{site.evidence}</p>
+          <p>{cleanNote(site.evidence)}</p>
         </details>
       ) : null}
       {price ? (
@@ -158,6 +164,7 @@ export default function Detail({
           </p>
         </>
       ) : null}
+      {extras}
     </aside>
   );
 }
@@ -171,6 +178,7 @@ export function DealDetail({
   onOpenSite,
   onClose,
   sheet,
+  extras,
 }: {
   deal: DealProps;
   universeName?: string;
@@ -180,6 +188,7 @@ export function DealDetail({
   onOpenSite?: () => void;
   onClose?: () => void;
   sheet?: { expanded: boolean; onToggle: () => void };
+  extras?: ReactNode;
 }) {
   return (
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
@@ -196,8 +205,9 @@ export function DealDetail({
       {mapsLinks(lat, lng)}
       <h3>Broker</h3>
       <div className="kv">
-        <span>Broker</span><div>{deal.broker || "—"}</div>
-        <span>Firm</span><div>{deal.firm || "—"}</div>
+        <span>Broker</span><div>{shownBroker(deal) || "—"}</div>
+        <span>Firm</span><div>{shownFirm(deal) || "—"}</div>
+        <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
       </div>
       <h3>Listing</h3>
       <div className="kv">
@@ -205,7 +215,7 @@ export function DealDetail({
         <span>Asking price</span>
         <div>
           {deal.asking_price_display || "—"}
-          {deal.asking_price_source ? ` · ${deal.asking_price_source}` : ""}
+          {shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
         </div>
         <span>Source</span>
         <div>
@@ -238,6 +248,7 @@ export function DealDetail({
           </p>
         </>
       ) : null}
+      {extras}
     </aside>
   );
 }

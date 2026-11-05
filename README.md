@@ -33,6 +33,42 @@ Planned accounts, none created here: `jaideep` (admin), `cindel`, `ming`, `ricar
 
 On Vercel, sign-in refuses to run if neither Redis pair is set. Locally, without Redis, lockout is skipped.
 
+## Actions
+
+Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes a stage, and it never writes to the workbook or the Google Sheet.
+
+### Neon
+
+1. In the Vercel project, add the Neon integration from the Marketplace (or create a Neon database and connect it). This repo does not provision the database.
+2. Use the pooled connection string. Neon exposes it as `DATABASE_URL`. Do not commit that string.
+3. Redeploy. The first notes, suggestions, or saved-view request applies `db/migrations`. From a machine that has the URL, `npm run db:migrate` does the same thing.
+4. After a workbook sync rebuilds `data/generated`, run `npm run reconcile-suggestions`. The suggestions panel also checks on open. A suggestion becomes `applied` only when the generated data already matches the proposed value. Accepting a suggestion does not change what the map shows.
+
+### Roles
+
+Queue access is separate from the admin page. It is read from the account list, not from names in the code.
+
+| Access | Can do |
+|---|---|
+| viewer | Read notes and suggestions. Save a personal view. Export the suggestion CSV. |
+| contributor | Viewer, plus notes, replies, and proposals. Authors can edit or remove their own posts. |
+| reviewer | Contributor, plus accept or reject an open suggestion, resolve a thread, and share a team view. |
+
+Set it in either place:
+
+- On one account: `"actionRole":"viewer"` inside that person's `AUTH_USERS` object. An optional `"name"` is the label shown in the owner list.
+- For a whole role label: `ACTION_ROLE_MAP={"admin":"reviewer","user":"contributor"}`.
+
+If you set neither, `admin` is a reviewer and `user` is a contributor. A bad `ACTION_ROLE_MAP` falls back to that default. The accounts page shows the resolved access. Every saved note, reply, edit, removal, suggestion, decision, saved view, and export is appended to `audit_log`.
+
+Free text is checked before it is stored. Text that fails the same wording rules as the map is rejected and is not written. The rejection does not repeat the blocked text.
+
+### Suggestion CSV
+
+More → Suggestions → Download CSV. A person applies those rows in the workbook. The columns are the record, the field, the current value, the proposed value, the reason, and the status (`open`, `accepted`, `rejected`, or `applied`).
+
+Approved next steps have their own download on that panel. Columns are the site id (the permanent id when the record has one), the target date, the title, the owner, and when it was approved. Approving a next step does not change the stage and does not write the workbook. A later approval leaves the earlier one in the history on the card.
+
 Failed attempts are counted for unknown usernames as well as known ones, with the same message. A separate Redis counter limits attempts per IP (10 in 15 minutes). A username locks after 5 failures in 15 minutes.
 
 Imagery uses the public Esri World Imagery tiles. No imagery key is sent to the browser.
@@ -63,6 +99,25 @@ Other new county rows go in `data/source/incoming/` as `.csv` or `.xlsx` with `s
 
 Verdict rows are append-only in `data/verdicts/verdicts.csv`. Pull requests run `python scripts/build_data.py --check`.
 
+## Workbook sync
+
+A scheduled workflow exports the Pipeline Sheet and reads the other build inputs from a Drive folder named Map sync inputs. The folder id is the repository variable `MAP_SYNC_INPUTS_FOLDER_ID`. There is no default, and the sync does not look in the program root. It lists only the top level of that folder.
+
+The service account needs Viewer on exactly three things: the Pipeline workbook, Map sync inputs, and the 2 Sites folder (`TIMELINE_SITES_FOLDER_ID`). It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request.
+
+Map sync inputs sits in the Moove root, next to 2 Sites. Its top level holds:
+
+- `universe_v3.csv`
+- `listings_match_v3.csv`
+- `depots.csv`
+- `las_ring100_screen.csv`
+- `reconciliation_final`, a Google Sheet, exported to xlsx when the sync reads it
+- `service-area-PHX.kmz`, `service-area-LAS.kmz`, and `service-area-MIA.kmz`
+
+Any file ending in `.kmz` is kept. The three names above are the ones this folder uses. A Google Doc never counts. A csv Sheet export must have one tab. Anything else in the folder is skipped.
+
+`note_rewrites.json` is map configuration, committed at `data/note_rewrites.json`. It is not a Drive input. The build still runs if that file is missing.
+
 ## Counts from this data drop
 
 | Step | Count |
@@ -88,7 +143,7 @@ Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The 
 
 ## Not in this version
 
-- No nightly pull from the live workbook.
+- The workbook sync opens a pull request every four hours when the data changed. It does not merge, and it does not write back to the Sheet.
 - Broward parcel geometry did not resolve. Clark, Maricopa, and Miami-Dade returned 61 wash parcels. Adjoining parcel outlines are not in the inputs.
 - The 75–250 m review band was not recomputed. Two same-parcel pairs are counted once.
 - No write-back of a human call, and no PDF export. The current view exports to CSV.

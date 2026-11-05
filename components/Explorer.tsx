@@ -3,11 +3,15 @@
 import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
+import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail } from "./Detail";
 import Wordmark from "./Wordmark";
-import SiteTable, { DealTable } from "./SiteTable";
-import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
-import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle, tierLabel } from "@/lib/labels";
+import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
+import SiteTable, { DealTable, siteExportHeaders, siteExportRow } from "./SiteTable";
+import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
+import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -32,12 +36,12 @@ export default function Explorer() {
   const router = useRouter();
   const [data, setData] = useState<AppData | null>(null);
   const [detail, setDetail] = useState<SiteProps | null>(null);
-  const [me, setMe] = useState<{ u: string; role: string } | null>(null);
+  const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
-  const [tableOpen, setTableOpen] = useState(false);
-  const [compare, setCompare] = useState(false);
-  const [showDropped, setShowDropped] = useState(false);
+  const tableOpen = params.get("table") === "1";
+  const compare = params.get("disagree") === "1";
+  const showDropped = params.get("ruled") === "1";
   const [layersOpen, setLayersOpen] = useState(false);
   const showAreas = params.get("areas") !== "0";
   const showDepots = params.get("depots") !== "0";
@@ -77,14 +81,20 @@ export default function Explorer() {
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeParam = params.get("pstage") as PipeId | null;
   const pipeStage: PipeId = pipeParam && PIPE_STEPS.some((step) => step.id === pipeParam) ? pipeParam : "desk";
+  const listView = params.get("view") === "list";
+  const sortParam = params.get("sort") || "site:asc";
+  const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
+  const sortDesc = sortParam.endsWith(":desc");
 
-  function write(next: Record<string, string | null>) {
+  function write(next: Record<string, string | null>, history = false) {
     const url = new URLSearchParams(params.toString());
     for (const [key, value] of Object.entries(next)) {
       if (!value) url.delete(key);
       else url.set(key, value);
     }
-    router.replace(`/?${url.toString()}`, { scroll: false });
+    const href = `/?${url.toString()}`;
+    if (history) router.push(href, { scroll: false });
+    else router.replace(href, { scroll: false });
   }
 
   function setTableTab(tab: "universe" | "pipeline" | "land") {
@@ -129,7 +139,7 @@ export default function Explorer() {
         setMe(meRes.ok ? await meRes.json() : null);
         const changes = funnelPayload.meta?.changes;
         if (changes && typeof changes.new_sites === "number") {
-          setChangesNote(`Since the previous build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`);
+          setChangesNote(`Since the previous published build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`);
         }
       }
     });
@@ -151,6 +161,10 @@ export default function Explorer() {
   }, [selected]);
 
   useEffect(() => {
+    setSelected(params.get("site"));
+  }, [params]);
+
+  useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setFiltersOpen(false);
@@ -170,7 +184,7 @@ export default function Explorer() {
     return map;
   }, [features]);
   const censusFeatures = features.filter((feature) => feature.properties.origin !== "off-market");
-  const sites = censusFeatures.map((feature) => feature.properties);
+  const sites = censusFeatures.map((feature) => presentSite(feature.properties));
   const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && feature.properties.city === city);
 
   function passesChips(site: SiteProps, loose: boolean) {
@@ -197,7 +211,7 @@ export default function Explorer() {
 
   function toggleType(type: string) {
     if (businessTypes === null) {
-      setBusinessTypes([type]);
+      setBusinessTypes(BUSINESS_TYPES.filter((item) => item !== type));
       return;
     }
     const next = businessTypes.includes(type)
@@ -233,9 +247,11 @@ export default function Explorer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [features, stage, city, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes]);
 
-  const visibleFeatures: SiteFeature[] = visibleSites
-    .map((site) => featureById.get(site.site_id))
-    .filter((feature): feature is SiteFeature => Boolean(feature));
+  const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
+    const feature = featureById.get(site.site_id);
+    if (!feature) return [];
+    return [{ ...feature, properties: site }];
+  });
 
   const dealFeatures = data?.deals.features ?? [];
   const dealRows = dealFeatures.map((feature) => feature.properties);
@@ -255,19 +271,30 @@ export default function Explorer() {
   const landDeals = dealRows.filter((deal) => deal.kind === "land" && deal.city === city && typeOn(deal.business_type || "Other") && (!query || `${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase())));
 
   function exportTable() {
-    const rows = tableTab === "pipeline" ? pipelineDeals : tableTab === "land" ? landDeals : visibleSites;
+    const filterLine = `Filters: city ${city}, ${funnel === "pipeline" ? `pipeline ${pipeStage}` : `step ${stage}`}${query ? `, search ${query}` : ""}${landTier !== "any" ? `, tier ${landTier}` : ""}${verdict !== "any" ? `, verdict ${verdict}` : ""}${listed === "yes" ? ", listed" : ""}${businessTypes ? `, types ${businessTypes.join(" ")}` : ""}. As of ${new Date().toISOString().slice(0, 10)}.`;
     const headers = tableTab === "universe"
-      ? ["site_id", "name", "address", "city", "verdict", "zoning", "flood_zone", "year_built", "miles_to_depot", "confidence", "owner"]
-      : ["deal_id", "name", "address", "city", "stage", "firm", "asking_price_display"];
-    const lines = [headers.join(",")];
-    for (const row of rows as Record<string, unknown>[]) {
-      lines.push(headers.map((key) => `"${String(row[key] ?? "").replace(/"/g, "\"\"")}"`).join(","));
-    }
+      ? siteExportHeaders()
+      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site"];
+    const body = tableTab === "universe"
+      ? visibleSites.map((row) => siteExportRow(row))
+      : (tableTab === "land" ? landDeals : pipelineDeals).map((row) => [
+          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id,
+        ]);
+    const lines = [`# ${filterLine}`, headers.join(","), ...body.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`).join(","))];
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `${city}-${tableTab}.csv`;
     link.click();
+    setMoreOpen(false);
+    setMenuOpen(false);
+    if (me?.actionsEnabled) {
+      void fetch("/api/actions/exports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "table" }),
+      }).catch(() => undefined);
+    }
   }
 
   function addCompare(id: string) {
@@ -310,7 +337,10 @@ export default function Explorer() {
         .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
         .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
   const linkedIds = new Set(pipelineSquares.map((feature) => feature.properties.universe_id).filter(Boolean));
-  const pipelineSites = features.filter((feature) => linkedIds.has(feature.properties.site_id) && feature.geometry);
+  const pipelineSites = features.flatMap((feature) => {
+    if (!linkedIds.has(feature.properties.site_id) || !feature.geometry) return [];
+    return [{ ...feature, properties: presentSite(feature.properties) }];
+  });
 
   const selectedSite = detail && detail.site_id === selected
     ? detail
@@ -324,7 +354,7 @@ export default function Explorer() {
     let cancel = false;
     fetch(`/api/data/sites/${encodeURIComponent(selected)}`).then(async (response) => {
       if (!response.ok) return;
-      const payload = (await response.json()) as SiteProps;
+      const payload = presentSite((await response.json()) as SiteProps);
       if (!cancel) setDetail(payload);
     });
     return () => {
@@ -334,20 +364,39 @@ export default function Explorer() {
 
   function choose(id: string | null) {
     setSelected(id);
-    write({ site: id });
+    write({ site: id }, true);
   }
 
   function jump(nextCity: string) {
     setSelected(null);
-    write({ city: nextCity === "PHX" ? null : nextCity, site: null });
+    write({ city: nextCity === "PHX" ? null : nextCity, site: null }, true);
+  }
+
+  function filtersOn() {
+    return Boolean(query || businessTypes || landTier !== "any" || verdict !== "any" || listed === "yes" || landSites || compare || showDropped);
   }
 
   function count(step: StageId) {
     return sites.filter((site) => site.city === city && inStage(site, step)).length;
   }
 
+  function filteredAt(step: StageId) {
+    if (compare) return sites.filter((site) => site.city === city && site.verdict_disagreement && passesChips(site, true) && inStage(site, step)).length;
+    let total = sites.filter((site) => inStage(site, step) && passesChips(site, false)).length;
+    if (landSites) total += sites.filter((site) => site.land_only && site.city === city && passesChips(site, true)).length;
+    if (showDropped) total += sites.filter((site) => droppedAt(site, step) && passesChips(site, true)).length;
+    return total;
+  }
+
+  function stepBadge(step: StageId) {
+    const total = count(step);
+    if (!filtersOn()) return total.toLocaleString();
+    const shown = step === stage && extra == null ? visibleSites.length : filteredAt(step);
+    return `${shown.toLocaleString()} of ${total.toLocaleString()}`;
+  }
+
   function subcount(step: StageId, field: "listed" | "contacted") {
-    return sites.filter((site) => site.city === city && inStage(site, step) && site[field]).length;
+    return sites.filter((site) => site.city === city && inStage(site, step) && site[field] && passesChips(site, false)).length;
   }
 
   const heldCount = sites.filter((site) => site.city === city && heldOutside(site)).length;
@@ -380,6 +429,70 @@ export default function Explorer() {
 
   const sheet = { expanded: sheetExpanded, onToggle: () => setSheetExpanded((value) => !value) };
   const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && !dealPoint(deal));
+  const offMarketShown = funnel === "pipeline" || extra ? [] : offMarketFeatures.filter((feature) => {
+    if (!feature.geometry) return false;
+    if (stage !== "universe" && !inStage(feature.properties, stage)) return false;
+    return passesChips(feature.properties, false);
+  });
+  const universePins = showUniverse ? visibleFeatures.filter((feature) => feature.geometry) : [];
+  const pinCount = funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length;
+  const siteById = new Map(sites.map((site) => [site.site_id, site]));
+
+  function siteRow(site: SiteProps): ListRow {
+    const price = site.listed && site.asking_price_display ? `${site.asking_price_display}${site.asking_price_source ? ` · ${site.asking_price_source}` : ""}` : "";
+    return {
+      id: site.site_id,
+      site: site.name || site.address || site.site_id,
+      type: site.business_type || "Car wash",
+      city: site.city,
+      stage: plainVerdict(site.verdict),
+      tier: tierLabel(site.land_tier) || "",
+      spare: site.spare_ac_own != null ? `${site.spare_ac_own} ac` : "",
+      zoning: site.zoning || "",
+      traffic: site.aadt_count ? `${site.aadt_count}${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}` : "",
+      listed: site.listed ? `Yes${price ? ` · ${price}` : ""}` : "No",
+      lead: leadSourceLine(site, dealRows.find((deal) => deal.deal_id === site.linked_deal_id || deal.universe_id === site.site_id)),
+    };
+  }
+
+  function dealRow(deal: DealProps): ListRow {
+    const linked = deal.universe_id ? siteById.get(deal.universe_id) : undefined;
+    const price = deal.asking_price_display ? `${deal.asking_price_display}${deal.asking_price_source ? ` · ${deal.asking_price_source}` : ""}` : "";
+    return {
+      id: deal.deal_id,
+      site: deal.name || deal.address || deal.deal_id,
+      type: deal.business_type || "Other",
+      city: deal.city,
+      stage: stageDetail(deal.stage, deal.stage_group),
+      tier: linked ? tierLabel(linked.land_tier) || "" : "",
+      spare: linked?.spare_ac_own != null ? `${linked.spare_ac_own} ac` : "",
+      zoning: linked?.zoning || "",
+      traffic: linked?.aadt_count ? `${linked.aadt_count}${linked.aadt_road ? ` on ${plainRoad(linked.aadt_road)}` : ""}` : "",
+      listed: price || (deal.listed ? "Yes" : "No"),
+      lead: [deal.broker, deal.firm].filter(Boolean).join(" · "),
+    };
+  }
+
+  const listRows = [...(funnel === "pipeline"
+    ? pipelineSquares.map((feature) => dealRow(feature.properties))
+    : [...universePins.map((feature) => siteRow(feature.properties)), ...offMarketShown.map((feature) => siteRow(feature.properties))]
+  )].sort((a, b) => {
+    const left = String(a[sortKey] || "").trim();
+    const right = String(b[sortKey] || "").trim();
+    if (!left && !right) return 0;
+    if (!left) return 1;
+    if (!right) return -1;
+    const diff = left.localeCompare(right, undefined, { numeric: true });
+    return sortDesc ? -diff : diff;
+  });
+
+  function exportList() {
+    const blob = new Blob([listCsv(listRows)], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${city}-list.csv`;
+    link.click();
+  }
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
   if (businessTypes) activeFilters.push({ id: "types", label: businessTypes.join(", "), clear: () => setBusinessTypes(null) });
@@ -387,8 +500,8 @@ export default function Explorer() {
   if (verdict !== "any") activeFilters.push({ id: "verdict", label: plainVerdict(verdict), clear: () => write({ verdict: null }) });
   if (listed === "yes") activeFilters.push({ id: "listed", label: "Listed", clear: () => write({ listed: null }) });
   if (landSites) activeFilters.push({ id: "land", label: "Land sites", clear: () => write({ land: null }) });
-  if (compare) activeFilters.push({ id: "compare", label: "Reviews disagree", clear: () => setCompare(false) });
-  if (showDropped) activeFilters.push({ id: "ruled", label: "Ruled out", clear: () => setShowDropped(false) });
+  if (compare) activeFilters.push({ id: "compare", label: "Reviews disagree", clear: () => write({ disagree: null }) });
+  if (showDropped) activeFilters.push({ id: "ruled", label: "Ruled out", clear: () => write({ ruled: null }) });
   if (extra === "held") activeFilters.push({ id: "held", label: "Held outside the service area", clear: () => write({ extra: null }) });
 
   function closeMenus() {
@@ -413,7 +526,7 @@ export default function Explorer() {
   }
 
   return (
-    <div className={`shell ${tableOpen ? "table-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage}>
+    <div className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""}`} data-visible={visibleSites.length} data-city={city} data-stage={stage} data-pin-count={pinCount} data-list-count={listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -440,6 +553,10 @@ export default function Explorer() {
             <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           </div>
+          <div className="funnel-switch only-desktop" role="group" aria-label="Map or list">
+            <button className={!listView ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
+            <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
+          </div>
           <div className="user-menu only-desktop">
             <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
               {(me?.u || "?").slice(0, 1).toUpperCase()}
@@ -455,7 +572,7 @@ export default function Explorer() {
           <button className="icon-btn only-mobile" type="button" aria-pressed={searchOpen} aria-label={searchOpen ? "Hide search" : "Search"} onClick={() => setSearchOpen((value) => !value)}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M16 16l5 5" /></svg>
           </button>
-          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => !value); setFiltersOpen(false); }}>
+          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => !value); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
@@ -474,9 +591,9 @@ export default function Explorer() {
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                   <span className="step">
-                    <button className={stage === step.id && extra !== "listed" && extra !== "contacted" ? "on" : ""} type="button" aria-current={stage === step.id && !extra ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => { setShowDropped(false); write({ stage: step.id === "land" ? null : step.id, extra: null }); }}>
+                    <button className={stage === step.id && extra !== "listed" && extra !== "contacted" ? "on" : ""} type="button" aria-current={stage === step.id && !extra ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: null, ruled: null }, true)}>
                       <span>{step.label}</span>
-                      <strong>{count(step.id).toLocaleString()}</strong>
+                      <strong data-count={step.id === stage && extra == null ? visibleSites.length : filteredAt(step.id)}>{stepBadge(step.id)}</strong>
                     </button>
                     {listedHere > 0 ? (
                       <button className={`sub ${extra === "listed" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.listed} onMouseEnter={() => setTip(FUNNEL_NOTES.listed)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "listed" ? null : "listed" })}>
@@ -492,14 +609,20 @@ export default function Explorer() {
                 </Fragment>
               );
             }) : PIPE_STEPS.map((step, index) => {
-              const rows = dealRows.filter((deal) => deal.kind === "pipeline" && deal.city === city && deal.stage_group === step.id && typeOn(deal.business_type || "Other"));
+              const rows = dealRows.filter((deal) => {
+                if (deal.kind !== "pipeline" || deal.city !== city || deal.stage_group !== step.id) return false;
+                if (!typeOn(deal.business_type || "Other")) return false;
+                if (!query) return true;
+                const blob = `${deal.deal_id} ${deal.name} ${deal.address} ${deal.broker} ${deal.firm} ${deal.universe_id}`.toLowerCase();
+                return blob.includes(query.toLowerCase());
+              });
               const squares = rows.filter((deal) => dealPoint(deal)).length;
               const unmapped = rows.length - squares;
               return (
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                   <span className="step">
-                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id })}>
+                    <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
                       <span>{step.label}</span>
                       <strong>{squares.toLocaleString()}</strong>
                     </button>
@@ -514,6 +637,15 @@ export default function Explorer() {
               </button>
             ) : null}
           </nav>
+          {query && funnel === "universe" && stage !== "universe" ? (
+            (() => {
+              const everywhere = sites.filter((site) => site.city === city && inStage(site, "universe") && passesChips(site, false)).length;
+              const here = sites.filter((site) => inStage(site, stage) && passesChips(site, false)).length;
+              const more = everywhere - here;
+              if (more <= 0) return null;
+              return <button className="aside" type="button" onClick={() => write({ stage: "universe" }, true)}>{more.toLocaleString()} more at other steps</button>;
+            })()
+          ) : null}
           <span
             className="summary-chip"
             title={funnel === "pipeline" ? SUMMARY_NOTES.pipeline : SUMMARY_NOTES.universe}
@@ -522,6 +654,7 @@ export default function Explorer() {
           >
             {summaryText()}
           </span>
+          {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
             {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
@@ -531,8 +664,9 @@ export default function Explorer() {
             {moreOpen ? (
               <div className="menu" role="menu">
                 <button type="button" onClick={exportTable}>Export CSV</button>
-                <button type="button" onClick={() => { setTableOpen((value) => !value); setMoreOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
+                <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMoreOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
                 <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+                <ActionsMenuButtons close={() => setMoreOpen(false)} />
                 <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }}>How to read this</button>
                 {changesNote ? <p className="menu-note">{changesNote}</p> : null}
               </div>
@@ -597,9 +731,9 @@ export default function Explorer() {
                   ))}
                   <button className={listed === "yes" ? "on" : ""} type="button" onClick={() => write({ listed: listed === "yes" ? null : "yes" })}>Listed</button>
                   <button className={landSites ? "on" : ""} type="button" onClick={() => write({ land: landSites ? null : "1" })}>Land sites</button>
-                  <button className={compare ? "on" : ""} type="button" onClick={() => setCompare((value) => !value)}>Reviews disagree</button>
+                  <button className={compare ? "on" : ""} type="button" onClick={() => write({ disagree: compare ? null : "1" })}>Reviews disagree</button>
                   {dropCount > 0 ? (
-                    <button className={showDropped ? "on" : ""} type="button" onClick={() => setShowDropped((value) => !value)}>
+                    <button className={showDropped ? "on" : ""} type="button" onClick={() => write({ ruled: showDropped ? null : "1" })}>
                       Ruled out ({dropCount.toLocaleString()})
                     </button>
                   ) : null}
@@ -626,13 +760,16 @@ export default function Explorer() {
             <button type="button" onClick={() => { setFiltersOpen(true); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
             <button type="button" onClick={() => { setLayersOpen(true); setMenuOpen(false); }}>Layers</button>
             <button type="button" onClick={() => { setLegendOpen(true); setMenuOpen(false); }}>Legend</button>
-            <button type="button" onClick={() => { setTableOpen((value) => !value); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
+            <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
             <button type="button" onClick={exportTable}>Export CSV</button>
             <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+            <ActionsMenuButtons close={() => setMenuOpen(false)} />
+            <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
               <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Unplaced deals ({unplacedDeals.length.toLocaleString()})</button>
             ) : null}
+            {data.funnel.workbook_as_of ? <p className="menu-note">Data as of {data.funnel.workbook_as_of}</p> : null}
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
             <p className="menu-note">{me?.u}</p>
             {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
@@ -658,13 +795,14 @@ export default function Explorer() {
       </header>
 
       <div className="map-stage">
+        <ActionsDialogs />
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
           deals={drawnDeals}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
-          offMarket={funnel === "pipeline" ? [] : offMarketFeatures.filter((feature) => typeOn(feature.properties.business_type || "Other"))}
+          offMarket={offMarketShown}
           selectedId={selected}
           showAreas={showAreas}
           showDepots={showDepots}
@@ -679,6 +817,26 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
+        {funnel === "universe" && !listView && visibleSites.length === 0 ? (
+          <p className="empty-map">{compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
+        ) : null}
+        {!listView ? (() => {
+          const missing = funnel === "pipeline"
+            ? pipelineStepRows.length - pipelineSquares.length
+            : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
+          return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
+        })() : null}
+        {listView ? (
+          <ListView
+            rows={listRows}
+            selectedId={selected}
+            sort={{ id: sortKey, desc: sortDesc }}
+            onSort={(id, desc) => write({ sort: `${id}:${(desc ?? (sortKey === id ? !sortDesc : false)) ? "desc" : "asc"}` })}
+            onOpen={choose}
+            onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
+            onExport={exportList}
+          />
+        ) : null}
         <aside className={`layers ${layersOpen ? "open" : ""}`}>
           <button type="button" onClick={() => setLayersOpen((value) => !value)}>{layersOpen ? "Hide layers" : "Layers"}</button>
           {layersOpen ? (
@@ -694,7 +852,7 @@ export default function Explorer() {
           ) : null}
         </aside>
         <div className={`legend ${legendOpen ? "open" : ""}`} onMouseLeave={() => setTip("")}>
-          <button type="button" onClick={() => setLegendOpen((value) => !value)}>{legendOpen ? "Hide legend" : "Legend"}</button>
+          <button type="button" onClick={() => { setLegendOpen((value) => !value); setMenuOpen(false); }}>{legendOpen ? "Hide legend" : "Legend"}</button>
           {legendOpen ? (
             <ul>
               {STATUS_NOTES.map((item) => (
@@ -732,6 +890,7 @@ export default function Explorer() {
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onClose={() => choose(null)}
             sheet={sheet}
+            extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
           />
         ) : selectedSite ? (
           <Detail
@@ -744,11 +903,13 @@ export default function Explorer() {
               if (!coords || !data) return selectedSite.miles_to_depot;
               return nearestDepot(coords[0], coords[1], data.depots.features)?.miles ?? selectedSite.miles_to_depot;
             })()}
+            linkedDeal={dealRows.find((deal) => deal.deal_id === selectedSite.linked_deal_id || deal.universe_id === selectedSite.site_id) || null}
             onOpenDeal={selectedSite.linked_deal_id ? () => choose(selectedSite.linked_deal_id || null) : undefined}
             onAddCompare={() => addCompare(selectedSite.site_id)}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
             sheet={sheet}
+            extras={<RecordActions kind="site" id={selectedSite.site_id} />}
           />
         ) : null}
         {compareIds.length >= 2 ? (
@@ -776,14 +937,14 @@ export default function Explorer() {
       {tableOpen ? (
         <section className="dock">
           <div className="dock-tabs">
-            <button className="only-mobile" type="button" onClick={() => setTableOpen(false)}>Map</button>
+            <button className="only-mobile" type="button" onClick={() => write({ table: null })}>Map</button>
             {(["universe", "pipeline", "land"] as const).map((tab) => (
               <button key={tab} className={tableTab === tab ? "on" : ""} type="button" onClick={() => setTableTab(tab)}>
                 {tab === "universe" ? "Universe" : tab === "pipeline" ? "Pipeline" : "Land"}
               </button>
             ))}
           </div>
-          {tableTab === "universe" ? <SiteTable rows={visibleSites} selectedId={selected} onSelect={choose} /> : null}
+          {tableTab === "universe" ? <SiteTable rows={visibleSites} selectedId={selected} onSelect={choose} sorting={sortParam ? [{ id: sortParam.split(":")[0], desc: sortParam.endsWith(":desc") }] : []} onSortingChange={(next) => write({ sort: next[0] ? `${next[0].id}:${next[0].desc ? "desc" : "asc"}` : null })} /> : null}
           {tableTab === "pipeline" ? <DealTable rows={pipelineDeals} selectedId={selected} onSelect={choose} /> : null}
           {tableTab === "land" ? <DealTable rows={landDeals} selectedId={selected} onSelect={choose} /> : null}
         </section>

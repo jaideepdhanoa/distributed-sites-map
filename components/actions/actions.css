@@ -1,0 +1,58 @@
+.act { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--line); }
+.act form, .act-dialog form { display: grid; gap: 8px; margin: 8px 0; }
+.act label, .act-dialog label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.act input, .act textarea, .act select, .act-dialog input, .act-dialog textarea, .act-dialog select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+}
+.act textarea, .act-dialog textarea { resize: vertical; }
+.act button, .act-dialog button, .act-dialog a {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 999px;
+  padding: 6px 12px;
+  min-height: 36px;
+}
+.act button[type="submit"], .act-dialog button[type="submit"] { background: var(--pine); color: #faf7f1; border-color: var(--pine); }
+.act-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
+.act-list li { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.act-threads { display: grid; gap: 8px; }
+.act-thread { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.act-thread summary { cursor: pointer; min-height: 36px; }
+.act-replies { list-style: none; margin: 8px 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.act-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.act-row .on { background: var(--ink); color: #faf7f1; }
+.act-check { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
+.act-check input { width: auto; }
+.act-layer { position: absolute; inset: 0; z-index: 8; }
+.act-dialog {
+  position: absolute;
+  z-index: 9;
+  top: 12px;
+  right: 12px;
+  width: min(440px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  background: #faf7f1;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px 24px;
+  box-shadow: var(--shadow);
+}
+.act-dialog h2 { font-family: var(--font-serif), Georgia, serif; font-size: 24px; margin: 0 0 8px; }
+@media (max-width: 720px) {
+  .act button, .act-dialog button { min-height: 44px; }
+  .act-dialog {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 86vh;
+    border-radius: 16px 16px 0 0;
+  }
+}

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/api/actions/**": ["./db/migrations/**/*.sql", "./config/display-policy.json", "./data/generated/*.geojson"],
+  },
   async headers() {
     return [
       {

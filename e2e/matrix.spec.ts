@@ -125,7 +125,7 @@ for (const city of CITIES) {
     const sets = new Map<string, Set<string>>();
     for (const step of STEPS) {
       const expected = expectedSites(catalog, city, step);
-      const off = expectedOffMarket(catalog, city);
+      const off = expectedOffMarket(catalog, city, step);
       await openMap(page, `${cityQuery}stage=${step}`, {
         city,
         stage: step,
@@ -164,7 +164,7 @@ for (const city of CITIES) {
     for (const step of STEPS) {
       for (const filter of FILTERS) {
         const expected = expectedSites(catalog, city, step, filter.chips);
-        const off = filter.chips.query || filter.chips.types ? expectedOffMarket(catalog, city, filter.chips) : undefined;
+        const off = expectedOffMarket(catalog, city, step, filter.chips);
         await openMap(page, `${cityQuery}stage=${step}&${filter.query}`, {
           city,
           stage: step,
@@ -179,10 +179,7 @@ for (const city of CITIES) {
         expect(count.filtered, `${city} ${step} ${filter.label}`).toBe(true);
         expect(count.shown, `${city} ${step} ${filter.label} badge`).toBe(expected.visible);
         expect(count.total, `${city} ${step} ${filter.label} total`).toBe(unfilteredCount(catalog, city, step));
-        if (filter.chips.query || filter.chips.types) {
-          const off = expectedOffMarket(catalog, city, filter.chips);
-          same(`${city} ${step} ${filter.label} off-market`, (await source(page, "offmarket")).map((pin) => pin.id), off);
-        }
+        same(`${city} ${step} ${filter.label} off-market`, (await source(page, "offmarket")).map((pin) => pin.id), off);
       }
     }
 

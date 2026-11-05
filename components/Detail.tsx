@@ -1,5 +1,5 @@
 import type { DealProps, SiteProps } from "@/lib/types";
-import { cleanNote, formatRecordedDate, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { cleanNote, formatRecordedDate, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { nextStepText, plainVerdict, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 
 function acres(value: number | null | undefined, text?: string) {
@@ -26,6 +26,7 @@ export default function Detail({
   lat,
   lng,
   onOpenDeal,
+  linkedDeal,
   onAddCompare,
   sameOwner,
   onClose,
@@ -36,6 +37,7 @@ export default function Detail({
   lat?: number | null;
   lng?: number | null;
   onOpenDeal?: () => void;
+  linkedDeal?: DealProps | null;
   onAddCompare?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
@@ -64,6 +66,8 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}</p>
+      <h3>Lead source</h3>
+      <p>{leadSourceLine(site, linkedDeal)}</p>
       {mapsLinks(lat, lng)}
       <h3>Owner</h3>
       <p>{site.owner || "—"}</p>
@@ -81,7 +85,7 @@ export default function Detail({
         <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
         <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
         <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-        <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${site.aadt_road}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
+        <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
         <span>Flood</span><div>{site.flood_zone || "—"}</div>
         <span>Year built</span><div>{site.year_built || "—"}</div>
         <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
@@ -197,6 +201,7 @@ export function DealDetail({
       <div className="kv">
         <span>Broker</span><div>{shownBroker(deal) || "—"}</div>
         <span>Firm</span><div>{shownFirm(deal) || "—"}</div>
+        <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
       </div>
       <h3>Listing</h3>
       <div className="kv">

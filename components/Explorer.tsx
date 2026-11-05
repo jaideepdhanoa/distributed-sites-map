@@ -382,7 +382,7 @@ export default function Explorer() {
   }
 
   function subcount(step: StageId, field: "listed" | "contacted") {
-    return sites.filter((site) => site.city === city && inStage(site, step) && site[field]).length;
+    return sites.filter((site) => site.city === city && inStage(site, step) && site[field] && passesChips(site, false)).length;
   }
 
   const heldCount = sites.filter((site) => site.city === city && heldOutside(site)).length;
@@ -700,12 +700,10 @@ export default function Explorer() {
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
-          offMarket={funnel === "pipeline" ? [] : offMarketFeatures.filter((feature) => {
+          offMarket={funnel === "pipeline" || extra ? [] : offMarketFeatures.filter((feature) => {
             const site = feature.properties;
-            if (!typeOn(site.business_type || "Other")) return false;
-            if (!query) return true;
-            const blob = `${site.site_id} ${site.name} ${site.also_known_as || ""} ${site.address} ${site.apn} ${site.owner}`.toLowerCase();
-            return blob.includes(query.toLowerCase());
+            if (stage !== "universe" && !inStage(site, stage)) return false;
+            return passesChips(site, false);
           })}
           selectedId={selected}
           showAreas={showAreas}
@@ -795,6 +793,7 @@ export default function Explorer() {
               if (!coords || !data) return selectedSite.miles_to_depot;
               return nearestDepot(coords[0], coords[1], data.depots.features)?.miles ?? selectedSite.miles_to_depot;
             })()}
+            linkedDeal={dealRows.find((deal) => deal.deal_id === selectedSite.linked_deal_id || deal.universe_id === selectedSite.site_id) || null}
             onOpenDeal={selectedSite.linked_deal_id ? () => choose(selectedSite.linked_deal_id || null) : undefined}
             onAddCompare={() => addCompare(selectedSite.site_id)}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}

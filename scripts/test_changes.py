@@ -29,6 +29,23 @@ class ChangeCounts(unittest.TestCase):
         self.assertEqual(changes["stage_moves"], 2)
         self.assertEqual(changes["sample_verdicts"][0]["site_id"], "A")
 
+    def test_real_head_file_is_the_baseline(self):
+        from build_data import published_features
+
+        published = published_features("data/generated/sites.geojson")
+        self.assertTrue(published)
+        changed = []
+        flipped = False
+        for item in published:
+            props = dict((item.get("properties") or {}))
+            if not flipped and props.get("site_id"):
+                props["verdict"] = "FAIL" if props.get("verdict") != "FAIL" else "PASS"
+                flipped = True
+            changed.append(props)
+        changes = summarize_changes(published, changed, [], [])
+        self.assertEqual(changes["new_sites"], 0)
+        self.assertEqual(changes["verdict_changes"], 1)
+
     def test_repeat_build_against_the_same_published_file_is_zero(self):
         published = [{"properties": {"site_id": "A", "verdict": "PASS", "pipeline_stage": "1 Desk screen"}}]
         again = [{"site_id": "A", "verdict": "PASS", "pipeline_stage": "1 Desk screen"}]

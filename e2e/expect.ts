@@ -155,15 +155,11 @@ export function expectedSites(catalog: Catalog, city: string, stage: string, opt
   };
 }
 
-export function expectedOffMarket(catalog: Catalog, city: string, options: Chips = {}) {
+export function expectedOffMarket(catalog: Catalog, city: string, stage = "universe", options: Chips = {}) {
+  if (options.extra || stage !== "universe") return [];
   return catalog.sites
     .filter((feature) => feature.geometry && feature.properties.origin === "off-market" && feature.properties.city === city)
-    .filter((feature) => {
-      const site = feature.properties;
-      if (options.types && !options.types.includes(site.business_type || "Other")) return false;
-      if (options.query && !blob(site).includes(options.query.toLowerCase())) return false;
-      return true;
-    })
+    .filter((feature) => chips({ ...feature.properties, business_type: feature.properties.business_type || "Other" }, options, false))
     .map((feature) => feature.properties.site_id);
 }
 

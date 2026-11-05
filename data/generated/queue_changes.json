@@ -1,0 +1,307 @@
+{
+  "events": [],
+  "baseline": [
+    {
+      "id": "PIPE-LAS-0011",
+      "city": "LAS",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$1,150,000",
+      "askingSource": "Regency Realty Investments",
+      "active": false
+    },
+    {
+      "id": "PIPE-LAS-0015",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$2,615,000",
+      "askingSource": "First Choice Business Brokers",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0016",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$7,000,000",
+      "askingSource": "Miracle",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0017",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "FAIL",
+      "askingPrice": "$7,000,000",
+      "askingSource": "Miracle",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0070",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$5,000,000",
+      "askingSource": "Ian Walker",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0071",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$3,500,000",
+      "askingSource": "Ian Walker",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0072",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$6,900,000",
+      "askingSource": "Not shown",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0073",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$2,595,000",
+      "askingSource": "Life Realty District",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0012",
+      "city": "MIA",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$1,350,000",
+      "askingSource": "Not shown",
+      "active": false
+    },
+    {
+      "id": "PIPE-MIA-0013",
+      "city": "MIA",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$3,300,000",
+      "askingSource": "Not shown",
+      "active": false
+    },
+    {
+      "id": "PIPE-MIA-0074",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$728,000",
+      "askingSource": "Lauren Restrepo",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0075",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,800,000",
+      "askingSource": "Not shown",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0076",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,900,000",
+      "askingSource": "Vivian Serralta",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0077",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$2,500,000",
+      "askingSource": "RESF Commercial",
+      "active": true
+    },
+    {
+      "id": "PIPE-MIA-0079",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$3,999,000",
+      "askingSource": "carwashesforsale.com listing",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0001",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$1,600,000",
+      "askingSource": "Car Wash Brokers Inc",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0003",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$2,300,000",
+      "askingSource": "Car Wash Brokers Inc",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0004",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$2,900,000",
+      "askingSource": "Car Wash Brokers Inc",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0005",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$2,100,000",
+      "askingSource": "Car Wash Brokers Inc",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0006",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$725,000",
+      "askingSource": "Car Wash Brokers Inc",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0007",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$699,000",
+      "askingSource": "Matthews",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0008",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$2,750,000",
+      "askingSource": "Not shown",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0009",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,790,000",
+      "askingSource": "Not shown",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0010",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$4,500,000",
+      "askingSource": "Colton Rodgers",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0014",
+      "city": "PHX",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "$2,400,000",
+      "askingSource": "Brad Ingarfield",
+      "active": false
+    },
+    {
+      "id": "PIPE-PHX-0018",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$2,100,000",
+      "askingSource": "WCI Business Sales",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0067",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$4,990,000",
+      "askingSource": "WCI Business Sales",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0068",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$3,490,000",
+      "askingSource": "WCI Business Sales",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0069",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$4,500,000",
+      "askingSource": "WCI Business Sales",
+      "active": true
+    },
+    {
+      "id": "PIPE-SNA-0002",
+      "city": "SNA",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
+      "verdict": "",
+      "askingPrice": "",
+      "askingSource": "Voit",
+      "active": false
+    }
+  ],
+  "activity": [],
+  "materials": []
+}

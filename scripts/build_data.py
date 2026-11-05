@@ -4295,6 +4295,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             (OUT / f"parcels-{city_code}.geojson").write_text(json.dumps(city_fc))
         (OUT / "funnel.json").write_text(json.dumps(funnel, indent=2))
         (OUT / "changes.json").write_text(json.dumps(changes, indent=2))
+        refresh_queue_feed()
         report["changes"] = changes
         (OUT / "build_report.json").write_text(json.dumps(report, indent=2))
         with (OUT / "crosswalk.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -4821,6 +4822,14 @@ def check_against_report(report: dict) -> None:
             + (f"Re-run scripts/build_data.py; stale sections: {mismatches}\n" if mismatches else "")
             + "\n".join(problems[:20])
         )
+
+
+def refresh_queue_feed() -> None:
+    """Compare this build with the previous queue snapshot. A failure here does not fail the data build."""
+    try:
+        subprocess.run(["npx", "tsx", "scripts/build-queue-feed.ts"], cwd=ROOT, timeout=180, check=False)
+    except Exception:
+        print("Queue feed was not refreshed.")
 
 
 def main():

@@ -7,9 +7,9 @@ const port = 3456;
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
 const hash = bcrypt.hashSync(password, 8);
 const users = [
-  { u: "viewer", h: hash, role: "user", actionRole: "viewer" },
-  { u: "contributor", h: hash, role: "user", actionRole: "contributor" },
-  { u: "reviewer", h: hash, role: "admin", actionRole: "reviewer" },
+  { u: "viewer", h: hash, role: "user", actionRole: "viewer", name: "Viewer" },
+  { u: "contributor", h: hash, role: "user", actionRole: "contributor", name: "Contributor" },
+  { u: "reviewer", h: hash, role: "admin", actionRole: "reviewer", name: "Reviewer" },
 ];
 
 async function main() {

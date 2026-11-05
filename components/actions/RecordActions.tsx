@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatPacific, replyCount } from "@/lib/actions/time";
+import { MentionChips, MentionField, type MentionAccount } from "./MentionField";
 import { canReview, canWrite, useActionStatus, type ActionRole } from "./panel";
 
 type Note = {
@@ -13,6 +14,7 @@ type Note = {
   updatedAt: string | null;
   deleted: boolean;
   resolvedAt: string | null;
+  mentions?: MentionAccount[];
 };
 type Suggestion = {
   id: string;
@@ -27,9 +29,12 @@ type Suggestion = {
   decidedAt: string | null;
   title: string | null;
   targetOn: string | null;
+  ownerId: string | null;
   ownerName: string | null;
+  doneAt: string | null;
+  mentions?: MentionAccount[];
 };
-type Account = { id: string; name: string };
+type Account = MentionAccount;
 
 const FIELDS: { id: string; label: string }[] = [
   { id: "stage", label: "Stage" },
@@ -66,6 +71,8 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
   const [notes, setNotes] = useState<Note[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [note, setNote] = useState("");
+  const [noteMentions, setNoteMentions] = useState<Account[]>([]);
+  const [stepMentions, setStepMentions] = useState<Account[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [stepTitle, setStepTitle] = useState("");
   const [stepDate, setStepDate] = useState("");
@@ -128,6 +135,18 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
     await reload();
   }
 
+  function openThread(sourceId: string) {
+    void fetch("/api/queue/mentions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceId }),
+    }).then(() => window.dispatchEvent(new Event("queue-refresh"))).catch(() => undefined);
+  }
+
+  function canFinish(item: Suggestion) {
+    return item.field === "proposed_next_step" && !item.doneAt && (item.status === "open" || item.status === "accepted") && (reviewer || item.ownerId === status.username);
+  }
+
   const openCount = suggestions.filter((item) => item.status === "open").length;
   const openProposals = suggestions.filter((item) => item.field === "proposed_next_step" && item.status === "open").length;
   const approvedSteps = suggestions
@@ -146,6 +165,11 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
             <strong>{currentStep.title || currentStep.proposedValue}</strong>
             {currentStep.targetOn ? ` · ${currentStep.targetOn}` : ""}
             {currentStep.ownerName ? ` · ${currentStep.ownerName}` : ""}
+            {currentStep.doneAt ? ` · Done ${formatPacific(currentStep.doneAt)}` : ""}
+            <MentionChips mentions={currentStep.mentions} />
+            {canFinish(currentStep) ? (
+              <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${currentStep.id}/done`, {}, () => undefined)}>Done</button>
+            ) : null}
           </p>
         ) : (
           <p className="note">No approved next step.</p>
@@ -175,8 +199,10 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
               writable={writable}
               reviewer={reviewer}
               pending={pending}
-              onReply={(parentId, body) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body }, () => undefined)}
-              onEdit={(noteId, body) => submit(`/api/actions/notes/${noteId}`, { body }, () => undefined, "PATCH")}
+              accounts={accounts}
+              onOpen={openThread}
+              onReply={(parentId, body, mentions) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions }, () => undefined)}
+              onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
               onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
               onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
               actor={status.username}
@@ -190,13 +216,23 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void submit("/api/actions/notes", { targetKind: kind, targetId: id, body: note }, () => setNote(""));
+            void submit("/api/actions/notes", { targetKind: kind, targetId: id, body: note, mentions: noteMentions.map((item) => item.id) }, () => {
+              setNote("");
+              setNoteMentions([]);
+            });
           }}
         >
-          <label>
-            Note
-            <textarea data-testid="note-body" value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={2000} />
-          </label>
+          <MentionField
+            label="Note"
+            value={note}
+            onChange={setNote}
+            mentions={noteMentions}
+            onMentions={setNoteMentions}
+            accounts={accounts}
+            testId="note-body"
+            rows={3}
+            maxLength={2000}
+          />
           <button type="submit" disabled={pending}>Save note</button>
         </form>
       ) : (
@@ -209,20 +245,27 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
             event.preventDefault();
             void submit(
               "/api/actions/suggestions",
-              { targetKind: kind, targetId: id, field: "proposed_next_step", title: stepTitle, targetOn: stepDate, ownerId: stepOwner, proposedValue: stepTitle },
+              { targetKind: kind, targetId: id, field: "proposed_next_step", title: stepTitle, targetOn: stepDate, ownerId: stepOwner, proposedValue: stepTitle, mentions: stepMentions.map((item) => item.id) },
               () => {
                 setStepTitle("");
                 setStepDate("");
                 setStepOwner("");
+                setStepMentions([]);
               },
             );
           }}
         >
           <h3>Propose a next step</h3>
-          <label>
-            Title
-            <input data-testid="next-step-title" value={stepTitle} onChange={(event) => setStepTitle(event.target.value)} maxLength={120} />
-          </label>
+          <MentionField
+            label="Title"
+            value={stepTitle}
+            onChange={setStepTitle}
+            mentions={stepMentions}
+            onMentions={setStepMentions}
+            accounts={accounts}
+            testId="next-step-title"
+            maxLength={120}
+          />
           <label>
             Target date
             <input type="date" aria-label="Target date" value={stepDate} onChange={(event) => setStepDate(event.target.value)} />
@@ -250,7 +293,16 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
                 <span className={`badge ${item.status === "open" ? "pending" : "checked"}`}>{item.status}</span>
               </p>
               <p>{item.reason}</p>
-              <p className="note">{item.authorId} · {formatPacific(item.createdAt)}{item.currentValue ? ` · was ${item.currentValue}` : ""}</p>
+              <MentionChips mentions={item.mentions} />
+              <p className="note">{item.authorId} · {formatPacific(item.createdAt)}{item.currentValue ? ` · was ${item.currentValue}` : ""}{item.doneAt ? ` · Done ${formatPacific(item.doneAt)}` : ""}</p>
+              {item.mentions?.some((mention) => mention.id === status.username) ? (
+                <details onToggle={(event) => { if (event.currentTarget.open) openThread(item.id); }}>
+                  <summary>Thread</summary>
+                </details>
+              ) : null}
+              {canFinish(item) ? (
+                <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${item.id}/done`, {}, () => undefined)}>Done</button>
+              ) : null}
               {reviewer && item.status === "open" ? (
                 <div className="act-row">
                   <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
@@ -315,10 +367,12 @@ function NoteThread({
   reviewer,
   pending,
   actor,
+  accounts,
   onReply,
   onEdit,
   onDelete,
   onResolve,
+  onOpen,
 }: {
   note: Note;
   replies: Note[];
@@ -326,24 +380,35 @@ function NoteThread({
   reviewer: boolean;
   pending: boolean;
   actor: string;
-  onReply: (parentId: string, body: string) => void;
-  onEdit: (id: string, body: string) => void;
+  accounts: Account[];
+  onReply: (parentId: string, body: string, mentions: string[]) => void;
+  onEdit: (id: string, body: string, mentions: string[]) => void;
   onDelete: (id: string) => void;
   onResolve: (id: string) => void;
+  onOpen: (id: string) => void;
 }) {
   const [reply, setReply] = useState("");
+  const [replyMentions, setReplyMentions] = useState<Account[]>([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
+  const [draftMentions, setDraftMentions] = useState<Account[]>(note.mentions || []);
   const [confirming, setConfirming] = useState(false);
+  const mentionedMe = [note, ...replies].some((item) => item.mentions?.some((mention) => mention.id === actor));
   return (
-    <details className="act-thread" open={!note.resolvedAt} data-testid="note-thread">
+    <details
+      className="act-thread"
+      open={!note.resolvedAt && !mentionedMe}
+      data-testid="note-thread"
+      onToggle={(event) => { if (event.currentTarget.open) onOpen(note.id); }}
+    >
       <summary>
         {note.authorId} · {formatPacific(note.createdAt)}
         {note.resolvedAt ? " · Resolved" : replies.length ? ` · ${replyCount(replies.length)}` : ""}
+        <MentionChips mentions={note.mentions} />
       </summary>
       {note.deleted ? <p className="note">Removed</p> : editing ? (
-        <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft); setEditing(false); }}>
-          <textarea aria-label="Edit note" value={draft} onChange={(event) => setDraft(event.target.value)} rows={3} maxLength={2000} />
+        <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
+          <MentionField label="Edit note" value={draft} onChange={setDraft} mentions={draftMentions} onMentions={setDraftMentions} accounts={accounts} testId={`edit-${note.id}`} rows={3} maxLength={2000} />
           <button type="submit" disabled={pending}>Save edit</button>
         </form>
       ) : (
@@ -367,16 +432,13 @@ function NoteThread({
       {replies.length ? (
         <ul className="act-replies">
           {replies.map((replyNote) => (
-            <ReplyLine key={replyNote.id} note={replyNote} actor={actor} writable={writable} pending={pending} onEdit={onEdit} onDelete={onDelete} />
+            <ReplyLine key={replyNote.id} note={replyNote} actor={actor} accounts={accounts} writable={writable} pending={pending} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </ul>
       ) : null}
       {writable && !note.deleted ? (
-        <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply); setReply(""); }}>
-          <label>
-            Reply
-            <textarea data-testid="note-reply" value={reply} onChange={(event) => setReply(event.target.value)} rows={2} maxLength={2000} />
-          </label>
+        <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply, replyMentions.map((item) => item.id)); setReply(""); setReplyMentions([]); }}>
+          <MentionField label="Reply" value={reply} onChange={setReply} mentions={replyMentions} onMentions={setReplyMentions} accounts={accounts} testId="note-reply" rows={2} maxLength={2000} />
           <button type="submit" disabled={pending}>Reply</button>
         </form>
       ) : null}
@@ -387,6 +449,7 @@ function NoteThread({
 function ReplyLine({
   note,
   actor,
+  accounts,
   writable,
   pending,
   onEdit,
@@ -394,23 +457,25 @@ function ReplyLine({
 }: {
   note: Note;
   actor: string;
+  accounts: Account[];
   writable: boolean;
   pending: boolean;
-  onEdit: (id: string, body: string) => void;
+  onEdit: (id: string, body: string, mentions: string[]) => void;
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
+  const [draftMentions, setDraftMentions] = useState<Account[]>(note.mentions || []);
   const [confirming, setConfirming] = useState(false);
   return (
     <li>
       {note.deleted ? <p className="note">Removed</p> : editing ? (
-        <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft); setEditing(false); }}>
-          <textarea aria-label="Edit reply" value={draft} onChange={(event) => setDraft(event.target.value)} rows={2} maxLength={2000} />
+        <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
+          <MentionField label="Edit reply" value={draft} onChange={setDraft} mentions={draftMentions} onMentions={setDraftMentions} accounts={accounts} testId={`edit-${note.id}`} rows={2} maxLength={2000} />
           <button type="submit" disabled={pending}>Save edit</button>
         </form>
       ) : (
-        <p>{note.body}</p>
+        <p>{note.body}<MentionChips mentions={note.mentions} /></p>
       )}
       <p className="note">{note.authorId} · {formatPacific(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
       {writable && actor === note.authorId && !note.deleted ? (

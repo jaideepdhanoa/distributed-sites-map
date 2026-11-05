@@ -1,0 +1,32 @@
+.queue {
+  position: absolute;
+  z-index: 7;
+  inset: 12px;
+  overflow: auto;
+  background: #faf7f1;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 16px 28px;
+  box-shadow: var(--shadow);
+}
+.queue-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin-bottom: 8px; }
+.queue-filters label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.queue-filters select, .queue-card input, .queue-card select, .queue-card textarea {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 40px;
+}
+.queue-card h2 { font-family: var(--font-serif), Georgia, serif; font-size: 28px; margin: 4px 0; }
+.queue-empty { font-size: 22px; margin: 24px 0; }
+.queue-card form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 8px 0; }
+.queue-card form button { width: auto; }
+@media (max-width: 720px) {
+  .queue {
+    inset: auto 0 0 0;
+    max-height: 88vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .queue button { min-height: 44px; }
+}

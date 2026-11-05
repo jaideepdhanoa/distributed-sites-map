@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await openActions("contributor");
   if (isResponse(session)) return session;
-  let body: { targetKind?: string; targetId?: string; body?: string; parentId?: string };
+  let body: { targetKind?: string; targetId?: string; body?: string; parentId?: string; mentions?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       body: String(body.body || ""),
       authorId: session.u,
       parentId: body.parentId,
+      mentions: body.mentions,
     }),
   );
   if (isResponse(note)) return note;

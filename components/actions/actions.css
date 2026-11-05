@@ -25,6 +25,34 @@
 .act-thread summary { cursor: pointer; min-height: 36px; }
 .act-replies { list-style: none; margin: 8px 0 0 12px; padding: 0; display: grid; gap: 6px; }
 .act-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.mention-field { position: relative; display: grid; gap: 6px; }
+.mention-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.mention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: #e4eef8;
+  color: #1d3b5c;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.mention-chip button { border: 0; background: transparent; min-height: 0; padding: 0 2px; color: inherit; }
+.mention-menu {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px;
+  display: grid;
+  gap: 2px;
+}
+.mention-menu button { text-align: left; width: 100%; }
+.mention-menu button.on, .mention-menu button[aria-selected="true"] { background: var(--paper); }
 .act-row .on { background: var(--ink); color: #faf7f1; }
 .act-check { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
 .act-check input { width: auto; }

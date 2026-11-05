@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
+import QueueView from "./queue/QueueView";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import Wordmark from "./Wordmark";
@@ -60,6 +61,7 @@ export default function Explorer() {
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
+  const [queueCount, setQueueCount] = useState(0);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
   const tableOpen = params.get("table") === "1";
@@ -110,6 +112,16 @@ export default function Explorer() {
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
+  const queueOpen = params.get("view") === "queue";
+  const queueMarket = params.get("qmarket") || city;
+  const queueStage = params.get("qstage") || (funnel === "pipeline" ? pipeStage : "any");
+  const queueViable = params.get("qviable") !== "0";
+  const queueFresh = params.get("qnew") === "1";
+  const queueFlagged = params.get("qflag") === "1";
+  const queueApproval = params.get("qapprove") === "1";
+  const queueMentions = params.get("qmention") === "1";
+  const queueAssigned = params.get("qassign") === "1";
+  const [queueTick, setQueueTick] = useState(0);
 
   function write(next: Record<string, string | null>, history = false) {
     const url = new URLSearchParams(params.toString());
@@ -180,6 +192,35 @@ export default function Explorer() {
       cancel = true;
     };
   }, [city]);
+
+  useEffect(() => {
+    const onRefresh = () => setQueueTick((value) => value + 1);
+    window.addEventListener("queue-refresh", onRefresh);
+    return () => window.removeEventListener("queue-refresh", onRefresh);
+  }, []);
+
+  useEffect(() => {
+    if (!me?.actionsEnabled) return;
+    const q = new URLSearchParams({
+      market: queueMarket,
+      stage: queueStage,
+      viable: queueViable ? "1" : "0",
+      fresh: queueFresh ? "1" : "0",
+      flagged: queueFlagged ? "1" : "0",
+      approve: queueApproval ? "1" : "0",
+      mentions: queueMentions ? "1" : "0",
+      assigned: queueAssigned ? "1" : "0",
+    });
+    let cancel = false;
+    fetch(`/api/queue?${q}`).then(async (response) => {
+      if (cancel || !response.ok) return;
+      const payload = (await response.json()) as { items?: unknown[] };
+      setQueueCount(payload.items?.length || 0);
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [me?.actionsEnabled, queueMarket, queueStage, queueViable, queueFresh, queueFlagged, queueApproval, queueMentions, queueAssigned, queueTick]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
@@ -619,8 +660,13 @@ export default function Explorer() {
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           </div>
           <div className="funnel-switch only-desktop" role="group" aria-label="Map or list">
-            <button className={!listView ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
+            <button className={!listView && !queueOpen ? "on" : ""} type="button" onClick={() => write({ view: null })}>Map</button>
             <button className={listView ? "on" : ""} type="button" onClick={() => write({ view: "list" })}>List</button>
+            {me?.actionsEnabled ? (
+              <button className={queueOpen ? "on" : ""} type="button" onClick={() => write({ view: queueOpen ? null : "queue" })}>
+                Queue{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
+              </button>
+            ) : null}
           </div>
           <div className="user-menu only-desktop">
             <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
@@ -847,6 +893,9 @@ export default function Explorer() {
             <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
             <ActionsMenuButtons close={() => setMenuOpen(false)} />
             <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
+            {me?.actionsEnabled ? (
+              <button type="button" onClick={() => { write({ view: "queue" }); setMenuOpen(false); }}>Queue{queueCount ? ` (${queueCount})` : ""}</button>
+            ) : null}
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
               <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
@@ -894,6 +943,24 @@ export default function Explorer() {
 
       <div className="map-stage">
         <ActionsDialogs />
+        {queueOpen && me?.actionsEnabled ? (
+          <QueueView
+            market={queueMarket}
+            stage={queueStage}
+            viable={queueViable}
+            freshOnly={queueFresh}
+            flaggedOnly={queueFlagged}
+            approvalOnly={queueApproval}
+            mentionsOnly={queueMentions}
+            assignedOnly={queueAssigned}
+            onCount={setQueueCount}
+            onFilter={(patch) => {
+              const next = { ...patch, view: "queue" };
+              if ("qmarket" in next && next.qmarket === city) next.qmarket = null;
+              write(next);
+            }}
+          />
+        ) : null}
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
           deals={drawnDeals}

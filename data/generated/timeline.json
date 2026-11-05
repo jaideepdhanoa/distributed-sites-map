@@ -1,0 +1,638 @@
+{
+  "generated_at": "2026-11-05T05:31:44+00:00",
+  "records": {
+    "LAND-LAS-0001": {
+      "materials": [],
+      "last_touched": "2026-10-28"
+    },
+    "LAND-LAS-0009": {
+      "materials": [],
+      "last_touched": "2026-11-03"
+    },
+    "LAND-LAS-0010": {
+      "materials": [],
+      "last_touched": "2026-10-29"
+    },
+    "LAND-LAS-0011": {
+      "materials": [],
+      "last_touched": "2026-10-29"
+    },
+    "LAND-LAS-0012": {
+      "materials": [],
+      "last_touched": "2026-10-29"
+    },
+    "LAND-LAS-0013": {
+      "materials": [],
+      "last_touched": "2026-10-29"
+    },
+    "LAND-LAS-0014": {
+      "materials": [],
+      "last_touched": "2026-10-29"
+    },
+    "LAND-PHX-0003": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "LAND-PHX-0007": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "LAND-PHX-0033": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0034": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0035": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0036": {
+      "materials": [],
+      "last_touched": "2026-11-03"
+    },
+    "LAND-PHX-0038": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0039": {
+      "materials": [],
+      "last_touched": "2026-11-03"
+    },
+    "LAND-PHX-0040": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0041": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0042": {
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "PIPE-LAS-0011": {
+      "materials": [],
+      "last_touched": "2026-10-18"
+    },
+    "PIPE-LAS-0015": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-LAS-0016": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-LAS-0017": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-LAS-0070": {
+      "materials": [],
+      "last_touched": "2026-11-03"
+    },
+    "PIPE-LAS-0071": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-LAS-0072": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-LAS-0073": {
+      "materials": [],
+      "last_touched": "2026-11-03"
+    },
+    "PIPE-MIA-0012": {
+      "materials": [],
+      "last_touched": "2026-10-18"
+    },
+    "PIPE-MIA-0013": {
+      "materials": [],
+      "last_touched": "2026-10-18"
+    },
+    "PIPE-MIA-0075": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-MIA-0079": {
+      "materials": [],
+      "last_touched": "2026-11-03"
+    },
+    "PIPE-MIA-0080": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0001": {
+      "materials": [
+        {
+          "category": "financials",
+          "label": "Financials",
+          "count": 11,
+          "latest": "2026-10-22"
+        },
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 5,
+          "latest": "2026-10-22"
+        },
+        {
+          "category": "operations",
+          "label": "Operations",
+          "count": 23,
+          "latest": "2026-10-22"
+        }
+      ],
+      "last_touched": "2026-11-04",
+      "folder_url": "https://drive.google.com/drive/folders/1sLDt5-gZ_UIiiaA9KPuO_9SCytlY3afk"
+    },
+    "PIPE-PHX-0003": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0004": {
+      "materials": [],
+      "last_touched": "2026-10-18"
+    },
+    "PIPE-PHX-0005": {
+      "materials": [
+        {
+          "category": "financials",
+          "label": "Financials",
+          "count": 6,
+          "latest": "2026-10-21"
+        }
+      ],
+      "last_touched": "2026-11-04",
+      "folder_url": "https://drive.google.com/drive/folders/1VXR-W12R7pM_jpOvAnTPMe6ep7ZSDlGP"
+    },
+    "PIPE-PHX-0006": {
+      "materials": [],
+      "last_touched": "2026-10-21"
+    },
+    "PIPE-PHX-0007": {
+      "materials": [],
+      "last_touched": "2026-10-18"
+    },
+    "PIPE-PHX-0008": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0009": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0010": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0014": {
+      "materials": [],
+      "last_touched": "2026-10-18"
+    },
+    "PIPE-PHX-0018": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0081": {
+      "materials": [],
+      "last_touched": "2026-10-21"
+    },
+    "PIPE-SNA-0002": {
+      "materials": [],
+      "last_touched": "2026-11-04"
+    }
+  },
+  "items": [
+    {
+      "record_id": "PIPE-SNA-0002",
+      "event_id": "A-000057",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0018",
+      "event_id": "A-000070",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0010",
+      "event_id": "A-000064",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0009",
+      "event_id": "A-000063",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0008",
+      "event_id": "A-000062",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0005",
+      "event_id": "A-000054",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0003",
+      "event_id": "A-000053",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000052",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-MIA-0080",
+      "event_id": "A-000018",
+      "date": "2026-11-04",
+      "type": "financials",
+      "summary": "Financials on file"
+    },
+    {
+      "record_id": "PIPE-MIA-0080",
+      "event_id": "A-000058",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Financial screen"
+    },
+    {
+      "record_id": "PIPE-MIA-0075",
+      "event_id": "A-000073",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-LAS-0072",
+      "event_id": "A-000072",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-LAS-0071",
+      "event_id": "A-000071",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-LAS-0017",
+      "event_id": "A-000056",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-LAS-0016",
+      "event_id": "A-000055",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-LAS-0015",
+      "event_id": "A-000069",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "LAND-PHX-0007",
+      "event_id": "A-000075",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "LAND-PHX-0003",
+      "event_id": "A-000074",
+      "date": "2026-11-04",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-MIA-0080",
+      "event_id": "A-000200",
+      "date": "2026-11-03",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "PIPE-MIA-0079",
+      "event_id": "A-000198",
+      "date": "2026-11-03",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "PIPE-LAS-0073",
+      "event_id": "A-000196",
+      "date": "2026-11-03",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "PIPE-LAS-0071",
+      "event_id": "A-000195",
+      "date": "2026-11-03",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "PIPE-LAS-0070",
+      "event_id": "A-000194",
+      "date": "2026-11-03",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0039",
+      "event_id": "A-000017",
+      "date": "2026-11-03",
+      "type": "legal",
+      "summary": "Environmental report on file"
+    },
+    {
+      "record_id": "LAND-PHX-0036",
+      "event_id": "A-000009",
+      "date": "2026-11-03",
+      "type": "brochure",
+      "summary": "Brochure on file"
+    },
+    {
+      "record_id": "LAND-PHX-0036",
+      "event_id": "A-000010",
+      "date": "2026-11-03",
+      "type": "legal",
+      "summary": "Environmental report on file"
+    },
+    {
+      "record_id": "LAND-PHX-0036",
+      "event_id": "A-000011",
+      "date": "2026-11-03",
+      "type": "photos",
+      "summary": "Site photos on file"
+    },
+    {
+      "record_id": "LAND-LAS-0009",
+      "event_id": "A-000016",
+      "date": "2026-11-03",
+      "type": "legal",
+      "summary": "Preliminary title report on file"
+    },
+    {
+      "record_id": "LAND-PHX-0042",
+      "event_id": "A-000166",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0041",
+      "event_id": "A-000165",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0040",
+      "event_id": "A-000164",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0038",
+      "event_id": "A-000163",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0035",
+      "event_id": "A-000162",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0034",
+      "event_id": "A-000161",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0033",
+      "event_id": "A-000159",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-LAS-0014",
+      "event_id": "A-000146",
+      "date": "2026-10-29",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-LAS-0013",
+      "event_id": "A-000145",
+      "date": "2026-10-29",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-LAS-0012",
+      "event_id": "A-000144",
+      "date": "2026-10-29",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-LAS-0011",
+      "event_id": "A-000143",
+      "date": "2026-10-29",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-LAS-0010",
+      "event_id": "A-000141",
+      "date": "2026-10-29",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "PIPE-LAS-0017",
+      "event_id": "A-000015",
+      "date": "2026-10-28",
+      "type": "legal",
+      "summary": "Site layout on file"
+    },
+    {
+      "record_id": "PIPE-LAS-0016",
+      "event_id": "A-000014",
+      "date": "2026-10-28",
+      "type": "legal",
+      "summary": "Site layout on file"
+    },
+    {
+      "record_id": "LAND-LAS-0001",
+      "event_id": "A-000013",
+      "date": "2026-10-28",
+      "type": "legal",
+      "summary": "Site layout on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000002",
+      "date": "2026-10-22",
+      "type": "financials",
+      "summary": "Financials on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000004",
+      "date": "2026-10-22",
+      "type": "legal",
+      "summary": "Site layout on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000006",
+      "date": "2026-10-22",
+      "type": "photos",
+      "summary": "Site photos on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0081",
+      "event_id": "A-000020",
+      "date": "2026-10-21",
+      "type": "financials",
+      "summary": "Financials on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0006",
+      "event_id": "A-000060",
+      "date": "2026-10-21",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0005",
+      "event_id": "A-000012",
+      "date": "2026-10-21",
+      "type": "brochure",
+      "summary": "Brochure on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0003",
+      "event_id": "A-000007",
+      "date": "2026-10-21",
+      "type": "financials",
+      "summary": "Financials on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0003",
+      "event_id": "A-000008",
+      "date": "2026-10-21",
+      "type": "doc",
+      "summary": "Document on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000001",
+      "date": "2026-10-21",
+      "type": "financials",
+      "summary": "Financials on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000003",
+      "date": "2026-10-21",
+      "type": "legal",
+      "summary": "Survey on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0001",
+      "event_id": "A-000005",
+      "date": "2026-10-21",
+      "type": "doc",
+      "summary": "Document on file"
+    },
+    {
+      "record_id": "PIPE-PHX-0014",
+      "event_id": "A-000068",
+      "date": "2026-10-18",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0007",
+      "event_id": "A-000061",
+      "date": "2026-10-18",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-PHX-0004",
+      "event_id": "A-000059",
+      "date": "2026-10-18",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-MIA-0013",
+      "event_id": "A-000067",
+      "date": "2026-10-18",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-MIA-0012",
+      "event_id": "A-000066",
+      "date": "2026-10-18",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-LAS-0011",
+      "event_id": "A-000065",
+      "date": "2026-10-18",
+      "type": "stage",
+      "summary": "Stage set to Dropped"
+    },
+    {
+      "record_id": "PIPE-SNA-0002",
+      "event_id": "A-000019",
+      "date": "2026-10-16",
+      "type": "brochure",
+      "summary": "Brochure on file"
+    }
+  ]
+}

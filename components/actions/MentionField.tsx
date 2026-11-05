@@ -27,6 +27,7 @@ export function MentionField({
   testId,
   rows,
   maxLength,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -37,6 +38,7 @@ export function MentionField({
   testId: string;
   rows?: number;
   maxLength: number;
+  placeholder?: string;
 }) {
   const caret = useRef(0);
   const [open, setOpen] = useState(false);
@@ -116,7 +118,7 @@ export function MentionField({
     <div className="mention-field">
       <label>
         {label}
-        {rows ? <textarea {...fieldProps} rows={rows} /> : <input {...fieldProps} />}
+        {rows ? <textarea {...fieldProps} rows={rows} placeholder={placeholder} /> : <input {...fieldProps} placeholder={placeholder} />}
       </label>
       {mentions.length ? (
         <span className="mention-chips">

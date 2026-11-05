@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatPacific, replyCount } from "@/lib/actions/time";
+import { APPROVER_LABEL } from "@/lib/actions/approver";
+import { formatPacific } from "@/lib/actions/time";
 import { MentionChips, MentionField, type MentionAccount } from "./MentionField";
 import { canReview, canWrite, useActionStatus, type ActionRole } from "./panel";
 
@@ -83,6 +84,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [proposeNext, setProposeNext] = useState(false);
   const writable = canWrite(status.actionRole);
   const reviewer = canReview(status.actionRole);
 
@@ -302,8 +304,8 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
 
   return (
     <section className="act" data-testid="record-actions">
-      <div data-testid="next-step">
-        <h3>Next step</h3>
+      <div data-testid="next-step" className={currentStep ? "pin" : ""}>
+        <p className="who">Approved next step</p>
         {currentStep ? (
           <p>
             <strong>{currentStep.title || currentStep.proposedValue}</strong>
@@ -332,34 +334,59 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
           </details>
         ) : null}
       </div>
-      <h3>Notes</h3>
-      {roots.length ? (
-        <div className="act-threads" data-testid="note-threads">
-          {roots.map((item) => (
-            <NoteThread
-              key={item.id}
-              note={item}
-              replies={notes.filter((reply) => reply.parentId === item.id)}
-              writable={writable}
-              reviewer={reviewer}
-              pending={pending}
-              accounts={accounts}
-              onOpen={openThread}
-              onReply={(parentId, body, mentions) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions }, () => undefined)}
-              onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
-              onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
-              onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
-              actor={status.username}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="note">No notes yet.</p>
-      )}
+      <div className="act-threads" data-testid="note-threads">
+        {roots.map((item) => (
+          <NoteThread
+            key={item.id}
+            note={item}
+            replies={notes.filter((reply) => reply.parentId === item.id)}
+            writable={writable}
+            reviewer={reviewer}
+            pending={pending}
+            accounts={accounts}
+            onOpen={openThread}
+            onReply={(parentId, body, mentions) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions }, () => undefined)}
+            onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
+            onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
+            onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
+            actor={status.username}
+          />
+        ))}
+        {pendingSteps.map((item) => (
+          <article key={item.id} className="thread proposal">
+            <p className="tag">Proposed next step · waiting for {APPROVER_LABEL}</p>
+            <p className="who"><strong>{accounts.find((account) => account.id === item.authorId)?.name || item.authorId}</strong> · {formatPacific(item.createdAt)}</p>
+            <p>{item.title || item.proposedValue}</p>
+            {reviewer ? (
+              <div className="act-row">
+                <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
+                <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "rejected" }, () => undefined)}>Reject</button>
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
       {writable ? (
         <form
           onSubmit={(event) => {
             event.preventDefault();
+            const text = note.trim();
+            if (!text) return;
+            if (proposeNext) {
+              void submit("/api/actions/suggestions", {
+                targetKind: kind,
+                targetId: id,
+                field: "proposed_next_step",
+                title: text,
+                proposedValue: text,
+                mentions: noteMentions.map((item) => item.id),
+              }, () => {
+                setNote("");
+                setNoteMentions([]);
+                setProposeNext(false);
+              });
+              return;
+            }
             void submit("/api/actions/notes", { targetKind: kind, targetId: id, body: note, mentions: noteMentions.map((item) => item.id) }, () => {
               setNote("");
               setNoteMentions([]);
@@ -367,7 +394,8 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
           }}
         >
           <MentionField
-            label="Note"
+            label=""
+            placeholder="Comment or @mention…"
             value={note}
             onChange={setNote}
             mentions={noteMentions}
@@ -377,127 +405,19 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
             rows={3}
             maxLength={2000}
           />
-          <button type="submit" disabled={pending}>Save note</button>
+          <p className="hint">Type @ to mention someone. Mentions surface the site in their Review queue.</p>
+          <div className="act-row">
+            <label className="act-check">
+              <input type="checkbox" checked={proposeNext} onChange={(event) => setProposeNext(event.target.checked)} />
+              Propose next step
+            </label>
+            <button type="submit" disabled={pending}>Comment</button>
+          </div>
+          <p className="note">{APPROVER_LABEL} approves a next step before it changes the record.</p>
         </form>
       ) : (
         <p className="note">Notes are read only for this login.</p>
       )}
-      {writable ? (
-        <form
-          data-testid="next-step-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submit(
-              "/api/actions/suggestions",
-              { targetKind: kind, targetId: id, field: "proposed_next_step", title: stepTitle, targetOn: stepDate, ownerId: stepOwner, proposedValue: stepTitle, mentions: stepMentions.map((item) => item.id) },
-              () => {
-                setStepTitle("");
-                setStepDate("");
-                setStepOwner("");
-                setStepMentions([]);
-              },
-            );
-          }}
-        >
-          <h3>Propose a next step</h3>
-          <MentionField
-            label="Title"
-            value={stepTitle}
-            onChange={setStepTitle}
-            mentions={stepMentions}
-            onMentions={setStepMentions}
-            accounts={accounts}
-            testId="next-step-title"
-            maxLength={120}
-          />
-          <label>
-            Target date
-            <input type="date" aria-label="Target date" value={stepDate} onChange={(event) => setStepDate(event.target.value)} />
-          </label>
-          <label>
-            Owner
-            <select aria-label="Owner" value={stepOwner} onChange={(event) => setStepOwner(event.target.value)}>
-              <option value="">Unassigned</option>
-              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-            </select>
-          </label>
-          <button type="submit" disabled={pending}>Propose next step</button>
-        </form>
-      ) : null}
-
-      <h3>Suggestions {openCount ? <span className="badge pending">{openCount} open</span> : null} {openProposals ? <span className="badge pending">{openProposals} open proposals</span> : null}</h3>
-      <p className="note">A suggestion does not change the map. Someone applies it in the workbook.</p>
-      {suggestions.length ? (
-        <ul className="act-list">
-          {suggestions.map((item) => (
-            <li key={item.id}>
-              <p>
-                <strong>{fieldLabel(item.field)}{item.detail ? ` · ${fieldLabel(item.detail)}` : ""}:</strong> {item.proposedValue}
-                {" "}
-                <span className={`badge ${item.status === "open" ? "pending" : "checked"}`}>{item.status}</span>
-              </p>
-              <p>{item.reason}</p>
-              <MentionChips mentions={item.mentions} />
-              <p className="note">{item.authorId} · {formatPacific(item.createdAt)}{item.currentValue ? ` · was ${item.currentValue}` : ""}{item.doneAt ? ` · Done ${formatPacific(item.doneAt)}` : ""}</p>
-              {item.mentions?.some((mention) => mention.id === status.username) ? (
-                <details onToggle={(event) => { if (event.currentTarget.open) openThread(item.id); }}>
-                  <summary>Thread</summary>
-                </details>
-              ) : null}
-              {canFinish(item) ? (
-                <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${item.id}/done`, {}, () => undefined)}>Done</button>
-              ) : null}
-              {reviewer && item.status === "open" ? (
-                <div className="act-row">
-                  <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
-                  <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "rejected" }, () => undefined)}>Reject</button>
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="note">No suggestions on this record.</p>
-      )}
-      {writable ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submit(
-              "/api/actions/suggestions",
-              { targetKind: kind, targetId: id, field, detail: field === "correction" ? detail : undefined, proposedValue: proposed, reason },
-              () => {
-                setProposed("");
-                setReason("");
-              },
-            );
-          }}
-        >
-          <label>
-            Field
-            <select aria-label="Field" value={field} onChange={(event) => setField(event.target.value)}>
-              {FIELDS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </select>
-          </label>
-          {field === "correction" ? (
-            <label>
-              Column
-              <select aria-label="Column" value={detail} onChange={(event) => setDetail(event.target.value)}>
-                {COLUMNS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-            </label>
-          ) : null}
-          <label>
-            Proposed value
-            <input data-testid="proposed-value" value={proposed} onChange={(event) => setProposed(event.target.value)} maxLength={500} />
-          </label>
-          <label>
-            Reason
-            <textarea data-testid="suggest-reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} />
-          </label>
-          <button type="submit" data-testid="suggest-change" disabled={pending}>Suggest a change</button>
-        </form>
-      ) : null}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
       <RoleLine role={status.actionRole} />
     </section>
@@ -547,8 +467,7 @@ function NoteThread({
       onToggle={(event) => { if (event.currentTarget.open) onOpen(note.id); }}
     >
       <summary>
-        {note.authorId} · {formatPacific(note.createdAt)}
-        {note.resolvedAt ? " · Resolved" : replies.length ? ` · ${replyCount(replies.length)}` : ""}
+        <strong>{accounts.find((account) => account.id === note.authorId)?.name || note.authorId}</strong> · {formatPacific(note.createdAt)}
       </summary>
       {note.deleted ? <p className="note">Removed</p> : editing ? (
         <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
@@ -634,7 +553,7 @@ function ReplyLine({
           {note.mentions?.length ? <p className="note">Mentioned <MentionChips mentions={note.mentions} /></p> : null}
         </>
       )}
-      <p className="note">{note.authorId} · {formatPacific(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
+      <p className="note"><strong>{accounts.find((account) => account.id === note.authorId)?.name || note.authorId}</strong> · {formatPacific(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
       {writable && actor === note.authorId && !note.deleted ? (
         <div className="act-row">
           <button type="button" onClick={() => { setEditing((value) => !value); setDraft(note.body); }}>Edit</button>

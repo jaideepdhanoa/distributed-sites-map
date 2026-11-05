@@ -276,15 +276,20 @@ export default function Explorer() {
   const pipelineDeals = dealRows.filter((deal) => deal.kind === "pipeline" && dealMatches(deal) && (deal.stage_group !== "dropped" || showDroppedDeals || (funnel === "pipeline" && pipeStage === "dropped")));
   const landDeals = dealRows.filter((deal) => deal.kind === "land" && deal.city === city && typeOn(deal.business_type || "Other") && (!query || `${deal.name} ${deal.address}`.toLowerCase().includes(query.toLowerCase())));
 
+  function activityCells(id: string | undefined) {
+    const touch = id ? activity[id] : undefined;
+    return [touch?.lastTouched || "", touch?.materials || 0];
+  }
+
   function exportTable() {
     const filterLine = `Filters: city ${city}, ${funnel === "pipeline" ? `pipeline ${pipeStage}` : `step ${stage}`}${query ? `, search ${query}` : ""}${landTier !== "any" ? `, tier ${landTier}` : ""}${verdict !== "any" ? `, verdict ${verdict}` : ""}${listed === "yes" ? ", listed" : ""}${businessTypes ? `, types ${businessTypes.join(" ")}` : ""}. As of ${new Date().toISOString().slice(0, 10)}.`;
     const headers = tableTab === "universe"
-      ? siteExportHeaders()
-      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site"];
+      ? [...siteExportHeaders(), "Last touched", "Materials"]
+      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site", "Last touched", "Materials"];
     const body = tableTab === "universe"
-      ? visibleSites.map((row) => siteExportRow(row))
+      ? visibleSites.map((row) => [...siteExportRow(row), ...activityCells(row.linked_deal_id)])
       : (tableTab === "land" ? landDeals : pipelineDeals).map((row) => [
-          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id,
+          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id, ...activityCells(row.deal_id),
         ]);
     const lines = [`# ${filterLine}`, headers.join(","), ...body.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`).join(","))];
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });

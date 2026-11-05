@@ -6,13 +6,19 @@ const sans = Outfit({ subsets: ["latin"], variable: "--font-sans" });
 const serif = Newsreader({ subsets: ["latin"], variable: "--font-serif" });
 
 export const metadata: Metadata = {
-  title: "Sites",
+  title: {
+    default: "Distributed Infra · Site pipeline",
+    template: "%s · Distributed Infra",
+  },
+  description: "Site pipeline map for Phoenix, Las Vegas and Miami",
+  applicationName: "Distributed Infra",
   robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#1e4636",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

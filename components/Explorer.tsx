@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Detail, { DealDetail } from "./Detail";
+import Wordmark from "./Wordmark";
 import SiteTable, { DealTable } from "./SiteTable";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, nearestDepot, type PipeId, type StageId } from "@/lib/filter";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageTitle, tierLabel } from "@/lib/labels";
@@ -357,8 +358,22 @@ export default function Explorer() {
     window.location.href = "/login";
   }
 
-  if (error) return <main className="empty">{error}</main>;
-  if (!data) return <main className="empty">Loading</main>;
+  if (error) {
+    return (
+      <main className="empty">
+        <Wordmark level="p" />
+        <p>{error}</p>
+      </main>
+    );
+  }
+  if (!data) {
+    return (
+      <main className="empty">
+        <Wordmark level="p" />
+        <p>Loading</p>
+      </main>
+    );
+  }
 
   const focus = CITY_VIEW[city] ?? CITY_VIEW.PHX;
   const dropCount = sites.filter((site) => droppedAt(site, stage) && site.city === city).length;
@@ -404,7 +419,7 @@ export default function Explorer() {
       ) : null}
       <header className="bar">
         <div className="top">
-          <h1 className="word">Sites</h1>
+          <Wordmark view={tableOpen ? "list" : "map"} />
           <div className="cities only-desktop" role="group" aria-label="City">
             {CITIES.map((item) => (
               <button key={item} className={city === item ? "on" : ""} type="button" onClick={() => jump(item)}>

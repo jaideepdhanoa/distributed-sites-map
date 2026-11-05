@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatPacific, replyCount } from "@/lib/actions/time";
 import { canReview, canWrite, useActionStatus, type ActionRole } from "./panel";
 
 type Note = {
@@ -54,12 +55,6 @@ const COLUMNS: { id: string; label: string }[] = [
   { id: "asking_price_display", label: "Asking price" },
   { id: "asking_price_source", label: "Asking price source" },
 ];
-
-function when(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toISOString().slice(0, 16).replace("T", " ");
-}
 
 function fieldLabel(id: string) {
   if (id === "proposed_next_step") return "Proposed next step";
@@ -162,7 +157,7 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
               {earlierSteps.map((item) => (
                 <li key={item.id}>
                   <p>{item.title || item.proposedValue}{item.targetOn ? ` · ${item.targetOn}` : ""}</p>
-                  <p className="note">{item.ownerName || item.authorId} · approved {item.decidedAt ? when(item.decidedAt) : ""}</p>
+                  <p className="note">{item.ownerName || item.authorId} · approved {item.decidedAt ? formatPacific(item.decidedAt) : ""}</p>
                 </li>
               ))}
             </ul>
@@ -255,7 +250,7 @@ export function RecordActions({ kind, id }: { kind: "site" | "deal"; id: string 
                 <span className={`badge ${item.status === "open" ? "pending" : "checked"}`}>{item.status}</span>
               </p>
               <p>{item.reason}</p>
-              <p className="note">{item.authorId} · {when(item.createdAt)}{item.currentValue ? ` · was ${item.currentValue}` : ""}</p>
+              <p className="note">{item.authorId} · {formatPacific(item.createdAt)}{item.currentValue ? ` · was ${item.currentValue}` : ""}</p>
               {reviewer && item.status === "open" ? (
                 <div className="act-row">
                   <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
@@ -343,8 +338,8 @@ function NoteThread({
   return (
     <details className="act-thread" open={!note.resolvedAt} data-testid="note-thread">
       <summary>
-        {note.authorId} · {when(note.createdAt)}
-        {note.resolvedAt ? " · Resolved" : replies.length ? ` · ${replies.length} replies` : ""}
+        {note.authorId} · {formatPacific(note.createdAt)}
+        {note.resolvedAt ? " · Resolved" : replies.length ? ` · ${replyCount(replies.length)}` : ""}
       </summary>
       {note.deleted ? <p className="note">Removed</p> : editing ? (
         <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft); setEditing(false); }}>
@@ -417,7 +412,7 @@ function ReplyLine({
       ) : (
         <p>{note.body}</p>
       )}
-      <p className="note">{note.authorId} · {when(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
+      <p className="note">{note.authorId} · {formatPacific(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
       {writable && actor === note.authorId && !note.deleted ? (
         <div className="act-row">
           <button type="button" onClick={() => { setEditing((value) => !value); setDraft(note.body); }}>Edit</button>

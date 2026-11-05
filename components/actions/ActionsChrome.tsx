@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import "./actions.css";
+import { formatPacific } from "@/lib/actions/time";
 import { canReview, openPanel, useActionStatus, usePanel } from "./panel";
 
 type Suggestion = {
@@ -115,7 +116,7 @@ function SuggestionsDialog() {
               <li key={row.id}>
                 <p><strong>{row.targetId}</strong> · {row.field} · {row.proposedValue} <span className="badge pending">{row.status}</span></p>
                 <p>{row.reason}</p>
-                <p className="note">{row.authorId} · {row.createdAt.slice(0, 16).replace("T", " ")}</p>
+                <p className="note">{row.authorId} · {formatPacific(row.createdAt)}</p>
                 {canReview(status.actionRole) && row.status === "open" ? (
                   <div className="act-row">
                     <button type="button" onClick={() => void decide(row.id, "accepted")}>Accept</button>

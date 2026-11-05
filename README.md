@@ -99,6 +99,25 @@ Other new county rows go in `data/source/incoming/` as `.csv` or `.xlsx` with `s
 
 Verdict rows are append-only in `data/verdicts/verdicts.csv`. Pull requests run `python scripts/build_data.py --check`.
 
+## Workbook sync
+
+A scheduled workflow exports the Pipeline Sheet and reads the other build inputs from a Drive folder named Map sync inputs. The folder id is the repository variable `MAP_SYNC_INPUTS_FOLDER_ID`. There is no default, and the sync does not look in the program root. It lists only the top level of that folder.
+
+The service account needs Viewer on exactly three things: the Pipeline workbook, Map sync inputs, and the 2 Sites folder (`TIMELINE_SITES_FOLDER_ID`). It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request.
+
+Map sync inputs sits in the Moove root, next to 2 Sites. Its top level holds:
+
+- `universe_v3.csv`
+- `listings_match_v3.csv`
+- `depots.csv`
+- `las_ring100_screen.csv`
+- `reconciliation_final`, a Google Sheet, exported to xlsx when the sync reads it
+- `service-area-PHX.kmz`, `service-area-LAS.kmz`, and `service-area-MIA.kmz`
+
+Any file ending in `.kmz` is kept. The three names above are the ones this folder uses. A Google Doc never counts. A csv Sheet export must have one tab. Anything else in the folder is skipped.
+
+`note_rewrites.json` is map configuration, committed at `data/note_rewrites.json`. It is not a Drive input. The build still runs if that file is missing.
+
 ## Counts from this data drop
 
 | Step | Count |
@@ -124,7 +143,7 @@ Contacted is 0 because the pipeline only has stage 0, stage 1, and Dropped. The 
 
 ## Not in this version
 
-- No nightly pull from the live workbook.
+- The workbook sync opens a pull request every four hours when the data changed. It does not merge, and it does not write back to the Sheet.
 - Broward parcel geometry did not resolve. Clark, Maricopa, and Miami-Dade returned 61 wash parcels. Adjoining parcel outlines are not in the inputs.
 - The 75–250 m review band was not recomputed. Two same-parcel pairs are counted once.
 - No write-back of a human call, and no PDF export. The current view exports to CSV.

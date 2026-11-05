@@ -11,6 +11,7 @@
     "add-user": "node scripts/hash-password.mjs --user",
     "test": "node --import tsx --test tests/actions/*.test.ts",
     "test:e2e": "playwright test",
+    "test:actions": "E2E_ACTIONS=1 playwright test e2e/actions.spec.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "reconcile-suggestions": "tsx scripts/reconcile-suggestions.ts"
   },

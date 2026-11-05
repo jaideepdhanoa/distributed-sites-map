@@ -169,6 +169,7 @@ export type AppData = {
   deals: { type: "FeatureCollection"; features: DealFeature[] };
   funnel: {
     generated_at: string;
+    workbook_as_of?: string;
     stages: FunnelStage[];
   };
 };

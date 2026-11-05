@@ -190,7 +190,7 @@ That command only reads. It writes `data/generated/timeline.json`.
 ## Not in this version
 
 - The workbook sync opens a pull request every four hours when the data changed. It does not merge, and it does not write back to the Sheet.
-- Broward parcel geometry did not resolve. Clark, Maricopa, and Miami-Dade returned 61 wash parcels. Adjoining parcel outlines are not in the inputs.
+- Parcel outlines are drawn for Clark, Maricopa, Miami-Dade, and Broward. A folio or parcel number is tried first, then the pin. Broward uses the County Property Appraiser parcel layer. Same-owner adjoining outlines are drawn where the site record has adjoining spare land.
 - The 75–250 m review band was not recomputed. Two same-parcel pairs are counted once.
 - No write-back of a human call, and no PDF export. The current view exports to CSV.
 - The map loads sites, areas, depots, parcels, and the funnel on separate routes, and loads one site's full record when you select it.

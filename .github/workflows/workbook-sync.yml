@@ -19,6 +19,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt cryptography
       - name: Export the Sheet and rebuild
+        id: rebuild
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           MAP_SYNC_INPUTS_FOLDER_ID: ${{ vars.MAP_SYNC_INPUTS_FOLDER_ID }}
@@ -52,10 +53,12 @@ jobs:
           fi
           git commit -m "Workbook sync $DATE"
           TITLE="Workbook sync $DATE"
+          python scripts/sync_workbook.py --pr-body /tmp/sync-pr-body.md
           export SYNC_PR_TITLE="$TITLE"
-          export SYNC_PR_BODY="Automatic read-only export of the Pipeline workbook. Not merged.
-
-          The build compared this export with the previous published data. The comment has the knock-out drift report. Nothing was written back to the Sheet."
+          export SYNC_PR_BODY="$(cat /tmp/sync-pr-body.md)"
           bash scripts/open_sync_pr.sh "$BRANCH"
           python scripts/sync_workbook.py --comment
           gh pr comment "$(cat /tmp/sync-pr-number)" --body-file /tmp/drift-comment.md
+      - name: Located deals without a universe row
+        if: steps.rebuild.outcome == 'success'
+        run: python scripts/build_data.py --gap-gate

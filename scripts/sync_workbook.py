@@ -261,6 +261,31 @@ def _timeline_lines() -> list[str]:
     return timeline_comment_lines(folder_urls, materials, rows, report_timeline)
 
 
+def _gap_lines() -> list[str]:
+    script_dir = str(ROOT / "scripts")
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    import build_data
+
+    return build_data.universe_gap_lines()
+
+
+def sync_pr_body() -> str:
+    """Pull request text. Lists every located deal that still has no Universe row."""
+    return "\n".join(
+        [
+            "Automatic read-only export of the Pipeline workbook. Not merged.",
+            "",
+            "Nothing was written back to the Sheet. The map does not invent a Universe row, a coordinate, or a parcel number.",
+            "",
+            *_gap_lines(),
+            "",
+            "The comment has the knock-out drift report.",
+            "",
+        ]
+    )
+
+
 def write_sync_comment(path: Path) -> None:
     report = json.loads((ROOT / "data" / "generated" / "build_report.json").read_text())
     changes = report.get("changes") or {}
@@ -269,6 +294,8 @@ def write_sync_comment(path: Path) -> None:
     drift = drift_path.read_text() if drift_path.exists() else ""
     text = "\n".join(
         [
+            *_gap_lines(),
+            "",
             f"Data as of {funnel.get('workbook_as_of') or ''}.",
             f"New sites: {changes.get('new_sites', 0)}.",
             f"Verdict changes: {changes.get('verdict_changes', 0)}.",
@@ -287,5 +314,9 @@ def write_sync_comment(path: Path) -> None:
 if __name__ == "__main__":
     if "--comment" in sys.argv:
         write_sync_comment(Path("/tmp/drift-comment.md"))
+    elif "--pr-body" in sys.argv:
+        index = sys.argv.index("--pr-body")
+        target = Path(sys.argv[index + 1]) if len(sys.argv) > index + 1 else Path("/tmp/sync-pr-body.md")
+        target.write_text(sync_pr_body())
     else:
         export_workbook()

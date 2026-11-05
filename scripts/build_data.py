@@ -1751,6 +1751,122 @@ def universe_link_gap(features: list[dict]) -> dict:
     }
 
 
+UNIVERSE_GAP_BASELINE = ROOT / "data" / "universe_gap_baseline.json"
+
+
+def load_universe_gap_baseline() -> tuple[list[str], list[str]]:
+    """Return (deal ids, problems). The build never writes this file."""
+    path = UNIVERSE_GAP_BASELINE
+    rel = path.relative_to(ROOT).as_posix()
+    if not path.exists():
+        return [], [f"Missing {rel}. The universe gap gate needs that allowlist."]
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return [], [f"{rel} is not valid JSON."]
+    raw = payload.get("deal_ids") if isinstance(payload, dict) else None
+    if not isinstance(raw, list):
+        return [], [f"{rel} needs a deal_ids list."]
+    ids: list[str] = []
+    seen: set[str] = set()
+    problems: list[str] = []
+    for item in raw:
+        deal_id = str(item or "").strip()
+        if not deal_id:
+            problems.append(f"{rel} contains a blank deal id.")
+            continue
+        if deal_id in seen:
+            problems.append(f"{rel} lists {deal_id} more than once.")
+            continue
+        seen.add(deal_id)
+        ids.append(deal_id)
+    return ids, problems
+
+
+def universe_gap_status(features: list[dict]) -> dict:
+    """Located Pipeline and Land deals that have no universe row, against the allowlist."""
+    gap = universe_link_gap(features)
+    baseline_ids, baseline_problems = load_universe_gap_baseline()
+    located_ids = [str(item.get("deal_id") or "").strip() for item in gap["located_missing"]]
+    allowed = set(baseline_ids)
+    return {
+        "linked": gap["linked"],
+        "located_ids": [deal_id for deal_id in located_ids if deal_id],
+        "unlocated_count": gap["unlocated_without_universe"],
+        "baseline_ids": baseline_ids,
+        "baseline_problems": baseline_problems,
+        "new_ids": [deal_id for deal_id in located_ids if deal_id and deal_id not in allowed],
+        "blank": sum(1 for deal_id in located_ids if not deal_id),
+        "baseline_count": len(baseline_ids),
+    }
+
+
+def universe_gap_problems(features: list[dict]) -> list[str]:
+    """Fail when a located deal has no universe row and is not on the allowlist.
+
+    A smaller gap passes. A new deal id fails even when the count stays the same.
+    Deals with no location stay out of this gate.
+    """
+    status = universe_gap_status(features)
+    problems = list(status["baseline_problems"])
+    if status["blank"]:
+        problems.append(
+            f"{status['blank']} located Pipeline or Land deal(s) have no universe_id and no deal id."
+        )
+    if status["new_ids"]:
+        problems.append(
+            "Located deals without a Universe row are outside data/universe_gap_baseline.json: "
+            + ", ".join(status["new_ids"])
+            + ". Mint a counted Universe row for each id. "
+            "The map does not invent a row, a coordinate, or a parcel number, and it does not write the workbook."
+        )
+    return problems
+
+
+def universe_gap_lines(features: list[dict] | None = None) -> list[str]:
+    """Deal ids in the located gap, for the sync pull request and its comment."""
+    if features is None:
+        path = OUT / "deals.geojson"
+        features = json.loads(path.read_text()).get("features") or [] if path.exists() else []
+    status = universe_gap_status(features)
+    lines: list[str] = []
+    if status["blank"]:
+        lines.append(f"Located deals with no deal id: {status['blank']}. The check fails.")
+        lines.append("")
+    if status["new_ids"]:
+        lines.append(f"NEW located deals without a Universe row: {len(status['new_ids'])}. The check fails.")
+        lines.extend(f"- {deal_id}" for deal_id in status["new_ids"])
+        lines.append("")
+    lines.append(f"Located deals without a Universe row: {len(status['located_ids'])}.")
+    lines.append(f"Baseline allowlist in data/universe_gap_baseline.json: {status['baseline_count']}.")
+    if status["new_ids"]:
+        lines.append(
+            "These ids are not on the allowlist. Mint a counted Universe row for each. "
+            "The map does not invent a row, a coordinate, or a parcel number, and it does not write the workbook."
+        )
+    else:
+        lines.append("No new located deal is missing a Universe row. The ids below are the recorded backlog.")
+    lines.append("")
+    lines.append("Deal ids still located without a Universe row:")
+    if status["located_ids"]:
+        lines.extend(f"- {deal_id}" for deal_id in status["located_ids"])
+    else:
+        lines.append("- none")
+    return lines
+
+
+def enforce_universe_gap(features: list[dict] | None = None) -> None:
+    if features is None:
+        path = OUT / "deals.geojson"
+        if not path.exists():
+            raise SystemExit("Universe gap check failed.\nmissing deals.geojson")
+        features = json.loads(path.read_text()).get("features") or []
+    print("\n".join(universe_gap_lines(features)))
+    problems = universe_gap_problems(features)
+    if problems:
+        raise SystemExit("Universe gap check failed.\n" + "\n".join(problems))
+
+
 def match_workbook_site(city: str, apn_value, address_text: str, by_apn: dict, by_street: dict) -> str | None:
     """One matcher for a deal row and for the site it attaches to.
 
@@ -4929,6 +5045,15 @@ def validate_committed() -> None:
     expect("unlocated without universe", gap["unlocated_without_universe"], deal_report.get("unlocated_without_universe"))
     if deal_report.get("located_without_universe_ids") != [item["deal_id"] for item in gap["located_missing"]]:
         problems.append("located_without_universe_ids does not match the deals file")
+    gap_problems = universe_gap_problems(deal_features)
+    if gap_problems:
+        problems = gap_problems + problems
+    else:
+        gap_status = universe_gap_status(deal_features)
+        print(
+            f"Located without universe: {len(gap_status['located_ids'])} "
+            f"(baseline {gap_status['baseline_count']}). No new deal ids."
+        )
     unscreened = loaded.get("unscreened.geojson") or {}
     unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
     pinned = sorted(item[0] for item in unscreened_rows if item[1])
@@ -5216,9 +5341,19 @@ def refresh_queue_feed() -> None:
 def main():
     parser = argparse.ArgumentParser(description="Build map data from data/source")
     parser.add_argument("--check", action="store_true", help="Rebuild in memory and compare to committed data")
+    parser.add_argument(
+        "--gap-gate",
+        action="store_true",
+        help="Fail if a located deal has no universe row and is not on the baseline allowlist",
+    )
     parser.add_argument("--refresh-parcels", action="store_true")
     parser.add_argument("--muse-verdicts", default=os.environ.get("MUSE_VERDICTS_FILE") or None)
     args = parser.parse_args()
+    if args.gap_gate:
+        enforce_universe_gap()
+        print("Universe gap check passed.")
+        if not args.check:
+            return
     if args.check:
         if sources_present():
             report = build(write=False, refresh_parcels=False, muse_file=args.muse_verdicts)

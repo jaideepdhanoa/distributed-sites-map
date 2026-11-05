@@ -15,6 +15,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      - name: Located deals without a universe row
+        run: python scripts/build_data.py --gap-gate
       - run: python scripts/build_data.py --check
       - run: python scripts/test_changes.py
       - run: python tests/test_sync_workbook.py

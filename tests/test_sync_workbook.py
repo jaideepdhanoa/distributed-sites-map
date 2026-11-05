@@ -224,6 +224,29 @@ class TimelineCommentTest(unittest.TestCase):
         self.assertIn("Timeline warnings: 1.", lines)
 
 
+class UniverseGapSyncTextTest(unittest.TestCase):
+    def test_pr_body_and_comment_list_every_open_deal_id(self) -> None:
+        import scripts.build_data as build
+
+        status = build.universe_gap_status(
+            json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())["features"]
+        )
+        body = sync.sync_pr_body()
+        self.assertIn("Not merged.", body)
+        self.assertIn("Nothing was written back to the Sheet.", body)
+        self.assertIn("No new located deal is missing a Universe row.", body)
+        for deal_id in status["located_ids"]:
+            self.assertIn(f"- {deal_id}", body)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "comment.md"
+            sync.write_sync_comment(path)
+            comment = path.read_text()
+        for deal_id in status["located_ids"]:
+            self.assertIn(f"- {deal_id}", comment)
+        self.assertLess(comment.index("Located deals without a Universe row:"), comment.index("Drift report"))
+        self.assertLess(comment.index(status["located_ids"][0]), comment.index("Drift report"))
+
+
 class DriftReasonTest(unittest.TestCase):
     def test_stall_phrase_becomes_lot_too_small(self) -> None:
         import scripts.build_data as build

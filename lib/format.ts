@@ -10,6 +10,9 @@ const LISTING_HOSTS: Array<[string, string]> = [
   ["carwashesforsale.com", "Car Washes For Sale"],
   ["linkedin.com", "LinkedIn"],
   ["carwashbrokers.com", "Car Wash Brokers"],
+  ["realmo.com", "Realmo"],
+  ["brevitas.com", "Brevitas"],
+  ["ppirfl.com", "Listing"],
 ];
 
 export function listingHost(url: string) {
@@ -93,7 +96,7 @@ export function plainRoad(value?: string | null) {
   return text.split(/\s+/).map(roadWord).join(" ").replace(/\s+/g, " ").trim();
 }
 
-const LISTING_HOSTS: Record<string, string> = {
+const SOURCE_HOSTS: Record<string, string> = {
   "loopnet.com": "LoopNet",
   "crexi.com": "Crexi",
   "bizbuysell.com": "BizBuySell",
@@ -107,7 +110,7 @@ const LISTING_HOSTS: Record<string, string> = {
 
 function hostLabel(url?: string | null) {
   const host = (url || "").replace(/^https?:\/\/(?:www\.)?/i, "").split("/")[0].toLowerCase();
-  return LISTING_HOSTS[host] || "";
+  return SOURCE_HOSTS[host] || "";
 }
 
 /** A public listing name. Internal scan labels are not a source. */

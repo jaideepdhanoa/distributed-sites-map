@@ -600,16 +600,15 @@ export default function Explorer() {
                   <span className="step">
                     <button className={pipeStage === step.id ? "on" : ""} type="button" aria-current={pipeStage === step.id ? "step" : undefined} title={FUNNEL_NOTES[step.id]} onMouseEnter={() => setTip(FUNNEL_NOTES[step.id])} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
                       <span>{step.label}</span>
-                      <strong>{squares.toLocaleString()}</strong>
+                      <strong data-count={squares}>{unmapped > 0 ? `${rows.length.toLocaleString()} (${unmapped.toLocaleString()} not on map)` : rows.length.toLocaleString()}</strong>
                     </button>
-                    {unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
                   </span>
                 </Fragment>
               );
             })}
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
               <button className={`aside ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setMoreOpen(false); setFiltersOpen(false); }}>
-                {unplacedDeals.length.toLocaleString()} unplaced
+                All stages not on the map ({unplacedDeals.length.toLocaleString()})
               </button>
             ) : null}
           </nav>
@@ -630,7 +629,7 @@ export default function Explorer() {
           >
             {summaryText()}
           </span>
-          {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
+          {data.funnel.workbook_as_of ? <span className="summary-chip as-of only-desktop">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
             {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
@@ -648,6 +647,7 @@ export default function Explorer() {
             ) : null}
           </div>
         </div>
+        {data.funnel.workbook_as_of ? <p className="as-of-line only-mobile">Data as of {data.funnel.workbook_as_of}</p> : null}
         {activeFilters.length ? (
           <div className="active-row" aria-label="Active filters">
             {activeFilters.map((item) => (
@@ -725,10 +725,13 @@ export default function Explorer() {
         {menuOpen ? (
           <div className="popover menu-sheet" role="dialog" aria-label="Menu">
             <div className="popover-head">
-              <h2>Menu</h2>
+              <div>
+                <h2>Menu</h2>
+                {data.funnel.workbook_as_of ? <p className="as-of-line">Data as of {data.funnel.workbook_as_of}</p> : null}
+              </div>
               <button type="button" onClick={() => setMenuOpen(false)}>Close</button>
             </div>
-            <div className="funnel-switch" role="group" aria-label="Which funnel">
+            <div className="funnel-switch segment" role="group" aria-label="Which funnel">
               <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
               <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
             </div>
@@ -741,9 +744,8 @@ export default function Explorer() {
             <button type="button" onClick={() => { write({ view: listView ? null : "list" }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
             <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Unplaced deals ({unplacedDeals.length.toLocaleString()})</button>
+              <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
             ) : null}
-            {data.funnel.workbook_as_of ? <p className="menu-note">Data as of {data.funnel.workbook_as_of}</p> : null}
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
             <p className="menu-note">{me?.u}</p>
             {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
@@ -753,7 +755,7 @@ export default function Explorer() {
         {unplacedOpen ? (
           <div className="popover" role="dialog" aria-label="Unplaced deals">
             <div className="popover-head">
-              <h2>{unplacedDeals.length.toLocaleString()} unplaced deals</h2>
+              <h2>{unplacedDeals.length.toLocaleString()} deals not on the map</h2>
               <button type="button" onClick={() => setUnplacedOpen(false)}>Close</button>
             </div>
             <ul className="unplaced-list">

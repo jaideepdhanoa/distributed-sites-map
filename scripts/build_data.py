@@ -4751,7 +4751,14 @@ def display_language_problems(loaded: dict) -> list[str]:
             for found in _DISPLAY_TERMS.finditer(obj):
                 word = found.group(0).lower()
                 # Avenue abbreviations and a business named Power are not the private terms.
-                if word == "av" and key in {"aadt_road", "address", "name"}:
+                # A numbered "147 AV" in a traffic note is the same abbreviation.
+                if word == "av" and (
+                    key in {"aadt_road", "address", "name"}
+                    or (
+                        key == "research_note"
+                        and re.search(r"(?i)\d+\s+av\b", obj[max(0, found.start() - 8) : found.end()])
+                    )
+                ):
                     continue
                 if word == "power" and (
                     key in {"name", "owner", "also_known_as", "broker", "firm", "address", "aadt_road"}

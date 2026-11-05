@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-04T00:27:55Z",
-  "workbook_as_of": "2026-11-04",
+  "generated_at": "2026-11-05T03:21:39Z",
+  "workbook_as_of": "2026-11-05",
   "stages": [
     {
       "id": "census",
@@ -311,7 +311,7 @@
       "name": "Of which contacted",
       "unit": "sites",
       "total": 0,
-      "pipeline_any": 0,
+      "pipeline_any": 1,
       "by_city": {
         "LAS": 0,
         "PHX": 0,

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-04T00:27:55Z",
+  "generated_at": "2026-11-05T03:21:39Z",
   "census_rows": {
     "total": 1701,
     "by_city": {
@@ -135,23 +135,25 @@
   ],
   "listed_of_candidates": 2,
   "contacted_of_candidates": 0,
-  "contacted_any": 0,
-  "pipeline_rows": 79,
+  "contacted_any": 1,
+  "pipeline_rows": 81,
   "land_rows": 42,
   "pipeline_stage_counts": {
-    "Dropped": 11,
-    "1 Desk screen": 19,
-    "Off market (no lead)": 49
+    "Dropped": 21,
+    "Off market (no lead)": 49,
+    "1 Desk screen": 10,
+    "2 Financial screen": 1
   },
   "land_stage_counts": {
-    "1 Desk screen": 25,
+    "1 Desk screen": 23,
+    "Dropped": 2,
     "Off market (no lead)": 17
   },
   "deals": {
-    "pipeline": 30,
+    "pipeline": 32,
     "land": 25,
-    "matched": 39,
-    "unmatched": 16,
+    "matched": 40,
+    "unmatched": 17,
     "geocode_failed": [
       {
         "deal_id": "PIPE-PHX-0006",
@@ -165,28 +167,28 @@
         "city": "PHX",
         "kind": "pipeline",
         "label": "PHX Auto repair, Maricopa County",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       },
       {
         "deal_id": "PIPE-PHX-0009",
         "city": "PHX",
         "kind": "pipeline",
         "label": "PHX Auto service, Mesa",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       },
       {
         "deal_id": "PIPE-LAS-0015",
         "city": "LAS",
         "kind": "pipeline",
         "label": "LAS Auto repair and body shop (address to come)",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       },
       {
         "deal_id": "PIPE-PHX-0018",
         "city": "PHX",
         "kind": "pipeline",
         "label": "PHX Tire business, Apache Junction",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       },
       {
         "deal_id": "PIPE-PHX-0067",
@@ -214,7 +216,7 @@
         "city": "LAS",
         "kind": "pipeline",
         "label": "LAS Gas station with real estate and a tenant (address to come)",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       },
       {
         "deal_id": "PIPE-MIA-0074",
@@ -228,7 +230,7 @@
         "city": "MIA",
         "kind": "pipeline",
         "label": "MIA Gas station with land, North Miami (address to come)",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       },
       {
         "deal_id": "PIPE-MIA-0077",
@@ -236,21 +238,30 @@
         "kind": "pipeline",
         "label": "MIA Mechanic shop near Tamiami Airport (address to come)",
         "stage": "1 Desk screen"
+      },
+      {
+        "deal_id": "PIPE-MIA-0080",
+        "city": "MIA",
+        "kind": "pipeline",
+        "label": "MIA 7520 W McNab Rd",
+        "stage": "2 Financial screen"
       }
     ],
     "pipeline_by_city": {
-      "PHX": 14,
+      "PHX": 15,
       "SNA": 1,
       "LAS": 8,
-      "MIA": 7
+      "MIA": 8
     },
     "pipeline_by_stage": {
-      "Dropped": 11,
-      "1 Desk screen": 19
+      "Dropped": 21,
+      "1 Desk screen": 10,
+      "2 Financial screen": 1
     },
     "pipeline_by_group": {
-      "dropped": 11,
-      "desk": 19
+      "dropped": 21,
+      "desk": 10,
+      "contacted": 1
     },
     "land_by_city": {
       "LAS": 11,
@@ -258,13 +269,14 @@
       "MIA": 1
     },
     "land_by_group": {
-      "desk": 25
+      "desk": 23,
+      "dropped": 2
     },
     "listing_links": {
       "pipeline": {
         "PHX": {
           "with_link": 10,
-          "without_link": 4
+          "without_link": 5
         },
         "SNA": {
           "with_link": 0,
@@ -275,7 +287,7 @@
           "without_link": 3
         },
         "MIA": {
-          "with_link": 5,
+          "with_link": 6,
           "without_link": 2
         }
       },
@@ -297,8 +309,8 @@
       "listed_sites": 79
     },
     "source_lines": {
-      "broker-listed": 44,
-      "broker": 11
+      "broker-listed": 45,
+      "broker": 12
     }
   },
   "off_market": {
@@ -783,7 +795,7 @@
   "parcels": {
     "counts": {
       "cache_hit": 927,
-      "not_found": 154,
+      "not_found": 155,
       "broward_unavailable": 44,
       "features": 958,
       "adjoining": 31,
@@ -811,10 +823,10 @@
         "pct": 69.9
       },
       "PHX": {
-        "targets": 283,
+        "targets": 284,
         "matched": 277,
-        "none": 6,
-        "pct": 97.9
+        "none": 7,
+        "pct": 97.5
       }
     },
     "by_layer": {
@@ -843,11 +855,11 @@
       },
       "pipeline": {
         "PHX": {
-          "targets": 7,
+          "targets": 8,
           "matched": 4,
-          "none": 3,
+          "none": 4,
           "no_geometry": 0,
-          "pct": 57.1
+          "pct": 50.0
         },
         "LAS": {
           "targets": 6,
@@ -2072,13 +2084,19 @@
         "reason": "no parcel at this pin"
       },
       {
+        "id": "PIPE-PHX-0081",
+        "city": "PHX",
+        "kind": "pipeline",
+        "reason": "no parcel at this pin"
+      },
+      {
         "id": "LAND-PHX-0003",
         "city": "PHX",
         "kind": "land",
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 927, 'not_found': 154, 'broward_unavailable': 44, 'features': 958, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 446, 'PHX': 277}, 'by_method': {'parcel number': 877, 'pin location': 50}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, and Miami-Dade assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 927, 'not_found': 155, 'broward_unavailable': 44, 'features': 958, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 446, 'PHX': 277}, 'by_method': {'parcel number': 877, 'pin location': 50}}."
   },
   "public_records": {
     "utility_by_city": {
@@ -2092,7 +2110,7 @@
       "PHX": 252
     },
     "hifld_territories": 98,
-    "note": "County parcel records supply the mailing address and the last recorded sale when the layer includes them. Miami-Dade's parcel layer has no last-sale date or price. Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value.",
+    "note": "County parcel records supply the mailing address and the last recorded sale when the layer includes them. Water and irrigation districts are left out. Miami-Dade's parcel layer has no last-sale date or price. Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value.",
     "context": {
       "zoning_by_city": {
         "LAS": 36,
@@ -2104,11 +2122,14 @@
         "MIA": 556,
         "PHX": 244
       },
-      "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Scottsdale was also queried when the old zoning note named that city even if the street address did not. Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
+      "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
     }
   },
   "review_source": "second review column",
-  "warnings": [],
+  "warnings": [
+    "Contacted count is 1, expected 0 with the current stages.",
+    "Pipeline tab has 81 rows (stages {'Dropped': 21, 'Off market (no lead)': 49, '1 Desk screen': 10, '2 Financial screen': 1}). The older note of 79 is not in this export."
+  ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
     "Nightly workbook sync is not wired; drop a new export in data/source and rerun this script.",
@@ -2124,10 +2145,71 @@
     "new_sites": 0,
     "removed_sites": 0,
     "verdict_changes": 0,
-    "stage_moves": 0,
+    "stage_moves": 26,
     "sample_new": [],
     "sample_verdicts": [],
-    "sample_stages": []
+    "sample_stages": [
+      {
+        "site_id": "LAS-U53",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "LAS-U829",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "LAS-U977",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "MIA-U747",
+        "before": "",
+        "after": "2 Financial screen"
+      },
+      {
+        "site_id": "PHX-U309",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PHX-U326",
+        "before": "",
+        "after": "1 Desk screen"
+      },
+      {
+        "site_id": "PHX-U633",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PIPE-PHX-0008",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PIPE-PHX-0009",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PIPE-LAS-0015",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PIPE-PHX-0018",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "site_id": "PIPE-LAS-0072",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      }
+    ]
   },
   "verdicts_appended": 0,
   "verdicts_total": 2660,

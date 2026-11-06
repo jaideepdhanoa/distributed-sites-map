@@ -207,6 +207,9 @@ def export_workbook() -> None:
     if modified:
         (SRC / "workbook_as_of.txt").write_text(modified + "\n")
     print(f"Exported workbook read-only. Modified {modified or 'unknown'}.")
+    # `python scripts/sync_workbook.py` puts scripts/ on sys.path, not the repo root.
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
     from scripts.site_photos import cache_map_images
 
     cache_map_images(token, SRC / "pipeline_sync.xlsx")

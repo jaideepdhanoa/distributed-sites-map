@@ -713,6 +713,13 @@
       "type": "stage",
       "at": "2026-11-06T04:47:11.756Z",
       "summary": "Stage is now 2 Financial screen."
+    },
+    {
+      "id": "materials:LAND-LAS-0001:2026-11-06T22:43:26.051Z:property_legal",
+      "siteId": "LAND-LAS-0001",
+      "type": "materials",
+      "at": "2026-11-06T22:43:26.051Z",
+      "summary": "Property and legal count is now 3."
     }
   ],
   "baseline": [
@@ -1399,7 +1406,7 @@
       "siteId": "LAND-LAS-0001",
       "category": "property_legal",
       "label": "Property and legal",
-      "count": 2
+      "count": 3
     },
     {
       "siteId": "LAND-LAS-0009",

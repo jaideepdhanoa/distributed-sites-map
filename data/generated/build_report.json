@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-06T22:21:56Z",
+  "generated_at": "2026-11-06T22:41:35Z",
   "census_rows": {
     "total": 1737,
     "by_city": {
@@ -283,16 +283,16 @@
     "listing_links": {
       "pipeline": {
         "PHX": {
-          "with_link": 12,
-          "without_link": 6
+          "with_link": 14,
+          "without_link": 4
         },
         "SNA": {
           "with_link": 0,
           "without_link": 1
         },
         "LAS": {
-          "with_link": 5,
-          "without_link": 3
+          "with_link": 8,
+          "without_link": 0
         },
         "MIA": {
           "with_link": 7,
@@ -301,24 +301,24 @@
       },
       "land": {
         "LAS": {
-          "with_link": 11,
-          "without_link": 1
+          "with_link": 12,
+          "without_link": 0
         },
         "PHX": {
-          "with_link": 16,
-          "without_link": 2
+          "with_link": 18,
+          "without_link": 0
         },
         "MIA": {
           "with_link": 2,
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 45,
+      "listed_sites_with_link": 53,
       "listed_sites": 78
     },
     "source_lines": {
-      "broker-listed": 53,
-      "broker": 15
+      "broker-listed": 61,
+      "broker": 7
     }
   },
   "off_market": {
@@ -535,7 +535,7 @@
       },
       "traffic_by_city": {
         "LAS": 41,
-        "MIA": 558,
+        "MIA": 557,
         "PHX": 259
       },
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."

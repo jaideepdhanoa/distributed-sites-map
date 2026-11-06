@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
-import { capacityFacts, cashTile, inRange, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
+import { capacityFacts, cashTile, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -71,4 +71,7 @@ const pin = publicDeal({ site_capacity: "Strong", cap_a_substation_mi: 0.4, name
 assert.equal("site_capacity" in pin, false);
 assert.equal("cap_a_substation_mi" in pin, false);
 assert.equal(pin.name, "A");
+assert.equal(openLandText(0), "0 sq ft");
+assert.equal(openLandText(null), "");
+assert.equal(openLandText(undefined), "");
 console.log("key numbers ok");

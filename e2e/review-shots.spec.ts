@@ -31,9 +31,12 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.goto("/?stage=in_area&site=PHX-U189", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
   await waitForBasemap(page);
-  await expect(page.locator("aside.drawer")).toContainText("Lead source");
-  await expect(page.locator("aside.drawer")).toContainText("Off-market");
-  await expect(page.locator("aside.drawer")).toContainText("County record not reviewed");
+  const drawer = page.locator("aside.drawer");
+  await expect(drawer).toContainText("Magic Hand Car Wash");
+  await expect(drawer).toContainText("PHX-U189");
+  await expect(drawer).toContainText("Lead source");
+  await expect(drawer).toContainText("Census site");
+  await expect(drawer).toContainText("County record not reviewed");
   await page.screenshot({ path: `review-shots/${name}-site-panel.png`, fullPage: false });
   await page.goto("/?stage=in_area", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".funnel");

@@ -219,7 +219,7 @@ export default function PipelineList({
                       {column === "openLand" && row.deal.open_land_sqft != null ? (
                         <span className="open-land">
                           {cell(row, column)}
-                          <i><b style={{ width: `${Math.max(8, (row.deal.open_land_sqft / maxOpen) * 100)}%` }} /></i>
+                          <i><b style={{ width: `${row.deal.open_land_sqft > 0 ? Math.max(8, (row.deal.open_land_sqft / maxOpen) * 100) : 0}%` }} /></i>
                         </span>
                       ) : column === "depot" && row.noPin ? (
                         <span className="no-pin">No pin</span>

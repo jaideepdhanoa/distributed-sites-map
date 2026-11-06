@@ -120,6 +120,43 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(report["counts"]["stated_cash_flow"]["tracked"], 1)
         self.assertEqual(report["withheld"], [{"deal_id": "PIPE-2", "name": "Held", "note": "Package figures not shown"}])
 
+    def test_measured_zero_spare_area_is_open_land(self) -> None:
+        for raw in (0, 0.0, "0", "0.0", "0 "):
+            figures = key_figures(_row(**{"Spare area (sq ft)": raw}), "pipeline")
+            self.assertEqual(figures["open_land_sqft"], 0)
+            self.assertIsNotNone(figures["open_land_sqft"])
+            self.assertEqual(figures["open_land_basis"], "Estimated")
+
+    def test_blank_spare_area_stays_unmeasured(self) -> None:
+        for raw in (None, "", " ", "not measured"):
+            figures = key_figures(_row(**{"Spare area (sq ft)": raw}), "pipeline")
+            self.assertIsNone(figures["open_land_sqft"])
+            self.assertEqual(figures["open_land_basis"], "")
+
+    def test_zero_stays_empty_for_other_key_figures(self) -> None:
+        figures = key_figures(
+            _row(
+                **{
+                    "Land (acres)": 0,
+                    "Asking price ($)": "0",
+                    "Revenue ($ a year)": 0,
+                    "EBITDA ($ a year)": 0.0,
+                    "Spare area (sq ft)": 0,
+                    "Business check": "Operating, address confirmed",
+                }
+            ),
+            "pipeline",
+        )
+        self.assertIsNone(figures["land_acres"])
+        self.assertEqual(figures["land_acres_basis"], "")
+        self.assertIsNone(figures["stated_revenue"])
+        self.assertIsNone(figures["stated_cash_flow"])
+        self.assertIsNone(figures["price_per_acre"])
+        self.assertIsNone(figures["cash_multiple"])
+        self.assertEqual(figures["open_land_sqft"], 0)
+        self.assertIsNone(figures["stated_revenue_display"])
+        self.assertIsNone(figures["stated_cash_flow_display"])
+
     def test_listing_gone_matches_withdrawn_status(self) -> None:
         self.assertTrue(listing_gone("Sold or withdrawn"))
         self.assertTrue(listing_gone("Delisted"))

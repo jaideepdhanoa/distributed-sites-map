@@ -73,19 +73,22 @@ FIGURE_FIELDS = (
 )
 
 
-def _number(value):
+def _number(value, *, allow_zero: bool = False):
+    """Read a measure. Zero stays empty unless this is a finished spare-area check."""
     if value is None or value == "":
         return None
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
         number = float(value)
-        return number if number > 0 else None
-    match = re.search(r"\d+(?:\.\d+)?", str(value).replace(",", ""))
-    if not match:
-        return None
-    number = float(match.group())
-    return number if number > 0 else None
+    else:
+        match = re.search(r"\d+(?:\.\d+)?", str(value).replace(",", ""))
+        if not match:
+            return None
+        number = float(match.group())
+    if number > 0 or (allow_zero and number == 0):
+        return number
+    return None
 
 
 def money(value) -> str | None:
@@ -265,7 +268,8 @@ def key_figures(row: dict, kind: str) -> dict:
     """Fields safe to ship. Package figures are dropped, not blanked quietly."""
     acres = _number(row.get("Land (acres)"))
     basis = land_basis(str(row.get("Land basis") or ""), acres)
-    spare = _number(row.get("Spare area (sq ft)"))
+    # A completed aerial can record 0 sq ft. Asking, acres, and cash still treat 0 as empty.
+    spare = _number(row.get("Spare area (sq ft)"), allow_zero=True)
     asking = _number(row.get("Asking price ($)"))
     revenue = _number(row.get("Revenue ($ a year)"))
     cash = _number(row.get("EBITDA ($ a year)"))

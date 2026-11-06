@@ -3142,8 +3142,8 @@ PIPE-PHX-0008,Pipeline,"PHX Auto repair, Maricopa County"
 PIPE-PHX-0009,Pipeline,"PHX Auto service, Mesa"
 PHX-U309,Pipeline,PHX 10480 Cotton Crossing
 LAS-U858,Pipeline,LAS 4860 S Topaz St
-PIPE-MIA-0012,Pipeline,MIA 11070 NW 17th Ave
-PIPE-MIA-0013,Pipeline,MIA 8730 SW 8th St
+WB-MIA-0011,Pipeline,MIA 11070 NW 17th Ave
+WB-MIA-0012,Pipeline,MIA 8730 SW 8th St
 PHX-U229,Pipeline,"PHX University Dr & Priest Dr, Tempe"
 PIPE-LAS-0015,Pipeline,LAS Auto repair and body shop (address to come)
 LAS-U829,Pipeline,LAS 3190 W Sahara Ave
@@ -3152,52 +3152,50 @@ PIPE-PHX-0018,Pipeline,"PHX Tire business, Apache Junction"
 PIPE-PHX-0067,Pipeline,"PHX Sinclair gas station, Mesa (address to come)"
 PIPE-PHX-0068,Pipeline,"PHX Shell gas station, Gilbert (address to come)"
 PIPE-PHX-0069,Pipeline,"PHX ARCO ampm gas station, Phoenix (address to come)"
-PIPE-LAS-0070,Pipeline,LAS 7251 W Azure Dr
+WB-LAS-0017,Pipeline,LAS 7251 W Azure Dr
 LAS-U53,Pipeline,"LAS 2014 Ann Rd, North Las Vegas"
 PIPE-LAS-0072,Pipeline,LAS Gas station with real estate and a tenant (address to come)
 LAS-U16,Pipeline,LAS 2225 N Nellis Blvd
 PIPE-MIA-0074,Pipeline,MIA Auto repair with real estate (address to come)
 PIPE-MIA-0075,Pipeline,"MIA Gas station with land, North Miami (address to come)"
-PIPE-MIA-0076,Pipeline,MIA 1601 NW 119th St
+WB-MIA-0013,Pipeline,MIA 1601 NW 119th St
 PIPE-MIA-0077,Pipeline,MIA Mechanic shop near Tamiami Airport (address to come)
 MIA-U1206,Pipeline,MIA 1080 NW 31st Ave
 MIA-U747,Pipeline,MIA 7520 W McNab Rd
 PHX-U326,Pipeline,PHX 5515 N 59th Ave
 PIPE-MIA-0082,Pipeline,"MIA Clean Get Away Car Wash, Pembroke Pines, FL (street address to confirm)"
 PHX-U167,Pipeline,"PHX Fast Lap Xpress Wash, 3830 N 51st Ave"
-PIPE-PHX-0084,Pipeline,PHX 3520 N 16th St
-PIPE-PHX-0085,Pipeline,PHX 8812-8828 N Black Canyon Hwy
+WB-PHX-0012,Pipeline,PHX 3520 N 16th St
+WB-PHX-0013,Pipeline,PHX 8812-8828 N Black Canyon Hwy
 LAS-U943,Land Sites,LAS 2436 E Cheyenne Ave
-LAND-PHX-0002,Land Sites,PHX 4405 N 7th Ave
-LAND-PHX-0003,Land Sites,"PHX 3141 E Ocotillo Rd, San Tan Valley"
-LAND-LAS-0004,Land Sites,LAS 3500 E Charleston Blvd
-LAND-LAS-0005,Land Sites,LAS 5690 Boulder Hwy
-LAND-MIA-0006,Land Sites,"MIA 900 Palm Ave, Hialeah"
+WB-PHX-0014,Land Sites,PHX 4405 N 7th Ave
+WB-PHX-0015,Land Sites,"PHX 3141 E Ocotillo Rd, San Tan Valley"
+WB-LAS-0018,Land Sites,LAS 3500 E Charleston Blvd
+WB-LAS-0019,Land Sites,LAS 5690 Boulder Hwy
+WB-MIA-0014,Land Sites,"MIA 900 Palm Ave, Hialeah"
 PHX-U633,Land Sites,"PHX 25240 W Pima St, Buckeye"
-LAND-LAS-0008,Land Sites,LAS 4990 Paradise Rd
-LAND-LAS-0009,Land Sites,LAS 2315 E Tropicana Ave
-LAND-LAS-0010,Land Sites,"LAS 2400 E Cheyenne Ave, North Las Vegas"
-LAND-LAS-0011,Land Sites,"LAS 2668 N Las Vegas Blvd, North Las Vegas"
-LAND-LAS-0012,Land Sites,"LAS 2625 Branson St, North Las Vegas"
-LAND-LAS-0013,Land Sites,"LAS Las Vegas Blvd N, 0.60-acre IP lot (89115)"
-LAND-LAS-0014,Land Sites,LAS 7910 S Dean Martin Dr
-LAND-LAS-0015,Land Sites,"LAS Denning St and Aurora Beam Ave, Whitney"
-LAND-PHX-0033,Land Sites,PHX 5020 S 16th St
-LAND-PHX-0034,Land Sites,"PHX 654 N Country Club Dr, Mesa"
-LAND-PHX-0035,Land Sites,PHX 2345 W Buckeye Rd
-LAND-PHX-0036,Land Sites,PHX 2402 E Broadway Rd
-LAND-PHX-0037,Land Sites,PHX 3232 E McDowell Rd
+WB-LAS-0020,Land Sites,LAS 4990 Paradise Rd
+WB-LAS-0021,Land Sites,LAS 2315 E Tropicana Ave
+WB-LAS-0022,Land Sites,"LAS 2400 E Cheyenne Ave, North Las Vegas"
+WB-LAS-0023,Land Sites,"LAS 2668 N Las Vegas Blvd, North Las Vegas"
+WB-LAS-0024,Land Sites,"LAS 2625 Branson St, North Las Vegas"
+WB-LAS-0025,Land Sites,"LAS Las Vegas Blvd N, 0.60-acre IP lot (89115)"
+WB-LAS-0026,Land Sites,LAS 7910 S Dean Martin Dr
+WB-LAS-0027,Land Sites,"LAS Denning St and Aurora Beam Ave, Whitney"
+WB-PHX-0018,Land Sites,PHX 2345 W Buckeye Rd
+WB-PHX-0019,Land Sites,PHX 2402 E Broadway Rd
+WB-PHX-0020,Land Sites,PHX 3232 E McDowell Rd
 WB-PHX-0001,Land Sites,PHX 6650 S Central Ave
-LAND-PHX-0039,Land Sites,PHX 4013-4021 S Central Ave
-LAND-PHX-0040,Land Sites,PHX 2531 S 7th Ave
-LAND-PHX-0041,Land Sites,PHX 1830 W Fillmore St
-LAND-PHX-0042,Land Sites,PHX 2220 W Indian School Rd
-LAND-PHX-0043,Land Sites,PHX 3926 N 19th Ave
-LAND-PHX-0044,Land Sites,PHX SWC 35th Ave & Baseline Rd
-LAND-PHX-0045,Land Sites,PHX 120-140 W Osborn Rd
-LAND-PHX-0046,Land Sites,"PHX South Mountain Pavilion, 2040/2050 W Baseline Rd"
+WB-PHX-0021,Land Sites,PHX 4013-4021 S Central Ave
+WB-PHX-0022,Land Sites,PHX 2531 S 7th Ave
+WB-PHX-0023,Land Sites,PHX 1830 W Fillmore St
+WB-PHX-0024,Land Sites,PHX 2220 W Indian School Rd
+WB-PHX-0025,Land Sites,PHX 3926 N 19th Ave
+WB-PHX-0026,Land Sites,PHX SWC 35th Ave & Baseline Rd
+WB-PHX-0027,Land Sites,PHX 120-140 W Osborn Rd
+WB-PHX-0028,Land Sites,"PHX South Mountain Pavilion, 2040/2050 W Baseline Rd"
 PHX-U217,Land Sites,PHX 3930 E Baseline Rd
 PHX-U501,Land Sites,PHX 1905 W Baseline Rd
-LAND-PHX-0049,Land Sites,PHX 2725 N 35th Ave
-LAND-LAS-0050,Land Sites,LAS 8355 Dean Martin Dr
-LAND-MIA-0051,Land Sites,MIA 19045 NW 2nd Ave
+WB-PHX-0029,Land Sites,PHX 2725 N 35th Ave
+WB-LAS-0028,Land Sites,LAS 8355 Dean Martin Dr
+WB-MIA-0015,Land Sites,MIA 19045 NW 2nd Ave

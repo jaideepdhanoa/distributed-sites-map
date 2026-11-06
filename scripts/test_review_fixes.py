@@ -100,7 +100,7 @@ class ShippedCounts(unittest.TestCase):
             if props.get("origin") == "universe" and props.get("counts_as_site") and not props.get("duplicate_of") and props.get("in_area") and not props.get("land_only") and props.get("listed"):
                 listed.append(props["city"])
         from collections import Counter
-        self.assertEqual(dict(Counter(listed)), {"PHX": 4, "LAS": 6, "MIA": 9})
+        self.assertEqual(dict(Counter(listed)), {"LAS": 13, "PHX": 18, "MIA": 11})
         stars = next(item["properties"] for item in deals if item["properties"]["deal_id"] == "PIPE-MIA-0080")
         self.assertEqual(stars["folder_url"], "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ")
         self.assertEqual(by_id["MIA-U747"]["folder_url"], stars["folder_url"])

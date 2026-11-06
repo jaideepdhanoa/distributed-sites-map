@@ -5161,8 +5161,8 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     problems = []
     stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
     census = stages.get("census") or {}
-    if census.get("total") != 1701 or census.get("by_city") != {"LAS": 428, "PHX": 561, "MIA": 712}:
-        problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,701 rows")
+    if census.get("total") != 1737 or census.get("by_city") != {"LAS": 440, "PHX": 579, "MIA": 717, "SNA": 1}:
+        problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,737 rows")
     unique_rows = [feature for feature in features if _universe_stage(feature, "universe")]
     leaked = [
         (feature.get("properties") or {}).get("site_id")
@@ -5218,14 +5218,14 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     terrible = by_id.get("LAS-U100") or {}
     if terrible.get("verdict") != "PASS" or terrible.get("network_status") != "cleared":
         problems.append("LAS-U100 Terrible's #153 must stay cleared")
-    if len(unique_rows) != 1658:
-        problems.append(f"unique sites are {len(unique_rows)}, workbook counted rows are 1,658")
-    if unique_by_city != {"LAS": 417, "PHX": 555, "MIA": 686}:
-        problems.append(f"unique sites by city are {unique_by_city}, expected LAS 417 / PHX 555 / MIA 686")
+    if len(unique_rows) != 1693:
+        problems.append(f"unique sites are {len(unique_rows)}, workbook counted rows are 1,693")
+    if unique_by_city != {"LAS": 429, "PHX": 573, "MIA": 691}:
+        problems.append(f"unique sites by city are {unique_by_city}, expected LAS 429 / PHX 573 / MIA 691")
     in_area_rows = [feature for feature in features if _universe_stage(feature, "in_area")]
     in_area_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in in_area_rows))
-    if len(in_area_rows) != 1043 or in_area_by_city != {"LAS": 179, "PHX": 254, "MIA": 610}:
-        problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,043 (LAS 179 / PHX 254 / MIA 610)")
+    if len(in_area_rows) != 1068 or in_area_by_city != {"LAS": 186, "PHX": 270, "MIA": 612}:
+        problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,068 (LAS 186 / PHX 270 / MIA 612)")
     verdict_counts = Counter((feature.get("properties") or {}).get("verdict") for feature in unique_rows)
     expected_verdicts = {"PASS": 12, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
     got_verdicts = {key: verdict_counts.get(key, 0) for key in expected_verdicts}

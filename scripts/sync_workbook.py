@@ -207,6 +207,9 @@ def export_workbook() -> None:
     if modified:
         (SRC / "workbook_as_of.txt").write_text(modified + "\n")
     print(f"Exported workbook read-only. Modified {modified or 'unknown'}.")
+    from scripts.site_photos import cache_map_images
+
+    cache_map_images(token, SRC / "pipeline_sync.xlsx")
 
 
 def timeline_comment_lines(folder_urls: int, materials: int, rows: int, timeline: dict | None) -> list[str]:

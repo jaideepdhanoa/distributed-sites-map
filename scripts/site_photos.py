@@ -6,10 +6,17 @@ no rows. Image bytes stay out of the sheet and out of the map payload.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from scripts.key_numbers import _fact_date
+
+ROOT = Path(__file__).resolve().parents[1]
+PHOTO_DIR = ROOT / "data" / "generated" / "photos"
 
 TAB = "Site Photos"
 HEADER_AT = 0
@@ -272,22 +279,68 @@ def index_photos(rows: list[dict] | None) -> dict[str, list[dict]]:
     return grouped
 
 
-def _public_photo(photo: dict) -> dict:
+_IMAGE_EXT = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+_MAX_IMAGE = 8 * 1024 * 1024
+
+
+def photo_asset_key(file_id: str) -> str:
+    """Public file name. A Drive id can accidentally contain a blocked word."""
+    return hashlib.sha256(file_id.encode()).hexdigest()[:20]
+
+
+def cached_view_url(file_id: str, directory: Path | None = None) -> str:
+    root = directory or PHOTO_DIR
+    key = photo_asset_key(file_id) if file_id else ""
+    if not key or not root.is_dir():
+        return ""
+    for path in root.glob(f"{key}.*"):
+        if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            return f"/api/data/photos/{key}{path.suffix.lower()}"
+    return ""
+
+
+def _drive_host(url: str) -> bool:
+    host = _host(url)
+    return host in {"drive.google.com", "docs.google.com"} or host.endswith("googleusercontent.com")
+
+
+def _public_photo(photo: dict, photo_dir: Path | None = None) -> dict:
+    """Ship a same-origin image. Drive ids and thumbnail URLs stay off the payload."""
     shipped = {"role": photo["role"], "visibility": "map"}
-    for key in ("source", "as_of", "file_id", "view_url", "caption", "attribution"):
+    for key in ("source", "as_of", "caption", "attribution"):
         if photo.get(key):
             shipped[key] = photo[key]
+    if photo["role"] == "street_frontage":
+        shipped["view_url"] = photo["view_url"]
+        return shipped
+    local = cached_view_url(str(photo.get("file_id") or ""), photo_dir)
+    view = str(photo.get("view_url") or "")
+    if local:
+        shipped["view_url"] = local
+    elif view and is_direct_image_url(view) and not _drive_host(view) and not is_street_view_still(view):
+        shipped["view_url"] = view
     return shipped
 
 
-def photos_for_deal(grouped: dict[str, list[dict]], deal_id: str, kind: str) -> list[dict]:
+def photos_for_deal(
+    grouped: dict[str, list[dict]],
+    deal_id: str,
+    kind: str,
+    photo_dir: Path | None = None,
+) -> list[dict]:
     wanted = SHEET_FOR_KIND.get(kind, "")
     out = []
     for photo in grouped.get((deal_id or "").upper(), []):
         sheet = photo.get("sheet") or ""
         if sheet and sheet != wanted:
             continue
-        out.append(_public_photo(photo))
+        out.append(_public_photo(photo, photo_dir))
     return out
 
 
@@ -298,12 +351,18 @@ def frontage_url(photos: list[dict]) -> str:
     return ""
 
 
-def photo_fields(row: dict, kind: str, deal_id: str, grouped: dict[str, list[dict]]) -> dict:
+def photo_fields(
+    row: dict,
+    kind: str,
+    deal_id: str,
+    grouped: dict[str, list[dict]],
+    photo_dir: Path | None = None,
+) -> dict:
     """Fields merged onto a deal. Spare-area measures are not touched."""
     summary = photo_summary(row)
     deferred = summary.get("photo_status") == "Deferred"
     # Deferred means no usable address or parcel, so the card gets no gallery and no panorama.
-    photos = [] if deferred else photos_for_deal(grouped, deal_id, kind)
+    photos = [] if deferred else photos_for_deal(grouped, deal_id, kind, photo_dir)
     fields: dict = {"photos": photos}
     for key in SUMMARY_KEYS:
         value = summary.get(key)
@@ -313,3 +372,63 @@ def photo_fields(row: dict, kind: str, deal_id: str, grouped: dict[str, list[dic
     if pano:
         fields["street_view_url"] = pano
     return fields
+
+
+def _looks_like_image(blob: bytes) -> bool:
+    return blob.startswith(b"\xff\xd8") or blob.startswith(b"\x89PNG") or blob.startswith(b"GIF8") or blob.startswith(b"RIFF")
+
+
+def _drive_media(token: str, file_id: str) -> tuple[bytes, str]:
+    meta_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=mimeType"
+    request = urllib.request.Request(meta_url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        meta = json.loads(response.read().decode())
+    mime = str(meta.get("mimeType") or "")
+    if mime not in _IMAGE_EXT:
+        return b"", mime
+    media = urllib.request.Request(
+        f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    with urllib.request.urlopen(media, timeout=120) as response:
+        return response.read(), mime
+
+
+def cache_map_images(token: str, workbook: Path, dest: Path | None = None) -> dict:
+    """Copy Visibility=map Drive images next to the generated data.
+
+    Uses the same read-only token that exports the workbook. Street-frontage
+    rows are panorama links and are not downloaded. A file the account cannot
+    read is counted and skipped.
+    """
+    folder = dest or PHOTO_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    saved = skipped = failed = 0
+    seen: set[str] = set()
+    for row in load_site_photos(workbook):
+        if _text(row.get("Visibility")).lower() != "map":
+            continue
+        if _text(row.get("Role")).lower() == "street_frontage":
+            continue
+        file_id = file_id_from(row)
+        if not file_id or file_id in seen:
+            continue
+        seen.add(file_id)
+        if cached_view_url(file_id, folder):
+            skipped += 1
+            continue
+        try:
+            blob, mime = _drive_media(token, file_id)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+            failed += 1
+            continue
+        ext = _IMAGE_EXT.get(mime, "")
+        if not ext or not blob or len(blob) > _MAX_IMAGE or not _looks_like_image(blob):
+            failed += 1
+            continue
+        (folder / f"{photo_asset_key(file_id)}{ext}").write_bytes(blob)
+        saved += 1
+    if failed:
+        print(f"The sync account could not read {failed} site photo files.")
+    print(f"Site photos cached: {saved} new, {skipped} already stored, {failed} unreadable.")
+    return {"saved": saved, "skipped": skipped, "failed": failed}

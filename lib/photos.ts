@@ -19,7 +19,6 @@ export const ROLE_LABEL: Record<string, string> = {
   street_frontage: "Street View",
 };
 
-const FILE_ID = /^[A-Za-z0-9_-]{10,}$/;
 const STILL = /streetviewpixels|maps\/api\/streetview|streetview|ggpht\.com|geo\d\.ggpht/i;
 const PANO_AT = /@-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,[^/\s]*3a/i;
 
@@ -86,41 +85,24 @@ export function isDirectImageUrl(url: string) {
   return true;
 }
 
-export function driveFileId(photo: Pick<SitePhoto, "file_id" | "view_url">) {
-  const explicit = text(photo.file_id);
-  if (FILE_ID.test(explicit)) return explicit;
-  const view = text(photo.view_url);
-  const match = view.match(/[?&]id=([A-Za-z0-9_-]{10,})/) || view.match(/\/d\/([A-Za-z0-9_-]{10,})/);
-  return match?.[1] || "";
-}
+const LOCAL_PHOTO = /^\/api\/data\/photos\/[a-f0-9]{20}\.(?:jpe?g|png|webp|gif)$/;
 
-export function withDriveSize(url: string, width: "w400" | "w1600") {
-  if (/[?&]sz=w\d+/i.test(url)) return url.replace(/sz=w\d+/i, `sz=${width}`);
-  if (url.includes("googleusercontent.com") && /=(?:w|s)\d+$/i.test(url)) {
-    return url.replace(/=(?:w|s)\d+$/i, `=${width}`);
+export function isDriveHost(url: string) {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    return host === "drive.google.com" || host === "docs.google.com" || host.endsWith("googleusercontent.com");
+  } catch {
+    return false;
   }
-  return url;
 }
 
-/** img src candidates. The stored view URL is first. Folder pages and stills are omitted. */
-export function imageCandidates(photo: SitePhoto, size: "thumb" | "full"): string[] {
+/** Same-origin cached image, or a non-Drive https image. Drive hosts sign the visitor out of the picture. */
+export function imageCandidates(photo: SitePhoto, _size: "thumb" | "full"): string[] {
   if (photo.role === "street_frontage" || photo.visibility === "drive_only") return [];
-  const width = size === "thumb" ? "w400" : "w1600";
-  const urls: string[] = [];
-  const add = (url: string) => {
-    const value = text(url);
-    if (!value || urls.includes(value) || !isDirectImageUrl(value)) return;
-    urls.push(value);
-  };
   const view = text(photo.view_url);
-  if (view) add(withDriveSize(view, width));
-  const id = driveFileId(photo);
-  if (id) {
-    add(`https://lh3.googleusercontent.com/d/${id}`);
-    add(`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=${width}`);
-  }
-  if (view) add(view);
-  return urls;
+  if (LOCAL_PHOTO.test(view)) return [view];
+  if (view && isDirectImageUrl(view) && !isDriveHost(view)) return [view];
+  return [];
 }
 
 export function viewpoint(url: string) {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -14,10 +15,13 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.key_numbers import key_figures
 from scripts.site_photos import (
+    cache_map_images,
+    cached_view_url,
     index_photos,
     is_direct_image_url,
     is_pano_url,
     load_site_photos,
+    photo_asset_key,
     photo_fields,
     photo_summary,
 )
@@ -122,12 +126,14 @@ class PhotoContract(unittest.TestCase):
         roles = [photo["role"] for photo in fields["photos"]]
         self.assertEqual(roles, ["spare_land_annotated", "access_spare", "electrical", "listing", "street_frontage"])
         self.assertNotIn("caption", fields["photos"][0])
+        self.assertNotIn("file_id", fields["photos"][0])
+        self.assertNotIn("drive.google.com", json.dumps(fields))
         self.assertEqual(fields["street_view_url"], PANO)
         self.assertEqual(fields["photo_status"], "Partial")
         self.assertEqual(fields["photo_diligence_count"], 2)
         self.assertEqual(fields["photo_listing_count"], 4)
         land = photo_fields({}, "land", "LAND-PHX-0002", grouped)
-        self.assertEqual(land["photos"][0]["file_id"], "1fromfolderlinkXXXX")
+        self.assertNotIn("file_id", land["photos"][0])
         self.assertNotIn("view_url", land["photos"][0])
         self.assertEqual(photo_summary({"Photo status": "", "Diligence photo count": None}), {
             "photo_status": "",
@@ -209,6 +215,61 @@ class PhotoContract(unittest.TestCase):
         self.assertNotIn("street_view_url", empty["features"][0]["properties"])
         self.assertEqual(bare[0]["photos"], [])
         self.assertTrue(bare[0]["street_view_url"].startswith("https://www.google.com/maps/"))
+
+    def test_cached_image_is_same_origin_and_hides_the_drive_id(self) -> None:
+        grouped = index_photos([
+            {
+                "Site ID": "PIPE-PHX-0001",
+                "Sheet": "Pipeline",
+                "Role": "lot_aerial",
+                "Source": "esri_world_imagery",
+                "View URL": THUMB,
+                "Drive file ID": FILE_ID,
+                "Visibility": "map",
+                "Attribution": "Esri",
+            }
+        ])
+        key = photo_asset_key(FILE_ID)
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder / f"{key}.jpg").write_bytes(b"\xff\xd8\xff\xd9")
+            fields = photo_fields({}, "pipeline", "PIPE-PHX-0001", grouped, photo_dir=folder)
+            self.assertEqual(fields["photos"][0]["view_url"], f"/api/data/photos/{key}.jpg")
+            self.assertEqual(cached_view_url(FILE_ID, folder), f"/api/data/photos/{key}.jpg")
+            blob = json.dumps(fields)
+            self.assertNotIn(FILE_ID, blob)
+            self.assertNotIn("drive.google.com", blob)
+            self.assertNotIn("googleusercontent.com", blob)
+
+    def test_cache_skips_frontage_and_keeps_an_existing_file(self) -> None:
+        def boom(_token, _file_id):
+            return b"\xff\xd8\xff\xd9", "image/jpeg"
+
+        book_rows = [
+            ["Site ID", "Sheet", "Role", "Source", "Drive file ID", "View URL", "Visibility"],
+            ["PIPE-PHX-0001", "Pipeline", "lot_aerial", "esri_world_imagery", FILE_ID, THUMB, "map"],
+            ["PIPE-PHX-0001", "Pipeline", "street_frontage", "google_street_view", "", PANO, "map"],
+            ["PIPE-PHX-0001", "Pipeline", "listing", "broker_listing", FILE_ID, THUMB, "drive_only"],
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "book.xlsx"
+            dest = Path(tmp) / "photos"
+            _book(path, {"Site Photos": book_rows})
+            import scripts.site_photos as photos
+
+            original = photos._drive_media
+            photos._drive_media = boom
+            try:
+                report = cache_map_images("token", path, dest)
+            finally:
+                photos._drive_media = original
+            self.assertEqual(report["saved"], 1)
+            self.assertEqual(report["failed"], 0)
+            self.assertTrue((dest / f"{photo_asset_key(FILE_ID)}.jpg").is_file())
+            again = cache_map_images("token", path, dest)
+            self.assertEqual(again["skipped"], 1)
+            self.assertEqual(again["saved"], 0)
+            self.assertNotIn("token", json.dumps(report))
 
 
 if __name__ == "__main__":

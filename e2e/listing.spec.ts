@@ -22,7 +22,10 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(folder).toHaveAttribute("href", "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ");
   await expect(folder).toHaveAttribute("target", "_blank");
   await expect(page.getByRole("link", { name: "Open in Google Maps" })).toBeVisible();
+  await expect(page.getByTestId("street-view-link")).toBeVisible();
   await expect(page.getByTestId("listing-link")).toBeVisible();
+  await expect(page.getByTestId("grade-pair")).toBeVisible();
+  await expect(page.getByTestId("site-photos")).toHaveCount(0);
 
   await page.goto("/?view=list&site=MIA-U747");
   const siteFolder = page.getByTestId("site-folder-link");

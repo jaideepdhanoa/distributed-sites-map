@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
+from scripts.site_photos import index_photos, load_site_photos, photo_fields
 from scripts.timeline_drive import folder_id_from_row, folder_url_for
 
 SRC = ROOT / "data" / "source"
@@ -1650,6 +1651,13 @@ DEAL_FIELDS = (
     "business_type",
     "broker_contacted",
     "last_broker_contact",
+    "street_view_url",
+    "photos",
+    "photo_status",
+    "photo_diligence_count",
+    "photo_listing_count",
+    "photos_checked",
+    "photo_notes",
     *FIGURE_FIELDS,
 )
 
@@ -2368,6 +2376,7 @@ def build_deal_layer(
     depots: list[dict],
     reg: dict | None = None,
     outreach: dict[str, str] | None = None,
+    photo_rows: list[dict] | None = None,
 ) -> tuple[dict, dict]:
     reg = reg if reg is not None else registry_load()
     cache = {}
@@ -2375,6 +2384,7 @@ def build_deal_layer(
         cache = json.loads(GEOCODE_CACHE.read_text())
     by_apn, by_street = universe_match_index(sites)
     outreach = outreach or {}
+    photo_index = index_photos(photo_rows)
 
     def match_row(row: dict) -> str | None:
         city = str(row.get("Market") or "").strip()
@@ -2448,6 +2458,7 @@ def build_deal_layer(
                 "broker_contacted": bool(outreach.get(deal_id)),
                 "last_broker_contact": outreach.get(deal_id) or "",
                 **key_figures(row, kind),
+                **photo_fields(row, kind, deal_id, photo_index),
             }
             if props["business_type"] not in BUSINESS_TYPES:
                 raise SystemExit(f"{deal_id} business type is not allowed: {props['business_type']}")
@@ -2511,6 +2522,10 @@ def build_deal_layer(
         uid = feature["properties"].get("universe_id") or ""
         if uid:
             by_universe.setdefault(uid, []).append(feature["properties"])
+
+    def _has_photo_pack(props: dict) -> bool:
+        return bool(props.get("photos") or props.get("photo_status") or props.get("street_view_url"))
+
     for site in sites:
         link = best.get(site["site_id"])
         site["linked_deal_id"] = link["deal_id"] if link else ""
@@ -2539,6 +2554,20 @@ def build_deal_layer(
             site["folder_url"] = folder
         elif "folder_url" in site:
             site.pop("folder_url", None)
+        donor = link if link and _has_photo_pack(link) else None
+        if donor is None:
+            for props in by_universe.get(site["site_id"], []):
+                if _has_photo_pack(props):
+                    donor = props
+                    break
+        site["photos"] = list((donor or {}).get("photos") or [])
+        for key in ("photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes"):
+            if donor and donor.get(key) not in (None, ""):
+                site[key] = donor[key]
+            elif key in site:
+                site.pop(key, None)
+        if donor and donor.get("street_view_url"):
+            site["street_view_url"] = donor["street_view_url"]
     problems = folder_link_problems(expected_folders, features, sites)
     if problems:
         raise SystemExit("A Folder URL was dropped.\n" + "\n".join(problems[:20]))
@@ -4570,7 +4599,13 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     areas_fc = {"type": "FeatureCollection", "features": areas}
     depots = build_depots()
     deals_fc, deal_report = build_deal_layer(
-        pipeline_rows, land_rows, sites, depots["features"], reg, broker_outreach(workbook)
+        pipeline_rows,
+        land_rows,
+        sites,
+        depots["features"],
+        reg,
+        broker_outreach(workbook),
+        load_site_photos(workbook),
     )
     apply_contacted_deal_stage(funnel, deals_fc["features"])
     listed_drift = listed_flag_drift(sites)

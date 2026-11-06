@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-06T04:46:03Z",
+  "generated_at": "2026-11-06T22:21:56Z",
   "census_rows": {
     "total": 1737,
     "by_city": {
@@ -295,8 +295,8 @@
           "without_link": 3
         },
         "MIA": {
-          "with_link": 5,
-          "without_link": 4
+          "with_link": 7,
+          "without_link": 2
         }
       },
       "land": {
@@ -313,12 +313,12 @@
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 43,
+      "listed_sites_with_link": 45,
       "listed_sites": 78
     },
     "source_lines": {
-      "broker-listed": 51,
-      "broker": 17
+      "broker-listed": 53,
+      "broker": 15
     }
   },
   "off_market": {
@@ -363,8 +363,8 @@
   "parcels": {
     "counts": {
       "cache_hit": 1089,
-      "not_found": 7,
       "fetched": 26,
+      "not_found": 7,
       "features": 1146,
       "adjoining": 31,
       "by_city": {
@@ -512,7 +512,7 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'not_found': 7, 'fetched': 26, 'features': 1146, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 293}, 'by_method': {'parcel number': 1051, 'pin location': 64}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'fetched': 26, 'not_found': 7, 'features': 1146, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 293}, 'by_method': {'parcel number': 1051, 'pin location': 64}}."
   },
   "public_records": {
     "utility_by_city": {
@@ -571,21 +571,10 @@
     "new_sites": 0,
     "removed_sites": 0,
     "verdict_changes": 0,
-    "stage_moves": 2,
+    "stage_moves": 0,
     "sample_new": [],
     "sample_verdicts": [],
-    "sample_stages": [
-      {
-        "site_id": "WB-PHX-0012",
-        "before": "1 Desk screen",
-        "after": "2 Financial screen"
-      },
-      {
-        "deal_id": "PIPE-PHX-0084",
-        "before": "1 Desk screen",
-        "after": "2 Financial screen"
-      }
-    ]
+    "sample_stages": []
   },
   "verdicts_appended": 2,
   "verdicts_total": 2662,
@@ -596,10 +585,10 @@
     "parcels-MIA.geojson": 327553
   },
   "timeline": {
-    "matched_folders": 16,
+    "matched_folders": 55,
     "unmatched_folders": 0,
-    "sheet_links": 16,
-    "warnings": 8,
+    "sheet_links": 43,
+    "warnings": 60,
     "drive": "ok"
   }
 }

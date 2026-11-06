@@ -29,11 +29,11 @@ export type RangeFilter = {
 
 const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "omax"] as const;
 
-/** Map pins omit site-capacity facts so they are not tinted or badged. */
+/** Map pins omit site-capacity facts and photo lists. */
 export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
-    if (key === "site_capacity" || key.startsWith("cap_")) delete copy[key];
+    if (key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
   }
   return copy;
 }

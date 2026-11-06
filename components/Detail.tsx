@@ -6,8 +6,10 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText } from "@/lib/keyNumbers";
+import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts } from "./KeyStrip";
 import PanelSections from "./PanelSections";
+import SitePhotos from "./SitePhotos";
 
 function acres(value: number | null | undefined, text?: string) {
   if (text) return text;
@@ -72,20 +74,25 @@ function mapsLinks(
   listing?: { listing_url?: string | null; listing_removed?: boolean | null } | null,
   required = false,
   folderUrl?: string | null,
+  streetViewUrl?: string | null,
 ) {
   const hasMap = lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
   const cue = listing ? listingCue(listing) : null;
   const showListing = Boolean(cue && (required || cue.url));
   const folder = folderUrl && FOLDER_URL.test(folderUrl) ? folderUrl : "";
-  if (!hasMap && !showListing && !folder) return null;
   const point = hasMap ? `${lat},${lng}` : "";
+  const generated = hasMap ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}` : "";
+  const street = streetViewUrl && isPanoUrl(streetViewUrl) ? streetViewUrl : generated;
+  if (!hasMap && !showListing && !folder && !street) return null;
   return (
     <p className="map-links">
       {hasMap ? (
+        <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+      ) : null}
+      {street ? (
         <>
-          <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
-          {" · "}
-          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}`} target="_blank" rel="noopener noreferrer">Street View</a>
+          {hasMap ? " · " : null}
+          <a href={street} target="_blank" rel="noopener noreferrer" data-testid="street-view-link">Street View</a>
         </>
       ) : null}
       {showListing && cue ? (
@@ -134,6 +141,8 @@ export default function Detail({
   onSwipe?: (direction: "next" | "prev") => void;
 }) {
   if (!site) return null;
+  const photos = cardPhotos(site, linkedDeal);
+  const street = photos.frontageUrl || site.street_view_url;
   const price = site.asking_price_display;
   const why = site.summary_why || "Not screened yet.";
   const next = nextStepText(site);
@@ -164,7 +173,7 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}{price ? ` · Asking ${price}` : ""}</p>
-      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url)}
+      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -174,6 +183,7 @@ export default function Detail({
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       <GradePair site={site} deal={linkedDeal} prefer="site" />
+      <SitePhotos card={photos} />
       <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
         overview={
@@ -260,7 +270,7 @@ export default function Detail({
               <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
               <span>Nearest depot</span><div>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
               <span>County parcel</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
-              <span>Street View</span><div>{site.street_view_url ? <a href={site.street_view_url} target="_blank" rel="noopener noreferrer">Open Street View</a> : "—"}</div>
+              <span>Street View</span><div>{street ? <a href={street} target="_blank" rel="noopener noreferrer">Open Street View</a> : "—"}</div>
               <span>Parcel</span><div>{site.parcel_match === "none" ? "No parcel found" : site.parcel_match === "pin location" ? "Matched by pin location" : site.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
               {site.listed ? (
                 <>
@@ -366,6 +376,7 @@ export function DealDetail({
   onSwipe?: (direction: "next" | "prev") => void;
 }) {
   const hasPin = lat != null && lng != null;
+  const photos = cardPhotos(deal, universeSite);
   return (
     <aside
       className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
@@ -396,8 +407,9 @@ export function DealDetail({
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
-      {mapsLinks(lat, lng, deal, true, deal.folder_url)}
+      {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
       <GradePair site={universeSite} deal={deal} prefer="deal" />
+      <SitePhotos card={photos} />
       {onCompare ? (
         <label className="compare-check">
           <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />

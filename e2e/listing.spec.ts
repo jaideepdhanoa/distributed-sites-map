@@ -22,10 +22,19 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(folder).toHaveAttribute("href", "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ");
   await expect(folder).toHaveAttribute("target", "_blank");
   await expect(page.getByRole("link", { name: "Open in Google Maps" })).toBeVisible();
+  await expect(page.getByTestId("street-view-link")).toBeVisible();
   await expect(page.getByTestId("listing-link")).toBeVisible();
+  await expect(page.getByTestId("grade-pair")).toBeVisible();
+  const photos = page.getByTestId("site-photos");
+  await expect(photos).toBeVisible();
+  const thumb = page.getByTestId("photo-thumb").first();
+  await expect(thumb).toBeVisible();
+  await expect(thumb.locator("img")).toHaveAttribute("src", /^\/api\/data\/photos\/[a-f0-9]{20}\.jpg$/);
+  await expect(page.getByTestId("street-view-link")).toHaveAttribute("href", /map_action=pano/);
 
   await page.goto("/?view=list&site=MIA-U747");
   const siteFolder = page.getByTestId("site-folder-link");
   await expect(siteFolder).toBeVisible();
   await expect(siteFolder).toHaveAttribute("href", "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ");
+  await expect(page.getByTestId("site-photos")).toBeVisible();
 });

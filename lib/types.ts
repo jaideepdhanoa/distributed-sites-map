@@ -1,3 +1,14 @@
+export type SitePhoto = {
+  role: string;
+  source?: string;
+  as_of?: string;
+  file_id?: string;
+  view_url?: string;
+  caption?: string;
+  attribution?: string;
+  visibility?: string;
+};
+
 export type FieldDot = { status: string; source: string; date: string };
 
 export type Review = {
@@ -121,6 +132,12 @@ export type SiteProps = {
   lead_source?: string;
   county_url: string;
   street_view_url: string;
+  photos?: SitePhoto[];
+  photo_status?: string;
+  photo_diligence_count?: number | null;
+  photo_listing_count?: number | null;
+  photos_checked?: string;
+  photo_notes?: string;
   why_stopped: string;
   fields: Record<string, FieldDot>;
   reviews: Review[];
@@ -143,6 +160,13 @@ export type DealProps = {
   listing_url: string;
   /** Workbook Folder column. Empty when the row has no site folder. */
   folder_url?: string;
+  street_view_url?: string;
+  photos?: SitePhoto[];
+  photo_status?: string;
+  photo_diligence_count?: number | null;
+  photo_listing_count?: number | null;
+  photos_checked?: string;
+  photo_notes?: string;
   listing_removed?: boolean;
   asking_price: number | null;
   asking_price_display: string | null;

@@ -706,6 +706,13 @@
       "type": "materials",
       "at": "2026-11-05T22:04:28.943Z",
       "summary": "Financials count is now 1."
+    },
+    {
+      "id": "stage:PIPE-PHX-0084:2026-11-06T04:47:11.756Z:2 Financial screen",
+      "siteId": "PIPE-PHX-0084",
+      "type": "stage",
+      "at": "2026-11-06T04:47:11.756Z",
+      "summary": "Stage is now 2 Financial screen."
     }
   ],
   "baseline": [
@@ -1042,8 +1049,8 @@
     {
       "id": "PIPE-PHX-0084",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "2 Financial screen",
+      "stageGroup": "financial",
       "verdict": "",
       "askingPrice": "$1,750,000",
       "askingSource": "Incyte Realty",
@@ -1254,16 +1261,6 @@
     {
       "id": "A-000162",
       "siteId": "LAND-PHX-0035",
-      "summary": "Listing noted"
-    },
-    {
-      "id": "A-000161",
-      "siteId": "LAND-PHX-0034",
-      "summary": "Listing noted"
-    },
-    {
-      "id": "A-000159",
-      "siteId": "LAND-PHX-0033",
       "summary": "Listing noted"
     },
     {

@@ -1,22 +1,20 @@
 {
-  "new_sites": 35,
-  "removed_sites": 78,
+  "new_sites": 0,
+  "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 0,
-  "sample_new": [
-    "WB-LAS-0017",
-    "WB-LAS-0018",
-    "WB-LAS-0019",
-    "WB-LAS-0020",
-    "WB-LAS-0021",
-    "WB-LAS-0022",
-    "WB-LAS-0023",
-    "WB-LAS-0024",
-    "WB-LAS-0025",
-    "WB-LAS-0026",
-    "WB-LAS-0027",
-    "WB-LAS-0028"
-  ],
+  "stage_moves": 2,
+  "sample_new": [],
   "sample_verdicts": [],
-  "sample_stages": []
+  "sample_stages": [
+    {
+      "site_id": "WB-PHX-0012",
+      "before": "1 Desk screen",
+      "after": "2 Financial screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0084",
+      "before": "1 Desk screen",
+      "after": "2 Financial screen"
+    }
+  ]
 }

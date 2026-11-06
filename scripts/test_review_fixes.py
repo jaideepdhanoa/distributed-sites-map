@@ -117,7 +117,7 @@ class ShippedCounts(unittest.TestCase):
         with (ROOT / "data/drift_report.csv").open(newline="", encoding="utf-8") as handle:
             drift_rows = list(csv.DictReader(handle))
         leads = [row["lead id"] for row in drift_rows]
-        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "LAND-PHX-0049", "LAS-U119"])
+        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "PIPE-PHX-0085", "LAND-PHX-0049", "LAS-U119"])
         by_lead = {row["lead id"]: row for row in drift_rows}
         self.assertEqual(by_lead["LAND-PHX-0049"]["workbook Stage"], "1 Desk screen")
         self.assertEqual(by_lead["LAND-PHX-0049"]["KO reason"], "Outside the service area")

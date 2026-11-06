@@ -1,16 +1,17 @@
 {
-  "generated_at": "2026-11-05T22:02:39Z",
-  "workbook_as_of": "2026-11-05",
+  "generated_at": "2026-11-06T00:15:39Z",
+  "workbook_as_of": "2026-11-06",
   "stages": [
     {
       "id": "census",
       "name": "Census rows",
       "unit": "rows",
-      "total": 1701,
+      "total": 1737,
       "by_city": {
-        "LAS": 428,
-        "PHX": 561,
-        "MIA": 712
+        "LAS": 440,
+        "PHX": 579,
+        "MIA": 717,
+        "SNA": 1
       },
       "note": "Workbook Universe tab. A census union, not a count of operating businesses. The Universe step keeps the rows marked counted, one site each."
     },
@@ -18,11 +19,11 @@
       "id": "unique",
       "name": "Unique sites",
       "unit": "sites",
-      "total": 1658,
+      "total": 1693,
       "by_city": {
-        "LAS": 417,
-        "PHX": 555,
-        "MIA": 686
+        "LAS": 429,
+        "PHX": 573,
+        "MIA": 691
       },
       "by_class": {
         "Gas-attached": 512,
@@ -33,19 +34,20 @@
         "Not a wash": 61,
         "Licence-only": 18,
         "Closed": 1,
-        "Quarantined": 3
+        "Quarantined": 3,
+        "Unknown": 35
       },
-      "note": "Counted rows on the Universe tab: 1658. The tab has 1701 rows in all. Census file records not on a counted row are left out (24)."
+      "note": "Counted rows on the Universe tab: 1693. The tab has 1737 rows in all. Census file records not on a counted row are left out (24)."
     },
     {
       "id": "in_area",
       "name": "In service area",
       "unit": "sites",
-      "total": 1043,
+      "total": 1068,
       "by_city": {
-        "LAS": 179,
-        "PHX": 254,
-        "MIA": 610
+        "LAS": 186,
+        "PHX": 270,
+        "MIA": 612
       },
       "by_class": {
         "Gas-attached": 406,
@@ -53,7 +55,8 @@
         "Embedded": 256,
         "Not a wash": 45,
         "Licence-only": 15,
-        "Quarantined": 2
+        "Quarantined": 2,
+        "Unknown": 25
       },
       "by_city_class": {
         "LAS": {
@@ -62,19 +65,22 @@
           "Embedded": 25,
           "Not a wash": 31,
           "Licence-only": 3,
-          "Quarantined": 2
+          "Quarantined": 2,
+          "Unknown": 7
         },
         "PHX": {
           "Embedded": 63,
           "Gas-attached": 63,
-          "Core": 128
+          "Core": 128,
+          "Unknown": 16
         },
         "MIA": {
           "Gas-attached": 291,
           "Core": 125,
           "Embedded": 168,
           "Not a wash": 14,
-          "Licence-only": 12
+          "Licence-only": 12,
+          "Unknown": 2
         }
       },
       "note": "Service area comes from the Universe tab. In is inside the current area. Out and unknown stay outside. Las Vegas rings 200 and 300 stay on the expansion horizon."
@@ -314,8 +320,8 @@
       "unit": "deals",
       "total": 29,
       "by_city": {
-        "LAS": 10,
-        "PHX": 12,
+        "LAS": 11,
+        "PHX": 11,
         "MIA": 7
       },
       "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."

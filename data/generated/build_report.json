@@ -1,27 +1,28 @@
 {
-  "generated_at": "2026-11-05T22:02:39Z",
+  "generated_at": "2026-11-06T00:15:39Z",
   "census_rows": {
-    "total": 1701,
+    "total": 1737,
     "by_city": {
-      "LAS": 428,
-      "PHX": 561,
-      "MIA": 712
+      "LAS": 440,
+      "PHX": 579,
+      "MIA": 717,
+      "SNA": 1
     }
   },
   "live_universe": {
-    "counted": 1658,
+    "counted": 1693,
     "by_city": {
-      "LAS": 417,
-      "PHX": 555,
-      "MIA": 686
+      "LAS": 429,
+      "PHX": 573,
+      "MIA": 691
     },
     "in_area_by_city": {
-      "LAS": 179,
-      "PHX": 254,
-      "MIA": 610
+      "LAS": 186,
+      "PHX": 270,
+      "MIA": 612
     },
     "matched_existing": 1621,
-    "new_sites": 37,
+    "new_sites": 72,
     "dropped_existing": 24,
     "county_verdicts_before_holds": {
       "PASS": 14,
@@ -32,18 +33,18 @@
     },
     "note": "County verdicts are the Universe tab before Charleston Car Wash and the Chandler Quick Quack are held at Maybe. Cleared on the map is the in-area Pass rows after those two holds."
   },
-  "unique_site_records": 1682,
-  "unique_sites_counted": 1658,
+  "unique_site_records": 1717,
+  "unique_sites_counted": 1693,
   "same_parcel_collapsed": {
     "LAS-V2-249": "LAS-U878",
     "LAS-V2-226": "LAS-U97"
   },
   "in_area": {
-    "total": 1043,
+    "total": 1068,
     "by_city": {
-      "LAS": 179,
-      "PHX": 254,
-      "MIA": 610
+      "LAS": 186,
+      "PHX": 270,
+      "MIA": 612
     },
     "by_class": {
       "Gas-attached": 406,
@@ -51,7 +52,8 @@
       "Embedded": 256,
       "Not a wash": 45,
       "Licence-only": 15,
-      "Quarantined": 2
+      "Quarantined": 2,
+      "Unknown": 25
     }
   },
   "land_tiers": {
@@ -137,24 +139,29 @@
   "listed_of_candidates": 2,
   "contacted_of_candidates": 0,
   "contacted_any": 0,
-  "pipeline_rows": 85,
-  "land_rows": 51,
+  "pipeline_rows": 36,
+  "land_rows": 32,
   "pipeline_stage_counts": {
     "Dropped": 22,
-    "Off market (no lead)": 49,
     "1 Desk screen": 13,
     "2 Financial screen": 1
   },
   "land_stage_counts": {
-    "1 Desk screen": 29,
-    "Dropped": 5,
-    "Off market (no lead)": 17
+    "1 Desk screen": 27,
+    "Dropped": 5
   },
   "deals": {
     "pipeline": 36,
-    "land": 34,
-    "matched": 44,
-    "unmatched": 26,
+    "land": 32,
+    "matched": 54,
+    "unmatched": 14,
+    "shipped_linked": 54,
+    "located_without_universe": 1,
+    "unlocated_without_universe": 13,
+    "located_without_universe_ids": [
+      "PIPE-SNA-0002"
+    ],
+    "universe_gap_note": "A deal joins the universe when the Universe tab has a counted row for that place. The map links by parcel or a unique street and does not invent a row, a coordinate, or a parcel number.",
     "geocode_failed": [
       {
         "deal_id": "PIPE-PHX-0006",
@@ -266,12 +273,11 @@
     },
     "land_by_city": {
       "LAS": 12,
-      "PHX": 19,
-      "MIA": 2,
-      "UNK": 1
+      "PHX": 18,
+      "MIA": 2
     },
     "land_by_group": {
-      "desk": 29,
+      "desk": 27,
       "dropped": 5
     },
     "listing_links": {
@@ -299,513 +305,28 @@
           "without_link": 1
         },
         "PHX": {
-          "with_link": 17,
+          "with_link": 16,
           "without_link": 2
         },
         "MIA": {
           "with_link": 2,
           "without_link": 0
-        },
-        "UNK": {
-          "with_link": 1,
-          "without_link": 0
         }
       },
-      "listed_sites_with_link": 15,
-      "listed_sites": 80
+      "listed_sites_with_link": 43,
+      "listed_sites": 78
     },
     "source_lines": {
-      "broker-listed": 53,
+      "broker-listed": 51,
       "broker": 17
-    },
-    "shipped_linked": 21,
-    "located_without_universe": 36,
-    "unlocated_without_universe": 13,
-    "located_without_universe_ids": [
-      "PIPE-SNA-0002",
-      "PIPE-MIA-0012",
-      "PIPE-MIA-0013",
-      "PIPE-LAS-0070",
-      "PIPE-MIA-0076",
-      "PIPE-PHX-0084",
-      "PIPE-PHX-0085",
-      "LAND-PHX-0002",
-      "LAND-PHX-0003",
-      "LAND-LAS-0004",
-      "LAND-LAS-0005",
-      "LAND-MIA-0006",
-      "LAND-LAS-0008",
-      "LAND-LAS-0009",
-      "LAND-LAS-0010",
-      "LAND-LAS-0011",
-      "LAND-LAS-0012",
-      "LAND-LAS-0013",
-      "LAND-LAS-0014",
-      "LAND-LAS-0015",
-      "LAND-PHX-0033",
-      "LAND-PHX-0034",
-      "LAND-PHX-0035",
-      "LAND-PHX-0036",
-      "LAND-PHX-0037",
-      "LAND-PHX-0039",
-      "LAND-PHX-0040",
-      "LAND-PHX-0041",
-      "LAND-PHX-0042",
-      "LAND-PHX-0043",
-      "LAND-PHX-0044",
-      "LAND-PHX-0045",
-      "LAND-PHX-0046",
-      "LAND-PHX-0049",
-      "LAND-LAS-0050",
-      "LAND-MIA-0051"
-    ],
-    "universe_gap_note": "A deal joins the universe when the Universe tab has a counted row for that place. The map links by parcel or a unique street and does not invent a row, a coordinate, or a parcel number."
+    }
   },
   "off_market": {
-    "matched": 23,
-    "unmatched": 43,
-    "matched_by_city": {
-      "PHX": 14,
-      "LAS": 6,
-      "MIA": 3
-    },
-    "unmatched_by_city": {
-      "PHX": 9,
-      "LAS": 8,
-      "MIA": 26
-    },
-    "unmatched_rows": [
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 2649 W Indian School Rd",
-        "name": "Glidepath LLC wash",
-        "apn": "110-01-015D",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0001",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 7045 E Main St, Mesa",
-        "name": "Storey's Auto (U-Haul) on a vehicle yard",
-        "apn": "218-19-070",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0002",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 747 E Southern Ave, Mesa",
-        "name": "Kelly Automotive",
-        "apn": "139-13-002C",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0003",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 2427 W Northern Ave",
-        "name": "Japanese Auto Pros",
-        "apn": "157-28-075",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0004",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 15440 N 40th St",
-        "name": "Blackwell Automotive",
-        "apn": "214-34-056B",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0005",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 5838 N 19th Ave",
-        "name": "Greg Clark Automotive Specialists",
-        "apn": "153-08-079H",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0006",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 11044 N Cave Creek Rd",
-        "name": "Michael's Collision CARSTAR",
-        "apn": "159-21-039H",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0007",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 11625 N Saguaro Blvd, Fountain Hills",
-        "name": "Carzz Motor Sports and Liberty Auto Center",
-        "apn": "176-08-466A",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0008",
-        "placed": true
-      },
-      {
-        "city": "PHX",
-        "kind": "pipeline",
-        "label": "PHX 16040 N 75th Ave, Peoria",
-        "name": "Auto repair garage (business to confirm)",
-        "apn": "200-53-014H",
-        "universe_id": "",
-        "site_id": "OFF-PHX-0009",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 3045 N Lamb Blvd",
-        "name": "MoTech Premium Conversions",
-        "apn": "140-18-502-006",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0001",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 4435 W Wigwam Ave",
-        "name": "Ted Wiens Tire & Auto (corporate store)",
-        "apn": "177-18-303-038",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0002",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS Paradise yard, APN 162-19-802-035",
-        "name": "Truck and trailer yard (no street address)",
-        "apn": "162-19-802-035",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0003",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 2730 N Nellis Blvd",
-        "name": "Service garage and equipment yard",
-        "apn": "140-16-301-010",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0004",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 5045 E Cheyenne Ave",
-        "name": "Multi-tenant auto building (Revolution Auto Repair)",
-        "apn": "140-17-501-006",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0005",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 400 Northbridge Ln",
-        "name": "Automotive center (business to confirm)",
-        "apn": "162-04-803-013",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0006",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 1450 E Lake Mead Pkwy, Henderson",
-        "name": "Lake Mead Car Wash",
-        "apn": "160-33-411-012",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0007",
-        "placed": true
-      },
-      {
-        "city": "LAS",
-        "kind": "pipeline",
-        "label": "LAS 3446 W Hacienda Ave",
-        "name": "Auto repair (business to confirm)",
-        "apn": "162-29-204-012",
-        "universe_id": "",
-        "site_id": "OFF-LAS-0008",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 12005 SW 129th Ct",
-        "name": "Multi-tenant auto building (Firestone)",
-        "apn": "30-5914-081-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0001",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 12539 SW 128th St",
-        "name": "Xtreme Care Body Shop",
-        "apn": "30-5913-004-0070",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0002",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 8500 NW 64th St",
-        "name": "Fleet Tech & Maintenance",
-        "apn": "30-3015-023-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0003",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 13470 SW 128th St",
-        "name": "Auto business (to verify)",
-        "apn": "30-5914-005-0050",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0004",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 17110 S Dixie Hwy",
-        "name": "Vehicle and bus lot",
-        "apn": "30-5033-014-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0005",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 24005 S Federal Hwy, Homestead",
-        "name": "RV and vehicle lot",
-        "apn": "30-6923-000-0970",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0006",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 17501 NW 27th Ave, Miami Gardens",
-        "name": "ALS Auto Service",
-        "apn": "34-2110-002-0131",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0007",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 1500 SW 67th Ave",
-        "name": "Mavi auto repair",
-        "apn": "30-4011-008-1870",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0008",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "pipeline",
-        "label": "MIA 3700 NW 27th Ave",
-        "name": "Shops with boat and vehicle storage (MKAB Holdings)",
-        "apn": "30-3121-011-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0009",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 7370 NW 12th St and 7391 NW 11th St",
-        "name": "Truck and trailer parking yards by the airport (Lejeune Airport Park Suites)",
-        "apn": "30-3052-002-0120; 30-3052-002-0140",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0010",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 2190 NW 110th Ave, Sweetwater",
-        "name": "Bus and truck yard (GLB Property)",
-        "apn": "25-3031-008-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0011",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 2180 NW 22nd St",
-        "name": "Bus and truck yard with a shop building (Carolina Enterprises)",
-        "apn": "01-3127-002-0030",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0012",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 2757 NW 36th St and 2736 NW 37th St",
-        "name": "Car storage lots near the airport (2757 NW 36th St LLC)",
-        "apn": "01-3121-011-0320; 30-3121-011-0220",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0013",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 2900 NW 36th St and 2901 NW 35th St",
-        "name": "Truck fleet yard near the airport (2900 NW Thirty Sixth Street LLC)",
-        "apn": "01-3128-032-0010; 30-3128-032-0020",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0014",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 3650 NW South River Dr",
-        "name": "Car storage lot next to 's 3611 NW S River Dr site (Lejeune Properties)",
-        "apn": "30-3128-026-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0015",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 1200 NW 36th St",
-        "name": "Vacant corner lot by the Allapattah Metrorail station (1200 NW 36 ST LLC)",
-        "apn": "01-3126-039-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0016",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 1200 Old Griffin Rd, Dania Beach",
-        "name": "Car storage yard on Old Griffin Rd (1200 Old Griffin Road LLC)",
-        "apn": "5042-33-00-0060; 5042-33-00-0061",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0017",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 2575 W State Road 84, Dania Beach",
-        "name": "Truck and trailer parking on State Road 84 (Rumur Properties)",
-        "apn": "5042-20-42-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0018",
-        "placed": false
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 5021 SW 51st St, Davie",
-        "name": "Truck and bus parking yard (Fig Tree on 2nd)",
-        "apn": "5041-36-01-0090",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0019",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 3300 SW 11th Ave, Fort Lauderdale",
-        "name": "Truck fleet yard (Limousines of South Florida)",
-        "apn": "5042-21-21-0022",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0020",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 5900 Mayo St, Hollywood",
-        "name": "Truck yard (N&T Management)",
-        "apn": "5141-24-00-0011",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0021",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA Ansin Blvd, Hallandale Beach",
-        "name": "Truck and trailer parking on Ansin Blvd (2200 N 30 Rd LLC)",
-        "apn": "5142-28-66-0010",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0022",
-        "placed": false
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 1301 SW 12th Ave, Dania Beach",
-        "name": "Vacant 2.6-acre lot (CDH Planning)",
-        "apn": "5142-03-00-0590",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0023",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 2392 SW 57th Ave, West Park",
-        "name": "Vacant 1-acre industrial lot (FW Developments)",
-        "apn": "5141-24-02-0520",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0024",
-        "placed": true
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA Dewey St near S State Road 7, Hollywood area",
-        "name": "Car storage lot (Kolo 1)",
-        "apn": "5141-24-06-0090",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0025",
-        "placed": false
-      },
-      {
-        "city": "MIA",
-        "kind": "land",
-        "label": "MIA 1400 NE 16th Ct, Fort Lauderdale",
-        "name": "Dealer car storage lot (MDR Motors)",
-        "apn": "4942-35-00-0100",
-        "universe_id": "",
-        "site_id": "OFF-MIA-0026",
-        "placed": true
-      }
-    ],
+    "matched": 0,
+    "unmatched": 0,
+    "matched_by_city": {},
+    "unmatched_by_city": {},
+    "unmatched_rows": [],
     "note": "Matched off-market rows add research to the census site and do not add a second pin. Unmatched rows are drawn in universe mode and filtered by business type. They are not part of the car-wash census counts."
   },
   "sites_without_coordinates": [
@@ -821,8 +342,7 @@
     "PIPE-MIA-0074",
     "PIPE-MIA-0075",
     "PIPE-MIA-0077",
-    "PIPE-MIA-0082",
-    "LAND-PHX-0003"
+    "PIPE-MIA-0082"
   ],
   "disagreements": [
     "LAS-U36",
@@ -842,38 +362,37 @@
   ],
   "parcels": {
     "counts": {
-      "cache_hit": 927,
-      "fetched": 204,
+      "cache_hit": 1089,
+      "fetched": 26,
       "not_found": 7,
-      "features": 1162,
+      "features": 1146,
       "adjoining": 31,
       "by_city": {
-        "LAS": 205,
-        "MIA": 639,
-        "PHX": 287
+        "LAS": 204,
+        "MIA": 618,
+        "PHX": 293
       },
       "by_method": {
-        "parcel number": 1067,
+        "parcel number": 1051,
         "pin location": 64
-      },
-      "broward_unavailable": 44
+      }
     },
     "coverage": {
       "LAS": {
-        "targets": 205,
-        "matched": 205,
+        "targets": 204,
+        "matched": 204,
         "none": 0,
         "pct": 100.0
       },
       "MIA": {
-        "targets": 640,
-        "matched": 639,
+        "targets": 619,
+        "matched": 618,
         "none": 1,
         "pct": 99.8
       },
       "PHX": {
-        "targets": 293,
-        "matched": 287,
+        "targets": 299,
+        "matched": 293,
         "none": 6,
         "pct": 98.0
       }
@@ -881,25 +400,25 @@
     "by_layer": {
       "universe": {
         "LAS": {
-          "targets": 187,
-          "matched": 187,
+          "targets": 186,
+          "matched": 186,
           "none": 0,
           "no_geometry": 0,
           "pct": 100.0
         },
         "MIA": {
-          "targets": 633,
-          "matched": 632,
+          "targets": 612,
+          "matched": 611,
           "none": 1,
           "no_geometry": 0,
           "pct": 99.8
         },
         "PHX": {
-          "targets": 263,
-          "matched": 261,
+          "targets": 270,
+          "matched": 268,
           "none": 2,
           "no_geometry": 0,
-          "pct": 99.2
+          "pct": 99.3
         }
       },
       "pipeline": {
@@ -934,11 +453,11 @@
           "pct": 100.0
         },
         "PHX": {
-          "targets": 19,
-          "matched": 18,
+          "targets": 18,
+          "matched": 17,
           "none": 1,
           "no_geometry": 0,
-          "pct": 94.7
+          "pct": 94.4
         },
         "MIA": {
           "targets": 2,
@@ -993,31 +512,31 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 927, 'fetched': 204, 'not_found': 7, 'features': 1162, 'adjoining': 31, 'by_city': {'LAS': 205, 'MIA': 639, 'PHX': 287}, 'by_method': {'parcel number': 1067, 'pin location': 64}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'fetched': 26, 'not_found': 7, 'features': 1146, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 293}, 'by_method': {'parcel number': 1051, 'pin location': 64}}."
   },
   "public_records": {
     "utility_by_city": {
-      "LAS": 179,
-      "MIA": 610,
-      "PHX": 254
+      "LAS": 186,
+      "MIA": 612,
+      "PHX": 270
     },
     "assessor_by_city": {
-      "LAS": 175,
-      "MIA": 406,
-      "PHX": 252
+      "LAS": 181,
+      "MIA": 408,
+      "PHX": 261
     },
     "hifld_territories": 98,
     "note": "County parcel records supply the mailing address and the last recorded sale when the layer includes them. Water and irrigation districts are left out. Miami-Dade's parcel layer has no last-sale date or price. Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value.",
     "context": {
       "zoning_by_city": {
-        "LAS": 36,
-        "MIA": 144,
+        "LAS": 43,
+        "MIA": 145,
         "PHX": 33
       },
       "traffic_by_city": {
         "LAS": 41,
-        "MIA": 556,
-        "PHX": 244
+        "MIA": 558,
+        "PHX": 259
       },
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
     },
@@ -1032,7 +551,10 @@
   },
   "review_source": "second review column",
   "warnings": [
-    "Pipeline tab has 85 rows (stages {'Dropped': 22, 'Off market (no lead)': 49, '1 Desk screen': 13, '2 Financial screen': 1}). The older note of 79 is not in this export."
+    "Census row count is 1737, workbook expectation was 1,701.",
+    "Unique sites are 1693 {'LAS': 429, 'PHX': 573, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
+    "In-area city split is {'LAS': 186, 'PHX': 270, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
+    "Pipeline tab has 36 rows (stages {'Dropped': 22, '1 Desk screen': 13, '2 Financial screen': 1}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -1046,27 +568,40 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "changes": {
-    "new_sites": 0,
-    "removed_sites": 0,
+    "new_sites": 35,
+    "removed_sites": 78,
     "verdict_changes": 0,
     "stage_moves": 0,
-    "sample_new": [],
+    "sample_new": [
+      "WB-LAS-0017",
+      "WB-LAS-0018",
+      "WB-LAS-0019",
+      "WB-LAS-0020",
+      "WB-LAS-0021",
+      "WB-LAS-0022",
+      "WB-LAS-0023",
+      "WB-LAS-0024",
+      "WB-LAS-0025",
+      "WB-LAS-0026",
+      "WB-LAS-0027",
+      "WB-LAS-0028"
+    ],
     "sample_verdicts": [],
     "sample_stages": []
   },
   "verdicts_appended": 2,
   "verdicts_total": 2662,
   "parcel_bytes": {
-    "parcels.geojson": 591487,
-    "parcels-PHX.geojson": 149715,
-    "parcels-LAS.geojson": 104003,
-    "parcels-MIA.geojson": 337855
+    "parcels.geojson": 583828,
+    "parcels-PHX.geojson": 152482,
+    "parcels-LAS.geojson": 103879,
+    "parcels-MIA.geojson": 327553
   },
   "timeline": {
     "matched_folders": 14,
     "unmatched_folders": 0,
     "sheet_links": 14,
-    "warnings": 6,
+    "warnings": 8,
     "drive": "ok"
   }
 }

@@ -1,12 +1,12 @@
 {
-  "workbook_as_of": "2026-11-05",
+  "workbook_as_of": "2026-11-06",
   "pipeline": {
     "Dropped": 22,
     "1 Desk screen": 13,
     "2 Financial screen": 1
   },
   "land": {
-    "1 Desk screen": 29,
+    "1 Desk screen": 27,
     "Dropped": 5
   },
   "rows": [
@@ -262,16 +262,6 @@
     },
     {
       "deal_id": "LAND-LAS-0015",
-      "kind": "land",
-      "stage": "1 Desk screen"
-    },
-    {
-      "deal_id": "LAND-PHX-0033",
-      "kind": "land",
-      "stage": "1 Desk screen"
-    },
-    {
-      "deal_id": "LAND-PHX-0034",
       "kind": "land",
       "stage": "1 Desk screen"
     },

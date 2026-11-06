@@ -1,4 +1,8 @@
-"""Shipped text stays free of private terms, and site capacity stays on the panel."""
+"""Shipped text stays free of private terms.
+
+Site capacity may appear on the card, the key strip, and the list filter.
+Map pin code stays off that list, so a grade mark cannot land on a pin.
+"""
 
 from __future__ import annotations
 
@@ -26,8 +30,15 @@ GENERATED = (
 PANEL_FILES = {
     "components/KeyStrip.tsx",
     "components/Detail.tsx",
+    "components/Explorer.tsx",
+    "components/ListView.tsx",
+    "components/PipelineList.tsx",
+    "components/SiteTable.tsx",
+    "components/CompareTray.tsx",
     "lib/keyNumbers.ts",
     "lib/types.ts",
+    "app/api/data/sites/route.ts",
+    "app/api/data/sites/[id]/route.ts",
 }
 SURFACE = ("components", "lib", "app")
 

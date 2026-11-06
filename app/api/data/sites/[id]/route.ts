@@ -15,6 +15,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   delete properties.utility_proximity;
   delete properties.serving_utility;
   delete properties.serving_utility_source;
+  delete properties.site_capacity;
   console.info(JSON.stringify({ event: "data", user: session.u, part: "site", id }));
   return NextResponse.json(properties, { headers: privateHeaders });
 }

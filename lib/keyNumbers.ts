@@ -7,6 +7,7 @@ export const PIPELINE_COLUMNS = [
   { id: "acres", label: "Acres" },
   { id: "perAcre", label: "Per acre" },
   { id: "openLand", label: "Open land" },
+  { id: "capacity", label: "Site capacity" },
   { id: "cashFlow", label: "Cash flow" },
   { id: "depot", label: "Depot mi" },
   { id: "checked", label: "Checked" },
@@ -28,10 +29,118 @@ export type RangeFilter = {
 
 const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "omax"] as const;
 
-export function publicDeal<T extends { site_capacity?: unknown }>(props: T): Omit<T, "site_capacity"> {
+/** Map pins omit site-capacity facts so they are not tinted or badged. */
+export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
-  delete copy.site_capacity;
+  for (const key of Object.keys(copy)) {
+    if (key === "site_capacity" || key.startsWith("cap_")) delete copy[key];
+  }
   return copy;
+}
+
+export type CapacityFact = { id: "a" | "b" | "c" | "d"; lines: string[]; basis: string };
+
+export type CapacityRecord = {
+  cap_a_substation_mi?: number | null;
+  cap_a_line_ft?: number | null;
+  cap_a_source?: string | null;
+  cap_a_as_of?: string | null;
+  cap_a_confidence?: string | null;
+  cap_b_feeder?: string | null;
+  cap_b_frontage?: number | null;
+  cap_b_nearby?: number | null;
+  cap_b_horizon?: string | null;
+  cap_b_source?: string | null;
+  cap_b_as_of?: string | null;
+  cap_b_confidence?: string | null;
+  cap_c_amps?: number | null;
+  cap_c_volts?: number | null;
+  cap_c_phase?: string | null;
+  cap_c_panels?: number | null;
+  cap_c_source?: string | null;
+  cap_c_as_of?: string | null;
+  cap_c_confidence?: string | null;
+  cap_d_peak?: number | null;
+  cap_d_year?: number | null;
+  cap_d_source?: string | null;
+  cap_d_as_of?: string | null;
+  cap_d_confidence?: string | null;
+};
+
+function factNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function factText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function factCount(value: number, digits = 2): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function factBasis(source?: string | null, confidence?: string | null, asOf?: string | null): string {
+  return [source, confidence, asOf].map((item) => (item || "").trim()).filter(Boolean).join(" · ");
+}
+
+/** Typed fact layers only. A blank layer is omitted. No grade is inferred. */
+export function capacityFacts(row: CapacityRecord | null | undefined, scope: "site" | "deal"): CapacityFact[] {
+  const record = row || {};
+  const facts: CapacityFact[] = [];
+  const proximity: string[] = [];
+  const substation = factNumber(record.cap_a_substation_mi);
+  const line = factNumber(record.cap_a_line_ft);
+  if (substation != null) proximity.push(`Substation ${factCount(substation)} mi`);
+  if (line != null) proximity.push(`Line ${Math.round(line).toLocaleString()} ft`);
+  if (proximity.length) {
+    facts.push({ id: "a", lines: proximity, basis: factBasis(record.cap_a_source, record.cap_a_confidence, record.cap_a_as_of) });
+  }
+  const hosting: string[] = [];
+  if (factText(record.cap_b_feeder)) hosting.push(`Feeder ${factText(record.cap_b_feeder)}`);
+  const frontage = factNumber(record.cap_b_frontage);
+  const nearby = factNumber(record.cap_b_nearby);
+  if (frontage != null) hosting.push(`Frontage hosting ${factCount(frontage)}`);
+  if (nearby != null) hosting.push(`Nearby hosting ${factCount(nearby)}`);
+  if (factText(record.cap_b_horizon)) hosting.push(`Horizon ${factText(record.cap_b_horizon)}`);
+  if (hosting.length) {
+    facts.push({ id: "b", lines: hosting, basis: factBasis(record.cap_b_source, record.cap_b_confidence, record.cap_b_as_of) });
+  }
+  if (scope === "site") return facts;
+  const service: string[] = [];
+  const amps = factNumber(record.cap_c_amps);
+  const volts = factNumber(record.cap_c_volts);
+  const panels = factNumber(record.cap_c_panels);
+  if (amps != null) service.push(`${Math.round(amps).toLocaleString()} amps`);
+  if (volts != null) service.push(`${Math.round(volts).toLocaleString()} volts`);
+  if (factText(record.cap_c_phase)) service.push(`Phase ${factText(record.cap_c_phase)}`);
+  if (panels != null) service.push(`${Math.round(panels).toLocaleString()} panels`);
+  if (service.length) {
+    facts.push({ id: "c", lines: service, basis: factBasis(record.cap_c_source, record.cap_c_confidence, record.cap_c_as_of) });
+  }
+  const load: string[] = [];
+  const peak = factNumber(record.cap_d_peak);
+  const year = factNumber(record.cap_d_year);
+  if (peak != null) load.push(`Peak load ${factCount(peak, 0)}`);
+  if (year != null) load.push(`Year load ${Math.round(year).toLocaleString()}`);
+  if (load.length) {
+    facts.push({ id: "d", lines: load, basis: factBasis(record.cap_d_source, record.cap_d_confidence, record.cap_d_as_of) });
+  }
+  return facts;
+}
+
+export function factsForDeal(deal: CapacityRecord | null | undefined): CapacityFact[] {
+  return capacityFacts(deal, "deal");
+}
+
+export function factsForSite(site: CapacityRecord | null | undefined, deal?: CapacityRecord | null): CapacityFact[] {
+  const own = capacityFacts(site, "site");
+  if (own.length || !deal) return own;
+  return capacityFacts(deal, "site");
+}
+
+export function capacitySummary(facts: CapacityFact[]): string {
+  if (!facts.length) return "Not on file";
+  return facts.map((fact) => fact.lines.join(", ")).join("; ");
 }
 
 export function basisLabel(basis?: string | null) {

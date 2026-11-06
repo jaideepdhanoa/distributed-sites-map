@@ -11,6 +11,8 @@ import {
   compactMoney,
   depotLine,
   fullMoney,
+  capacitySummary,
+  factsForDeal,
   openLandText,
   summaryOf,
   acresTotal,
@@ -35,6 +37,7 @@ function cell(row: PipelineRow, id: PipelineColumnId) {
   if (id === "acres") return acresText(deal.land_acres) || "Not provided";
   if (id === "perAcre") return deal.price_per_acre_display || "Not provided";
   if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
+  if (id === "capacity") return capacitySummary(factsForDeal(deal));
   if (id === "cashFlow") {
     if (deal.figures_status === "withheld") return "Package figures not shown";
     if (deal.stated_cash_flow_display) return deal.stated_cash_flow_display;
@@ -51,6 +54,7 @@ function sortValue(row: PipelineRow, id: PipelineColumnId) {
   if (id === "acres") return deal.land_acres;
   if (id === "perAcre") return deal.price_per_acre;
   if (id === "openLand") return deal.open_land_sqft;
+  if (id === "capacity") return factsForDeal(deal).length;
   if (id === "cashFlow") return deal.stated_cash_flow;
   if (id === "depot") return row.noPin ? null : deal.miles_to_depot;
   return null;
@@ -221,6 +225,8 @@ export default function PipelineList({
                         <span className="no-pin">No pin</span>
                       ) : column === "stage" ? (
                         <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column)}</span>
+                      ) : column === "capacity" ? (
+                        <span title={factsForDeal(row.deal).map((fact) => fact.basis).filter(Boolean).join(" · ")}>{cell(row, column)}</span>
                       ) : column === "site" ? (
                         <span className="site-name">
                           <span className="site-name-text">{cell(row, column)}</span>
@@ -245,6 +251,11 @@ export default function PipelineList({
               <button type="button" className={row.deal.deal_id === selectedId ? "on" : ""} onClick={() => onOpen(row.deal.deal_id)}>
                 <strong>{row.deal.name || row.deal.address}</strong>
                 <span>{dealAsking(row)} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
+                <span>
+                  {row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"}
+                  {" · "}
+                  Site capacity {capacitySummary(factsForDeal(row.deal))}
+                </span>
                 {row.noPin ? <span className="no-pin">No pin</span> : null}
               </button>
               <ListingIcon deal={row.deal} />

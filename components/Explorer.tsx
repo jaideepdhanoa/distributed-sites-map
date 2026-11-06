@@ -16,7 +16,7 @@ import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawer
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
-import { PIPELINE_COLUMNS, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
+import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 
@@ -339,6 +339,24 @@ export default function Explorer() {
   const censusFeatures = features.filter((feature) => feature.properties.origin !== "off-market");
   const sites = censusFeatures.map((feature) => presentSite(feature.properties));
   const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && feature.properties.city === city);
+  const dealBundle = useMemo(() => {
+    const rows = data?.deals.features ?? [];
+    const byId = new Map<string, DealProps>();
+    const byUniverse = new Map<string, DealProps>();
+    for (const feature of rows) {
+      byId.set(feature.properties.deal_id, feature.properties);
+      if (feature.properties.universe_id && !byUniverse.has(feature.properties.universe_id)) byUniverse.set(feature.properties.universe_id, feature.properties);
+    }
+    return { features: rows, byId, byUniverse };
+  }, [data?.deals]);
+
+  function dealForSite(site: SiteProps) {
+    if (site.linked_deal_id) {
+      const linked = dealBundle.byId.get(site.linked_deal_id);
+      if (linked) return linked;
+    }
+    return dealBundle.byUniverse.get(site.site_id);
+  }
 
   function passesChips(site: SiteProps, loose: boolean, anyMarket = false) {
     if (!anyMarket && !allCities && site.city !== city) return false;
@@ -412,7 +430,7 @@ export default function Explorer() {
     return [...byId.values()].sort(compareSites);
     // passesChips closes over the chip state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes, who]);
+  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes, who, data?.deals]);
 
   const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
     const feature = poolById.get(site.site_id);
@@ -474,11 +492,11 @@ export default function Explorer() {
     const filterLine = `Filters: city ${city}, ${funnel === "pipeline" ? `pipeline ${pipeStage}` : `step ${stage}`}${query ? `, search ${query}` : ""}${landTier !== "any" ? `, tier ${landTier}` : ""}${verdict !== "any" ? `, verdict ${verdict}` : ""}${listed === "yes" ? ", listed" : ""}${businessTypes ? `, types ${businessTypes.join(" ")}` : ""}. As of ${new Date().toISOString().slice(0, 10)}.`;
     const headers = tableTab === "universe"
       ? [...siteExportHeaders(), "Last touched", "Materials"]
-      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Depot mi", "Universe site", "Last touched", "Materials"];
+      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Site capacity", "Depot mi", "Universe site", "Last touched", "Materials"];
     const body = tableTab === "universe"
-      ? visibleSites.map((row) => [...siteExportRow(row), ...activityCells(row.linked_deal_id)])
+      ? visibleSites.map((row) => [...siteExportRow(row, dealRows), ...activityCells(row.linked_deal_id)])
       : (tableTab === "land" ? landDeals : pipelineDeals).map((row) => [
-          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), row.miles_to_depot, row.universe_id, ...activityCells(row.deal_id),
+          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), capacitySummary(factsForDeal(row)), row.miles_to_depot, row.universe_id, ...activityCells(row.deal_id),
         ]);
     const lines = [`# ${filterLine}`, headers.join(","), ...body.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`).join(","))];
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -725,6 +743,7 @@ export default function Explorer() {
       stage: plainVerdict(site.verdict),
       tier: tierLabel(site.land_tier) || "",
       spare: site.spare_ac_own != null ? `${site.spare_ac_own} ac` : "",
+      grade: capacitySummary(factsForSite(site, dealForSite(site))),
       zoning: site.zoning || "",
       traffic: site.aadt_count ? `${site.aadt_count}${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}` : "",
       listed: site.listed ? `Yes${price ? ` · ${price}` : ""}` : "No",
@@ -743,6 +762,7 @@ export default function Explorer() {
       stage: stageDetail(deal.stage, deal.stage_group),
       tier: linked ? tierLabel(linked.land_tier) || "" : "",
       spare: linked?.spare_ac_own != null ? `${linked.spare_ac_own} ac` : "",
+      grade: capacitySummary(factsForDeal(deal)),
       zoning: linked?.zoning || "",
       traffic: linked?.aadt_count ? `${linked.aadt_count}${linked.aadt_road ? ` on ${plainRoad(linked.aadt_road)}` : ""}` : "",
       listed: price || (deal.listed ? "Yes" : "No"),
@@ -760,6 +780,7 @@ export default function Explorer() {
       stage: row.approximate ? "Approximate location" : row.pinned ? "Listed" : "Address withheld",
       tier: "",
       spare: row.acres_text || (row.acres != null ? `${row.acres} ac` : ""),
+      grade: "Not on file",
       zoning: "",
       traffic: "",
       listed: price || "Yes",
@@ -1464,6 +1485,7 @@ export default function Explorer() {
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
             <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000.</p>
+            <p>Site capacity sits beside spare land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
             <p>Deals contacted, beside Universe, counts Pipeline and Land deals in this city with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>
             <ul>
@@ -1475,6 +1497,7 @@ export default function Explorer() {
           <DealDetail
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
+            universeSite={selectedDeal.universe_id ? siteById.get(selectedDeal.universe_id) : null}
             universeName={siteById.get(selectedDeal.universe_id)?.name}
             depotMiles={selectedDeal.miles_to_depot}
             lng={dealPoint(selectedDeal)?.[0]}
@@ -1544,7 +1567,7 @@ export default function Explorer() {
               </button>
             ))}
           </div>
-          {tableTab === "universe" ? <SiteTable rows={visibleSites} selectedId={selected} onSelect={choose} activity={activity} sorting={sortParam ? [{ id: sortParam.split(":")[0], desc: sortParam.endsWith(":desc") }] : []} onSortingChange={(next) => write({ sort: next[0] ? `${next[0].id}:${next[0].desc ? "desc" : "asc"}` : null })} /> : null}
+          {tableTab === "universe" ? <SiteTable rows={visibleSites} deals={dealRows} selectedId={selected} onSelect={choose} activity={activity} sorting={sortParam ? [{ id: sortParam.split(":")[0], desc: sortParam.endsWith(":desc") }] : []} onSortingChange={(next) => write({ sort: next[0] ? `${next[0].id}:${next[0].desc ? "desc" : "asc"}` : null })} /> : null}
           {tableTab === "pipeline" ? <DealTable rows={pipelineDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
           {tableTab === "land" ? <DealTable rows={landDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
         </section>

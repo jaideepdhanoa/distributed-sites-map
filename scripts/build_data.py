@@ -3728,6 +3728,29 @@ def city_class(rows: list[dict]) -> dict:
     return out
 
 
+def attach_universe_capacity(sites: list[dict]) -> None:
+    """Copy universe fact layers A and B. Service and load stay off the site file."""
+    if not sources_present():
+        return
+    from scripts.key_numbers import capacity_fields
+
+    try:
+        rows = sheet_rows(source_workbook(), "Universe", 0)
+    except (SystemExit, OSError, KeyError, ValueError):
+        return
+    index: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        city = str(row.get("Market") or "").strip()
+        apn = norm_apn(row.get("APN"))
+        if city and apn and (city, apn) not in index:
+            index[(city, apn)] = row
+    for site in sites:
+        row = index.get((str(site.get("city") or ""), norm_apn(site.get("apn"))))
+        if not row:
+            continue
+        site.update(capacity_fields(row, service=False))
+
+
 def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> dict:
     universe = load_csv(SRC / "universe_v3.csv")
     ring_rows = {row["site_id"]: row for row in load_csv(SRC / "las_ring100_screen.csv")}
@@ -4563,6 +4586,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         public_records["context"] = apply_context(sites)
     public_records["gap_fills"] = apply_gap_fills(sites)
 
+    attach_universe_capacity(sites)
     site_features = []
     for site in sites:
         geom = None

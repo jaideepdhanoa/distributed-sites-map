@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.build_data import geocode_queries, scan_obj
-from scripts.key_numbers import coverage, key_figures, listing_gone
+from scripts.key_numbers import capacity_fields, coverage, key_figures, listing_gone
 
 
 def _row(**extra):
@@ -125,6 +125,42 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertTrue(listing_gone("Delisted"))
         self.assertFalse(listing_gone("Listed"))
         self.assertFalse(listing_gone(""))
+
+    def test_typed_facts_keep_values_and_drop_blocked_source_text(self) -> None:
+        fields = capacity_fields(
+            {
+                "pwr_a_substation_mi": 0.81,
+                "pwr_a_hv_line_ft": 392,
+                "pwr_a_source_type": "OSM proximity (Overpass)",
+                "pwr_a_source_pointer": "BA Power notes",
+                "pwr_a_as_of": "2026-11-03",
+                "pwr_a_confidence": "Estimated",
+                "pwr_a_captured_by": "Indie",
+                "pwr_b_hosting_mw_frontage": 0,
+                "pwr_b_hosting_horizon": 2028,
+                "pwr_b_source_type": "utility hosting map",
+                "pwr_c_service_amps": 1200,
+                "pwr_c_source_type": "listing claim",
+                "pwr_c_confidence": "Claimed",
+                "upgrade_usd": 50000,
+                "AZ Power rating (deprecated)": "Strong",
+            },
+            service=True,
+        )
+        self.assertEqual(fields["cap_a_substation_mi"], 0.81)
+        self.assertEqual(fields["cap_a_line_ft"], 392)
+        self.assertEqual(fields["cap_a_source"], "OSM proximity (Overpass)")
+        self.assertEqual(fields["cap_a_as_of"], "2026-11-03")
+        self.assertEqual(fields["cap_a_confidence"], "Estimated")
+        self.assertNotIn("cap_b_source", fields)
+        self.assertEqual(fields["cap_b_frontage"], 0)
+        self.assertEqual(fields["cap_b_horizon"], "2028")
+        self.assertEqual(fields["cap_c_amps"], 1200)
+        self.assertEqual(fields["cap_c_source"], "listing claim")
+        self.assertNotIn("upgrade_usd", fields)
+        self.assertNotIn("site_capacity", fields)
+        problems = scan_obj(fields, "facts")
+        self.assertEqual(problems, [])
 
     def test_mcnab_query_drops_the_wrong_city(self) -> None:
         self.assertEqual(

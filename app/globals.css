@@ -131,6 +131,15 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   outline-offset: 2px;
 }
 .chips button.on, .cities button.on { background: var(--ink); color: #faf7f1; border-color: var(--ink); }
+.fact-stack { display: grid; gap: 8px; }
+.fact-stack p { margin: 0; }
+.fact-stack strong, .metrics .fact-stack strong, .grade-pair .fact-stack strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: normal;
+}
+.fact-stack small { display: block; color: var(--muted); font-size: 12px; }
 .map-stage { position: relative; min-height: 0; background: #1c2420; }
 .dock { min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: white; border-top: 1px solid var(--line); }
 .drawer {
@@ -817,6 +826,39 @@ tr { cursor: pointer; }
   .stack-list .why { max-width: none; }
 }
 
+.grade-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+.grade-pair article {
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.grade-pair span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.grade-pair strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+  line-height: 1.25;
+}
+.grade-pair small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.grade-pair article.facts { display: flex; flex-direction: column; gap: 6px; }
 .key-strip { margin: 8px 0 12px; }
 .metrics {
   display: grid;

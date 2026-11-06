@@ -42,6 +42,30 @@ FIGURE_FIELDS = (
     "figures_basis",
     "figures_status",
     "site_capacity",
+    "cap_a_substation_mi",
+    "cap_a_line_ft",
+    "cap_a_source",
+    "cap_a_as_of",
+    "cap_a_confidence",
+    "cap_b_feeder",
+    "cap_b_frontage",
+    "cap_b_nearby",
+    "cap_b_horizon",
+    "cap_b_source",
+    "cap_b_as_of",
+    "cap_b_confidence",
+    "cap_c_amps",
+    "cap_c_volts",
+    "cap_c_phase",
+    "cap_c_panels",
+    "cap_c_source",
+    "cap_c_as_of",
+    "cap_c_confidence",
+    "cap_d_peak",
+    "cap_d_year",
+    "cap_d_source",
+    "cap_d_as_of",
+    "cap_d_confidence",
     "price_per_acre",
     "price_per_acre_display",
     "cash_multiple",
@@ -100,6 +124,106 @@ def land_basis(text: str, acres) -> str:
 
 def capacity_rating(value) -> str:
     return _CAPACITY.get(str(value or "").strip().lower(), "Unknown")
+
+
+def _fact_text(value) -> str:
+    """Keep a typed source or confidence only when the map wording filter allows it."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    from scripts.build_data import _DISPLAY_TERMS, banned_hits
+
+    if banned_hits(text) or _DISPLAY_TERMS.search(text):
+        return ""
+    return text
+
+
+def _fact_number(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return number if number == number else None
+    match = re.fullmatch(r"\s*-?\d+(?:\.\d+)?\s*", str(value))
+    if not match:
+        return None
+    return float(match.group())
+
+
+def _fact_date(value) -> str:
+    if value is None or value == "":
+        return ""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and 20000 < float(value) < 80000:
+        from datetime import timedelta
+
+        return (datetime(1899, 12, 30) + timedelta(days=float(value))).date().isoformat()
+    text = str(value).strip()
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", text)
+    if match:
+        return match.group(1)
+    if re.fullmatch(r"\d+(?:\.\d+)?", text):
+        number = float(text)
+        if 20000 < number < 80000:
+            from datetime import timedelta
+
+            return (datetime(1899, 12, 30) + timedelta(days=number)).date().isoformat()
+    return ""
+
+
+def _store_number(value):
+    number = _fact_number(value)
+    if number is None:
+        return None
+    if number.is_integer():
+        return int(number)
+    return round(number, 4)
+
+
+def capacity_fields(row: dict, *, service: bool) -> dict:
+    """Typed fact layers. Blank cells stay absent. Free-text notes are not a source."""
+    out = {}
+
+    def put(key, value):
+        if value is None or value == "":
+            return
+        out[key] = value
+
+    put("cap_a_substation_mi", _store_number(row.get("pwr_a_substation_mi")))
+    put("cap_a_line_ft", _store_number(row.get("pwr_a_hv_line_ft")))
+    put("cap_a_source", _fact_text(row.get("pwr_a_source_type")))
+    put("cap_a_as_of", _fact_date(row.get("pwr_a_as_of")))
+    put("cap_a_confidence", _fact_text(row.get("pwr_a_confidence")))
+    put("cap_b_feeder", _fact_text(row.get("pwr_b_feeder_id")))
+    put("cap_b_frontage", _store_number(row.get("pwr_b_hosting_mw_frontage")))
+    put("cap_b_nearby", _store_number(row.get("pwr_b_hosting_mw_nearby")))
+    horizon = row.get("pwr_b_hosting_horizon")
+    if isinstance(horizon, float) and horizon.is_integer():
+        horizon = int(horizon)
+    put("cap_b_horizon", _fact_text("" if horizon is None else str(horizon)))
+    put("cap_b_source", _fact_text(row.get("pwr_b_source_type")))
+    put("cap_b_as_of", _fact_date(row.get("pwr_b_as_of")))
+    put("cap_b_confidence", _fact_text(row.get("pwr_b_confidence")))
+    if not service:
+        return out
+    put("cap_c_amps", _store_number(row.get("pwr_c_service_amps")))
+    put("cap_c_volts", _store_number(row.get("pwr_c_service_volts")))
+    put("cap_c_phase", _fact_text(row.get("pwr_c_service_phase")))
+    put("cap_c_panels", _store_number(row.get("pwr_c_panel_count")))
+    put("cap_c_source", _fact_text(row.get("pwr_c_source_type")))
+    put("cap_c_as_of", _fact_date(row.get("pwr_c_as_of")))
+    put("cap_c_confidence", _fact_text(row.get("pwr_c_confidence")))
+    put("cap_d_peak", _store_number(row.get("pwr_d_peak_kw")))
+    put("cap_d_year", _store_number(row.get("pwr_d_kwh_year")))
+    put("cap_d_source", _fact_text(row.get("pwr_d_source_type")))
+    put("cap_d_as_of", _fact_date(row.get("pwr_d_as_of")))
+    put("cap_d_confidence", _fact_text(row.get("pwr_d_confidence")))
+    return out
 
 
 def checked_live(value) -> str:
@@ -187,6 +311,7 @@ def key_figures(row: dict, kind: str) -> dict:
         "figures_basis": figures_basis,
         "figures_status": status,
         "site_capacity": capacity_rating(row.get("Power rating")),
+        **capacity_fields(row, service=True),
         "price_per_acre": per_acre,
         "price_per_acre_display": compact_money(per_acre),
         "cash_multiple": multiple,

@@ -3728,17 +3728,27 @@ def city_class(rows: list[dict]) -> dict:
     return out
 
 
-_SITE_CAPACITY = {"Strong": "Strong", "OK": "OK", "Weak": "Weak", "Unknown": "Unknown"}
+def attach_universe_capacity(sites: list[dict]) -> None:
+    """Copy universe fact layers A and B. Service and load stay off the site file."""
+    if not sources_present():
+        return
+    from scripts.key_numbers import capacity_fields
 
-
-def shipped_site_capacity(site: dict) -> str:
-    """Copy the screening grade onto the deal field name, then drop the old keys.
-
-    A blank screening value stays Unknown. That is not a guessed rating.
-    The serving-company name stays off the file.
-    """
-    raw = str(site.get("utility_proximity") or "").strip()
-    return _SITE_CAPACITY.get(raw, "Unknown")
+    try:
+        rows = sheet_rows(source_workbook(), "Universe", 0)
+    except (SystemExit, OSError, KeyError, ValueError):
+        return
+    index: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        city = str(row.get("Market") or "").strip()
+        apn = norm_apn(row.get("APN"))
+        if city and apn and (city, apn) not in index:
+            index[(city, apn)] = row
+    for site in sites:
+        row = index.get((str(site.get("city") or ""), norm_apn(site.get("apn"))))
+        if not row:
+            continue
+        site.update(capacity_fields(row, service=False))
 
 
 def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> dict:
@@ -4576,13 +4586,13 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         public_records["context"] = apply_context(sites)
     public_records["gap_fills"] = apply_gap_fills(sites)
 
+    attach_universe_capacity(sites)
     site_features = []
     for site in sites:
         geom = None
         if site["lat"] is not None and site["lon"] is not None:
             geom = {"type": "Point", "coordinates": [site["lon"], site["lat"]]}
         props = {k: v for k, v in site.items() if k not in {"lat", "lon", "utility_proximity", "serving_utility", "serving_utility_source", "_source_listed"}}
-        props["site_capacity"] = shipped_site_capacity(site)
         site_features.append({"type": "Feature", "geometry": geom, "properties": props})
     sites_fc = {"type": "FeatureCollection", "features": site_features}
     parcels_fc = {"type": "FeatureCollection", "features": parcels}

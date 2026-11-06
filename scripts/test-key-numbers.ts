@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
-import { cashTile, inRange, peerNote, publicDeal, rangesFromSearch, readCapacity, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
+import { capacityFacts, cashTile, inRange, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -61,11 +61,14 @@ assert.deepEqual(tileAmount(null, ""), { text: "Not provided", title: "Not provi
 assert.equal(listingCue({ listing_url: "https://www.loopnet.com/Listing/1" }).label, "View on LoopNet ↗");
 assert.equal(listingCue({ listing_url: "" }).label, "No listing page on file");
 assert.equal(listingCue({ listing_url: "https://www.bizbuysell.com/x", listing_removed: true }).label, "View on BizBuySell ↗ (may be removed)");
-assert.deepEqual(readCapacity({ dealGrade: "Strong" }), { grade: "Strong", basis: "Deal file" });
-assert.deepEqual(readCapacity({ dealGrade: "Unknown" }), { grade: "Unknown", basis: "Not rated" });
-assert.deepEqual(readCapacity({ siteGrade: "OK" }), { grade: "OK", basis: "Site record" });
-assert.deepEqual(readCapacity({ dealGrade: "Unknown", siteGrade: "Strong" }), { grade: "Unknown", basis: "Not rated" });
-assert.deepEqual(readCapacity({}), { grade: "Unknown", basis: "Not rated" });
-assert.equal("site_capacity" in publicDeal({ site_capacity: "Strong", name: "A" }), false);
-assert.equal(publicDeal({ site_capacity: "Strong", name: "A" }).name, "A");
+assert.deepEqual(capacityFacts({ cap_a_substation_mi: 0.81, cap_a_line_ft: 392, cap_a_source: "OSM proximity (Overpass)", cap_a_confidence: "Estimated", cap_a_as_of: "2026-11-03" }, "site"), [
+  { id: "a", lines: ["Substation 0.81 mi", "Line 392 ft"], basis: "OSM proximity (Overpass) · Estimated · 2026-11-03" },
+]);
+assert.deepEqual(capacityFacts({ cap_c_amps: 1200, cap_c_source: "listing claim", cap_c_confidence: "Claimed" }, "site"), []);
+assert.equal(capacityFacts({ cap_c_amps: 1200, cap_c_source: "listing claim", cap_c_confidence: "Claimed" }, "deal")[0].lines[0], "1,200 amps");
+assert.equal(capacityFacts({}, "deal").length, 0);
+const pin = publicDeal({ site_capacity: "Strong", cap_a_substation_mi: 0.4, name: "A" });
+assert.equal("site_capacity" in pin, false);
+assert.equal("cap_a_substation_mi" in pin, false);
+assert.equal(pin.name, "A");
 console.log("key numbers ok");

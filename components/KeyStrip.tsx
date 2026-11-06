@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Banknote, Gauge, LandPlot, MapPin, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps } from "@/lib/types";
-import { basisLabel, cashTile, depotLine, fullMoney, openLandText, peerNote, readCapacity, tileAmount } from "@/lib/keyNumbers";
+import { basisLabel, cashTile, depotLine, factsForDeal, fullMoney, openLandText, peerNote, tileAmount, type CapacityFact } from "@/lib/keyNumbers";
 import { shownPriceSource } from "@/lib/format";
 
 function CountUp({ value }: { value: string }) {
@@ -36,6 +36,20 @@ function CountUp({ value }: { value: string }) {
   return <>{shown}</>;
 }
 
+export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
+  if (!facts.length) return <strong>Not on file</strong>;
+  return (
+    <div className="fact-stack" data-testid="capacity-facts">
+      {facts.map((fact) => (
+        <p key={fact.id}>
+          {fact.lines.map((line) => <strong key={line}>{line}</strong>)}
+          {fact.basis ? <small>{fact.basis}</small> : null}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function Metric({
   icon: Icon,
   label,
@@ -43,7 +57,6 @@ function Metric({
   title,
   note,
   basis,
-  loud,
 }: {
   icon: typeof Wallet;
   label: string;
@@ -51,10 +64,9 @@ function Metric({
   title?: string;
   note?: string;
   basis?: string;
-  loud?: boolean;
 }) {
   return (
-    <article className={`${label === "Cash flow" || label === "Revenue" ? "wide" : ""} ${loud ? "unknown" : ""}`.trim()}>
+    <article className={label === "Cash flow" || label === "Revenue" ? "wide" : ""}>
       <span><Icon size={15} strokeWidth={1.75} aria-hidden="true" /> {label}</span>
       <strong title={title || value}><CountUp value={value} /></strong>
       {note ? <small>{note}</small> : null}
@@ -87,7 +99,7 @@ export default function KeyStrip({
     : deal.stated_revenue != null && !deal.stated_cash_flow_display
       ? tileAmount(deal.stated_revenue, deal.stated_revenue_display)
       : { text: cash.value, title: cash.value };
-  const capacity = readCapacity({ dealGrade: deal.site_capacity });
+  const facts = factsForDeal(deal);
   return (
     <section className="key-strip" data-testid="key-strip">
       <div className="metrics">
@@ -95,7 +107,10 @@ export default function KeyStrip({
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
         <Metric icon={Ruler} label="Per acre" value={perAcreTile.text} title={perAcreTile.title} note={rank?.label || (deal.land_acres_basis === "Unknown" ? "From the listing acreage" : deal.land_acres != null ? "From the acreage on file" : "")} />
         <Metric icon={Trees} label="Open land" value={openTile.text} title={openTile.title} note={deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet"} basis={deal.open_land_sqft != null ? "Estimated" : ""} />
-        <Metric icon={Gauge} label="Site capacity" value={capacity.grade} basis={capacity.basis} loud={capacity.grade === "Unknown"} />
+        <article className={facts.length > 1 ? "wide" : ""}>
+          <span><Gauge size={15} strokeWidth={1.75} aria-hidden="true" /> Site capacity</span>
+          <CapacityFacts facts={facts} />
+        </article>
         <Metric icon={MapPin} label="Depot" value={depotLine(deal.miles_to_depot, hasPin)} note={hasPin ? "straight line" : ""} />
         <Metric icon={Banknote} label={deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"} value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
       </div>

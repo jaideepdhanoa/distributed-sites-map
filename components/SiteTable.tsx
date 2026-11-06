@@ -9,7 +9,7 @@ import {
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
 import { shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
-import { readCapacity } from "@/lib/keyNumbers";
+import { capacitySummary, factsForDeal, factsForSite } from "@/lib/keyNumbers";
 import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
@@ -71,7 +71,7 @@ function dealForSite(row: SiteProps, deals: DealProps[]) {
 }
 
 export function siteCapacityText(row: SiteProps, deals: DealProps[] = []) {
-  return readCapacity({ siteGrade: row.site_capacity, dealGrade: dealForSite(row, deals)?.site_capacity }).grade;
+  return capacitySummary(factsForSite(row, dealForSite(row, deals)));
 }
 
 export function siteExportHeaders() {
@@ -131,8 +131,8 @@ export default function SiteTable({
     header: "Site capacity",
     accessorFn: (row) => siteCapacityText(row, deals),
     cell: ({ row }) => {
-      const read = readCapacity({ siteGrade: row.original.site_capacity, dealGrade: dealForSite(row.original, deals)?.site_capacity });
-      return <span className={read.grade === "Unknown" ? "unknown-grade" : ""} title={read.basis}>{read.grade}</span>;
+      const facts = factsForSite(row.original, dealForSite(row.original, deals));
+      return <span title={facts.map((fact) => fact.basis).filter(Boolean).join(" · ")}>{capacitySummary(facts)}</span>;
     },
   };
   const baseColumns = columns.flatMap((column) => (column.id === "tier" ? [column, capacityColumn] : [column]));
@@ -223,10 +223,10 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
   {
     id: "site_capacity",
     header: "Site capacity",
-    accessorFn: (row) => readCapacity({ dealGrade: row.site_capacity }).grade,
+    accessorFn: (row) => capacitySummary(factsForDeal(row)),
     cell: ({ row }) => {
-      const read = readCapacity({ dealGrade: row.original.site_capacity });
-      return <span className={read.grade === "Unknown" ? "unknown-grade" : ""} title={read.basis}>{read.grade}</span>;
+      const facts = factsForDeal(row.original);
+      return <span title={facts.map((fact) => fact.basis).filter(Boolean).join(" · ")}>{capacitySummary(facts)}</span>;
     },
   },
   {

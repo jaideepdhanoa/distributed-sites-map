@@ -100,7 +100,7 @@ export default function ListView({
             {rows.map((row) => (
               <tr key={row.id} className={row.id === selectedId ? "on" : ""} onClick={() => onOpen(row.id)}>
                 {LIST_COLUMNS.map((column) => (
-                  <td key={column.id} className={column.id === "grade" && row.grade === "Unknown" ? "unknown-grade" : ""} title={row[column.id] || ""}>{row[column.id] || "—"}</td>
+                  <td key={column.id} title={row[column.id] || ""}>{row[column.id] || "—"}</td>
                 ))}
                 <td>
                   <button type="button" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>

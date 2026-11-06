@@ -38,6 +38,7 @@ PANEL_FILES = {
     "lib/keyNumbers.ts",
     "lib/types.ts",
     "app/api/data/sites/route.ts",
+    "app/api/data/sites/[id]/route.ts",
 }
 SURFACE = ("components", "lib", "app")
 

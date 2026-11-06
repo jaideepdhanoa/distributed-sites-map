@@ -5,8 +5,8 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { checkedPhrase, fullMoney, openLandText, readCapacity } from "@/lib/keyNumbers";
-import KeyStrip from "./KeyStrip";
+import { checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText } from "@/lib/keyNumbers";
+import KeyStrip, { CapacityFacts } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 
 function acres(value: number | null | undefined, text?: string) {
@@ -39,7 +39,7 @@ function GradePair({
   prefer: "site" | "deal";
 }) {
   const spare = sparePeer(site, deal, prefer);
-  const capacity = readCapacity({ siteGrade: site?.site_capacity, dealGrade: deal?.site_capacity });
+  const facts = prefer === "site" ? factsForSite(site, deal) : factsForDeal(deal);
   return (
     <div className="grade-pair" data-testid="grade-pair">
       <article>
@@ -47,10 +47,9 @@ function GradePair({
         <strong>{spare.value}</strong>
         <small>{spare.basis}</small>
       </article>
-      <article className={capacity.grade === "Unknown" ? "unknown" : ""} data-grade={capacity.grade}>
+      <article className="facts">
         <span>Site capacity</span>
-        <strong>{capacity.grade}</strong>
-        <small>{capacity.basis}</small>
+        <CapacityFacts facts={facts} />
       </article>
     </div>
   );
@@ -300,11 +299,7 @@ export default function Detail({
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
               <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
               <span>Site capacity</span>
-              <div className={readCapacity({ siteGrade: site.site_capacity, dealGrade: linkedDeal?.site_capacity }).grade === "Unknown" ? "unknown-grade" : ""}>
-                {readCapacity({ siteGrade: site.site_capacity, dealGrade: linkedDeal?.site_capacity }).grade}
-                {" · "}
-                {readCapacity({ siteGrade: site.site_capacity, dealGrade: linkedDeal?.site_capacity }).basis}
-              </div>
+              <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
               <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
               <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
@@ -460,11 +455,7 @@ export function DealDetail({
               <span>Open land</span>
               <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
               <span>Site capacity</span>
-              <div className={readCapacity({ dealGrade: deal.site_capacity }).grade === "Unknown" ? "unknown-grade" : ""}>
-                {readCapacity({ dealGrade: deal.site_capacity }).grade}
-                {" · "}
-                {readCapacity({ dealGrade: deal.site_capacity }).basis}
-              </div>
+              <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
               <div>
                 {deal.figures_status === "withheld"

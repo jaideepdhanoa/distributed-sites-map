@@ -113,6 +113,9 @@ class PhotoContract(unittest.TestCase):
         rows = [
             {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "listing", "Source": "broker_listing", "View URL": THUMB, "Drive file ID": FILE_ID, "Visibility": "map"},
             {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "electrical", "Source": "site_visit", "View URL": THUMB, "Drive file ID": "1electricalfileidXXXX", "Visibility": "map"},
+            {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "street_level", "Source": "other", "View URL": "https://images.example/front.jpg", "Visibility": "map"},
+            {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "street_level", "Source": "google_street_view", "View URL": STILL, "Visibility": "map"},
+            {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "building", "Source": "other", "View URL": "https://images.example/building.jpg", "Visibility": "map"},
             {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "street_frontage", "Source": "google_street_view", "View URL": STILL, "Visibility": "map"},
             {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "street_frontage", "Source": "google_street_view", "View URL": PANO, "Visibility": "map"},
             {"Site ID": "PIPE-PHX-0001", "Sheet": "Pipeline", "Role": "lot_aerial", "Source": "google_street_view", "View URL": STILL, "Visibility": "map"},
@@ -124,7 +127,10 @@ class PhotoContract(unittest.TestCase):
         grouped = index_photos(rows)
         fields = photo_fields({"Photo status": "Partial", "Diligence photo count": 2, "Listing photo count": 4}, "pipeline", "PIPE-PHX-0001", grouped)
         roles = [photo["role"] for photo in fields["photos"]]
-        self.assertEqual(roles, ["spare_land_annotated", "access_spare", "electrical", "listing", "street_frontage"])
+        self.assertEqual(
+            roles,
+            ["spare_land_annotated", "access_spare", "building", "street_level", "electrical", "listing", "street_frontage"],
+        )
         self.assertNotIn("caption", fields["photos"][0])
         self.assertNotIn("file_id", fields["photos"][0])
         self.assertNotIn("drive.google.com", json.dumps(fields))

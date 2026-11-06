@@ -6,6 +6,8 @@ const ROLE_ORDER = [
   "spare_land_annotated",
   "lot_aerial",
   "access_spare",
+  "building",
+  "street_level",
   "electrical",
   "listing",
 ] as const;
@@ -14,6 +16,8 @@ export const ROLE_LABEL: Record<string, string> = {
   spare_land_annotated: "Spare land",
   lot_aerial: "Aerial",
   access_spare: "Access",
+  building: "Building",
+  street_level: "Street level",
   electrical: "Electrical",
   listing: "Listing",
   street_frontage: "Street View",

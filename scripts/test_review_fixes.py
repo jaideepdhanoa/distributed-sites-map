@@ -1,5 +1,6 @@
 """Checks for the review fixes: listings, one matcher, stages, and the unscreened layer."""
 
+import csv
 import json
 import unittest
 from pathlib import Path
@@ -113,9 +114,16 @@ class ShippedCounts(unittest.TestCase):
         withheld = sorted(item["properties"]["listing_id"] for item in layer if not item.get("geometry"))
         self.assertEqual(pinned, ["L-013", "L-236", "L-239"])
         self.assertEqual(withheld, ["L-214", "L-215", "L-216", "L-221", "L-233"])
-        drift = (ROOT / "data/drift_report.csv").read_text().splitlines()
-        leads = [line.split(",", 1)[0] for line in drift[1:] if line.strip()]
-        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "LAS-U119"])
+        with (ROOT / "data/drift_report.csv").open(newline="", encoding="utf-8") as handle:
+            drift_rows = list(csv.DictReader(handle))
+        leads = [row["lead id"] for row in drift_rows]
+        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "LAND-PHX-0049", "LAS-U119"])
+        by_lead = {row["lead id"]: row for row in drift_rows}
+        self.assertEqual(by_lead["LAND-PHX-0049"]["workbook Stage"], "1 Desk screen")
+        self.assertEqual(by_lead["LAND-PHX-0049"]["KO reason"], "Outside the service area")
+        self.assertEqual(by_lead["LAND-PHX-0049"]["rule applied"], "R-042")
+        self.assertEqual(by_lead["LAS-U119"]["map stage"], "not listed")
+        self.assertIn("off-market", by_lead["LAS-U119"]["KO reason"])
         gap = universe_link_gap(deals)
         self.assertGreaterEqual(gap["linked"], 21)
         if universe_gap_status(deals)["located_ids"]:

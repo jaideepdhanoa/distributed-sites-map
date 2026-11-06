@@ -24,6 +24,8 @@ ROLES = (
     "spare_land_annotated",
     "lot_aerial",
     "access_spare",
+    "building",
+    "street_level",
     "electrical",
     "listing",
     "street_frontage",

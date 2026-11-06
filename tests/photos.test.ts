@@ -46,6 +46,8 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
     photo({ role: "listing", view_url: local("eeeeeeeeeeeeeeeeeeee") }),
     photo({ role: "listing", view_url: local("ffffffffffffffffffff") }),
     photo({ role: "listing", view_url: local("11111111111111111111") }),
+    photo({ role: "street_level", view_url: local("66666666666666666666") }),
+    photo({ role: "building", view_url: local("77777777777777777777") }),
     photo({ role: "electrical", view_url: local("22222222222222222222") }),
     photo({ role: "street_frontage", view_url: PANO, source: "google_street_view" }),
     photo({ role: "lot_aerial", view_url: local("33333333333333333333"), source: "esri_world_imagery", attribution: "Esri, Maxar" }),
@@ -58,6 +60,8 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
   assert.deepEqual(model.slides.map((item) => item.role), [
     "spare_land_annotated",
     "lot_aerial",
+    "building",
+    "street_level",
     "electrical",
     "listing",
     "listing",

@@ -2,19 +2,8 @@
   "new_sites": 0,
   "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 2,
+  "stage_moves": 0,
   "sample_new": [],
   "sample_verdicts": [],
-  "sample_stages": [
-    {
-      "site_id": "WB-PHX-0012",
-      "before": "1 Desk screen",
-      "after": "2 Financial screen"
-    },
-    {
-      "deal_id": "PIPE-PHX-0084",
-      "before": "1 Desk screen",
-      "after": "2 Financial screen"
-    }
-  ]
+  "sample_stages": []
 }

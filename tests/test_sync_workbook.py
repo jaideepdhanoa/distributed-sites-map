@@ -224,6 +224,42 @@ class TimelineCommentTest(unittest.TestCase):
         self.assertIn("Timeline warnings: 1.", lines)
 
 
+class UniverseGapSyncTextTest(unittest.TestCase):
+    def test_pr_body_and_comment_list_every_open_deal_id(self) -> None:
+        import scripts.build_data as build
+
+        status = build.universe_gap_status(
+            json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())["features"]
+        )
+        body = sync.sync_pr_body()
+        self.assertIn("Not merged.", body)
+        self.assertIn("Nothing was written back to the Sheet.", body)
+        if status["located_ids"]:
+            self.assertIn("The check fails.", body)
+        else:
+            self.assertIn("Located LAS, PHX, and MIA deals without a Universe row: 0.", body)
+        for deal_id in status["located_ids"]:
+            self.assertIn(f"- {deal_id}", body)
+        for item in status["outside"]:
+            if item["deal_id"]:
+                self.assertIn(f"- {item['deal_id']} ({item['city']})", body)
+                self.assertNotIn(item["deal_id"], "\n".join(build.universe_gap_problems(
+                    json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())["features"]
+                )))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "comment.md"
+            sync.write_sync_comment(path)
+            comment = path.read_text()
+        for deal_id in status["located_ids"]:
+            self.assertIn(f"- {deal_id}", comment)
+        self.assertLess(
+            comment.index("Located LAS, PHX, and MIA deals without a Universe row:"),
+            comment.index("Drift report"),
+        )
+        if status["located_ids"]:
+            self.assertLess(comment.index(status["located_ids"][0]), comment.index("Drift report"))
+
+
 class DriftReasonTest(unittest.TestCase):
     def test_stall_phrase_becomes_lot_too_small(self) -> None:
         import scripts.build_data as build

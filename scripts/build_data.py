@@ -1751,6 +1751,104 @@ def universe_link_gap(features: list[dict]) -> dict:
     }
 
 
+MAP_MARKETS = {"LAS", "PHX", "MIA"}
+
+
+def universe_gap_status(features: list[dict]) -> dict:
+    """Located Pipeline and Land deals that have no universe row.
+
+    The failing set is LAS, PHX, and MIA. Other markets are listed and do not fail the check.
+    The market is the deal's city field. A deal id is not used to invent a market.
+    """
+    gap = universe_link_gap(features)
+    located_ids: list[str] = []
+    outside: list[dict] = []
+    blank = 0
+    for item in gap["located_missing"]:
+        deal_id = str(item.get("deal_id") or "").strip()
+        city = str(item.get("city") or "").strip().upper()
+        if city not in MAP_MARKETS:
+            outside.append({"deal_id": deal_id, "city": city or "unknown"})
+            continue
+        if not deal_id:
+            blank += 1
+            continue
+        located_ids.append(deal_id)
+    return {
+        "linked": gap["linked"],
+        "located_ids": located_ids,
+        "outside": outside,
+        "unlocated_count": gap["unlocated_without_universe"],
+        "blank": blank,
+    }
+
+
+def universe_gap_problems(features: list[dict]) -> list[str]:
+    """Fail when a located LAS, PHX, or MIA deal has no universe row.
+
+    Inside those markets the count has to be zero. There is no exception list.
+    Deals with no location, and located deals in other markets, stay out of this gate.
+    """
+    status = universe_gap_status(features)
+    problems = []
+    if status["blank"]:
+        problems.append(
+            f"{status['blank']} located LAS, PHX, or MIA deal(s) have no universe_id and no deal id."
+        )
+    if status["located_ids"]:
+        problems.append(
+            f"Located LAS, PHX, and MIA deals without a Universe row: {len(status['located_ids'])}. "
+            + ", ".join(status["located_ids"])
+            + ". Mint a counted Universe row for each id. "
+            "The map does not invent a row, a coordinate, or a parcel number, and it does not write the workbook."
+        )
+    return problems
+
+
+def universe_gap_lines(features: list[dict] | None = None) -> list[str]:
+    """Deal ids in the located gap, for the sync pull request and its comment."""
+    if features is None:
+        path = OUT / "deals.geojson"
+        features = json.loads(path.read_text()).get("features") or [] if path.exists() else []
+    status = universe_gap_status(features)
+    lines: list[str] = []
+    if status["blank"]:
+        lines.append(f"Located LAS, PHX, or MIA deals with no deal id: {status['blank']}. The check fails.")
+        lines.append("")
+    count = len(status["located_ids"])
+    if count:
+        lines.append(f"Located LAS, PHX, and MIA deals without a Universe row: {count}. The check fails.")
+        lines.append(
+            "Mint a counted Universe row for each id. "
+            "The map does not invent a row, a coordinate, or a parcel number, and it does not write the workbook."
+        )
+        lines.append("")
+        lines.append("Deal ids:")
+        lines.extend(f"- {deal_id}" for deal_id in status["located_ids"])
+    else:
+        lines.append("Located LAS, PHX, and MIA deals without a Universe row: 0.")
+        lines.append("Every located Pipeline and Land deal in LAS, PHX, and MIA has a Universe row.")
+    if status["outside"]:
+        lines.append("")
+        lines.append("Located deals outside LAS, PHX, and MIA. The check does not use these ids:")
+        for item in status["outside"]:
+            label = item["deal_id"] or "(no deal id)"
+            lines.append(f"- {label} ({item['city']})")
+    return lines
+
+
+def enforce_universe_gap(features: list[dict] | None = None) -> None:
+    if features is None:
+        path = OUT / "deals.geojson"
+        if not path.exists():
+            raise SystemExit("Universe gap check failed.\nmissing deals.geojson")
+        features = json.loads(path.read_text()).get("features") or []
+    print("\n".join(universe_gap_lines(features)))
+    problems = universe_gap_problems(features)
+    if problems:
+        raise SystemExit("Universe gap check failed.\n" + "\n".join(problems))
+
+
 def match_workbook_site(city: str, apn_value, address_text: str, by_apn: dict, by_street: dict) -> str | None:
     """One matcher for a deal row and for the site it attaches to.
 
@@ -4929,6 +5027,11 @@ def validate_committed() -> None:
     expect("unlocated without universe", gap["unlocated_without_universe"], deal_report.get("unlocated_without_universe"))
     if deal_report.get("located_without_universe_ids") != [item["deal_id"] for item in gap["located_missing"]]:
         problems.append("located_without_universe_ids does not match the deals file")
+    gap_problems = universe_gap_problems(deal_features)
+    if gap_problems:
+        problems = gap_problems + problems
+    else:
+        print("Located LAS, PHX, and MIA deals without a universe row: 0.")
     unscreened = loaded.get("unscreened.geojson") or {}
     unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
     pinned = sorted(item[0] for item in unscreened_rows if item[1])
@@ -5058,8 +5161,8 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     problems = []
     stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
     census = stages.get("census") or {}
-    if census.get("total") != 1701 or census.get("by_city") != {"LAS": 428, "PHX": 561, "MIA": 712}:
-        problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,701 rows")
+    if census.get("total") != 1737 or census.get("by_city") != {"LAS": 440, "PHX": 579, "MIA": 717, "SNA": 1}:
+        problems.append(f"universe census count is {census.get('total')} {census.get('by_city')}, expected 1,737 rows")
     unique_rows = [feature for feature in features if _universe_stage(feature, "universe")]
     leaked = [
         (feature.get("properties") or {}).get("site_id")
@@ -5115,14 +5218,14 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     terrible = by_id.get("LAS-U100") or {}
     if terrible.get("verdict") != "PASS" or terrible.get("network_status") != "cleared":
         problems.append("LAS-U100 Terrible's #153 must stay cleared")
-    if len(unique_rows) != 1658:
-        problems.append(f"unique sites are {len(unique_rows)}, workbook counted rows are 1,658")
-    if unique_by_city != {"LAS": 417, "PHX": 555, "MIA": 686}:
-        problems.append(f"unique sites by city are {unique_by_city}, expected LAS 417 / PHX 555 / MIA 686")
+    if len(unique_rows) != 1693:
+        problems.append(f"unique sites are {len(unique_rows)}, workbook counted rows are 1,693")
+    if unique_by_city != {"LAS": 429, "PHX": 573, "MIA": 691}:
+        problems.append(f"unique sites by city are {unique_by_city}, expected LAS 429 / PHX 573 / MIA 691")
     in_area_rows = [feature for feature in features if _universe_stage(feature, "in_area")]
     in_area_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in in_area_rows))
-    if len(in_area_rows) != 1043 or in_area_by_city != {"LAS": 179, "PHX": 254, "MIA": 610}:
-        problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,043 (LAS 179 / PHX 254 / MIA 610)")
+    if len(in_area_rows) != 1068 or in_area_by_city != {"LAS": 186, "PHX": 270, "MIA": 612}:
+        problems.append(f"in service area is {len(in_area_rows)} {in_area_by_city}, workbook is 1,068 (LAS 186 / PHX 270 / MIA 612)")
     verdict_counts = Counter((feature.get("properties") or {}).get("verdict") for feature in unique_rows)
     expected_verdicts = {"PASS": 12, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
     got_verdicts = {key: verdict_counts.get(key, 0) for key in expected_verdicts}
@@ -5216,9 +5319,19 @@ def refresh_queue_feed() -> None:
 def main():
     parser = argparse.ArgumentParser(description="Build map data from data/source")
     parser.add_argument("--check", action="store_true", help="Rebuild in memory and compare to committed data")
+    parser.add_argument(
+        "--gap-gate",
+        action="store_true",
+        help="Fail if a located LAS, PHX, or MIA deal has no universe row",
+    )
     parser.add_argument("--refresh-parcels", action="store_true")
     parser.add_argument("--muse-verdicts", default=os.environ.get("MUSE_VERDICTS_FILE") or None)
     args = parser.parse_args()
+    if args.gap_gate:
+        enforce_universe_gap()
+        print("Universe gap check passed.")
+        if not args.check:
+            return
     if args.check:
         if sources_present():
             report = build(write=False, refresh_parcels=False, muse_file=args.muse_verdicts)

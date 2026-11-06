@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-06T00:15:39Z",
+  "generated_at": "2026-11-06T04:46:03Z",
   "census_rows": {
     "total": 1737,
     "by_city": {
@@ -143,8 +143,8 @@
   "land_rows": 32,
   "pipeline_stage_counts": {
     "Dropped": 22,
-    "1 Desk screen": 13,
-    "2 Financial screen": 1
+    "1 Desk screen": 12,
+    "2 Financial screen": 2
   },
   "land_stage_counts": {
     "1 Desk screen": 27,
@@ -263,13 +263,13 @@
     },
     "pipeline_by_stage": {
       "Dropped": 22,
-      "1 Desk screen": 13,
-      "2 Financial screen": 1
+      "1 Desk screen": 12,
+      "2 Financial screen": 2
     },
     "pipeline_by_group": {
       "dropped": 22,
-      "desk": 13,
-      "financial": 1
+      "desk": 12,
+      "financial": 2
     },
     "land_by_city": {
       "LAS": 12,
@@ -363,8 +363,8 @@
   "parcels": {
     "counts": {
       "cache_hit": 1089,
-      "fetched": 26,
       "not_found": 7,
+      "fetched": 26,
       "features": 1146,
       "adjoining": 31,
       "by_city": {
@@ -512,7 +512,7 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'fetched': 26, 'not_found': 7, 'features': 1146, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 293}, 'by_method': {'parcel number': 1051, 'pin location': 64}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'not_found': 7, 'fetched': 26, 'features': 1146, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 293}, 'by_method': {'parcel number': 1051, 'pin location': 64}}."
   },
   "public_records": {
     "utility_by_city": {
@@ -554,7 +554,7 @@
     "Census row count is 1737, workbook expectation was 1,701.",
     "Unique sites are 1693 {'LAS': 429, 'PHX': 573, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
     "In-area city split is {'LAS': 186, 'PHX': 270, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
-    "Pipeline tab has 36 rows (stages {'Dropped': 22, '1 Desk screen': 13, '2 Financial screen': 1}). The older note of 79 is not in this export."
+    "Pipeline tab has 36 rows (stages {'Dropped': 22, '1 Desk screen': 12, '2 Financial screen': 2}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -568,26 +568,24 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "changes": {
-    "new_sites": 35,
-    "removed_sites": 78,
+    "new_sites": 0,
+    "removed_sites": 0,
     "verdict_changes": 0,
-    "stage_moves": 0,
-    "sample_new": [
-      "WB-LAS-0017",
-      "WB-LAS-0018",
-      "WB-LAS-0019",
-      "WB-LAS-0020",
-      "WB-LAS-0021",
-      "WB-LAS-0022",
-      "WB-LAS-0023",
-      "WB-LAS-0024",
-      "WB-LAS-0025",
-      "WB-LAS-0026",
-      "WB-LAS-0027",
-      "WB-LAS-0028"
-    ],
+    "stage_moves": 2,
+    "sample_new": [],
     "sample_verdicts": [],
-    "sample_stages": []
+    "sample_stages": [
+      {
+        "site_id": "WB-PHX-0012",
+        "before": "1 Desk screen",
+        "after": "2 Financial screen"
+      },
+      {
+        "deal_id": "PIPE-PHX-0084",
+        "before": "1 Desk screen",
+        "after": "2 Financial screen"
+      }
+    ]
   },
   "verdicts_appended": 2,
   "verdicts_total": 2662,
@@ -598,9 +596,9 @@
     "parcels-MIA.geojson": 327553
   },
   "timeline": {
-    "matched_folders": 14,
+    "matched_folders": 16,
     "unmatched_folders": 0,
-    "sheet_links": 14,
+    "sheet_links": 16,
     "warnings": 8,
     "drive": "ok"
   }

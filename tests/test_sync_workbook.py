@@ -234,7 +234,10 @@ class UniverseGapSyncTextTest(unittest.TestCase):
         body = sync.sync_pr_body()
         self.assertIn("Not merged.", body)
         self.assertIn("Nothing was written back to the Sheet.", body)
-        self.assertIn("No new located deal is missing a Universe row.", body)
+        if status["located_ids"]:
+            self.assertIn("The check fails.", body)
+        else:
+            self.assertIn("Located deals without a Universe row: 0.", body)
         for deal_id in status["located_ids"]:
             self.assertIn(f"- {deal_id}", body)
         with tempfile.TemporaryDirectory() as tmp:
@@ -244,7 +247,8 @@ class UniverseGapSyncTextTest(unittest.TestCase):
         for deal_id in status["located_ids"]:
             self.assertIn(f"- {deal_id}", comment)
         self.assertLess(comment.index("Located deals without a Universe row:"), comment.index("Drift report"))
-        self.assertLess(comment.index(status["located_ids"][0]), comment.index("Drift report"))
+        if status["located_ids"]:
+            self.assertLess(comment.index(status["located_ids"][0]), comment.index("Drift report"))
 
 
 class DriftReasonTest(unittest.TestCase):

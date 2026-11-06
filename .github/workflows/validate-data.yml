@@ -15,9 +15,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Located deals without a universe row
-        run: python scripts/build_data.py --gap-gate
-      - run: python scripts/build_data.py --check
       - run: python scripts/test_changes.py
       - run: python tests/test_sync_workbook.py
       - run: python tests/test_sync_push.py
@@ -32,6 +29,10 @@ jobs:
       - run: node --experimental-strip-types scripts/test-key-numbers.ts
       - run: node --experimental-strip-types scripts/test-contacted-deals.ts
       - run: node --experimental-strip-types scripts/test-search.ts
+      - run: python scripts/build_data.py --check
+      - name: Located deals without a universe row
+        if: always()
+        run: python scripts/build_data.py --gap-gate
 
   e2e:
     runs-on: ubuntu-latest

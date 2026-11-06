@@ -121,15 +121,13 @@ Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_
 
 ### Universe gap
 
-Universe stays a strict superset of every Pipeline or Land deal that already has a location. The map links that deal to a counted Universe row by parcel or a unique street. Muse mints the row. Workbook sync reads the Sheet and opens a pull request. It leaves the Sheet unchanged.
+Universe stays a strict superset of every Pipeline or Land deal that already has a location. The map links that deal to a counted Universe row by parcel or a unique street. Workbook sync reads the Sheet and opens a pull request. It leaves the Sheet unchanged.
 
-`data/universe_gap_baseline.json` is the allowlist of 36 deal ids that were located and still missing a Universe row on 2026-11-05, taken from `located_without_universe_ids` in the build report. `python scripts/build_data.py --gap-gate` prints those ids and fails when a located deal id is missing from the list. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync puts the same id list in the pull request body and the drift comment, then runs the gate. A red gate leaves the pull request open and unmerged.
+`python scripts/build_data.py --gap-gate` prints every located deal id that has no `universe_id`. The check fails when that count is above zero. There is no exception list. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync puts the same id list in the pull request body and the drift comment, then runs the gate. A red gate leaves the pull request open and unmerged.
 
-The recorded backlog stays green, including while ids drop off the list after a Universe row is minted. A located deal id that the allowlist does not already name fails the check. That includes a one-for-one swap, where the count stays at 36. A ceiling of 36 would stay green for that swap, and it would stay green after the backlog reached zero and a new located deal appeared. Failing on every count above zero would leave every pull request red until all 36 rows exist.
+Indie is minting counted Universe rows in the workbook for the 36 located deals in the current data. After those rows are on the Universe tab, the next workbook sync links each deal and the count goes to zero. Until that sync rebuilds the generated files, this check stays red. The map does not mint the row, invent a coordinate, or invent a parcel number.
 
-Muse mints a counted Universe row for each id in the gap, then the next sync links the deal. Leave the allowlist as it is. Names that have already been minted do not fail the check.
-
-Torque keeps the map on linking only. Add an id to the allowlist only in a reviewed change that records an explicit exception for that deal. After rows are minted, the allowlist can be trimmed to the ids that remain so the file matches the open backlog. New ids stay blocked either way. Leave a sync pull request unmerged while this check is red.
+Leave a sync pull request unmerged while this check is red.
 
 Map sync inputs sits in the Moove root, next to 2 Sites. Its top level holds:
 

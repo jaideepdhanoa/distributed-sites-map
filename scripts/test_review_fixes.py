@@ -8,7 +8,6 @@ from build_data import (
     classify_register_row,
     match_workbook_site,
     stage_group,
-    load_universe_gap_baseline,
     universe_gap_lines,
     universe_gap_problems,
     universe_gap_status,
@@ -119,7 +118,10 @@ class ShippedCounts(unittest.TestCase):
         self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "LAS-U119"])
         gap = universe_link_gap(deals)
         self.assertGreaterEqual(gap["linked"], 21)
-        self.assertEqual(universe_gap_problems(deals), [])
+        if gap["located_without_universe"]:
+            self.assertTrue(universe_gap_problems(deals))
+        else:
+            self.assertEqual(universe_gap_problems(deals), [])
         self.assertEqual(gap["unlocated_without_universe"], 13)
         by_apn, by_street = universe_match_index([item["properties"] for item in sites])
         deal_by_id = {item["properties"]["deal_id"]: item["properties"] for item in deals}
@@ -136,20 +138,22 @@ class UniverseGapGate(unittest.TestCase):
     def _deals(self):
         return json.loads((ROOT / "data/generated/deals.geojson").read_text())["features"]
 
-    def test_committed_located_deals_stay_on_the_allowlist(self):
+    def test_committed_gap_matches_the_zero_rule(self):
         deals = self._deals()
         status = universe_gap_status(deals)
-        self.assertEqual(universe_gap_problems(deals), [])
-        self.assertEqual(status["new_ids"], [])
-        self.assertEqual(status["baseline_count"], 36)
-        self.assertLessEqual(set(status["located_ids"]), set(status["baseline_ids"]))
+        problems = universe_gap_problems(deals)
         text = "\n".join(universe_gap_lines(deals))
-        for deal_id in status["located_ids"]:
-            self.assertIn(f"- {deal_id}", text)
-        self.assertIn("No new located deal is missing a Universe row.", text)
-        self.assertNotIn("NEW located deals", text)
+        if status["located_ids"]:
+            self.assertTrue(problems)
+            self.assertIn("The check fails.", text)
+            blob = "\n".join(problems) + "\n" + text
+            for deal_id in status["located_ids"]:
+                self.assertIn(deal_id, blob)
+        else:
+            self.assertEqual(problems, [])
+            self.assertIn("Located deals without a Universe row: 0.", text)
 
-    def test_a_new_located_deal_is_named(self):
+    def test_any_located_deal_without_a_row_is_named(self):
         features = [
             {
                 "type": "Feature",
@@ -160,36 +164,11 @@ class UniverseGapGate(unittest.TestCase):
         problems = universe_gap_problems(features)
         self.assertEqual(len(problems), 1)
         self.assertIn("PIPE-PHX-9999", problems[0])
-        self.assertIn("universe_gap_baseline.json", problems[0])
         text = "\n".join(universe_gap_lines(features))
-        self.assertTrue(text.startswith("NEW located deals without a Universe row: 1."))
-        self.assertLess(text.index("PIPE-PHX-9999"), text.index("Deal ids still located"))
+        self.assertTrue(text.startswith("Located deals without a Universe row: 1. The check fails."))
+        self.assertIn("- PIPE-PHX-9999", text)
 
-    def test_a_swap_fails_when_the_count_stays_the_same(self):
-        baseline, problems = load_universe_gap_baseline()
-        self.assertEqual(problems, [])
-        self.assertGreaterEqual(len(baseline), 1)
-        features = [
-            {
-                "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [-112.0, 33.4]},
-                "properties": {"kind": "pipeline", "deal_id": deal_id, "universe_id": ""},
-            }
-            for deal_id in baseline[1:]
-        ]
-        features.append(
-            {
-                "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [-112.1, 33.5]},
-                "properties": {"kind": "pipeline", "deal_id": "PIPE-NEW-0001", "universe_id": ""},
-            }
-        )
-        status = universe_gap_status(features)
-        self.assertEqual(len(status["located_ids"]), len(baseline))
-        self.assertEqual(status["new_ids"], ["PIPE-NEW-0001"])
-        self.assertTrue(any("PIPE-NEW-0001" in item for item in universe_gap_problems(features)))
-
-    def test_clearing_a_listed_id_passes(self):
+    def test_a_linked_deal_passes(self):
         features = [
             {
                 "type": "Feature",
@@ -198,8 +177,9 @@ class UniverseGapGate(unittest.TestCase):
             }
         ]
         self.assertEqual(universe_gap_problems(features), [])
+        self.assertIn("Located deals without a Universe row: 0.", "\n".join(universe_gap_lines(features)))
 
-    def test_one_remaining_backlog_id_passes(self):
+    def test_one_open_backlog_id_fails_with_no_exception(self):
         features = [
             {
                 "type": "Feature",
@@ -207,8 +187,10 @@ class UniverseGapGate(unittest.TestCase):
                 "properties": {"kind": "land", "deal_id": "LAND-PHX-0002", "universe_id": ""},
             }
         ]
-        self.assertEqual(universe_gap_problems(features), [])
-        self.assertIn("LAND-PHX-0002", "\n".join(universe_gap_lines(features)))
+        problems = universe_gap_problems(features)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("LAND-PHX-0002", problems[0])
+        self.assertIn("- LAND-PHX-0002", "\n".join(universe_gap_lines(features)))
 
     def test_an_unlocated_deal_stays_out_of_the_gate(self):
         features = [
@@ -221,7 +203,7 @@ class UniverseGapGate(unittest.TestCase):
         self.assertEqual(universe_gap_problems(features), [])
         text = "\n".join(universe_gap_lines(features))
         self.assertNotIn("PIPE-PHX-9998", text)
-        self.assertIn("- none", text)
+        self.assertIn("Located deals without a Universe row: 0.", text)
 
     def test_a_blank_deal_id_fails(self):
         features = [

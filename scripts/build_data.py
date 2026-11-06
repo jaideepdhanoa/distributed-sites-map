@@ -1751,33 +1751,53 @@ def universe_link_gap(features: list[dict]) -> dict:
     }
 
 
+MAP_MARKETS = {"LAS", "PHX", "MIA"}
+
+
 def universe_gap_status(features: list[dict]) -> dict:
-    """Located Pipeline and Land deals that have no universe row."""
+    """Located Pipeline and Land deals that have no universe row.
+
+    The failing set is LAS, PHX, and MIA. Other markets are listed and do not fail the check.
+    The market is the deal's city field. A deal id is not used to invent a market.
+    """
     gap = universe_link_gap(features)
-    located_ids = [str(item.get("deal_id") or "").strip() for item in gap["located_missing"]]
+    located_ids: list[str] = []
+    outside: list[dict] = []
+    blank = 0
+    for item in gap["located_missing"]:
+        deal_id = str(item.get("deal_id") or "").strip()
+        city = str(item.get("city") or "").strip().upper()
+        if city not in MAP_MARKETS:
+            outside.append({"deal_id": deal_id, "city": city or "unknown"})
+            continue
+        if not deal_id:
+            blank += 1
+            continue
+        located_ids.append(deal_id)
     return {
         "linked": gap["linked"],
-        "located_ids": [deal_id for deal_id in located_ids if deal_id],
+        "located_ids": located_ids,
+        "outside": outside,
         "unlocated_count": gap["unlocated_without_universe"],
-        "blank": sum(1 for deal_id in located_ids if not deal_id),
+        "blank": blank,
     }
 
 
 def universe_gap_problems(features: list[dict]) -> list[str]:
-    """Fail when any located Pipeline or Land deal has no universe row.
+    """Fail when a located LAS, PHX, or MIA deal has no universe row.
 
-    The count has to be zero. There is no exception list.
-    Deals with no location stay out of this gate.
+    Inside those markets the count has to be zero. There is no exception list.
+    Deals with no location, and located deals in other markets, stay out of this gate.
     """
     status = universe_gap_status(features)
     problems = []
     if status["blank"]:
         problems.append(
-            f"{status['blank']} located Pipeline or Land deal(s) have no universe_id and no deal id."
+            f"{status['blank']} located LAS, PHX, or MIA deal(s) have no universe_id and no deal id."
         )
     if status["located_ids"]:
         problems.append(
-            f"Located deals without a Universe row: {len(status['located_ids'])}. "
+            f"Located LAS, PHX, and MIA deals without a Universe row: {len(status['located_ids'])}. "
             + ", ".join(status["located_ids"])
             + ". Mint a counted Universe row for each id. "
             "The map does not invent a row, a coordinate, or a parcel number, and it does not write the workbook."
@@ -1793,11 +1813,11 @@ def universe_gap_lines(features: list[dict] | None = None) -> list[str]:
     status = universe_gap_status(features)
     lines: list[str] = []
     if status["blank"]:
-        lines.append(f"Located deals with no deal id: {status['blank']}. The check fails.")
+        lines.append(f"Located LAS, PHX, or MIA deals with no deal id: {status['blank']}. The check fails.")
         lines.append("")
     count = len(status["located_ids"])
     if count:
-        lines.append(f"Located deals without a Universe row: {count}. The check fails.")
+        lines.append(f"Located LAS, PHX, and MIA deals without a Universe row: {count}. The check fails.")
         lines.append(
             "Mint a counted Universe row for each id. "
             "The map does not invent a row, a coordinate, or a parcel number, and it does not write the workbook."
@@ -1806,8 +1826,14 @@ def universe_gap_lines(features: list[dict] | None = None) -> list[str]:
         lines.append("Deal ids:")
         lines.extend(f"- {deal_id}" for deal_id in status["located_ids"])
     else:
-        lines.append("Located deals without a Universe row: 0.")
-        lines.append("Every located Pipeline and Land deal has a Universe row.")
+        lines.append("Located LAS, PHX, and MIA deals without a Universe row: 0.")
+        lines.append("Every located Pipeline and Land deal in LAS, PHX, and MIA has a Universe row.")
+    if status["outside"]:
+        lines.append("")
+        lines.append("Located deals outside LAS, PHX, and MIA. The check does not use these ids:")
+        for item in status["outside"]:
+            label = item["deal_id"] or "(no deal id)"
+            lines.append(f"- {label} ({item['city']})")
     return lines
 
 
@@ -5005,7 +5031,7 @@ def validate_committed() -> None:
     if gap_problems:
         problems = gap_problems + problems
     else:
-        print("Located without universe: 0.")
+        print("Located LAS, PHX, and MIA deals without a universe row: 0.")
     unscreened = loaded.get("unscreened.geojson") or {}
     unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
     pinned = sorted(item[0] for item in unscreened_rows if item[1])
@@ -5296,7 +5322,7 @@ def main():
     parser.add_argument(
         "--gap-gate",
         action="store_true",
-        help="Fail if any located deal has no universe row",
+        help="Fail if a located LAS, PHX, or MIA deal has no universe row",
     )
     parser.add_argument("--refresh-parcels", action="store_true")
     parser.add_argument("--muse-verdicts", default=os.environ.get("MUSE_VERDICTS_FILE") or None)

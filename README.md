@@ -121,13 +121,13 @@ Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_
 
 ### Universe gap
 
-Universe stays a strict superset of every Pipeline or Land deal that already has a location. The map links that deal to a counted Universe row by parcel or a unique street. Workbook sync reads the Sheet and opens a pull request. It leaves the Sheet unchanged.
+Universe stays a strict superset of every Pipeline or Land deal that already has a location in LAS, PHX, or MIA. The map links that deal to a counted Universe row by parcel or a unique street. The market is the deal's city field. Workbook sync reads the Sheet and opens a pull request. It leaves the Sheet unchanged.
 
-`python scripts/build_data.py --gap-gate` prints every located deal id that has no `universe_id`. The check fails when that count is above zero. There is no exception list. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync puts the same id list in the pull request body and the drift comment, then runs the gate. A red gate leaves the pull request open and unmerged.
+`python scripts/build_data.py --gap-gate` prints every located LAS, PHX, and MIA deal id that has no `universe_id`. The check fails when that count is above zero. Inside those three markets there is no exception list. A located deal in another market, including SNA, is listed in the sync pull request and does not fail the check. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync puts the LAS, PHX, and MIA ids in the pull request body and the drift comment, then runs the gate. A red gate leaves the pull request open and unmerged.
 
-Indie is minting counted Universe rows in the workbook for the 36 located deals in the current data. After those rows are on the Universe tab, the next workbook sync links each deal and the count goes to zero. Until that sync rebuilds the generated files, this check stays red. The map does not mint the row, invent a coordinate, or invent a parcel number.
+On 5 Nov 2026 Jaideep kept PIPE-SNA-0002 (Newport Beach) outside this check. The map does not assign that deal a LAS, PHX, or MIA market, and it does not require an SNA Universe row. The map does not mint a row, invent a coordinate, or invent a parcel number.
 
-Leave a sync pull request unmerged while this check is red.
+Leave a sync pull request unmerged while a located LAS, PHX, or MIA deal has no Universe row.
 
 Map sync inputs sits in the Moove root, next to 2 Sites. Its top level holds:
 

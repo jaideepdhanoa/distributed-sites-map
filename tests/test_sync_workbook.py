@@ -237,16 +237,25 @@ class UniverseGapSyncTextTest(unittest.TestCase):
         if status["located_ids"]:
             self.assertIn("The check fails.", body)
         else:
-            self.assertIn("Located deals without a Universe row: 0.", body)
+            self.assertIn("Located LAS, PHX, and MIA deals without a Universe row: 0.", body)
         for deal_id in status["located_ids"]:
             self.assertIn(f"- {deal_id}", body)
+        for item in status["outside"]:
+            if item["deal_id"]:
+                self.assertIn(f"- {item['deal_id']} ({item['city']})", body)
+                self.assertNotIn(item["deal_id"], "\n".join(build.universe_gap_problems(
+                    json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())["features"]
+                )))
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "comment.md"
             sync.write_sync_comment(path)
             comment = path.read_text()
         for deal_id in status["located_ids"]:
             self.assertIn(f"- {deal_id}", comment)
-        self.assertLess(comment.index("Located deals without a Universe row:"), comment.index("Drift report"))
+        self.assertLess(
+            comment.index("Located LAS, PHX, and MIA deals without a Universe row:"),
+            comment.index("Drift report"),
+        )
         if status["located_ids"]:
             self.assertLess(comment.index(status["located_ids"][0]), comment.index("Drift report"))
 

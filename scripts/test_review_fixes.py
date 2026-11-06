@@ -118,7 +118,7 @@ class ShippedCounts(unittest.TestCase):
         self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "LAS-U119"])
         gap = universe_link_gap(deals)
         self.assertGreaterEqual(gap["linked"], 21)
-        if gap["located_without_universe"]:
+        if universe_gap_status(deals)["located_ids"]:
             self.assertTrue(universe_gap_problems(deals))
         else:
             self.assertEqual(universe_gap_problems(deals), [])
@@ -138,83 +138,106 @@ class UniverseGapGate(unittest.TestCase):
     def _deals(self):
         return json.loads((ROOT / "data/generated/deals.geojson").read_text())["features"]
 
-    def test_committed_gap_matches_the_zero_rule(self):
+    def _point(self, deal_id, city, universe_id="", coordinates=None):
+        return {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": coordinates or [-112.0, 33.4]},
+            "properties": {"kind": "pipeline", "deal_id": deal_id, "city": city, "universe_id": universe_id},
+        }
+
+    def test_committed_gap_fails_only_for_covered_markets(self):
         deals = self._deals()
         status = universe_gap_status(deals)
         problems = universe_gap_problems(deals)
         text = "\n".join(universe_gap_lines(deals))
+        blob = "\n".join(problems)
+        for deal_id in status["located_ids"]:
+            self.assertIn(deal_id, blob)
+            self.assertIn(f"- {deal_id}", text)
+        for item in status["outside"]:
+            if item["deal_id"]:
+                self.assertNotIn(item["deal_id"], blob)
+                self.assertIn(item["deal_id"], text)
         if status["located_ids"]:
-            self.assertTrue(problems)
             self.assertIn("The check fails.", text)
-            blob = "\n".join(problems) + "\n" + text
-            for deal_id in status["located_ids"]:
-                self.assertIn(deal_id, blob)
         else:
             self.assertEqual(problems, [])
-            self.assertIn("Located deals without a Universe row: 0.", text)
+            self.assertIn("Located LAS, PHX, and MIA deals without a Universe row: 0.", text)
 
-    def test_any_located_deal_without_a_row_is_named(self):
-        features = [
-            {
-                "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [-112.0, 33.4]},
-                "properties": {"kind": "pipeline", "deal_id": "PIPE-PHX-9999", "universe_id": ""},
-            }
-        ]
+    def test_sna_alone_does_not_fail(self):
+        features = [self._point("PIPE-SNA-0002", "SNA", coordinates=[-117.9, 33.65])]
+        self.assertEqual(universe_gap_problems(features), [])
+        text = "\n".join(universe_gap_lines(features))
+        self.assertIn("Located LAS, PHX, and MIA deals without a Universe row: 0.", text)
+        self.assertIn("- PIPE-SNA-0002 (SNA)", text)
+        self.assertNotIn("The check fails.", text)
+
+    def test_any_covered_market_deal_without_a_row_is_named(self):
+        features = [self._point("PIPE-PHX-9999", "PHX"), self._point("PIPE-SNA-0002", "SNA", coordinates=[-117.9, 33.65])]
         problems = universe_gap_problems(features)
         self.assertEqual(len(problems), 1)
         self.assertIn("PIPE-PHX-9999", problems[0])
+        self.assertNotIn("PIPE-SNA-0002", problems[0])
         text = "\n".join(universe_gap_lines(features))
-        self.assertTrue(text.startswith("Located deals without a Universe row: 1. The check fails."))
+        self.assertTrue(text.startswith("Located LAS, PHX, and MIA deals without a Universe row: 1. The check fails."))
         self.assertIn("- PIPE-PHX-9999", text)
+        self.assertIn("- PIPE-SNA-0002 (SNA)", text)
 
     def test_a_linked_deal_passes(self):
-        features = [
-            {
-                "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [-112.0, 33.4]},
-                "properties": {"kind": "land", "deal_id": "LAND-PHX-0002", "universe_id": "PHX-U1"},
-            }
-        ]
+        features = [self._point("LAND-PHX-0002", "PHX", universe_id="PHX-U1")]
         self.assertEqual(universe_gap_problems(features), [])
-        self.assertIn("Located deals without a Universe row: 0.", "\n".join(universe_gap_lines(features)))
+        self.assertIn(
+            "Located LAS, PHX, and MIA deals without a Universe row: 0.",
+            "\n".join(universe_gap_lines(features)),
+        )
 
-    def test_one_open_backlog_id_fails_with_no_exception(self):
-        features = [
-            {
-                "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [-112.0, 33.4]},
-                "properties": {"kind": "land", "deal_id": "LAND-PHX-0002", "universe_id": ""},
-            }
-        ]
+    def test_one_open_covered_market_id_fails_with_no_exception(self):
+        features = [self._point("LAND-PHX-0002", "PHX")]
         problems = universe_gap_problems(features)
         self.assertEqual(len(problems), 1)
         self.assertIn("LAND-PHX-0002", problems[0])
         self.assertIn("- LAND-PHX-0002", "\n".join(universe_gap_lines(features)))
+
+    def test_a_deal_id_does_not_invent_a_covered_market(self):
+        features = [self._point("LAND-PHX-0043", "UNK", coordinates=[-112.1, 33.49])]
+        self.assertEqual(universe_gap_problems(features), [])
+        text = "\n".join(universe_gap_lines(features))
+        self.assertIn("- LAND-PHX-0043 (UNK)", text)
+        self.assertIn("Located LAS, PHX, and MIA deals without a Universe row: 0.", text)
 
     def test_an_unlocated_deal_stays_out_of_the_gate(self):
         features = [
             {
                 "type": "Feature",
                 "geometry": None,
-                "properties": {"kind": "pipeline", "deal_id": "PIPE-PHX-9998", "universe_id": ""},
+                "properties": {"kind": "pipeline", "deal_id": "PIPE-PHX-9998", "city": "PHX", "universe_id": ""},
             }
         ]
         self.assertEqual(universe_gap_problems(features), [])
         text = "\n".join(universe_gap_lines(features))
         self.assertNotIn("PIPE-PHX-9998", text)
-        self.assertIn("Located deals without a Universe row: 0.", text)
+        self.assertIn("Located LAS, PHX, and MIA deals without a Universe row: 0.", text)
 
-    def test_a_blank_deal_id_fails(self):
+    def test_a_blank_deal_id_in_a_covered_market_fails(self):
         features = [
             {
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [-80.2, 26.0]},
-                "properties": {"kind": "land", "deal_id": "  ", "universe_id": ""},
+                "properties": {"kind": "land", "deal_id": "  ", "city": "MIA", "universe_id": ""},
             }
         ]
         problems = universe_gap_problems(features)
         self.assertTrue(any("no deal id" in item for item in problems))
+
+    def test_a_blank_deal_id_outside_the_covered_markets_does_not_fail(self):
+        features = [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [-117.9, 33.65]},
+                "properties": {"kind": "pipeline", "deal_id": "  ", "city": "SNA", "universe_id": ""},
+            }
+        ]
+        self.assertEqual(universe_gap_problems(features), [])
 
 
 if __name__ == "__main__":

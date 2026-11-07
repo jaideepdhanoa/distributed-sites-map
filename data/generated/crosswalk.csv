@@ -3136,7 +3136,7 @@ PIPE-SNA-0002,Pipeline,SNA 4200 Birch St
 PHX-U432,Pipeline,PHX 16843 N 43rd Ave
 PHX-U274,Pipeline,PHX 1220 N Horne
 PHX-U435,Pipeline,PHX 515 E Union Hills Dr
-PIPE-PHX-0006,Pipeline,"PHX Flex-serve wash, northeast Phoenix"
+PIPE-PHX-0006,Pipeline,PIPE-PHX-0008
 PHX-U346,Pipeline,PHX 3510 W Cactus Rd
 PIPE-PHX-0008,Pipeline,"PHX Auto repair, Maricopa County"
 PIPE-PHX-0009,Pipeline,"PHX Auto service, Mesa"
@@ -3199,3 +3199,4 @@ PHX-U501,Land Sites,PHX 1905 W Baseline Rd
 WB-PHX-0029,Land Sites,PHX 2725 N 35th Ave
 WB-LAS-0028,Land Sites,LAS 8355 Dean Martin Dr
 WB-MIA-0015,Land Sites,MIA 19045 NW 2nd Ave
+LAND-PHX-0050,Land Sites,PHX 1616 E Portland St (land)

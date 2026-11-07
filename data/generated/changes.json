@@ -1,9 +1,32 @@
 {
-  "new_sites": 0,
+  "new_sites": 1,
   "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 0,
-  "sample_new": [],
+  "stage_moves": 4,
+  "sample_new": [
+    "LAND-PHX-0050"
+  ],
   "sample_verdicts": [],
-  "sample_stages": []
+  "sample_stages": [
+    {
+      "site_id": "WB-PHX-0015",
+      "before": "Dropped",
+      "after": "Financial screen"
+    },
+    {
+      "site_id": "PIPE-MIA-0082",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-MIA-0082",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "deal_id": "LAND-PHX-0003",
+      "before": "Dropped",
+      "after": "Financial screen"
+    }
+  ]
 }

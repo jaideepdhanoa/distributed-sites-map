@@ -720,6 +720,41 @@
       "type": "materials",
       "at": "2026-11-06T22:43:26.051Z",
       "summary": "Property and legal count is now 3."
+    },
+    {
+      "id": "price:PIPE-LAS-0071:2026-11-07T23:41:18.738Z:$3,500,000",
+      "siteId": "PIPE-LAS-0071",
+      "type": "price",
+      "at": "2026-11-07T23:41:18.738Z",
+      "summary": "Asking price is $3,500,000, from Ian Walker, NRC Realty & Capital Advisors."
+    },
+    {
+      "id": "price:PIPE-MIA-0012:2026-11-07T23:41:18.738Z:$1,350,000",
+      "siteId": "PIPE-MIA-0012",
+      "type": "price",
+      "at": "2026-11-07T23:41:18.738Z",
+      "summary": "Asking price is $1,350,000, from Maria Lorena L Gonzalez, Florida Realty of Miami Corp."
+    },
+    {
+      "id": "stage:PIPE-MIA-0082:2026-11-07T23:41:18.738Z:Dropped",
+      "siteId": "PIPE-MIA-0082",
+      "type": "stage",
+      "at": "2026-11-07T23:41:18.738Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "price:PIPE-PHX-0006:2026-11-07T23:41:18.738Z:not listed",
+      "siteId": "PIPE-PHX-0006",
+      "type": "price",
+      "at": "2026-11-07T23:41:18.738Z",
+      "summary": "Asking price is not listed, from PHX Auto repair, Maricopa County."
+    },
+    {
+      "id": "price:PIPE-PHX-0085:2026-11-07T23:41:18.738Z:$4,000,000",
+      "siteId": "PIPE-PHX-0085",
+      "type": "price",
+      "at": "2026-11-07T23:41:18.738Z",
+      "summary": "Asking price is $4,000,000, from Cushman & Wakefield."
     }
   ],
   "baseline": [
@@ -780,7 +815,7 @@
       "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$3,500,000",
-      "askingSource": "Ian Walker",
+      "askingSource": "Ian Walker, NRC Realty & Capital Advisors",
       "active": false
     },
     {
@@ -810,7 +845,7 @@
       "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$1,350,000",
-      "askingSource": "Not shown",
+      "askingSource": "Maria Lorena L Gonzalez, Florida Realty of Miami Corp",
       "active": false
     },
     {
@@ -886,12 +921,12 @@
     {
       "id": "PIPE-MIA-0082",
       "city": "MIA",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$550,000",
       "askingSource": "Roger Pardo",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0001",
@@ -935,12 +970,12 @@
     },
     {
       "id": "PIPE-PHX-0006",
-      "city": "PHX",
+      "city": "12.0",
       "stage": "Dropped",
       "stageGroup": "dropped",
       "verdict": "",
-      "askingPrice": "$725,000",
-      "askingSource": "Car Wash Brokers Inc",
+      "askingPrice": "",
+      "askingSource": "PHX Auto repair, Maricopa County",
       "active": false
     },
     {
@@ -1069,7 +1104,7 @@
       "stage": "1 Desk screen",
       "stageGroup": "desk",
       "verdict": "",
-      "askingPrice": "",
+      "askingPrice": "$4,000,000",
       "askingSource": "Cushman & Wakefield",
       "active": true
     },

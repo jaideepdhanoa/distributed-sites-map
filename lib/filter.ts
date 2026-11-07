@@ -64,13 +64,17 @@ export function landFit(site: SiteProps): boolean {
 const SQFT_PER_ACRE = 43560;
 
 /** Spare square feet from the acre figure the list shows. Blank stays unmatched. */
+export function spareTier(site: { spare_ac_own?: number | null }): "L10" | "L4" | null {
+  if (site.spare_ac_own == null || !Number.isFinite(site.spare_ac_own)) return null;
+  const sqft = site.spare_ac_own * SQFT_PER_ACRE;
+  if (sqft + 1e-6 >= 10_000) return "L10";
+  if (sqft + 1e-6 >= 4_000) return "L4";
+  return null;
+}
+
 export function matchesLandTier(site: { spare_ac_own?: number | null }, tier: string): boolean {
   if (!tier || tier === "any") return true;
-  if (site.spare_ac_own == null || !Number.isFinite(site.spare_ac_own)) return false;
-  const sqft = site.spare_ac_own * SQFT_PER_ACRE;
-  if (tier === "L10") return sqft + 1e-6 >= 10_000;
-  if (tier === "L4") return sqft + 1e-6 >= 4_000 && sqft < 10_000;
-  return false;
+  return spareTier(site) === tier;
 }
 
 // Universe funnel. The first step is one pin per place after census records are merged.

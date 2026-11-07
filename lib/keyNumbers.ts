@@ -3,6 +3,14 @@ import type { DealProps, SiteProps } from "./types";
 function shortRoad(value?: string | null) {
   let text = (value || "").trim().replace(/\s+/g, " ").replace(/^07\s+/, "");
   if (!text) return "";
+  text = text.replace(/\(([^)]*)\)/g, (_, inner: string) => {
+    const parts = inner.split(/\s+to\s+/i);
+    const kept = parts.map((part) => part.trim()).filter((part) => part && !/^n\/a$/i.test(part));
+    if (!kept.length) return "";
+    if (kept.length < parts.length) return ` (${kept.join(" to ")})`;
+    return ` (${inner.trim()})`;
+  }).replace(/\s+/g, " ").trim();
+  if (!text) return "";
   text = text.replace(/\bI\s+0*(\d+)\b/i, (_, number) => `I-${Number(number)}`);
   text = text.replace(/\bSR\s*0*(\d+)\b/i, (_, number) => `SR-${Number(number)}`);
   return text.split(" ").map((word) => {
@@ -257,6 +265,26 @@ export function pillText(deal: DealProps, mode: PinLabel) {
   if (mode === "peracre") return deal.price_per_acre != null ? compactMoney(deal.price_per_acre) : "";
   return "";
 }
+
+/** Label features for the pin-text layer. Per acre never falls back to an acre string. */
+export function dealLabelFeatures<T extends { geometry: { type: string; coordinates: number[] } | null; properties: DealProps }>(
+  deals: T[],
+  mode: PinLabel,
+) {
+  return deals.flatMap((feature) => {
+    if (!feature.geometry) return [];
+    const pill = pillText(feature.properties, mode);
+    if (!pill || /\bac\b/.test(pill) && mode === "peracre") return [];
+    if (!pill) return [];
+    return [{
+      type: "Feature" as const,
+      properties: { pill },
+      geometry: feature.geometry,
+    }];
+  });
+}
+
+export const DEAL_LABEL_FIELD = ["get", "pill"] as const;
 
 function readNumber(params: { get(name: string): string | null }, key: string) {
   const raw = params.get(key);

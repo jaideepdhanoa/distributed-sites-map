@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
-import { matchesLandTier } from "../lib/filter.ts";
-import { capacityFacts, cashTile, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount, workbookTrafficLine } from "../lib/keyNumbers.ts";
+import { matchesLandTier, spareTier } from "../lib/filter.ts";
+import { DEAL_LABEL_FIELD, capacityFacts, cashTile, dealLabelFeatures, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount, workbookTrafficLine } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -60,6 +60,18 @@ assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display
 assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "acres"), "1.42 ac");
 assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "peracre"), "$775K");
 assert.equal(pillText(deal({ land_acres: 1.64, price_per_acre: null, price_per_acre_display: "" }), "peracre"), "");
+const labels = dealLabelFeatures([
+  { geometry: { type: "Point", coordinates: [-112.1, 33.4] }, properties: deal({ deal_id: "A", land_acres: 1.42, price_per_acre: 774648 }) },
+  { geometry: { type: "Point", coordinates: [-112.2, 33.5] }, properties: deal({ deal_id: "B", land_acres: 1.64, price_per_acre: null }) },
+], "peracre");
+assert.deepEqual(labels.map((feature) => feature.properties.pill), ["$775K"]);
+assert.equal(labels.some((feature) => feature.properties.pill.includes(" ac")), false);
+assert.equal(DEAL_LABEL_FIELD[0], "get");
+assert.equal(DEAL_LABEL_FIELD[1], "pill");
+assert.equal(spareTier({ spare_ac_own: 0 }), null);
+assert.equal(spareTier({ spare_ac_own: 0.2 }), "L4");
+assert.equal(workbookTrafficLine(deal({ trade_aadt: 46000, trade_aadt_road: "86000042 (N/A to N/A)", trade_aadt_m: 335 })).includes("n/a"), false);
+assert.match(workbookTrafficLine(deal({ trade_aadt: 46000, trade_aadt_road: "86000042 (N/A to N/A)", trade_aadt_m: 335 })), /86000042/);
 assert.equal(matchesLandTier({ spare_ac_own: 0 }, "L4"), false);
 assert.equal(matchesLandTier({ spare_ac_own: 0.2 }, "L4"), true);
 assert.equal(matchesLandTier({ spare_ac_own: null }, "L4"), false);

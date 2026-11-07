@@ -13,7 +13,7 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
-import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, matchesLandTier, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
+import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, matchesLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
@@ -73,6 +73,12 @@ export default function Explorer() {
     window.addEventListener("resize", applyDrawerWidth);
     return () => window.removeEventListener("resize", applyDrawerWidth);
   }, [applyDrawerWidth]);
+  useEffect(() => {
+    const shell = shellRef.current;
+    const bar = shell?.querySelector(".bar");
+    if (!shell || !bar) return;
+    shell.style.setProperty("--bar-h", `${bar.getBoundingClientRect().height}px`);
+  });
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
@@ -741,7 +747,7 @@ export default function Explorer() {
       type: site.business_type || "Car wash",
       city: site.city,
       stage: plainVerdict(site.verdict),
-      tier: tierLabel(site.land_tier) || "",
+      tier: tierLabel(spareTier(site)) || "",
       spare: site.spare_ac_own != null ? `${site.spare_ac_own} ac` : "",
       grade: capacitySummary(factsForSite(site, dealForSite(site))),
       zoning: site.zoning || "",
@@ -760,7 +766,7 @@ export default function Explorer() {
       type: deal.business_type || "Other",
       city: deal.city,
       stage: stageDetail(deal.stage, deal.stage_group),
-      tier: linked ? tierLabel(linked.land_tier) || "" : "",
+      tier: linked ? tierLabel(spareTier(linked)) || "" : "",
       spare: linked?.spare_ac_own != null ? `${linked.spare_ac_own} ac` : "",
       grade: capacitySummary(factsForDeal(deal)),
       zoning: linked?.zoning || "",

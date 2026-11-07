@@ -1,4 +1,5 @@
 import { listingCue } from "@/lib/format";
+import { spareTier } from "@/lib/filter";
 import { AREA_KIND_LABEL, STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 import { acresText, depotLine, openLandText } from "@/lib/keyNumbers";
 
@@ -43,8 +44,9 @@ export function siteTip(props: Record<string, unknown>, offMarket = false): TipM
   if (props.listed) {
     marks.push({ swatch: "listing", label: STATUS_NOTES.find((item) => item.id === "listing")!.label });
   }
-  const tier = tierLabel(text(props.land_tier));
-  if (tier) marks.push({ swatch: props.land_tier === "L10" ? "l10" : "l4", label: tier });
+  const tierCode = spareTier({ spare_ac_own: typeof props.spare_ac_own === "number" ? props.spare_ac_own : null });
+  const tier = tierLabel(tierCode);
+  if (tier) marks.push({ swatch: tierCode === "L10" ? "l10" : "l4", label: tier });
   return { title: siteName(props), marks, extra: text(props.business_type) };
 }
 

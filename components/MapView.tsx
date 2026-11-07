@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
-import { pillText, publicDeal, type PinLabel } from "@/lib/keyNumbers";
+import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 
 type Props = {
@@ -144,6 +144,7 @@ export default function MapView(props: Props) {
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterRadius: 48, clusterMaxZoom: 11 },
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          "deal-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           unscreened: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -345,17 +346,14 @@ export default function MapView(props: Props) {
           {
             id: "deal-pills",
             type: "symbol",
-            source: "deals",
-            filter: ["all", ["has", "pill"], ["!=", ["get", "pill"], ""]],
+            source: "deal-labels",
             layout: {
               "text-field": ["get", "pill"],
               "text-font": ["Noto Sans Regular"],
               "text-size": 12,
-              "text-offset": [0, 1.45],
+              "text-offset": [0, 1.6],
               "text-anchor": "top",
-              "text-allow-overlap": false,
-              "text-optional": true,
-              "text-padding": 4,
+              "text-allow-overlap": true,
             },
             paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 8 },
           },
@@ -655,14 +653,32 @@ export default function MapView(props: Props) {
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });
       (map.getSource("deals") as GeoJSONSource).setData({
         type: "FeatureCollection",
-        features: props.deals.filter((feature) => feature.geometry).map((feature) => {
-          const pill = pillText(feature.properties, props.pinLabel || "none");
-          return {
-            ...feature,
-            id: `${feature.properties.deal_id}:${pill}`,
-            properties: { ...publicDeal(feature.properties), pill },
-          };
-        }),
+        features: props.deals.filter((feature) => feature.geometry).map((feature) => ({
+          ...feature,
+          properties: publicDeal(feature.properties),
+        })),
+      });
+      const labelData = {
+        type: "FeatureCollection" as const,
+        features: dealLabelFeatures(props.deals, props.pinLabel || "none"),
+      };
+      // Rebuild the label layer so a mode change cannot keep the previous acre text.
+      if (map.getLayer("deal-pills")) map.removeLayer("deal-pills");
+      if (map.getSource("deal-labels")) map.removeSource("deal-labels");
+      map.addSource("deal-labels", { type: "geojson", data: labelData });
+      map.addLayer({
+        id: "deal-pills",
+        type: "symbol",
+        source: "deal-labels",
+        layout: {
+          "text-field": ["get", "pill"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 12,
+          "text-offset": [0, 1.6],
+          "text-anchor": "top",
+          "text-allow-overlap": true,
+        },
+        paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 8 },
       });
       (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });

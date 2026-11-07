@@ -338,8 +338,24 @@ span.listing-link.muted {
   .search { max-width: 180px; }
 }
 @media (min-width: 768px) {
-  .shell.list-open.filters-open .list-pane { left: min(380px, 42vw); }
-  .shell.list-open.filters-open .popover { left: 12px; right: auto; width: min(360px, 40vw); }
+  .shell.list-open.filters-open {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+  .shell.list-open.filters-open > .bar { grid-column: 1 / -1; grid-row: 1; }
+  .shell.list-open.filters-open > .map-stage { grid-column: 2; grid-row: 2; min-width: 0; }
+  .shell.list-open.filters-open .popover[aria-label="Filters"] {
+    position: fixed;
+    left: 0;
+    top: var(--bar-h, 7.5rem);
+    bottom: 0;
+    width: 320px;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    border-right: 1px solid var(--line);
+    z-index: 4;
+  }
+  .shell.list-open.filters-open .list-pane { left: 0; right: 0; }
 }
 .word {
   display: flex;
@@ -548,10 +564,10 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-sort { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .list-sort select { max-width: 46vw; height: 36px; }
 .list-scroll { flex: 1; min-width: 0; overflow: auto; }
-.list-table { border-collapse: collapse; width: 100%; table-layout: auto; font-size: 13px; }
-.list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: anywhere; max-width: 18rem; }
-.list-table th:first-child, .list-table td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; max-width: 16rem; }
-.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: normal; text-align: left; }
+.list-table { border-collapse: collapse; width: max-content; min-width: 100%; table-layout: auto; font-size: 13px; }
+.list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: break-word; word-break: normal; min-width: 6.5rem; max-width: 18rem; }
+.list-table th:first-child, .list-table td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; min-width: 12rem; max-width: 18rem; }
+.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: normal; text-align: left; overflow-wrap: break-word; word-break: normal; }
 .list-table tr.on td { background: #e7f0ea; }
 .list-cards { display: none; list-style: none; margin: 0; padding: 0; }
 .list-cards li { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 8px 12px; }

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-06T22:41:35Z",
+  "generated_at": "2026-11-07T05:49:08Z",
   "census_rows": {
     "total": 1737,
     "by_city": {
@@ -142,8 +142,8 @@
   "pipeline_rows": 36,
   "land_rows": 32,
   "pipeline_stage_counts": {
-    "Dropped": 22,
-    "1 Desk screen": 12,
+    "Dropped": 23,
+    "1 Desk screen": 11,
     "2 Financial screen": 2
   },
   "land_stage_counts": {
@@ -252,7 +252,7 @@
         "city": "MIA",
         "kind": "pipeline",
         "label": "MIA Clean Get Away Car Wash, Pembroke Pines, FL (street address to confirm)",
-        "stage": "1 Desk screen"
+        "stage": "Dropped"
       }
     ],
     "pipeline_by_city": {
@@ -262,13 +262,13 @@
       "MIA": 9
     },
     "pipeline_by_stage": {
-      "Dropped": 22,
-      "1 Desk screen": 12,
+      "Dropped": 23,
+      "1 Desk screen": 11,
       "2 Financial screen": 2
     },
     "pipeline_by_group": {
-      "dropped": 22,
-      "desk": 12,
+      "dropped": 23,
+      "desk": 11,
       "financial": 2
     },
     "land_by_city": {
@@ -287,16 +287,16 @@
           "without_link": 4
         },
         "SNA": {
-          "with_link": 0,
-          "without_link": 1
+          "with_link": 1,
+          "without_link": 0
         },
         "LAS": {
           "with_link": 8,
           "without_link": 0
         },
         "MIA": {
-          "with_link": 7,
-          "without_link": 2
+          "with_link": 8,
+          "without_link": 1
         }
       },
       "land": {
@@ -313,12 +313,12 @@
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 53,
-      "listed_sites": 78
+      "listed_sites_with_link": 52,
+      "listed_sites": 75
     },
     "source_lines": {
-      "broker-listed": 61,
-      "broker": 7
+      "broker-listed": 63,
+      "broker": 5
     }
   },
   "off_market": {
@@ -535,7 +535,7 @@
       },
       "traffic_by_city": {
         "LAS": 41,
-        "MIA": 557,
+        "MIA": 558,
         "PHX": 259
       },
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
@@ -554,7 +554,7 @@
     "Census row count is 1737, workbook expectation was 1,701.",
     "Unique sites are 1693 {'LAS': 429, 'PHX': 573, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
     "In-area city split is {'LAS': 186, 'PHX': 270, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
-    "Pipeline tab has 36 rows (stages {'Dropped': 22, '1 Desk screen': 12, '2 Financial screen': 2}). The older note of 79 is not in this export."
+    "Pipeline tab has 36 rows (stages {'Dropped': 23, '1 Desk screen': 11, '2 Financial screen': 2}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -571,10 +571,21 @@
     "new_sites": 0,
     "removed_sites": 0,
     "verdict_changes": 0,
-    "stage_moves": 0,
+    "stage_moves": 2,
     "sample_new": [],
     "sample_verdicts": [],
-    "sample_stages": []
+    "sample_stages": [
+      {
+        "site_id": "PIPE-MIA-0082",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      },
+      {
+        "deal_id": "PIPE-MIA-0082",
+        "before": "1 Desk screen",
+        "after": "Dropped"
+      }
+    ]
   },
   "verdicts_appended": 2,
   "verdicts_total": 2662,

@@ -1,8 +1,8 @@
 {
-  "workbook_as_of": "2026-11-06",
+  "workbook_as_of": "2026-11-07",
   "pipeline": {
-    "Dropped": 22,
-    "1 Desk screen": 12,
+    "Dropped": 23,
+    "1 Desk screen": 11,
     "2 Financial screen": 2
   },
   "land": {
@@ -173,7 +173,7 @@
     {
       "deal_id": "PIPE-MIA-0082",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "Dropped"
     },
     {
       "deal_id": "PIPE-PHX-0083",

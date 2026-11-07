@@ -2,8 +2,19 @@
   "new_sites": 0,
   "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 0,
+  "stage_moves": 2,
   "sample_new": [],
   "sample_verdicts": [],
-  "sample_stages": []
+  "sample_stages": [
+    {
+      "site_id": "PIPE-MIA-0082",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-MIA-0082",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    }
+  ]
 }

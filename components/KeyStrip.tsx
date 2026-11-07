@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Banknote, Gauge, LandPlot, MapPin, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps } from "@/lib/types";
-import { basisLabel, cashTile, depotLine, factsForDeal, fullMoney, openLandText, peerNote, tileAmount, type CapacityFact } from "@/lib/keyNumbers";
+import { basisLabel, baysLine, cashTile, depotLine, factsForDeal, fullMoney, openLandText, peerNote, tileAmount, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { shownPriceSource } from "@/lib/format";
 
 function CountUp({ value }: { value: string }) {
@@ -100,13 +100,16 @@ export default function KeyStrip({
       ? tileAmount(deal.stated_revenue, deal.stated_revenue_display)
       : { text: cash.value, title: cash.value };
   const facts = factsForDeal(deal);
+  const bays = baysLine(deal);
+  const traffic = workbookTrafficLine(deal);
+  const trade = tradeAreaLines(deal);
   return (
     <section className="key-strip" data-testid="key-strip">
       <div className="metrics">
         <Metric icon={Wallet} label="Asking" value={askingTile.text} title={askingTile.title} note={shownPriceSource(deal) || (deal.asking_price_display ? "Listing" : "")} basis={deal.asking_price_display ? "Broker-stated" : ""} />
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
         <Metric icon={Ruler} label="Per acre" value={perAcreTile.text} title={perAcreTile.title} note={rank?.label || (deal.land_acres_basis === "Unknown" ? "From the listing acreage" : deal.land_acres != null ? "From the acreage on file" : "")} />
-        <Metric icon={Trees} label="Open land" value={openTile.text} title={openTile.title} note={deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet"} basis={deal.open_land_sqft != null ? "Estimated" : ""} />
+        <Metric icon={Trees} label="Open land" value={openTile.text} title={openTile.title} note={[deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet", bays].filter(Boolean).join(" · ")} basis={deal.open_land_sqft != null ? "Estimated" : ""} />
         <article className={facts.length > 1 ? "wide" : ""}>
           <span><Gauge size={15} strokeWidth={1.75} aria-hidden="true" /> Site capacity</span>
           <CapacityFacts facts={facts} />
@@ -114,6 +117,12 @@ export default function KeyStrip({
         <Metric icon={MapPin} label="Depot" value={depotLine(deal.miles_to_depot, hasPin)} note={hasPin ? "straight line" : ""} />
         <Metric icon={Banknote} label={deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"} value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
       </div>
+      {traffic || trade.length ? (
+        <div className="trade-area" data-testid="trade-area">
+          {traffic ? <p>{traffic}</p> : null}
+          {trade.map((line) => <p key={line}>{line}</p>)}
+        </div>
+      ) : null}
       {rank ? (
         <div className="rank-bar" title={rank.label}>
           <span>Asking per acre</span>

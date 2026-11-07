@@ -61,6 +61,18 @@ export function landFit(site: SiteProps): boolean {
   return site.land_tier === "L10" || site.land_tier === "L4";
 }
 
+const SQFT_PER_ACRE = 43560;
+
+/** Spare square feet from the acre figure the list shows. Blank stays unmatched. */
+export function matchesLandTier(site: { spare_ac_own?: number | null }, tier: string): boolean {
+  if (!tier || tier === "any") return true;
+  if (site.spare_ac_own == null || !Number.isFinite(site.spare_ac_own)) return false;
+  const sqft = site.spare_ac_own * SQFT_PER_ACRE;
+  if (tier === "L10") return sqft + 1e-6 >= 10_000;
+  if (tier === "L4") return sqft + 1e-6 >= 4_000 && sqft < 10_000;
+  return false;
+}
+
 // Universe funnel. The first step is one pin per place after census records are merged.
 // Each later step is a subset of the one before it:
 // Universe > In service area > L10/L4 > County-checked > Cleared.

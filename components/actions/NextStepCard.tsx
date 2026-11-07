@@ -293,7 +293,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     body = (
       <>
         <p className="kicker">Next step</p>
-        <p>No next step yet. Propose one — {APPROVER_LABEL} approves before it changes the record.</p>
+        <p>No next step yet. Propose one.</p>
+        <p>{APPROVER_LABEL} approves before it changes the record.</p>
         {writable ? <button type="button" className="propose" onClick={() => setOpen(true)}>+ Propose next step</button> : null}
         <p className="hint">Knock off, bring back, stage move, or a work item — all go through approval.</p>
       </>

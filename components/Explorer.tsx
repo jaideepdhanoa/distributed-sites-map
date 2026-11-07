@@ -13,7 +13,7 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
-import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
+import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, matchesLandTier, nearestDepot, presentSite, type PipeId, type StageId } from "@/lib/filter";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
@@ -362,7 +362,7 @@ export default function Explorer() {
     if (!anyMarket && !allCities && site.city !== city) return false;
     if (query && !matchesQuery(query, siteSearchParts(site))) return false;
     if (loose) return true;
-    if (landTier !== "any" && site.land_tier !== landTier) return false;
+    if (!matchesLandTier(site, landTier)) return false;
     if (verdict !== "any" && (site.verdict || "none") !== verdict) return false;
     if (listed === "yes" && !site.listed) return false;
     if (!typeOn(site.business_type || "Car wash")) return false;
@@ -936,7 +936,7 @@ export default function Explorer() {
   }) : [];
 
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -1001,7 +1001,12 @@ export default function Explorer() {
         ) : null}
         {query.trim().length >= 2 ? (
           <div className="search-hits" role="listbox" aria-label="Search results" data-testid="search-hits">
-            {universeWide || pipelineWide ? <p className="search-note">No matches in this view. Showing matches from every stage and market.</p> : null}
+            {universeWide || pipelineWide ? (
+              <div className="search-wide" data-testid="search-wide">
+                <p className="search-note">No matches in this view. Showing matches from every stage and market.</p>
+                <p className="search-note search-wide-warn">The 0 on this step is this view only. Matches below are from other steps or markets, so the site can still be on the map.</p>
+              </div>
+            ) : null}
             {searchHits.length ? searchHits.map((hit) => (
               <button key={`${hit.kind}-${hit.id}`} type="button" role="option" onClick={() => openHit(hit)}>
                 <span className="hit-title">{hit.title}</span>
@@ -1364,6 +1369,10 @@ export default function Explorer() {
         ) : null}
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
+          coverage={funnel !== "pipeline" && showUniverse ? {
+            listed: visibleFeatures.length,
+            missingPoint: visibleFeatures.filter((feature) => !feature.geometry).length,
+          } : null}
           deals={drawnDeals}
           areas={data.areas.features}
           depots={data.depots.features}

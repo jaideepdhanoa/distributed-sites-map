@@ -130,9 +130,14 @@ class ShippedCounts(unittest.TestCase):
             self.assertTrue(universe_gap_problems(deals))
         else:
             self.assertEqual(universe_gap_problems(deals), [])
-        self.assertEqual(gap["unlocated_without_universe"], 13)
-        by_apn, by_street = universe_match_index([item["properties"] for item in sites])
+        self.assertEqual(gap["unlocated_without_universe"], 14)
         deal_by_id = {item["properties"]["deal_id"]: item["properties"] for item in deals}
+        self.assertEqual(deal_by_id["LAND-PHX-0033"]["universe_id"], "WB-PHX-0016")
+        self.assertEqual(deal_by_id["LAND-PHX-0033"]["open_land_sqft"], 25700)
+        self.assertEqual(deal_by_id["LAND-PHX-0033"]["bays_that_fit"], 55)
+        self.assertIsNone(next(item.get("geometry") for item in deals if item["properties"]["deal_id"] == "LAND-PHX-0050"))
+        self.assertEqual(deal_by_id["LAND-PHX-0050"]["bays_that_fit"], 118)
+        by_apn, by_street = universe_match_index([item["properties"] for item in sites])
         for entry in gap["located_missing"]:
             row = deal_by_id[entry["deal_id"]]
             self.assertIsNone(

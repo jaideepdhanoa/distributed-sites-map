@@ -1,5 +1,5 @@
 import type { DealProps, SiteProps } from "@/lib/types";
-import { acresText, capacitySummary, cashTile, depotLine, factsForDeal, openLandText } from "@/lib/keyNumbers";
+import { acresText, baysLine, capacitySummary, cashTile, depotLine, factsForDeal, openLandText, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
 import { stageDetail } from "@/lib/labels";
 
 export default function CompareTray({
@@ -48,9 +48,12 @@ export default function CompareTray({
                 <p>Land {acresText(deal.land_acres) || "Not provided"}</p>
                 <p>Per acre {deal.price_per_acre_display || "Not provided"}</p>
                 <p>Open land {deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</p>
+                <p>{baysLine(deal) || "Bays that fit not provided"}</p>
                 <p>Site capacity {capacitySummary(factsForDeal(deal))}</p>
+                <p>{workbookTrafficLine(deal) || "Traffic count not provided"}</p>
+                {tradeAreaLines(deal).map((line) => <p key={line}>{line}</p>)}
+                <p>Cash flow {cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>
                 <p>Depot {depotLine(deal.miles_to_depot, deal.miles_to_depot != null)}</p>
-                <p>Cash flow {cash.value}</p>
               </article>
             );
           })}
@@ -60,6 +63,7 @@ export default function CompareTray({
               <p>{site.address}</p>
               <p>{site.owner || "Owner not on file"}</p>
               <p>{site.zoning || "Zoning not on file"}</p>
+              <p>{universeTrafficLine(site) || "Traffic count not on the universe row"}</p>
             </article>
           ))}
         </div>

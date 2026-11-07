@@ -337,6 +337,10 @@ span.listing-link.muted {
   .shell.table-open { grid-template-rows: auto 1fr 200px; }
   .search { max-width: 180px; }
 }
+@media (min-width: 768px) {
+  .shell.list-open.filters-open .list-pane { left: min(380px, 42vw); }
+  .shell.list-open.filters-open .popover { left: 12px; right: auto; width: min(360px, 40vw); }
+}
 .word {
   display: flex;
   align-items: center;
@@ -407,6 +411,24 @@ span.listing-link.muted {
 .search-hits .hit-title { font-weight: 650; }
 .search-hits .hit-meta { color: var(--muted); }
 .search-note { margin: 2px 8px; color: var(--muted); font-size: 13px; }
+.search-wide-warn { color: var(--ink); font-weight: 650; }
+.trade-area { margin-top: 8px; display: grid; gap: 2px; }
+.trade-area p { margin: 0; font-size: 13px; }
+.map-coverage {
+  position: absolute;
+  z-index: 4;
+  left: 12px;
+  bottom: 28px;
+  max-width: min(440px, calc(100% - 24px));
+  margin: 0;
+  background: #faf7f1;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.35;
+}
 .party-filter {
   width: 100%;
   border: 1px solid var(--line);
@@ -526,10 +548,10 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-sort { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .list-sort select { max-width: 46vw; height: 36px; }
 .list-scroll { flex: 1; min-width: 0; overflow: auto; }
-.list-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 13px; }
-.list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: top; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.list-table th:first-child, .list-table td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; }
-.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.list-table { border-collapse: collapse; width: 100%; table-layout: auto; font-size: 13px; }
+.list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: anywhere; max-width: 18rem; }
+.list-table th:first-child, .list-table td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; max-width: 16rem; }
+.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: normal; text-align: left; }
 .list-table tr.on td { background: #e7f0ea; }
 .list-cards { display: none; list-style: none; margin: 0; padding: 0; }
 .list-cards li { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 8px 12px; }
@@ -677,13 +699,13 @@ tr { cursor: pointer; }
   .only-desktop { display: none !important; }
   .only-mobile { display: inline-flex !important; }
   .city-pick.only-mobile { display: block !important; }
-  .map-switch.only-desktop { display: inline-flex !important; }
   .mobile-search { display: block !important; width: 100%; max-width: none; height: 44px; margin-top: 6px; }
-  .bar { padding: 6px 8px; }
-  .top { height: 48px; }
-  .funnel-row { flex-wrap: nowrap; height: 40px; min-height: 0; overflow: hidden; }
-  .funnel { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
-  .funnel button, .funnel .sub, .funnel .aside { min-height: 32px; height: 32px; align-items: center; padding-top: 0; padding-bottom: 0; }
+  .bar { padding: 6px 8px; overflow: visible; }
+  .top { height: auto; min-height: 44px; flex-wrap: wrap; row-gap: 6px; }
+  .top .review-launch, .top .icon-btn, .top .city-pick { flex: none; }
+  .funnel-row { flex-wrap: wrap; height: auto; min-height: 40px; overflow: visible; align-items: flex-start; }
+  .funnel, .funnel.compact { flex-wrap: wrap; overflow: visible; height: auto; flex: 1 1 100%; }
+  .funnel button, .funnel .sub, .funnel .aside { min-height: 32px; height: auto; align-items: center; padding-top: 4px; padding-bottom: 4px; white-space: normal; }
   .summary-chip { display: none; }
   .summary-chip.as-of {
     display: inline-flex;

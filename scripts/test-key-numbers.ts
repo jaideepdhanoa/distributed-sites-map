@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
-import { capacityFacts, cashTile, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount } from "../lib/keyNumbers.ts";
+import { matchesLandTier } from "../lib/filter.ts";
+import { capacityFacts, cashTile, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount, workbookTrafficLine } from "../lib/keyNumbers.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -54,6 +55,20 @@ const note = peerNote(rows[1], rows);
 assert.equal(note?.label, "1st lowest of 2 Phoenix pipeline");
 
 assert.equal(cashTile(deal({ figures_status: "withheld" })).value, "Package figures not shown");
+assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received", figures_status: "shown" })).value, "-$121,000");
+assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).note, "EBITDA · Package Received");
+assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "acres"), "1.42 ac");
+assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "peracre"), "$775K");
+assert.equal(pillText(deal({ land_acres: 1.64, price_per_acre: null, price_per_acre_display: "" }), "peracre"), "");
+assert.equal(matchesLandTier({ spare_ac_own: 0 }, "L4"), false);
+assert.equal(matchesLandTier({ spare_ac_own: 0.2 }, "L4"), true);
+assert.equal(matchesLandTier({ spare_ac_own: null }, "L4"), false);
+assert.equal(growthText(-0.0557), "-5.57%");
+assert.match(workbookTrafficLine(deal({ trade_aadt: 840, trade_aadt_road: "07  SOUTHERN AVE", trade_aadt_m: 58, trade_aadt_max: 27012 })), /840 vehicles\/day/);
+assert.match(workbookTrafficLine(deal({ trade_aadt: 840, trade_aadt_road: "07  SOUTHERN AVE", trade_aadt_m: 58, trade_aadt_max: 27012 })), /Workbook trade area/);
+const load = capacityFacts({ cap_d_peak: 108, cap_d_year: 192720 }, "deal")[0].lines.join(" ");
+assert.match(load, /108 kW/);
+assert.match(load, /192,720 kWh\/year/);
 assert.equal(cashTile(deal({ figures_status: "shown", stated_cash_flow_display: "$400,000", cash_multiple_display: "6.2x cash flow", figures_basis: "Claimed", figures_source: "BizBuySell listing" })).extra, "6.2x cash flow");
 assert.deepEqual(tileAmount(4990000, "$4,990,000"), { text: "$4.99M", title: "$4,990,000" });
 assert.deepEqual(tileAmount(7000000, "$7,000,000"), { text: "$7M", title: "$7,000,000" });

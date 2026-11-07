@@ -1056,6 +1056,80 @@ def apply_gap_fills(sites: list[dict]) -> dict:
     return counts
 
 
+def row_is_data(row: dict) -> bool:
+    """A blank first cell is not an empty row when a Site ID or measure is filled in.
+
+    Land rows have been entered with the name cells empty and the id in a later column.
+    """
+    if any(str(row.get(key) or "").strip() for key in ("Site", "Name", "Site ID", "APN or folio")):
+        return True
+    for key in ("Asking price ($)", "Spare area (sq ft)", "Land (acres)"):
+        if row.get(key) not in (None, ""):
+            return True
+    return False
+
+
+def deal_place_label(row: dict) -> str:
+    """Street label for a deal. A listing URL can carry the street when the name cells are blank."""
+    site = str(row.get("Site") or "").strip()
+    if site:
+        return site
+    name = str(row.get("Name") or "").strip()
+    if name:
+        return name
+    url = str(row.get("Listing link") or "")
+    match = re.search(r"/Listing/([^/?#]+)", url, re.I)
+    if not match:
+        return ""
+    slug = re.sub(r"-(?:AZ|NV|FL|Phoenix|Miami|Las-Vegas).*$", "", match.group(1), flags=re.I)
+    text = slug.replace("-", " ").strip()
+    if not re.search(r"\d", text):
+        return ""
+    return text
+
+
+def distinct_pipeline_names(sites: list[dict], features: list[dict]) -> int:
+    """Prefer a pipeline name when two universe rows share one name at different addresses.
+
+    The sheet sometimes copies one business name onto another address. A pipeline name that
+    is not that copy is the name already typed on the pipeline row.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for site in sites:
+        if site.get("origin") != "universe":
+            continue
+        key = re.sub(r"[^a-z0-9]", "", str(site.get("name") or "").lower())
+        if key:
+            grouped.setdefault(key, []).append(site)
+    deals_for: dict[str, list[dict]] = {}
+    for feature in features:
+        props = feature.get("properties") or {}
+        uid = str(props.get("universe_id") or "")
+        if uid:
+            deals_for.setdefault(uid, []).append(props)
+    changed = 0
+    for group in grouped.values():
+        addresses = {re.sub(r"[^a-z0-9]", "", str(site.get("address") or "").lower()) for site in group}
+        if len(group) < 2 or len(addresses) < 2:
+            continue
+        shared = re.sub(r"[^a-z0-9]", "", str(group[0].get("name") or "").lower())
+        for site in group:
+            linked = deals_for.get(site.get("site_id") or "") or []
+            linked.sort(key=lambda props: 0 if props.get("kind") == "pipeline" else 1)
+            if not linked:
+                continue
+            deal_name = str(linked[0].get("name") or "").strip()
+            deal_key = re.sub(r"[^a-z0-9]", "", deal_name.lower())
+            # A pipeline row titled with its street is not a different business name.
+            if re.search(r"\d", deal_name):
+                continue
+            if not deal_key or deal_key == shared or deal_key in shared or shared in deal_key:
+                continue
+            site["name"] = deal_name[:160]
+            changed += 1
+    return changed
+
+
 def sheet_rows(path: Path, sheet: str, header_row: int) -> list[dict]:
     """Read a sheet, including hyperlink targets that are not in the cell text."""
     wb = openpyxl.load_workbook(path, read_only=False, data_only=True)
@@ -1065,7 +1139,7 @@ def sheet_rows(path: Path, sheet: str, header_row: int) -> list[dict]:
     header = [str(cell.value).strip() if cell.value is not None else "" for cell in rows[header_row]]
     out = []
     for offset, row in enumerate(rows[header_row + 1 :]):
-        if not row or row[0].value in (None, ""):
+        if not row:
             continue
         item = {"_excel_row": header_row + offset + 2}
         links: list[tuple[str, str]] = []
@@ -1079,6 +1153,8 @@ def sheet_rows(path: Path, sheet: str, header_row: int) -> list[dict]:
                 target = str(cell.hyperlink.target).strip()
             if target:
                 links.append((key, target))
+        if not row_is_data(item):
+            continue
         item["_links"] = links
         out.append(item)
     return out
@@ -2243,7 +2319,7 @@ def deal_text_problems(deal_id: str, props: dict) -> list[str]:
 
 
 def _geocode_query(row: dict) -> str:
-    label = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", str(row.get("Site") or "").strip(), flags=re.I)
+    label = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", deal_place_label(row), flags=re.I)
     if not label or "address to come" in label.lower():
         return ""
     # A house number may sit after a business name. Leads with no street number stay unplaced.
@@ -2388,7 +2464,7 @@ def build_deal_layer(
 
     def match_row(row: dict) -> str | None:
         city = str(row.get("Market") or "").strip()
-        return match_workbook_site(city, row.get("APN or folio"), str(row.get("Site") or ""), by_apn, by_street)
+        return match_workbook_site(city, row.get("APN or folio"), deal_place_label(row), by_apn, by_street)
 
     features = []
     failed = []
@@ -2397,9 +2473,13 @@ def build_deal_layer(
     for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
         for index, row in enumerate(rows, start=1):
             city = str(row.get("Market") or "").strip() or "UNK"
-            label = str(row.get("Site") or "").strip()
+            label = deal_place_label(row)
             deal_id = shipped_deal_id(row, kind, index, reg)
             universe_id = match_row(row)
+            if city == "UNK" and universe_id:
+                linked_market = next((item.get("city") for item in sites if item.get("site_id") == universe_id), "")
+                if linked_market in {"PHX", "LAS", "MIA"}:
+                    city = linked_market
             if universe_id:
                 matched += 1
             broker, firm = split_broker(row.get("Broker"))
@@ -2423,7 +2503,15 @@ def build_deal_layer(
                 lon, lat = coords
                 miles = nearest_depot_miles(lon, lat, depots)
             else:
-                failed.append({"deal_id": deal_id, "city": city, "kind": kind, "label": label, "stage": str(row.get("Stage") or "")})
+                linked_site = next((item for item in sites if item.get("site_id") == universe_id), None) if universe_id else None
+                if linked_site and linked_site.get("lat") is not None and linked_site.get("lon") is not None:
+                    lon = float(linked_site["lon"])
+                    lat = float(linked_site["lat"])
+                    coords = (lon, lat)
+                    miles = nearest_depot_miles(lon, lat, depots)
+                    status = "linked site"
+                else:
+                    failed.append({"deal_id": deal_id, "city": city, "kind": kind, "label": label, "stage": str(row.get("Stage") or "")})
             address = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I)
             source = firm or broker or ("Listing" if url else "")
             folder = folder_url_from_row(row)
@@ -2578,6 +2666,7 @@ def build_deal_layer(
         "listed_sites": sum(1 for site in sites if site.get("listed")),
     }
     report["source_lines"] = dict(Counter(item["properties"].get("source_kind") or "" for item in features))
+    distinct_pipeline_names(sites, features)
     return {"type": "FeatureCollection", "features": features}, report
 
 
@@ -4910,7 +4999,7 @@ def display_language_problems(loaded: dict) -> list[str]:
                 # Avenue abbreviations and a business named Power are not the private terms.
                 # A numbered "147 AV" in a traffic note is the same abbreviation.
                 if word == "av" and (
-                    key in {"aadt_road", "address", "name"}
+                    key in {"aadt_road", "trade_aadt_road", "address", "name"}
                     or (
                         key == "research_note"
                         and re.search(r"(?i)\d+\s+av\b", obj[max(0, found.start() - 8) : found.end()])
@@ -4918,7 +5007,7 @@ def display_language_problems(loaded: dict) -> list[str]:
                 ):
                     continue
                 if word == "power" and (
-                    key in {"name", "owner", "also_known_as", "broker", "firm", "address", "aadt_road"}
+                    key in {"name", "owner", "also_known_as", "broker", "firm", "address", "aadt_road", "trade_aadt_road"}
                     or re.search(r"(?i)power[\s-](?:rd|road)\b", obj)
                 ):
                     continue

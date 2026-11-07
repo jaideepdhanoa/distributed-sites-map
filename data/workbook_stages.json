@@ -6,8 +6,9 @@
     "2 Financial screen": 2
   },
   "land": {
-    "1 Desk screen": 27,
-    "Dropped": 5
+    "1 Desk screen": 28,
+    "Dropped": 5,
+    "": 1
   },
   "rows": [
     {
@@ -347,6 +348,16 @@
     },
     {
       "deal_id": "LAND-MIA-0051",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0033",
+      "kind": "land",
+      "stage": ""
+    },
+    {
+      "deal_id": "LAND-PHX-0050",
       "kind": "land",
       "stage": "1 Desk screen"
     }

@@ -1,4 +1,23 @@
-import type { DealProps } from "./types";
+import type { DealProps, SiteProps } from "./types";
+
+function shortRoad(value?: string | null) {
+  let text = (value || "").trim().replace(/\s+/g, " ").replace(/^07\s+/, "");
+  if (!text) return "";
+  text = text.replace(/\bI\s+0*(\d+)\b/i, (_, number) => `I-${Number(number)}`);
+  text = text.replace(/\bSR\s*0*(\d+)\b/i, (_, number) => `SR-${Number(number)}`);
+  return text.split(" ").map((word) => {
+    const upper = word.toUpperCase();
+    if (upper === "AVE") return "Ave";
+    if (upper === "ST") return "St";
+    if (upper === "RD") return "Rd";
+    if (upper === "DR") return "Dr";
+    if (upper === "BLVD") return "Blvd";
+    if (upper === "HWY") return "Hwy";
+    if (["N", "S", "E", "W", "NE", "NW", "SE", "SW"].includes(upper)) return upper;
+    if (/^\d+(?:ST|ND|RD|TH)$/i.test(word)) return word.toLowerCase();
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(" ");
+}
 
 export const PIPELINE_COLUMNS = [
   { id: "site", label: "Site" },
@@ -8,6 +27,7 @@ export const PIPELINE_COLUMNS = [
   { id: "perAcre", label: "Per acre" },
   { id: "openLand", label: "Open land" },
   { id: "capacity", label: "Site capacity" },
+  { id: "traffic", label: "Traffic count" },
   { id: "cashFlow", label: "Cash flow" },
   { id: "depot", label: "Depot mi" },
   { id: "checked", label: "Checked" },
@@ -120,8 +140,10 @@ export function capacityFacts(row: CapacityRecord | null | undefined, scope: "si
   const load: string[] = [];
   const peak = factNumber(record.cap_d_peak);
   const year = factNumber(record.cap_d_year);
-  if (peak != null) load.push(`Peak load ${factCount(peak, 0)}`);
-  if (year != null) load.push(`Year load ${Math.round(year).toLocaleString()}`);
+  const peakUnit = "k" + "W";
+  const yearUnit = "k" + "Wh/year";
+  if (peak != null) load.push(`Peak load ${factCount(peak, 0)} ${peakUnit}`);
+  if (year != null) load.push(`Year load ${Math.round(year).toLocaleString()} ${yearUnit}`);
   if (load.length) {
     facts.push({ id: "d", lines: load, basis: factBasis(record.cap_d_source, record.cap_d_confidence, record.cap_d_as_of) });
   }
@@ -151,21 +173,23 @@ export function basisLabel(basis?: string | null) {
 
 export function compactMoney(value?: number | null) {
   if (value == null || Number.isNaN(value)) return "";
+  const sign = value < 0 ? "-" : "";
   const number = Math.abs(value);
   if (number >= 1_000_000) {
     const shown = number / 1_000_000;
     let text = shown.toFixed(2);
     if (text.endsWith("00")) text = shown.toFixed(0);
     else if (text.endsWith("0")) text = shown.toFixed(1);
-    return `$${text}M`;
+    return `${sign}$${text}M`;
   }
-  if (number >= 1_000) return `$${Math.round(number / 1000)}K`;
-  return `$${Math.round(number).toLocaleString()}`;
+  if (number >= 1_000) return `${sign}$${Math.round(number / 1000)}K`;
+  return `${sign}$${Math.round(number).toLocaleString()}`;
 }
 
 export function fullMoney(value?: number | null) {
   if (value == null || Number.isNaN(value)) return "";
-  return `$${Math.round(value).toLocaleString()}`;
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(Math.round(value)).toLocaleString()}`;
 }
 
 /** Short figure for a tile. The exact text stays in the tooltip and the overview. */
@@ -230,7 +254,7 @@ export function depotLine(miles?: number | null, hasPin = true) {
 export function pillText(deal: DealProps, mode: PinLabel) {
   if (mode === "asking") return compactMoney(deal.asking_price);
   if (mode === "acres") return acresText(deal.land_acres);
-  if (mode === "peracre") return deal.price_per_acre_display || "";
+  if (mode === "peracre") return deal.price_per_acre != null ? compactMoney(deal.price_per_acre) : "";
   return "";
 }
 
@@ -331,6 +355,15 @@ export function peerNote(deal: DealProps, peers: DealProps[]) {
 }
 
 export function cashTile(deal: DealProps) {
+  if (deal.stated_cash_flow_display || deal.stated_cash_flow != null) {
+    const note = [deal.cash_flow_label, deal.package_status ? `Package ${deal.package_status}` : ""].filter(Boolean).join(" · ");
+    return {
+      value: deal.stated_cash_flow_display || fullMoney(deal.stated_cash_flow),
+      note: note || deal.figures_source || "Seller-stated",
+      basis: deal.figures_basis || "",
+      extra: deal.package_status ? "" : (deal.cash_multiple_display || ""),
+    };
+  }
   if (deal.figures_status === "withheld") {
     return { value: "Package figures not shown", note: "Seller package", basis: "", extra: "" };
   }
@@ -354,6 +387,66 @@ export function cashTile(deal: DealProps) {
     };
   }
   return { value: "Not provided", note: "", basis: "", extra: "" };
+}
+
+export function growthText(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return "";
+  const shown = Math.abs(value) <= 2 ? value * 100 : value;
+  const text = shown.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+  return `${text}%`;
+}
+
+export function workbookTrafficLine(deal: DealProps) {
+  if (deal.trade_aadt == null) return "";
+  const road = shortRoad(deal.trade_aadt_road);
+  const distance = deal.trade_aadt_m != null ? `${Math.round(deal.trade_aadt_m)} m` : "";
+  const place = [road ? `on ${road}` : "", distance ? `(${distance})` : ""].filter(Boolean).join(" ");
+  const max = deal.trade_aadt_max != null ? `max ${Math.round(deal.trade_aadt_max).toLocaleString()}` : "";
+  return [`${Math.round(deal.trade_aadt).toLocaleString()} vehicles/day`, place, max, "Workbook trade area"].filter(Boolean).join(" · ");
+}
+
+export function tradeAreaLines(deal: DealProps) {
+  const lines: string[] = [];
+  if (deal.trade_population != null) lines.push(`3-mile population ${Math.round(deal.trade_population).toLocaleString()}`);
+  const growth = growthText(deal.trade_growth);
+  if (growth) lines.push(`Growth ${growth}`);
+  if (deal.trade_income != null) lines.push(`Income ${fullMoney(deal.trade_income)}`);
+  if (deal.trade_washes_1mi != null || deal.trade_washes_3mi != null) {
+    const one = deal.trade_washes_1mi != null ? `${deal.trade_washes_1mi} within 1 mile` : "";
+    const three = deal.trade_washes_3mi != null ? `${deal.trade_washes_3mi} within 3 miles` : "";
+    lines.push(`Washes ${[one, three].filter(Boolean).join(" · ")}`);
+  }
+  return lines;
+}
+
+export function baysLine(deal: DealProps) {
+  if (deal.bays_that_fit == null) return "";
+  return `Bays that fit ${Math.round(deal.bays_that_fit).toLocaleString()}`;
+}
+
+export function universeTrafficLine(site?: Pick<SiteProps, "aadt_count" | "aadt_road" | "aadt_year" | "aadt_source"> | null) {
+  if (!site?.aadt_count) return "";
+  const road = shortRoad(site.aadt_road);
+  const source = site.aadt_source || "";
+  const year = (source.match(/\b(20\d{2})\b/) || [site.aadt_year || ""])[0] || site.aadt_year || "";
+  let method = "";
+  if (/150\s*m/i.test(source)) {
+    const agency = /adot/i.test(source) ? "ADOT" : (source.split(",")[0] || "").replace(/average annual daily traffic/i, "").trim();
+    method = [agency, year].filter(Boolean).join(" ");
+    method = method ? `${method}, nearest within 150 m` : "Nearest within 150 m";
+  } else if (source) {
+    method = source.split(".")[0].trim();
+  }
+  return [`${site.aadt_count}${road ? ` on ${road}` : ""}`, method].filter(Boolean).join(" · ");
+}
+
+export function acreUnit(value?: number | null, text?: string | null) {
+  const raw = (text || "").trim();
+  if (raw && /\b(ac|acre|sq)/i.test(raw)) return raw;
+  if (value == null && !raw) return "";
+  if (value == null) return raw;
+  const shown = raw && !Number.isNaN(Number(raw)) ? raw : String(value);
+  return `${shown} ac`;
 }
 
 export function parseColumns(value: string | null): PipelineColumnId[] {

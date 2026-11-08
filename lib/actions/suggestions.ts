@@ -6,6 +6,7 @@ import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from
 import { audit } from "./audit";
 import type { Sql } from "./db";
 import { allowsAssignee, allowsDate, exportStage, normalizeNextStep } from "./nextStep";
+import { parseDocumentRequest } from "@/lib/financials";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
 import {
   csvCell,
@@ -188,11 +189,23 @@ export async function createSuggestion(
     }, getUsers())
     : null;
   const title = normalized ? normalized.title : null;
-  const proposedValue = normalized ? normalized.proposedValue : parseBody(input.proposedValue, "proposed value", 500);
-  const reason = normalized ? normalized.reason : parseBody(input.reason, "reason", 2000);
-  const targetOn = normalized ? normalized.targetOn : null;
-  const ownerId = normalized ? normalized.ownerId : null;
+  let proposedValue = normalized ? normalized.proposedValue : parseBody(input.proposedValue, "proposed value", 500);
+  let reason = normalized ? normalized.reason : parseBody(input.reason, "reason", 2000);
+  let targetOn = normalized ? normalized.targetOn : null;
+  let ownerId = normalized ? normalized.ownerId : null;
   const detail = normalized ? normalized.detail : parsedDetail;
+  if (field === "document_request") {
+    const request = parseDocumentRequest(proposedValue);
+    if (!request) throw new InputError("Choose the missing checklist items.");
+    const owner = String(input.ownerId || "").trim().toLowerCase();
+    if (!owner || !getUsers().some((user) => user.u === owner)) throw new InputError("Name one owner.");
+    ownerId = owner;
+    targetOn = input.targetOn ? parseDate(input.targetOn) : null;
+    if (request.reason) reason = parseBody(request.reason, "reason", 2000);
+    proposedValue = JSON.stringify({ mode: request.mode, items: request.items, reason });
+    assertClean(proposedValue);
+    assertClean(reason);
+  }
   if (!normalized) {
     assertClean(proposedValue);
     if (reason) assertClean(reason);
@@ -214,6 +227,15 @@ export async function createSuggestion(
     after: { id, field, detail, currentValue, proposedValue, reason, status: "open", title, targetOn, ownerId },
   });
   const siteId = permanentSiteId(target.targetKind, target.targetId, lookup);
+  if (field === "document_request") {
+    await recordAppEvent(sql, {
+      siteId,
+      type: "document_request",
+      summary: "Request documents",
+      actorId: input.authorId,
+      refId: id,
+    });
+  }
   if (nextStep && mentionIds.length) {
     await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "suggestion", sourceId: id });
   }
@@ -259,6 +281,17 @@ export async function decideSuggestion(
     before: { id: row.id, status: "open" },
     after: { id: row.id, status: input.status, note },
   });
+  if (input.status === "accepted" && row.field_name === "document_request" && row.target_on) {
+    const day = dayOf(row.target_on);
+    const siteId = permanentSiteId(row.target_kind, row.target_id);
+    if (day && siteId) {
+      await sql.query(
+        `INSERT INTO queue_snoozes (user_id, site_id, until_date) VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, site_id) DO UPDATE SET until_date = EXCLUDED.until_date`,
+        [input.actorId, siteId, day],
+      );
+    }
+  }
   if (row.field_name === "proposed_next_step") {
     const title = safeSnapshot(row.title || row.proposed_value, 120);
     if (title) {

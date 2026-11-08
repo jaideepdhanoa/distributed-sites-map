@@ -12,6 +12,7 @@ export const SUGGESTION_FIELDS = [
   "asking_price_display",
   "asking_price_source",
   "proposed_next_step",
+  "document_request",
 ] as const;
 
 export type SuggestionField = (typeof SUGGESTION_FIELDS)[number];

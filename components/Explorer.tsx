@@ -1779,6 +1779,7 @@ export default function Explorer() {
             sheet={sheet}
             banner={reviewing && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
             onSwipe={reviewing ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
+            signedIn={Boolean(me)}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             figuresReady={Boolean(selectedDeal) || figuresReady}
             related={relatedPanel({ id: selectedDeal.deal_id, kind: "deal", name: selectedDeal.name, address: selectedDeal.address, apn: selectedDeal.apn || siteById.get(selectedDeal.universe_id)?.apn })}
@@ -1811,6 +1812,7 @@ export default function Explorer() {
             onClose={() => choose(null)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
+            signedIn={Boolean(me)}
             figuresReady={figuresReady}
             related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}
           />

@@ -4822,6 +4822,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         (OUT / "areas.geojson").write_text(json.dumps(areas_fc))
         (OUT / "depots.geojson").write_text(json.dumps(depots))
         (OUT / "deals.geojson").write_text(json.dumps(deals_fc))
+        from scripts.financials import write_financials_file
+
+        write_financials_file(workbook, OUT / "financials.json", reg)
         (OUT / "parcels.geojson").write_text(json.dumps(parcels_fc))
         for city_code in ("PHX", "LAS", "MIA"):
             city_fc = {
@@ -5510,6 +5513,10 @@ def _write_timeline() -> None:
 
     workbook = source_workbook() if sources_present() else None
     summary = build_timeline.write_timeline(workbook)
+    if workbook is not None:
+        from scripts.financials import refresh_package_links
+
+        refresh_package_links(workbook, OUT / "financials.json")
     if summary.get("drive") == "error":
         raise SystemExit("drive: error")
     report_path = OUT / "build_report.json"

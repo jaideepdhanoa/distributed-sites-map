@@ -410,39 +410,63 @@ export function peerNote(deal: DealProps, peers: DealProps[]) {
   };
 }
 
+export function showsFinancials(deal: Pick<DealProps, "kind" | "figures_status" | "financials_open" | "stated_cash_flow" | "stated_cash_flow_display" | "stated_revenue_display">): boolean {
+  if (deal.financials_open === false) return false;
+  if (deal.kind === "land") return false;
+  const blank = !deal.stated_cash_flow_display && deal.stated_cash_flow == null && !deal.stated_revenue_display;
+  if (deal.figures_status === "vacant" && blank) return false;
+  return true;
+}
+
+export function claimWord(deal: Pick<DealProps, "claim_word" | "figures_basis" | "cash_flow_label">): string {
+  const typed = (deal.claim_word || "").trim();
+  if (typed) return typed;
+  if (deal.cash_flow_label === "Normalized EBITDA") return "Normalized";
+  if (deal.figures_basis === "Claimed") return "Broker-stated";
+  if (deal.figures_basis === "Documented" || deal.figures_basis === "Verified") return deal.figures_basis;
+  return "";
+}
+
+export function packageLine(deal: Pick<DealProps, "package_line" | "package_status">, askedOn = ""): string {
+  const typed = (deal.package_line || "").trim();
+  if (typed) return typed;
+  const status = (deal.package_status || "").trim().toLowerCase();
+  if (!status || status === "none" || status.includes("refus")) return "";
+  if (status.includes("partial")) return "Partial package";
+  if (status === "received") return "Package on file";
+  if (status.includes("requested")) return askedOn ? `Package asked for (${askedOn})` : "Package asked for";
+  return "";
+}
+
 export function cashTile(deal: DealProps) {
+  if (!showsFinancials(deal)) {
+    return { value: "", note: "", basis: "", extra: "", hidden: true };
+  }
   if (deal.stated_cash_flow_display || deal.stated_cash_flow != null) {
-    const note = [deal.cash_flow_label, deal.package_status ? `Package ${deal.package_status}` : ""].filter(Boolean).join(" · ");
+    const line = packageLine(deal);
+    const note = [deal.cash_flow_label, line].filter(Boolean).join(" · ");
     return {
       value: deal.stated_cash_flow_display || fullMoney(deal.stated_cash_flow),
       note: note || deal.figures_source || "Seller-stated",
-      basis: deal.figures_basis || "",
-      extra: deal.package_status ? "" : (deal.cash_multiple_display || ""),
+      basis: claimWord(deal),
+      extra: line ? "" : (deal.cash_multiple_display || ""),
+      hidden: false,
     };
   }
   if (deal.figures_status === "withheld") {
-    return { value: "Package figures not shown", note: "Seller package", basis: "", extra: "" };
-  }
-  if (deal.figures_status === "vacant" || deal.kind === "land" && !deal.stated_cash_flow_display && !deal.stated_revenue_display) {
-    return { value: "Vacant land, no business", note: "Nothing to show", basis: "", extra: "" };
-  }
-  if (deal.stated_cash_flow_display) {
-    return {
-      value: deal.stated_cash_flow_display,
-      note: deal.figures_source || "Seller-stated",
-      basis: "Claimed",
-      extra: deal.cash_multiple_display || "",
-    };
+    return { value: "Package figures not shown", note: "Seller package", basis: "", extra: "", hidden: false };
   }
   if (deal.stated_revenue_display) {
     return {
       value: deal.stated_revenue_display,
-      note: deal.figures_source || "Seller-stated",
-      basis: "Claimed",
+      note: [deal.figures_source || "Seller-stated", packageLine(deal)].filter(Boolean).join(" · "),
+      basis: claimWord(deal) || "Broker-stated",
       extra: "",
+      hidden: false,
     };
   }
-  return { value: "Not provided", note: "", basis: "", extra: "" };
+  const line = packageLine(deal);
+  return { value: "Not provided", note: line, basis: claimWord(deal), extra: "", hidden: false };
 }
 
 export function growthText(value?: number | null) {

@@ -54,7 +54,7 @@ export default function CompareTray({
                 <p>Asking {sheetMoney(deal.asking_price, deal.asking_price_display)}</p>
                 <p>{baysLine(deal) || "Bays that fit not provided"}</p>
                 <p>{workbookTrafficLine(deal) || "Traffic count not provided"}</p>
-                <p>Cash flow {deal.stated_cash_flow_display ? sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) : cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>
+                {cash.hidden ? null : <p>Cash flow {deal.stated_cash_flow_display ? sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) : cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>}
                 <p>Land {acresText(deal.land_acres) || "Not provided"}</p>
                 <p>Per acre {deal.price_per_acre != null ? sheetMoney(deal.price_per_acre, fullMoney(deal.price_per_acre)) : "Not provided"}</p>
                 <p>Workbook spare {deal.open_land_sqft != null ? `${openLandText(deal.open_land_sqft)} · sheet, square feet` : "Not measured"}</p>

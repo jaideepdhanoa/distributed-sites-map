@@ -63,7 +63,7 @@ export function recordField(record: Record<string, unknown> | null, field: strin
 }
 
 export function valuesMatch(field: string, detail: string | null, proposed: string, record: Record<string, unknown> | null): boolean {
-  if (field === "proposed_next_step") return false;
+  if (field === "proposed_next_step" || field === "document_request") return false;
   if (!record) return false;
   const want = proposed.trim().toLowerCase();
   if (!want) return false;

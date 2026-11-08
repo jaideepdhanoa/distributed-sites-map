@@ -5,7 +5,7 @@ import { stamp } from "@/lib/actions/text";
 
 export async function recordAppEvent(
   sql: Sql,
-  input: { siteId: string; type: "note" | "reply" | "next_proposed" | "next_accepted" | "next_rejected"; summary: string; actorId: string; refId?: string },
+  input: { siteId: string; type: "note" | "reply" | "next_proposed" | "next_accepted" | "next_rejected" | "document_request"; summary: string; actorId: string; refId?: string },
 ): Promise<void> {
   const summary = safeSnapshot(input.summary, 240);
   if (!summary) return;

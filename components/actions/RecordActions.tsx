@@ -63,6 +63,7 @@ const COLUMNS: { id: string; label: string }[] = [
 
 function fieldLabel(id: string) {
   if (id === "proposed_next_step") return "Proposed next step";
+  if (id === "document_request") return "Request documents";
   return FIELDS.find((item) => item.id === id)?.label || COLUMNS.find((item) => item.id === id)?.label || id;
 }
 

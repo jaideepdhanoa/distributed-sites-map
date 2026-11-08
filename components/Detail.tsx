@@ -6,7 +6,7 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { acreUnit, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
@@ -87,6 +87,7 @@ export default function Detail({
   onSwipe,
   figuresReady = true,
   related,
+  signedIn = false,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -105,6 +106,7 @@ export default function Detail({
   onSwipe?: (direction: "next" | "prev") => void;
   figuresReady?: boolean;
   related?: ReactNode;
+  signedIn?: boolean;
 }) {
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
@@ -149,7 +151,7 @@ export default function Detail({
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       <SitePhotos card={photos} />
-      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
       {related}
       {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
@@ -327,6 +329,7 @@ export function DealDetail({
   extras,
   banner,
   onSwipe,
+  signedIn = false,
   figuresReady = true,
   related,
 }: {
@@ -347,11 +350,13 @@ export function DealDetail({
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
+  signedIn?: boolean;
   figuresReady?: boolean;
   related?: ReactNode;
 }) {
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
+  const cash = cashTile(deal);
   return (
     <aside
       className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
@@ -391,7 +396,7 @@ export function DealDetail({
       ) : null}
       {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       <SitePhotos card={photos} />
-      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
       {related}
       <NextStepCard kind="deal" id={deal.deal_id} />
       <PanelSections
@@ -446,14 +451,8 @@ export function DealDetail({
               <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
               <span>Site capacity</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
-              <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
-              <div>
-                {deal.stated_cash_flow_display
-                  ? `${deal.stated_cash_flow_display}${deal.cash_flow_label ? ` · ${deal.cash_flow_label}` : ""}${deal.figures_basis ? ` · ${deal.figures_basis}` : ""}${deal.package_status ? ` · Package ${deal.package_status}` : ""}`
-                  : deal.figures_status === "withheld"
-                  ? "Package figures not shown"
-                  : deal.stated_revenue_display || (deal.kind === "land" ? "Vacant land, no business" : "Not provided")}
-              </div>
+              {cash.hidden ? null : <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>}
+              {cash.hidden ? null : <div>{[cash.value, cash.note, cash.basis].filter(Boolean).join(" · ") || "Not provided"}</div>}
             </div>
           </>
         }

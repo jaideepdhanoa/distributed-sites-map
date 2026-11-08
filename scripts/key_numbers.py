@@ -82,6 +82,9 @@ FIGURE_FIELDS = (
     "price_per_acre_display",
     "cash_multiple",
     "cash_multiple_display",
+    "claim_word",
+    "package_line",
+    "financials_open",
     "access_notes",
     "score",
 )
@@ -344,6 +347,12 @@ def cash_flow_label(value) -> str:
 
 def package_status_label(value) -> str:
     text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    if "refus" in text or "unavailable" in text:
+        return "Refused or unavailable"
+    if "partial" in text and "request" in text:
+        return "Partial, more requested"
     if "partial" in text:
         return "partial"
     return {"received": "Received", "none": "None", "requested": "Requested"}.get(text, "")
@@ -353,6 +362,39 @@ def financials_basis(value) -> str:
     return {"documented": "Documented", "verified": "Verified", "claimed": "Claimed", "unknown": "Unknown"}.get(
         str(value or "").strip().lower(), ""
     )
+
+
+def claim_word(basis: str, normalized) -> str:
+    """BE Claimed reads as Broker-stated. A filled normalized figure reads as Normalized."""
+    if normalized is not None:
+        return "Normalized"
+    return {"Claimed": "Broker-stated", "Documented": "Documented", "Verified": "Verified"}.get(basis or "", "")
+
+
+def package_line(status: str, asked_on: str = "") -> str:
+    """Headline package line. Empty means the card shows nothing for the package."""
+    text = (status or "").strip().lower()
+    if not text or text == "none" or "refus" in text:
+        return ""
+    if "partial" in text:
+        return "Partial package"
+    if text == "received":
+        return "Package on file"
+    if "requested" in text:
+        day = (asked_on or "").strip()
+        return f"Package asked for ({day})" if day else "Package asked for"
+    return ""
+
+
+def financials_open(kind: str, business: str, status: str) -> bool:
+    """Land, no business, and Not needed stay off the cash-flow tile and the panel."""
+    if kind == "land":
+        return False
+    if re.search(r"(?i)no business|land only", business or ""):
+        return False
+    if re.search(r"(?i)not needed", str(status or "")):
+        return False
+    return True
 
 
 def _whole(value, *, allow_zero: bool = False, allow_negative: bool = False):
@@ -447,6 +489,9 @@ def key_figures(row: dict, kind: str) -> dict:
         "figures_status": status,
         "cash_flow_label": label if cash_out is not None else "",
         "package_status": package_state,
+        "claim_word": claim_word(figures_basis, normalized),
+        "package_line": package_line(package_state),
+        "financials_open": financials_open(kind, business, str(row.get("Financials status") or "")),
         "bays_that_fit": _whole(row.get("Stalls that fit"), allow_zero=True),
         "trade_aadt": _whole(row.get("AADT (nearest)"), allow_zero=True),
         "trade_aadt_road": _road_name(row.get("AADT road")),

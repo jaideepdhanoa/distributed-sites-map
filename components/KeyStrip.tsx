@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
-import type { DealProps } from "@/lib/types";
-import { acreUnit, baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import type { DealProps, SiteProps } from "@/lib/types";
+import { acreUnit, baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, showsFinancials, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { panelFromDeal, safePackageHref, type FinancialPanel } from "@/lib/financials";
 import { listingCue, shownPriceSource } from "@/lib/format";
-import type { SiteProps } from "@/lib/types";
+import FinancialsPanel from "./FinancialsPanel";
 
 export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
   if (!facts.length) return <strong>Not on file</strong>;
@@ -58,12 +60,14 @@ export function SitePacket({
   site,
   deal,
   hasPin,
+  signedIn = false,
 }: {
   site: SiteProps;
   deal?: DealProps | null;
   hasPin: boolean;
+  signedIn?: boolean;
 }) {
-  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} />;
+  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} />;
   const facts = factsForSite(site);
   const capacity = capacityTiles(facts);
   const asking = site.asking_price_display || "";
@@ -96,11 +100,13 @@ export default function KeyStrip({
   deal,
   hasPin,
   universeSite,
+  signedIn = false,
 }: {
   deal: DealProps;
   hasPin: boolean;
-  peers: DealProps[];
+  peers?: DealProps[];
   universeSite?: SiteProps | null;
+  signedIn?: boolean;
 }) {
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "Not provided";
@@ -110,11 +116,33 @@ export default function KeyStrip({
     : deal.stated_revenue != null && !deal.stated_cash_flow_display
       ? { text: sheetMoney(deal.stated_revenue, deal.stated_revenue_display), title: sheetMoney(deal.stated_revenue, deal.stated_revenue_display) }
       : { text: cash.value, title: cash.value };
-  const facts = factsForDeal(deal);
-  const capacity = capacityTiles(facts);
+  const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
+  const [financialsOpen, setFinancialsOpen] = useState(false);
+  const [financials, setFinancials] = useState<FinancialPanel | null>(null);
+  const showFinancials = showsFinancials(deal);
+  useEffect(() => {
+    setFinancialsOpen(false);
+    setFinancials(null);
+  }, [deal.deal_id]);
+  useEffect(() => {
+    if (!signedIn || !showFinancials) return undefined;
+    let cancel = false;
+    fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`)
+      .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel : null))
+      .then((panel) => {
+        if (!cancel) setFinancials(panel);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [signedIn, showFinancials, deal.deal_id]);
+  const packageHref = safePackageHref(financials?.packageHref, signedIn);
+  const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
+  const shownPanel = showFinancials ? (financials ?? fallbackPanel) : null;
   const population = trade.find((line) => line.startsWith("3-mile population"));
   const washes = trade.find((line) => line.startsWith("Washes "));
   const growth = trade.find((line) => line.startsWith("Growth "));
@@ -126,6 +154,8 @@ export default function KeyStrip({
     .replace(/^[\d,]+ vehicles\/day · /, "")
     .replace(/ · max [\d,]+/, "")
     .replace(/ · Workbook trade area$/, "");
+  const cashLabel = deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow";
+  const cashNote = `${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`;
   return (
     <section className="key-strip packet" data-testid="key-strip">
       <h3 className="job">Space</h3>
@@ -144,12 +174,27 @@ export default function KeyStrip({
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         <Metric icon={Wallet} label="Asking" value={askingText} title={askingText} note={shownPriceSource(deal) || ""} basis={deal.asking_price_display ? "Broker-stated" : ""} />
-        <Metric icon={Banknote} label="Cash flow" value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />
+        {cash.hidden ? null : signedIn && showFinancials ? (
+          <article className="wide">
+            <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
+              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {cashLabel}</span>
+              <strong title={cashView.title}>{cashView.text}</strong>
+              {cashNote ? <small>{cashNote}</small> : null}
+              {cash.basis ? <em>{cash.basis}</em> : null}
+            </button>
+            {packageHref ? <a href={packageHref} target="_blank" rel="noopener noreferrer">Open package</a> : null}
+          </article>
+        ) : (
+          <Metric icon={Banknote} label={cashLabel} value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />
+        )}
         {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
         {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
+      {signedIn && showFinancials && financialsOpen && shownPanel?.open ? (
+        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
+      ) : null}
       <div className="supporting">
         {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
         {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}

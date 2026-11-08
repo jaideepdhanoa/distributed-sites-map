@@ -195,6 +195,12 @@ export type DealProps = {
   figures_status?: "shown" | "withheld" | "vacant" | "absent";
   cash_flow_label?: string;
   package_status?: string;
+  /** Broker-stated, Documented, Verified, or Normalized. */
+  claim_word?: string;
+  /** Package on file, Partial package, Package asked for, or blank. */
+  package_line?: string;
+  /** False for land, no business, and Financials status Not needed. */
+  financials_open?: boolean;
   bays_that_fit?: number | null;
   trade_aadt?: number | null;
   trade_aadt_road?: string;

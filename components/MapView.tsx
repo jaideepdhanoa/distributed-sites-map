@@ -5,6 +5,7 @@ import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLay
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
+import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 
 type Props = {
@@ -32,6 +33,11 @@ type Props = {
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
   onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
+  fitPoints?: [number, number][];
+  area?: MapArea | null;
+  onArea?: (area: MapArea | null) => void;
+  overlayPoints?: { label: string; coordinates: [number, number] }[];
+  gridFeatures?: GeoFeature[];
 };
 
 function ringPoint(lon: number, lat: number, miles: number, step: number): [number, number] {
@@ -51,6 +57,14 @@ function depotRings(depots: GeoFeature[]) {
     }
   }
   return features;
+}
+
+function geometryCoords(geometry: { type: string; coordinates: unknown } | null | undefined): [number, number][] {
+  if (!geometry) return [];
+  if (geometry.type === "Point") return [geometry.coordinates as [number, number]];
+  if (geometry.type === "LineString") return geometry.coordinates as [number, number][];
+  if (geometry.type === "Polygon") return (geometry.coordinates as [number, number][][])[0] || [];
+  return [];
 }
 
 function glide(map: Map, center: [number, number], zoom: number) {
@@ -113,8 +127,15 @@ export default function MapView(props: Props) {
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
   const [coverageText, setCoverageText] = useState("");
+  const [areaTool, setAreaTool] = useState<"off" | "radius" | "draw">("off");
+  const [draftPoints, setDraftPoints] = useState<[number, number][]>([]);
+  const [radiusMiles, setRadiusMiles] = useState(1);
   const measureRef = useRef(false);
   measureRef.current = measure;
+  const areaToolRef = useRef(areaTool);
+  areaToolRef.current = areaTool;
+  const radiusRef = useRef(radiusMiles);
+  radiusRef.current = radiusMiles;
   const [readout, setReadout] = useState("");
   const points = useRef<[number, number][]>([]);
   const propsRef = useRef(props);
@@ -412,6 +433,8 @@ export default function MapView(props: Props) {
       center: [props.focusLng, props.focusLat],
       zoom: props.focusZoom,
       attributionControl: false,
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      fadeDuration: 0,
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     const size = 36;
@@ -464,6 +487,9 @@ export default function MapView(props: Props) {
     map.on("load", () => {
       map.resize();
       requestAnimationFrame(() => map.resize());
+      window.setTimeout(() => {
+        if (mapRef.current === map) map.resize();
+      }, 350);
       if (!map.getSource("sites")) {
         for (const [id, source] of Object.entries(satelliteStyle.sources)) {
           if (id === "imagery" || id === "labels") continue;
@@ -604,6 +630,15 @@ export default function MapView(props: Props) {
       map.on("mouseout", hideTip);
       map.on("dragstart", hideTip);
       map.on("click", (event: MapMouseEvent) => {
+        if (areaToolRef.current === "radius") {
+          propsRef.current.onArea?.({ kind: "radius", lng: event.lngLat.lng, lat: event.lngLat.lat, miles: radiusRef.current });
+          return;
+        }
+        if (areaToolRef.current === "draw") {
+          const point: [number, number] = [event.lngLat.lng, event.lngLat.lat];
+          setDraftPoints((points) => [...points, point]);
+          return;
+        }
         if (!measureRef.current) return;
         points.current = [...points.current, [event.lngLat.lng, event.lngLat.lat]];
         const source = map.getSource("measure") as GeoJSONSource;
@@ -638,6 +673,7 @@ export default function MapView(props: Props) {
   const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");
   const appliedReview = useRef("");
+  const appliedFit = useRef("");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -662,24 +698,113 @@ export default function MapView(props: Props) {
         type: "FeatureCollection" as const,
         features: dealLabelFeatures(props.deals, props.pinLabel || "none"),
       };
-      // Rebuild the label layer so a mode change cannot keep the previous acre text.
-      if (map.getLayer("deal-pills")) map.removeLayer("deal-pills");
-      if (map.getSource("deal-labels")) map.removeSource("deal-labels");
-      map.addSource("deal-labels", { type: "geojson", data: labelData });
-      map.addLayer({
-        id: "deal-pills",
-        type: "symbol",
-        source: "deal-labels",
-        layout: {
-          "text-field": ["get", "pill"],
-          "text-font": ["Noto Sans Regular"],
-          "text-size": 12,
-          "text-offset": [0, 1.6],
-          "text-anchor": "top",
-          "text-allow-overlap": true,
-        },
-        paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 8 },
-      });
+      const labelSource = map.getSource("deal-labels") as GeoJSONSource | undefined;
+      if (labelSource) labelSource.setData(labelData);
+      else map.addSource("deal-labels", { type: "geojson", data: labelData });
+      const overlayData = {
+        type: "FeatureCollection" as const,
+        features: (props.overlayPoints || []).map((point) => ({
+          type: "Feature" as const,
+          properties: { label: point.label },
+          geometry: { type: "Point" as const, coordinates: point.coordinates },
+        })),
+      };
+      const overlaySource = map.getSource("overlays") as GeoJSONSource | undefined;
+      if (overlaySource) overlaySource.setData(overlayData);
+      else map.addSource("overlays", { type: "geojson", data: overlayData });
+      const gridData = {
+        type: "FeatureCollection" as const,
+        features: (props.gridFeatures || []).filter((feature) => feature.geometry),
+      };
+      const gridSource = map.getSource("grid") as GeoJSONSource | undefined;
+      if (gridSource) gridSource.setData(gridData);
+      else map.addSource("grid", { type: "geojson", data: gridData });
+      if (!map.getLayer("grid-line")) {
+        map.addLayer({
+          id: "grid-line",
+          type: "line",
+          source: "grid",
+          filter: ["==", ["get", "kind"], "line"],
+          paint: { "line-color": "#2c5d8f", "line-width": 3, "line-opacity": 0.9 },
+        });
+      }
+      if (!map.getLayer("grid-substation")) {
+        map.addLayer({
+          id: "grid-substation",
+          type: "fill",
+          source: "grid",
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Polygon"]],
+          paint: { "fill-color": "#2c5d8f", "fill-opacity": 0.35 },
+        });
+      }
+      if (!map.getLayer("grid-substation-line")) {
+        map.addLayer({
+          id: "grid-substation-line",
+          type: "line",
+          source: "grid",
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["!=", ["geometry-type"], "Point"]],
+          paint: { "line-color": "#1d4e89", "line-width": 2 },
+        });
+      }
+      if (!map.getLayer("grid-substation-point")) {
+        map.addLayer({
+          id: "grid-substation-point",
+          type: "circle",
+          source: "grid",
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"]],
+          paint: { "circle-radius": 7, "circle-color": "#1d4e89", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2 },
+        });
+      }
+      if (!map.getLayer("grid-labels")) {
+        map.addLayer({
+          id: "grid-labels",
+          type: "symbol",
+          source: "grid",
+          filter: ["any", ["==", ["geometry-type"], "Point"], ["has", "label_only"]],
+          layout: {
+            "text-field": ["get", "label"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 13,
+            "text-offset": [0, -1.4],
+            "text-anchor": "bottom",
+            "text-allow-overlap": true,
+          },
+          paint: { "text-color": "#1d4e89", "text-halo-color": "#f7f4ee", "text-halo-width": 3 },
+        });
+      }
+      if (!map.getLayer("overlay-labels")) {
+        map.addLayer({
+          id: "overlay-labels",
+          type: "symbol",
+          source: "overlays",
+          layout: {
+            "text-field": ["get", "label"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 11,
+            "text-offset": [0, -1.8],
+            "text-anchor": "bottom",
+            "text-allow-overlap": false,
+            "text-optional": true,
+          },
+          paint: { "text-color": "#1e4636", "text-halo-color": "#f4fff6", "text-halo-width": 6 },
+        });
+      }
+      if (!map.getLayer("deal-pills")) {
+        map.addLayer({
+          id: "deal-pills",
+          type: "symbol",
+          source: "deal-labels",
+          layout: {
+            "text-field": ["get", "pill"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 13,
+            "text-offset": [0, 1.55],
+            "text-anchor": "top",
+            "text-allow-overlap": true,
+          },
+          paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 10 },
+        });
+      }
       (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
@@ -693,8 +818,19 @@ export default function MapView(props: Props) {
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
+      const phone = window.matchMedia("(max-width: 767px)").matches;
+      const fitKey = (props.fitPoints || []).map((point) => point.join(",")).join("|");
       if (reviewToken) {
         appliedReview.current = reviewToken;
+      } else if (phone && fitKey && appliedFit.current !== fitKey) {
+        appliedFit.current = fitKey;
+        appliedFocus.current = focusToken;
+        const lngs = props.fitPoints!.map((point) => point[0]);
+        const lats = props.fitPoints!.map((point) => point[1]);
+        map.fitBounds(
+          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+          { padding: { top: 56, bottom: 120, left: 28, right: 28 }, maxZoom: 13, duration: 0 },
+        );
       } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
@@ -707,7 +843,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -718,6 +854,7 @@ export default function MapView(props: Props) {
     let cancel = false;
     const report = () => {
       if (cancel || !map.isStyleLoaded() || !map.getLayer("clusters") || !map.getLayer("sites")) return;
+      try {
       const bounds = map.getBounds();
       let onScreen = 0;
       let offScreen = 0;
@@ -746,6 +883,9 @@ export default function MapView(props: Props) {
         ? ` ${grouped.toLocaleString()} more on this map are grouped into ${clusterCount.toLocaleString()} clusters.`
         : "";
       setCoverageText(`${listed.toLocaleString()} listed. ${pinIds.size.toLocaleString()} separate pins on screen.${clusterNote} ${offScreen.toLocaleString()} off this view. ${missing.toLocaleString()} with no point.`);
+      } catch {
+        setCoverageText("");
+      }
     };
     report();
     map.on("moveend", report);
@@ -803,8 +943,21 @@ export default function MapView(props: Props) {
       const off = propsRef.current.offMarket.find((feature) => feature.properties.site_id === props.selectedId);
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === props.selectedId);
       const geometry = site?.geometry || off?.geometry || deal?.geometry;
-      if (!geometry) return;
-      glide(map, geometry.coordinates as [number, number], 16);
+      if (!geometry || geometry.type !== "Point") return;
+      const pin = geometry.coordinates as [number, number];
+      const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
+      if (!extra.length) {
+        glide(map, pin, 16);
+        return;
+      }
+      const points = [pin, ...extra];
+      const lngs = points.map((point) => point[0]);
+      const lats = points.map((point) => point[1]);
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: { top: 88, bottom: 56, left: 48, right: 430 }, maxZoom: 15, duration: reduce ? 0 : 300 },
+      );
     };
     if (props.reviewFocus) return;
     if (props.selectedId && !selectedOnMap) return;
@@ -814,7 +967,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.gridFeatures]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -918,6 +1071,8 @@ export default function MapView(props: Props) {
     <div className="stage-map">
       <div ref={node} className="map" />
       <div className="map-tools">
+        <details className="map-chrome">
+          <summary>Map tools</summary>
         <div className="pin-label" role="group" aria-label="Basemap" data-testid="basemap">
           <span>Base</span>
           <button className={(props.basemap || "positron") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
@@ -931,10 +1086,35 @@ export default function MapView(props: Props) {
             </button>
           ))}
         </div>
-        <button className={measure ? "on" : ""} type="button" onClick={() => { setMeasure((value) => !value); points.current = []; setReadout(""); }}>
+        <button className={measure ? "on" : ""} type="button" onClick={() => { setMeasure((value) => !value); setAreaTool("off"); points.current = []; setReadout(""); }}>
           Measure acres
         </button>
+        <button className={areaTool === "radius" ? "on" : ""} type="button" onClick={() => { setAreaTool((value) => value === "radius" ? "off" : "radius"); setMeasure(false); }}>
+          Radius
+        </button>
+        {areaTool === "radius" ? (
+          <label className="map-readout">
+            Miles
+            <select aria-label="Radius miles" value={radiusMiles} onChange={(event) => setRadiusMiles(Number(event.target.value))}>
+              {[0.5, 1, 2, 3, 5].map((miles) => <option key={miles} value={miles}>{miles}</option>)}
+            </select>
+          </label>
+        ) : null}
+        <button className={areaTool === "draw" ? "on" : ""} type="button" onClick={() => { setAreaTool((value) => value === "draw" ? "off" : "draw"); setMeasure(false); setDraftPoints([]); }}>
+          Draw area
+        </button>
+        {areaTool === "draw" && draftPoints.length >= 3 ? (
+          <button type="button" onClick={() => { props.onArea?.({ kind: "polygon", points: draftPoints }); setAreaTool("off"); }}>
+            Use this area
+          </button>
+        ) : null}
+        {props.area ? (
+          <button type="button" onClick={() => { props.onArea?.(null); setDraftPoints([]); setAreaTool("off"); }}>
+            Clear area
+          </button>
+        ) : null}
         {readout ? <span className="map-readout">{readout}</span> : null}
+        </details>
       </div>
       {coverageText ? <p className="map-coverage" data-testid="map-coverage">{coverageText}</p> : null}
       <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>

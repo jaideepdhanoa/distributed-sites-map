@@ -1,42 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Gauge, LandPlot, MapPin, Ruler, Trees, Wallet } from "lucide-react";
-import type { DealProps } from "@/lib/types";
-import { basisLabel, baysLine, cashTile, depotLine, factsForDeal, fullMoney, openLandText, peerNote, showsFinancials, tileAmount, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
+import type { DealProps, SiteProps } from "@/lib/types";
+import { acreUnit, baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, showsFinancials, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { panelFromDeal, safePackageHref, type FinancialPanel } from "@/lib/financials";
-import { shownPriceSource } from "@/lib/format";
+import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
-
-function CountUp({ value }: { value: string }) {
-  const [shown, setShown] = useState(value);
-  useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const match = value.match(/-?\d[\d,]*(?:\.\d+)?/);
-    if (!match || reduce || /not |package |vacant /i.test(value)) {
-      setShown(value);
-      return;
-    }
-    const target = Number(match[0].replaceAll(",", ""));
-    if (!Number.isFinite(target)) {
-      setShown(value);
-      return;
-    }
-    const decimals = match[0].includes(".") ? match[0].split(".")[1].length : 0;
-    const started = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - started) / 300);
-      const current = target * progress;
-      const formatted = decimals ? current.toFixed(decimals) : Math.round(current).toLocaleString();
-      setShown(value.replace(match[0], formatted));
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-  return <>{shown}</>;
-}
 
 export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
   if (!facts.length) return <strong>Not on file</strong>;
@@ -70,40 +40,83 @@ function Metric({
   return (
     <article className={label === "Cash flow" || label === "Revenue" ? "wide" : ""}>
       <span><Icon size={15} strokeWidth={1.75} aria-hidden="true" /> {label}</span>
-      <strong title={title || value}><CountUp value={value} /></strong>
+      <strong title={title || value}>{value}</strong>
       {note ? <small>{note}</small> : null}
       {basis ? <em>{basis}</em> : null}
     </article>
   );
 }
 
+function capacityTiles(facts: { lines: string[] }[]) {
+  const capacityLabels = ["Peak load", "Year load", "Frontage hosting", "Nearby hosting", "Substation", "Line", "Feeder", "Horizon", "Phase"];
+  return facts.flatMap((fact) => fact.lines.map((line) => {
+    const label = capacityLabels.find((item) => line.startsWith(`${item} `));
+    if (!label) return { label: "Service", value: line };
+    return { label, value: line.slice(label.length + 1) };
+  }));
+}
+
+export function SitePacket({
+  site,
+  deal,
+  hasPin,
+  signedIn = false,
+}: {
+  site: SiteProps;
+  deal?: DealProps | null;
+  hasPin: boolean;
+  signedIn?: boolean;
+}) {
+  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} />;
+  const facts = factsForSite(site);
+  const capacity = capacityTiles(facts);
+  const asking = site.asking_price_display || "";
+  const ownSpare = site.spare_ac_own != null ? acreUnit(site.spare_ac_own, site.spare_ac_own_text) : "";
+  const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
+  return (
+    <section className="key-strip packet" data-testid="key-strip">
+      <h3 className="job">Space</h3>
+      <div className="metrics">
+        {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
+        {ownSpare ? <Metric icon={Trees} label="Universe own spare" value={ownSpare} note="Census own-parcel spare, acres" /> : null}
+        {!acres && !ownSpare ? <Metric icon={Trees} label="Spare" value="Not measured" /> : null}
+      </div>
+      <h3 className="job">Capacity</h3>
+      {capacity.length ? (
+        <div className="metrics">
+          {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
+        </div>
+      ) : <p className="note">Not on file</p>}
+      <h3 className="job">Attractiveness</h3>
+      <div className="metrics">
+        {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="Not on file" />}
+        <Metric icon={Ruler} label="Depot" value={depotLine(site.miles_to_depot, hasPin)} />
+      </div>
+    </section>
+  );
+}
+
 export default function KeyStrip({
   deal,
   hasPin,
-  peers,
+  universeSite,
   signedIn = false,
 }: {
   deal: DealProps;
   hasPin: boolean;
-  peers: DealProps[];
+  peers?: DealProps[];
+  universeSite?: SiteProps | null;
   signedIn?: boolean;
 }) {
-  const rank = peerNote(deal, peers);
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "Not provided";
-  const openTile = deal.open_land_sqft != null
-    ? { text: Math.round(deal.open_land_sqft).toLocaleString(), title: openLandText(deal.open_land_sqft) }
-    : { text: "Not measured", title: "Not measured" };
-  const perAcreTile = deal.price_per_acre != null
-    ? tileAmount(deal.price_per_acre, fullMoney(deal.price_per_acre))
-    : { text: "Not provided", title: "Not provided" };
-  const askingTile = tileAmount(deal.asking_price, deal.asking_price_display);
-  const cashView = deal.stated_cash_flow != null
-    ? tileAmount(deal.stated_cash_flow, deal.stated_cash_flow_display)
+  const askingText = sheetMoney(deal.asking_price, deal.asking_price_display);
+  const cashView = deal.stated_cash_flow != null || deal.stated_cash_flow_display
+    ? { text: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display), title: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) }
     : deal.stated_revenue != null && !deal.stated_cash_flow_display
-      ? tileAmount(deal.stated_revenue, deal.stated_revenue_display)
+      ? { text: sheetMoney(deal.stated_revenue, deal.stated_revenue_display), title: sheetMoney(deal.stated_revenue, deal.stated_revenue_display) }
       : { text: cash.value, title: cash.value };
-  const facts = factsForDeal(deal);
+  const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
@@ -126,47 +139,66 @@ export default function KeyStrip({
   const packageHref = safePackageHref(financials?.packageHref, signedIn);
   const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
   const shownPanel = financials ?? fallbackPanel;
+  const population = trade.find((line) => line.startsWith("3-mile population"));
+  const washes = trade.find((line) => line.startsWith("Washes "));
+  const growth = trade.find((line) => line.startsWith("Growth "));
+  const income = trade.find((line) => line.startsWith("Income "));
+  const listing = listingCue(deal);
+  const ownSpare = universeSite?.spare_ac_own != null ? acreUnit(universeSite.spare_ac_own, universeSite.spare_ac_own_text) : "";
+  const trafficValue = deal.trade_aadt != null ? `${Math.round(deal.trade_aadt).toLocaleString()} vehicles/day` : "";
+  const trafficNote = traffic
+    .replace(/^[\d,]+ vehicles\/day · /, "")
+    .replace(/ · max [\d,]+/, "")
+    .replace(/ · Workbook trade area$/, "");
+  const cashLabel = deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow";
+  const cashNote = `${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`;
   return (
-    <section className="key-strip" data-testid="key-strip">
+    <section className="key-strip packet" data-testid="key-strip">
+      <h3 className="job">Space</h3>
       <div className="metrics">
-        <Metric icon={Wallet} label="Asking" value={askingTile.text} title={askingTile.title} note={shownPriceSource(deal) || (deal.asking_price_display ? "Listing" : "")} basis={deal.asking_price_display ? "Broker-stated" : ""} />
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
-        <Metric icon={Ruler} label="Per acre" value={perAcreTile.text} title={perAcreTile.title} note={rank?.label || (deal.land_acres_basis === "Unknown" ? "From the listing acreage" : deal.land_acres != null ? "From the acreage on file" : "")} />
-        <Metric icon={Trees} label="Open land" value={openTile.text} title={openTile.title} note={[deal.open_land_sqft != null ? "sq ft · aerial" : "No aerial check yet", bays].filter(Boolean).join(" · ")} basis={deal.open_land_sqft != null ? "Estimated" : ""} />
-        <article className={facts.length > 1 ? "wide" : ""}>
-          <span><Gauge size={15} strokeWidth={1.75} aria-hidden="true" /> Site capacity</span>
-          <CapacityFacts facts={facts} />
-        </article>
-        <Metric icon={MapPin} label="Depot" value={depotLine(deal.miles_to_depot, hasPin)} note={hasPin ? "straight line" : ""} />
+        <Metric icon={Trees} label="Workbook spare" value={deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"} note="Sheet spare area, square feet" />
+        {ownSpare ? <Metric icon={Trees} label="Universe own spare" value={ownSpare} note="Census own-parcel spare, acres" /> : null}
+        <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "Not provided"} />
+      </div>
+      <h3 className="job">Capacity</h3>
+      {capacity.length ? (
+        <div className="metrics">
+          {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
+        </div>
+      ) : <p className="note">Not on file</p>}
+      <h3 className="job">Attractiveness</h3>
+      <div className="metrics">
+        <Metric icon={Wallet} label="Asking" value={askingText} title={askingText} note={shownPriceSource(deal) || ""} basis={deal.asking_price_display ? "Broker-stated" : ""} />
         {cash.hidden ? null : signedIn && showFinancials ? (
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
-              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
-              <strong title={cashView.title}><CountUp value={cashView.text} /></strong>
-              {cash.note || cash.extra ? <small>{`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`}</small> : null}
+              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {cashLabel}</span>
+              <strong title={cashView.title}>{cashView.text}</strong>
+              {cashNote ? <small>{cashNote}</small> : null}
               {cash.basis ? <em>{cash.basis}</em> : null}
             </button>
             {packageHref ? <a href={packageHref} target="_blank" rel="noopener noreferrer">Open package</a> : null}
           </article>
         ) : (
-          <Metric icon={Banknote} label={deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"} value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
+          <Metric icon={Banknote} label={cashLabel} value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />
         )}
+        {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
+        {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
+        {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
+        {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
       {signedIn && financialsOpen && shownPanel.open ? (
         <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
       ) : null}
-      {traffic || trade.length ? (
-        <div className="trade-area" data-testid="trade-area">
-          {traffic ? <p>{traffic}</p> : null}
-          {trade.map((line) => <p key={line}>{line}</p>)}
-        </div>
-      ) : null}
-      {rank ? (
-        <div className="rank-bar" title={rank.label}>
-          <span>Asking per acre</span>
-          <i><b style={{ left: `${rank.pct * 100}%` }} /></i>
-        </div>
-      ) : null}
+      <div className="supporting">
+        {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
+        {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}
+        {deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
+        <span>Depot</span><strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
+        {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{deal.access_notes}</strong></> : null}
+        {listing.label ? <><span>Listing</span><strong>{listing.label}</strong></> : null}
+      </div>
     </section>
   );
 }

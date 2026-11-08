@@ -46,6 +46,7 @@ export default function ListView({
   onOpen,
   onShowMap,
   onExport,
+  note,
 }: {
   rows: ListRow[];
   selectedId: string | null;
@@ -54,9 +55,11 @@ export default function ListView({
   onOpen: (id: string) => void;
   onShowMap: (id: string) => void;
   onExport: () => void;
+  note?: string;
 }) {
   return (
     <div className="list-pane" data-list-count={rows.length}>
+      {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">
         <p>{rows.length.toLocaleString()} shown</p>
         <label className="list-sort only-mobile">

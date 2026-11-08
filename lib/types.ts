@@ -241,6 +241,9 @@ export type DealProps = {
   price_per_acre_display?: string | null;
   cash_multiple?: number | null;
   cash_multiple_display?: string | null;
+  access_notes?: string;
+  score?: number | null;
+  apn?: string;
 };
 
 export type UnscreenedProps = {

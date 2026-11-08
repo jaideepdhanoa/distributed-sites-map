@@ -190,7 +190,7 @@ export default function PipelineList({
                 const column = PIPELINE_COLUMNS.find((item) => item.id === id);
                 const active = sort.id === id;
                 return (
-                  <th key={id} aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}>
+                  <th key={id} className={id === "capacity" ? "capacity" : undefined} aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}>
                     <button type="button" onClick={() => onSort(id)}>
                       {column?.label}
                       {active ? (sort.desc ? " ↓" : " ↑") : ""}
@@ -219,7 +219,7 @@ export default function PipelineList({
                     />
                   </td>
                   {columns.map((column) => (
-                    <td key={column}>
+                    <td key={column} className={column === "capacity" ? "capacity" : undefined}>
                       {column === "openLand" && row.deal.open_land_sqft != null ? (
                         <span className="open-land">
                           {cell(row, column)}
@@ -230,7 +230,7 @@ export default function PipelineList({
                       ) : column === "stage" ? (
                         <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column)}</span>
                       ) : column === "capacity" ? (
-                        <span title={factsForDeal(row.deal).map((fact) => fact.basis).filter(Boolean).join(" · ")}>{cell(row, column)}</span>
+                        <span className="capacity-cell" title={factsForDeal(row.deal).map((fact) => fact.basis).filter(Boolean).join(" · ")}>{cell(row, column)}</span>
                       ) : column === "site" ? (
                         <span className="site-name">
                           <span className="site-name-text">{cell(row, column)}</span>

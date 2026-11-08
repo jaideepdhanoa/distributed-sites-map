@@ -6,56 +6,15 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { acreUnit, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
-import { cashTile } from "@/lib/keyNumbers";
-import KeyStrip, { CapacityFacts } from "./KeyStrip";
+import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 
 function acres(value: number | null | undefined, text?: string) {
   const shown = acreUnit(value, text);
   return shown || "—";
-}
-
-function spareRows(site?: SiteProps | null, deal?: DealProps | null) {
-  const rows: { label: string; value: string; basis: string }[] = [];
-  if (deal?.open_land_sqft != null) {
-    rows.push({ label: "Workbook spare", value: openLandText(deal.open_land_sqft), basis: deal.open_land_basis || "Estimated" });
-  }
-  if (site?.spare_ac_own != null) {
-    rows.push({ label: "Universe own spare", value: acreUnit(site.spare_ac_own, site.spare_ac_own_text), basis: "Own parcel" });
-  }
-  if (!rows.length) rows.push({ label: "Spare land", value: "Not measured", basis: "No aerial check yet" });
-  return rows;
-}
-
-function GradePair({
-  site,
-  deal,
-  prefer,
-}: {
-  site?: SiteProps | null;
-  deal?: DealProps | null;
-  prefer: "site" | "deal";
-}) {
-  const rows = spareRows(site, deal);
-  const facts = prefer === "site" ? factsForSite(site, deal) : factsForDeal(deal);
-  return (
-    <div className="grade-pair" data-testid="grade-pair">
-      {rows.map((row) => (
-        <article key={row.label}>
-          <span>{row.label}</span>
-          <strong>{row.value}</strong>
-          <small>{row.basis}</small>
-        </article>
-      ))}
-      <article className="facts">
-        <span>Site capacity</span>
-        <CapacityFacts facts={facts} />
-      </article>
-    </div>
-  );
 }
 
 function websiteLabel(url: string) {
@@ -119,12 +78,16 @@ export default function Detail({
   onOpenParty,
   linkedDeal,
   onAddCompare,
+  onNotFit,
   sameOwner,
   onClose,
   sheet,
   extras,
   banner,
   onSwipe,
+  figuresReady = true,
+  related,
+  signedIn = false,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -134,12 +97,16 @@ export default function Detail({
   onOpenParty?: (name: string) => void;
   linkedDeal?: DealProps | null;
   onAddCompare?: () => void;
+  onNotFit?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
+  figuresReady?: boolean;
+  related?: ReactNode;
+  signedIn?: boolean;
 }) {
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
@@ -173,7 +140,7 @@ export default function Detail({
       <h2>{site.name || site.address || site.site_id}</h2>
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
-      <p className="note">{site.site_id}{price ? ` · Asking ${price}` : ""}</p>
+      <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
       {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
@@ -183,9 +150,11 @@ export default function Detail({
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
-      {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
-      <GradePair site={site} deal={linkedDeal} prefer="site" />
       <SitePhotos card={photos} />
+      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {related}
+      {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+      {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
         overview={
@@ -299,7 +268,7 @@ export default function Detail({
             ) : null}
           </>
         }
-        numbers={
+        numbers={figuresReady ? (
           <>
             <div className="kv">
               <span>Asking price</span>
@@ -308,8 +277,8 @@ export default function Detail({
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Universe own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
-              {linkedDeal?.open_land_sqft != null ? <><span>Workbook spare</span><div>{openLandText(linkedDeal.open_land_sqft)} · {linkedDeal.open_land_basis || "Estimated"}</div></> : null}
+              <span>Universe own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)} · Census own-parcel spare, acres</div>
+              {linkedDeal?.open_land_sqft != null ? <><span>Workbook spare</span><div>{openLandText(linkedDeal.open_land_sqft)} · Sheet spare area, square feet</div></> : null}
               <span>Site capacity</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
@@ -334,7 +303,7 @@ export default function Detail({
               </>
             ) : null}
           </>
-        }
+        ) : <p className="note">Loading figures</p>}
         activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} />}
         discussion={extras}
       />
@@ -354,12 +323,15 @@ export function DealDetail({
   onOpenParty,
   onClose,
   onCompare,
+  onNotFit,
   compared,
   sheet,
   extras,
   banner,
   onSwipe,
   signedIn = false,
+  figuresReady = true,
+  related,
 }: {
   deal: DealProps;
   peers?: DealProps[];
@@ -372,12 +344,15 @@ export function DealDetail({
   onOpenParty?: (name: string) => void;
   onClose?: () => void;
   onCompare?: (on: boolean) => void;
+  onNotFit?: () => void;
   compared?: boolean;
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
   signedIn?: boolean;
+  figuresReady?: boolean;
+  related?: ReactNode;
 }) {
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
@@ -419,9 +394,10 @@ export function DealDetail({
           Compare
         </label>
       ) : null}
-      <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} signedIn={signedIn} />
-      <GradePair site={universeSite} deal={deal} prefer="deal" />
+      {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       <SitePhotos card={photos} />
+      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {related}
       <NextStepCard kind="deal" id={deal.deal_id} />
       <PanelSections
         overview={

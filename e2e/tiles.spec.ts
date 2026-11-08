@@ -14,7 +14,7 @@ for (const panel of panels) {
       await page.getByTestId("panel-tab-numbers").click();
       await page.waitForSelector("[data-testid=key-strip] strong");
       const strip = page.getByTestId("key-strip");
-      await expect(strip).toContainText(panel.exact === "$7,000,000" ? "$7M" : "$4.99M");
+      await expect(strip).toContainText(panel.exact);
       const overview = page.locator(".drawer .kv");
       await expect(overview).toContainText(panel.exact);
       const offenders = await strip.locator("strong").evaluateAll((nodes) =>

@@ -1727,6 +1727,7 @@ DEAL_FIELDS = (
     "business_type",
     "broker_contacted",
     "last_broker_contact",
+    "apn",
     "street_view_url",
     "photos",
     "photo_status",
@@ -2545,6 +2546,7 @@ def build_deal_layer(
                 "business_type": business_type_from_row(row),
                 "broker_contacted": bool(outreach.get(deal_id)),
                 "last_broker_contact": outreach.get(deal_id) or "",
+                "apn": apn_text(row.get("APN or folio") or row.get("APN") or ""),
                 **key_figures(row, kind),
                 **photo_fields(row, kind, deal_id, photo_index),
             }

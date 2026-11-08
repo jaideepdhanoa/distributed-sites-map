@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { listAudit } from "../../lib/actions/audit";
 import { migrate } from "../../lib/actions/migrate";
-import { createNote, deleteNote, editNote, listNotes, resolveNote } from "../../lib/actions/notes";
+import { createNote, deleteNote, editNote, listNotes, reopenNote, resolveNote } from "../../lib/actions/notes";
 import type { RecordLookup } from "../../lib/actions/records";
 import { valuesMatch } from "../../lib/actions/records";
 import {
@@ -175,6 +175,9 @@ test("a note can take one level of replies, and the author can edit or remove it
   await assert.rejects(() => resolveNote(sql, { id: reply.id, actorId: "editor" }), InputError);
   const resolved = await resolveNote(sql, { id: root.id, actorId: "editor" });
   assert.ok(resolved.resolvedAt);
+  const reopened = await reopenNote(sql, { id: root.id, actorId: "editor" });
+  assert.equal(reopened.resolvedAt, null);
+  await assert.rejects(() => reopenNote(sql, { id: root.id, actorId: "editor" }), InputError);
 });
 
 test("an approved next step stays on the card and earlier approvals remain history", async () => {

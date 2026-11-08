@@ -99,8 +99,26 @@ function factNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+const SCRIPT_SOURCE = /\.(?:py|js|mjs|ts|tsx|json|csv|xlsx|xls)\b|[/\\]|diligence_sweep|(?:^|[\s_])sweep(?:\.py)?\b/i;
+const SHEET_ERROR = /#(?:REF|N\/A|VALUE|DIV\/0|NAME|NULL|NUM|ERROR)!?/i;
+
+/** Drop script names, file paths, and spreadsheet errors. A blank source stays blank. */
+export function cleanFactText(value?: string | null): string {
+  const text = (value || "").trim();
+  if (!text || SHEET_ERROR.test(text) || SCRIPT_SOURCE.test(text)) return "";
+  return text;
+}
+
 function factText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  return cleanFactText(typeof value === "string" ? value : "");
+}
+
+/** A workbook score is shown only when it is a real number. Formula errors stay off the card. */
+export function displayScore(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text || SHEET_ERROR.test(text) || !/^-?\d+(?:\.\d+)?$/.test(text)) return "";
+  return text;
 }
 
 function factCount(value: number, digits = 2): string {
@@ -108,7 +126,7 @@ function factCount(value: number, digits = 2): string {
 }
 
 function factBasis(source?: string | null, confidence?: string | null, asOf?: string | null): string {
-  return [source, confidence, asOf].map((item) => (item || "").trim()).filter(Boolean).join(" · ");
+  return [cleanFactText(source), cleanFactText(confidence), cleanFactText(asOf)].filter(Boolean).join(" · ");
 }
 
 /** Typed fact layers only. A blank layer is omitted. No grade is inferred. */
@@ -200,6 +218,13 @@ export function fullMoney(value?: number | null) {
   return `${sign}$${Math.abs(Math.round(value)).toLocaleString()}`;
 }
 
+/** The workbook's own dollar text, shared by the card, compare tray, and list. */
+export function sheetMoney(amount?: number | null, exact?: string | null) {
+  const full = cleanFactText(exact);
+  if (full) return full;
+  return fullMoney(amount) || "Not provided";
+}
+
 /** Short figure for a tile. The exact text stays in the tooltip and the overview. */
 export function tileAmount(amount?: number | null, exact?: string | null) {
   const full = (exact || "").trim();
@@ -261,7 +286,11 @@ export function depotLine(miles?: number | null, hasPin = true) {
 
 export function pillText(deal: DealProps, mode: PinLabel) {
   if (mode === "asking") return compactMoney(deal.asking_price);
-  if (mode === "acres") return acresText(deal.land_acres);
+  if (mode === "acres") {
+    const acres = deal.land_acres;
+    if (typeof acres !== "number" || !Number.isFinite(acres) || acres < 0 || acres > 500) return "";
+    return acresText(acres);
+  }
   if (mode === "peracre") return deal.price_per_acre != null ? compactMoney(deal.price_per_acre) : "";
   return "";
 }
@@ -274,8 +303,7 @@ export function dealLabelFeatures<T extends { geometry: { type: string; coordina
   return deals.flatMap((feature) => {
     if (!feature.geometry) return [];
     const pill = pillText(feature.properties, mode);
-    if (!pill || /\bac\b/.test(pill) && mode === "peracre") return [];
-    if (!pill) return [];
+    if (!pill || (/\bac\b/.test(pill) && mode === "peracre") || (mode === "acres" && pill.includes("$"))) return [];
     return [{
       type: "Feature" as const,
       properties: { pill },
@@ -424,11 +452,24 @@ export function growthText(value?: number | null) {
   return `${text}%`;
 }
 
+function trafficRoad(value?: string | null) {
+  const readable = shortRoad(value);
+  const rawId = (value || "").match(/\b(\d{6,})\b/)?.[1] || "";
+  const digits = readable.replace(/\D/g, "");
+  const numericOnly = Boolean(readable) && /^\d{5,}$/.test(readable.replace(/\s+/g, ""));
+  const headline = numericOnly || (rawId && digits === rawId) ? "" : readable;
+  const freeway = /\b(I-\d+|US-\d+|SR-\d+)\b/.test(headline) || /\b(interstate|freeway)\b/i.test(headline);
+  const segment = headline ? "" : (rawId || (numericOnly ? readable : ""));
+  return { headline, freeway, segment };
+}
+
 export function workbookTrafficLine(deal: DealProps) {
   if (deal.trade_aadt == null) return "";
-  const road = shortRoad(deal.trade_aadt_road);
+  const road = trafficRoad(deal.trade_aadt_road);
   const distance = deal.trade_aadt_m != null ? `${Math.round(deal.trade_aadt_m)} m` : "";
-  const place = [road ? `on ${road}` : "", distance ? `(${distance})` : ""].filter(Boolean).join(" ");
+  const named = road.headline ? `on ${road.headline}${road.freeway ? ", freeway" : ""}` : "";
+  const segment = road.segment ? `segment ${road.segment}` : "";
+  const place = [named || segment, distance ? `(${distance})` : ""].filter(Boolean).join(" ");
   const max = deal.trade_aadt_max != null ? `max ${Math.round(deal.trade_aadt_max).toLocaleString()}` : "";
   return [`${Math.round(deal.trade_aadt).toLocaleString()} vehicles/day`, place, max, "Workbook trade area"].filter(Boolean).join(" · ");
 }

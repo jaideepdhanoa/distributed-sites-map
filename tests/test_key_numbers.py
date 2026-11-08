@@ -179,6 +179,27 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertIsNone(figures["stated_revenue_display"])
         self.assertIsNone(figures["stated_cash_flow_display"])
 
+    def test_script_names_and_score_errors_stay_off_the_card(self) -> None:
+        figures = key_figures(
+            _row(**{
+                "pwr_a_substation_mi": 0.96,
+                "pwr_a_hv_line_ft": 7873,
+                "pwr_a_source_type": "OSM via diligence_sweep.py",
+                "Access and visibility notes": "Shared-access easement; SW retention beneath vacuums.",
+                "Score (of 100)": "#REF!",
+            }),
+            "land",
+        )
+        self.assertEqual(figures["cap_a_substation_mi"], 0.96)
+        self.assertEqual(figures["cap_a_line_ft"], 7873)
+        self.assertNotIn("cap_a_source", figures)
+        self.assertIn("easement", figures["access_notes"])
+        self.assertIsNone(figures["score"])
+        scored = key_figures(_row(**{"Score (of 100)": 72}), "pipeline")
+        self.assertEqual(scored["score"], 72)
+        blank = key_figures(_row(**{"Access and visibility notes": ""}), "pipeline")
+        self.assertEqual(blank["access_notes"], "")
+
     def test_listing_gone_matches_withdrawn_status(self) -> None:
         self.assertTrue(listing_gone("Sold or withdrawn"))
         self.assertTrue(listing_gone("Delisted"))

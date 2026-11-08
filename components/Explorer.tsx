@@ -13,7 +13,11 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
-import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inStage, isLiveContactedDeal, matchesLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
+import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
+import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
+import { relatedRecords } from "@/lib/related";
+import { readLinks, readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, setLinkStatus, proposeLink, type LinkProposal, type SavedSearch, type Shortlist } from "@/lib/savedSets";
+import { APPROVER_LABEL } from "@/lib/actions/approver";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
@@ -83,7 +87,13 @@ export default function Explorer() {
   const [activity, setActivity] = useState<ActivitySummary>({});
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
-  const [me, setMe] = useState<{ u: string; role: string; actionsEnabled?: boolean } | null>(null);
+  const [me, setMe] = useState<{ u: string; role: string; actionRole?: string; actionsEnabled?: boolean } | null>(null);
+  const [figuresReady, setFiguresReady] = useState(!params.get("site"));
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [shortlists, setShortlists] = useState<Shortlist[]>([]);
+  const [linkProposals, setLinkProposals] = useState<LinkProposal[]>([]);
+  const [searchName, setSearchName] = useState("");
+  const [listName, setListName] = useState("");
   const [queueCount, setQueueCount] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
@@ -167,6 +177,12 @@ export default function Explorer() {
     : rememberedPill;
   const pipelineSortId = (PIPELINE_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as PipelineColumnId;
 
+  const mapArea = parseMapArea(params);
+  useEffect(() => {
+    setSavedSearches(readSearches());
+    setShortlists(readShortlists());
+    setLinkProposals(readLinks());
+  }, []);
   useEffect(() => {
     const stored = window.localStorage.getItem("pin-label");
     if (stored === "asking" || stored === "acres" || stored === "peracre" || stored === "none") setRememberedPill(stored);
@@ -441,6 +457,10 @@ export default function Explorer() {
   const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
     const feature = poolById.get(site.site_id);
     if (!feature) return [];
+    if (mapArea) {
+      const coords = feature.geometry?.coordinates;
+      if (!coords || !inMapArea(coords[0], coords[1], mapArea)) return [];
+    }
     return [{ ...feature, properties: site }];
   });
 
@@ -449,7 +469,10 @@ export default function Explorer() {
   }
 
   function inDealMarket(deal: DealProps, wide: boolean) {
-    return wide || allCities || deal.city === city;
+    if (wide || allCities) return true;
+    const feature = dealFeatures.find((item) => item.properties.deal_id === deal.deal_id);
+    const coords = feature?.geometry?.coordinates;
+    return inSelectedMarket(deal, city, coords ? [coords[0], coords[1]] : null);
   }
 
   const localDealMatches = query
@@ -551,7 +574,7 @@ export default function Explorer() {
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage);
   const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
-  const drawnDeals: DealFeature[] = funnel === "pipeline"
+  const drawnDealsBase: DealFeature[] = funnel === "pipeline"
     ? [
         ...(showPipeline ? pipelineSquares : []),
         ...(showLandLayer ? stageLandSquares : []),
@@ -562,6 +585,14 @@ export default function Explorer() {
       ]
         .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
         .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
+  const listedStepEmpty = funnel !== "pipeline" && listed === "yes" && !query && visibleSites.length === 0;
+  const areaDeals = (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
+    if (funnel === "pipeline" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
+    if (!mapArea) return true;
+    const coords = feature.geometry?.coordinates;
+    return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
+  });
+  const drawnDeals = areaDeals;
   const linkedIds = new Set(pipelineSquares.map((feature) => feature.properties.universe_id).filter(Boolean));
   const pipelineSites = features.flatMap((feature) => {
     if (!linkedIds.has(feature.properties.site_id) || !feature.geometry) return [];
@@ -580,10 +611,13 @@ export default function Explorer() {
   useEffect(() => {
     if (!selected) return;
     let cancel = false;
+    setFiguresReady(false);
     fetch(`/api/data/sites/${encodeURIComponent(selected)}`).then(async (response) => {
-      if (!response.ok) return;
-      const payload = presentSite((await response.json()) as SiteProps);
-      if (!cancel) setDetail(payload);
+      if (cancel) return;
+      if (response.ok) setDetail(presentSite((await response.json()) as SiteProps));
+      setFiguresReady(true);
+    }).catch(() => {
+      if (!cancel) setFiguresReady(true);
     });
     return () => {
       cancel = true;
@@ -592,6 +626,7 @@ export default function Explorer() {
 
   function choose(id: string | null) {
     setSelected(id);
+    setFiguresReady(!id);
     write({ site: id }, true);
   }
 
@@ -673,6 +708,45 @@ export default function Explorer() {
       && (params.get("pstage") || null) === (patch.pstage ?? null);
     if (!aligned) write(patch);
   }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, dealFeatures.length, params]);
+
+  function relatedPanel(current: { id: string; kind: "site" | "deal"; name?: string | null; address?: string | null; apn?: string | null }) {
+    const records = [
+      ...sites.map((site) => ({ id: site.site_id, kind: "site" as const, name: site.name, address: site.address, apn: site.apn })),
+      ...dealRows.map((deal) => ({ id: deal.deal_id, kind: "deal" as const, name: deal.name, address: deal.address, apn: deal.apn })),
+    ];
+    const hits = relatedRecords(current, records);
+    if (!hits.length) return null;
+    const reviewer = me?.actionRole === "reviewer";
+    const byParcel = hits.some((hit) => hit.via === "apn");
+    return (
+      <section className="related-records" data-testid="related-records">
+        <h3>{byParcel ? "Same parcel" : "Same address"}</h3>
+        <p className="note">{APPROVER_LABEL} approves before a review action changes the record. Approving a link does not rewrite Market or the workbook.</p>
+        <ul>
+          {hits.map((hit) => {
+            const proposal = linkProposals.find((row) => (row.fromId === current.id && row.toId === hit.id) || (row.fromId === hit.id && row.toId === current.id));
+            return (
+              <li key={hit.id}>
+                <button type="button" className="text-link" onClick={() => choose(hit.id)}>{hit.label}</button>
+                <span>{hit.id} · {hit.via === "apn" ? `APN ${hit.apn}` : "same address"}</span>
+                {proposal ? <span>{proposal.status === "approved" ? "Link approved" : "Link proposed"}</span> : (
+                  <button type="button" onClick={() => {
+                    if (!window.confirm(`Propose a link between ${current.id} and ${hit.id}? ${APPROVER_LABEL} approves before a review action changes the record.`)) return;
+                    setLinkProposals(proposeLink({ fromId: current.id, toId: hit.id, via: hit.via, apn: hit.apn }));
+                  }}>Propose link</button>
+                )}
+                {proposal && reviewer ? (
+                  <button type="button" onClick={() => setLinkProposals(setLinkStatus(proposal.fromId, proposal.toId, proposal.status === "approved" ? "pending" : "approved"))}>
+                    {proposal.status === "approved" ? "Reopen link" : "Approve link"}
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    );
+  }
 
   if (error) {
     return (
@@ -806,9 +880,13 @@ export default function Explorer() {
     const diff = left.localeCompare(right, undefined, { numeric: true });
     return sortDesc ? -diff : diff;
   });
-  const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges));
+  const tierOn = (deal: DealProps) => matchesOpenLandTier(deal.open_land_sqft, landTier) && (!mapArea || (() => {
+    const point = dealPoint(deal);
+    return point ? inMapArea(point[0], point[1], mapArea) : false;
+  })());
+  const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
   const landForList = showLandLayer
-    ? landDeals.filter((deal) => (dealWide || deal.stage_group === pipeStage) && inRange(deal, ranges))
+    ? landDeals.filter((deal) => (dealWide || deal.stage_group === pipeStage) && inRange(deal, ranges) && tierOn(deal))
     : [];
   const pipelineRows: PipelineRow[] = [...rangedPipeline, ...landForList].map((deal) => ({ deal, noPin: !dealPoint(deal) }));
 
@@ -1002,6 +1080,11 @@ export default function Explorer() {
           <button className={!listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
           <button className={listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
         </div>
+        <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
+          <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
+          <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+          <button className={filtersOpen ? "on" : ""} type="button" onClick={() => { setFiltersOpen((value) => !value); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
+        </div>
         {searchOpen ? (
           <input className="search mobile-search" aria-label="Search" placeholder="Name, address, broker, APN, id" value={query} onChange={(event) => write({ q: event.target.value || null })} onKeyDown={onSearchKey} />
         ) : null}
@@ -1016,7 +1099,9 @@ export default function Explorer() {
             {searchHits.length ? searchHits.map((hit) => (
               <button key={`${hit.kind}-${hit.id}`} type="button" role="option" onClick={() => openHit(hit)}>
                 <span className="hit-title">{hit.title}</span>
-                <span className="hit-meta">{[marketName(hit.city), hit.kind === "deal" ? stageTitle(hit.stage) : (STEPS.find((step) => step.id === hit.stage)?.label || "Universe"), hit.id, hit.address].filter(Boolean).join(" · ")}</span>
+                <span className="hit-address">{hit.address || "Address not on file"}</span>
+                <span className="hit-id">{hit.id}</span>
+                <span className="hit-meta">{[marketName(hit.city), hit.kind === "deal" ? stageTitle(hit.stage) : (STEPS.find((step) => step.id === hit.stage)?.label || "Universe")].filter(Boolean).join(" · ")}</span>
               </button>
             )) : <p className="search-note">No matches.</p>}
           </div>
@@ -1209,16 +1294,35 @@ export default function Explorer() {
                 write({ who: next, funnel: "pipeline", tab: "pipeline", pstage: "all", city: "all", view: "list" });
               }}
             />
+            <h3>Spare land</h3>
+            <div className="chips">
+              {(["any", "L10", "L4"] as const).map((item) => (
+                <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
+                  {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
+                </button>
+              ))}
+            </div>
+            <h3>Saved searches</h3>
+            <form className="saved-search" onSubmit={(event) => {
+              event.preventDefault();
+              setSavedSearches(saveSearch(searchName, window.location.search.replace(/^\?/, "")));
+              setSearchName("");
+            }}>
+              <input aria-label="Saved search name" placeholder="Name this search" value={searchName} onChange={(event) => setSearchName(event.target.value)} maxLength={80} />
+              <button type="submit">Save search</button>
+            </form>
+            {savedSearches.length ? (
+              <ul className="saved-list">
+                {savedSearches.map((item) => (
+                  <li key={item.name}>
+                    <button type="button" onClick={() => { window.location.assign(item.query ? `/?${item.query}` : "/"); }}>{item.name}</button>
+                    <button type="button" onClick={() => setSavedSearches(removeSearch(item.name))}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="note">No saved searches yet.</p>}
             {funnel === "universe" ? (
               <>
-                <h3>Spare land</h3>
-                <div className="chips">
-                  {(["any", "L10", "L4"] as const).map((item) => (
-                    <button key={item} className={landTier === item ? "on" : ""} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
-                      {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
-                    </button>
-                  ))}
-                </div>
                 <h3>Status</h3>
                 <div className="chips">
                   {[
@@ -1380,6 +1484,12 @@ export default function Explorer() {
             missingPoint: visibleFeatures.filter((feature) => !feature.geometry).length,
           } : null}
           deals={drawnDeals}
+          fitPoints={[
+            ...((funnel === "pipeline" ? [] : visibleFeatures).flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : [])),
+            ...drawnDeals.flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : []),
+          ]}
+          area={mapArea}
+          onArea={(next) => write(areaQuery(next))}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
@@ -1412,8 +1522,16 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
-        {funnel === "universe" && !listView && visibleSites.length === 0 ? (
-          <p className="empty-map">{compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
+        {funnel === "universe" && !listView && visibleFeatures.length === 0 ? (
+          <p className="empty-map">{listedStepEmpty
+            ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Universe has ${subcount("universe", "listed").toLocaleString()} listed. In service area has ${subcount("in_area", "listed").toLocaleString()} listed.`
+            : compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
+        ) : null}
+        {listedStepEmpty && !listView ? (
+          <div className="empty-actions">
+            <button type="button" onClick={() => write({ stage: "universe", listed: "yes" })}>Show Universe listed</button>
+            <button type="button" onClick={() => write({ stage: "in_area", listed: "yes" })}>Show in service area listed</button>
+          </div>
         ) : null}
         {!listView ? (() => {
           const missing = funnel === "pipeline"
@@ -1526,6 +1644,8 @@ export default function Explorer() {
             banner={reviewing && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
             onSwipe={reviewing ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
+            figuresReady={Boolean(selectedDeal) || figuresReady}
+            related={relatedPanel({ id: selectedDeal.deal_id, kind: "deal", name: selectedDeal.name, address: selectedDeal.address, apn: selectedDeal.apn || siteById.get(selectedDeal.universe_id)?.apn })}
           />
         ) : selectedUnscreened ? (
           <UnscreenedDetail
@@ -1554,6 +1674,8 @@ export default function Explorer() {
             onClose={() => choose(null)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
+            figuresReady={figuresReady}
+            related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}
           />
         ) : null}
         {compareIds.length ? (
@@ -1567,9 +1689,27 @@ export default function Explorer() {
               const site = sites.find((item) => item.site_id === id);
               return site ? [site] : [];
             })}
+            contextSites={sites}
             onRemove={(id) => setCompared(id, false)}
-            onClose={() => write({ compare: null })}
-          />
+            onClose={() => write({ compare: null, slist: null })}
+          >
+            {compareIds.length >= 2 ? (
+              <form className="shortlist-save" onSubmit={(event) => {
+                event.preventDefault();
+                const next = saveShortlist(listName, compareIds);
+                setShortlists(next);
+                write({ slist: listName.trim() || null });
+                setListName("");
+              }}>
+                <input aria-label="Shortlist name" placeholder="Name this shortlist" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={80} />
+                <button type="submit">Save shortlist</button>
+                {shortlists.map((item) => (
+                  <button key={item.name} type="button" onClick={() => write({ compare: item.ids.join("|"), slist: item.name })}>{item.name}</button>
+                ))}
+                {params.get("slist") ? <button type="button" onClick={() => setShortlists(removeShortlist(params.get("slist") || ""))}>Remove {params.get("slist")}</button> : null}
+              </form>
+            ) : null}
+          </CompareTray>
         ) : null}
       </div>
       {tableOpen ? (

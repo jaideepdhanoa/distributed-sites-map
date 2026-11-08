@@ -77,6 +77,46 @@ export function matchesLandTier(site: { spare_ac_own?: number | null }, tier: st
   return spareTier(site) === tier;
 }
 
+/** Workbook spare area, in square feet, against the same 4,000 and 10,000 sq ft tiers. */
+export function matchesOpenLandTier(sqft: number | null | undefined, tier: string): boolean {
+  if (!tier || tier === "any") return true;
+  if (sqft == null || !Number.isFinite(sqft)) return false;
+  if (tier === "L10") return sqft + 1e-6 >= 10_000;
+  if (tier === "L4") return sqft + 1e-6 >= 4_000 && sqft < 10_000;
+  return false;
+}
+
+const MARKET_BOX: Record<string, { west: number; east: number; south: number; north: number; names: string[] }> = {
+  PHX: { west: -112.9, east: -111.3, south: 33.1, north: 34.0, names: ["phoenix", "scottsdale", "tempe", "mesa", "glendale", "chandler", "gilbert", "peoria", "avondale", "goodyear", "surprise", "buckeye"] },
+  LAS: { west: -115.6, east: -114.7, south: 35.85, north: 36.5, names: ["las vegas", "henderson", "north las vegas"] },
+  MIA: { west: -80.75, east: -80.0, south: 25.3, north: 26.4, names: ["miami", "miami beach", "hialeah", "doral", "homestead"] },
+};
+
+function textInMarket(value: string, names: string[]) {
+  const folded = value.toLowerCase();
+  return names.some((name) => folded.includes(name));
+}
+
+/**
+ * A blank or UNK market still belongs to a city when the address or the pin is there.
+ * A filled market (including SNA) is left as recorded.
+ */
+export function inSelectedMarket(
+  record: { city?: string | null; address?: string | null; name?: string | null; listing_url?: string | null },
+  selected: string,
+  point?: [number, number] | null,
+): boolean {
+  if (!selected || selected === "all") return true;
+  const city = (record.city || "").trim();
+  if (city === selected) return true;
+  if (city && city !== "UNK") return false;
+  const box = MARKET_BOX[selected];
+  if (!box) return false;
+  if (point && point[0] >= box.west && point[0] <= box.east && point[1] >= box.south && point[1] <= box.north) return true;
+  const blob = [record.address, record.name, record.listing_url].filter(Boolean).join(" ");
+  return textInMarket(blob, box.names);
+}
+
 // Universe funnel. The first step is one pin per place after census records are merged.
 // Each later step is a subset of the one before it:
 // Universe > In service area > L10/L4 > County-checked > Cleared.

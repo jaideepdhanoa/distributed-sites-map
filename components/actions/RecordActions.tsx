@@ -171,6 +171,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
           onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
           onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
           onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
+          onReopen={(noteId) => submit(`/api/actions/notes/${noteId}/reopen`, {}, () => undefined)}
           actor={status.username}
         />
       ))}
@@ -314,6 +315,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
             onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
             onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
             onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
+            onReopen={(noteId) => submit(`/api/actions/notes/${noteId}/reopen`, {}, () => undefined)}
             actor={status.username}
           />
         ))}
@@ -366,6 +368,7 @@ function NoteThread({
   onEdit,
   onDelete,
   onResolve,
+  onReopen,
   onOpen,
 }: {
   note: Note;
@@ -379,6 +382,7 @@ function NoteThread({
   onEdit: (id: string, body: string, mentions: string[]) => void;
   onDelete: (id: string) => void;
   onResolve: (id: string) => void;
+  onReopen: (id: string) => void;
   onOpen: (id: string) => void;
 }) {
   const [reply, setReply] = useState("");
@@ -426,6 +430,9 @@ function NoteThread({
         ) : null}
         {reviewer && !note.resolvedAt && !note.deleted ? (
           <button type="button" onClick={() => onResolve(note.id)}>Resolve</button>
+        ) : null}
+        {reviewer && note.resolvedAt && !note.deleted ? (
+          <button type="button" onClick={() => onReopen(note.id)}>Reopen</button>
         ) : null}
       </div>
       {replies.length ? (

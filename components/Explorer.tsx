@@ -16,14 +16,14 @@ import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawer
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
-import { readLinks, readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, setLinkStatus, proposeLink, type LinkProposal, type SavedSearch, type Shortlist } from "@/lib/savedSets";
+import { readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, type SavedSearch, type Shortlist } from "@/lib/savedSets";
 import { clearHidden, hideSite, readHidden } from "@/lib/hide";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
-import type { AppData, DealFeature, DealProps, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
+import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
 
@@ -92,10 +92,10 @@ export default function Explorer() {
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
-  const [linkProposals, setLinkProposals] = useState<LinkProposal[]>([]);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
   const [handoff, setHandoff] = useState("");
+  const [powerFeatures, setPowerFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [listName, setListName] = useState("");
@@ -186,8 +186,18 @@ export default function Explorer() {
   useEffect(() => {
     setSavedSearches(readSearches());
     setShortlists(readShortlists());
-    setLinkProposals(readLinks());
     setHiddenIds(readHidden());
+  }, []);
+  useEffect(() => {
+    let cancel = false;
+    fetch("/api/data/power").then(async (response) => {
+      if (!response.ok || cancel) return;
+      const payload = await response.json() as { features?: GeoFeature[] };
+      if (!cancel) setPowerFeatures(Array.isArray(payload.features) ? payload.features : []);
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
   }, []);
   useEffect(() => {
     const stored = window.localStorage.getItem("pin-label");
@@ -783,38 +793,18 @@ export default function Explorer() {
       ...sites.map((site) => ({ id: site.site_id, kind: "site" as const, name: site.name, address: site.address, apn: site.apn })),
       ...dealRows.map((deal) => ({ id: deal.deal_id, kind: "deal" as const, name: deal.name, address: deal.address, apn: deal.apn })),
     ];
-    const hits = relatedRecords(current, records);
+    const hits = relatedRecords(current, records).filter((hit) => hit.label && hit.label !== hit.id);
     if (!hits.length) return null;
-    const reviewer = me?.actionRole === "reviewer";
     return (
       <section className="related-records same-parcel" data-testid="related-records">
         {hits.map((hit) => {
-          const proposal = linkProposals.find((row) => (row.fromId === current.id && row.toId === hit.id) || (row.fromId === hit.id && row.toId === current.id));
           const place = hit.via === "apn" ? "parcel" : "address";
           return (
             <p key={hit.id}>
               Same {place} as <button type="button" className="text-link" onClick={() => choose(hit.id)}>{hit.label}</button>
-              {proposal ? <span className="quiet"> · {proposal.status === "approved" ? "Link approved" : "Link proposed"}</span> : (
-                <>
-                  {" · "}
-                  <button type="button" className="text-link" onClick={() => {
-                    if (!window.confirm(`Link this record with ${hit.label}? Approval is required before that changes the record.`)) return;
-                    setLinkProposals(proposeLink({ fromId: current.id, toId: hit.id, via: hit.via, apn: hit.apn }));
-                  }}>Propose link</button>
-                </>
-              )}
-              {proposal && reviewer ? (
-                <>
-                  {" · "}
-                  <button type="button" className="text-link" onClick={() => setLinkProposals(setLinkStatus(proposal.fromId, proposal.toId, proposal.status === "approved" ? "pending" : "approved"))}>
-                    {proposal.status === "approved" ? "Reopen" : "Approve"}
-                  </button>
-                </>
-              ) : null}
             </p>
           );
         })}
-        <p className="quiet">A link waits for approval. It does not change Market or the workbook.</p>
       </section>
     );
   }
@@ -1575,6 +1565,7 @@ export default function Explorer() {
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
           overlayPoints={overlayPoints}
+          powerFeatures={powerFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}

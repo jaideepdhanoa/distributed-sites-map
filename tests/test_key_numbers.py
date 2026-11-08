@@ -320,6 +320,16 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(distinct_pipeline_names(chain, chain_deals), 0)
         self.assertEqual(chain[0]["name"], "Super Star Car Wash")
 
+    def test_power_geometry_matches_stored_distance(self) -> None:
+        layer = json.loads((ROOT / "data/generated/power.geojson").read_text())
+        features = [item for item in layer["features"] if not item["properties"].get("label_only")]
+        portland = [item for item in features if item["properties"]["deal_id"] == "LAND-PHX-0050"]
+        self.assertEqual([item["properties"]["kind"] for item in portland], ["substation"])
+        self.assertEqual(portland[0]["geometry"]["type"], "Polygon")
+        self.assertIn("0.96 mi", portland[0]["properties"]["label"])
+        sonoran = [item["properties"]["kind"] for item in features if item["properties"]["deal_id"] == "PIPE-PHX-0001"]
+        self.assertEqual(sonoran, ["substation", "line"])
+
     def test_mcnab_query_drops_the_wrong_city(self) -> None:
         self.assertEqual(
             geocode_queries("7520 W McNab Rd, Miami, FL"),

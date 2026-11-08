@@ -120,9 +120,11 @@ a { color: var(--pine); }
 .chev { color: #8a8175; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chips button, .cities button, .who button, .close {
-  border: 1px solid #8d8376;
-  background: white;
+  border: 1px solid var(--line);
+  background: var(--cream-0);
+  color: var(--ink);
   border-radius: 999px;
+  box-shadow: var(--shadow-1);
   padding: 4px 10px;
 }
 .chips button { display: inline-flex; align-items: center; gap: 6px; }
@@ -298,14 +300,18 @@ span.listing-link.muted {
 .unplaced { margin: 8px 0 0; font-size: 13px; max-width: 720px; }
 .unplaced ul { margin: 6px 0 0; padding-left: 18px; max-height: 140px; overflow: auto; }
 .type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.type-filters button { border: 1px solid #8d8376; background: white; border-radius: 999px; padding: 3px 8px; font-size: 12px; }
+.type-filters button { border: 1px solid var(--line); background: var(--cream-0); color: var(--ink); border-radius: 999px; box-shadow: var(--shadow-1); padding: 3px 8px; font-size: 12px; }
 .type-filters button.on { background: var(--ink); color: #faf7f1; border-color: var(--ink); }
 .funnel-switch { display: flex; gap: 6px; margin-top: 8px; }
-.funnel-switch button, .dock-tabs button, .layers > button {
-  border: 1px solid #8d8376;
-  background: white;
+.dock-tabs button, .layers > button, .legend > button, .funnel-row > button.only-mobile {
+  border: 1px solid var(--line);
+  background: var(--cream-0);
+  color: var(--ink);
   border-radius: 999px;
-  padding: 4px 10px;
+  box-shadow: var(--shadow-1);
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 550;
 }
 .funnel-switch button.on, .dock-tabs button.on { background: #1c1914; color: #faf7f1; border-color: #1c1914; }
 .summary-chip {
@@ -569,10 +575,13 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   width: min(420px, calc(100% - 24px));
 }
 .empty-actions button {
-  border: 1px solid #8d8376;
-  background: white;
+  border: 1px solid var(--line);
+  background: var(--cream-0);
+  color: var(--ink);
   border-radius: 999px;
+  box-shadow: var(--shadow-1);
   padding: 8px 12px;
+  font-weight: 550;
 }
 .location-note { bottom: 16px; left: 16px; transform: none; }
 .drawer .action { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 6px 12px; margin: 8px 0; }
@@ -638,9 +647,11 @@ tr { cursor: pointer; }
 .funnel-switch button { border: 0; background: transparent; padding: 4px 10px; height: 28px; }
 .cities button { padding: 4px 10px; height: 32px; }
 .avatar, .tool, .icon-btn {
-  border: 1px solid #8d8376;
-  background: white;
+  border: 1px solid var(--line);
+  background: var(--cream-0);
+  color: var(--ink);
   border-radius: 999px;
+  box-shadow: var(--shadow-1);
   height: 32px;
   padding: 0 10px;
   flex: none;
@@ -678,10 +689,13 @@ tr { cursor: pointer; }
 .popover h3 { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .popover-head h2 { margin: 0; }
 .popover-head button, .active-row button, .removable {
-  border: 1px solid #8d8376;
-  background: white;
+  border: 1px solid var(--line);
+  background: var(--cream-0);
+  color: var(--ink);
   border-radius: 999px;
+  box-shadow: var(--shadow-1);
   padding: 4px 10px;
+  font-weight: 550;
 }
 .count-badge {
   min-width: 18px;
@@ -700,7 +714,7 @@ tr { cursor: pointer; }
 .backdrop { position: fixed; inset: 0; z-index: 5; border: 0; background: transparent; padding: 0; }
 .summary-chip { flex: none; max-width: none; overflow: visible; white-space: nowrap; }
 .as-of-line { margin: 2px 0 0; font-size: 13px; font-weight: 650; color: var(--ink); line-height: 1.3; }
-.city-pick select { height: 44px; border: 1px solid #8d8376; border-radius: 999px; background: white; padding: 0 12px; max-width: 46vw; }
+.city-pick select { height: 44px; border: 1px solid var(--line); border-radius: 999px; background: var(--cream-0); color: var(--ink); box-shadow: var(--shadow-1); padding: 0 12px; max-width: 46vw; }
 .drawer-grip, .sheet-handle { display: none; }
 .shell.drawer-resizing, .shell.drawer-resizing * { user-select: none; cursor: col-resize; }
 @media (min-width: 768px) {
@@ -756,7 +770,7 @@ tr { cursor: pointer; }
   .map-chrome:not([open]) > button,
   .map-chrome:not([open]) .map-readout { display: none; }
   .maplibregl-ctrl-top-right { z-index: 4; }
-  .phone-step { display: inline-flex !important; align-items: center; gap: 6px; border: 1px solid #8d8376; background: white; border-radius: 999px; padding: 4px 10px; min-height: 34px; }
+  .phone-step { display: inline-flex !important; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--cream-0); color: var(--ink); border-radius: 999px; box-shadow: var(--shadow-1); padding: 4px 12px; min-height: 34px; font-weight: 550; }
   .funnel-switch.only-mobile { display: none !important; }
   .funnel-row { display: none; }
   .shell.steps-open .funnel-row {
@@ -1146,7 +1160,7 @@ tr { cursor: pointer; }
 }
 .phone-step { display: none; }
 .menu-overlays { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.menu-overlays button { border: 1px solid #8d8376; background: white; border-radius: 999px; padding: 4px 8px; font-size: 12px; }
+.menu-overlays button { border: 1px solid var(--line); background: var(--cream-0); color: var(--ink); border-radius: 999px; box-shadow: var(--shadow-1); padding: 4px 8px; font-size: 12px; }
 .menu-overlays button.on { background: #1e4636; color: #fffdf8; border-color: #1e4636; }
 .same-parcel p { margin: 0 0 4px; }
 .same-parcel .quiet { color: var(--muted); font-size: 12px; }

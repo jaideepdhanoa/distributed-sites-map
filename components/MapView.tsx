@@ -37,6 +37,7 @@ type Props = {
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
   overlayPoints?: { label: string; coordinates: [number, number] }[];
+  powerFeatures?: GeoFeature[];
 };
 
 function ringPoint(lon: number, lat: number, miles: number, step: number): [number, number] {
@@ -56,6 +57,14 @@ function depotRings(depots: GeoFeature[]) {
     }
   }
   return features;
+}
+
+function geometryCoords(geometry: { type: string; coordinates: unknown } | null | undefined): [number, number][] {
+  if (!geometry) return [];
+  if (geometry.type === "Point") return [geometry.coordinates as [number, number]];
+  if (geometry.type === "LineString") return geometry.coordinates as [number, number][];
+  if (geometry.type === "Polygon") return (geometry.coordinates as [number, number][][])[0] || [];
+  return [];
 }
 
 function glide(map: Map, center: [number, number], zoom: number) {
@@ -703,6 +712,66 @@ export default function MapView(props: Props) {
       const overlaySource = map.getSource("overlays") as GeoJSONSource | undefined;
       if (overlaySource) overlaySource.setData(overlayData);
       else map.addSource("overlays", { type: "geojson", data: overlayData });
+      const powerData = {
+        type: "FeatureCollection" as const,
+        features: (props.powerFeatures || []).filter((feature) => feature.geometry),
+      };
+      const powerSource = map.getSource("power") as GeoJSONSource | undefined;
+      if (powerSource) powerSource.setData(powerData);
+      else map.addSource("power", { type: "geojson", data: powerData });
+      if (!map.getLayer("power-line")) {
+        map.addLayer({
+          id: "power-line",
+          type: "line",
+          source: "power",
+          filter: ["==", ["get", "kind"], "line"],
+          paint: { "line-color": "#2c5d8f", "line-width": 3, "line-opacity": 0.9 },
+        });
+      }
+      if (!map.getLayer("power-substation")) {
+        map.addLayer({
+          id: "power-substation",
+          type: "fill",
+          source: "power",
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Polygon"]],
+          paint: { "fill-color": "#2c5d8f", "fill-opacity": 0.35 },
+        });
+      }
+      if (!map.getLayer("power-substation-line")) {
+        map.addLayer({
+          id: "power-substation-line",
+          type: "line",
+          source: "power",
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["!=", ["geometry-type"], "Point"]],
+          paint: { "line-color": "#1d4e89", "line-width": 2 },
+        });
+      }
+      if (!map.getLayer("power-substation-point")) {
+        map.addLayer({
+          id: "power-substation-point",
+          type: "circle",
+          source: "power",
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"]],
+          paint: { "circle-radius": 7, "circle-color": "#1d4e89", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2 },
+        });
+      }
+      if (!map.getLayer("power-labels")) {
+        map.addLayer({
+          id: "power-labels",
+          type: "symbol",
+          source: "power",
+          filter: ["any", ["==", ["geometry-type"], "Point"], ["has", "label_only"]],
+          layout: {
+            "text-field": ["get", "label"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 13,
+            "text-offset": [0, -1.4],
+            "text-anchor": "bottom",
+            "text-allow-overlap": true,
+          },
+          paint: { "text-color": "#1d4e89", "text-halo-color": "#f7f4ee", "text-halo-width": 3 },
+        });
+      }
       if (!map.getLayer("overlay-labels")) {
         map.addLayer({
           id: "overlay-labels",
@@ -774,7 +843,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.powerFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -874,8 +943,21 @@ export default function MapView(props: Props) {
       const off = propsRef.current.offMarket.find((feature) => feature.properties.site_id === props.selectedId);
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === props.selectedId);
       const geometry = site?.geometry || off?.geometry || deal?.geometry;
-      if (!geometry) return;
-      glide(map, geometry.coordinates as [number, number], 16);
+      if (!geometry || geometry.type !== "Point") return;
+      const pin = geometry.coordinates as [number, number];
+      const extra = (propsRef.current.powerFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
+      if (!extra.length) {
+        glide(map, pin, 16);
+        return;
+      }
+      const points = [pin, ...extra];
+      const lngs = points.map((point) => point[0]);
+      const lats = points.map((point) => point[1]);
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: { top: 88, bottom: 56, left: 48, right: 430 }, maxZoom: 15, duration: reduce ? 0 : 300 },
+      );
     };
     if (props.reviewFocus) return;
     if (props.selectedId && !selectedOnMap) return;
@@ -885,7 +967,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.powerFeatures]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -284,8 +284,8 @@
     "listing_links": {
       "pipeline": {
         "PHX": {
-          "with_link": 13,
-          "without_link": 5
+          "with_link": 12,
+          "without_link": 6
         },
         "SNA": {
           "with_link": 0,
@@ -302,19 +302,19 @@
       },
       "land": {
         "LAS": {
-          "with_link": 12,
-          "without_link": 0
+          "with_link": 11,
+          "without_link": 1
         },
         "PHX": {
-          "with_link": 18,
-          "without_link": 0
+          "with_link": 15,
+          "without_link": 3
         },
         "MIA": {
           "with_link": 2,
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 47,
+      "listed_sites_with_link": 43,
       "listed_sites": 78
     },
     "source_lines": {

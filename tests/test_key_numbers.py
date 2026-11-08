@@ -254,10 +254,27 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(listing_url_from_row(typed), "https://www.loopnet.com/Listing/1523-E-Southern-Ave-Phoenix-AZ/40461709/")
         direct = {**blank, "Listing link": "https://www.bizbuysell.com/business-opportunity/example/"}
         self.assertEqual(listing_url_from_row(direct), "https://www.bizbuysell.com/business-opportunity/example/")
-        deals = json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())
-        shipped = next(feature["properties"] for feature in deals["features"] if feature["properties"]["deal_id"] == "PIPE-LAS-0011")
-        self.assertEqual(shipped.get("listing_url") or "", "")
-        self.assertIn("maps.clarkcountynv.gov", shipped.get("photo_notes") or "")
+        text_only = {
+            **blank,
+            "Listing link": "No public listing - broker email only (Car Wash Brokers package, Oct 21)",
+            "Photo notes": "https://mcassessor.maricopa.gov/mcs/?q=144-32-001B",
+            "_links": [("Photo notes", "https://mcassessor.maricopa.gov/mcs/?q=144-32-001B")],
+        }
+        self.assertEqual(listing_url_from_row(text_only), "")
+        deals = json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())["features"]
+        sites = json.loads((ROOT / "data" / "generated" / "sites.geojson").read_text())["features"]
+        by_deal = {feature["properties"]["deal_id"]: feature["properties"] for feature in deals}
+        by_site = {feature["properties"]["site_id"]: feature["properties"] for feature in sites}
+        las = by_deal["PIPE-LAS-0011"]
+        self.assertEqual(las.get("listing_url") or "", "")
+        self.assertIn("maps.clarkcountynv.gov", las.get("photo_notes") or "")
+        for deal_id in ("LAND-PHX-0045", "LAND-PHX-0046", "LAND-LAS-0050", "LAND-PHX-0050", "PIPE-PHX-0081"):
+            self.assertEqual(by_deal[deal_id].get("listing_url") or "", "", deal_id)
+        for site_id in ("PHX-U326", "WB-PHX-0027", "WB-PHX-0028", "WB-LAS-0028"):
+            self.assertEqual(by_site[site_id].get("listing_url") or "", "", site_id)
+        self.assertIn("loopnet.com", by_deal["PIPE-PHX-0001"]["listing_url"])
+        self.assertIn("bizbuysell.com", by_deal["PIPE-LAS-0072"]["listing_url"])
+        self.assertIn("loopnet.com", by_deal["LAND-PHX-0033"]["listing_url"])
 
     def test_duplicate_universe_name_uses_the_pipeline_name(self) -> None:
         sites = [

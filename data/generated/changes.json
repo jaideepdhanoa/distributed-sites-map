@@ -1,9 +1,11 @@
 {
-  "new_sites": 0,
-  "removed_sites": 0,
+  "new_sites": 1,
+  "removed_sites": 1,
   "verdict_changes": 0,
   "stage_moves": 0,
-  "sample_new": [],
+  "sample_new": [
+    "WB-PHX-0030"
+  ],
   "sample_verdicts": [],
   "sample_stages": []
 }

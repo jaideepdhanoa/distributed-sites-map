@@ -720,6 +720,48 @@
       "type": "materials",
       "at": "2026-11-06T22:43:26.051Z",
       "summary": "Property and legal count is now 3."
+    },
+    {
+      "id": "price:PIPE-LAS-0071:2026-11-08T00:50:43.622Z:$3,500,000",
+      "siteId": "PIPE-LAS-0071",
+      "type": "price",
+      "at": "2026-11-08T00:50:43.622Z",
+      "summary": "Asking price is $3,500,000, from Ian Walker, NRC Realty & Capital Advisors."
+    },
+    {
+      "id": "price:PIPE-MIA-0012:2026-11-08T00:50:43.622Z:$1,350,000",
+      "siteId": "PIPE-MIA-0012",
+      "type": "price",
+      "at": "2026-11-08T00:50:43.622Z",
+      "summary": "Asking price is $1,350,000, from Maria Lorena L Gonzalez, Florida Realty of Miami Corp."
+    },
+    {
+      "id": "stage:PIPE-MIA-0082:2026-11-08T00:50:43.622Z:Dropped",
+      "siteId": "PIPE-MIA-0082",
+      "type": "stage",
+      "at": "2026-11-08T00:50:43.622Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "price:PIPE-PHX-0006:2026-11-08T00:50:43.622Z:not listed",
+      "siteId": "PIPE-PHX-0006",
+      "type": "price",
+      "at": "2026-11-08T00:50:43.622Z",
+      "summary": "Asking price is not listed, from PHX Auto repair, Maricopa County."
+    },
+    {
+      "id": "price:PIPE-PHX-0085:2026-11-08T00:50:43.622Z:$4,000,000",
+      "siteId": "PIPE-PHX-0085",
+      "type": "price",
+      "at": "2026-11-08T00:50:43.622Z",
+      "summary": "Asking price is $4,000,000, from Cushman & Wakefield."
+    },
+    {
+      "id": "activity:PIPE-MIA-0082:2026-11-08T01:05:55.173Z:A-000271",
+      "siteId": "PIPE-MIA-0082",
+      "type": "activity",
+      "at": "2026-11-08T01:05:55.173Z",
+      "summary": "New activity: Stage set to Dropped on the broker's written word that the real estate is not for sale"
     }
   ],
   "baseline": [
@@ -780,7 +822,7 @@
       "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$3,500,000",
-      "askingSource": "Ian Walker",
+      "askingSource": "Ian Walker, NRC Realty & Capital Advisors",
       "active": false
     },
     {
@@ -810,7 +852,7 @@
       "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$1,350,000",
-      "askingSource": "Not shown",
+      "askingSource": "Maria Lorena L Gonzalez, Florida Realty of Miami Corp",
       "active": false
     },
     {
@@ -886,12 +928,12 @@
     {
       "id": "PIPE-MIA-0082",
       "city": "MIA",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$550,000",
       "askingSource": "Roger Pardo",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0001",
@@ -935,12 +977,12 @@
     },
     {
       "id": "PIPE-PHX-0006",
-      "city": "PHX",
+      "city": "12.0",
       "stage": "Dropped",
       "stageGroup": "dropped",
       "verdict": "",
-      "askingPrice": "$725,000",
-      "askingSource": "Car Wash Brokers Inc",
+      "askingPrice": "",
+      "askingSource": "PHX Auto repair, Maricopa County",
       "active": false
     },
     {
@@ -1069,7 +1111,7 @@
       "stage": "1 Desk screen",
       "stageGroup": "desk",
       "verdict": "",
-      "askingPrice": "",
+      "askingPrice": "$4,000,000",
       "askingSource": "Cushman & Wakefield",
       "active": true
     },
@@ -1085,6 +1127,11 @@
     }
   ],
   "activity": [
+    {
+      "id": "A-000271",
+      "siteId": "PIPE-MIA-0082",
+      "summary": "Stage set to Dropped on the broker's written word that the real estate is not for sale"
+    },
     {
       "id": "A-000226",
       "siteId": "LAND-PHX-0044",

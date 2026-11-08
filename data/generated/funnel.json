@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-11-06T22:41:35Z",
-  "workbook_as_of": "2026-11-06",
+  "generated_at": "2026-11-08T01:04:27Z",
+  "workbook_as_of": "2026-11-08",
   "stages": [
     {
       "id": "census",
       "name": "Census rows",
       "unit": "rows",
-      "total": 1737,
+      "total": 1738,
       "by_city": {
         "LAS": 440,
-        "PHX": 579,
+        "PHX": 580,
         "MIA": 717,
         "SNA": 1
       },
@@ -19,10 +19,10 @@
       "id": "unique",
       "name": "Unique sites",
       "unit": "sites",
-      "total": 1693,
+      "total": 1694,
       "by_city": {
         "LAS": 429,
-        "PHX": 573,
+        "PHX": 574,
         "MIA": 691
       },
       "by_class": {
@@ -35,18 +35,18 @@
         "Licence-only": 18,
         "Closed": 1,
         "Quarantined": 3,
-        "Unknown": 35
+        "Unknown": 36
       },
-      "note": "Counted rows on the Universe tab: 1693. The tab has 1737 rows in all. Census file records not on a counted row are left out (24)."
+      "note": "Counted rows on the Universe tab: 1694. The tab has 1738 rows in all. Census file records not on a counted row are left out (24)."
     },
     {
       "id": "in_area",
       "name": "In service area",
       "unit": "sites",
-      "total": 1068,
+      "total": 1069,
       "by_city": {
         "LAS": 186,
-        "PHX": 270,
+        "PHX": 271,
         "MIA": 612
       },
       "by_class": {
@@ -56,7 +56,7 @@
         "Not a wash": 45,
         "Licence-only": 15,
         "Quarantined": 2,
-        "Unknown": 25
+        "Unknown": 26
       },
       "by_city_class": {
         "LAS": {
@@ -72,7 +72,7 @@
           "Embedded": 63,
           "Gas-attached": 63,
           "Core": 128,
-          "Unknown": 16
+          "Unknown": 17
         },
         "MIA": {
           "Gas-attached": 291,
@@ -321,8 +321,8 @@
       "total": 29,
       "by_city": {
         "LAS": 11,
-        "PHX": 11,
-        "MIA": 7
+        "PHX": 12,
+        "MIA": 6
       },
       "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
     }

@@ -101,7 +101,7 @@ class ShippedCounts(unittest.TestCase):
             if props.get("origin") == "universe" and props.get("counts_as_site") and not props.get("duplicate_of") and props.get("in_area") and not props.get("land_only") and props.get("listed"):
                 listed.append(props["city"])
         from collections import Counter
-        self.assertEqual(dict(Counter(listed)), {"LAS": 13, "PHX": 18, "MIA": 11})
+        self.assertEqual(dict(Counter(listed)), {"LAS": 13, "PHX": 18, "MIA": 10})
         stars = next(item["properties"] for item in deals if item["properties"]["deal_id"] == "PIPE-MIA-0080")
         self.assertEqual(stars["folder_url"], "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ")
         self.assertEqual(by_id["MIA-U747"]["folder_url"], stars["folder_url"])
@@ -117,11 +117,11 @@ class ShippedCounts(unittest.TestCase):
         with (ROOT / "data/drift_report.csv").open(newline="", encoding="utf-8") as handle:
             drift_rows = list(csv.DictReader(handle))
         leads = [row["lead id"] for row in drift_rows]
-        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "PIPE-PHX-0085", "LAND-PHX-0049", "LAS-U119"])
+        self.assertEqual(leads, ["PIPE-LAS-0073", "PIPE-PHX-0081", "PIPE-PHX-0085", "LAND-PHX-0003", "LAS-U119"])
         by_lead = {row["lead id"]: row for row in drift_rows}
-        self.assertEqual(by_lead["LAND-PHX-0049"]["workbook Stage"], "1 Desk screen")
-        self.assertEqual(by_lead["LAND-PHX-0049"]["KO reason"], "Outside the service area")
-        self.assertEqual(by_lead["LAND-PHX-0049"]["rule applied"], "R-042")
+        self.assertEqual(by_lead["LAND-PHX-0003"]["workbook Stage"], "Financial screen")
+        self.assertEqual(by_lead["LAND-PHX-0003"]["KO reason"], "Outside the service area")
+        self.assertEqual(by_lead["LAND-PHX-0003"]["rule applied"], "R-042")
         self.assertEqual(by_lead["LAS-U119"]["map stage"], "not listed")
         self.assertIn("off-market", by_lead["LAS-U119"]["KO reason"])
         gap = universe_link_gap(deals)
@@ -130,13 +130,24 @@ class ShippedCounts(unittest.TestCase):
             self.assertTrue(universe_gap_problems(deals))
         else:
             self.assertEqual(universe_gap_problems(deals), [])
-        self.assertEqual(gap["unlocated_without_universe"], 14)
+        self.assertEqual(gap["unlocated_without_universe"], 13)
         deal_by_id = {item["properties"]["deal_id"]: item["properties"] for item in deals}
-        self.assertEqual(deal_by_id["LAND-PHX-0033"]["universe_id"], "WB-PHX-0016")
+        self.assertEqual(deal_by_id["LAND-PHX-0033"]["universe_id"], "")
+        self.assertEqual(deal_by_id["LAND-PHX-0033"]["city"], "UNK")
+        self.assertEqual(
+            deal_by_id["LAND-PHX-0033"]["listing_url"],
+            "https://www.loopnet.com/Listing/5020-S-16th-St-Phoenix-AZ/39334803/",
+        )
         self.assertEqual(deal_by_id["LAND-PHX-0033"]["open_land_sqft"], 25700)
         self.assertEqual(deal_by_id["LAND-PHX-0033"]["bays_that_fit"], 55)
-        self.assertIsNone(next(item.get("geometry") for item in deals if item["properties"]["deal_id"] == "LAND-PHX-0050"))
+        portland = next(item for item in deals if item["properties"]["deal_id"] == "LAND-PHX-0050")
+        self.assertEqual(portland["geometry"], {"type": "Point", "coordinates": [-112.04595, 33.4611]})
+        self.assertEqual(portland["properties"]["coord_status"], "listing")
+        self.assertEqual(portland["properties"]["listing_url"], "")
+        self.assertEqual(portland["properties"]["universe_id"], "WB-PHX-0030")
         self.assertEqual(deal_by_id["LAND-PHX-0050"]["bays_that_fit"], 118)
+        self.assertEqual(deal_by_id["LAND-PHX-0050"]["open_land_sqft"], 55000)
+        self.assertEqual(deal_by_id["LAND-PHX-0050"]["asking_price"], 1250000)
         by_apn, by_street = universe_match_index([item["properties"] for item in sites])
         for entry in gap["located_missing"]:
             row = deal_by_id[entry["deal_id"]]

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-06T22:44:20+00:00",
+  "generated_at": "2026-11-08T01:06:44+00:00",
   "records": {
     "LAND-LAS-0001": {
       "folder_url": "https://drive.google.com/drive/folders/1b1nRtWO5Kcm-weYghZOajqXMhEmWXU55",
@@ -208,6 +208,11 @@
       "materials": [],
       "last_touched": ""
     },
+    "LAND-PHX-0050": {
+      "folder_url": "https://drive.google.com/drive/folders/1o_OXtfDcpMyP7RMmX-GIeSNR2Hsfk_-a",
+      "materials": [],
+      "last_touched": ""
+    },
     "PIPE-LAS-0011": {
       "folder_url": "https://drive.google.com/drive/folders/1-CCIYhfPrH724_TzN-YR4f3MK2dLDqQ-",
       "materials": [],
@@ -310,7 +315,7 @@
     },
     "PIPE-MIA-0082": {
       "materials": [],
-      "last_touched": "2026-11-03"
+      "last_touched": "2026-11-06"
     },
     "PIPE-PHX-0001": {
       "folder_url": "https://drive.google.com/drive/folders/1sLDt5-gZ_UIiiaA9KPuO_9SCytlY3afk",
@@ -443,6 +448,13 @@
     }
   },
   "items": [
+    {
+      "record_id": "PIPE-MIA-0082",
+      "event_id": "A-000271",
+      "date": "2026-11-06",
+      "type": "stage",
+      "summary": "Stage set to Dropped on the broker's written word that the real estate is not for sale"
+    },
     {
       "record_id": "LAND-PHX-0044",
       "event_id": "A-000226",

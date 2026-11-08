@@ -585,6 +585,10 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 }
 .location-note { bottom: 16px; left: 16px; transform: none; }
 .drawer .action { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 6px 12px; margin: 8px 0; }
+@media (min-width: 768px) {
+  .shell.drawer-open .maplibregl-ctrl-top-right { right: var(--drawer-width); }
+  .shell.drawer-open .layers { right: calc(var(--drawer-width) + 10px); z-index: 5; }
+}
 .list-pane { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; background: #faf7f1; }
 .shell.list-open .list-pane { display: flex; }
 .shell.list-open.drawer-open .list-pane { right: var(--drawer-width); }

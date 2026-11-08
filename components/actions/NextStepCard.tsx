@@ -174,7 +174,6 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       }}
     >
       <p className="kicker">Propose next step</p>
-      <p>Pick a type, then fill what that type needs.</p>
       <div className="type-chips" role="group" aria-label="Next step type">
         {NEXT_STEP_TYPES.map((item) => (
           <button key={item.id} type="button" className={type === item.id ? "on" : ""} onClick={() => setType(item.id)}>{item.label}</button>
@@ -233,7 +232,6 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())}>Submit for approval</button>
         <button type="button" onClick={resetForm}>Cancel</button>
       </div>
-      <p className="hint">Advance picks the next funnel stage. Drop needs a reason. Mark duplicate names the surviving record and waits for approval. One next step at a time.</p>
     </form>
   ) : null;
 

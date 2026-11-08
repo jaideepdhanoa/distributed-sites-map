@@ -100,13 +100,15 @@
 .next-card .type { background: white; color: var(--ink); border: 1px solid var(--line); }
 .next-card .approved-kicker { background: #d5eadc; color: #1f6b45; }
 .next-card .reason { margin: 0; background: white; border-radius: 10px; padding: 8px 10px; }
-.next-card form { display: grid; gap: 8px; }
+.next-card form { display: grid; gap: 6px; }
+.next-card form > p { margin: 0; }
 .next-card button {
   border: 1px solid var(--line);
   background: white;
   border-radius: 999px;
-  padding: 6px 12px;
-  min-height: 36px;
+  padding: 3px 8px;
+  min-height: 28px;
+  font-size: 12px;
 }
 .next-card button.propose { background: var(--pine); color: #faf7f1; border-color: var(--pine); }
 .next-card .type-chips, .next-card .split { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -97,6 +97,7 @@ export default function Explorer() {
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
   const [handoff, setHandoff] = useState("");
+  const [stepsOpen, setStepsOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [listName, setListName] = useState("");
   const [queueCount, setQueueCount] = useState(0);
@@ -616,6 +617,13 @@ export default function Explorer() {
     return [{ label: feature.properties.label, coordinates: [coords[0], coords[1]] as [number, number] }];
   });
   const handedOff = useRef("");
+  const stepKey = `${funnel}|${stage}|${pipeStage}|${listed}|${allStages}|${allPipes}`;
+  const seenStep = useRef(stepKey);
+  useEffect(() => {
+    if (seenStep.current === stepKey) return;
+    seenStep.current = stepKey;
+    setStepsOpen(false);
+  }, [stepKey]);
   useEffect(() => {
     if (!data || funnel === "pipeline" || listView || !listedStepEmpty) return;
     const key = `${stage}|${listed}`;
@@ -759,33 +767,35 @@ export default function Explorer() {
     const hits = relatedRecords(current, records);
     if (!hits.length) return null;
     const reviewer = me?.actionRole === "reviewer";
-    const byParcel = hits.some((hit) => hit.via === "apn");
     return (
-      <section className="related-records" data-testid="related-records">
-        <h3>{byParcel ? "Same parcel" : "Same address"}</h3>
-        <p className="note">{APPROVER_LABEL} approves before a review action changes the record. Approving a link does not rewrite Market or the workbook.</p>
-        <ul>
-          {hits.map((hit) => {
-            const proposal = linkProposals.find((row) => (row.fromId === current.id && row.toId === hit.id) || (row.fromId === hit.id && row.toId === current.id));
-            return (
-              <li key={hit.id}>
-                <button type="button" className="text-link" onClick={() => choose(hit.id)}>{hit.label}</button>
-                <span>{hit.id} · {hit.via === "apn" ? `APN ${hit.apn}` : "same address"}</span>
-                {proposal ? <span>{proposal.status === "approved" ? "Link approved" : "Link proposed"}</span> : (
-                  <button type="button" onClick={() => {
-                    if (!window.confirm(`Propose a link between ${current.id} and ${hit.id}? ${APPROVER_LABEL} approves before a review action changes the record.`)) return;
+      <section className="related-records same-parcel" data-testid="related-records">
+        {hits.map((hit) => {
+          const proposal = linkProposals.find((row) => (row.fromId === current.id && row.toId === hit.id) || (row.fromId === hit.id && row.toId === current.id));
+          const place = hit.via === "apn" ? "parcel" : "address";
+          return (
+            <p key={hit.id}>
+              Same {place} as <button type="button" className="text-link" onClick={() => choose(hit.id)}>{hit.label}</button>
+              {proposal ? <span className="quiet"> · {proposal.status === "approved" ? "Link approved" : "Link proposed"}</span> : (
+                <>
+                  {" · "}
+                  <button type="button" className="text-link" onClick={() => {
+                    if (!window.confirm(`Link this record with ${hit.label}? ${APPROVER_LABEL} approves before that changes the record.`)) return;
                     setLinkProposals(proposeLink({ fromId: current.id, toId: hit.id, via: hit.via, apn: hit.apn }));
                   }}>Propose link</button>
-                )}
-                {proposal && reviewer ? (
-                  <button type="button" onClick={() => setLinkProposals(setLinkStatus(proposal.fromId, proposal.toId, proposal.status === "approved" ? "pending" : "approved"))}>
-                    {proposal.status === "approved" ? "Reopen link" : "Approve link"}
+                </>
+              )}
+              {proposal && reviewer ? (
+                <>
+                  {" · "}
+                  <button type="button" className="text-link" onClick={() => setLinkProposals(setLinkStatus(proposal.fromId, proposal.toId, proposal.status === "approved" ? "pending" : "approved"))}>
+                    {proposal.status === "approved" ? "Reopen" : "Approve"}
                   </button>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+                </>
+              ) : null}
+            </p>
+          );
+        })}
+        <p className="quiet">A link waits for {APPROVER_LABEL}’s approval. It does not change Market or the workbook.</p>
       </section>
     );
   }
@@ -1062,7 +1072,7 @@ export default function Explorer() {
   }) : [];
 
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -1111,6 +1121,11 @@ export default function Explorer() {
               </div>
             ) : null}
           </div>
+          <button className="phone-step only-mobile" type="button" onClick={() => setStepsOpen(true)}>
+            {funnel === "pipeline"
+              ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
+              : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Spare land"))}
+          </button>
           <button className="icon-btn only-mobile" type="button" aria-pressed={searchOpen} aria-label={searchOpen ? "Hide search" : "Search"} onClick={() => setSearchOpen((value) => !value)}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M16 16l5 5" /></svg>
           </button>
@@ -1149,6 +1164,7 @@ export default function Explorer() {
           </div>
         ) : null}
         <div className="funnel-row">
+          <button className="only-mobile" type="button" onClick={() => setStepsOpen(false)}>Close steps</button>
           <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? (
               <>
@@ -1409,6 +1425,13 @@ export default function Explorer() {
               <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
             </div>
             <button type="button" onClick={() => { setFiltersOpen(true); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
+            <div className="menu-overlays" role="group" aria-label="Workbook overlays">
+              {OVERLAYS.map((item) => (
+                <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "on" : ""} onClick={() => toggleOverlay(item.id)}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
             <button type="button" onClick={() => { setLayersOpen(true); setMenuOpen(false); }}>Layers</button>
             <button type="button" onClick={() => { setLegendOpen(true); setMenuOpen(false); }}>Legend</button>
             <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
@@ -1566,12 +1589,13 @@ export default function Explorer() {
           onBounds={() => undefined}
         />
         <div className="overlay-bar" role="group" aria-label="Workbook overlays">
-          {OVERLAYS.map((item) => (
-            <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "on" : ""} onClick={() => toggleOverlay(item.id)}>
-              {item.label}
-            </button>
-          ))}
-          <span className="overlay-note">Scan only. A blank cell stays off the layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</span>
+          <div className="overlay-chips">
+            {OVERLAYS.map((item) => (
+              <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "on" : ""} onClick={() => toggleOverlay(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
           {hiddenIds.length ? (
             <button type="button" onClick={() => { setHiddenIds(clearHidden()); setShowHidden(false); }}>
               Clear {hiddenIds.length} hidden
@@ -1649,6 +1673,7 @@ export default function Explorer() {
                   </span>
                 </span>
               </label>
+              <p className="layer-meta">A blank stays off a workbook layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</p>
             </>
           ) : null}
         </aside>

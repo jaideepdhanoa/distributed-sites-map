@@ -64,15 +64,26 @@ export default function KeyStrip({
       ? { text: sheetMoney(deal.stated_revenue, deal.stated_revenue_display), title: sheetMoney(deal.stated_revenue, deal.stated_revenue_display) }
       : { text: cash.value, title: cash.value };
   const facts = factsForDeal(deal);
+  const capacityLabels = ["Peak load", "Year load", "Frontage hosting", "Nearby hosting", "Substation", "Line", "Feeder", "Horizon", "Phase"];
+  const capacity = facts.flatMap((fact) => fact.lines.map((line) => {
+    const label = capacityLabels.find((item) => line.startsWith(`${item} `));
+    if (!label) return { label: "Service", value: line };
+    return { label, value: line.slice(label.length + 1) };
+  }));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
   const population = trade.find((line) => line.startsWith("3-mile population"));
-  const washes = trade.find((line) => line.startsWith("Washes"));
-  const growth = trade.find((line) => line.startsWith("Growth"));
-  const income = trade.find((line) => line.startsWith("Income"));
+  const washes = trade.find((line) => line.startsWith("Washes "));
+  const growth = trade.find((line) => line.startsWith("Growth "));
+  const income = trade.find((line) => line.startsWith("Income "));
   const listing = listingCue(deal);
   const ownSpare = universeSite?.spare_ac_own != null ? acreUnit(universeSite.spare_ac_own, universeSite.spare_ac_own_text) : "";
+  const trafficValue = deal.trade_aadt != null ? `${Math.round(deal.trade_aadt).toLocaleString()} vehicles/day` : "";
+  const trafficNote = traffic
+    .replace(/^[\d,]+ vehicles\/day · /, "")
+    .replace(/ · max [\d,]+/, "")
+    .replace(/ · Workbook trade area$/, "");
   return (
     <section className="key-strip packet" data-testid="key-strip">
       <h3 className="job">Space</h3>
@@ -83,26 +94,27 @@ export default function KeyStrip({
         <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "Not provided"} />
       </div>
       <h3 className="job">Capacity</h3>
-      <CapacityFacts facts={facts} />
+      {capacity.length ? (
+        <div className="metrics">
+          {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
+        </div>
+      ) : <p className="note">Not on file</p>}
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         <Metric icon={Wallet} label="Asking" value={askingText} title={askingText} note={shownPriceSource(deal) || ""} basis={deal.asking_price_display ? "Broker-stated" : ""} />
-        <Metric icon={Banknote} label="Cash flow" value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
+        <Metric icon={Banknote} label="Cash flow" value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />
+        {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
+        {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
+        {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
+        {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
-      {traffic || population || washes ? (
-        <div className="trade-area" data-testid="trade-area">
-          {traffic ? <p>{traffic}</p> : null}
-          {population ? <p>{population}</p> : null}
-          {washes ? <p>{washes}</p> : null}
-        </div>
-      ) : null}
       <div className="supporting">
-        {growth ? <p>{growth}</p> : null}
-        {income ? <p>{income}</p> : null}
-        {deal.price_per_acre_display ? <p>Per acre {fullMoney(deal.price_per_acre)}</p> : null}
-        <p>Depot {depotLine(deal.miles_to_depot, hasPin)}</p>
-        {deal.access_notes ? <p data-testid="access-notes">Access and visibility: {deal.access_notes}</p> : null}
-        <p>{listing.label}</p>
+        {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
+        {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}
+        {deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
+        <span>Depot</span><strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
+        {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{deal.access_notes}</strong></> : null}
+        {listing.label ? <><span>Listing</span><strong>{listing.label}</strong></> : null}
       </div>
     </section>
   );

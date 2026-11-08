@@ -117,7 +117,6 @@ export function MentionField({
 
   return (
     <div className="mention-field">
-      <p className="note">Name one reviewer. The list is not notified as a group.</p>
       <label>
         {label}
         {rows ? <textarea {...fieldProps} rows={rows} placeholder={placeholder} /> : <input {...fieldProps} placeholder={placeholder} />}

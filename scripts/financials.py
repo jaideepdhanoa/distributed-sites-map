@@ -26,6 +26,10 @@ from scripts.key_numbers import (
 PROTECTED_SITE_IDS = frozenset({"PIPE-PHX-0006"})
 # Parent program folder. A package link never points here.
 PARENT_FOLDER_ID = "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk"
+BLOCKED_FOLDER_IDS = frozenset({
+    PARENT_FOLDER_ID,
+    "11ONFb99evERFObom8lf_Qq81onW50WBw",
+})
 SOURCE_FOLDER_NAME = "Source files"
 PACKAGE_FOLDER_NAME = "1 Financials"
 
@@ -71,7 +75,7 @@ RECAST_ROLES = {
 }
 COUNTED_ROLES = {"Reported", "Addback accepted", "Normalized result"}
 DRIVE_ID = re.compile(r"/(?:folders|file/d)/([A-Za-z0-9_-]+)")
-SENSITIVE_NAME = re.compile(r"(?i)(payroll|tax return|\bw-?2\b|\b1099\b)")
+SENSITIVE_NAME = re.compile(r"(?i)(payroll|tax return|schedule c|\bw-?2\b|\b1099\b)")
 EMAIL_FOLDER = re.compile(r"(?i)^4\b|emails and calls")
 
 
@@ -93,7 +97,7 @@ def _amount(value):
     if isinstance(value, (int, float)):
         number = float(value)
     else:
-        match = re.search(r"-?\d+(?:\.\d+)?", str(value).replace(",", ""))
+        match = re.search(r"-?\d+(?:\.\d+)?", str(value).replace(",", "").replace("$", ""))
         if not match:
             return None
         number = float(match.group())
@@ -197,7 +201,7 @@ def safe_drive_href(value) -> str:
     if not text or "drive.google.com" not in text:
         return ""
     match = DRIVE_ID.search(text)
-    if not match or match.group(1) == PARENT_FOLDER_ID:
+    if not match or match.group(1) in BLOCKED_FOLDER_IDS:
         return ""
     return text.split("?")[0]
 
@@ -498,29 +502,53 @@ def _facts_from_tab(rows: list[dict], fallback_claim: str) -> tuple[list[dict], 
     return figures, listed
 
 
+def _checklist_state(raw, href: str, received: str) -> str:
+    """Keep the workbook's item state. A package-level Received does not mark every item On file."""
+    text = re.sub(r"\s+", " ", str(raw or "")).strip().lower()
+    if text.startswith("some on file"):
+        return "Some on file, more asked for"
+    if text.startswith("asked for") or text == "requested":
+        return "Asked for"
+    if text.startswith("not available") or "unavailable" in text or text.startswith("refused"):
+        return "Not available"
+    if text.startswith("not asked"):
+        return "Not asked yet"
+    if text == "on file":
+        return "On file"
+    if href or received:
+        return "On file"
+    return "Not asked yet"
+
+
+def _gap_why(state: str, note) -> str:
+    if state != "Not available":
+        return ""
+    if re.search(r"(?i)escrow", str(note or "")):
+        return "Seller will share at escrow"
+    return ""
+
+
 def _checklist_from_tab(rows: list[dict]) -> list[dict]:
     by_id = {}
     for row in rows:
-        if excluded_material(str(row.get("Item") or "")) or excluded_material(str(row.get("Note") or "")):
+        if excluded_material(str(row.get("Item") or "")) or excluded_material(str(row.get("File link") or "")):
             continue
         key = item_id(row.get("Item"))
         if not key:
             continue
         href = safe_drive_href(row.get("File link"))
-        note = _clean_note(row.get("Note"))
-        state = str(row.get("State") or "").strip()
-        if state not in {"On file", "Some on file, more asked for", "Asked for", "Not available", "Not asked yet"}:
-            state = "On file" if href or str(row.get("Received on") or "").strip() else "Not asked yet"
+        received = _date_text(row.get("Received on"))
+        state = _checklist_state(row.get("State"), href, received)
         by_id[key] = {
             "id": key,
             "state": state,
             "since": _date_text(row.get("Asked on")),
-            "why": note if state == "Not available" else "",
+            "why": _gap_why(state, row.get("Note")),
             "period": str(row.get("Covers period") or "").strip(),
             "href": href,
             "owner": str(row.get("Owner") or "").strip(),
-            "received_on": _date_text(row.get("Received on")),
-            "note": "" if state == "Not available" else note,
+            "received_on": received,
+            "note": "",
         }
     return [_checklist_row(key, by_id.get(key)) for key, _label in CHECKLIST]
 
@@ -542,10 +570,16 @@ def _checklist_row(key: str, current: dict | None) -> dict:
 
 
 def _default_checklist(package_status: str, asked_on: str, why: str) -> list[dict]:
-    present = package_status in {"Received", "partial", "Partial, more requested"}
-    state = _state(present and package_status == "Received", package_status, asked_on, why)
-    if package_status in {"partial", "Partial, more requested"}:
+    """No item row means the item is not known. Package Received is not proof each item is on file."""
+    lowered = (package_status or "").lower()
+    if "partial" in lowered:
         state = {"state": "Some on file, more asked for", "since": "", "why": ""}
+    elif "refus" in lowered or "unavailable" in lowered:
+        state = {"state": "Not available", "since": "", "why": why or "Refused or unavailable"}
+    elif "request" in lowered:
+        state = {"state": "Asked for", "since": asked_on, "why": ""}
+    else:
+        state = {"state": "Not asked yet", "since": "", "why": why}
     rows = []
     for key, _label in CHECKLIST:
         rows.append({
@@ -562,35 +596,66 @@ def _default_checklist(package_status: str, asked_on: str, why: str) -> list[dic
     return rows
 
 
-def _bridge(figures: list[dict], normalized) -> tuple[list[dict], dict | None]:
+def _bridge_line(figure: dict, *, role: str, counted: bool, text: str | None = None) -> dict:
+    return {
+        "figure": figure["figure"],
+        "text": text if text is not None else figure.get("text") or "",
+        "role": role,
+        "page": figure.get("page") or "",
+        "source_name": figure.get("source_name") or "",
+        "source_href": figure.get("source_href") or "",
+        "counted": counted,
+    }
+
+
+def _reported_earnings(figures: list[dict], headline_text: str) -> dict | None:
+    reported = [figure for figure in figures if figure.get("recast") == "Reported" and figure.get("text")]
+    for figure in reported:
+        if headline_text and figure["text"] == headline_text:
+            return figure
+    for figure in reported:
+        if re.search(r"(?i)ebitda|cash flow", figure.get("figure") or ""):
+            return figure
+    return None
+
+
+def _bridge(figures: list[dict], normalized, headline_text: str = "") -> tuple[list[dict], dict | None]:
+    """Reported earnings, then each addback. Proposed and needs-support lines are not counted."""
     lines = []
+    reported = _reported_earnings(figures, headline_text)
+    if reported:
+        lines.append(_bridge_line(reported, role="Reported", counted=True, text=_whole_text(_amount(reported["text"])) or reported["text"]))
     for figure in figures:
         role = figure.get("recast") or ""
-        if role not in COUNTED_ROLES and role not in {"Addback proposed", "Needs support"}:
+        if role not in {"Addback accepted", "Addback proposed", "Needs support"} or not figure.get("text"):
             continue
-        if role == "Normalized result":
-            continue
-        if not figure.get("text"):
-            continue
-        lines.append({
-            "figure": figure["figure"],
-            "text": figure["text"] if role in {"Addback proposed", "Addback accepted", "Needs support"} else _whole_text(_amount(figure["text"])),
-            "role": role,
-            "page": figure.get("page") or "",
-            "source_name": figure.get("source_name") or "",
-            "counted": role in {"Reported", "Addback accepted"},
-        })
-    ending = None
+        lines.append(_bridge_line(figure, role=role, counted=role == "Addback accepted"))
+    normalized_fact = next((figure for figure in figures if figure.get("recast") == "Normalized result" and figure.get("text")), None)
+    if normalized_fact:
+        ending = _bridge_line(normalized_fact, role="Normalized result", counted=True)
+        ending["figure"] = "Normalized EBITDA"
+        return lines, ending
     if normalized is not None:
-        ending = {
+        return lines, {
             "figure": "Normalized EBITDA",
-            "text": _whole_text(normalized),
+            "text": _cents_text(normalized),
             "role": "Normalized result",
             "page": "",
             "source_name": "",
+            "source_href": "",
             "counted": True,
         }
-    return lines, ending
+    if not lines:
+        return [], None
+    return lines, {
+        "figure": "Normalized EBITDA",
+        "text": "",
+        "role": "Normalized result",
+        "page": "",
+        "source_name": "",
+        "source_href": "",
+        "counted": False,
+    }
 
 
 def _claims(row: dict, package_status: str, basis: str) -> list[dict]:
@@ -614,7 +679,9 @@ def _claims(row: dict, package_status: str, basis: str) -> list[dict]:
             return ""
         return _count_text(amount)
 
-    broker_earnings = claimed if claimed is not None else (documented if broker_claim else None)
+    broker_earnings = claimed if broker_claim else None
+    if claimed is not None and documented is not None and round(float(claimed)) != round(float(documented)):
+        broker_earnings = claimed
     package = package_line(package_status) or _state(False, package_status, "", "")["state"]
     return [
         {"topic": "Earnings", "broker": money_side(broker_earnings, broker_earnings is not None), "documents": money_side(docs_earnings, doc_claim)},
@@ -649,6 +716,34 @@ def _headline(row: dict, basis: str, package_status: str) -> dict:
     }
 
 
+def _place_periods(figures: list[dict], headline_text: str) -> None:
+    """Put the headline year on Latest, the year before on Prior, and the year before that on Two years prior."""
+    anchor = None
+    for figure in figures:
+        if headline_text and figure.get("text") == headline_text:
+            years = [int(year) for year in re.findall(r"20\d{2}", figure.get("period_label") or "")]
+            if years:
+                anchor = years[-1]
+                break
+    if anchor is None:
+        years = [int(year) for figure in figures for year in re.findall(r"20\d{2}", figure.get("period_label") or "")]
+        anchor = max(years) if years else None
+    for figure in figures:
+        years = [int(year) for year in re.findall(r"20\d{2}", figure.get("period_label") or "")]
+        if not years or anchor is None:
+            figure["period"] = figure.get("period") or "Latest"
+            continue
+        year = max(years)
+        if year >= anchor:
+            figure["period"] = "Latest"
+        elif year == anchor - 1:
+            figure["period"] = "Prior"
+        elif year == anchor - 2:
+            figure["period"] = "Two years prior"
+        else:
+            figure["period"] = "Latest"
+
+
 def build_site(deal_id: str, kind: str, row: dict, fact_rows: list[dict] | None, check_rows: list[dict] | None, package_href: str = "", listed: list[dict] | None = None) -> dict:
     """One site. Missing tabs fall back to Pipeline columns. No invented figures."""
     status = financials_basis(_named(row, "status"))
@@ -673,7 +768,11 @@ def build_site(deal_id: str, kind: str, row: dict, fact_rows: list[dict] | None,
     else:
         why = "No business on this site" if re.search(r"(?i)no business|land only", business) else ""
         checklist = _default_checklist(package_status, asked_on, why)
-    bridge, ending = _bridge(figures, normalized)
+    headline = _headline(row, status, package_status)
+    if asked_on and package_status == "Requested":
+        headline["packageLine"] = package_line(package_status, asked_on)
+    _place_periods(figures, headline.get("text") or "")
+    bridge, ending = _bridge(figures, normalized, headline.get("text") or "")
     href = safe_drive_href(package_href)
     listed_out = []
     for item in (listed or []) + sensitive:
@@ -682,9 +781,6 @@ def build_site(deal_id: str, kind: str, row: dict, fact_rows: list[dict] | None,
         if not name or excluded_material(name) or not sensitive_name(name):
             continue
         listed_out.append({"name": name, "href": link})
-    headline = _headline(row, status, package_status)
-    if asked_on and package_status == "Requested":
-        headline["packageLine"] = package_line(package_status, asked_on)
     return {
         "open": True,
         "packageStatus": package_status,
@@ -761,7 +857,18 @@ def build_payload(sites: list[tuple[str, str, dict]], facts: dict[str, list[dict
 
 
 def write_financials_file(workbook: Path, destination: Path, reg: dict | None = None) -> dict:
-    """Write data/generated/financials.json. Does not write the workbook."""
+    """Write data/generated/financials.json. Does not write the workbook.
+
+    A workbook export that does not yet contain the two tabs leaves an existing
+    snapshot in place, so a later sync cannot wipe figures that were already read.
+    """
+    import openpyxl
+
+    book = openpyxl.load_workbook(workbook, read_only=True)
+    names = list(book.sheetnames)
+    book.close()
+    if "Financial facts" not in names and "Package checklist" not in names and destination.exists():
+        return {"sites": 0, "kept": True}
     sites, facts, checks = read_workbook(workbook, reg)
     payload = build_payload(sites, facts, checks)
     from scripts.build_data import scan_obj
@@ -776,16 +883,16 @@ def write_financials_file(workbook: Path, destination: Path, reg: dict | None = 
 
 def package_folder_id(lister, site_folder_id: str) -> str:
     """AE folder, then Source files, then 1 Financials. Missing means no link."""
-    if not lister or not site_folder_id or site_folder_id == PARENT_FOLDER_ID:
+    if not lister or not site_folder_id or site_folder_id in BLOCKED_FOLDER_IDS:
         return ""
     children = lister.list_children(site_folder_id)
     source = next((child for child in children if child.get("name") == SOURCE_FOLDER_NAME), None)
-    if not source:
-        return ""
-    inner = lister.list_children(str(source.get("id") or ""))
-    folder = next((child for child in inner if child.get("name") == PACKAGE_FOLDER_NAME and not excluded_material(str(child.get("name") or ""))), None)
+    search = lister.list_children(str(source.get("id") or "")) if source else children
+    folder = next((child for child in search if child.get("name") == PACKAGE_FOLDER_NAME and not excluded_material(str(child.get("name") or ""))), None)
+    if folder is None and source is not None:
+        folder = next((child for child in children if child.get("name") == PACKAGE_FOLDER_NAME), None)
     found = str((folder or {}).get("id") or "")
-    if not found or found == PARENT_FOLDER_ID:
+    if not found or found in BLOCKED_FOLDER_IDS:
         return ""
     return found
 
@@ -804,7 +911,7 @@ def sensitive_files(lister, folder_id: str) -> list[dict]:
         if not sensitive_name(name):
             continue
         file_id = str(child.get("id") or "")
-        href = f"https://drive.google.com/file/d/{file_id}/view" if file_id and file_id != PARENT_FOLDER_ID else ""
+        href = f"https://drive.google.com/file/d/{file_id}/view" if file_id and file_id not in BLOCKED_FOLDER_IDS else ""
         found.append({"name": name, "href": href})
     return found
 

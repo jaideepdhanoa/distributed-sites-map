@@ -177,16 +177,17 @@ export default function FinancialsPanel({
         <div className="fin-bridge" data-testid="recast-bridge">
           <h3>Recast</h3>
           {panel.bridge.map((item) => (
-            <p key={`${item.role}-${item.figure}`}>
+            <p key={`${item.role}-${item.figure}-${item.text}`}>
               <span>{item.figure}</span>
               <strong>{shownAmount(item.text, "Not asked yet")}</strong>
               <small>{item.role}{item.counted ? "" : " · Not counted"}{item.page ? ` · p. ${item.page}` : ""}</small>
+              {item.sourceHref ? <a href={item.sourceHref} target="_blank" rel="noopener noreferrer">{item.sourceName || "Source file"}</a> : null}
             </p>
           ))}
           {panel.ending ? (
             <p>
               <span>{panel.ending.figure}</span>
-              <strong>{shownAmount(panel.ending.text, "Not asked yet")}</strong>
+              <strong>{panel.ending.text ? shownAmount(panel.ending.text, "Not asked yet") : stateLine("Not asked yet")}</strong>
               <small>Normalized result</small>
             </p>
           ) : null}

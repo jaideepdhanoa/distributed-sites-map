@@ -3,8 +3,9 @@ import type { DealProps } from "./types";
 
 export { claimWord, packageLine, showsFinancials };
 
-/** Parent program folder. Package links never use it. */
+/** Parent program folders. Package links never use them. */
 export const PARENT_FOLDER_ID = "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk";
+const BLOCKED_FOLDERS = new Set([PARENT_FOLDER_ID, "11ONFb99evERFObom8lf_Qq81onW50WBw"]);
 
 export const CHECKLIST_IDS = ["pl_years", "car_counts", "membership", "payroll", "rent", "water_bills"] as const;
 export type ChecklistId = (typeof CHECKLIST_IDS)[number];
@@ -45,6 +46,7 @@ export type BridgeRow = {
   role: string;
   page: string;
   sourceName: string;
+  sourceHref: string;
   counted: boolean;
 };
 
@@ -103,7 +105,7 @@ export function safePackageHref(value: string | null | undefined, signedIn: bool
   if (!signedIn) return "";
   const text = (value || "").trim();
   if (!text.includes("drive.google.com")) return "";
-  if (text.includes(PARENT_FOLDER_ID)) return "";
+  if ([...BLOCKED_FOLDERS].some((id) => text.includes(id))) return "";
   if (!/\/(?:folders|file\/d)\//.test(text)) return "";
   return text.split("?")[0];
 }
@@ -142,8 +144,6 @@ function checklistFromStatus(status: string, askedOn: string): ChecklistRow[] {
     why = "Refused or unavailable";
   } else if (lower.includes("partial")) {
     state = "Some on file, more asked for";
-  } else if (lower === "received") {
-    state = "On file";
   } else if (lower.includes("request")) {
     state = "Asked for";
     since = askedOn;
@@ -211,7 +211,7 @@ export function panelFromDeal(deal: DealProps): FinancialPanel {
     headline: { text: earnings === "$0" ? "" : earnings, metric: deal.cash_flow_label || "", claim, packageLine: line },
     figures,
     bridge: [],
-    ending: claim === "Normalized" && earnings ? { figure: "Normalized EBITDA", text: earnings, role: "Normalized result", page: "", sourceName: "", counted: true } : null,
+    ending: claim === "Normalized" && earnings ? { figure: "Normalized EBITDA", text: earnings, role: "Normalized result", page: "", sourceName: "", sourceHref: "", counted: true } : null,
     claims: [
       { topic: "Earnings", broker: brokerEarnings, documents: docEarnings },
       { topic: "Revenue", broker: deal.figures_basis === "Claimed" ? (deal.stated_revenue_display || "") : "", documents: claim === "Documented" || claim === "Verified" ? (deal.stated_revenue_display || "") : "" },
@@ -265,16 +265,18 @@ export function panelFromStored(raw: Record<string, unknown> | null | undefined,
         role: textOf(row.role),
         page: textOf(row.page),
         sourceName: textOf(row.source_name) || textOf(row.sourceName),
+        sourceHref: safePackageHref(textOf(row.source_href) || textOf(row.sourceHref), signedIn),
         counted: Boolean(row.counted),
       };
     }) : [],
-    ending: endingRaw && textOf(endingRaw.text) ? {
-      figure: textOf(endingRaw.figure),
+    ending: endingRaw && (textOf(endingRaw.figure) || textOf(endingRaw.text)) ? {
+      figure: textOf(endingRaw.figure) || "Normalized EBITDA",
       text: textOf(endingRaw.text),
       role: textOf(endingRaw.role) || "Normalized result",
-      page: "",
-      sourceName: "",
-      counted: true,
+      page: textOf(endingRaw.page),
+      sourceName: textOf(endingRaw.source_name) || textOf(endingRaw.sourceName),
+      sourceHref: safePackageHref(textOf(endingRaw.source_href) || textOf(endingRaw.sourceHref), signedIn),
+      counted: Boolean(endingRaw.counted) && Boolean(textOf(endingRaw.text)),
     } : null,
     claims: Array.isArray(raw.claims) ? raw.claims.map((item) => {
       const row = item as Record<string, unknown>;

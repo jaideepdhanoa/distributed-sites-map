@@ -124,6 +124,10 @@ export default function KeyStrip({
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
+    setFinancialsOpen(false);
+    setFinancials(null);
+  }, [deal.deal_id]);
+  useEffect(() => {
     if (!signedIn || !showFinancials) return undefined;
     let cancel = false;
     fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`)
@@ -138,7 +142,7 @@ export default function KeyStrip({
   }, [signedIn, showFinancials, deal.deal_id]);
   const packageHref = safePackageHref(financials?.packageHref, signedIn);
   const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
-  const shownPanel = financials ?? fallbackPanel;
+  const shownPanel = showFinancials ? (financials ?? fallbackPanel) : null;
   const population = trade.find((line) => line.startsWith("3-mile population"));
   const washes = trade.find((line) => line.startsWith("Washes "));
   const growth = trade.find((line) => line.startsWith("Growth "));
@@ -188,7 +192,7 @@ export default function KeyStrip({
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
-      {signedIn && financialsOpen && shownPanel.open ? (
+      {signedIn && showFinancials && financialsOpen && shownPanel?.open ? (
         <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
       ) : null}
       <div className="supporting">

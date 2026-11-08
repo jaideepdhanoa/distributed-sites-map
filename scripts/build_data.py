@@ -5215,13 +5215,18 @@ CONTACTED_DEAL_NOTE = (
 
 
 def live_contacted_deal_props(features: list[dict]) -> list[dict]:
-    """Active Pipeline and Land deals with broker outreach. Dropped deals stay out."""
+    """Active Pipeline and Land deals with broker outreach.
+
+    Dropped deals stay out. A blank market is not LAS, PHX, or MIA, so it stays out of this bar.
+    """
     rows = []
     for feature in features:
         props = feature.get("properties") if isinstance(feature, dict) and "properties" in feature else feature
         if not isinstance(props, dict):
             continue
         if props.get("kind") not in {"pipeline", "land"}:
+            continue
+        if str(props.get("city") or "").strip() not in MAP_MARKETS:
             continue
         if props.get("stage_group") == "dropped":
             continue

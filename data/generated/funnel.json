@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-06T22:41:35Z",
-  "workbook_as_of": "2026-11-06",
+  "generated_at": "2026-11-08T00:49:34Z",
+  "workbook_as_of": "2026-11-08",
   "stages": [
     {
       "id": "census",
@@ -321,8 +321,8 @@
       "total": 29,
       "by_city": {
         "LAS": 11,
-        "PHX": 11,
-        "MIA": 7
+        "PHX": 12,
+        "MIA": 6
       },
       "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
     }

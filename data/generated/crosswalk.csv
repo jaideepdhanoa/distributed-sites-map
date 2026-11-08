@@ -3136,7 +3136,7 @@ PIPE-SNA-0002,Pipeline,SNA 4200 Birch St
 PHX-U432,Pipeline,PHX 16843 N 43rd Ave
 PHX-U274,Pipeline,PHX 1220 N Horne
 PHX-U435,Pipeline,PHX 515 E Union Hills Dr
-PIPE-PHX-0006,Pipeline,"PHX Flex-serve wash, northeast Phoenix"
+PIPE-PHX-0006,Pipeline,PIPE-PHX-0008
 PHX-U346,Pipeline,PHX 3510 W Cactus Rd
 PIPE-PHX-0008,Pipeline,"PHX Auto repair, Maricopa County"
 PIPE-PHX-0009,Pipeline,"PHX Auto service, Mesa"
@@ -3182,6 +3182,8 @@ WB-LAS-0024,Land Sites,"LAS 2625 Branson St, North Las Vegas"
 WB-LAS-0025,Land Sites,"LAS Las Vegas Blvd N, 0.60-acre IP lot (89115)"
 WB-LAS-0026,Land Sites,LAS 7910 S Dean Martin Dr
 WB-LAS-0027,Land Sites,"LAS Denning St and Aurora Beam Ave, Whitney"
+LAND-PHX-0033,Land Sites,
+LAND-PHX-0034,Land Sites,
 WB-PHX-0018,Land Sites,PHX 2345 W Buckeye Rd
 WB-PHX-0019,Land Sites,PHX 2402 E Broadway Rd
 WB-PHX-0020,Land Sites,PHX 3232 E McDowell Rd
@@ -3199,3 +3201,4 @@ PHX-U501,Land Sites,PHX 1905 W Baseline Rd
 WB-PHX-0029,Land Sites,PHX 2725 N 35th Ave
 WB-LAS-0028,Land Sites,LAS 8355 Dean Martin Dr
 WB-MIA-0015,Land Sites,MIA 19045 NW 2nd Ave
+LAND-PHX-0050,Land Sites,PHX 1616 E Portland St (land)

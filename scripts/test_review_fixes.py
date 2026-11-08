@@ -101,7 +101,7 @@ class ShippedCounts(unittest.TestCase):
             if props.get("origin") == "universe" and props.get("counts_as_site") and not props.get("duplicate_of") and props.get("in_area") and not props.get("land_only") and props.get("listed"):
                 listed.append(props["city"])
         from collections import Counter
-        self.assertEqual(dict(Counter(listed)), {"LAS": 13, "PHX": 17, "MIA": 10})
+        self.assertEqual(dict(Counter(listed)), {"LAS": 13, "PHX": 18, "MIA": 10})
         stars = next(item["properties"] for item in deals if item["properties"]["deal_id"] == "PIPE-MIA-0080")
         self.assertEqual(stars["folder_url"], "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ")
         self.assertEqual(by_id["MIA-U747"]["folder_url"], stars["folder_url"])
@@ -144,7 +144,10 @@ class ShippedCounts(unittest.TestCase):
         self.assertEqual(portland["geometry"], {"type": "Point", "coordinates": [-112.04595, 33.4611]})
         self.assertEqual(portland["properties"]["coord_status"], "listing")
         self.assertEqual(portland["properties"]["listing_url"], "")
+        self.assertEqual(portland["properties"]["universe_id"], "WB-PHX-0030")
         self.assertEqual(deal_by_id["LAND-PHX-0050"]["bays_that_fit"], 118)
+        self.assertEqual(deal_by_id["LAND-PHX-0050"]["open_land_sqft"], 55000)
+        self.assertEqual(deal_by_id["LAND-PHX-0050"]["asking_price"], 1250000)
         by_apn, by_street = universe_match_index([item["properties"] for item in sites])
         for entry in gap["located_missing"]:
             row = deal_by_id[entry["deal_id"]]

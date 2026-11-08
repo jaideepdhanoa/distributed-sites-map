@@ -1,28 +1,28 @@
 {
-  "generated_at": "2026-11-08T00:49:34Z",
+  "generated_at": "2026-11-08T01:04:27Z",
   "census_rows": {
-    "total": 1737,
+    "total": 1738,
     "by_city": {
       "LAS": 440,
-      "PHX": 579,
+      "PHX": 580,
       "MIA": 717,
       "SNA": 1
     }
   },
   "live_universe": {
-    "counted": 1693,
+    "counted": 1694,
     "by_city": {
       "LAS": 429,
-      "PHX": 573,
+      "PHX": 574,
       "MIA": 691
     },
     "in_area_by_city": {
       "LAS": 186,
-      "PHX": 270,
+      "PHX": 271,
       "MIA": 612
     },
     "matched_existing": 1621,
-    "new_sites": 72,
+    "new_sites": 73,
     "dropped_existing": 24,
     "county_verdicts_before_holds": {
       "PASS": 14,
@@ -33,17 +33,17 @@
     },
     "note": "County verdicts are the Universe tab before Charleston Car Wash and the Chandler Quick Quack are held at Maybe. Cleared on the map is the in-area Pass rows after those two holds."
   },
-  "unique_site_records": 1717,
-  "unique_sites_counted": 1693,
+  "unique_site_records": 1718,
+  "unique_sites_counted": 1694,
   "same_parcel_collapsed": {
     "LAS-V2-249": "LAS-U878",
     "LAS-V2-226": "LAS-U97"
   },
   "in_area": {
-    "total": 1068,
+    "total": 1069,
     "by_city": {
       "LAS": 186,
-      "PHX": 270,
+      "PHX": 271,
       "MIA": 612
     },
     "by_class": {
@@ -53,7 +53,7 @@
       "Not a wash": 45,
       "Licence-only": 15,
       "Quarantined": 2,
-      "Unknown": 25
+      "Unknown": 26
     }
   },
   "land_tiers": {
@@ -156,16 +156,15 @@
   "deals": {
     "pipeline": 36,
     "land": 35,
-    "matched": 54,
-    "unmatched": 17,
-    "shipped_linked": 54,
-    "located_without_universe": 4,
+    "matched": 55,
+    "unmatched": 16,
+    "shipped_linked": 55,
+    "located_without_universe": 3,
     "unlocated_without_universe": 13,
     "located_without_universe_ids": [
       "PIPE-SNA-0002",
       "LAND-PHX-0033",
-      "LAND-PHX-0034",
-      "LAND-PHX-0050"
+      "LAND-PHX-0034"
     ],
     "universe_gap_note": "A deal joins the universe when the Universe tab has a counted row for that place. The map links by parcel or a unique street and does not invent a row, a coordinate, or a parcel number.",
     "geocode_failed": [
@@ -911,17 +910,17 @@
   "parcels": {
     "counts": {
       "cache_hit": 1089,
-      "fetched": 27,
+      "fetched": 28,
       "not_found": 7,
-      "features": 1147,
+      "features": 1148,
       "adjoining": 31,
       "by_city": {
         "LAS": 204,
         "MIA": 618,
-        "PHX": 294
+        "PHX": 295
       },
       "by_method": {
-        "parcel number": 1051,
+        "parcel number": 1052,
         "pin location": 65
       }
     },
@@ -939,8 +938,8 @@
         "pct": 99.8
       },
       "PHX": {
-        "targets": 300,
-        "matched": 294,
+        "targets": 301,
+        "matched": 295,
         "none": 6,
         "pct": 98.0
       }
@@ -962,8 +961,8 @@
           "pct": 99.8
         },
         "PHX": {
-          "targets": 270,
-          "matched": 268,
+          "targets": 271,
+          "matched": 269,
           "none": 2,
           "no_geometry": 0,
           "pct": 99.3
@@ -1060,18 +1059,18 @@
         "reason": "no parcel at this pin"
       }
     ],
-    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'fetched': 27, 'not_found': 7, 'features': 1147, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 294}, 'by_method': {'parcel number': 1051, 'pin location': 65}}."
+    "note": "Parcel outlines come from the Clark, Maricopa, Miami-Dade, and Broward assessor layers. A parcel number match is tried first, then the pin location. Counts: {'cache_hit': 1089, 'fetched': 28, 'not_found': 7, 'features': 1148, 'adjoining': 31, 'by_city': {'LAS': 204, 'MIA': 618, 'PHX': 295}, 'by_method': {'parcel number': 1052, 'pin location': 65}}."
   },
   "public_records": {
     "utility_by_city": {
       "LAS": 186,
       "MIA": 612,
-      "PHX": 270
+      "PHX": 271
     },
     "assessor_by_city": {
       "LAS": 181,
       "MIA": 408,
-      "PHX": 261
+      "PHX": 262
     },
     "hifld_territories": 98,
     "note": "County parcel records supply the mailing address and the last recorded sale when the layer includes them. Water and irrigation districts are left out. Miami-Dade's parcel layer has no last-sale date or price. Clark County's free parcel layer has mailing address and last sale. It does not include year built or assessed value.",
@@ -1084,7 +1083,7 @@
       "traffic_by_city": {
         "LAS": 41,
         "MIA": 558,
-        "PHX": 259
+        "PHX": 260
       },
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
     },
@@ -1099,9 +1098,9 @@
   },
   "review_source": "second review column",
   "warnings": [
-    "Census row count is 1737, workbook expectation was 1,701.",
-    "Unique sites are 1693 {'LAS': 429, 'PHX': 573, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
-    "In-area city split is {'LAS': 186, 'PHX': 270, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
+    "Census row count is 1738, workbook expectation was 1,701.",
+    "Unique sites are 1694 {'LAS': 429, 'PHX': 574, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
+    "In-area city split is {'LAS': 186, 'PHX': 271, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
     "Pipeline tab has 85 rows (stages {'Dropped': 23, '': 49, '1 Desk screen': 11, '2 Financial screen': 2}). The older note of 79 is not in this export."
   ],
   "skipped": [
@@ -1116,54 +1115,21 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "changes": {
-    "new_sites": 3,
-    "removed_sites": 0,
+    "new_sites": 1,
+    "removed_sites": 1,
     "verdict_changes": 0,
-    "stage_moves": 6,
+    "stage_moves": 0,
     "sample_new": [
-      "LAND-PHX-0033",
-      "LAND-PHX-0034",
-      "LAND-PHX-0050"
+      "WB-PHX-0030"
     ],
     "sample_verdicts": [],
-    "sample_stages": [
-      {
-        "site_id": "WB-PHX-0015",
-        "before": "Dropped",
-        "after": "Financial screen"
-      },
-      {
-        "site_id": "WB-PHX-0029",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PIPE-MIA-0082",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "deal_id": "PIPE-MIA-0082",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "deal_id": "LAND-PHX-0003",
-        "before": "Dropped",
-        "after": "Financial screen"
-      },
-      {
-        "deal_id": "LAND-PHX-0049",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      }
-    ]
+    "sample_stages": []
   },
   "verdicts_appended": 2,
   "verdicts_total": 2662,
   "parcel_bytes": {
-    "parcels.geojson": 584395,
-    "parcels-PHX.geojson": 153049,
+    "parcels.geojson": 584961,
+    "parcels-PHX.geojson": 153615,
     "parcels-LAS.geojson": 103879,
     "parcels-MIA.geojson": 327553
   },

@@ -755,6 +755,13 @@
       "type": "price",
       "at": "2026-11-08T00:50:43.622Z",
       "summary": "Asking price is $4,000,000, from Cushman & Wakefield."
+    },
+    {
+      "id": "activity:PIPE-MIA-0082:2026-11-08T01:05:55.173Z:A-000271",
+      "siteId": "PIPE-MIA-0082",
+      "type": "activity",
+      "at": "2026-11-08T01:05:55.173Z",
+      "summary": "New activity: Stage set to Dropped on the broker's written word that the real estate is not for sale"
     }
   ],
   "baseline": [
@@ -1120,6 +1127,11 @@
     }
   ],
   "activity": [
+    {
+      "id": "A-000271",
+      "siteId": "PIPE-MIA-0082",
+      "summary": "Stage set to Dropped on the broker's written word that the real estate is not for sale"
+    },
     {
       "id": "A-000226",
       "siteId": "LAND-PHX-0044",

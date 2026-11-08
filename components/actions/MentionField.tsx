@@ -46,6 +46,7 @@ export function MentionField({
   const [active, setActive] = useState(0);
   const listId = `${testId}-mentions`;
   const choices = useMemo(() => {
+    if (mentions.length >= 1) return [];
     const needle = query.trim().toLowerCase();
     return accounts
       .filter((account) => !mentions.some((item) => item.id === account.id))
@@ -116,6 +117,7 @@ export function MentionField({
 
   return (
     <div className="mention-field">
+      <p className="note">Name one reviewer. The list is not notified as a group.</p>
       <label>
         {label}
         {rows ? <textarea {...fieldProps} rows={rows} placeholder={placeholder} /> : <input {...fieldProps} placeholder={placeholder} />}

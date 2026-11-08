@@ -1,9 +1,10 @@
 import { stageTitle } from "@/lib/labels";
 
 export const NEXT_STEP_TYPES = [
-  { id: "knock_off", label: "Knock off" },
+  { id: "stage_move", label: "Advance" },
+  { id: "knock_off", label: "Drop with a reason" },
+  { id: "mark_duplicate", label: "Mark duplicate" },
   { id: "bring_back", label: "Bring back" },
-  { id: "stage_move", label: "Stage move" },
   { id: "work_item", label: "Work item" },
 ] as const;
 
@@ -41,6 +42,7 @@ export function exportStage(detail: string | null | undefined, proposedValue: st
   const type = nextStepType(detail);
   if (!detail) return "";
   if (type === "knock_off") return "Dropped";
+  if (type === "mark_duplicate") return "";
   if (type === "bring_back" || type === "stage_move") {
     return (NEXT_STAGE_IDS as readonly string[]).includes(proposedValue) ? stageTitle(proposedValue) : "";
   }

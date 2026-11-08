@@ -157,6 +157,7 @@ export function ReviewBar({
 
 function ReviewMenu({ siteId, followed, onClose, onSnooze }: { siteId: string; followed: boolean; onClose: () => void; onSnooze: () => void }) {
   const [snooze, setSnooze] = useState("");
+  const [packageReason, setPackageReason] = useState("");
   const [flagUser, setFlagUser] = useState("");
   const [flagNote, setFlagNote] = useState("");
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
@@ -182,11 +183,20 @@ function ReviewMenu({ siteId, followed, onClose, onSnooze }: { siteId: string; f
   }
   return (
     <div className="review-menu" data-testid="queue-menu" role="dialog" aria-label="More actions">
-      <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/snooze", { siteId, until: snooze }); }}>
-        <label>Snooze until
-          <input data-testid="queue-snooze" type="date" value={snooze} onChange={(event) => setSnooze(event.target.value)} />
+      <form onSubmit={(event) => { event.preventDefault(); if (!packageReason) return; void act("/api/queue/snooze", { siteId, until: snooze, reason: packageReason }); }}>
+        <p className="note">Snooze until a package arrives. This does not change Stage.</p>
+        <label>Package status
+          <select aria-label="Package status" value={packageReason} onChange={(event) => setPackageReason(event.target.value)} required>
+            <option value="">Choose a package reason</option>
+            <option value="Package not received">Package not received</option>
+            <option value="Package requested">Package requested</option>
+            <option value="Package partial">Package partial</option>
+          </select>
         </label>
-        <button type="submit">Snooze</button>
+        <label>Snooze until
+          <input data-testid="queue-snooze" type="date" value={snooze} onChange={(event) => setSnooze(event.target.value)} required />
+        </label>
+        <button type="submit">Snooze until a package arrives</button>
       </form>
       <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/flag", { siteId, toUser: flagUser, note: flagNote }); }}>
         <label>Flag for

@@ -18,6 +18,8 @@ import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
 import { readLinks, readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, setLinkStatus, proposeLink, type LinkProposal, type SavedSearch, type Shortlist } from "@/lib/savedSets";
 import { APPROVER_LABEL } from "@/lib/actions/approver";
+import { clearHidden, hideSite, readHidden } from "@/lib/hide";
+import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
@@ -92,6 +94,9 @@ export default function Explorer() {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [linkProposals, setLinkProposals] = useState<LinkProposal[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
+  const [handoff, setHandoff] = useState("");
   const [searchName, setSearchName] = useState("");
   const [listName, setListName] = useState("");
   const [queueCount, setQueueCount] = useState(0);
@@ -163,7 +168,7 @@ export default function Explorer() {
   const queueApproval = params.get("qapprove") === "1";
   const queueMentions = params.get("qmention") === "1";
   const queueAssigned = params.get("qassign") === "1";
-  const visibleFeed = feed.filter((site) => site.status !== "snoozed");
+  const visibleFeed = feed.filter((site) => site.status !== "snoozed" && (showHidden || !hiddenIds.includes(site.siteId)));
   const reviewIndex = Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
   const reviewCurrent = visibleFeed[reviewIndex];
   const caughtUp = reviewing && feedLoaded && !feed.some((site) => site.status === "open");
@@ -182,6 +187,7 @@ export default function Explorer() {
     setSavedSearches(readSearches());
     setShortlists(readShortlists());
     setLinkProposals(readLinks());
+    setHiddenIds(readHidden());
   }, []);
   useEffect(() => {
     const stored = window.localStorage.getItem("pin-label");
@@ -592,7 +598,43 @@ export default function Explorer() {
     const coords = feature.geometry?.coordinates;
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
   });
-  const drawnDeals = areaDeals;
+  function personallyHidden(id: string) {
+    if (showHidden || !hiddenIds.includes(id)) return false;
+    if (selected === id) return false;
+    if (query.trim().length >= 2 && matchesQuery(query, [id])) return false;
+    return true;
+  }
+  const drawnDeals = areaDeals.filter((feature) => !personallyHidden(feature.properties.deal_id));
+  const overlaysOn = parseOverlays(params.get("overlay"));
+  function toggleOverlay(id: OverlayId) {
+    const next = overlaysOn.includes(id) ? overlaysOn.filter((item) => item !== id) : [...overlaysOn, id];
+    write({ overlay: next.length ? next.join("|") : null });
+  }
+  const overlayPoints = overlayFeatures(drawnDeals, overlaysOn).flatMap((feature) => {
+    const coords = feature.geometry?.coordinates;
+    if (!coords) return [];
+    return [{ label: feature.properties.label, coordinates: [coords[0], coords[1]] as [number, number] }];
+  });
+  const handedOff = useRef("");
+  useEffect(() => {
+    if (!data || funnel === "pipeline" || listView || !listedStepEmpty) return;
+    const key = `${stage}|${listed}`;
+    if (handedOff.current === key) return;
+    const universeListed = subcount("universe", "listed");
+    const areaListed = subcount("in_area", "listed");
+    const from = STEPS.find((step) => step.id === stage)?.label || "This step";
+    if (stage !== "universe" && universeListed > 0) {
+      handedOff.current = key;
+      setHandoff(`${from} has no listed sites. Showing Universe, which has ${universeListed.toLocaleString()} listed.`);
+      write({ stage: "universe", listed: "yes" });
+      return;
+    }
+    if (stage !== "in_area" && areaListed > 0) {
+      handedOff.current = key;
+      setHandoff(`${from} has no listed sites. Showing In service area, which has ${areaListed.toLocaleString()} listed.`);
+      write({ stage: "in_area", listed: "yes" });
+    }
+  }, [data, listedStepEmpty, stage, listed, funnel, listView]);
   const linkedIds = new Set(pipelineSquares.map((feature) => feature.properties.universe_id).filter(Boolean));
   const pipelineSites = features.flatMap((feature) => {
     if (!linkedIds.has(feature.properties.site_id) || !feature.geometry) return [];
@@ -808,7 +850,7 @@ export default function Explorer() {
     if (!(allStages || universeWide || stage === "universe") && !inStage(feature.properties, stage)) return false;
     return passesChips(feature.properties, false, universeWide);
   });
-  const universePins = showUniverse ? visibleFeatures.filter((feature) => feature.geometry) : [];
+  const universePins = showUniverse ? visibleFeatures.filter((feature) => feature.geometry && !personallyHidden(feature.properties.site_id)) : [];
   const unscreenedPins = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : [];
   const pinCount = (funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
@@ -1490,6 +1532,7 @@ export default function Explorer() {
           ]}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
+          overlayPoints={overlayPoints}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
@@ -1522,6 +1565,20 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
+        <div className="overlay-bar" role="group" aria-label="Workbook overlays">
+          {OVERLAYS.map((item) => (
+            <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "on" : ""} onClick={() => toggleOverlay(item.id)}>
+              {item.label}
+            </button>
+          ))}
+          <span className="overlay-note">Scan only. A blank cell stays off the layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</span>
+          {hiddenIds.length ? (
+            <button type="button" onClick={() => { setHiddenIds(clearHidden()); setShowHidden(false); }}>
+              Clear {hiddenIds.length} hidden
+            </button>
+          ) : null}
+        </div>
+        {handoff ? <p className="empty-map" role="status">{handoff}</p> : null}
         {funnel === "universe" && !listView && visibleFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
             ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Universe has ${subcount("universe", "listed").toLocaleString()} listed. In service area has ${subcount("in_area", "listed").toLocaleString()} listed.`
@@ -1639,6 +1696,7 @@ export default function Explorer() {
             onOpenParty={openParty}
             onClose={() => choose(null)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
+            onNotFit={() => { setHiddenIds(hideSite(selectedDeal.deal_id)); choose(null); }}
             compared={compareIds.includes(selectedDeal.deal_id)}
             sheet={sheet}
             banner={reviewing && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
@@ -1670,6 +1728,7 @@ export default function Explorer() {
             onOpenDeal={selectedSite.linked_deal_id ? () => choose(selectedSite.linked_deal_id || null) : undefined}
             onOpenParty={openParty}
             onAddCompare={() => setCompared(selectedSite.site_id, !compareIds.includes(selectedSite.site_id))}
+            onNotFit={() => { setHiddenIds(hideSite(selectedSite.site_id)); choose(null); }}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
             sheet={sheet}

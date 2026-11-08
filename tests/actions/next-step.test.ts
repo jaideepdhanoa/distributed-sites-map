@@ -50,6 +50,36 @@ test("a knock off needs a reason and exports Dropped", async () => {
   assert.equal(site.pipeline_stage, "1 Desk screen");
 });
 
+test("mark duplicate names the surviving record and does not set a stage", async () => {
+  const sql = await ready();
+  await assert.rejects(
+    () => createSuggestion(sql, {
+      targetKind: "site",
+      targetId: "PHX-U180",
+      field: "proposed_next_step",
+      detail: "mark_duplicate",
+      proposedValue: "",
+      reason: "",
+      authorId: "writer",
+    }, lookup),
+    InputError,
+  );
+  const step = await createSuggestion(sql, {
+    targetKind: "site",
+    targetId: "PHX-U180",
+    field: "proposed_next_step",
+    detail: "mark_duplicate",
+    proposedValue: "WB-PHX-0016",
+    reason: "Same parcel after the reviewer confirmed the address.",
+    authorId: "writer",
+  }, lookup);
+  assert.equal(step.detail, "mark_duplicate");
+  assert.equal(step.proposedValue, "WB-PHX-0016");
+  assert.equal(step.title, "Duplicate of WB-PHX-0016");
+  const csv = nextStepsCsv([step], lookup);
+  assert.doesNotMatch(csv, /Dropped/);
+});
+
 test("bring back needs a stage and does not take an assignee", async () => {
   const sql = await ready();
   await assert.rejects(

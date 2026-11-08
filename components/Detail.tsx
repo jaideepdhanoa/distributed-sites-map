@@ -118,6 +118,7 @@ export default function Detail({
   onOpenParty,
   linkedDeal,
   onAddCompare,
+  onNotFit,
   sameOwner,
   onClose,
   sheet,
@@ -135,6 +136,7 @@ export default function Detail({
   onOpenParty?: (name: string) => void;
   linkedDeal?: DealProps | null;
   onAddCompare?: () => void;
+  onNotFit?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
   sheet?: { expanded: boolean; onToggle: () => void };
@@ -187,6 +189,7 @@ export default function Detail({
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
       {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+      {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       {figuresReady ? <GradePair site={site} deal={linkedDeal} prefer="site" /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
       {related}
       <SitePhotos card={photos} />
@@ -358,6 +361,7 @@ export function DealDetail({
   onOpenParty,
   onClose,
   onCompare,
+  onNotFit,
   compared,
   sheet,
   extras,
@@ -377,6 +381,7 @@ export function DealDetail({
   onOpenParty?: (name: string) => void;
   onClose?: () => void;
   onCompare?: (on: boolean) => void;
+  onNotFit?: () => void;
   compared?: boolean;
   sheet?: { expanded: boolean; onToggle: () => void };
   extras?: ReactNode;
@@ -424,10 +429,10 @@ export function DealDetail({
           Compare
         </label>
       ) : null}
-      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
-      {figuresReady ? <GradePair site={universeSite} deal={deal} prefer="deal" /> : null}
-      {related}
+      {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       <SitePhotos card={photos} />
+      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {related}
       <NextStepCard kind="deal" id={deal.deal_id} />
       <PanelSections
         overview={

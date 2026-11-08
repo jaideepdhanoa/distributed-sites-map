@@ -36,6 +36,7 @@ type Props = {
   fitPoints?: [number, number][];
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
+  overlayPoints?: { label: string; coordinates: [number, number] }[];
 };
 
 function ringPoint(lon: number, lat: number, miles: number, step: number): [number, number] {
@@ -691,6 +692,34 @@ export default function MapView(props: Props) {
       const labelSource = map.getSource("deal-labels") as GeoJSONSource | undefined;
       if (labelSource) labelSource.setData(labelData);
       else map.addSource("deal-labels", { type: "geojson", data: labelData });
+      const overlayData = {
+        type: "FeatureCollection" as const,
+        features: (props.overlayPoints || []).map((point) => ({
+          type: "Feature" as const,
+          properties: { label: point.label },
+          geometry: { type: "Point" as const, coordinates: point.coordinates },
+        })),
+      };
+      const overlaySource = map.getSource("overlays") as GeoJSONSource | undefined;
+      if (overlaySource) overlaySource.setData(overlayData);
+      else map.addSource("overlays", { type: "geojson", data: overlayData });
+      if (!map.getLayer("overlay-labels")) {
+        map.addLayer({
+          id: "overlay-labels",
+          type: "symbol",
+          source: "overlays",
+          layout: {
+            "text-field": ["get", "label"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 11,
+            "text-offset": [0, -1.8],
+            "text-anchor": "bottom",
+            "text-allow-overlap": false,
+            "text-optional": true,
+          },
+          paint: { "text-color": "#1e4636", "text-halo-color": "#f4fff6", "text-halo-width": 6 },
+        });
+      }
       if (!map.getLayer("deal-pills")) {
         map.addLayer({
           id: "deal-pills",
@@ -745,7 +774,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -960,6 +989,8 @@ export default function MapView(props: Props) {
     <div className="stage-map">
       <div ref={node} className="map" />
       <div className="map-tools">
+        <details className="map-chrome">
+          <summary>Map tools</summary>
         <div className="pin-label" role="group" aria-label="Basemap" data-testid="basemap">
           <span>Base</span>
           <button className={(props.basemap || "positron") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
@@ -1001,6 +1032,7 @@ export default function MapView(props: Props) {
           </button>
         ) : null}
         {readout ? <span className="map-readout">{readout}</span> : null}
+        </details>
       </div>
       {coverageText ? <p className="map-coverage" data-testid="map-coverage">{coverageText}</p> : null}
       <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>

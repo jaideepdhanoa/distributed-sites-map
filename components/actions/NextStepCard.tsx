@@ -51,6 +51,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   const [title, setTitle] = useState("");
   const [reason, setReason] = useState("");
   const [stage, setStage] = useState("");
+  const [survivor, setSurvivor] = useState("");
+  const [sameParcel, setSameParcel] = useState(false);
   const [ownerId, setOwnerId] = useState("");
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
@@ -101,6 +103,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     setTitle("");
     setReason("");
     setStage("");
+    setSurvivor("");
+    setSameParcel(false);
     setOwnerId("");
     setDue("");
     setReassigning(false);
@@ -134,6 +138,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     setTitle(item.title || "");
     setReason(item.reason || "");
     setStage(item.detail === "bring_back" || item.detail === "stage_move" ? item.proposedValue : "");
+    setSurvivor(item.detail === "mark_duplicate" ? item.proposedValue : "");
+    setSameParcel(item.detail === "mark_duplicate");
     setOwnerId(item.ownerId || "");
     setDue(item.targetOn || "");
   }
@@ -145,8 +151,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       field: "proposed_next_step",
       detail: stepType,
       title: stepType === "work_item" ? title : undefined,
-      proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : title,
-      reason: stepType === "knock_off" ? reason : "",
+      proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : stepType === "mark_duplicate" ? survivor : title,
+      reason: stepType === "knock_off" || stepType === "mark_duplicate" ? reason : "",
       ownerId: allowsAssignee(stepType) ? ownerId : "",
       targetOn: allowsDate(stepType) ? due : "",
     };
@@ -158,6 +164,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       onSubmit={(event) => {
         event.preventDefault();
         if (!type) return;
+        if (type === "mark_duplicate" && !sameParcel) return;
         const body = payloadFor(type);
         if (editing) {
           void submit(`/api/actions/suggestions/${editing}`, body, "PATCH");
@@ -179,11 +186,24 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           <input aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
         </label>
       ) : null}
-      {type === "knock_off" ? (
+      {type === "knock_off" || type === "mark_duplicate" ? (
         <label>
           Reason
-          <textarea aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} />
+          <textarea aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} required />
         </label>
+      ) : null}
+      {type === "mark_duplicate" ? (
+        <>
+          <label>
+            Surviving record
+            <input aria-label="Surviving record" value={survivor} onChange={(event) => setSurvivor(event.target.value)} placeholder="Pipeline, land, or universe id" />
+          </label>
+          <label className="act-check">
+            <input type="checkbox" checked={sameParcel} onChange={(event) => setSameParcel(event.target.checked)} />
+            These are the same parcel
+          </label>
+          <p className="hint">The link waits until {APPROVER_LABEL} approves. It does not change Stage.</p>
+        </>
       ) : null}
       {type === "bring_back" || type === "stage_move" ? (
         <label>
@@ -210,10 +230,10 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         </div>
       ) : null}
       <div className="act-row">
-        <button type="submit" disabled={pending || !type}>Submit for approval</button>
+        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())}>Submit for approval</button>
         <button type="button" onClick={resetForm}>Cancel</button>
       </div>
-      <p className="hint">Knock off needs a reason. Bring back and Stage move need a stage. Work item is freeform.</p>
+      <p className="hint">Advance picks the next funnel stage. Drop needs a reason. Mark duplicate names the surviving record and waits for approval. One next step at a time.</p>
     </form>
   ) : null;
 
@@ -233,7 +253,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           {focus.ownerName ? ` · Assignee ${focus.ownerName}` : knock ? " · No assignee" : ""}
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
-        {knock && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
+        {(knock || stepType === "mark_duplicate") && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
         {reviewer ? (
           <div className="act-row">
             <button type="button" className="propose" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "accepted" })}>Accept</button>
@@ -296,7 +316,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         <p>No next step yet. Propose one.</p>
         <p>{APPROVER_LABEL} approves before it changes the record.</p>
         {writable ? <button type="button" className="propose" onClick={() => setOpen(true)}>+ Propose next step</button> : null}
-        <p className="hint">Knock off, bring back, stage move, or a work item — all go through approval.</p>
+        <p className="hint">Advance, drop with a reason, or mark duplicate. {APPROVER_LABEL} approves before it changes the record. Resolving a comment does not change Stage.</p>
       </>
     );
   }

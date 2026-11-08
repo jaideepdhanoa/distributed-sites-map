@@ -744,6 +744,17 @@ tr { cursor: pointer; }
     right: 8px;
     max-width: none;
   }
+  .map-chrome > summary {
+    display: inline-flex;
+    border: 0;
+    background: #fffdf8;
+    border-radius: 999px;
+    padding: 6px 10px;
+  }
+  .map-chrome:not([open]) .pin-label,
+  .map-chrome:not([open]) > button,
+  .map-chrome:not([open]) .map-readout { display: none; }
+  .maplibregl-ctrl-top-right { top: auto; bottom: 28px; }
   .pin-label { max-width: 100%; }
   .compare-tray {
     position: fixed;
@@ -751,7 +762,7 @@ tr { cursor: pointer; }
     right: 0;
     bottom: 0;
     top: auto;
-    max-height: 46vh;
+    max-height: 68vh;
     overflow: auto;
     border-radius: 16px 16px 0 0;
     z-index: 7;
@@ -1048,6 +1059,49 @@ tr { cursor: pointer; }
 }
 .photo-nav button:disabled { opacity: 0.45; }
 .key-strip { margin: 8px 0 12px; }
+.packet .job { margin: 14px 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.packet .job:first-child { margin-top: 4px; }
+.supporting { margin-top: 8px; color: var(--muted); font-size: 13px; display: grid; gap: 2px; }
+.supporting p { margin: 0; }
+.overlay-bar {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 52px;
+  left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: min(560px, calc(100% - 70px));
+  justify-content: flex-end;
+}
+.overlay-bar button, .overlay-note {
+  background: rgba(250, 247, 241, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.overlay-bar button.on { background: #1e4636; color: #fffdf8; border-color: #1e4636; }
+.overlay-note { color: var(--muted); max-width: 280px; white-space: normal; }
+@media (max-width: 767px) {
+  .overlay-bar {
+    top: 8px;
+    bottom: auto;
+    left: 8px;
+    right: 8px;
+    max-height: none;
+    justify-content: flex-start;
+  }
+  .overlay-note { display: none; }
+  .overlay-bar button { font-size: 11px; padding: 4px 8px; }
+  .compare-tray .compare-grid { grid-template-columns: 1fr; }
+}
+.map-chrome > summary { display: none; }
+.map-chrome:not([open]) > .pin-label,
+.map-chrome:not([open]) > button,
+.map-chrome:not([open]) > .map-readout,
+.map-chrome:not([open]) > label { display: flex; }
 .metrics strong, .compare-grid p, .access-note { white-space: normal; overflow-wrap: anywhere; }
 .access-note, .related-records { margin: 8px 0; }
 .related-records ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

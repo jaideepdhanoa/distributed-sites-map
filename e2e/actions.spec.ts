@@ -219,7 +219,7 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByRole("checkbox", { name: "Propose next step" })).toHaveCount(0);
   await page.getByRole("button", { name: "Propose next step" }).click();
-  await page.getByRole("button", { name: "Knock off" }).click();
+  await page.getByRole("button", { name: "Drop with a reason" }).click();
   await page.getByLabel("Reason").fill("The broker confirmed another buyer.");
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByTestId("proposed-next-step")).toContainText("Drop from pipeline");

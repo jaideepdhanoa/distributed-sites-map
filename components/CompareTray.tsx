@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { acreUnit, acresText, baysLine, capacitySummary, cashTile, depotLine, displayScore, factsForDeal, openLandText, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, acresText, baysLine, capacitySummary, cashTile, depotLine, displayScore, factsForDeal, fullMoney, openLandText, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
 import { stageDetail } from "@/lib/labels";
 
 export default function CompareTray({
@@ -52,19 +52,19 @@ export default function CompareTray({
                 <h3>{deal.name || deal.address}</h3>
                 <p>{stageDetail(deal.stage, deal.stage_group)}</p>
                 <p>Asking {sheetMoney(deal.asking_price, deal.asking_price_display)}</p>
+                <p>{baysLine(deal) || "Bays that fit not provided"}</p>
+                <p>{workbookTrafficLine(deal) || "Traffic count not provided"}</p>
+                <p>Cash flow {deal.stated_cash_flow_display ? sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) : cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>
                 <p>Land {acresText(deal.land_acres) || "Not provided"}</p>
-                <p>Per acre {deal.price_per_acre_display || "Not provided"}</p>
+                <p>Per acre {deal.price_per_acre != null ? sheetMoney(deal.price_per_acre, fullMoney(deal.price_per_acre)) : "Not provided"}</p>
                 <p>Workbook spare {deal.open_land_sqft != null ? `${openLandText(deal.open_land_sqft)} · sheet, square feet` : "Not measured"}</p>
                 {(() => {
                   const linked = lookup.find((site) => site.site_id === deal.universe_id);
                   if (!linked || linked.spare_ac_own == null) return null;
                   return <p>Universe own spare {acreUnit(linked.spare_ac_own, linked.spare_ac_own_text)} · census own-parcel, acres</p>;
                 })()}
-                <p>{baysLine(deal) || "Bays that fit not provided"}</p>
                 <p>Site capacity {capacitySummary(factsForDeal(deal))}</p>
-                <p>{workbookTrafficLine(deal) || "Traffic count not provided"}</p>
                 {tradeAreaLines(deal).map((line) => <p key={line}>{line}</p>)}
-                <p>Cash flow {deal.stated_cash_flow_display ? sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) : cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>
                 {deal.access_notes ? <p>Access and visibility: {deal.access_notes}</p> : null}
                 {displayScore(deal.score) ? <p>Score {displayScore(deal.score)} of 100</p> : null}
                 <p>Depot {depotLine(deal.miles_to_depot, deal.miles_to_depot != null)}</p>

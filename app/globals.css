@@ -1116,6 +1116,44 @@ tr { cursor: pointer; }
 @media (max-width: 767px) {
   .drawer { animation-name: sheet-in; }
 }
+.fin-tile {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.fin-head, .fin-switch { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fin-head { justify-content: space-between; }
+.fin-switch { margin: 8px 0; }
+.fin-switch button, .fin-request button, .fin-head button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  padding: 4px 10px;
+}
+.fin-switch button.on { background: var(--pine-900); color: var(--cream-0); }
+.fin-figures, .fin-check, .fin-bridge, .fin-claims { display: grid; }
+.fin-figures article, .fin-check article, .fin-bridge p, .fin-claims p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.fin-request label { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; }
+@media (max-width: 767px) {
+  .fin-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    overflow: auto;
+    margin: 0;
+    background: var(--cream-0);
+    padding: 16px 16px 32px;
+  }
+}
 @keyframes sheet-in { from { transform: translateY(24px); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .drawer, .metrics strong { animation: none; transition: none; }

@@ -162,7 +162,16 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
     assignments.set(siteId, list);
   }
   const assigned = new Set(assignments.keys());
-  const needsApproval = new Set(openSteps.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)));
+  const openDocuments = reviewer
+    ? await sql.query<{ target_kind: "site" | "deal"; target_id: string }>(
+      `SELECT target_kind, target_id FROM suggestions WHERE field_name = 'document_request' AND status = 'open'`,
+      [],
+    )
+    : { rows: [] as { target_kind: "site" | "deal"; target_id: string }[] };
+  const needsApproval = new Set([
+    ...openSteps.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)),
+    ...openDocuments.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)),
+  ]);
   const reasons: Record<string, QueueReason[]> = {};
   const push = (siteId: string, reason: QueueReason) => {
     if (!siteId) return;

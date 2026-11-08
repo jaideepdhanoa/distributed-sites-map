@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Banknote, Gauge, LandPlot, MapPin, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps } from "@/lib/types";
-import { basisLabel, baysLine, cashTile, depotLine, factsForDeal, fullMoney, openLandText, peerNote, tileAmount, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { basisLabel, baysLine, cashTile, depotLine, factsForDeal, fullMoney, openLandText, peerNote, showsFinancials, tileAmount, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { panelFromDeal, safePackageHref, type FinancialPanel } from "@/lib/financials";
 import { shownPriceSource } from "@/lib/format";
+import FinancialsPanel from "./FinancialsPanel";
 
 function CountUp({ value }: { value: string }) {
   const [shown, setShown] = useState(value);
@@ -79,10 +81,12 @@ export default function KeyStrip({
   deal,
   hasPin,
   peers,
+  signedIn = false,
 }: {
   deal: DealProps;
   hasPin: boolean;
   peers: DealProps[];
+  signedIn?: boolean;
 }) {
   const rank = peerNote(deal, peers);
   const cash = cashTile(deal);
@@ -103,6 +107,25 @@ export default function KeyStrip({
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
+  const [financialsOpen, setFinancialsOpen] = useState(false);
+  const [financials, setFinancials] = useState<FinancialPanel | null>(null);
+  const showFinancials = showsFinancials(deal);
+  useEffect(() => {
+    if (!signedIn || !showFinancials) return undefined;
+    let cancel = false;
+    fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`)
+      .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel : null))
+      .then((panel) => {
+        if (!cancel) setFinancials(panel);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [signedIn, showFinancials, deal.deal_id]);
+  const packageHref = safePackageHref(financials?.packageHref, signedIn);
+  const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
+  const shownPanel = financials ?? fallbackPanel;
   return (
     <section className="key-strip" data-testid="key-strip">
       <div className="metrics">
@@ -115,8 +138,23 @@ export default function KeyStrip({
           <CapacityFacts facts={facts} />
         </article>
         <Metric icon={MapPin} label="Depot" value={depotLine(deal.miles_to_depot, hasPin)} note={hasPin ? "straight line" : ""} />
-        <Metric icon={Banknote} label={deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"} value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
+        {cash.hidden ? null : signedIn && showFinancials ? (
+          <article className="wide">
+            <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
+              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
+              <strong title={cashView.title}><CountUp value={cashView.text} /></strong>
+              {cash.note || cash.extra ? <small>{`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`}</small> : null}
+              {cash.basis ? <em>{cash.basis}</em> : null}
+            </button>
+            {packageHref ? <a href={packageHref} target="_blank" rel="noopener noreferrer">Open package</a> : null}
+          </article>
+        ) : (
+          <Metric icon={Banknote} label={deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"} value={cashView.text} title={cashView.title} note={`${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`} basis={cash.basis} />
+        )}
       </div>
+      {signedIn && financialsOpen && shownPanel.open ? (
+        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
+      ) : null}
       {traffic || trade.length ? (
         <div className="trade-area" data-testid="trade-area">
           {traffic ? <p>{traffic}</p> : null}

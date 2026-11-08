@@ -43,6 +43,7 @@ function cell(row: PipelineRow, id: PipelineColumnId) {
   if (id === "traffic") return workbookTrafficLine(deal) || "Not provided";
   if (id === "cashFlow") {
     const cash = cashTile(deal);
+    if (cash.hidden) return "";
     if (cash.value === "Not provided" || cash.value === "Vacant land, no business") return cash.value;
     return [cash.value, cash.note, cash.basis].filter(Boolean).join(" · ");
   }

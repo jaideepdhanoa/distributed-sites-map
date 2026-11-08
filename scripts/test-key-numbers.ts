@@ -56,7 +56,11 @@ assert.equal(note?.label, "1st lowest of 2 Phoenix pipeline");
 
 assert.equal(cashTile(deal({ figures_status: "withheld" })).value, "Package figures not shown");
 assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received", figures_status: "shown" })).value, "-$121,000");
-assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).note, "EBITDA · Package Received");
+assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).note, "EBITDA · Package on file");
+assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).basis, "Documented");
+assert.equal(cashTile(deal({ figures_basis: "Claimed", stated_cash_flow_display: "$400,000", cash_flow_label: "EBITDA" })).basis, "Broker-stated");
+assert.equal(cashTile(deal({ kind: "land", figures_status: "vacant", stated_cash_flow: 0, stated_cash_flow_display: "$0" })).hidden, true);
+assert.equal(cashTile(deal({ kind: "land", figures_status: "vacant" })).value, "");
 assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "acres"), "1.42 ac");
 assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "peracre"), "$775K");
 assert.equal(pillText(deal({ land_acres: 1.64, price_per_acre: null, price_per_acre_display: "" }), "peracre"), "");

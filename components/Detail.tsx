@@ -8,6 +8,7 @@ import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { acreUnit, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
+import { cashTile } from "@/lib/keyNumbers";
 import KeyStrip, { CapacityFacts } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
@@ -358,6 +359,7 @@ export function DealDetail({
   extras,
   banner,
   onSwipe,
+  signedIn = false,
 }: {
   deal: DealProps;
   peers?: DealProps[];
@@ -375,9 +377,11 @@ export function DealDetail({
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
+  signedIn?: boolean;
 }) {
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
+  const cash = cashTile(deal);
   return (
     <aside
       className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
@@ -415,7 +419,7 @@ export function DealDetail({
           Compare
         </label>
       ) : null}
-      <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />
+      <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} signedIn={signedIn} />
       <GradePair site={universeSite} deal={deal} prefer="deal" />
       <SitePhotos card={photos} />
       <NextStepCard kind="deal" id={deal.deal_id} />
@@ -471,14 +475,8 @@ export function DealDetail({
               <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
               <span>Site capacity</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
-              <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
-              <div>
-                {deal.stated_cash_flow_display
-                  ? `${deal.stated_cash_flow_display}${deal.cash_flow_label ? ` · ${deal.cash_flow_label}` : ""}${deal.figures_basis ? ` · ${deal.figures_basis}` : ""}${deal.package_status ? ` · Package ${deal.package_status}` : ""}`
-                  : deal.figures_status === "withheld"
-                  ? "Package figures not shown"
-                  : deal.stated_revenue_display || (deal.kind === "land" ? "Vacant land, no business" : "Not provided")}
-              </div>
+              {cash.hidden ? null : <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>}
+              {cash.hidden ? null : <div>{[cash.value, cash.note, cash.basis].filter(Boolean).join(" · ") || "Not provided"}</div>}
             </div>
           </>
         }

@@ -52,7 +52,7 @@ export default function CompareTray({
                 <p>Site capacity {capacitySummary(factsForDeal(deal))}</p>
                 <p>{workbookTrafficLine(deal) || "Traffic count not provided"}</p>
                 {tradeAreaLines(deal).map((line) => <p key={line}>{line}</p>)}
-                <p>Cash flow {cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>
+                {cash.hidden ? null : <p>Cash flow {cash.value}{cash.note ? ` · ${cash.note}` : ""}{cash.basis ? ` · ${cash.basis}` : ""}</p>}
                 <p>Depot {depotLine(deal.miles_to_depot, deal.miles_to_depot != null)}</p>
               </article>
             );

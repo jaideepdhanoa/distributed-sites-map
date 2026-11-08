@@ -132,6 +132,10 @@ export default function Explorer() {
   const [userOpen, setUserOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
+  const [hitsOpen, setHitsOpen] = useState(false);
+  const searchTimer = useRef<number | null>(null);
+  const searchFocused = useRef(false);
   const [catalog, setCatalog] = useState<SiteFeature[] | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
@@ -147,6 +151,18 @@ export default function Explorer() {
   const listed = params.get("listed") || "any";
   const landSites = params.get("land") === "1";
   const query = params.get("q") || "";
+  useEffect(() => {
+    if (!searchFocused.current) setQueryDraft(query);
+  }, [query]);
+  useEffect(() => {
+    function onPointer(event: PointerEvent) {
+      const target = event.target as Element | null;
+      if (target?.closest(".search, .search-hits")) return;
+      setHitsOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, []);
   const who = params.get("who") || "";
   const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
   const showLandLayer = funnel === "pipeline" ? params.get("landlayer") !== "0" : params.get("landlayer") === "1";
@@ -827,7 +843,7 @@ export default function Explorer() {
   }
 
   const searchHits = collectSearchHits(
-    query,
+    queryDraft,
     dealRows,
     (catalog ?? features).map((feature) => feature.properties),
     (site) => deepestStage(presentSite(site as SiteProps)),
@@ -836,8 +852,28 @@ export default function Explorer() {
   const focus = (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : (CITY_VIEW[city] ?? CITY_VIEW.PHX);
   const dropCount = sites.filter((site) => droppedAt(site, stage) && (allCities || site.city === city)).length;
 
+  function onSearchInput(value: string) {
+    setQueryDraft(value);
+    setHitsOpen(value.trim().length >= 2);
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => write({ q: value || null }), 200);
+  }
+
+  function closeSearch(clear = false) {
+    setHitsOpen(false);
+    setSearchOpen(false);
+    if (!clear) return;
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    setQueryDraft("");
+    write({ q: null });
+  }
+
   function openHit(hit: SearchHit) {
-    const patch: Record<string, string | null> = { site: hit.id, who: null, q: query || null };
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    setQueryDraft("");
+    setHitsOpen(false);
+    setSearchOpen(false);
+    const patch: Record<string, string | null> = { site: hit.id, who: null, q: null };
     if (hit.city === "PHX" || hit.city === "LAS" || hit.city === "MIA") patch.city = hit.city === "PHX" ? null : hit.city;
     if (hit.kind === "deal") {
       const known = PIPE_STEPS.some((step) => step.id === hit.stage);
@@ -856,6 +892,11 @@ export default function Explorer() {
   }
 
   function onSearchKey(event: { key: string; preventDefault: () => void }) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch(true);
+      return;
+    }
     if (event.key !== "Enter" || !searchHits[0]) return;
     event.preventDefault();
     openHit(searchHits[0]);
@@ -1104,7 +1145,7 @@ export default function Explorer() {
               <option value="MIA">Miami</option>
             </select>
           </label>
-          <input className="search only-desktop" aria-label="Search" placeholder="Name, address, broker, APN, id" value={query} onChange={(event) => write({ q: event.target.value || null })} onKeyDown={onSearchKey} />
+          <input className="search only-desktop" aria-label="Search" placeholder="Name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
@@ -1130,7 +1171,7 @@ export default function Explorer() {
               </div>
             ) : null}
           </div>
-          <button className="phone-step only-mobile" type="button" onClick={() => setStepsOpen(true)}>
+          <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
             {funnel === "pipeline"
               ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Spare land"))}
@@ -1138,7 +1179,7 @@ export default function Explorer() {
           <button className="icon-btn only-mobile" type="button" aria-pressed={searchOpen} aria-label={searchOpen ? "Hide search" : "Search"} onClick={() => setSearchOpen((value) => !value)}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M16 16l5 5" /></svg>
           </button>
-          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => !value); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
+          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
@@ -1152,9 +1193,9 @@ export default function Explorer() {
           <button className={filtersOpen ? "on" : ""} type="button" onClick={() => { setFiltersOpen((value) => !value); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {searchOpen ? (
-          <input className="search mobile-search" aria-label="Search" placeholder="Name, address, broker, APN, id" value={query} onChange={(event) => write({ q: event.target.value || null })} onKeyDown={onSearchKey} />
+          <input className="search mobile-search" aria-label="Search" placeholder="Name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
         ) : null}
-        {query.trim().length >= 2 ? (
+        {hitsOpen && queryDraft.trim().length >= 2 ? (
           <div className="search-hits" role="listbox" aria-label="Search results" data-testid="search-hits">
             {universeWide || pipelineWide ? (
               <div className="search-wide" data-testid="search-wide">
@@ -1509,6 +1550,7 @@ export default function Explorer() {
           onExit={() => write({ review: null, i: null })}
           onOpenFeed={() => setFeedSheet(true)}
           onSnooze={snoozeCurrent}
+          onNotFit={() => { if (reviewCurrent?.siteId) setHiddenIds(hideSite(reviewCurrent.siteId)); }}
           filters={(
             <FilterPopover
               summary={filterSummary}

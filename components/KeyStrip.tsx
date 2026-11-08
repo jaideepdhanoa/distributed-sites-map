@@ -2,7 +2,7 @@
 
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps } from "@/lib/types";
-import { acreUnit, baysLine, basisLabel, cashTile, depotLine, factsForDeal, fullMoney, openLandText, sheetMoney, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { acreUnit, baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import type { SiteProps } from "@/lib/types";
 
@@ -45,6 +45,53 @@ function Metric({
   );
 }
 
+function capacityTiles(facts: { lines: string[] }[]) {
+  const capacityLabels = ["Peak load", "Year load", "Frontage hosting", "Nearby hosting", "Substation", "Line", "Feeder", "Horizon", "Phase"];
+  return facts.flatMap((fact) => fact.lines.map((line) => {
+    const label = capacityLabels.find((item) => line.startsWith(`${item} `));
+    if (!label) return { label: "Service", value: line };
+    return { label, value: line.slice(label.length + 1) };
+  }));
+}
+
+export function SitePacket({
+  site,
+  deal,
+  hasPin,
+}: {
+  site: SiteProps;
+  deal?: DealProps | null;
+  hasPin: boolean;
+}) {
+  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} />;
+  const facts = factsForSite(site);
+  const capacity = capacityTiles(facts);
+  const asking = site.asking_price_display || "";
+  const ownSpare = site.spare_ac_own != null ? acreUnit(site.spare_ac_own, site.spare_ac_own_text) : "";
+  const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
+  return (
+    <section className="key-strip packet" data-testid="key-strip">
+      <h3 className="job">Space</h3>
+      <div className="metrics">
+        {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
+        {ownSpare ? <Metric icon={Trees} label="Universe own spare" value={ownSpare} note="Census own-parcel spare, acres" /> : null}
+        {!acres && !ownSpare ? <Metric icon={Trees} label="Spare" value="Not measured" /> : null}
+      </div>
+      <h3 className="job">Capacity</h3>
+      {capacity.length ? (
+        <div className="metrics">
+          {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
+        </div>
+      ) : <p className="note">Not on file</p>}
+      <h3 className="job">Attractiveness</h3>
+      <div className="metrics">
+        {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="Not on file" />}
+        <Metric icon={Ruler} label="Depot" value={depotLine(site.miles_to_depot, hasPin)} />
+      </div>
+    </section>
+  );
+}
+
 export default function KeyStrip({
   deal,
   hasPin,
@@ -64,12 +111,7 @@ export default function KeyStrip({
       ? { text: sheetMoney(deal.stated_revenue, deal.stated_revenue_display), title: sheetMoney(deal.stated_revenue, deal.stated_revenue_display) }
       : { text: cash.value, title: cash.value };
   const facts = factsForDeal(deal);
-  const capacityLabels = ["Peak load", "Year load", "Frontage hosting", "Nearby hosting", "Substation", "Line", "Feeder", "Horizon", "Phase"];
-  const capacity = facts.flatMap((fact) => fact.lines.map((line) => {
-    const label = capacityLabels.find((item) => line.startsWith(`${item} `));
-    if (!label) return { label: "Service", value: line };
-    return { label, value: line.slice(label.length + 1) };
-  }));
+  const capacity = capacityTiles(facts);
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);

@@ -8,53 +8,13 @@ import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { acreUnit, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
-import KeyStrip, { CapacityFacts } from "./KeyStrip";
+import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 
 function acres(value: number | null | undefined, text?: string) {
   const shown = acreUnit(value, text);
   return shown || "—";
-}
-
-function spareRows(site?: SiteProps | null, deal?: DealProps | null) {
-  const rows: { label: string; value: string; basis: string }[] = [];
-  if (deal?.open_land_sqft != null) {
-    rows.push({ label: "Workbook spare", value: openLandText(deal.open_land_sqft), basis: "Sheet spare area, square feet" });
-  }
-  if (site?.spare_ac_own != null) {
-    rows.push({ label: "Universe own spare", value: acreUnit(site.spare_ac_own, site.spare_ac_own_text), basis: "Census own-parcel spare, acres" });
-  }
-  if (!rows.length) rows.push({ label: "Spare land", value: "Not measured", basis: "No aerial check yet" });
-  return rows;
-}
-
-function GradePair({
-  site,
-  deal,
-  prefer,
-}: {
-  site?: SiteProps | null;
-  deal?: DealProps | null;
-  prefer: "site" | "deal";
-}) {
-  const rows = spareRows(site, deal);
-  const facts = prefer === "site" ? factsForSite(site, deal) : factsForDeal(deal);
-  return (
-    <div className="grade-pair" data-testid="grade-pair">
-      {rows.map((row) => (
-        <article key={row.label}>
-          <span>{row.label}</span>
-          <strong>{row.value}</strong>
-          <small>{row.basis}</small>
-        </article>
-      ))}
-      <article className="facts">
-        <span>Site capacity</span>
-        <CapacityFacts facts={facts} />
-      </article>
-    </div>
-  );
 }
 
 function websiteLabel(url: string) {
@@ -188,11 +148,11 @@ export default function Detail({
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
+      <SitePhotos card={photos} />
+      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {related}
       {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
-      {figuresReady ? <GradePair site={site} deal={linkedDeal} prefer="site" /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
-      {related}
-      <SitePhotos card={photos} />
       <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
         overview={

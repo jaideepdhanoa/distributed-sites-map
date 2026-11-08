@@ -71,6 +71,17 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   }
 
   useEffect(() => {
+    function onOpen(event: Event) {
+      const detail = (event as CustomEvent<NextStepTypeId>).detail;
+      if (!detail) return;
+      setType(detail);
+      setOpen(true);
+    }
+    window.addEventListener("sites-open-next-step", onOpen);
+    return () => window.removeEventListener("sites-open-next-step", onOpen);
+  }, []);
+
+  useEffect(() => {
     if (!status.enabled) return undefined;
     let cancel = false;
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
@@ -310,10 +321,12 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     body = (
       <>
         <p className="kicker">Next step</p>
-        <p>No next step yet. Propose one.</p>
-        <p>Approval is required before it changes the record.</p>
-        {writable ? <button type="button" className="propose" onClick={() => setOpen(true)}>+ Propose next step</button> : null}
-        <p className="hint">Advance, drop with a reason, or mark duplicate. Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
+        <div className="type-chips" role="group" aria-label="Next step type">
+          <button type="button" onClick={() => { setType("stage_move"); setOpen(true); }}>Advance</button>
+          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }}>Drop with a reason</button>
+          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }}>Mark duplicate</button>
+        </div>
+        <p className="hint">Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
       </>
     );
   }

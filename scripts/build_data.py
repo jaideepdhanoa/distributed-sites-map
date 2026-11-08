@@ -2168,39 +2168,39 @@ def deal_source(row: dict, listing_url: str) -> tuple[str, str]:
     return name[:160], kind
 
 
+def _http_urls(value: str) -> list[str]:
+    return [match.rstrip(".,;") for match in re.findall(r"https?://[^\s)>\"]+", value or "")]
+
+
 def listing_url_from_row(row: dict) -> str:
-    """Prefer a public listing page over a map pin or a file folder.
+    """The typed Listing link column only.
 
-    Hyperlink targets are included even when the visible cell text is not the URL.
+    A URL in Photo notes, evidence, a source line, or any other note is not the
+    original listing. A hyperlink on the Listing link cell still counts when the
+    visible text is not the URL. A file-folder link in that cell is not a listing page.
     """
-    found = []
-    for key, value in row.items():
-        if str(key).startswith("_") or not isinstance(value, str):
-            continue
-        for match in re.findall(r"https?://[^\s)>\"]+", value):
-            found.append((str(key), match.rstrip(".,;")))
+    found: list[str] = []
+    cell = row.get("Listing link")
+    if isinstance(cell, str):
+        found.extend(_http_urls(cell))
     for key, target in row.get("_links") or []:
-        for match in re.findall(r"https?://[^\s)>\"]+", str(target)):
-            found.append((str(key), match.rstrip(".,;")))
-    if not found:
-        return ""
-
-    def rank(item):
-        key, url = item
+        if str(key) != "Listing link":
+            continue
+        found.extend(_http_urls(str(target)))
+    kept: list[str] = []
+    seen: set[str] = set()
+    for url in found:
         host = _url_host(url)
-        listing = host in _LISTING_HOSTS
-        drive = "google." in host or host.endswith("google.com")
-        preferred_col = key == "Listing link"
-        return (0 if listing else 1 if not drive else 2, 0 if preferred_col else 1)
-
-    found = [item for item in found if "linkedin." not in _url_host(item[1])]
-    if not found:
+        if "google." in host or host.endswith("google.com"):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        kept.append(url)
+    if not kept:
         return ""
-    found.sort(key=rank)
-    best = found[0][1]
-    if "google." in _url_host(best):
-        return ""
-    return best[:400]
+    kept.sort(key=lambda url: 0 if _url_host(url) in _LISTING_HOSTS else 1)
+    return kept[0][:400]
 
 
 def folder_url_from_row(row: dict) -> str:

@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.build_data import deal_place_label, distinct_pipeline_names, geocode_queries, row_is_data, scan_obj
+from scripts.build_data import deal_place_label, distinct_pipeline_names, geocode_queries, listing_url_from_row, row_is_data, scan_obj
 from scripts.key_numbers import capacity_fields, coverage, key_figures, listing_gone
 
 
@@ -229,6 +229,35 @@ class KeyFiguresTest(unittest.TestCase):
     def test_listing_url_supplies_a_blank_street(self) -> None:
         label = deal_place_label({"Site": "", "Name": "", "Listing link": "https://www.loopnet.com/Listing/5020-S-16th-St-Phoenix-AZ/39334803/"})
         self.assertEqual(label, "5020 S 16th St")
+
+    def test_photo_notes_url_is_not_the_listing_link(self) -> None:
+        sketch = "https://maps.clarkcountynv.gov/assessor/apps/aowebimages/aowebimage.aspx?sketch=16224402010"
+        notes = (
+            "No listing link on row. Clark County Assessor building sketch filed for APN 162-24-402-010 "
+            f"(not a photograph) — {sketch} (checked/filed 2026-11-06)."
+        )
+        blank = {
+            "Listing link": "",
+            "Listing status": "Listed",
+            "Photo notes": notes,
+            "What we know": f"See the sketch {sketch}",
+            "Land evidence": sketch,
+            "Source of the numbers": sketch,
+            "_links": [("Photo notes", sketch), ("What we know", sketch)],
+        }
+        self.assertEqual(listing_url_from_row(blank), "")
+        typed = {
+            **blank,
+            "Listing link": "View listing",
+            "_links": [("Listing link", "https://www.loopnet.com/Listing/1523-E-Southern-Ave-Phoenix-AZ/40461709/"), ("Photo notes", sketch)],
+        }
+        self.assertEqual(listing_url_from_row(typed), "https://www.loopnet.com/Listing/1523-E-Southern-Ave-Phoenix-AZ/40461709/")
+        direct = {**blank, "Listing link": "https://www.bizbuysell.com/business-opportunity/example/"}
+        self.assertEqual(listing_url_from_row(direct), "https://www.bizbuysell.com/business-opportunity/example/")
+        deals = json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())
+        shipped = next(feature["properties"] for feature in deals["features"] if feature["properties"]["deal_id"] == "PIPE-LAS-0011")
+        self.assertEqual(shipped.get("listing_url") or "", "")
+        self.assertIn("maps.clarkcountynv.gov", shipped.get("photo_notes") or "")
 
     def test_duplicate_universe_name_uses_the_pipeline_name(self) -> None:
         sites = [

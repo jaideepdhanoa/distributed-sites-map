@@ -284,20 +284,20 @@
     "listing_links": {
       "pipeline": {
         "PHX": {
-          "with_link": 14,
-          "without_link": 4
+          "with_link": 13,
+          "without_link": 5
         },
         "SNA": {
           "with_link": 0,
           "without_link": 1
         },
         "LAS": {
-          "with_link": 8,
-          "without_link": 0
+          "with_link": 5,
+          "without_link": 3
         },
         "MIA": {
-          "with_link": 7,
-          "without_link": 2
+          "with_link": 5,
+          "without_link": 4
         }
       },
       "land": {
@@ -314,12 +314,12 @@
           "without_link": 0
         }
       },
-      "listed_sites_with_link": 53,
+      "listed_sites_with_link": 47,
       "listed_sites": 78
     },
     "source_lines": {
-      "broker-listed": 61,
-      "broker": 7
+      "broker-listed": 55,
+      "broker": 13
     }
   },
   "off_market": {

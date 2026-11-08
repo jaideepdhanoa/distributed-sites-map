@@ -82,6 +82,8 @@ FIGURE_FIELDS = (
     "price_per_acre_display",
     "cash_multiple",
     "cash_multiple_display",
+    "access_notes",
+    "score",
 )
 
 
@@ -144,16 +146,50 @@ def capacity_rating(value) -> str:
     return _CAPACITY.get(str(value or "").strip().lower(), "Unknown")
 
 
+_SCRIPT_SOURCE = re.compile(r"(?i)(?:\.(?:py|js|mjs|ts|tsx|json|csv|xlsx|xls)\b|[/\\]|diligence_sweep|(?:^|[\s_])sweep(?:\.py)?\b)")
+_SHEET_ERROR = re.compile(r"(?i)#(?:REF|N/A|VALUE|DIV/0|NAME|NULL|NUM|ERROR)!?")
+
+
 def _fact_text(value) -> str:
     """Keep a typed source or confidence only when the map wording filter allows it."""
     text = str(value or "").strip()
-    if not text:
+    if not text or _SHEET_ERROR.search(text) or _SCRIPT_SOURCE.search(text):
         return ""
     from scripts.build_data import _DISPLAY_TERMS, banned_hits
 
     if banned_hits(text) or _DISPLAY_TERMS.search(text):
         return ""
     return text
+
+
+def _access_note(value) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text or _SHEET_ERROR.search(text) or _SCRIPT_SOURCE.search(text):
+        return ""
+    from scripts.build_data import banned_hits
+
+    if banned_hits(text):
+        return ""
+    return text[:500]
+
+
+def _score(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if number != number:
+            return None
+        return int(number) if number.is_integer() else round(number, 2)
+    text = str(value).strip()
+    if not text or _SHEET_ERROR.search(text):
+        return None
+    if not re.fullmatch(r"-?\d+(?:\.\d+)?", text):
+        return None
+    number = float(text)
+    return int(number) if number.is_integer() else round(number, 2)
 
 
 def _fact_number(value):
@@ -427,6 +463,8 @@ def key_figures(row: dict, kind: str) -> dict:
         "price_per_acre_display": compact_money(per_acre),
         "cash_multiple": multiple,
         "cash_multiple_display": multiple_text,
+        "access_notes": _access_note(row.get("Access and visibility notes")),
+        "score": _score(row.get("Score (of 100)")),
     }
 
 

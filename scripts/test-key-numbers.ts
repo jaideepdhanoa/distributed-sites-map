@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
 import { matchesLandTier, spareTier } from "../lib/filter.ts";
-import { DEAL_LABEL_FIELD, capacityFacts, cashTile, dealLabelFeatures, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, summaryOf, tileAmount, workbookTrafficLine } from "../lib/keyNumbers.ts";
+import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, dealLabelFeatures, displayScore, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, sheetMoney, summaryOf, tileAmount, workbookTrafficLine } from "../lib/keyNumbers.ts";
+import { overlayFeatures } from "../lib/overlays.ts";
+import { inSelectedMarket, matchesOpenLandTier } from "../lib/filter.ts";
+import { inMapArea, parseMapArea } from "../lib/geoFilter.ts";
+import { addressKey, relatedRecords } from "../lib/related.ts";
 import type { DealProps } from "../lib/types.ts";
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -57,7 +61,14 @@ assert.equal(note?.label, "1st lowest of 2 Phoenix pipeline");
 assert.equal(cashTile(deal({ figures_status: "withheld" })).value, "Package figures not shown");
 assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received", figures_status: "shown" })).value, "-$121,000");
 assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).note, "EBITDA · Package Received");
+assert.equal(pillText(deal({ kind: "land", land_acres: 0.28, price_per_acre: 4464285.71, price_per_acre_display: "$4.46M", asking_price: 1250000 }), "acres"), "0.28 ac");
 assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "acres"), "1.42 ac");
+assert.equal(pillText(deal({ land_acres: 775000, price_per_acre_display: "$775K" }), "acres"), "");
+const landLabels = dealLabelFeatures([
+  { geometry: { type: "Point", coordinates: [-112.08, 33.5] }, properties: deal({ kind: "land", deal_id: "LAND-PHX-0002", land_acres: 0.28, price_per_acre: 4464285.71, price_per_acre_display: "$4.46M" }) },
+], "acres");
+assert.deepEqual(landLabels.map((feature) => feature.properties.pill), ["0.28 ac"]);
+assert.equal(landLabels.some((feature) => feature.properties.pill.includes("$")), false);
 assert.equal(pillText(deal({ land_acres: 1.42, price_per_acre: 774648, price_per_acre_display: "$775K" }), "peracre"), "$775K");
 assert.equal(pillText(deal({ land_acres: 1.64, price_per_acre: null, price_per_acre_display: "" }), "peracre"), "");
 const labels = dealLabelFeatures([
@@ -71,7 +82,46 @@ assert.equal(DEAL_LABEL_FIELD[1], "pill");
 assert.equal(spareTier({ spare_ac_own: 0 }), null);
 assert.equal(spareTier({ spare_ac_own: 0.2 }), "L4");
 assert.equal(workbookTrafficLine(deal({ trade_aadt: 46000, trade_aadt_road: "86000042 (N/A to N/A)", trade_aadt_m: 335 })).includes("n/a"), false);
-assert.match(workbookTrafficLine(deal({ trade_aadt: 46000, trade_aadt_road: "86000042 (N/A to N/A)", trade_aadt_m: 335 })), /86000042/);
+assert.match(workbookTrafficLine(deal({ trade_aadt: 46000, trade_aadt_road: "86000042 (N/A to N/A)", trade_aadt_m: 335 })), /segment 86000042/);
+assert.equal(workbookTrafficLine(deal({ trade_aadt: 266478, trade_aadt_road: "I 010", trade_aadt_m: 85 })).includes("on I-10, freeway"), true);
+assert.equal(cleanFactText("OSM via diligence_sweep.py"), "");
+assert.equal(cleanFactText("OSM proximity (Overpass)"), "OSM proximity (Overpass)");
+assert.equal(displayScore("#REF!"), "");
+assert.equal(displayScore(72), "72");
+assert.equal(displayScore(""), "");
+assert.equal(sheetMoney(99214, "$99,214"), "$99,214");
+assert.equal(sheetMoney(317659, "$317,659"), "$317,659");
+assert.equal(inSelectedMarket({ city: "UNK", address: "5020 S 16th St", listing_url: "https://www.loopnet.com/Listing/5020-S-16th-St-Phoenix-AZ/1/" }, "PHX", [-112.04799, 33.40119]), true);
+assert.equal(inSelectedMarket({ city: "SNA", address: "1 Main St" }, "PHX", [-117.8, 33.6]), false);
+assert.equal(inSelectedMarket({ city: "PHX", address: "1616 E Portland St" }, "PHX", null), true);
+assert.equal(matchesOpenLandTier(2500, "L4"), false);
+assert.equal(matchesOpenLandTier(55000, "L10"), true);
+assert.equal(matchesOpenLandTier(0, "L4"), false);
+assert.equal(matchesOpenLandTier(null, "L4"), false);
+assert.equal(addressKey("5020 S 16th St"), addressKey("5020 S 16th Street"));
+assert.equal(relatedRecords(
+  { id: "LAND-PHX-0033", kind: "deal", address: "5020 S 16th St", name: "5020 S 16th St" },
+  [{ id: "WB-PHX-0016", kind: "site", address: "5020 S 16th St", name: "Vacant lot", apn: "113-54-014" }],
+)[0]?.id, "WB-PHX-0016");
+const overlayDeal = {
+  geometry: { type: "Point", coordinates: [-112.05, 33.46] },
+  properties: deal({ trade_aadt: 266478, trade_aadt_road: "I 010", trade_aadt_max: 386198, trade_population: null, trade_washes_1mi: 1, trade_washes_3mi: 6 }),
+};
+const overlayBlank = {
+  geometry: { type: "Point", coordinates: [-112.1, 33.4] },
+  properties: deal({ deal_id: "BLANK", trade_aadt: null, trade_population: null, trade_washes_1mi: null, trade_washes_3mi: null }),
+};
+const trafficLabels = overlayFeatures([overlayDeal, overlayBlank], ["traffic", "population", "washes"]);
+assert.equal(trafficLabels.length, 1);
+assert.match(trafficLabels[0].properties.label, /freeway/);
+assert.equal(trafficLabels[0].properties.label.includes("people"), false);
+assert.match(trafficLabels[0].properties.label, /washes 1 in 1 mi, 6 in 3 mi/);
+assert.equal(inMapArea(-112.05, 33.46, { kind: "radius", lng: -112.05, lat: 33.46, miles: 1 }), true);
+assert.equal(inMapArea(-112.2, 33.46, { kind: "radius", lng: -112.05, lat: 33.46, miles: 1 }), false);
+assert.equal(parseMapArea({ get: (key) => key === "ring" ? "-112.05000,33.46000,1" : null })?.kind, "radius");
+assert.deepEqual(capacityFacts({ cap_a_substation_mi: 0.96, cap_a_line_ft: 7873, cap_a_source: "OSM via diligence_sweep.py" }, "deal"), [
+  { id: "a", lines: ["Substation 0.96 mi", "Line 7,873 ft"], basis: "" },
+]);
 assert.equal(matchesLandTier({ spare_ac_own: 0 }, "L4"), false);
 assert.equal(matchesLandTier({ spare_ac_own: 0.2 }, "L4"), true);
 assert.equal(matchesLandTier({ spare_ac_own: null }, "L4"), false);

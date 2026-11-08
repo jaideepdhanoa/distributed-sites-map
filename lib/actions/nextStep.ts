@@ -60,11 +60,28 @@ export function normalizeNextStep(
       ownerId: null,
     };
   }
+  if (type === "mark_duplicate") {
+    const survivor = String(input.proposedValue || "").trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(survivor)) throw new InputError("Name the surviving record.");
+    if (!reasonText) throw new InputError("Confirm why these are the same parcel.");
+    const reason = parseBody(reasonText, "reason", 2000);
+    assertClean(reason);
+    const title = `Duplicate of ${survivor}`;
+    assertClean(title);
+    return {
+      detail: "mark_duplicate",
+      title,
+      proposedValue: survivor,
+      reason,
+      targetOn: null,
+      ownerId: null,
+    };
+  }
   if (type === "bring_back" || type === "stage_move") {
     const stage = String(input.proposedValue || "").trim();
     if (!(NEXT_STAGE_IDS as readonly string[]).includes(stage)) throw new InputError("Choose a stage.");
     const label = stageTitle(stage);
-    const title = type === "bring_back" ? `Bring back to ${label}` : `Move to ${label}`;
+    const title = type === "bring_back" ? `Bring back to ${label}` : `Advance to ${label}`;
     assertClean(title);
     return {
       detail: type,

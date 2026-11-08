@@ -2,6 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { cityPipelineCounts } from "./pipeline-counts";
 
+async function showFunnel(page: Page, project: string) {
+  if (project === "mobile") await page.locator(".phone-step").click();
+  await expect(page.locator("nav.funnel")).toBeVisible();
+}
+
 async function waitForBasemap(page: Page) {
   await page.waitForSelector(".maplibregl-canvas");
   await page.evaluate(() => new Promise<void>((resolve) => {
@@ -39,15 +44,17 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(drawer).toContainText("County record not reviewed");
   await page.screenshot({ path: `review-shots/${name}-site-panel.png`, fullPage: false });
   await page.goto("/?stage=in_area", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".funnel");
+  await page.waitForSelector(".shell");
+  await showFunnel(page, name);
   await waitForBasemap(page);
-  await expect(page.locator(".funnel")).toContainText("Universe");
+  await expect(page.locator("nav.funnel")).toContainText("Universe");
   await page.screenshot({ path: `review-shots/${name}-universe-bar.png`, fullPage: false });
   await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".funnel");
+  await page.waitForSelector(".shell");
+  await showFunnel(page, name);
   await waitForBasemap(page);
   const counts = cityPipelineCounts("PHX");
-  await expect(page.locator(".funnel")).toContainText(`(${counts.deskDeals} deals, ${counts.deskLand} land)`);
+  await expect(page.locator("nav.funnel")).toContainText(`(${counts.deskDeals} deals, ${counts.deskLand} land)`);
   const chipText = async () => page.locator(".summary-chip").first().textContent();
   await expect.poll(chipText).toContain(`${counts.activeDeals} deals + ${counts.activeLand} land sites`);
   await expect.poll(chipText).toContain(`${counts.droppedDeals} dropped deals + ${counts.droppedLand} dropped land sites`);

@@ -46,6 +46,7 @@ export function MentionField({
   const [active, setActive] = useState(0);
   const listId = `${testId}-mentions`;
   const choices = useMemo(() => {
+    if (mentions.length >= 1) return [];
     const needle = query.trim().toLowerCase();
     return accounts
       .filter((account) => !mentions.some((item) => item.id === account.id))

@@ -212,3 +212,23 @@ export async function resolveNote(sql: Sql, input: { id: string; actorId: string
   if (!note) throw new InputError("That thread could not be resolved.");
   return (await withMentions(sql, [note]))[0];
 }
+
+export async function reopenNote(sql: Sql, input: { id: string; actorId: string }): Promise<Note> {
+  const row = await loadNote(sql, input.id);
+  if (!row || row.deleted_at) throw new InputError("That note is not available.", 404);
+  if (row.parent_id) throw new InputError("Reopen the thread, not a reply.");
+  if (!row.resolved_at) throw new InputError("That thread is already open.");
+  await sql.query(`UPDATE notes SET resolved_at = NULL, resolved_by = NULL WHERE id = $1`, [input.id]);
+  await audit(sql, {
+    actorId: input.actorId,
+    action: "note.reopen",
+    targetKind: row.target_kind,
+    targetId: row.target_id,
+    before: { id: row.id, resolved: true },
+    after: { id: row.id, resolved: false },
+  });
+  const saved = await loadNote(sql, input.id);
+  const note = saved ? present(saved) : null;
+  if (!note) throw new InputError("That thread could not be reopened.");
+  return (await withMentions(sql, [note]))[0];
+}

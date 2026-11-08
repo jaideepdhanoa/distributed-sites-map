@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { APPROVER_LABEL } from "@/lib/actions/approver";
 import { allowsAssignee, allowsDate, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
 import "./actions.css";
@@ -51,6 +50,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   const [title, setTitle] = useState("");
   const [reason, setReason] = useState("");
   const [stage, setStage] = useState("");
+  const [survivor, setSurvivor] = useState("");
+  const [sameParcel, setSameParcel] = useState(false);
   const [ownerId, setOwnerId] = useState("");
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
@@ -68,6 +69,17 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     const body = (await response.json()) as { suggestions?: Step[] };
     setSteps((body.suggestions || []).filter((item) => item.field === "proposed_next_step"));
   }
+
+  useEffect(() => {
+    function onOpen(event: Event) {
+      const detail = (event as CustomEvent<NextStepTypeId>).detail;
+      if (!detail) return;
+      setType(detail);
+      setOpen(true);
+    }
+    window.addEventListener("sites-open-next-step", onOpen);
+    return () => window.removeEventListener("sites-open-next-step", onOpen);
+  }, []);
 
   useEffect(() => {
     if (!status.enabled) return undefined;
@@ -101,6 +113,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     setTitle("");
     setReason("");
     setStage("");
+    setSurvivor("");
+    setSameParcel(false);
     setOwnerId("");
     setDue("");
     setReassigning(false);
@@ -134,6 +148,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     setTitle(item.title || "");
     setReason(item.reason || "");
     setStage(item.detail === "bring_back" || item.detail === "stage_move" ? item.proposedValue : "");
+    setSurvivor(item.detail === "mark_duplicate" ? item.proposedValue : "");
+    setSameParcel(item.detail === "mark_duplicate");
     setOwnerId(item.ownerId || "");
     setDue(item.targetOn || "");
   }
@@ -145,8 +161,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       field: "proposed_next_step",
       detail: stepType,
       title: stepType === "work_item" ? title : undefined,
-      proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : title,
-      reason: stepType === "knock_off" ? reason : "",
+      proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : stepType === "mark_duplicate" ? survivor : title,
+      reason: stepType === "knock_off" || stepType === "mark_duplicate" ? reason : "",
       ownerId: allowsAssignee(stepType) ? ownerId : "",
       targetOn: allowsDate(stepType) ? due : "",
     };
@@ -158,6 +174,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       onSubmit={(event) => {
         event.preventDefault();
         if (!type) return;
+        if (type === "mark_duplicate" && !sameParcel) return;
         const body = payloadFor(type);
         if (editing) {
           void submit(`/api/actions/suggestions/${editing}`, body, "PATCH");
@@ -167,7 +184,6 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       }}
     >
       <p className="kicker">Propose next step</p>
-      <p>Pick a type, then fill what that type needs.</p>
       <div className="type-chips" role="group" aria-label="Next step type">
         {NEXT_STEP_TYPES.map((item) => (
           <button key={item.id} type="button" className={type === item.id ? "on" : ""} onClick={() => setType(item.id)}>{item.label}</button>
@@ -179,11 +195,24 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           <input aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
         </label>
       ) : null}
-      {type === "knock_off" ? (
+      {type === "knock_off" || type === "mark_duplicate" ? (
         <label>
           Reason
-          <textarea aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} />
+          <textarea aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} required />
         </label>
+      ) : null}
+      {type === "mark_duplicate" ? (
+        <>
+          <label>
+            Surviving record
+            <input aria-label="Surviving record" value={survivor} onChange={(event) => setSurvivor(event.target.value)} placeholder="Pipeline, land, or universe id" />
+          </label>
+          <label className="act-check">
+            <input type="checkbox" checked={sameParcel} onChange={(event) => setSameParcel(event.target.checked)} />
+            These are the same parcel
+          </label>
+          <p className="hint">The link waits for approval. It does not change Stage.</p>
+        </>
       ) : null}
       {type === "bring_back" || type === "stage_move" ? (
         <label>
@@ -210,10 +239,9 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         </div>
       ) : null}
       <div className="act-row">
-        <button type="submit" disabled={pending || !type}>Submit for approval</button>
+        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())}>Submit for approval</button>
         <button type="button" onClick={resetForm}>Cancel</button>
       </div>
-      <p className="hint">Knock off needs a reason. Bring back and Stage move need a stage. Work item is freeform.</p>
     </form>
   ) : null;
 
@@ -224,7 +252,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     body = (
       <>
         <div className="chip-row">
-          <span className="wait">Waiting for {APPROVER_LABEL}</span>
+          <span className="wait">Waiting for approval</span>
           <span className="type">{nextStepTypeLabel(focus.detail)}</span>
         </div>
         <h3>{focus.title || focus.proposedValue}</h3>
@@ -233,7 +261,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           {focus.ownerName ? ` · Assignee ${focus.ownerName}` : knock ? " · No assignee" : ""}
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
-        {knock && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
+        {(knock || stepType === "mark_duplicate") && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
         {reviewer ? (
           <div className="act-row">
             <button type="button" className="propose" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "accepted" })}>Accept</button>
@@ -255,7 +283,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         </div>
         <h3>Next: {approved.title || approved.proposedValue}</h3>
         <p className="who">
-          Approved by {who(accounts, approved.decidedBy) || APPROVER_LABEL}
+          Approved by {who(accounts, approved.decidedBy) || "the approver"}
           {approved.decidedAt ? ` · ${formatPacific(approved.decidedAt)}` : ""}
           {approved.ownerName ? ` · Owner ${approved.ownerName}` : ""}
           {approved.targetOn ? ` · Due ${shortDate(approved.targetOn)}` : ""}
@@ -293,10 +321,12 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     body = (
       <>
         <p className="kicker">Next step</p>
-        <p>No next step yet. Propose one.</p>
-        <p>{APPROVER_LABEL} approves before it changes the record.</p>
-        {writable ? <button type="button" className="propose" onClick={() => setOpen(true)}>+ Propose next step</button> : null}
-        <p className="hint">Knock off, bring back, stage move, or a work item — all go through approval.</p>
+        <div className="type-chips" role="group" aria-label="Next step type">
+          <button type="button" onClick={() => { setType("stage_move"); setOpen(true); }}>Advance</button>
+          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }}>Drop with a reason</button>
+          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }}>Mark duplicate</button>
+        </div>
+        <p className="hint">Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
       </>
     );
   }

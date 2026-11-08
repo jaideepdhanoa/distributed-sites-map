@@ -97,6 +97,7 @@ export function ReviewBar({
   onExit,
   onOpenFeed,
   onSnooze,
+  onNotFit,
   siteId,
   followed,
   filters,
@@ -111,11 +112,12 @@ export function ReviewBar({
   onExit: () => void;
   onOpenFeed: () => void;
   onSnooze: () => void;
+  onNotFit?: () => void;
   siteId: string;
   followed: boolean;
   filters: ReactNode;
 }) {
-  const [menu, setMenu] = useState(false);
+  const [menu, setMenu] = useState<null | "snooze" | "more">(null);
   const width = total ? Math.min(100, (reviewed / total) * 100) : 0;
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -125,11 +127,11 @@ export function ReviewBar({
       if (event.key === "k" || event.key === "K") onPrev();
       if (event.key === "r" || event.key === "R") onReviewed();
       if (event.key === "s" || event.key === "S") {
-        setMenu(true);
+        setMenu("snooze");
         window.setTimeout(() => document.querySelector<HTMLInputElement>("[data-testid='queue-snooze']")?.focus(), 0);
       }
       if (event.key === "f" || event.key === "F") {
-        setMenu(true);
+        setMenu("more");
         window.setTimeout(() => document.querySelector<HTMLSelectElement>("[aria-label='Flag for']")?.focus(), 0);
       }
     }
@@ -147,16 +149,24 @@ export function ReviewBar({
       <button type="button" className="review-step" aria-label="Previous" onClick={onPrev}>Previous</button>
       <button type="button" className="review-step" aria-label="Next" onClick={onNext}>Next</button>
       <button type="button" className="primary" data-testid="queue-reviewed" onClick={onReviewed}>Mark reviewed</button>
-      <button type="button" data-testid="queue-more" aria-expanded={menu} aria-label="More actions" onClick={() => setMenu((open) => !open)}>...</button>
+      <div className="review-verbs" role="group" aria-label="Review actions">
+        <button type="button" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "stage_move" })); }}>Advance</button>
+        <button type="button" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "knock_off" })); }}>Drop with a reason</button>
+        <button type="button" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "mark_duplicate" })); }}>Mark duplicate</button>
+        <button type="button" aria-expanded={menu === "snooze"} onClick={() => setMenu((value) => value === "snooze" ? null : "snooze")}>Snooze until a package arrives</button>
+        {onNotFit ? <button type="button" onClick={onNotFit}>Not a fit</button> : null}
+      </div>
+      <button type="button" data-testid="queue-more" aria-expanded={menu === "more"} aria-label="More actions" onClick={() => setMenu((value) => value === "more" ? null : "more")}>...</button>
       <span className="review-hint">J K move · R reviewed · S snooze · F flag</span>
       <button type="button" className="review-exit" onClick={onExit}>Exit review</button>
-      {menu ? <ReviewMenu siteId={siteId} followed={followed} onClose={() => setMenu(false)} onSnooze={onSnooze} /> : null}
+      {menu ? <ReviewMenu mode={menu} siteId={siteId} followed={followed} onClose={() => setMenu(null)} onSnooze={onSnooze} /> : null}
     </div>
   );
 }
 
-function ReviewMenu({ siteId, followed, onClose, onSnooze }: { siteId: string; followed: boolean; onClose: () => void; onSnooze: () => void }) {
+function ReviewMenu({ mode, siteId, followed, onClose, onSnooze }: { mode: "snooze" | "more"; siteId: string; followed: boolean; onClose: () => void; onSnooze: () => void }) {
   const [snooze, setSnooze] = useState("");
+  const [packageReason, setPackageReason] = useState("");
   const [flagUser, setFlagUser] = useState("");
   const [flagNote, setFlagNote] = useState("");
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
@@ -181,14 +191,25 @@ function ReviewMenu({ siteId, followed, onClose, onSnooze }: { siteId: string; f
     onClose();
   }
   return (
-    <div className="review-menu" data-testid="queue-menu" role="dialog" aria-label="More actions">
-      <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/snooze", { siteId, until: snooze }); }}>
-        <label>Snooze until
-          <input data-testid="queue-snooze" type="date" value={snooze} onChange={(event) => setSnooze(event.target.value)} />
-        </label>
-        <button type="submit">Snooze</button>
-      </form>
-      <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/flag", { siteId, toUser: flagUser, note: flagNote }); }}>
+    <div className="review-menu" data-testid="queue-menu" role="dialog" aria-label={mode === "snooze" ? "Snooze" : "More actions"}>
+      {mode === "snooze" ? (
+        <form onSubmit={(event) => { event.preventDefault(); if (!packageReason) return; void act("/api/queue/snooze", { siteId, until: snooze, reason: packageReason }); }}>
+          <p className="note">Snooze until a package arrives. This does not change Stage.</p>
+          <label>Package status
+            <select aria-label="Package status" value={packageReason} onChange={(event) => setPackageReason(event.target.value)} required>
+              <option value="">Choose a package reason</option>
+              <option value="Package not received">Package not received</option>
+              <option value="Package requested">Package requested</option>
+              <option value="Package partial">Package partial</option>
+            </select>
+          </label>
+          <label>Snooze until
+            <input data-testid="queue-snooze" type="date" value={snooze} onChange={(event) => setSnooze(event.target.value)} required />
+          </label>
+          <button type="submit">Snooze until a package arrives</button>
+        </form>
+      ) : null}
+      {mode === "more" ? <form onSubmit={(event) => { event.preventDefault(); void act("/api/queue/flag", { siteId, toUser: flagUser, note: flagNote }); }}>
         <label>Flag for
           <select aria-label="Flag for" value={flagUser} onChange={(event) => setFlagUser(event.target.value)}>
             <option value="">Choose an account</option>
@@ -199,10 +220,10 @@ function ReviewMenu({ siteId, followed, onClose, onSnooze }: { siteId: string; f
           <input data-testid="queue-flag-note" value={flagNote} onChange={(event) => setFlagNote(event.target.value)} maxLength={200} />
         </label>
         <button type="submit">Flag</button>
-      </form>
-      <button type="button" onClick={() => void act("/api/queue/follow", { siteId, follow: !followed })}>
+      </form> : null}
+      {mode === "more" ? <button type="button" onClick={() => void act("/api/queue/follow", { siteId, follow: !followed })}>
         {followed ? "Unfollow" : "Follow"}
-      </button>
+      </button> : null}
       {error ? <p className="err">{error}</p> : null}
     </div>
   );

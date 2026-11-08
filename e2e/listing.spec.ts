@@ -24,7 +24,11 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(page.getByRole("link", { name: "Open in Google Maps" })).toBeVisible();
   await expect(page.getByTestId("street-view-link")).toBeVisible();
   await expect(page.getByTestId("listing-link")).toBeVisible();
-  await expect(page.getByTestId("grade-pair")).toBeVisible();
+  const figures = page.getByTestId("key-strip");
+  await expect(figures).toBeVisible();
+  await expect(figures).toContainText("Space");
+  await expect(figures).toContainText("Capacity");
+  await expect(figures).toContainText("Attractiveness");
   const photos = page.getByTestId("site-photos");
   await expect(photos).toBeVisible();
   const thumb = page.getByTestId("photo-thumb").first();

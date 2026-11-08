@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
-import { pillText, publicDeal, type PinLabel } from "@/lib/keyNumbers";
+import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 
 type Props = {
@@ -27,6 +27,7 @@ type Props = {
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   pinLabel?: PinLabel;
   onPinLabel?: (mode: PinLabel) => void;
+  coverage?: { listed: number; missingPoint: number } | null;
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
@@ -111,6 +112,7 @@ export default function MapView(props: Props) {
   const mapRef = useRef<Map | null>(null);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
+  const [coverageText, setCoverageText] = useState("");
   const measureRef = useRef(false);
   measureRef.current = measure;
   const [readout, setReadout] = useState("");
@@ -142,6 +144,7 @@ export default function MapView(props: Props) {
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterRadius: 48, clusterMaxZoom: 11 },
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          "deal-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           unscreened: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -156,7 +159,7 @@ export default function MapView(props: Props) {
           { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
           { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#b7f0c8", "fill-opacity": 0.14 } },
           { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#f4fff7", "line-width": 2.4 } },
-          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-allow-overlap": true }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
+          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-allow-overlap": false, "text-padding": 6 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
           { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#ffb4a8", "line-width": 2.6 } },
@@ -343,13 +346,12 @@ export default function MapView(props: Props) {
           {
             id: "deal-pills",
             type: "symbol",
-            source: "deals",
-            filter: ["all", ["has", "pill"], ["!=", ["get", "pill"], ""]],
+            source: "deal-labels",
             layout: {
               "text-field": ["get", "pill"],
               "text-font": ["Noto Sans Regular"],
               "text-size": 12,
-              "text-offset": [0, 1.45],
+              "text-offset": [0, 1.6],
               "text-anchor": "top",
               "text-allow-overlap": true,
             },
@@ -653,8 +655,30 @@ export default function MapView(props: Props) {
         type: "FeatureCollection",
         features: props.deals.filter((feature) => feature.geometry).map((feature) => ({
           ...feature,
-          properties: { ...publicDeal(feature.properties), pill: pillText(feature.properties, props.pinLabel || "none") },
+          properties: publicDeal(feature.properties),
         })),
+      });
+      const labelData = {
+        type: "FeatureCollection" as const,
+        features: dealLabelFeatures(props.deals, props.pinLabel || "none"),
+      };
+      // Rebuild the label layer so a mode change cannot keep the previous acre text.
+      if (map.getLayer("deal-pills")) map.removeLayer("deal-pills");
+      if (map.getSource("deal-labels")) map.removeSource("deal-labels");
+      map.addSource("deal-labels", { type: "geojson", data: labelData });
+      map.addLayer({
+        id: "deal-pills",
+        type: "symbol",
+        source: "deal-labels",
+        layout: {
+          "text-field": ["get", "pill"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 12,
+          "text-offset": [0, 1.6],
+          "text-anchor": "top",
+          "text-allow-overlap": true,
+        },
+        paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 8 },
       });
       (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
@@ -684,6 +708,54 @@ export default function MapView(props: Props) {
       map.off("load", push);
     };
   }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !props.coverage) {
+      setCoverageText("");
+      return;
+    }
+    let cancel = false;
+    const report = () => {
+      if (cancel || !map.isStyleLoaded() || !map.getLayer("clusters") || !map.getLayer("sites")) return;
+      const bounds = map.getBounds();
+      let onScreen = 0;
+      let offScreen = 0;
+      for (const feature of props.sites) {
+        const coords = feature.geometry?.coordinates;
+        if (!coords) continue;
+        if (bounds.contains(coords as [number, number])) onScreen += 1;
+        else offScreen += 1;
+      }
+      const seenClusters = new Set<number>();
+      for (const feature of map.queryRenderedFeatures({ layers: ["clusters"] })) {
+        const id = Number(feature.properties?.cluster_id);
+        if (seenClusters.has(id)) continue;
+        seenClusters.add(id);
+      }
+      const clusterCount = seenClusters.size;
+      const pinIds = new Set<string>();
+      for (const feature of map.queryRenderedFeatures({ layers: ["sites"] })) {
+        const id = String(feature.properties?.site_id || "");
+        if (id) pinIds.add(id);
+      }
+      const listed = props.coverage?.listed ?? props.sites.length;
+      const missing = props.coverage?.missingPoint ?? 0;
+      const grouped = Math.max(onScreen - pinIds.size, 0);
+      const clusterNote = clusterCount > 0
+        ? ` ${grouped.toLocaleString()} more on this map are grouped into ${clusterCount.toLocaleString()} clusters.`
+        : "";
+      setCoverageText(`${listed.toLocaleString()} listed. ${pinIds.size.toLocaleString()} separate pins on screen.${clusterNote} ${offScreen.toLocaleString()} off this view. ${missing.toLocaleString()} with no point.`);
+    };
+    report();
+    map.on("moveend", report);
+    map.on("idle", report);
+    return () => {
+      cancel = true;
+      map.off("moveend", report);
+      map.off("idle", report);
+    };
+  }, [props.sites, props.coverage, props.showSites]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -864,6 +936,7 @@ export default function MapView(props: Props) {
         </button>
         {readout ? <span className="map-readout">{readout}</span> : null}
       </div>
+      {coverageText ? <p className="map-coverage" data-testid="map-coverage">{coverageText}</p> : null}
       <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
     </div>
   );

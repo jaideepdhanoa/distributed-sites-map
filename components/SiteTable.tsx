@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table/legacy";
 import { shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { capacitySummary, factsForDeal, factsForSite } from "@/lib/keyNumbers";
+import { spareTier } from "@/lib/filter";
 import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 
@@ -30,10 +31,10 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "city", header: "City" },
   {
     id: "tier",
-    accessorFn: (row) => tierLabel(row.land_tier),
+    accessorFn: (row) => tierLabel(spareTier(row)),
     header: "Spare land",
     cell: ({ row }) => {
-      const code = row.original.land_tier;
+      const code = spareTier(row.original);
       const label = tierLabel(code);
       const note = code ? TIER_NOTES[code]?.note : "";
       return label ? <span title={note}>{label}</span> : "—";
@@ -83,7 +84,7 @@ export function siteExportRow(row: SiteProps, deals: DealProps[] = []) {
     row.site_id,
     row.name,
     row.city,
-    tierLabel(row.land_tier),
+    tierLabel(spareTier(row)),
     siteCapacityText(row, deals),
     plainVerdict(row.verdict),
     row.zoning,
@@ -191,7 +192,7 @@ export default function SiteTable({
           <li key={row.site_id}>
             <button type="button" className={row.site_id === selectedId ? "on" : ""} onClick={() => onSelect(row.site_id)}>
               <strong>{row.name || row.address || row.site_id}</strong>
-              <span>{row.site_id} · {plainVerdict(row.verdict)}{row.land_tier ? ` · ${tierLabel(row.land_tier)}` : ""} · Site capacity {siteCapacityText(row, deals)}</span>
+              <span>{row.site_id} · {plainVerdict(row.verdict)}{spareTier(row) ? ` · ${tierLabel(spareTier(row))}` : ""} · Site capacity {siteCapacityText(row, deals)}</span>
               {row.summary_why ? <span className="why">{row.summary_why}</span> : null}
               {touchOf(activity, row.linked_deal_id)?.lastTouched || touchOf(activity, row.linked_deal_id)?.materials ? (
                 <span>{touchOf(activity, row.linked_deal_id)?.materials || 0} materials · {touchOf(activity, row.linked_deal_id)?.lastTouched || "—"}</span>

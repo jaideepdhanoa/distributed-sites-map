@@ -12,6 +12,7 @@ function bannedHits(text: string) {
     if (word === "power" && /\bpower\s+(rd|road)\b/i.test(around)) continue;
     // Stage 4 is labeled "Offer and close". The count is glued on in the bar text ("Offer and close0"), so this phrase is not an offer price.
     if (word === "offer" && /\boffer\s+and\s+close/i.test(around)) continue;
+    if (word === "kw" && /\d[\d,]*\s+kw\b/i.test(around)) continue;
     hits.add(match[0]);
   }
   return [...hits];

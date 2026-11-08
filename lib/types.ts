@@ -191,8 +191,20 @@ export type DealProps = {
   stated_cash_flow?: number | null;
   stated_cash_flow_display?: string | null;
   figures_source?: string;
-  figures_basis?: "Claimed" | "";
+  figures_basis?: "Claimed" | "Documented" | "Verified" | "Unknown" | "";
   figures_status?: "shown" | "withheld" | "vacant" | "absent";
+  cash_flow_label?: string;
+  package_status?: string;
+  bays_that_fit?: number | null;
+  trade_aadt?: number | null;
+  trade_aadt_road?: string;
+  trade_aadt_m?: number | null;
+  trade_aadt_max?: number | null;
+  trade_population?: number | null;
+  trade_growth?: number | null;
+  trade_income?: number | null;
+  trade_washes_1mi?: number | null;
+  trade_washes_3mi?: number | null;
   /** Deprecated grade. The map does not render it. */
   site_capacity?: string;
   cap_a_substation_mi?: number | null;

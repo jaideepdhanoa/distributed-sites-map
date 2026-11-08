@@ -41,6 +41,18 @@ FIGURE_FIELDS = (
     "figures_source",
     "figures_basis",
     "figures_status",
+    "cash_flow_label",
+    "package_status",
+    "bays_that_fit",
+    "trade_aadt",
+    "trade_aadt_road",
+    "trade_aadt_m",
+    "trade_aadt_max",
+    "trade_population",
+    "trade_growth",
+    "trade_income",
+    "trade_washes_1mi",
+    "trade_washes_3mi",
     "site_capacity",
     "cap_a_substation_mi",
     "cap_a_line_ft",
@@ -73,7 +85,7 @@ FIGURE_FIELDS = (
 )
 
 
-def _number(value, *, allow_zero: bool = False):
+def _number(value, *, allow_zero: bool = False, allow_negative: bool = False):
     """Read a measure. Zero stays empty unless this is a finished spare-area check."""
     if value is None or value == "":
         return None
@@ -82,11 +94,11 @@ def _number(value, *, allow_zero: bool = False):
     if isinstance(value, (int, float)):
         number = float(value)
     else:
-        match = re.search(r"\d+(?:\.\d+)?", str(value).replace(",", ""))
+        match = re.search(r"-?\d+(?:\.\d+)?", str(value).replace(",", ""))
         if not match:
             return None
         number = float(match.group())
-    if number > 0 or (allow_zero and number == 0):
+    if number > 0 or (allow_zero and number == 0) or (allow_negative and number < 0):
         return number
     return None
 
@@ -94,13 +106,16 @@ def _number(value, *, allow_zero: bool = False):
 def money(value) -> str | None:
     if value is None:
         return None
-    return f"${float(value):,.0f}"
+    number = float(value)
+    sign = "-" if number < 0 else ""
+    return f"{sign}${abs(number):,.0f}"
 
 
 def compact_money(value) -> str | None:
     if value is None:
         return None
     number = abs(float(value))
+    sign = "-" if float(value) < 0 else ""
     if number >= 1_000_000:
         shown = number / 1_000_000
         text = f"{shown:.2f}"
@@ -108,10 +123,10 @@ def compact_money(value) -> str | None:
             text = f"{shown:.0f}"
         elif text.endswith("0"):
             text = f"{shown:.1f}"
-        return f"${text}M"
+        return f"{sign}${text}M"
     if number >= 1_000:
-        return f"${number / 1000:.0f}K"
-    return money(number)
+        return f"{sign}${number / 1000:.0f}K"
+    return money(value)
 
 
 def land_basis(text: str, acres) -> str:
@@ -264,37 +279,117 @@ def listing_gone(status) -> bool:
     return bool(_GONE.search(str(status or "")))
 
 
+def cash_flow_label(value) -> str:
+    """Workbook cash-flow label. Long notes and file names stay off the card."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text:
+        return ""
+    key = text.lower().replace("’", "'")
+    labels = {
+        "ebitda": "EBITDA",
+        "normalized ebitda": "Normalized EBITDA",
+        "seller's cash flow": "Seller's cash flow",
+        "sellers cash flow": "Seller's cash flow",
+    }
+    if key in labels:
+        return labels[key]
+    if "normalized" in key and "ebitda" in key:
+        return "Normalized EBITDA"
+    if key == "ebitda":
+        return "EBITDA"
+    if len(text) > 40:
+        return ""
+    from scripts.build_data import banned_hits
+
+    if banned_hits(text):
+        return ""
+    return text
+
+
+def package_status_label(value) -> str:
+    text = str(value or "").strip().lower()
+    if "partial" in text:
+        return "partial"
+    return {"received": "Received", "none": "None", "requested": "Requested"}.get(text, "")
+
+
+def financials_basis(value) -> str:
+    return {"documented": "Documented", "verified": "Verified", "claimed": "Claimed", "unknown": "Unknown"}.get(
+        str(value or "").strip().lower(), ""
+    )
+
+
+def _whole(value, *, allow_zero: bool = False, allow_negative: bool = False):
+    number = _number(value, allow_zero=allow_zero, allow_negative=allow_negative)
+    if number is None:
+        return None
+    if float(number).is_integer():
+        return int(number)
+    return number
+
+
+def _road_name(value) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text:
+        return ""
+    from scripts.build_data import banned_hits
+
+    if banned_hits(text):
+        return ""
+    return text[:80]
+
+
 def key_figures(row: dict, kind: str) -> dict:
-    """Fields safe to ship. Package figures are dropped, not blanked quietly."""
+    """Fields safe to ship. Package file names stay off the card; claimed cash flow is labeled."""
     acres = _number(row.get("Land (acres)"))
     basis = land_basis(str(row.get("Land basis") or ""), acres)
-    # A completed aerial can record 0 sq ft. Asking, acres, and cash still treat 0 as empty.
+    # A completed aerial can record 0 sq ft. Asking and acres still treat 0 as empty.
     spare = _number(row.get("Spare area (sq ft)"), allow_zero=True)
     asking = _number(row.get("Asking price ($)"))
     revenue = _number(row.get("Revenue ($ a year)"))
-    cash = _number(row.get("EBITDA ($ a year)"))
+    label = cash_flow_label(row.get("Claimed cash-flow label"))
+    claimed = _number(row.get("Claimed cash flow ($ a year)"), allow_negative=True)
+    normalized = _number(row.get("Normalized EBITDA ($ a year)"), allow_negative=True)
+    legacy = _number(row.get("EBITDA ($ a year)"), allow_negative=True)
+    if label == "Normalized EBITDA" and normalized is not None:
+        cash = normalized
+    elif claimed is not None:
+        cash = claimed
+    else:
+        cash = legacy
+        if cash is not None and not label:
+            label = "EBITDA"
     source_text = str(row.get("Source of the numbers") or "")
     business = str(row.get("Business check") or "")
     vacant = kind == "land" or bool(re.search(r"(?i)no business|land only", business))
-    withheld = package_source(source_text) and (revenue is not None or cash is not None)
-    if withheld:
-        status = "withheld"
-        revenue_out = cash_out = None
-        figures_basis = ""
-        figures_source = ""
-    elif revenue is None and cash is None:
+    packaged = package_source(source_text)
+    recorded_basis = financials_basis(row.get("Financials status"))
+    package_state = package_status_label(row.get("Package status"))
+    if cash is not None:
+        status = "shown"
+        revenue_out = None if packaged else (round(revenue, 2) if revenue is not None else None)
+        cash_out = round(cash, 2)
+        figures_basis = recorded_basis or ("" if packaged else "Claimed")
+        figures_source = "" if packaged else public_source(source_text)
+    elif revenue is None:
         status = "vacant" if vacant else "absent"
         revenue_out = cash_out = None
-        figures_basis = ""
+        figures_basis = recorded_basis
+        figures_source = ""
+    elif packaged:
+        # A package can name revenue without a cash-flow figure. Do not ship the revenue or a file name.
+        status = "absent"
+        revenue_out = cash_out = None
+        figures_basis = recorded_basis
         figures_source = ""
     else:
         status = "shown"
-        revenue_out = round(revenue, 2) if revenue is not None else None
-        cash_out = round(cash, 2) if cash is not None else None
-        figures_basis = "Claimed"
+        revenue_out = round(revenue, 2)
+        cash_out = None
+        figures_basis = recorded_basis or "Claimed"
         figures_source = public_source(source_text)
     per_acre = round(asking / acres, 2) if asking and acres else None
-    multiple = round(asking / cash_out, 1) if asking and cash_out else None
+    multiple = round(asking / cash_out, 1) if asking and cash_out and cash_out > 0 and not packaged else None
     multiple_text = None
     if multiple is not None:
         text = f"{multiple:.1f}"
@@ -314,6 +409,18 @@ def key_figures(row: dict, kind: str) -> dict:
         "figures_source": figures_source,
         "figures_basis": figures_basis,
         "figures_status": status,
+        "cash_flow_label": label if cash_out is not None else "",
+        "package_status": package_state,
+        "bays_that_fit": _whole(row.get("Stalls that fit"), allow_zero=True),
+        "trade_aadt": _whole(row.get("AADT (nearest)"), allow_zero=True),
+        "trade_aadt_road": _road_name(row.get("AADT road")),
+        "trade_aadt_m": _whole(row.get("AADT segment distance (m)"), allow_zero=True),
+        "trade_aadt_max": _whole(row.get("AADT max within 800 m"), allow_zero=True),
+        "trade_population": _whole(row.get("Population within 3 miles"), allow_zero=True),
+        "trade_growth": _number(row.get("Population growth (3-mile)"), allow_zero=True, allow_negative=True),
+        "trade_income": _whole(row.get("Median household income (3-mile)"), allow_zero=True),
+        "trade_washes_1mi": _whole(row.get("Washes within 1 mile"), allow_zero=True),
+        "trade_washes_3mi": _whole(row.get("Washes within 3 miles"), allow_zero=True),
         "site_capacity": capacity_rating(row.get("Power rating")),
         **capacity_fields(row, service=True),
         "price_per_acre": per_acre,

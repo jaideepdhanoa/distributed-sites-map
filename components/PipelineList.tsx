@@ -7,6 +7,7 @@ import {
   type PipelineColumnId,
   type RangeFilter,
   acresText,
+  cashTile,
   checkedShort,
   compactMoney,
   depotLine,
@@ -14,6 +15,7 @@ import {
   capacitySummary,
   factsForDeal,
   openLandText,
+  workbookTrafficLine,
   summaryOf,
   acresTotal,
 } from "@/lib/keyNumbers";
@@ -38,11 +40,11 @@ function cell(row: PipelineRow, id: PipelineColumnId) {
   if (id === "perAcre") return deal.price_per_acre_display || "Not provided";
   if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
   if (id === "capacity") return capacitySummary(factsForDeal(deal));
+  if (id === "traffic") return workbookTrafficLine(deal) || "Not provided";
   if (id === "cashFlow") {
-    if (deal.figures_status === "withheld") return "Package figures not shown";
-    if (deal.stated_cash_flow_display) return deal.stated_cash_flow_display;
-    if (deal.figures_status === "vacant" || deal.kind === "land") return "Vacant land";
-    return "Not provided";
+    const cash = cashTile(deal);
+    if (cash.value === "Not provided" || cash.value === "Vacant land, no business") return cash.value;
+    return [cash.value, cash.note, cash.basis].filter(Boolean).join(" · ");
   }
   if (id === "depot") return depotLine(deal.miles_to_depot, !row.noPin);
   return checkedShort(deal.checked_live) || "Not provided";
@@ -55,6 +57,7 @@ function sortValue(row: PipelineRow, id: PipelineColumnId) {
   if (id === "perAcre") return deal.price_per_acre;
   if (id === "openLand") return deal.open_land_sqft;
   if (id === "capacity") return factsForDeal(deal).length;
+  if (id === "traffic") return deal.trade_aadt;
   if (id === "cashFlow") return deal.stated_cash_flow;
   if (id === "depot") return row.noPin ? null : deal.miles_to_depot;
   return null;

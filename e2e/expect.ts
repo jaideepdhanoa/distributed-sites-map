@@ -31,6 +31,7 @@ export type Site = {
   apn?: string;
   owner?: string;
   land_tier?: string | null;
+  spare_ac_own?: number | null;
   verdict?: string | null;
   listed?: boolean;
   contacted?: boolean;
@@ -125,10 +126,18 @@ export type Chips = {
   extra?: "listed" | "contacted" | "held" | null;
 };
 
+function matchesSpareTier(site: Site, tier: string) {
+  if (site.spare_ac_own == null || !Number.isFinite(site.spare_ac_own)) return false;
+  const sqft = site.spare_ac_own * 43560;
+  if (tier === "L10") return sqft + 1e-6 >= 10000;
+  if (tier === "L4") return sqft + 1e-6 >= 4000 && sqft < 10000;
+  return false;
+}
+
 function chips(site: Site, options: Chips, loose: boolean) {
   if (options.query && !blob(site).includes(options.query.toLowerCase())) return false;
   if (loose) return true;
-  if (options.tier && options.tier !== "any" && site.land_tier !== options.tier) return false;
+  if (options.tier && options.tier !== "any" && !matchesSpareTier(site, options.tier)) return false;
   if (options.verdict && options.verdict !== "any" && (site.verdict || "none") !== options.verdict) return false;
   if (options.listed === "yes" && !site.listed) return false;
   if (options.types && !(options.types.includes(site.business_type || "Car wash"))) return false;

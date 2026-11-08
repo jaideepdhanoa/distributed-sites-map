@@ -1,34 +1,32 @@
 import type { ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
-import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
+import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText } from "@/lib/keyNumbers";
+import { acreUnit, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 
 function acres(value: number | null | undefined, text?: string) {
-  if (text) return text;
-  if (value == null) return "—";
-  return `${value} ac`;
+  const shown = acreUnit(value, text);
+  return shown || "—";
 }
 
-function sparePeer(site?: SiteProps | null, deal?: DealProps | null, prefer: "site" | "deal" = "deal") {
-  const fromDeal = deal?.open_land_sqft != null
-    ? { value: openLandText(deal.open_land_sqft), basis: deal.open_land_basis || "Estimated" }
-    : null;
-  const tier = tierLabel(site?.land_tier);
-  const fromSite = tier
-    ? { value: tier, basis: site?.spare_ac_own != null ? `${site.spare_ac_own} ac own` : "Spare land tier" }
-    : site?.spare_ac_own != null
-      ? { value: site.spare_ac_own_text || `${site.spare_ac_own} ac`, basis: "Own spare" }
-      : null;
-  if (prefer === "site") return fromSite || fromDeal || { value: "Not measured", basis: "No aerial check yet" };
-  return fromDeal || fromSite || { value: "Not measured", basis: "No aerial check yet" };
+function spareRows(site?: SiteProps | null, deal?: DealProps | null) {
+  const rows: { label: string; value: string; basis: string }[] = [];
+  if (deal?.open_land_sqft != null) {
+    rows.push({ label: "Workbook spare", value: openLandText(deal.open_land_sqft), basis: deal.open_land_basis || "Estimated" });
+  }
+  if (site?.spare_ac_own != null) {
+    rows.push({ label: "Universe own spare", value: acreUnit(site.spare_ac_own, site.spare_ac_own_text), basis: "Own parcel" });
+  }
+  if (!rows.length) rows.push({ label: "Spare land", value: "Not measured", basis: "No aerial check yet" });
+  return rows;
 }
 
 function GradePair({
@@ -40,15 +38,17 @@ function GradePair({
   deal?: DealProps | null;
   prefer: "site" | "deal";
 }) {
-  const spare = sparePeer(site, deal, prefer);
+  const rows = spareRows(site, deal);
   const facts = prefer === "site" ? factsForSite(site, deal) : factsForDeal(deal);
   return (
     <div className="grade-pair" data-testid="grade-pair">
-      <article>
-        <span>Spare land</span>
-        <strong>{spare.value}</strong>
-        <small>{spare.basis}</small>
-      </article>
+      {rows.map((row) => (
+        <article key={row.label}>
+          <span>{row.label}</span>
+          <strong>{row.value}</strong>
+          <small>{row.basis}</small>
+        </article>
+      ))}
       <article className="facts">
         <span>Site capacity</span>
         <CapacityFacts facts={facts} />
@@ -175,13 +175,14 @@ export default function Detail({
       <p className="note">{site.site_id}{price ? ` · Asking ${price}` : ""}</p>
       {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {site.land_tier ? <span className={`badge tier ${site.land_tier === "L10" ? "l10" : "l4"}`} title={tierLabel(site.land_tier)}><i className={`swatch ${site.land_tier === "L10" ? "l10" : "l4"}`} />{tierLabel(site.land_tier)}</span> : null}
+        {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         {site.land_only ? <span className="badge pending">Land site</span> : null}
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
+      {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
       <GradePair site={site} deal={linkedDeal} prefer="site" />
       <SitePhotos card={photos} />
       <NextStepCard kind="site" id={site.site_id} />
@@ -210,7 +211,6 @@ export default function Detail({
                 </div>
               </>
             ) : null}
-            {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
             {site.place_note ? (
               <>
                 <h3>Contact</h3>
@@ -307,12 +307,13 @@ export default function Detail({
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
+              <span>Universe own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)}</div>
+              {linkedDeal?.open_land_sqft != null ? <><span>Workbook spare</span><div>{openLandText(linkedDeal.open_land_sqft)} · {linkedDeal.open_land_basis || "Estimated"}</div></> : null}
               <span>Site capacity</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
               <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-              <span>Traffic count</span><div>{site.aadt_count ? `${site.aadt_count} vehicles a day${site.aadt_road ? ` on ${plainRoad(site.aadt_road)}` : ""}${site.aadt_year ? ` (${site.aadt_year})` : ""}${site.aadt_source ? `. ${site.aadt_source}` : ""}` : "—"}</div>
+              <span>Traffic count</span><div>{universeTrafficLine(site) || "—"}</div>
               <span>Flood</span><div>{site.flood_zone || "—"}</div>
               <span>Year built</span><div>{site.year_built || "—"}</div>
               <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
@@ -408,14 +409,15 @@ export function DealDetail({
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
       {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
-      <GradePair site={universeSite} deal={deal} prefer="deal" />
-      <SitePhotos card={photos} />
       {onCompare ? (
         <label className="compare-check">
           <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
           Compare
         </label>
       ) : null}
+      <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />
+      <GradePair site={universeSite} deal={deal} prefer="deal" />
+      <SitePhotos card={photos} />
       <NextStepCard kind="deal" id={deal.deal_id} />
       <PanelSections
         overview={
@@ -442,12 +444,14 @@ export function DealDetail({
               <span>Next step</span><div>{deal.next_step || "Not provided"}</div>
             </div>
             {deal.universe_id ? (
-              <>
+              <div data-testid="universe-preview">
                 <h3>Universe site</h3>
                 <p>
                   <button className="text-link" type="button" onClick={onOpenSite}>{universeName || deal.universe_id}</button>
+                  {` · ${deal.universe_id}`}
                 </p>
-              </>
+                <p>{universeTrafficLine(universeSite) || "Traffic count not on this universe row"}</p>
+              </div>
             ) : hasPin ? (
               <p className="note" data-testid="universe-gap">This listing has a location and is not linked to a universe site yet.</p>
             ) : null}
@@ -455,7 +459,6 @@ export function DealDetail({
         }
         numbers={
           <>
-            <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} />
             <div className="kv">
               <span>Asking price</span>
               <div>
@@ -470,9 +473,11 @@ export function DealDetail({
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>
               <div>
-                {deal.figures_status === "withheld"
+                {deal.stated_cash_flow_display
+                  ? `${deal.stated_cash_flow_display}${deal.cash_flow_label ? ` · ${deal.cash_flow_label}` : ""}${deal.figures_basis ? ` · ${deal.figures_basis}` : ""}${deal.package_status ? ` · Package ${deal.package_status}` : ""}`
+                  : deal.figures_status === "withheld"
                   ? "Package figures not shown"
-                  : deal.stated_cash_flow_display || deal.stated_revenue_display || (deal.kind === "land" ? "Vacant land, no business" : "Not provided")}
+                  : deal.stated_revenue_display || (deal.kind === "land" ? "Vacant land, no business" : "Not provided")}
               </div>
             </div>
           </>

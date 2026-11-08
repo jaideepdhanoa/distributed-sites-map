@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.build_data import geocode_queries, scan_obj
+from scripts.build_data import deal_place_label, distinct_pipeline_names, geocode_queries, listing_url_from_row, row_is_data, scan_obj
 from scripts.key_numbers import capacity_fields, coverage, key_figures, listing_gone
 
 
@@ -70,11 +70,12 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(figures["figures_basis"], "Claimed")
         self.assertEqual(figures["figures_source"], "BizBuySell listing")
         self.assertEqual(figures["stated_cash_flow"], 400000)
+        self.assertEqual(figures["cash_flow_label"], "EBITDA")
         self.assertEqual(figures["cash_multiple_display"], "6.2x cash flow")
         self.assertEqual(figures["site_capacity"], "Strong")
-        self.assertNotIn("ebitda", json.dumps(figures).lower())
+        self.assertNotIn("ebitda", (figures["figures_source"] or "").lower())
 
-    def test_package_figures_are_omitted(self) -> None:
+    def test_package_cash_flow_is_labeled(self) -> None:
         figures = key_figures(
             _row(
                 **{
@@ -83,24 +84,45 @@ class KeyFiguresTest(unittest.TestCase):
                     "Land basis": None,
                     "Spare area (sq ft)": None,
                     "Revenue ($ a year)": 900000,
-                    "EBITDA ($ a year)": 320000,
+                    "EBITDA ($ a year)": -121000,
+                    "Claimed cash-flow label": "EBITDA",
+                    "Claimed cash flow ($ a year)": -121000,
+                    "Package status": "Received",
+                    "Financials status": "Documented",
                     "Asking price ($)": 3000000,
                     "Source of the numbers": "Matthews P&L statements in the site folder",
+                    "Stalls that fit": 0,
+                    "AADT (nearest)": 840,
+                    "AADT road": "07  SOUTHERN AVE",
+                    "AADT segment distance (m)": 58,
+                    "AADT max within 800 m": 27012,
+                    "Population within 3 miles": 95070,
+                    "Population growth (3-mile)": -0.0557,
+                    "Median household income (3-mile)": 78843,
+                    "Washes within 1 mile": 1,
+                    "Washes within 3 miles": 6,
                     "Power rating": None,
                 }
             ),
             "pipeline",
         )
-        self.assertEqual(figures["figures_status"], "withheld")
+        self.assertEqual(figures["figures_status"], "shown")
         self.assertIsNone(figures["stated_revenue"])
-        self.assertIsNone(figures["stated_cash_flow"])
+        self.assertEqual(figures["stated_cash_flow"], -121000)
+        self.assertEqual(figures["stated_cash_flow_display"], "-$121,000")
+        self.assertEqual(figures["cash_flow_label"], "EBITDA")
+        self.assertEqual(figures["package_status"], "Received")
+        self.assertEqual(figures["figures_basis"], "Documented")
         self.assertIsNone(figures["cash_multiple"])
         self.assertEqual(figures["figures_source"], "")
+        self.assertEqual(figures["bays_that_fit"], 0)
+        self.assertEqual(figures["trade_aadt"], 840)
+        self.assertEqual(figures["trade_washes_1mi"], 1)
         self.assertEqual(figures["land_acres"], 1.08)
-        self.assertIsNone(figures["open_land_sqft"])
-        blob = json.dumps(figures)
+        blob = json.dumps(figures).lower()
+        self.assertNotIn("matthews", blob)
+        self.assertNotIn("folder", blob)
         self.assertNotIn("900000", blob)
-        self.assertNotIn("320000", blob)
         problems = scan_obj(figures, "figures")
         self.assertEqual(problems, [])
 
@@ -117,8 +139,8 @@ class KeyFiguresTest(unittest.TestCase):
         }
         report = coverage([shown, withheld])
         self.assertEqual(report["counts"]["stated_cash_flow"]["active"], 1)
-        self.assertEqual(report["counts"]["stated_cash_flow"]["tracked"], 1)
-        self.assertEqual(report["withheld"], [{"deal_id": "PIPE-2", "name": "Held", "note": "Package figures not shown"}])
+        self.assertEqual(report["counts"]["stated_cash_flow"]["tracked"], 2)
+        self.assertEqual(report["withheld"], [])
 
     def test_measured_zero_spare_area_is_open_land(self) -> None:
         for raw in (0, 0.0, "0", "0.0", "0 "):
@@ -198,6 +220,84 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertNotIn("site_capacity", fields)
         problems = scan_obj(fields, "facts")
         self.assertEqual(problems, [])
+
+    def test_blank_name_row_stays_when_the_site_id_is_filled(self) -> None:
+        self.assertFalse(row_is_data({"Site": "", "Name": None}))
+        self.assertTrue(row_is_data({"Site": "", "Name": "", "Site ID": "LAND-PHX-0033"}))
+        self.assertTrue(row_is_data({"Asking price ($)": 950000}))
+
+    def test_listing_url_supplies_a_blank_street(self) -> None:
+        label = deal_place_label({"Site": "", "Name": "", "Listing link": "https://www.loopnet.com/Listing/5020-S-16th-St-Phoenix-AZ/39334803/"})
+        self.assertEqual(label, "5020 S 16th St")
+
+    def test_photo_notes_url_is_not_the_listing_link(self) -> None:
+        sketch = "https://maps.clarkcountynv.gov/assessor/apps/aowebimages/aowebimage.aspx?sketch=16224402010"
+        notes = (
+            "No listing link on row. Clark County Assessor building sketch filed for APN 162-24-402-010 "
+            f"(not a photograph) — {sketch} (checked/filed 2026-11-06)."
+        )
+        blank = {
+            "Listing link": "",
+            "Listing status": "Listed",
+            "Photo notes": notes,
+            "What we know": f"See the sketch {sketch}",
+            "Land evidence": sketch,
+            "Source of the numbers": sketch,
+            "_links": [("Photo notes", sketch), ("What we know", sketch)],
+        }
+        self.assertEqual(listing_url_from_row(blank), "")
+        typed = {
+            **blank,
+            "Listing link": "View listing",
+            "_links": [("Listing link", "https://www.loopnet.com/Listing/1523-E-Southern-Ave-Phoenix-AZ/40461709/"), ("Photo notes", sketch)],
+        }
+        self.assertEqual(listing_url_from_row(typed), "https://www.loopnet.com/Listing/1523-E-Southern-Ave-Phoenix-AZ/40461709/")
+        direct = {**blank, "Listing link": "https://www.bizbuysell.com/business-opportunity/example/"}
+        self.assertEqual(listing_url_from_row(direct), "https://www.bizbuysell.com/business-opportunity/example/")
+        text_only = {
+            **blank,
+            "Listing link": "No public listing - broker email only (Car Wash Brokers package, Oct 21)",
+            "Photo notes": "https://mcassessor.maricopa.gov/mcs/?q=144-32-001B",
+            "_links": [("Photo notes", "https://mcassessor.maricopa.gov/mcs/?q=144-32-001B")],
+        }
+        self.assertEqual(listing_url_from_row(text_only), "")
+        deals = json.loads((ROOT / "data" / "generated" / "deals.geojson").read_text())["features"]
+        sites = json.loads((ROOT / "data" / "generated" / "sites.geojson").read_text())["features"]
+        by_deal = {feature["properties"]["deal_id"]: feature["properties"] for feature in deals}
+        by_site = {feature["properties"]["site_id"]: feature["properties"] for feature in sites}
+        las = by_deal["PIPE-LAS-0011"]
+        self.assertEqual(las.get("listing_url") or "", "")
+        self.assertIn("maps.clarkcountynv.gov", las.get("photo_notes") or "")
+        for deal_id in ("LAND-PHX-0045", "LAND-PHX-0046", "LAND-LAS-0050", "LAND-PHX-0050", "PIPE-PHX-0081"):
+            self.assertEqual(by_deal[deal_id].get("listing_url") or "", "", deal_id)
+        for site_id in ("PHX-U326", "WB-PHX-0027", "WB-PHX-0028", "WB-LAS-0028"):
+            self.assertEqual(by_site[site_id].get("listing_url") or "", "", site_id)
+        self.assertIn("loopnet.com", by_deal["PIPE-PHX-0001"]["listing_url"])
+        self.assertIn("bizbuysell.com", by_deal["PIPE-LAS-0072"]["listing_url"])
+        self.assertIn("loopnet.com", by_deal["LAND-PHX-0033"]["listing_url"])
+
+    def test_duplicate_universe_name_uses_the_pipeline_name(self) -> None:
+        sites = [
+            {"site_id": "PHX-U193", "origin": "universe", "name": "Sonoran Express Car Wash", "address": "1523 E Southern Ave"},
+            {"site_id": "PHX-U432", "origin": "universe", "name": "Sonoran Express Car Wash", "address": "16843 N 43rd Ave"},
+        ]
+        features = [
+            {"properties": {"universe_id": "PHX-U193", "kind": "pipeline", "name": "Sonoran Express"}},
+            {"properties": {"universe_id": "PHX-U432", "kind": "pipeline", "name": "Express wash"}},
+        ]
+        self.assertEqual(distinct_pipeline_names(sites, features), 1)
+        self.assertEqual(sites[0]["name"], "Sonoran Express Car Wash")
+        self.assertEqual(sites[1]["name"], "Express wash")
+        chain = [
+            {"site_id": "PHX-U217", "origin": "universe", "name": "Super Star Car Wash", "address": "3930 E Baseline Rd"},
+            {"site_id": "PHX-U501", "origin": "universe", "name": "Super Star Car Wash", "address": "1905 W Baseline Rd"},
+        ]
+        chain_deals = [
+            {"properties": {"universe_id": "PHX-U217", "kind": "pipeline", "name": "3930 E Baseline Rd"}},
+            {"properties": {"universe_id": "PHX-U501", "kind": "pipeline", "name": "1905 W Baseline Rd"}},
+        ]
+        self.assertEqual(distinct_pipeline_names(chain, chain_deals), 0)
+        self.assertEqual(chain[0]["name"], "Super Star Car Wash")
 
     def test_mcnab_query_drops_the_wrong_city(self) -> None:
         self.assertEqual(

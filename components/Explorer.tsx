@@ -17,7 +17,6 @@ import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMark
 import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
 import { readLinks, readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, setLinkStatus, proposeLink, type LinkProposal, type SavedSearch, type Shortlist } from "@/lib/savedSets";
-import { APPROVER_LABEL } from "@/lib/actions/approver";
 import { clearHidden, hideSite, readHidden } from "@/lib/hide";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
 import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
@@ -593,6 +592,14 @@ export default function Explorer() {
         .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
         .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
   const listedStepEmpty = funnel !== "pipeline" && listed === "yes" && !query && visibleSites.length === 0;
+  const handoffStep: StageId | null = !listedStepEmpty ? null
+    : stage !== "universe" && subcount("universe", "listed") > 0 ? "universe"
+    : stage !== "in_area" && subcount("in_area", "listed") > 0 ? "in_area"
+    : null;
+  const shownFeatures = handoffStep ? listedFeatures(handoffStep) : visibleFeatures;
+  const handoffCopy = handoffStep
+    ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "In service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
+    : handoff;
   const areaDeals = (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
     if (funnel === "pipeline" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
     if (!mapArea) return true;
@@ -625,7 +632,7 @@ export default function Explorer() {
     setStepsOpen(false);
   }, [stepKey]);
   useEffect(() => {
-    if (!data || funnel === "pipeline" || listView || !listedStepEmpty) return;
+    if (!data || funnel === "pipeline" || !listedStepEmpty) return;
     const key = `${stage}|${listed}`;
     if (handedOff.current === key) return;
     const universeListed = subcount("universe", "listed");
@@ -719,6 +726,18 @@ export default function Explorer() {
     return sitePool.filter((site) => (allCities || site.city === city) && inStage(site, step) && site[field] && passesChips(site, false)).length;
   }
 
+  function listedFeatures(step: StageId): SiteFeature[] {
+    return sitePool.filter((site) => (allCities || site.city === city) && inStage(site, step) && site.listed && passesChips(site, true)).flatMap((site) => {
+      const feature = poolById.get(site.site_id);
+      if (!feature) return [];
+      if (mapArea) {
+        const coords = feature.geometry?.coordinates;
+        if (!coords || !inMapArea(coords[0], coords[1], mapArea)) return [];
+      }
+      return [{ ...feature, properties: site }];
+    });
+  }
+
   function countLiveContactedDeals() {
     return dealRows.filter((deal) => {
       if (!isLiveContactedDeal(deal) || (!allCities && deal.city !== city)) return false;
@@ -779,7 +798,7 @@ export default function Explorer() {
                 <>
                   {" · "}
                   <button type="button" className="text-link" onClick={() => {
-                    if (!window.confirm(`Link this record with ${hit.label}? ${APPROVER_LABEL} approves before that changes the record.`)) return;
+                    if (!window.confirm(`Link this record with ${hit.label}? Approval is required before that changes the record.`)) return;
                     setLinkProposals(proposeLink({ fromId: current.id, toId: hit.id, via: hit.via, apn: hit.apn }));
                   }}>Propose link</button>
                 </>
@@ -795,7 +814,7 @@ export default function Explorer() {
             </p>
           );
         })}
-        <p className="quiet">A link waits for {APPROVER_LABEL}’s approval. It does not change Market or the workbook.</p>
+        <p className="quiet">A link waits for approval. It does not change Market or the workbook.</p>
       </section>
     );
   }
@@ -860,7 +879,7 @@ export default function Explorer() {
     if (!(allStages || universeWide || stage === "universe") && !inStage(feature.properties, stage)) return false;
     return passesChips(feature.properties, false, universeWide);
   });
-  const universePins = showUniverse ? visibleFeatures.filter((feature) => feature.geometry && !personallyHidden(feature.properties.site_id)) : [];
+  const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry && !personallyHidden(feature.properties.site_id)) : [];
   const unscreenedPins = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : [];
   const pinCount = (funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
@@ -1543,14 +1562,14 @@ export default function Explorer() {
           <ReviewFeedSheet sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} />
         ) : null}
         <MapView
-          sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? visibleFeatures : [])}
+          sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? shownFeatures : [])}
           coverage={funnel !== "pipeline" && showUniverse ? {
-            listed: visibleFeatures.length,
-            missingPoint: visibleFeatures.filter((feature) => !feature.geometry).length,
+            listed: shownFeatures.length,
+            missingPoint: shownFeatures.filter((feature) => !feature.geometry).length,
           } : null}
           deals={drawnDeals}
           fitPoints={[
-            ...((funnel === "pipeline" ? [] : visibleFeatures).flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : [])),
+            ...((funnel === "pipeline" ? [] : shownFeatures).flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : [])),
             ...drawnDeals.flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : []),
           ]}
           area={mapArea}
@@ -1602,13 +1621,13 @@ export default function Explorer() {
             </button>
           ) : null}
         </div>
-        {handoff ? <p className="empty-map" role="status">{handoff}</p> : null}
-        {funnel === "universe" && !listView && visibleFeatures.length === 0 ? (
+        {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
+        {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
             ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Universe has ${subcount("universe", "listed").toLocaleString()} listed. In service area has ${subcount("in_area", "listed").toLocaleString()} listed.`
             : compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
         ) : null}
-        {listedStepEmpty && !listView ? (
+        {listedStepEmpty && !handoffStep && !listView ? (
           <div className="empty-actions">
             <button type="button" onClick={() => write({ stage: "universe", listed: "yes" })}>Show Universe listed</button>
             <button type="button" onClick={() => write({ stage: "in_area", listed: "yes" })}>Show in service area listed</button>
@@ -1649,6 +1668,7 @@ export default function Explorer() {
             onOpen={choose}
             onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
             onExport={exportList}
+            note={handoffCopy}
           />
         ) : null}
         <aside className={`layers ${layersOpen ? "open" : ""}`}>

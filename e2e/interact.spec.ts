@@ -86,6 +86,7 @@ test("Back returns to the previous city and step", async ({ page }, info) => {
   if (info.project.name === "mobile") await page.locator("select[aria-label='City']").selectOption("MIA");
   else await page.getByRole("button", { name: "Miami" }).click();
   await page.waitForURL(/city=MIA/);
+  if (info.project.name === "mobile") await page.locator(".phone-step").click();
   await page.locator(".funnel .step button", { hasText: "Cleared" }).first().click();
   await page.waitForURL(/stage=cleared/);
   await page.goBack();

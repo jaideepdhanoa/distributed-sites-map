@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { APPROVER_LABEL } from "@/lib/actions/approver";
 import { allowsAssignee, allowsDate, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
 import "./actions.css";
@@ -201,7 +200,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
             <input type="checkbox" checked={sameParcel} onChange={(event) => setSameParcel(event.target.checked)} />
             These are the same parcel
           </label>
-          <p className="hint">The link waits until {APPROVER_LABEL} approves. It does not change Stage.</p>
+          <p className="hint">The link waits for approval. It does not change Stage.</p>
         </>
       ) : null}
       {type === "bring_back" || type === "stage_move" ? (
@@ -242,7 +241,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     body = (
       <>
         <div className="chip-row">
-          <span className="wait">Waiting for {APPROVER_LABEL}</span>
+          <span className="wait">Waiting for approval</span>
           <span className="type">{nextStepTypeLabel(focus.detail)}</span>
         </div>
         <h3>{focus.title || focus.proposedValue}</h3>
@@ -273,7 +272,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         </div>
         <h3>Next: {approved.title || approved.proposedValue}</h3>
         <p className="who">
-          Approved by {who(accounts, approved.decidedBy) || APPROVER_LABEL}
+          Approved by {who(accounts, approved.decidedBy) || "the approver"}
           {approved.decidedAt ? ` · ${formatPacific(approved.decidedAt)}` : ""}
           {approved.ownerName ? ` · Owner ${approved.ownerName}` : ""}
           {approved.targetOn ? ` · Due ${shortDate(approved.targetOn)}` : ""}
@@ -312,9 +311,9 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       <>
         <p className="kicker">Next step</p>
         <p>No next step yet. Propose one.</p>
-        <p>{APPROVER_LABEL} approves before it changes the record.</p>
+        <p>Approval is required before it changes the record.</p>
         {writable ? <button type="button" className="propose" onClick={() => setOpen(true)}>+ Propose next step</button> : null}
-        <p className="hint">Advance, drop with a reason, or mark duplicate. {APPROVER_LABEL} approves before it changes the record. Resolving a comment does not change Stage.</p>
+        <p className="hint">Advance, drop with a reason, or mark duplicate. Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
       </>
     );
   }

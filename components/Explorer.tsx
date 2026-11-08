@@ -95,7 +95,7 @@ export default function Explorer() {
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
   const [handoff, setHandoff] = useState("");
-  const [powerFeatures, setPowerFeatures] = useState<GeoFeature[]>([]);
+  const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [listName, setListName] = useState("");
@@ -190,10 +190,10 @@ export default function Explorer() {
   }, []);
   useEffect(() => {
     let cancel = false;
-    fetch("/api/data/power").then(async (response) => {
+    fetch("/api/data/grid").then(async (response) => {
       if (!response.ok || cancel) return;
       const payload = await response.json() as { features?: GeoFeature[] };
-      if (!cancel) setPowerFeatures(Array.isArray(payload.features) ? payload.features : []);
+      if (!cancel) setGridFeatures(Array.isArray(payload.features) ? payload.features : []);
     }).catch(() => undefined);
     return () => {
       cancel = true;
@@ -1565,7 +1565,7 @@ export default function Explorer() {
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
           overlayPoints={overlayPoints}
-          powerFeatures={powerFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
+          gridFeatures={gridFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}

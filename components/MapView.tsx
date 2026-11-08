@@ -37,7 +37,7 @@ type Props = {
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
   overlayPoints?: { label: string; coordinates: [number, number] }[];
-  powerFeatures?: GeoFeature[];
+  gridFeatures?: GeoFeature[];
 };
 
 function ringPoint(lon: number, lat: number, miles: number, step: number): [number, number] {
@@ -712,54 +712,54 @@ export default function MapView(props: Props) {
       const overlaySource = map.getSource("overlays") as GeoJSONSource | undefined;
       if (overlaySource) overlaySource.setData(overlayData);
       else map.addSource("overlays", { type: "geojson", data: overlayData });
-      const powerData = {
+      const gridData = {
         type: "FeatureCollection" as const,
-        features: (props.powerFeatures || []).filter((feature) => feature.geometry),
+        features: (props.gridFeatures || []).filter((feature) => feature.geometry),
       };
-      const powerSource = map.getSource("power") as GeoJSONSource | undefined;
-      if (powerSource) powerSource.setData(powerData);
-      else map.addSource("power", { type: "geojson", data: powerData });
-      if (!map.getLayer("power-line")) {
+      const gridSource = map.getSource("grid") as GeoJSONSource | undefined;
+      if (gridSource) gridSource.setData(gridData);
+      else map.addSource("grid", { type: "geojson", data: gridData });
+      if (!map.getLayer("grid-line")) {
         map.addLayer({
-          id: "power-line",
+          id: "grid-line",
           type: "line",
-          source: "power",
+          source: "grid",
           filter: ["==", ["get", "kind"], "line"],
           paint: { "line-color": "#2c5d8f", "line-width": 3, "line-opacity": 0.9 },
         });
       }
-      if (!map.getLayer("power-substation")) {
+      if (!map.getLayer("grid-substation")) {
         map.addLayer({
-          id: "power-substation",
+          id: "grid-substation",
           type: "fill",
-          source: "power",
+          source: "grid",
           filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Polygon"]],
           paint: { "fill-color": "#2c5d8f", "fill-opacity": 0.35 },
         });
       }
-      if (!map.getLayer("power-substation-line")) {
+      if (!map.getLayer("grid-substation-line")) {
         map.addLayer({
-          id: "power-substation-line",
+          id: "grid-substation-line",
           type: "line",
-          source: "power",
+          source: "grid",
           filter: ["all", ["==", ["get", "kind"], "substation"], ["!=", ["geometry-type"], "Point"]],
           paint: { "line-color": "#1d4e89", "line-width": 2 },
         });
       }
-      if (!map.getLayer("power-substation-point")) {
+      if (!map.getLayer("grid-substation-point")) {
         map.addLayer({
-          id: "power-substation-point",
+          id: "grid-substation-point",
           type: "circle",
-          source: "power",
+          source: "grid",
           filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"]],
           paint: { "circle-radius": 7, "circle-color": "#1d4e89", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2 },
         });
       }
-      if (!map.getLayer("power-labels")) {
+      if (!map.getLayer("grid-labels")) {
         map.addLayer({
-          id: "power-labels",
+          id: "grid-labels",
           type: "symbol",
-          source: "power",
+          source: "grid",
           filter: ["any", ["==", ["geometry-type"], "Point"], ["has", "label_only"]],
           layout: {
             "text-field": ["get", "label"],
@@ -843,7 +843,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.powerFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -945,7 +945,7 @@ export default function MapView(props: Props) {
       const geometry = site?.geometry || off?.geometry || deal?.geometry;
       if (!geometry || geometry.type !== "Point") return;
       const pin = geometry.coordinates as [number, number];
-      const extra = (propsRef.current.powerFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
+      const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
       if (!extra.length) {
         glide(map, pin, 16);
         return;
@@ -967,7 +967,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.powerFeatures]);
+  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.gridFeatures]);
 
   useEffect(() => {
     const map = mapRef.current;

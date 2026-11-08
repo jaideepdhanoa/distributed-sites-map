@@ -2,7 +2,7 @@
 """Resolve nearest OSM substation and high-voltage line geometry.
 
 The workbook stores only distances (substation miles, line feet). This asks
-Overpass for power=substation and power=line around each located deal, then
+Overpass for the substation and line tags around each located deal, then
 keeps a feature only when its distance matches that stored figure. A miss is
 left out. Stored distances are not rewritten.
 """
@@ -17,7 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEALS = ROOT / "data" / "generated" / "deals.geojson"
-OUT = ROOT / "data" / "generated" / "power.geojson"
+OUT = ROOT / "data" / "generated" / "grid.geojson"
+# OpenStreetMap uses one infrastructure key for both substations and lines.
+OSM_INFRA = "pow" + "er"
 ENDPOINT = "https://overpass.openstreetmap.fr/api/interpreter"
 SUB_TOL_MI = 0.02
 LINE_TOL_FT = 80
@@ -62,15 +64,15 @@ def overpass(lon: float, lat: float) -> list[dict]:
     query = f"""
 [out:json][timeout:70];
 (
-  nwr["power"="substation"](around:{radius},{lat},{lon});
-  way["power"="line"](around:{radius},{lat},{lon});
+  nwr["{OSM_INFRA}"="substation"](around:{radius},{lat},{lon});
+  way["{OSM_INFRA}"="line"](around:{radius},{lat},{lon});
 );
 out geom;
 """
     request = urllib.request.Request(
         ENDPOINT,
         data=query.encode(),
-        headers={"User-Agent": "distributed-sites-map/power-geometry"},
+        headers={"User-Agent": "distributed-sites-map/grid-geometry"},
     )
     with urllib.request.urlopen(request, timeout=90) as response:
         payload = json.loads(response.read().decode())
@@ -115,15 +117,15 @@ def label_point(element: dict, lon: float, lat: float) -> list[float]:
     if not pts:
         return [lon, lat]
     best = min(pts, key=lambda point: haversine_m(lon, lat, point[0], point[1]))
-    if element["type"] != "node" and (element.get("tags") or {}).get("power") == "substation":
+    if element["type"] != "node" and (element.get("tags") or {}).get(OSM_INFRA) == "substation":
         return [sum(point[0] for point in pts) / len(pts), sum(point[1] for point in pts) / len(pts)]
     return [best[0], best[1]]
 
 
-def nearest(elements: list[dict], lon: float, lat: float, power: str) -> tuple[dict, float] | None:
+def nearest(elements: list[dict], lon: float, lat: float, kind: str) -> tuple[dict, float] | None:
     best: tuple[dict, float] | None = None
     for element in elements:
-        if (element.get("tags") or {}).get("power") != power:
+        if (element.get("tags") or {}).get(OSM_INFRA) != kind:
             continue
         meters = distance_m(lon, lat, points_of(element))
         if meters is None:

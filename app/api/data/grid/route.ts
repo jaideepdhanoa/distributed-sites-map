@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await requireUser();
   if (!isSession(session)) return session;
-  return NextResponse.json(readGenerated("power.geojson"), { headers: privateHeaders });
+  return NextResponse.json(readGenerated("grid.geojson"), { headers: privateHeaders });
 }

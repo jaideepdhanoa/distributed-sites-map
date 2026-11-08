@@ -320,8 +320,8 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(distinct_pipeline_names(chain, chain_deals), 0)
         self.assertEqual(chain[0]["name"], "Super Star Car Wash")
 
-    def test_power_geometry_matches_stored_distance(self) -> None:
-        layer = json.loads((ROOT / "data/generated/power.geojson").read_text())
+    def test_grid_geometry_matches_stored_distance(self) -> None:
+        layer = json.loads((ROOT / "data/generated/grid.geojson").read_text())
         features = [item for item in layer["features"] if not item["properties"].get("label_only")]
         portland = [item for item in features if item["properties"]["deal_id"] == "LAND-PHX-0050"]
         self.assertEqual([item["properties"]["kind"] for item in portland], ["substation"])

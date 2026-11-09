@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { nearestSheetSnap, sheetSnapHeights, stepSheet } from "../lib/sheetSnap";
+import { initialSheetSnap, nearestSheetSnap, sheetSnapHeights, stepSheet } from "../lib/sheetSnap";
 import { previewChromePlacement } from "../lib/previewChrome";
 
 const SONORAN = "/?funnel=pipeline&pstage=dropped&site=PIPE-PHX-0001";
@@ -16,15 +16,19 @@ test("sheet steps and drag release stop at half", () => {
   expect(nearestSheetSnap(heights.half, view)).toBe("half");
   expect(nearestSheetSnap(heights.full, view)).toBe("full");
   expect(nearestSheetSnap((heights.peek + heights.half) / 2 + 8, view)).toBe("half");
+  expect(initialSheetSnap(null)).toBe("peek");
+  expect(initialSheetSnap("")).toBe("peek");
+  expect(initialSheetSnap("later")).toBe("peek");
+  expect(initialSheetSnap("half")).toBe("half");
+  expect(initialSheetSnap("full")).toBe("full");
 });
 
 test("phone show more and show less stop at half", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.goto(SONORAN);
   const drawer = page.locator("aside.drawer");
-  await expect(drawer).toHaveClass(/snap-half/);
-  await page.getByRole("button", { name: "Show less" }).click();
   await expect(drawer).toHaveClass(/snap-peek/);
+  await expect(drawer).not.toHaveClass(/snap-half/);
   const peek = await drawer.boundingBox();
   const view = page.viewportSize()?.height ?? 800;
   expect(peek!.height).toBeLessThanOrEqual(view / 2);
@@ -41,7 +45,7 @@ test("phone show more and show less stop at half", async ({ page }, info) => {
 test("dragging the grab bar releases on half", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.goto(SONORAN);
-  await page.getByRole("button", { name: "Show less" }).click();
+  await expect(page.locator("aside.drawer")).toHaveClass(/snap-peek/);
   const grab = page.getByRole("button", { name: "Drag sheet" });
   const box = await grab.boundingBox();
   const shift = await page.evaluate(() => {
@@ -51,7 +55,7 @@ test("dragging the grab bar releases on half", async ({ page }, info) => {
     return half - peek;
   });
   const x = box!.x + box!.width / 2;
-  const y = box!.y + 16;
+  const y = box!.y + box!.height / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x, y - shift, { steps: 12 });
@@ -108,6 +112,80 @@ test("phone layers list scrolls between the header and the sheet", async ({ page
   expect(bounds.belowHeader).toBe(true);
   expect(bounds.aboveSheet).toBe(true);
   expect(bounds.noteInside).toBe(true);
+});
+
+test("desktop filters panel stays left of the drawer", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop filters");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(SONORAN);
+  await page.locator("aside.drawer").waitFor();
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Filters" });
+  await expect(panel).toBeVisible();
+  const overlap = await page.evaluate(() => {
+    const filters = document.querySelector('.popover[aria-label="Filters"]')!.getBoundingClientRect();
+    const drawer = document.querySelector("aside.drawer")!.getBoundingClientRect();
+    const layers = document.querySelector("aside.layers")!.getBoundingClientRect();
+    const close = document.querySelector("aside.drawer .drawer-head .close")!.getBoundingClientRect();
+    const hit = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    return { drawer: hit(filters, drawer), layers: hit(filters, layers), close: hit(filters, close) };
+  });
+  expect(overlap.drawer).toBe(false);
+  expect(overlap.layers).toBe(false);
+  expect(overlap.close).toBe(false);
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(page.locator(".layers.open")).toBeVisible();
+  await expect(panel).toHaveCount(0);
+});
+
+test("phone grab bar sits above the sheet labels", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone sheet");
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(SONORAN);
+  const drawer = page.locator("aside.drawer");
+  await expect(drawer).toHaveClass(/snap-peek/);
+  async function separated() {
+    return page.evaluate(() => {
+      const grab = document.querySelector(".sheet-handle .sheet-grab")!;
+      const bar = grab.getBoundingClientRect();
+      const mark = getComputedStyle(grab, "::before");
+      const labels = [...document.querySelectorAll(".sheet-steps .sheet-step")].filter((node) => (node.textContent || "").trim());
+      const texts = labels.map((node) => node.getBoundingClientRect());
+      const hit = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      return {
+        labels: texts.length,
+        grab: texts.some((text) => hit(bar, text)),
+        barPainted: mark.content !== "none" && mark.height !== "0px",
+      };
+    });
+  }
+  const peek = await separated();
+  expect(peek.labels).toBeGreaterThan(0);
+  expect(peek.grab).toBe(false);
+  expect(peek.barPainted).toBe(true);
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(drawer).toHaveClass(/snap-half/);
+  const half = await separated();
+  expect(half.labels).toBe(2);
+  expect(half.grab).toBe(false);
+});
+
+test("a site opened from the url starts at peek unless the url says otherwise", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone sheet");
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(SONORAN);
+  const drawer = page.locator("aside.drawer");
+  await expect(drawer).toHaveClass(/snap-peek/);
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(drawer).toHaveClass(/snap-half/);
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.locator(".layers.open").getByText("Depots").click();
+  await expect(drawer).toHaveClass(/snap-half/);
+  await page.goto(`${SONORAN}&sheet=half`);
+  await expect(page.locator("aside.drawer")).toHaveClass(/snap-half/);
+  await page.goto(`${SONORAN}&sheet=full`);
+  await expect(page.locator("aside.drawer")).toHaveClass(/snap-full/);
 });
 
 test("preview button hides on the phone when the sheet is above peek", () => {

@@ -22,3 +22,9 @@ export function stepSheet(snap: SheetSnap, direction: "more" | "less"): SheetSna
   if (direction === "more") return snap === "peek" ? "half" : "full";
   return snap === "full" ? "half" : "peek";
 }
+
+/** Peek, unless the link names peek, half, or full. */
+export function initialSheetSnap(value: string | null | undefined): SheetSnap {
+  if (value === "peek" || value === "half" || value === "full") return value;
+  return "peek";
+}

@@ -13,6 +13,7 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
+import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
@@ -92,6 +93,10 @@ export default function Explorer() {
     const bar = shell?.querySelector(".bar");
     if (!shell || !bar) return;
     shell.style.setProperty("--bar-h", `${bar.getBoundingClientRect().height}px`);
+    const layers = shell.querySelector(".layers");
+    if (!layers) return;
+    const width = Math.ceil(layers.getBoundingClientRect().width);
+    shell.style.setProperty("--layers-clear", `${Math.max(width, 1) + 22}px`);
   });
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
@@ -145,7 +150,10 @@ export default function Explorer() {
   const searchTimer = useRef<number | null>(null);
   const searchFocused = useRef(false);
   const [catalog, setCatalog] = useState<SiteFeature[] | null>(null);
-  const [sheetSnap, setSheetSnap] = useState<"peek" | "half" | "full">("half");
+  const sheetQuery = params.get("sheet");
+  const sheetQueryRef = useRef(sheetQuery);
+  sheetQueryRef.current = sheetQuery;
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>(() => initialSheetSnap(sheetQuery));
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
@@ -372,7 +380,7 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
-    setSheetSnap("half");
+    setSheetSnap(initialSheetSnap(sheetQueryRef.current));
   }, [selected]);
 
   useEffect(() => {

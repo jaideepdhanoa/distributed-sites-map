@@ -38,12 +38,9 @@ type SheetControl = {
 
 function SheetHandle({ sheet }: { sheet?: SheetControl }) {
   const drag = useRef<{ y: number; height: number } | null>(null);
-  const snap = sheet?.snap ?? "half";
+  const snap = sheet?.snap ?? "peek";
   return (
     <div className="sheet-handle" data-testid="sheet-handle">
-      {snap === "peek" ? <span className="sheet-step" /> : (
-        <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "less"))}>Show less</button>
-      )}
       <button
         type="button"
         className="sheet-grab"
@@ -83,9 +80,14 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           if (drawer) drawer.style.height = "";
         }}
       />
-      {snap === "full" ? <span className="sheet-step" /> : (
-        <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "more"))}>Show more</button>
-      )}
+      <div className="sheet-steps">
+        {snap === "peek" ? <span className="sheet-step" /> : (
+          <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "less"))}>Show less</button>
+        )}
+        {snap === "full" ? <span className="sheet-step" /> : (
+          <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "more"))}>Show more</button>
+        )}
+      </div>
     </div>
   );
 }

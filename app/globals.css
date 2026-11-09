@@ -640,6 +640,12 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 @media (min-width: 768px) {
   .shell.drawer-open .maplibregl-ctrl-top-right { right: var(--drawer-width); }
   .shell.drawer-open .layers { right: calc(var(--drawer-width) + 10px); z-index: 5; }
+  .shell.drawer-open { --drawer-offset: var(--drawer-width); }
+  .shell.filters-open .layers { z-index: 8; }
+  .shell:not(.list-open) .popover[aria-label="Filters"] {
+    right: calc(var(--drawer-offset, 0px) + var(--layers-clear, 120px));
+    width: min(400px, calc(100vw - var(--drawer-offset, 0px) - var(--layers-clear, 120px) - 24px));
+  }
 }
 .list-pane { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; background: #faf7f1; }
 .shell.list-open .list-pane { display: flex; }
@@ -1019,21 +1025,30 @@ tr { cursor: pointer; }
   .drawer.expanded,
   .drawer.snap-full { height: var(--sheet-h, 88vh); }
   .sheet-handle {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
     flex: 1;
     width: auto;
-    min-height: 44px;
-    align-items: center;
+    min-height: 0;
     border: 0;
     background: transparent;
     box-shadow: none;
     color: var(--ink-3);
-    padding: 0;
+    padding: 2px 0 0;
   }
   .sheet-handle::before { content: none; }
-  .sheet-handle .sheet-step:first-child { justify-self: end; }
-  .sheet-handle .sheet-step:last-child { justify-self: start; }
+  .sheet-steps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    column-gap: 12px;
+  }
+  .sheet-steps .sheet-step:first-child { justify-self: end; }
+  .sheet-steps .sheet-step:last-child { justify-self: start; }
   .close { min-height: 44px; }
   .table-wrap { overflow: auto; }
   .table-wrap table { display: none; }
@@ -1974,11 +1989,11 @@ span.listing-link.muted { text-decoration: none; }
   .phone-peek strong { display: block; font-size: var(--type-lead); }
   .phone-peek p { margin: 2px 0 0; color: var(--ink-3); font-size: var(--type-cap); }
   .phone-peek button { margin-left: auto; min-height: 44px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--paper-card); padding: 0 14px; }
-  .sheet-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 99px; background: #c3b8a8; }
+  .phone-peek > .sheet-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 99px; background: #c3b8a8; }
   .drawer { transition: height 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   .drawer-head .close, .hero-info, .map-links a, a.listing-link, .drawer .action, .compare-check, .layers-close { min-height: 44px; }
   .drawer-head { padding-top: 4px; padding-bottom: 4px; }
-  .sheet-handle { min-height: 44px; }
+  .sheet-handle { min-height: 0; }
   .hero-frame { min-height: 88px; margin-bottom: 8px; }
   .hero-frame iframe, .hero-still, .hero-still img { height: 88px; }
   .headline strong { font-size: 16px; line-height: 22px; }
@@ -2006,18 +2021,21 @@ span.listing-link.muted { text-decoration: none; }
     overflow: auto;
     padding-bottom: 8px;
   }
-  .sheet-grab {
-    width: 44px;
-    height: 44px;
+  .sheet-handle .sheet-grab {
+    position: static;
+    width: 72px;
+    height: 22px;
+    margin: 0;
     display: grid;
     place-items: center;
     border: 0;
+    border-radius: 999px;
     background: transparent;
     box-shadow: none;
     padding: 0;
     touch-action: none;
   }
-  .sheet-grab::before {
+  .sheet-handle .sheet-grab::before {
     content: "";
     width: 36px;
     height: 4px;
@@ -2025,16 +2043,22 @@ span.listing-link.muted { text-decoration: none; }
     background: #c3b8a8;
   }
   .sheet-step {
-    min-width: 72px;
-    min-height: 44px;
+    min-height: 32px;
     border: 0;
+    border-radius: 999px;
     background: transparent;
     box-shadow: none;
     color: var(--ink-3);
     font-size: 12px;
-    padding: 0 4px;
+    line-height: 16px;
+    padding: 4px 8px;
   }
-  .drawer-head { justify-content: stretch; padding-top: 4px; }
+  .sheet-step:focus-visible,
+  .sheet-handle .sheet-grab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1px var(--paper-card), 0 0 0 2px var(--green);
+  }
+  .drawer-head { justify-content: stretch; align-items: end; padding-top: 8px; }
   .drawer-head .close { flex: none; }
 }
 @media (prefers-reduced-motion: reduce) and (max-width: 767px) {

@@ -173,7 +173,6 @@ export default function KeyStrip({
       ) : <p className="note">Not on file</p>}
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
-        <Metric icon={Wallet} label="Asking" value={askingText} title={askingText} note={shownPriceSource(deal) || ""} basis={deal.asking_price_display ? "Broker-stated" : ""} />
         {cash.hidden ? null : signedIn && showFinancials ? (
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
@@ -187,6 +186,7 @@ export default function KeyStrip({
         ) : (
           <Metric icon={Banknote} label={cashLabel} value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />
         )}
+        <Metric icon={Wallet} label="Asking" value={askingText} title={askingText} note={shownPriceSource(deal) || ""} basis={deal.asking_price_display ? "Broker-stated" : ""} />
         {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
         {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}

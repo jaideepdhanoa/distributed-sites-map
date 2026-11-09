@@ -1,11 +1,40 @@
 {
-  "new_sites": 1,
-  "removed_sites": 1,
+  "new_sites": 4,
+  "removed_sites": 2,
   "verdict_changes": 0,
-  "stage_moves": 0,
+  "stage_moves": 5,
   "sample_new": [
-    "WB-PHX-0030"
+    "LAND-PHX-0052",
+    "LAND-PHX-0053",
+    "LAND-PHX-0054",
+    "LAND-PHX-0055"
   ],
   "sample_verdicts": [],
-  "sample_stages": []
+  "sample_stages": [
+    {
+      "site_id": "MIA-U1274",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "site_id": "WB-PHX-0016",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "site_id": "WB-PHX-0017",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0033",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0034",
+      "before": "",
+      "after": "1 Desk screen"
+    }
+  ]
 }

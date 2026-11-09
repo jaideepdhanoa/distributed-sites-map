@@ -186,7 +186,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       <p className="kicker">Propose next step</p>
       <div className="type-chips" role="group" aria-label="Next step type">
         {NEXT_STEP_TYPES.map((item) => (
-          <button key={item.id} type="button" className={type === item.id ? "on" : ""} onClick={() => setType(item.id)}>{item.label}</button>
+          <button key={item.id} type="button" className={type === item.id ? "chip on" : "chip"} onClick={() => setType(item.id)}>{item.label}</button>
         ))}
       </div>
       {type === "work_item" ? (
@@ -217,7 +217,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       {type === "bring_back" || type === "stage_move" ? (
         <label>
           Stage
-          <select aria-label="Stage" value={stage} onChange={(event) => setStage(event.target.value)}>
+          <select aria-label="Stage" value={stage} onChange={(event) => setStage(event.target.value)} className="secondary">
             <option value="">Choose a stage</option>
             {stages.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
@@ -227,7 +227,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         <div className="split">
           <label>
             Assignee (optional)
-            <select aria-label="Assignee" value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
+            <select aria-label="Assignee" value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="secondary">
               <option value="">No assignee</option>
               {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
             </select>
@@ -239,8 +239,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         </div>
       ) : null}
       <div className="act-row">
-        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())}>Submit for approval</button>
-        <button type="button" onClick={resetForm}>Cancel</button>
+        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())} className="menu-item">Submit for approval</button>
+        <button type="button" onClick={resetForm} className="menu-item">Cancel</button>
       </div>
     </form>
   ) : null;
@@ -265,11 +265,11 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         {reviewer ? (
           <div className="act-row">
             <button type="button" className="propose" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "accepted" })}>Accept</button>
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "rejected" })}>Reject</button>
-            <button type="button" onClick={() => startEdit(focus)}>Edit</button>
+            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "rejected" })} className="menu-item">Reject</button>
+            <button type="button" onClick={() => startEdit(focus)} className="menu-item">Edit</button>
           </div>
         ) : writable && focus.authorId === status.username ? (
-          <button type="button" onClick={() => startEdit(focus)}>Edit</button>
+          <button type="button" onClick={() => startEdit(focus)} className="menu-item">Edit</button>
         ) : null}
       </>
     );
@@ -293,25 +293,25 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
             <button type="button" className="propose" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${approved.id}/done`, {})}>Mark done</button>
           ) : null}
           {allowsAssignee(approved.detail) && (reviewer || approved.ownerId === status.username) ? (
-            <button type="button" onClick={() => { setReassigning((value) => !value); setDating(false); setOwnerId(approved.ownerId || ""); }}>Reassign</button>
+            <button type="button" onClick={() => { setReassigning((value) => !value); setDating(false); setOwnerId(approved.ownerId || ""); }} className="menu-item">Reassign</button>
           ) : null}
           {allowsDate(approved.detail) && (reviewer || approved.ownerId === status.username) ? (
-            <button type="button" onClick={() => { setDating((value) => !value); setReassigning(false); setDue(approved.targetOn || ""); }}>Change date</button>
+            <button type="button" onClick={() => { setDating((value) => !value); setReassigning(false); setDue(approved.targetOn || ""); }} className="menu-item">Change date</button>
           ) : null}
         </div>
         {reassigning ? (
           <div className="act-row">
-            <select aria-label="Assignee" value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
+            <select aria-label="Assignee" value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="secondary">
               <option value="">No assignee</option>
               {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
             </select>
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { ownerId }, "PATCH")}>Save assignee</button>
+            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { ownerId }, "PATCH")} className="menu-item">Save assignee</button>
           </div>
         ) : null}
         {dating ? (
           <div className="act-row">
             <input aria-label="Due" type="date" value={due} onChange={(event) => setDue(event.target.value)} />
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { targetOn: due }, "PATCH")}>Save date</button>
+            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { targetOn: due }, "PATCH")} className="menu-item">Save date</button>
           </div>
         ) : null}
         {stepType === "knock_off" ? <p className="hint">The workbook export asks for stage Dropped.</p> : null}
@@ -322,9 +322,9 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       <>
         <p className="kicker">Next step</p>
         <div className="type-chips" role="group" aria-label="Next step type">
-          <button type="button" onClick={() => { setType("stage_move"); setOpen(true); }}>Advance</button>
-          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }}>Drop with a reason</button>
-          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }}>Mark duplicate</button>
+          <button type="button" onClick={() => { setType("stage_move"); setOpen(true); }} className="menu-item">Advance</button>
+          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }} className="menu-item">Drop with a reason</button>
+          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }} className="menu-item">Mark duplicate</button>
         </div>
         <p className="hint">Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
       </>

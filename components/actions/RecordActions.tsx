@@ -202,7 +202,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
         rows={variant === "queue" ? 2 : 3}
         maxLength={2000}
       />
-      <button type="submit" disabled={pending}>Save note</button>
+      <button type="submit" disabled={pending} className="menu-item">Save note</button>
     </form>
   ) : (
     <p className="note">Notes are read only for this login.</p>
@@ -242,12 +242,12 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
       </label>
       <label>
         Owner
-        <select aria-label="Owner" value={stepOwner} onChange={(event) => setStepOwner(event.target.value)}>
+        <select aria-label="Owner" value={stepOwner} onChange={(event) => setStepOwner(event.target.value)} className="secondary">
           <option value="">Unassigned</option>
           {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
         </select>
       </label>
-      <button type="submit" disabled={pending}>Propose next step</button>
+      <button type="submit" disabled={pending} className="menu-item">Propose next step</button>
     </form>
   ) : null;
 
@@ -277,12 +277,12 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
                   <MentionChips mentions={item.mentions} />
                   <div className="act-row">
                     {canFinish(item) ? (
-                      <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${item.id}/done`, {}, () => undefined)}>Done</button>
+                      <button type="button" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${item.id}/done`, {}, () => undefined)} className="menu-item">Done</button>
                     ) : null}
                     {reviewer && item.status === "open" ? (
                       <>
-                        <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)}>Accept</button>
-                        <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "rejected" }, () => undefined)}>Reject</button>
+                        <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "accepted" }, () => undefined)} className="menu-item">Accept</button>
+                        <button type="button" onClick={() => void submit(`/api/actions/suggestions/${item.id}`, { status: "rejected" }, () => undefined)} className="menu-item">Reject</button>
                       </>
                     ) : null}
                   </div>
@@ -345,7 +345,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
           />
           <p className="hint">Type @ to mention someone.</p>
           <div className="act-row">
-            <button type="submit" disabled={pending}>Comment</button>
+            <button type="submit" disabled={pending} className="menu-item">Comment</button>
           </div>
         </form>
       ) : (
@@ -407,7 +407,7 @@ function NoteThread({
       {note.deleted ? <p className="note">Removed</p> : editing ? (
         <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
           <MentionField label="Edit note" value={draft} onChange={setDraft} mentions={draftMentions} onMentions={setDraftMentions} accounts={accounts} testId={`edit-${note.id}`} rows={3} maxLength={2000} />
-          <button type="submit" disabled={pending}>Save edit</button>
+          <button type="submit" disabled={pending} className="menu-item">Save edit</button>
         </form>
       ) : (
         <>
@@ -421,19 +421,19 @@ function NoteThread({
       <div className="act-row">
         {writable && actor === note.authorId && !note.deleted ? (
           <>
-            <button type="button" onClick={() => { setEditing((value) => !value); setDraft(note.body); }}>Edit</button>
+            <button type="button" onClick={() => { setEditing((value) => !value); setDraft(note.body); }} className="menu-item">Edit</button>
             {confirming ? (
-              <button type="button" onClick={() => onDelete(note.id)}>Confirm remove</button>
+              <button type="button" onClick={() => onDelete(note.id)} className="menu-item">Confirm remove</button>
             ) : (
-              <button type="button" onClick={() => setConfirming(true)}>Remove</button>
+              <button type="button" onClick={() => setConfirming(true)} className="menu-item">Remove</button>
             )}
           </>
         ) : null}
         {reviewer && !note.resolvedAt && !note.deleted ? (
-          <button type="button" onClick={() => onResolve(note.id)}>Resolve</button>
+          <button type="button" onClick={() => onResolve(note.id)} className="menu-item">Resolve</button>
         ) : null}
         {reviewer && note.resolvedAt && !note.deleted ? (
-          <button type="button" onClick={() => onReopen(note.id)}>Reopen</button>
+          <button type="button" onClick={() => onReopen(note.id)} className="menu-item">Reopen</button>
         ) : null}
       </div>
       {replies.length ? (
@@ -447,10 +447,10 @@ function NoteThread({
         replying ? (
           <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply, replyMentions.map((item) => item.id)); setReply(""); setReplyMentions([]); setReplying(false); }}>
             <MentionField label="Reply" value={reply} onChange={setReply} mentions={replyMentions} onMentions={setReplyMentions} accounts={accounts} testId="note-reply" rows={2} maxLength={2000} />
-            <button type="submit" disabled={pending}>Reply</button>
+            <button type="submit" disabled={pending} className="menu-item">Reply</button>
           </form>
         ) : (
-          <button type="button" onClick={() => setReplying(true)}>Reply</button>
+          <button type="button" onClick={() => setReplying(true)} className="menu-item">Reply</button>
         )
       ) : null}
     </details>
@@ -483,7 +483,7 @@ function ReplyLine({
       {note.deleted ? <p className="note">Removed</p> : editing ? (
         <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
           <MentionField label="Edit reply" value={draft} onChange={setDraft} mentions={draftMentions} onMentions={setDraftMentions} accounts={accounts} testId={`edit-${note.id}`} rows={2} maxLength={2000} />
-          <button type="submit" disabled={pending}>Save edit</button>
+          <button type="submit" disabled={pending} className="menu-item">Save edit</button>
         </form>
       ) : (
         <>
@@ -494,11 +494,11 @@ function ReplyLine({
       <p className="note"><strong>{accounts.find((account) => account.id === note.authorId)?.name || note.authorId}</strong> · {formatPacific(note.createdAt)}{note.updatedAt ? " · edited" : ""}</p>
       {writable && actor === note.authorId && !note.deleted ? (
         <div className="act-row">
-          <button type="button" onClick={() => { setEditing((value) => !value); setDraft(note.body); }}>Edit</button>
+          <button type="button" onClick={() => { setEditing((value) => !value); setDraft(note.body); }} className="menu-item">Edit</button>
           {confirming ? (
-            <button type="button" onClick={() => onDelete(note.id)}>Confirm remove</button>
+            <button type="button" onClick={() => onDelete(note.id)} className="menu-item">Confirm remove</button>
           ) : (
-            <button type="button" onClick={() => setConfirming(true)}>Remove</button>
+            <button type="button" onClick={() => setConfirming(true)} className="menu-item">Remove</button>
           )}
         </div>
       ) : null}

@@ -238,7 +238,7 @@ export default function Detail({
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" onClick={onClose}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {banner}
       <div className="drawer-scroll">
@@ -493,7 +493,7 @@ export function DealDetail({
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" onClick={onClose}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {banner}
       <div className="drawer-scroll">
@@ -608,7 +608,7 @@ export function UnscreenedDetail({
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}>
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" onClick={onClose}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <div className="drawer-scroll">
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

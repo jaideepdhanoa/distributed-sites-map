@@ -126,7 +126,7 @@ export function MentionField({
           {mentions.map((item) => (
             <span key={item.id} className="mention-chip" data-testid="mention-chip">
               {item.name}
-              <button type="button" aria-label={`Remove ${item.name}`} onClick={() => onMentions(mentions.filter((mention) => mention.id !== item.id))}>×</button>
+              <button type="button" aria-label={`Remove ${item.name}`} onClick={() => onMentions(mentions.filter((mention) => mention.id !== item.id))} className="menu-item">×</button>
             </span>
           ))}
         </span>
@@ -140,7 +140,7 @@ export function MentionField({
               role="option"
               aria-selected={index === active}
               data-testid="mention-option"
-              className={index === active ? "on" : ""}
+              className={index === active ? "chip on" : "chip"}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(account)}
             >

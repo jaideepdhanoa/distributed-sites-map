@@ -167,7 +167,7 @@ export default function SiteTable({
                 const sorted = header.column.getIsSorted();
                 return (
                   <th key={header.id} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}>
-                    <button type="button" onClick={header.column.getToggleSortingHandler()}>
+                    <button type="button" onClick={header.column.getToggleSortingHandler()} className="menu-item">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
                     </button>
@@ -179,7 +179,7 @@ export default function SiteTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className={row.original.site_id === selectedId ? "on" : ""} onClick={() => onSelect(row.original.site_id)}>
+            <tr key={row.id} className={row.original.site_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.original.site_id)}>
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext()) as ReactNode}</td>
               ))}
@@ -190,7 +190,7 @@ export default function SiteTable({
       <ul className="stack-list">
         {rows.map((row) => (
           <li key={row.site_id}>
-            <button type="button" className={row.site_id === selectedId ? "on" : ""} onClick={() => onSelect(row.site_id)}>
+            <button type="button" className={row.site_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.site_id)}>
               <strong>{row.name || row.address || row.site_id}</strong>
               <span>{row.site_id} · {plainVerdict(row.verdict)}{spareTier(row) ? ` · ${tierLabel(spareTier(row))}` : ""} · Site capacity {siteCapacityText(row, deals)}</span>
               {row.summary_why ? <span className="why">{row.summary_why}</span> : null}
@@ -282,7 +282,7 @@ export function DealTable({
                 const sorted = header.column.getIsSorted();
                 return (
                   <th key={header.id} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}>
-                    <button type="button" onClick={header.column.getToggleSortingHandler()}>
+                    <button type="button" onClick={header.column.getToggleSortingHandler()} className="menu-item">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
                     </button>
@@ -294,7 +294,7 @@ export function DealTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className={row.original.deal_id === selectedId ? "on" : ""} onClick={() => onSelect(row.original.deal_id)}>
+            <tr key={row.id} className={row.original.deal_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.original.deal_id)}>
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext()) as ReactNode}</td>
               ))}
@@ -305,7 +305,7 @@ export function DealTable({
       <ul className="stack-list">
         {rows.map((row) => (
           <li key={row.deal_id}>
-            <button type="button" className={row.deal_id === selectedId ? "on" : ""} onClick={() => onSelect(row.deal_id)}>
+            <button type="button" className={row.deal_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.deal_id)}>
               <strong>{row.name || row.address || row.deal_id}</strong>
               <span>{stageDetail(row.stage, row.stage_group)}{row.asking_price_display ? ` · ${row.asking_price_display}` : ""}</span>
               <span>{row.address}</span>

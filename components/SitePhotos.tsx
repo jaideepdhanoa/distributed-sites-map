@@ -118,8 +118,8 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
           </div>
         ) : null}
         <div className="hero-tabs" role="tablist" aria-label="Site view">
-          {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "on" : ""} onClick={() => setHero("street")}>Street View</button> : null}
-          {model.showGallery ? <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "on" : ""} onClick={() => setHero("photos")}>Photos{model.slides.length ? ` · ${model.slides.length}` : ""}</button> : null}
+          {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
+          {model.showGallery ? <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "chip on" : "chip"} onClick={() => setHero("photos")}>Photos{model.slides.length ? ` · ${model.slides.length}` : ""}</button> : null}
         </div>
         {credits.length ? (
           <>
@@ -195,10 +195,10 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
                   <p data-testid="photo-caption">{slide.caption || roleLabel(slide.role)}</p>
                   {slideCredit && slideCredit !== slide.caption ? <p className="photo-credit" data-testid="photo-attribution">{slideCredit}</p> : null}
                   <div className="photo-nav">
-                    <button type="button" onClick={() => step(-1)} disabled={open === 0}>Previous</button>
+                    <button type="button" onClick={() => step(-1)} disabled={open === 0} className="menu-item">Previous</button>
                     <span>{(open ?? 0) + 1} of {model.slides.length}</span>
-                    <button type="button" onClick={() => step(1)} disabled={open === model.slides.length - 1}>Next</button>
-                    <button type="button" onClick={() => setOpen(null)}>Close</button>
+                    <button type="button" onClick={() => step(1)} disabled={open === model.slides.length - 1} className="menu-item">Next</button>
+                    <button type="button" className="close" aria-label="Close photos" onClick={() => setOpen(null)}><span aria-hidden="true">×</span></button>
                   </div>
                 </figcaption>
               </div>

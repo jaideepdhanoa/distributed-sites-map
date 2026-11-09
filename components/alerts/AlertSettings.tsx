@@ -50,7 +50,7 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
     <div className="popover alert-sheet" role="dialog" aria-label="Alert settings" data-testid="alert-settings">
       <div className="popover-head">
         <h2>Alerts</h2>
-        <button type="button" onClick={onClose}>Close</button>
+        <button type="button" className="close" aria-label="Close alerts" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <p className="note alert-mail">{email ? `Mail goes to ${email}.` : "No mailbox is set for this account."}</p>
       {prefs ? (
@@ -60,7 +60,7 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
               <span>{LABELS[key]}</span>
               <span className="alert-modes" role="group" aria-label={LABELS[key]}>
                 {CHOICES.map((mode) => (
-                  <button key={mode} type="button" className={prefs[key] === mode ? "on" : ""} onClick={() => void choose(key, mode)}>
+                  <button key={mode} type="button" className={prefs[key] === mode ? "chip on" : "chip"} onClick={() => void choose(key, mode)}>
                     {mode === "instant" ? "Instant" : mode === "digest" ? "Digest" : "Off"}
                   </button>
                 ))}
@@ -70,8 +70,8 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
           <div className="alert-row">
             <span>{LABELS.followed}</span>
             <span className="alert-modes" role="group" aria-label="Daily digest">
-              <button type="button" className={prefs.followed === "off" ? "" : "on"} onClick={() => void choose("followed", "digest")}>On</button>
-              <button type="button" className={prefs.followed === "off" ? "on" : ""} onClick={() => void choose("followed", "off")}>Off</button>
+              <button type="button" className={prefs.followed === "off" ? "chip" : "chip on"} onClick={() => void choose("followed", "digest")}>On</button>
+              <button type="button" className={prefs.followed === "off" ? "chip on" : "chip"} onClick={() => void choose("followed", "off")}>Off</button>
             </span>
           </div>
           <p className="note">Instant mail is batched for about five minutes. The digest is 7:00 AM Pacific, and it is skipped when there is nothing to report.</p>

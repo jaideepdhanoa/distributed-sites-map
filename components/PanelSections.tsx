@@ -40,7 +40,7 @@ export default function PanelSections({
             type="button"
             role="tab"
             aria-selected={tab === id}
-            className={tab === id ? "on" : ""}
+            className={tab === id ? "chip on" : "chip"}
             data-testid={`panel-tab-${id}`}
             onClick={() => setTab(id)}
           >

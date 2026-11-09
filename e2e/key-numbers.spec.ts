@@ -11,23 +11,23 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
   if (info.project.name !== "mobile") await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk");
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
-  const chooser = info.project.name === "mobile"
-    ? page.getByTestId("basemap")
-    : page.getByTestId("basemap-desktop");
-  if (info.project.name === "mobile") {
-    const tools = page.locator(".map-chrome > summary");
-    if (await tools.isVisible()) await tools.click();
-  }
+  const mobile = info.project.name === "mobile";
+  const chooser = mobile ? page.getByTestId("basemap") : page.getByTestId("basemap-desktop");
+  if (mobile) await page.locator(".map-tools-toggle").click();
   await expect(chooser).toBeVisible();
+  if (!mobile) {
+    const close = page.getByRole("button", { name: "Close layers" });
+    await expect(close).toHaveCSS("background-color", "rgb(255, 253, 248)");
+    await expect(page.locator('.layers input[type="checkbox"]:checked').first()).toHaveCSS("background-color", "rgb(30, 70, 54)");
+    const bounds = await chooser.boundingBox();
+    expect(bounds && bounds.width > 20 && bounds.height > 20).toBeTruthy();
+  }
   await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
   await chooser.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
   await page.reload();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
-  if (info.project.name === "mobile") {
-    const tools = page.locator(".map-chrome > summary");
-    if (await tools.isVisible()) await tools.click();
-  }
+  if (mobile) await page.locator(".map-tools-toggle").click();
   await expect(chooser.getByRole("button", { name: "Map", exact: true })).toHaveClass(/on/);
   await page.evaluate(() => window.localStorage.removeItem("basemap"));
   await page.goto("/?review=1");

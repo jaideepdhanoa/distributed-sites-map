@@ -105,13 +105,13 @@ export default function CompareTray({
       <div className="compare-bar">
         <strong>Compare</strong>
         {deals.map((deal) => (
-          <button key={deal.deal_id} type="button" onClick={() => onRemove(deal.deal_id)}>
+          <button key={deal.deal_id} type="button" onClick={() => onRemove(deal.deal_id)} className="menu-item">
             {deal.name || deal.address}
             <span aria-hidden="true"> ×</span>
           </button>
         ))}
         {sites.map((site) => (
-          <button key={site.site_id} type="button" onClick={() => onRemove(site.site_id)}>
+          <button key={site.site_id} type="button" onClick={() => onRemove(site.site_id)} className="menu-item">
             {site.name || site.address}
             <span aria-hidden="true"> ×</span>
           </button>
@@ -119,7 +119,7 @@ export default function CompareTray({
         <button type="button" className="compare-go" disabled={count < 2}>
           Compare {count}
         </button>
-        <button type="button" className="compare-dismiss paper-btn" onClick={onClose}>Close compare</button>
+        <button type="button" className="close" aria-label="Close compare" onClick={onClose}><span aria-hidden="true">×</span></button>
         {children}
       </div>
       {count >= 2 ? (

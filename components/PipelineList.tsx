@@ -149,7 +149,7 @@ export default function PipelineList({
         <p>{rows.length.toLocaleString()} shown</p>
         <details className="col-picker">
           <summary>Columns</summary>
-          <button type="button" onClick={onResetColumns}>Pipeline default</button>
+          <button type="button" onClick={onResetColumns} className="menu-item">Pipeline default</button>
           {PIPELINE_COLUMNS.map((column) => (
             <label key={column.id}>
               <input type="checkbox" checked={columns.includes(column.id)} disabled={column.id === "site"} onChange={() => toggleColumn(column.id)} />
@@ -157,14 +157,14 @@ export default function PipelineList({
             </label>
           ))}
         </details>
-        <button type="button" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Hide filters" : "Filter"}</button>
+        <button type="button" onClick={() => setFiltersOpen((value) => !value)} className="menu-item">{filtersOpen ? "Hide filters" : "Filter"}</button>
         <button type="button" onClick={() => {
           const blob = new Blob([pipelineCsv(ordered, columns)], { type: "text/csv" });
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
           link.download = "pipeline.csv";
           link.click();
-        }}>Export CSV</button>
+        }} className="menu-item">Export CSV</button>
       </div>
       {filtersOpen ? (
         <div className="range-filters">
@@ -194,7 +194,7 @@ export default function PipelineList({
                 const active = sort.id === id;
                 return (
                   <th key={id} className={id === "capacity" ? "capacity" : undefined} aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}>
-                    <button type="button" onClick={() => onSort(id)}>
+                    <button type="button" onClick={() => onSort(id)} className="menu-item">
                       {column?.label}
                       {active ? (sort.desc ? " ↓" : " ↑") : ""}
                     </button>
@@ -208,7 +208,7 @@ export default function PipelineList({
             {ordered.map((row) => {
               const id = row.deal.deal_id;
               return (
-                <tr key={id} className={id === selectedId ? "on" : ""} onClick={(event) => {
+                <tr key={id} className={id === selectedId ? "list-row on" : "list-row"} onClick={(event) => {
                   if ((event.target as HTMLElement).closest("input, button, a")) return;
                   onOpen(id);
                 }}>
@@ -246,7 +246,7 @@ export default function PipelineList({
                     </td>
                   ))}
                   <td>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); onShowMap(id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); onShowMap(id); }} className="menu-item">{row.noPin ? "No pin" : "Show on map"}</button>
                   </td>
                 </tr>
               );
@@ -256,7 +256,7 @@ export default function PipelineList({
         <ul className="list-cards">
           {ordered.map((row) => (
             <li key={row.deal.deal_id}>
-              <button type="button" className={row.deal.deal_id === selectedId ? "on" : ""} onClick={() => onOpen(row.deal.deal_id)}>
+              <button type="button" className={row.deal.deal_id === selectedId ? "list-row on" : "list-row"} onClick={() => onOpen(row.deal.deal_id)}>
                 <strong>{unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}{row.deal.name || row.deal.address}</strong>
                 <span>{dealAsking(row)} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
                 <span>

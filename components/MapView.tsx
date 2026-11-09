@@ -139,6 +139,7 @@ export default function MapView(props: Props) {
   const radiusRef = useRef(radiusMiles);
   radiusRef.current = radiusMiles;
   const [readout, setReadout] = useState("");
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [mapGeneration, setMapGeneration] = useState(0);
   const points = useRef<[number, number][]>([]);
   const propsRef = useRef(props);
@@ -1261,55 +1262,53 @@ export default function MapView(props: Props) {
   return (
       <div className="stage-map" data-basemap={props.basemap || "satellite"}>
       <div ref={node} className="map" />
-      <div className="basemap-toggle" role="group" aria-label="Basemap" data-testid="basemap-desktop">
-        <button className={(props.basemap || "satellite") === "satellite" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
-        <button className={(props.basemap || "satellite") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
-      </div>
       <div className="map-tools">
-        <details className="map-chrome">
-          <summary>Map tools</summary>
+        <div className={`map-chrome ${toolsOpen ? "open" : ""}`}>
+          <button type="button" className="tool map-tools-toggle" aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}>Map tools</button>
+          <div className="map-chrome-body">
         <div className="pin-label" role="group" aria-label="Basemap" data-testid="basemap">
           <span>Base</span>
-          <button className={(props.basemap || "satellite") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
-          <button className={(props.basemap || "satellite") === "satellite" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
+          <button className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
+          <button className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
         </div>
         <div className="pin-label" role="group" aria-label="Pin label" data-testid="pin-label">
           <span>Pin label</span>
           {(["none", "asking", "acres", "peracre"] as const).map((mode) => (
-            <button key={mode} className={(props.pinLabel || "none") === mode ? "on" : ""} type="button" onClick={() => props.onPinLabel?.(mode)}>
+            <button key={mode} className={`tool ${(props.pinLabel || "none") === mode ? "on" : ""}`} type="button" onClick={() => props.onPinLabel?.(mode)}>
               {mode === "none" ? "None" : mode === "asking" ? "Asking" : mode === "acres" ? "Acres" : "Per acre"}
             </button>
           ))}
         </div>
-        <button className={measure ? "on" : ""} type="button" onClick={() => { setMeasure((value) => !value); setAreaTool("off"); points.current = []; setReadout(""); }}>
+        <button className={`tool ${measure ? "on" : ""}`} type="button" onClick={() => { setMeasure((value) => !value); setAreaTool("off"); points.current = []; setReadout(""); }}>
           Measure acres
         </button>
-        <button className={areaTool === "radius" ? "on" : ""} type="button" onClick={() => { setAreaTool((value) => value === "radius" ? "off" : "radius"); setMeasure(false); }}>
+        <button className={`tool ${areaTool === "radius" ? "on" : ""}`} type="button" onClick={() => { setAreaTool((value) => value === "radius" ? "off" : "radius"); setMeasure(false); }}>
           Radius
         </button>
         {areaTool === "radius" ? (
           <label className="map-readout">
             Miles
-            <select aria-label="Radius miles" value={radiusMiles} onChange={(event) => setRadiusMiles(Number(event.target.value))}>
+            <select className="secondary" aria-label="Radius miles" value={radiusMiles} onChange={(event) => setRadiusMiles(Number(event.target.value))}>
               {[0.5, 1, 2, 3, 5].map((miles) => <option key={miles} value={miles}>{miles}</option>)}
             </select>
           </label>
         ) : null}
-        <button className={areaTool === "draw" ? "on" : ""} type="button" onClick={() => { setAreaTool((value) => value === "draw" ? "off" : "draw"); setMeasure(false); setDraftPoints([]); }}>
+        <button className={`tool ${areaTool === "draw" ? "on" : ""}`} type="button" onClick={() => { setAreaTool((value) => value === "draw" ? "off" : "draw"); setMeasure(false); setDraftPoints([]); }}>
           Draw area
         </button>
         {areaTool === "draw" && draftPoints.length >= 3 ? (
-          <button type="button" onClick={() => { props.onArea?.({ kind: "polygon", points: draftPoints }); setAreaTool("off"); }}>
+          <button className="paper-btn" type="button" onClick={() => { props.onArea?.({ kind: "polygon", points: draftPoints }); setAreaTool("off"); }}>
             Use this area
           </button>
         ) : null}
         {props.area ? (
-          <button type="button" onClick={() => { props.onArea?.(null); setDraftPoints([]); setAreaTool("off"); }}>
+          <button className="paper-btn" type="button" onClick={() => { props.onArea?.(null); setDraftPoints([]); setAreaTool("off"); }}>
             Clear area
           </button>
         ) : null}
         {readout ? <span className="map-readout">{readout}</span> : null}
-        </details>
+          </div>
+        </div>
       </div>
       {coverageText ? <p className="map-coverage" data-testid="map-coverage">{coverageText}</p> : null}
       <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>

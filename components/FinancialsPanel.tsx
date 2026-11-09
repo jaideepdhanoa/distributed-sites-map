@@ -166,7 +166,7 @@ export default function FinancialsPanel({
     <section className="fin-sheet" role="dialog" aria-modal="true" aria-label="Financials" data-testid="financials-panel">
       <header className="fin-head">
         <h3>Financials</h3>
-        <button ref={closeRef} type="button" onClick={onClose}>Close</button>
+        <button ref={closeRef} type="button" className="close" aria-label="Close financials" onClick={onClose}><span aria-hidden="true">×</span></button>
       </header>
       <p className="fin-headline" data-testid="financials-headline">
         <strong>{shownAmount(panel.headline.text, "Not asked yet")}</strong>
@@ -176,7 +176,7 @@ export default function FinancialsPanel({
       {panel.packageLine ? <p>{panel.packageLine}{panel.packageHref ? <> · <a href={panel.packageHref} target="_blank" rel="noopener noreferrer">Open package</a></> : null}</p> : null}
       <div className="fin-switch" role="group" aria-label="Period">
         {PERIODS.map((item) => (
-          <button key={item} type="button" className={item === period ? "on" : ""} onClick={() => setPeriod(item)}>{item}</button>
+          <button key={item} type="button" className={item === period ? "chip on" : "chip"} onClick={() => setPeriod(item)}>{item}</button>
         ))}
       </div>
       <div className="fin-figures">
@@ -267,7 +267,7 @@ export default function FinancialsPanel({
           ))}
           <label>
             Owner
-            <select value={owner} onChange={(event) => setOwner(event.target.value)} required>
+            <select value={owner} onChange={(event) => setOwner(event.target.value)} required className="secondary">
               <option value="">Name one owner</option>
               {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
             </select>
@@ -284,12 +284,12 @@ export default function FinancialsPanel({
             <input type="checkbox" checked={wholePackage} onChange={(event) => setWholePackage(event.target.checked)} />
             Whole package declined
           </label>
-          <button type="submit" disabled={pending || (!wholePackage && !picked.length)}>Request documents</button>
+          <button type="submit" disabled={pending || (!wholePackage && !picked.length)} className="menu-item">Request documents</button>
           <button
             type="button"
             disabled={pending || (!wholePackage && !picked.length)}
             onClick={() => void submit(wholePackage ? "package_refused" : "refused")}
-          >
+           className="menu-item">
             Record as not available
           </button>
           {error ? <p>{error}</p> : null}
@@ -303,8 +303,8 @@ export default function FinancialsPanel({
               {item.ownerName ? ` · ${item.ownerName}` : ""}
               {reviewer ? (
                 <>
-                  <button type="button" disabled={pending} onClick={() => void decide(item.id, "accepted")}>Approve</button>
-                  <button type="button" disabled={pending} onClick={() => void decide(item.id, "rejected")}>Reject</button>
+                  <button type="button" disabled={pending} onClick={() => void decide(item.id, "accepted")} className="menu-item">Approve</button>
+                  <button type="button" disabled={pending} onClick={() => void decide(item.id, "rejected")} className="menu-item">Reject</button>
                 </>
               ) : null}
             </p>

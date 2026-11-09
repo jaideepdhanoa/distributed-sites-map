@@ -26,6 +26,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: node scripts/check_controls.mjs
       - run: node --experimental-strip-types scripts/test-stage-detail.ts
       - run: node --experimental-strip-types scripts/test-drawer-width.ts
       - run: node --experimental-strip-types scripts/test-key-numbers.ts

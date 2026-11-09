@@ -37,7 +37,7 @@
 .queue-pop select,
 .review-done button,
 .review-toast button,
-.review-sheet-head button {
+.review-sheet-head button:not(.close) {
   font: inherit;
   border: 1px solid rgba(250, 247, 241, 0.45);
   background: transparent;
@@ -84,7 +84,7 @@
 .review-menu input, .review-menu select, .queue-pop select { background: white; color: var(--ink); border-color: #8d8376; }
 .shell.reviewing { grid-template-rows: auto auto minmax(0, 1fr); }
 .shell.reviewing .map-stage { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 0; }
-.shell.reviewing .legend, .shell.reviewing .layers { display: none; }
+.shell.reviewing .legend { display: none; }
 .shell.reviewing .stage-map { position: relative; grid-column: 2; grid-row: 1; height: 100%; min-height: 0; }
 .review-rail {
   grid-column: 1;
@@ -164,7 +164,7 @@
 }
 .review-sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; }
 .review-sheet-head h2 { margin: 0; font-size: 16px; color: var(--ink); }
-.review-sheet-head button { color: var(--ink); border-color: #8d8376; background: white; }
+.review-sheet-head button:not(.close) { color: var(--ink); border-color: #8d8376; background: white; }
 @media (max-width: 767px) {
   .review-kicker, .review-rail, .review-meter, .review-long { display: none; }
   .review-short { display: inline; }

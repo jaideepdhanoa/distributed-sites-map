@@ -251,7 +251,7 @@ function ReviewMenu({ mode, siteId, followed, onClose, onShowSnooze, onSnooze }:
           </select>
         </label>
         <label>Note
-          <input data-testid="queue-flag-note" value={flagNote} onChange={(event) => setFlagNote(event.target.value)} maxLength={200} />
+          <input className="field" data-testid="queue-flag-note" value={flagNote} onChange={(event) => setFlagNote(event.target.value)} maxLength={200} />
         </label>
         <button type="submit" className="menu-item">Flag</button>
       </form> : null}

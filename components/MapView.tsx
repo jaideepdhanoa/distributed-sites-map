@@ -98,7 +98,7 @@ function areaLabels(areas: GeoFeature[]) {
     });
   };
   place("las-100", "Core and ring 100 (current)");
-  place("las-300", "Rings 200 and 300 (later)", [0, 0.12]);
+  place("las-300", "Rings 200 and 300 (later)", [0.04, -0.16]);
   place("phx-service", "Phoenix service area (current)");
   place("mia-current", "Miami service area (current)");
   place("mia-extended", "Miami extended area (later)", [0.05, 0.08]);
@@ -182,9 +182,9 @@ export default function MapView(props: Props) {
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
           { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f7e2a8", "line-dasharray": [1.2, 1.2], "line-width": 1.4, "line-opacity": 0.9 } },
           { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
-          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#dfeae1", "fill-opacity": 0.72 } },
+          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#dfeae1", "fill-opacity": 0.1 } },
           { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#b9cdbf", "line-width": 1.4 } },
-          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-max-width": 9, "text-allow-overlap": false, "text-padding": 8 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
+          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-max-width": 8, "text-offset": [0, 1.1], "text-allow-overlap": false, "text-padding": 8 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
           { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#9e4b3e", "line-width": 1.6, "line-dasharray": [1.5, 1.2] } },
@@ -759,13 +759,15 @@ export default function MapView(props: Props) {
       const paint = (id: string, prop: "circle-color" | "circle-opacity" | "circle-stroke-color" | "circle-stroke-opacity" | "circle-stroke-width" | "fill-opacity" | "line-color" | "line-width" | "text-color" | "text-halo-color" | "text-halo-width", value: string | number) => {
         if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
       };
+      const phoneScreen = window.matchMedia("(max-width: 767px)").matches;
       if (!satelliteOn) {
+        paint("areas-op", "fill-opacity", 0.45);
         paint("area-labels", "text-color", "#5b554b");
         paint("area-labels", "text-halo-color", "#f6f3ec");
         paint("depot-labels", "text-color", "#1d4e89");
         paint("depot-labels", "text-halo-color", "#fffdf8");
       } else {
-        paint("areas-op", "fill-opacity", 0.14);
+        paint("areas-op", "fill-opacity", phoneScreen ? 0.06 : 0.1);
         paint("areas-op-line", "line-color", "#f4efe6");
         paint("areas-op-line", "line-width", 2);
         for (const id of ["tier-large", "tier-small"]) {
@@ -831,6 +833,7 @@ export default function MapView(props: Props) {
   const appliedFocus = useRef("");
   const appliedReview = useRef("");
   const appliedFit = useRef("");
+  const appliedPad = useRef("");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1006,19 +1009,26 @@ export default function MapView(props: Props) {
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
-      map.setPadding(phone && !reviewing ? { top: 132, bottom: 148, left: 12, right: 12 } : { top: 0, bottom: 0, left: 0, right: 0 });
+      const phonePad = phone && !reviewing;
+      const padKey = phonePad ? "clear" : "flush";
+      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : { top: 0, bottom: 0, left: 0, right: 0 });
+      if ((props.basemap || "satellite") === "satellite" && map.getLayer("areas-op")) {
+        map.setPaintProperty("areas-op", "fill-opacity", phone ? 0.06 : 0.1);
+      }
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (reviewToken) {
         appliedReview.current = reviewToken;
-      } else if (phone && fitKey && appliedFit.current !== fitKey) {
+        appliedPad.current = "flush";
+      } else if (phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
+        appliedPad.current = padKey;
         appliedFocus.current = focusToken;
         const lngs = finiteFit.map((point) => point[0]);
         const lats = finiteFit.map((point) => point[1]);
         map.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: { top: 56, bottom: 120, left: 28, right: 28 }, maxZoom: 13, duration: 0 },
+          { padding: { top: 176, bottom: 168, left: 28, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
       } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;

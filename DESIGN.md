@@ -4,7 +4,7 @@ Read this before changing UI. The map, the list, and the review inbox share one 
 
 ## No browser-default controls
 
-Every `button`, `select`, `checkbox`, and `radio` uses a design-system class. Do not ship a control whose color, border, or radius comes from the user agent.
+Every `button`, `select`, `checkbox`, `radio`, and text field uses a design-system class on the element itself. Do not ship a control whose color, border, radius, or checkbox glyph comes from the user agent. `appearance` is `none`. A gray button face (`rgb(239, 239, 239)` or `rgb(240, 240, 240)`) means the class is missing or does not paint the control.
 
 ## Three tiers
 
@@ -35,11 +35,17 @@ The selected segment uses the state class `on` (fill `#1c1914`, text `#fffdf8`).
 
 A panel dismisses with one quiet round ✕: class `close`, 32px on desktop (44px on a phone), fill `#fffdf8`, 1px `#d6cebe`, `aria-label` for the name. Never a labeled Close button. Never a second dismiss control in the same panel. A click-outside backdrop is not a second visible dismiss.
 
-## Checkbox and select
+## Checkbox, select, and text fields
 
-Checkboxes in a panel are custom: 18px, box `#d6cebe` and fill `#fffdf8` when off, fill `#1e4636` with a `#fffdf8` check when on. Labels are 14px. A count caption uses `layer-meta`: 12px, color `#8a8273` (`--ink-3`).
+A checkbox uses class `check`: 18px, box `#d6cebe` and fill `#fffdf8` when off, fill `#1e4636` with a `#fffdf8` check when on, `appearance: none`. That includes Compare, the column menu, and Layers. Labels are 14px. A count caption uses `layer-meta`: 12px, color `#8a8273` (`--ink-3`).
 
 A `<select>` uses class `secondary`: fill `#fffdf8`, 1px `#d6cebe`, radius 999, and the custom chevron. Do not leave the native arrow.
+
+A text field uses class `field`: fill `#fffdf8`, 1px `#d6cebe`, radius 8px, and the focus ring. Search keeps class `search`.
+
+The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. The phone pipeline list also has a Sort `secondary` select, because the table headers are not on screen. Each phone row has a Show on map `text-link`.
+
+Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle.
 
 ## Panel header
 
@@ -61,7 +67,7 @@ That regression broke the Layers panel. `globals.css` used `.layers > button`. T
 
 ## Desktop chrome
 
-Do not put desktop chrome in a closed `<details>`. A closed `<details>` drops its children out of the accessibility tree even when CSS tries to show them, which is why the old Map tools summary rendered at about 2×2px and the desktop basemap switch was unreachable. Use a normal element. Phone-only chrome can hide its body until its toggle is open.
+Do not put chrome in a `<details>` or `<summary>`. A closed `<details>` drops its children out of the accessibility tree even when CSS tries to show them, which is why the old Map tools summary rendered at about 2×2px and the desktop basemap switch was unreachable. The native disclosure triangle is a browser control. Use a button. A note thread that must stay a disclosure uses class `disclosure` or `act-thread`, and its summary hides the marker.
 
 ## Phone
 
@@ -75,25 +81,25 @@ Satellite is the default basemap. The choice is remembered in `localStorage` und
 
 On desktop the switch is the segmented control at the top of the Layers panel. On a phone it stays inside Map tools.
 
-Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and area fills light enough that the ground shows through. Area labels wrap instead of running off the screen.
+Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. Map tools stays inside the screen, clear of the zoom control.
 
 ## CI guards
 
-`scripts/check_controls.mjs` runs in the validate job. It fails when a `<button>` or `<select>` in `components/**` has no allowlisted class.
+`scripts/check_controls.mjs` runs in the validate job. It scans every `.tsx` file under `components/` and `app/`. It fails when a `<button>`, `<select>`, `<details>`, `<summary>`, or an `<input>` of type checkbox, radio, number, text, search, or password has no allowlisted class. An untyped `<input>` counts as text. A `className` ternary has to put an allowlisted class on every branch. `on` does not count. A class on the allowlist still has to paint the control: `menu-item` and `action` carry their own background and border, because a class with no rules leaves the browser button face. That is why the phone list passed the old lint. The buttons had `menu-item`, the checkboxes and `<details>` were not scanned, and `menu-item` did not set a background.
 
-Playwright opens Layers at 1280×800, checks that the ✕ is cream rather than the browser button face, checks that a checked checkbox is `#1e4636`, and checks that the basemap control is larger than 20×20 and that the choice survives reload. The review screenshots job writes a crop of the open Layers panel.
+Playwright opens Layers at 1280×800, checks that the ✕ is cream rather than the browser button face, checks that a checked checkbox is `#1e4636`, and checks that the basemap control is larger than 20×20 and that the choice survives reload. At 390×800 it opens List, Columns, Compare, and Layers and fails if a visible button, select, or checkbox still has `appearance: auto`, the button face `rgb(239, 239, 239)` or `rgb(240, 240, 240)`, or `accent-color: auto` with no class. The review screenshots job writes a crop of the open Layers panel.
 
 ### Allowlist
 
 Adding a class means updating this list and `scripts/check_controls.mjs` in the same change. Keep it small.
 
-Core: `primary`, `paper-btn`, `text-link`, `tool`, `icon-btn`, `close`, `segmented`, `secondary`, `action`.
+Core: `primary`, `paper-btn`, `text-link`, `tool`, `icon-btn`, `close`, `segmented`, `secondary`, `action`, `check`, `field`, `search`, `sort-header`.
 
-Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`, `sub`, `aside`, `chip`, `menu-item`, `funnel-step`, `overlay-chip`, `search-hit`, `list-row`, `sort-header`, `removable`, `sheet-grab`, `sheet-step`, `review-row`, `review-step`, `review-count`, `review-more`, `review-exit`, `compare-go`, `fin-tile`, `photo-shot`, `hero-still`, `hero-info`, `photo-more`, `propose`.
+Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`, `sub`, `aside`, `chip`, `menu-item`, `funnel-step`, `overlay-chip`, `search-hit`, `list-row`, `removable`, `sheet-grab`, `sheet-step`, `review-row`, `review-step`, `review-count`, `review-more`, `review-exit`, `compare-go`, `fin-tile`, `photo-shot`, `hero-still`, `hero-info`, `photo-more`, `propose`, `disclosure`, `act-thread`.
 
 ## Definition of done for UI changes
 
-- [ ] No button, select, checkbox, or radio uses the browser default.
+- [ ] No button, select, checkbox, radio, or text field uses the browser default.
 - [ ] Each control has a class from the allowlist, on the element itself.
 - [ ] A new class was added to this file and to `scripts/check_controls.mjs`.
 - [ ] A panel has one quiet ✕ and no labeled Close.

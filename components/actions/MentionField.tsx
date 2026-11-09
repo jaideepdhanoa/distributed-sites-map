@@ -119,7 +119,7 @@ export function MentionField({
     <div className="mention-field">
       <label>
         {label}
-        {rows ? <textarea {...fieldProps} rows={rows} placeholder={placeholder} /> : <input {...fieldProps} placeholder={placeholder} />}
+        {rows ? <textarea {...fieldProps} rows={rows} placeholder={placeholder} /> : <input {...fieldProps} className="field" placeholder={placeholder} />}
       </label>
       {mentions.length ? (
         <span className="mention-chips">

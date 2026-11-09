@@ -192,7 +192,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       {type === "work_item" ? (
         <label>
           Title
-          <input aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
+          <input className="field" aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
         </label>
       ) : null}
       {type === "knock_off" || type === "mark_duplicate" ? (
@@ -205,10 +205,10 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         <>
           <label>
             Surviving record
-            <input aria-label="Surviving record" value={survivor} onChange={(event) => setSurvivor(event.target.value)} placeholder="Pipeline, land, or universe id" />
+            <input className="field" aria-label="Surviving record" value={survivor} onChange={(event) => setSurvivor(event.target.value)} placeholder="Pipeline, land, or universe id" />
           </label>
           <label className="act-check">
-            <input type="checkbox" checked={sameParcel} onChange={(event) => setSameParcel(event.target.checked)} />
+            <input className="check" type="checkbox" checked={sameParcel} onChange={(event) => setSameParcel(event.target.checked)} />
             These are the same parcel
           </label>
           <p className="hint">The link waits for approval. It does not change Stage.</p>

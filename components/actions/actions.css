@@ -22,7 +22,8 @@
 .act-list li { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .act-threads { display: grid; gap: 8px; }
 .act-thread { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-.act-thread summary { cursor: pointer; min-height: 36px; }
+.act-thread summary { cursor: pointer; min-height: 36px; list-style: none; }
+.act-thread summary::-webkit-details-marker { display: none; }
 .act-replies { list-style: none; margin: 8px 0 0 12px; padding: 0; display: grid; gap: 6px; }
 .act-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
 .mention-field { position: relative; display: grid; gap: 6px; }

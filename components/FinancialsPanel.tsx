@@ -258,6 +258,7 @@ export default function FinancialsPanel({
           {missing.map((item) => (
             <label key={item.id}>
               <input
+                className="check"
                 type="checkbox"
                 checked={picked.includes(item.id)}
                 onChange={(event) => setPicked((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}
@@ -278,10 +279,10 @@ export default function FinancialsPanel({
           </label>
           <label>
             Note
-            <input value={reason} onChange={(event) => setReason(event.target.value)} />
+            <input className="field" value={reason} onChange={(event) => setReason(event.target.value)} />
           </label>
           <label>
-            <input type="checkbox" checked={wholePackage} onChange={(event) => setWholePackage(event.target.checked)} />
+            <input className="check" type="checkbox" checked={wholePackage} onChange={(event) => setWholePackage(event.target.checked)} />
             Whole package declined
           </label>
           <button type="submit" disabled={pending || (!wholePackage && !picked.length)} className="menu-item">Request documents</button>

@@ -343,8 +343,8 @@ export default function Detail({
               </>
             ) : null}
             {cleanNote(site.evidence) ? (
-              <details>
-                <summary>Research notes</summary>
+              <details className="disclosure">
+                <summary className="disclosure">Research notes</summary>
                 <p>{cleanNote(site.evidence)}</p>
               </details>
             ) : null}
@@ -514,7 +514,7 @@ export function DealDetail({
               {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
               {onCompare ? (
                 <label className="compare-check">
-                  <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
+                  <input className="check" type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
                   Compare
                 </label>
               ) : null}

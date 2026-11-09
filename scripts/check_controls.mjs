@@ -1,7 +1,9 @@
 /**
- * Every button and select in components/ must carry a design-system class.
- * Parent selectors such as `.layers > button` are not enough: a wrapper change
- * drops the style and the control falls back to the browser default.
+ * Every button, select, checkbox, radio, text input, and details/summary in
+ * components/ and app/ must carry a design-system class on the element.
+ * A className expression passes only when an allowlisted class is present on
+ * every branch, or a template prefix always includes one. `menu-item` and
+ * `on` are not enough by themselves when the rendered class can omit them.
  *
  * Adding a class here means updating DESIGN.md in the same change.
  */
@@ -46,7 +48,14 @@ const ALLOW = new Set([
   "hero-info",
   "photo-more",
   "propose",
+  "check",
+  "field",
+  "search",
+  "disclosure",
+  "act-thread",
 ]);
+
+const INPUT_TYPES = new Set(["checkbox", "radio", "number", "text", "search", "password"]);
 
 function files(dir) {
   const out = [];
@@ -77,20 +86,63 @@ function tags(source, name) {
   return found;
 }
 
+function tokens(value) {
+  return value.split(/[^A-Za-z0-9_-]+/).filter(Boolean);
+}
+
+function hasAllow(value) {
+  return tokens(value).some((token) => ALLOW.has(token));
+}
+
+function classExpr(tag) {
+  const at = tag.search(/className=/);
+  if (at < 0) return null;
+  let i = at + "className=".length;
+  const quote = tag[i];
+  if (quote === "\"" || quote === "'") {
+    const end = tag.indexOf(quote, i + 1);
+    return { expr: tag.slice(i + 1, end < 0 ? tag.length : end), literal: true };
+  }
+  if (quote !== "{") return null;
+  let depth = 0;
+  for (let j = i; j < tag.length; j += 1) {
+    if (tag[j] === "{") depth += 1;
+    else if (tag[j] === "}") {
+      depth -= 1;
+      if (depth === 0) return { expr: tag.slice(i + 1, j), literal: false };
+    }
+  }
+  return { expr: tag.slice(i + 1), literal: false };
+}
+
 function allowed(tag) {
-  const attr = tag.match(/className=(?:"([^"]*)"|'([^']*)'|\{([^}]+)\})/);
-  if (!attr) return false;
-  const raw = attr[1] || attr[2] || attr[3] || "";
-  const tokens = raw.split(/[^A-Za-z0-9_-]+/).filter(Boolean);
-  return tokens.some((token) => ALLOW.has(token));
+  const info = classExpr(tag);
+  if (!info) return false;
+  if (info.literal) return hasAllow(info.expr);
+  const templates = [...info.expr.matchAll(/`([^`]*)`/g)].map((match) => match[1]);
+  if (templates.some((value) => hasAllow(value.replace(/\$\{[^}]*\}/g, " ")))) return true;
+  const branches = [];
+  for (const match of info.expr.matchAll(/\?\s*(?:"([^"]*)"|'([^']*)')\s*:\s*(?:"([^"]*)"|'([^']*)')/g)) {
+    branches.push(match[1] ?? match[2], match[3] ?? match[4]);
+  }
+  if (branches.length) return branches.every((value) => hasAllow(value));
+  return hasAllow(info.expr);
+}
+
+function inputType(tag) {
+  const match = tag.match(/\btype\s*=\s*["']([^"']+)["']/i);
+  return (match ? match[1] : "text").toLowerCase();
 }
 
 const problems = [];
-for (const path of files("components")) {
-  const source = readFileSync(path, "utf8");
-  for (const name of ["button", "select"]) {
-    for (const item of tags(source, name)) {
-      if (!allowed(item.tag)) problems.push(`${path}:${item.line} <${name}> ${item.tag.slice(0, 160).replace(/\s+/g, " ")}`);
+for (const dir of ["components", "app"]) {
+  for (const path of files(dir)) {
+    const source = readFileSync(path, "utf8");
+    for (const name of ["button", "select", "input", "details", "summary"]) {
+      for (const item of tags(source, name)) {
+        if (name === "input" && !INPUT_TYPES.has(inputType(item.tag))) continue;
+        if (!allowed(item.tag)) problems.push(`${path}:${item.line} <${name}> ${item.tag.slice(0, 160).replace(/\s+/g, " ")}`);
+      }
     }
   }
 }

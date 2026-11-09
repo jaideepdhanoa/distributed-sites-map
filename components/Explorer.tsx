@@ -1438,7 +1438,7 @@ export default function Explorer() {
                   : inStep || offCount;
                 if (shown === 0 && type !== "Car wash") return null;
                 return (
-                  <button key={type} type="button" title={type === "Car wash" ? CENSUS_NOTE : undefined} className={typeOn(type) && businessTypes !== null ? "on" : businessTypes === null ? "chip on" : "chip"} onClick={() => toggleType(type)}>
+                  <button key={type} type="button" title={type === "Car wash" ? CENSUS_NOTE : undefined} className={businessTypes === null || typeOn(type) ? "chip on" : "chip"} onClick={() => toggleType(type)}>
                     {type} {shown.toLocaleString()}
                   </button>
                 );
@@ -1446,7 +1446,7 @@ export default function Explorer() {
             </div>
             <h3>Broker or firm</h3>
             <input
-              className="party-filter"
+              className="field party-filter"
               aria-label="Broker or firm"
               placeholder="Name or firm"
               value={who}
@@ -1473,7 +1473,7 @@ export default function Explorer() {
               setSavedSearches(saveSearch(searchName, window.location.search.replace(/^\?/, "")));
               setSearchName("");
             }}>
-              <input aria-label="Saved search name" placeholder="Name this search" value={searchName} onChange={(event) => setSearchName(event.target.value)} maxLength={80} />
+              <input className="field" aria-label="Saved search name" placeholder="Name this search" value={searchName} onChange={(event) => setSearchName(event.target.value)} maxLength={80} />
               <button type="submit" className="menu-item">Save search</button>
             </form>
             {savedSearches.length ? (
@@ -1764,7 +1764,7 @@ export default function Explorer() {
             compareIds={compareIds}
             sort={{ id: pipelineSortId, desc: sortDesc }}
             ranges={ranges}
-            onSort={(id) => write({ sort: `${id}:${pipelineSortId === id && !sortDesc ? "desc" : "asc"}` })}
+            onSort={(id, desc) => write({ sort: `${id}:${(desc ?? (pipelineSortId === id ? !sortDesc : false)) ? "desc" : "asc"}` })}
             onOpen={choose}
             onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
             onCompare={(id, on) => setCompared(id, on)}
@@ -1802,13 +1802,13 @@ export default function Explorer() {
                   <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Map</button>
                 </div>
                 <p className="eyebrow">Sites</p>
-                <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
-                <label><input type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
-                <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land Sites</label>
-                <label><input type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
-                <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
+                <label><input className="check" type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
+                <label><input className="check" type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
+                <label><input className="check" type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land Sites</label>
+                <label><input className="check" type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
+                <label><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
                 <label>
-                  <input type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
+                  <input className="check" type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
                   <span>
                     Listed, not yet screened
                     <span className="layer-meta">
@@ -1819,9 +1819,9 @@ export default function Explorer() {
                   </span>
                 </label>
                 <p className="eyebrow">Context</p>
-                <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
-                <label><input type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
-                <label><input type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
+                <label><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
+                <label><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
+                <label><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
                 <p className="layer-meta">A blank stays off a workbook layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</p>
               </div>
             </>
@@ -1950,7 +1950,7 @@ export default function Explorer() {
                 write({ slist: listName.trim() || null });
                 setListName("");
               }}>
-                <input aria-label="Shortlist name" placeholder="Name this shortlist" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={80} />
+                <input className="field" aria-label="Shortlist name" placeholder="Name this shortlist" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={80} />
                 <button type="submit" className="menu-item">Save shortlist</button>
                 {shortlists.map((item) => (
                   <button key={item.name} type="button" onClick={() => write({ compare: item.ids.join("|"), slist: item.name })} className="menu-item">{item.name}</button>

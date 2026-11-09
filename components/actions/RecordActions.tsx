@@ -401,7 +401,7 @@ function NoteThread({
       data-testid="note-thread"
       onToggle={(event) => { if (event.currentTarget.open) onOpen(note.id); }}
     >
-      <summary>
+      <summary className="disclosure">
         <strong>{accounts.find((account) => account.id === note.authorId)?.name || note.authorId}</strong> · {formatPacific(note.createdAt)}
       </summary>
       {note.deleted ? <p className="note">Removed</p> : editing ? (

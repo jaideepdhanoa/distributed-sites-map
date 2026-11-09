@@ -95,7 +95,7 @@ export default function PipelineList({
   compareIds: string[];
   sort: { id: PipelineColumnId; desc: boolean };
   ranges: RangeFilter;
-  onSort: (id: PipelineColumnId) => void;
+  onSort: (id: PipelineColumnId, desc?: boolean) => void;
   onOpen: (id: string) => void;
   onShowMap: (id: string) => void;
   onCompare: (id: string, on: boolean) => void;
@@ -106,6 +106,7 @@ export default function PipelineList({
 }) {
   const unread = new Set(unreadIds || []);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
   const maxOpen = Math.max(1, ...rows.map((row) => row.deal.open_land_sqft || 0));
   const summary = useMemo(() => summaryOf(rows.map((row) => row.deal)), [rows]);
   const ordered = useMemo(() => {
@@ -147,24 +148,45 @@ export default function PipelineList({
       </div>
       <div className="list-bar">
         <p>{rows.length.toLocaleString()} shown</p>
-        <details className="col-picker">
-          <summary>Columns</summary>
-          <button type="button" onClick={onResetColumns} className="menu-item">Pipeline default</button>
-          {PIPELINE_COLUMNS.map((column) => (
-            <label key={column.id}>
-              <input type="checkbox" checked={columns.includes(column.id)} disabled={column.id === "site"} onChange={() => toggleColumn(column.id)} />
-              {column.label}
-            </label>
-          ))}
-        </details>
-        <button type="button" onClick={() => setFiltersOpen((value) => !value)} className="menu-item">{filtersOpen ? "Hide filters" : "Filter"}</button>
-        <button type="button" onClick={() => {
+        <div className="col-picker">
+          <button type="button" className="paper-btn" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((value) => !value)}>Columns</button>
+          {columnsOpen ? (
+            <div className="menu" role="group" aria-label="Columns">
+              <button type="button" className="text-link" onClick={onResetColumns}>Pipeline default</button>
+              {PIPELINE_COLUMNS.map((column) => (
+                <label key={column.id}>
+                  <input className="check" type="checkbox" checked={columns.includes(column.id)} disabled={column.id === "site"} onChange={() => toggleColumn(column.id)} />
+                  {column.label}
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <label className="list-sort only-mobile">
+          Sort
+          <select
+            className="secondary"
+            aria-label="Sort"
+            value={`${sort.id}:${sort.desc ? "desc" : "asc"}`}
+            onChange={(event) => {
+              const [id, direction] = event.target.value.split(":");
+              onSort(id as PipelineColumnId, direction === "desc");
+            }}
+          >
+            {PIPELINE_COLUMNS.flatMap((column) => [
+              <option key={`${column.id}:asc`} value={`${column.id}:asc`}>{column.label}, low to high</option>,
+              <option key={`${column.id}:desc`} value={`${column.id}:desc`}>{column.label}, high to low</option>,
+            ])}
+          </select>
+        </label>
+        <button type="button" className="paper-btn" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Hide filters" : "Filter"}</button>
+        <button type="button" className="paper-btn" onClick={() => {
           const blob = new Blob([pipelineCsv(ordered, columns)], { type: "text/csv" });
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
           link.download = "pipeline.csv";
           link.click();
-        }} className="menu-item">Export CSV</button>
+        }}>Export CSV</button>
       </div>
       {filtersOpen ? (
         <div className="range-filters">
@@ -178,8 +200,8 @@ export default function PipelineList({
           ).map(([label, minKey, maxKey]) => (
             <label key={label}>
               {label}
-              <input aria-label={`${label} minimum`} inputMode="decimal" value={ranges[minKey] ?? ""} onChange={(event) => setRange(minKey, event.target.value)} />
-              <input aria-label={`${label} maximum`} inputMode="decimal" value={ranges[maxKey] ?? ""} onChange={(event) => setRange(maxKey, event.target.value)} />
+              <input className="field" aria-label={`${label} minimum`} inputMode="decimal" value={ranges[minKey] ?? ""} onChange={(event) => setRange(minKey, event.target.value)} />
+              <input className="field" aria-label={`${label} maximum`} inputMode="decimal" value={ranges[maxKey] ?? ""} onChange={(event) => setRange(maxKey, event.target.value)} />
             </label>
           ))}
         </div>
@@ -194,7 +216,7 @@ export default function PipelineList({
                 const active = sort.id === id;
                 return (
                   <th key={id} className={id === "capacity" ? "capacity" : undefined} aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}>
-                    <button type="button" onClick={() => onSort(id)} className="menu-item">
+                    <button type="button" className="sort-header" onClick={() => onSort(id)}>
                       {column?.label}
                       {active ? (sort.desc ? " ↓" : " ↑") : ""}
                     </button>
@@ -214,6 +236,7 @@ export default function PipelineList({
                 }}>
                   <td>
                     <input
+                      className="check"
                       type="checkbox"
                       aria-label={`Compare ${row.deal.name || id}`}
                       checked={compareIds.includes(id)}
@@ -246,7 +269,7 @@ export default function PipelineList({
                     </td>
                   ))}
                   <td>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); onShowMap(id); }} className="menu-item">{row.noPin ? "No pin" : "Show on map"}</button>
+                    <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
                   </td>
                 </tr>
               );
@@ -266,6 +289,7 @@ export default function PipelineList({
                 </span>
                 {row.noPin ? <span className="no-pin">No pin</span> : null}
               </button>
+              <button type="button" className="text-link" onClick={() => onShowMap(row.deal.deal_id)}>{row.noPin ? "No pin" : "Show on map"}</button>
               <ListingIcon deal={row.deal} />
             </li>
           ))}

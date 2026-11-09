@@ -211,11 +211,11 @@ function ViewsDialog() {
         >
           <label>
             Name
-            <input data-testid="view-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
+            <input className="field" data-testid="view-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
           </label>
           {canReview(status.actionRole) ? (
             <label className="act-check">
-              <input type="checkbox" checked={team} onChange={(event) => setTeam(event.target.checked)} />
+              <input className="check" type="checkbox" checked={team} onChange={(event) => setTeam(event.target.checked)} />
               Share with the team
             </label>
           ) : null}

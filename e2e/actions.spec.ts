@@ -315,6 +315,14 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await settings.screenshot({ path: "/opt/cursor/artifacts/alert-settings.png" });
 });
 
+test("the account menu stays above the review bar", async ({ page }) => {
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
+  await expect(page.getByTestId("review-bar")).toBeVisible();
+  await page.getByRole("button", { name: /Account menu/ }).click();
+  await page.getByRole("menuitem", { name: "Alerts" }).click();
+  await expect(page.getByTestId("alert-settings")).toBeVisible();
+});
+
 test("a mention with no mail credentials is logged as would-send", async ({ page, request }) => {
   await login(request, "contributor");
   const response = await request.post("/api/actions/notes", {

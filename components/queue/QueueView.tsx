@@ -345,7 +345,7 @@ export function ReviewRail({
       ))}
       {rest.length ? (
         <section data-testid="review-other">
-          {groups.length ? <h2>Also in review</h2> : null}
+          <h2>Also in review</h2>
           {rest.map(({ site, index }) => row(site, index))}
         </section>
       ) : null}
@@ -391,7 +391,12 @@ export function ReviewFeedSheet({
                 {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">None</p>}
               </section>
             ))}
-            {rest.map(({ site, index }) => row(site, index))}
+            {rest.length ? (
+              <section data-testid="review-other-sheet">
+                <h3>Also in review</h3>
+                {rest.map(({ site, index }) => row(site, index))}
+              </section>
+            ) : null}
           </>
         );
       })()}

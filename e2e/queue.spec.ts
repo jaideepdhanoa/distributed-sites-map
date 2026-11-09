@@ -314,6 +314,30 @@ test("the review inbox keeps its sections, and an approval ignores market and st
   await expect(approval.locator(".queue-dot")).toBeVisible();
 });
 
+test("also in review matches the other inbox sections", async ({ page }) => {
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
+  const desktop = page.getByTestId("review-other");
+  await expect(desktop.getByRole("heading", { name: "Also in review" })).toBeVisible();
+  const desktopRow = desktop.getByRole("button").first();
+  await expect(desktopRow).toBeVisible();
+  await expect.poll(() => desktopRow.evaluate((el) => getComputedStyle(el).display)).toBe("grid");
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByTestId("review-position").click();
+  const sheet = page.getByTestId("review-feed");
+  const other = sheet.getByTestId("review-other-sheet");
+  const heading = other.getByRole("heading", { name: "Also in review" });
+  await expect(heading).toBeVisible();
+  const assigned = sheet.getByTestId("review-assigned-sheet").getByRole("heading", { name: "Assigned" });
+  const headingPad = await heading.evaluate((el) => getComputedStyle(el).paddingTop);
+  const assignedPad = await assigned.evaluate((el) => getComputedStyle(el).paddingTop);
+  expect(headingPad).toBe(assignedPad);
+  const row = other.getByRole("button").first();
+  await expect(row).toBeVisible();
+  await expect.poll(() => row.evaluate((el) => getComputedStyle(el).display)).toBe("grid");
+  await expect.poll(() => row.evaluate((el) => getComputedStyle(el).textAlign)).toBe("left");
+});
+
 test("the review filter menu stays inside a 390px screen", async ({ page }) => {
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
   await page.setViewportSize({ width: 390, height: 800 });

@@ -13,6 +13,7 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
+import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
@@ -92,6 +93,10 @@ export default function Explorer() {
     const bar = shell?.querySelector(".bar");
     if (!shell || !bar) return;
     shell.style.setProperty("--bar-h", `${bar.getBoundingClientRect().height}px`);
+    const layers = shell.querySelector(".layers");
+    if (!layers) return;
+    const width = Math.ceil(layers.getBoundingClientRect().width);
+    shell.style.setProperty("--layers-clear", `${Math.max(width, 1) + 22}px`);
   });
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
@@ -140,13 +145,15 @@ export default function Explorer() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
   const [hitsOpen, setHitsOpen] = useState(false);
   const searchTimer = useRef<number | null>(null);
   const searchFocused = useRef(false);
   const [catalog, setCatalog] = useState<SiteFeature[] | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetQuery = params.get("sheet");
+  const sheetQueryRef = useRef(sheetQuery);
+  sheetQueryRef.current = sheetQuery;
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>(() => initialSheetSnap(sheetQuery));
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
@@ -373,7 +380,7 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
-    setSheetExpanded(false);
+    setSheetSnap(initialSheetSnap(sheetQueryRef.current));
   }, [selected]);
 
   useEffect(() => {
@@ -382,6 +389,11 @@ export default function Explorer() {
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if (event.key === "/" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+        event.preventDefault();
+        document.querySelector<HTMLInputElement>(".search")?.focus();
+        return;
+      }
       if (event.key !== "Escape") return;
       setFiltersOpen(false);
       setMoreOpen(false);
@@ -870,7 +882,6 @@ export default function Explorer() {
 
   function closeSearch(clear = false) {
     setHitsOpen(false);
-    setSearchOpen(false);
     if (!clear) return;
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
     setQueryDraft("");
@@ -881,7 +892,6 @@ export default function Explorer() {
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
     setQueryDraft("");
     setHitsOpen(false);
-    setSearchOpen(false);
     const patch: Record<string, string | null> = { site: hit.id, who: null, q: null };
     if (hit.city === "PHX" || hit.city === "LAS" || hit.city === "MIA") patch.city = hit.city === "PHX" ? null : hit.city;
     if (hit.kind === "deal") {
@@ -911,7 +921,12 @@ export default function Explorer() {
     openHit(searchHits[0]);
   }
 
-  const sheet = { expanded: sheetExpanded, onToggle: () => setSheetExpanded((value) => !value) };
+  const sheet = {
+    expanded: sheetSnap === "full",
+    snap: sheetSnap,
+    onToggle: () => setSheetSnap((snap) => (snap === "full" ? "half" : snap === "peek" ? "half" : "full")),
+    onSnap: setSheetSnap,
+  };
   const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !dealPoint(deal));
   const offMarketPool = universeWide && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
@@ -1131,7 +1146,7 @@ export default function Explorer() {
   }) : [];
 
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -1154,7 +1169,10 @@ export default function Explorer() {
               <option value="MIA">Miami</option>
             </select>
           </label>
-          <input className="search only-desktop" aria-label="Search" placeholder="Name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
+          <div className="search-wrap only-desktop">
+            <input className="search" aria-label="Search" placeholder="Search name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
+            <kbd aria-hidden="true">/</kbd>
+          </div>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
             <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
@@ -1185,9 +1203,7 @@ export default function Explorer() {
               ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Spare land"))}
           </button>
-          <button className="icon-btn only-mobile" type="button" aria-pressed={searchOpen} aria-label={searchOpen ? "Hide search" : "Search"} onClick={() => setSearchOpen((value) => !value)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M16 16l5 5" /></svg>
-          </button>
+          <input className="search mobile-search" aria-label="Search" placeholder="Search sites" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
@@ -1201,14 +1217,11 @@ export default function Explorer() {
           <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           <button className={filtersOpen ? "on" : ""} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
-        {searchOpen ? (
-          <input className="search mobile-search" aria-label="Search" placeholder="Name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
-        ) : null}
         {hitsOpen && queryDraft.trim().length >= 2 ? (
           <div className="search-hits" role="listbox" aria-label="Search results" data-testid="search-hits">
             {universeWide || pipelineWide ? (
               <div className="search-wide" data-testid="search-wide">
-                <p className="search-note">No matches in this view, showing other stages and markets.</p>
+                <p className="search-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg>No matches in this view, showing other stages and markets.</p>
               </div>
             ) : null}
             {searchHits.length ? searchHits.map((hit) => {
@@ -1221,7 +1234,7 @@ export default function Explorer() {
                   {lead.id ? <span className="hit-id">{lead.id}</span> : null}
                 </button>
               );
-            }) : <p className="search-note">No matches.</p>}
+            }) : <p className="search-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg>No matches.</p>}
           </div>
         ) : null}
         <div className="funnel-row">
@@ -1688,6 +1701,16 @@ export default function Explorer() {
             : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
           return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
         })() : null}
+        {!listView && !selected && data ? (
+          <aside className="phone-peek" data-testid="phone-peek">
+            <span className="sheet-grab" aria-hidden="true" />
+            <div>
+              <strong>{summaryText()}</strong>
+              {data.funnel.workbook_as_of ? <p>Data as of {data.funnel.workbook_as_of}</p> : null}
+            </div>
+            <button type="button" aria-label="Open the list" onClick={() => write({ view: "list" })}>List</button>
+          </aside>
+        ) : null}
         {listView && funnel === "pipeline" ? (
           <PipelineList
             rows={pipelineRows}
@@ -1721,9 +1744,12 @@ export default function Explorer() {
           />
         ) : null}
         <aside className={`layers ${layersOpen ? "open" : ""}`}>
-          <button type="button" onClick={() => setLayersOpen((value) => { const next = !value; if (next) setFiltersOpen(false); return next; })}>{layersOpen ? "Hide layers" : "Layers"}</button>
+          <div className="layers-bar">
+            <button type="button" onClick={() => setLayersOpen((value) => { const next = !value; if (next) setFiltersOpen(false); return next; })}>{layersOpen ? "Hide layers" : "Layers"}</button>
+            {layersOpen ? <button type="button" className="layers-close" onClick={() => setLayersOpen(false)}>Close</button> : null}
+          </div>
           {layersOpen ? (
-            <>
+            <div className="layers-body">
               <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
               <label><input type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
               <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
@@ -1743,12 +1769,22 @@ export default function Explorer() {
                 </span>
               </label>
               <p className="layer-meta">A blank stays off a workbook layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</p>
-            </>
+            </div>
           ) : null}
         </aside>
         <div className={`legend ${legendOpen ? "open" : ""}`} onMouseLeave={() => setTip("")}>
           <button type="button" onClick={() => { setLegendOpen((value) => !value); setMenuOpen(false); }}>{legendOpen ? "Hide legend" : "Legend"}</button>
           {legendOpen ? (
+            <>
+            <div className="legend-family">
+              <p className="eyebrow">On the map</p>
+              <p><i className="pin-sample circle" />Pipeline deal</p>
+              <p><i className="pin-sample diamond" />Universe site</p>
+              <p><i className="pin-sample cluster">3</i>Group of nearby pins</p>
+              <p><i className="pin-sample depot" />Depot</p>
+              <p><i className="pin-sample line" />High-voltage line</p>
+            </div>
+            <p className="eyebrow">Stage</p>
             <ul>
               {STATUS_NOTES.map((item) => (
                 <li key={item.id} onMouseEnter={() => setTip(item.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(item.note)}>
@@ -1760,6 +1796,7 @@ export default function Explorer() {
               <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.current)}><i className="swatch current-area" /> {AREA_KIND_LABEL.current}</li>
               <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.later)}><i className="swatch later-area" /> {AREA_KIND_LABEL.later}</li>
             </ul>
+            </>
           ) : null}
           {tip ? <p className="tip">{tip}</p> : null}
         </div>

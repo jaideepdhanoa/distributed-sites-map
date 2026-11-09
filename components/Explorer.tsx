@@ -1208,7 +1208,7 @@ export default function Explorer() {
           <div className="search-hits" role="listbox" aria-label="Search results" data-testid="search-hits">
             {universeWide || pipelineWide ? (
               <div className="search-wide" data-testid="search-wide">
-                <p className="search-note">No matches in this view. Showing other stages and markets.</p>
+                <p className="search-note">No matches in this view, showing other stages and markets.</p>
               </div>
             ) : null}
             {searchHits.length ? searchHits.map((hit) => {

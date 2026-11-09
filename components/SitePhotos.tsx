@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { esriCredit, galleryModel, imageCandidates, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
 import type { SitePhoto } from "@/lib/types";
 
@@ -37,24 +37,23 @@ function Frame({ photo, size }: { photo: SitePhoto; size: "thumb" | "full" }) {
 }
 
 function Thumb({ photo, onOpen }: { photo: SitePhoto; onOpen: () => void }) {
-  const credit = esriCredit(photo);
   return (
     <figure className={photo.role === "listing" ? "listing" : "diligence"}>
       <button type="button" className="photo-shot" data-testid="photo-thumb" onClick={onOpen}>
         <Frame photo={photo} size="thumb" />
         <span className="photo-tag">{roleLabel(photo.role)}</span>
       </button>
-      {credit ? <figcaption className="photo-credit" data-testid="photo-attribution">{credit}</figcaption> : null}
     </figure>
   );
 }
 
-export default function SitePhotos({ card }: { card: PhotoCard }) {
+export default function SitePhotos({ card, between }: { card: PhotoCard; between?: ReactNode }) {
   const model = galleryModel(card);
-  const [open, setOpen] = useState<number | null>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
-
+  const [open, setOpen] = useState<number | null>(null);
+  const [hero, setHero] = useState<"street" | "photos">(model.showGallery ? "photos" : embed ? "street" : "photos");
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -65,7 +64,18 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
     if (!dialog.open) dialog.showModal();
   }, [open]);
 
-  if (!model.visible) return null;
+  const credits = Array.from(new Set(model.slides.map((photo) => photo.attribution || esriCredit(photo)).filter(Boolean)));
+  if (!model.visible) {
+    return (
+      <section className="site-photos">
+        <div className="hero-frame empty-hero">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M8 12h8M12 8v8" /></svg>
+          <p>No street view or photos on file</p>
+        </div>
+        {between}
+      </section>
+    );
+  }
   const slide = open != null ? model.slides[open] : null;
   const slideCredit = slide ? (slide.attribution || esriCredit(slide)) : "";
   const both = model.diligence.length > 0 && (model.listingThumbs.length > 0 || model.hiddenListing > 0);
@@ -85,11 +95,9 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
   }
 
   return (
-    <section className="site-photos" data-testid="site-photos">
-      {model.statusLine ? <p className="photo-status" data-testid="photo-status">{model.statusLine}</p> : null}
-      {embed ? (
-        <div className="street-frame">
-          <span>Street View</span>
+    <section className="site-photos card-hero" data-testid="site-photos">
+      <div className="hero-frame">
+        {embed && hero === "street" ? (
           <iframe
             title="Street View"
             data-testid="street-view-frame"
@@ -98,8 +106,37 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
             referrerPolicy="no-referrer-when-downgrade"
             allowFullScreen
           />
+        ) : null}
+        {hero === "photos" && model.slides[0] ? (
+          <button type="button" className="hero-still" onClick={() => openAt(model.slides[0])}>
+            <Frame photo={model.slides[0]} size="full" />
+          </button>
+        ) : null}
+        {!embed && !model.slides.length ? (
+          <div className="empty-hero">
+            <p>No street view or photos on file</p>
+          </div>
+        ) : null}
+        <div className="hero-tabs" role="tablist" aria-label="Site view">
+          {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "on" : ""} onClick={() => setHero("street")}>Street View</button> : null}
+          {model.showGallery ? <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "on" : ""} onClick={() => setHero("photos")}>Photos{model.slides.length ? ` · ${model.slides.length}` : ""}</button> : null}
         </div>
-      ) : null}
+        {credits.length ? (
+          <>
+            <button className="hero-info" type="button" aria-expanded={sourcesOpen} aria-label="Sources" onClick={() => setSourcesOpen((value) => !value)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+            </button>
+            {sourcesOpen ? (
+              <div className="hero-sources" role="note">
+                {credits.map((credit) => <p key={credit} className="photo-credit" data-testid="photo-attribution">{credit}</p>)}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+      {between}
+      <div className="photo-rest">
+      {model.statusLine ? <p className="photo-status" data-testid="photo-status">{model.statusLine}</p> : null}
       {model.showGallery ? (
         <>
           {model.diligence.length ? (
@@ -169,6 +206,7 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
           </dialog>
         </>
       ) : null}
+      </div>
     </section>
   );
 }

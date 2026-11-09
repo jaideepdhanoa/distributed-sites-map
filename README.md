@@ -28,8 +28,9 @@ Set these in Vercel. A change applies on the next deployment.
 | `KV_REST_API_TOKEN` | yes on Vercel | Pair to the URL above. |
 | `UPSTASH_REDIS_REST_URL` | alternative | Used when `KV_REST_API_URL` is unset. |
 | `UPSTASH_REDIS_REST_TOKEN` | alternative | Pair to the Upstash URL. |
-| `RESEND_API_KEY` | for live mail | Resend API key. Mail is sent from `moove.dhanoa.in`. |
-| `ALERT_FROM` | with Resend | `Distributed Infra <alerts@moove.dhanoa.in>` |
+| `RESEND_API_KEY` | for live mail | Resend API key. Mail is sent from `distributedsites.com`. |
+| `ALERT_FROM` | with Resend | `Distributed Infra <alerts@distributedsites.com>` |
+| `APP_URL` | no | Host for links in alert mail. Defaults to `https://distributedsites.com`. |
 | `ALERT_REPLY_TO` | no | Reply-To. Defaults to `jaideep@dhanoa.in`. |
 | `ALERT_EMAILS` | no | JSON map of username to mailbox. Overrides the optional `email` on an account. |
 | `SMTP_USER` | fallback | Gmail address, used only when `RESEND_API_KEY` is unset. |
@@ -107,7 +108,7 @@ A burst for one person is held until it has been quiet for about five minutes, t
 
 The daily digest runs at 7:00 AM America/Los_Angeles. It covers other notes and proposals on sites the person follows, plus the count waiting in their Review queue. Nothing is sent when there is nothing to report. Vercel Cron calls `/api/alerts/flush` every five minutes and `/api/alerts/digest` every hour. The digest route sends only during that 7:00 AM hour. Set `CRON_SECRET` to a long random string. Cron requests must send it as `Authorization: Bearer <CRON_SECRET>`.
 
-A link opens the site's Discussion tab or Review, for example `/?view=review&site=PIPE-...`, and the map still requires sign-in. The message shows the site name or id, the type, a short note, and the author. It does not include a package link or a financial figure. Subject and body go through the same wording check as the map.
+A link opens the site's Discussion tab or Review on `APP_URL` (default `https://distributedsites.com`), for example `https://distributedsites.com/?view=review&site=PIPE-...`, and the map still requires sign-in. The message shows the site name or id, the type, a short note, and the author. It does not include a package link or a financial figure. Subject and body go through the same wording check as the map.
 
 Only app accounts are mailed. Add an optional `email` on that person's `AUTH_USERS` object, or set `ALERT_EMAILS` so the password hash does not have to be rebuilt:
 
@@ -121,13 +122,14 @@ The account menu opens a settings sheet. Each of approvals, mentions, replies, f
 
 #### Resend
 
-Resend is the sender. Mail comes from the verified subdomain `moove.dhanoa.in`.
+Resend is the sender. Mail comes from the verified domain `distributedsites.com`. DNS for that domain is managed by Vercel DNS.
 
-1. In Resend, add the domain `moove.dhanoa.in`.
-2. Add the SPF, DKIM, and DMARC DNS records Resend lists for that domain.
+1. In Resend, add the domain `distributedsites.com`.
+2. Add the SPF, DKIM, and DMARC DNS records Resend lists. Create those records in Vercel DNS for `distributedsites.com`.
 3. Wait until Resend marks the domain verified.
 4. In Vercel, set `RESEND_API_KEY` to the Resend API key.
-5. Set `ALERT_FROM` to `Distributed Infra <alerts@moove.dhanoa.in>`.
+5. Set `ALERT_FROM` to `Distributed Infra <alerts@distributedsites.com>`.
+6. Set `APP_URL` to `https://distributedsites.com`. Links in the mail use `APP_URL`. If it is unset, they use `https://distributedsites.com`.
 
 Replies go to `jaideep@dhanoa.in`. Set `ALERT_REPLY_TO` only to use a different reply address.
 

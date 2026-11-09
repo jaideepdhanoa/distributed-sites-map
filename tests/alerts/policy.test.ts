@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { publicSnippet, renderBatch, screenEmail } from "../../lib/alerts/compose";
 import { findPolicyHits } from "../../lib/policy/banned";
+import { discussionHref, reviewHref, appOrigin } from "../../lib/alerts/links";
 import { DEFAULT_FROM, alertFrom, alertReplyTo, transportKind } from "../../lib/alerts/transport";
 
 function blockedWord(): string {
@@ -37,7 +38,7 @@ test("email subject and body drop banned wording, links, and figures", () => {
   assert.equal(publicSnippet("See https://files.example/pack and $20").includes("https"), false);
 });
 
-test("Resend is preferred, Gmail is the fallback, and the from-address is the verified subdomain", () => {
+test("Resend is preferred, Gmail is the fallback, and the from-address is the verified domain", () => {
   const previous = {
     key: process.env.RESEND_API_KEY,
     user: process.env.SMTP_USER,
@@ -61,11 +62,23 @@ test("Resend is preferred, Gmail is the fallback, and the from-address is the ve
   process.env.ALERT_FROM = DEFAULT_FROM;
   process.env.ALERT_REPLY_TO = "jaideep@dhanoa.in";
   assert.equal(transportKind(), "resend");
-  assert.equal(alertFrom(), "Distributed Infra <alerts@moove.dhanoa.in>");
+  assert.equal(alertFrom(), "Distributed Infra <alerts@distributedsites.com>");
   assert.equal(alertReplyTo(), "jaideep@dhanoa.in");
   for (const [name, value] of Object.entries(previous)) {
     const key = name === "key" ? "RESEND_API_KEY" : name === "user" ? "SMTP_USER" : name === "pass" ? "SMTP_PASS" : name === "from" ? "ALERT_FROM" : "ALERT_REPLY_TO";
     if (value == null) delete process.env[key];
     else process.env[key] = value;
   }
+});
+
+test("email links use APP_URL and default to https://distributedsites.com", () => {
+  const previous = process.env.APP_URL;
+  delete process.env.APP_URL;
+  assert.equal(appOrigin(), "https://distributedsites.com");
+  assert.equal(discussionHref("PIPE-PHX-0008"), "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
+  assert.equal(reviewHref("PIPE-LAS-0016"), "https://distributedsites.com/?view=review&site=PIPE-LAS-0016");
+  process.env.APP_URL = "https://preview.example/";
+  assert.equal(appOrigin(), "https://preview.example");
+  if (previous == null) delete process.env.APP_URL;
+  else process.env.APP_URL = previous;
 });

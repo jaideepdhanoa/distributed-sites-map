@@ -77,7 +77,7 @@ test("the daily cap records a warning and does not send", async () => {
     );
   }
   process.env.RESEND_API_KEY = "re_test_key";
-  process.env.ALERT_FROM = "Distributed Infra <alerts@moove.dhanoa.in>";
+  process.env.ALERT_FROM = "Distributed Infra <alerts@distributedsites.com>";
   await enqueue(sql, new Date(now.getTime() - 10 * 60_000).toISOString());
   const original = globalThis.fetch;
   let called = 0;

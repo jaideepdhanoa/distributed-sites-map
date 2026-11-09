@@ -1,11 +1,10 @@
+const DEFAULT_APP_URL = "https://distributedsites.com";
+
+/** Host for links in alert mail. APP_URL wins. Otherwise the production domain. */
 export function appOrigin(): string {
-  const explicit = (process.env.ALERT_APP_ORIGIN || "").trim().replace(/\/$/, "");
+  const explicit = (process.env.APP_URL || "").trim().replace(/\/$/, "");
   if (explicit) return explicit;
-  const production = (process.env.VERCEL_PROJECT_PRODUCTION_URL || "").trim();
-  if (production) return `https://${production.replace(/^https?:\/\//, "")}`;
-  const preview = (process.env.VERCEL_URL || "").trim();
-  if (preview) return `https://${preview.replace(/^https?:\/\//, "")}`;
-  return "";
+  return DEFAULT_APP_URL;
 }
 
 function withOrigin(path: string): string {

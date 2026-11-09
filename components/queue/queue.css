@@ -89,7 +89,7 @@
   border-right: 1px solid var(--line);
   z-index: 4;
 }
-.review-rail button, .review-sheet > button {
+.review-rail button, .review-sheet section button {
   display: grid;
   gap: 2px;
   width: 100%;
@@ -102,7 +102,8 @@
   padding: 8px 10px;
   min-height: 0;
 }
-.review-rail button.on, .review-sheet > button.on { background: #e7f0ea; }
+.review-rail button.on, .review-sheet section button.on { background: #e7f0ea; }
+.review-empty { margin: 0; padding: 0 10px 10px; color: var(--muted); font-size: 12px; }
 .review-rail button.done { opacity: 0.45; }
 .review-rail h2, .review-sheet h3 {
   margin: 0;
@@ -184,6 +185,14 @@
   .review-bar button.review-step::after { font-size: 18px; line-height: 1; }
   .review-bar .review-step[aria-label="Previous"]::after { content: "‹"; }
   .review-bar .review-step[aria-label="Next"]::after { content: "›"; }
+  .review-filters { position: static; }
+  .queue-pop {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: min(70vh, 480px);
+    overflow: auto;
+  }
   .review-noloc, .review-done { left: 50%; transform: translateX(-50%); }
   .shell.reviewing .map-stage { display: flex; flex-direction: column; }
   .shell.reviewing .stage-map { position: relative; height: auto; flex: 1 1 46%; min-height: 180px; width: 100%; }

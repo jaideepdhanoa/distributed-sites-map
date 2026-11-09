@@ -4,6 +4,7 @@
   "replyTo": "jaideep@dhanoa.in",
   "liveUsernames": ["jaideep"],
   "adminUsernames": ["jaideep"],
+  "previewAdmins": ["indie"],
   "emails": {
     "jaideep": "jaideep@dhanoa.in"
   }

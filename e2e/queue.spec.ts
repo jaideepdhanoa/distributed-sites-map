@@ -287,3 +287,46 @@ test("the empty queue and the phone layout", async ({ page, request }) => {
   await expect(page.getByTestId("queue-empty")).toBeVisible();
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-empty-mobile.png" });
 });
+
+test("the review inbox keeps its sections, and an approval ignores market and stage", async ({ page, request }) => {
+  await login(request, "contributor");
+  const created = await request.post("/api/actions/suggestions", {
+    data: {
+      targetKind: "deal",
+      targetId: "PIPE-PHX-0067",
+      field: "proposed_next_step",
+      title: "Drop the c-store",
+      targetOn: "2026-12-01",
+      proposedValue: "Drop the c-store",
+    },
+  });
+  expect(created.status()).toBe(201);
+  await login(request, "reviewer");
+  const queued = await queue(request, "market=LAS&stage=dropped&viable=1");
+  expect(queued.items.some((item) => item.siteId === "PIPE-PHX-0067")).toBeTruthy();
+
+  await openAs(page, "reviewer", "/?review=1&qmarket=LAS&qstage=dropped");
+  await expect(page.getByTestId("review-approvals")).toContainText("Needs my approval");
+  await expect(page.getByTestId("review-mentions")).toContainText("Mentions");
+  await expect(page.getByTestId("review-assigned")).toContainText("Assigned");
+  const approval = page.getByTestId("review-approvals").getByRole("button", { name: /Sinclair/ });
+  await expect(approval).toBeVisible();
+  await expect(approval.locator(".queue-dot")).toBeVisible();
+});
+
+test("the review filter menu stays inside a 390px screen", async ({ page }) => {
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByTestId("queue-filters").click();
+  const pop = page.locator(".queue-pop");
+  await expect(pop).toBeVisible();
+  const box = await pop.boundingBox();
+  expect(box).toBeTruthy();
+  if (box) {
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+  }
+  await expect(pop.getByRole("button", { name: "Active" })).toBeVisible();
+  await expect(pop.getByLabel("Queue market")).toBeVisible();
+  await expect(pop.getByLabel("Queue stage")).toBeVisible();
+});

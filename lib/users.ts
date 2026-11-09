@@ -17,6 +17,12 @@ const PROMOTED_ADMINS = new Set(
     .filter(Boolean),
 );
 
+function previewAdmin(username: string): boolean {
+  if (process.env.VERCEL_ENV !== "preview") return false;
+  const names = Array.isArray(alertDefaults.previewAdmins) ? alertDefaults.previewAdmins : [];
+  return names.some((name) => String(name).trim().toLowerCase() === username);
+}
+
 export function getUsers(): AuthUser[] {
   const raw = process.env.AUTH_USERS;
   if (!raw) return [];
@@ -41,7 +47,7 @@ export function getUsers(): AuthUser[] {
     const displayName = named || u;
     const emailRaw = String(row.email ?? "").trim().toLowerCase();
     const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : "";
-    const promoted = PROMOTED_ADMINS.has(u);
+    const promoted = PROMOTED_ADMINS.has(u) || previewAdmin(u);
     const accountRole = promoted ? "admin" : role;
     const accountAction = promoted ? "reviewer" : actionRole;
     if (u && h.startsWith("$2")) users.push({ u, h, role: accountRole, roleLabel, actionRole: accountAction, displayName, email });

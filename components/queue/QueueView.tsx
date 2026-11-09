@@ -36,7 +36,7 @@ function reviewGroups(sites: FeedSite[]) {
       take("Needs my approval", "review-approvals", (site) => Boolean(site.needsApproval)),
       take("Mentions", "review-mentions", (site) => Boolean(site.mentioned)),
       take("Assigned", "review-assigned", (site) => Boolean(site.assigned)),
-    ].filter((group) => group.rows.length > 0),
+    ],
     rest: sites.flatMap((site, index) => (claimed.has(site.siteId) ? [] : [{ site, index }])),
   };
 }
@@ -336,11 +336,11 @@ export function ReviewRail({
     </button>
   );
   return (
-    <aside className="review-rail" data-testid="review-rail">
+    <aside className="review-rail" data-testid="review-rail" aria-label="Review inbox">
       {groups.map((group) => (
         <section key={group.testId} data-testid={group.testId}>
           <h2>{group.label}</h2>
-          {group.rows.map(({ site, index }) => row(site, index))}
+          {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">None</p>}
         </section>
       ))}
       {rest.length ? (
@@ -386,9 +386,9 @@ export function ReviewFeedSheet({
         return (
           <>
             {groups.map((group) => (
-              <section key={group.testId}>
+              <section key={group.testId} data-testid={`${group.testId}-sheet`}>
                 <h3>{group.label}</h3>
-                {group.rows.map(({ site, index }) => row(site, index))}
+                {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">None</p>}
               </section>
             ))}
             {rest.map(({ site, index }) => row(site, index))}

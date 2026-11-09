@@ -8,7 +8,7 @@ import { privateHeaders } from "@/lib/guard";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
+async function runFlush(request: Request) {
   if (!(await authorizeJob(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders });
   }
@@ -19,4 +19,12 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ error: "The alert flush could not run." }, { status: 500, headers: privateHeaders });
   }
+}
+
+export function GET(request: Request) {
+  return runFlush(request);
+}
+
+export function POST(request: Request) {
+  return runFlush(request);
 }

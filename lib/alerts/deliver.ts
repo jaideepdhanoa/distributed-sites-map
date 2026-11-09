@@ -224,8 +224,9 @@ async function followedItems(sql: Sql, userId: string, since: Date): Promise<Mai
 }
 
 export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
-  const { hour, day } = losAngelesParts(now);
-  if (hour !== 7) return 0;
+  // Vercel Hobby runs this once, inside the 15:00 UTC hour (7:00 AM PST, 8:00 AM PDT).
+  // The Pacific calendar day is the idempotency key, so a late fire still counts as that day.
+  const { day } = losAngelesParts(now);
   let count = 0;
   for (const user of getUsers()) {
     if (resolveActionRole(user) == null) continue;

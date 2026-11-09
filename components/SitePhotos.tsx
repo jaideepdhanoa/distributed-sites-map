@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { esriCredit, galleryModel, imageCandidates, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
 import type { SitePhoto } from "@/lib/types";
 
@@ -47,7 +47,7 @@ function Thumb({ photo, onOpen }: { photo: SitePhoto; onOpen: () => void }) {
   );
 }
 
-export default function SitePhotos({ card }: { card: PhotoCard }) {
+export default function SitePhotos({ card, between }: { card: PhotoCard; between?: ReactNode }) {
   const model = galleryModel(card);
   const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
   const [open, setOpen] = useState<number | null>(null);
@@ -67,10 +67,13 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
   const credits = Array.from(new Set(model.slides.map((photo) => photo.attribution || esriCredit(photo)).filter(Boolean)));
   if (!model.visible) {
     return (
-      <div className="hero-frame empty-hero">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M8 12h8M12 8v8" /></svg>
-        <p>No street view or photos on file</p>
-      </div>
+      <section className="site-photos">
+        <div className="hero-frame empty-hero">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M8 12h8M12 8v8" /></svg>
+          <p>No street view or photos on file</p>
+        </div>
+        {between}
+      </section>
     );
   }
   const slide = open != null ? model.slides[open] : null;
@@ -131,6 +134,8 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
           </>
         ) : null}
       </div>
+      {between}
+      <div className="photo-rest">
       {model.statusLine ? <p className="photo-status" data-testid="photo-status">{model.statusLine}</p> : null}
       {model.showGallery ? (
         <>
@@ -201,6 +206,7 @@ export default function SitePhotos({ card }: { card: PhotoCard }) {
           </dialog>
         </>
       ) : null}
+      </div>
     </section>
   );
 }

@@ -36,8 +36,18 @@ type SheetControl = {
   onSnap?: (snap: SheetSnap) => void;
 };
 
+function nearestSnap(height: number): SheetSnap {
+  const view = window.innerHeight;
+  const stops: { id: SheetSnap; y: number }[] = [
+    { id: "peek", y: Math.min(240, view * 0.32) },
+    { id: "half", y: view * 0.5 },
+    { id: "full", y: view * 0.88 },
+  ];
+  return stops.reduce((best, item) => (Math.abs(item.y - height) < Math.abs(best.y - height) ? item : best)).id;
+}
+
 function SheetHandle({ sheet }: { sheet?: SheetControl }) {
-  const startY = useRef<number | null>(null);
+  const drag = useRef<{ y: number; height: number } | null>(null);
   const dragged = useRef(false);
   return (
     <button
@@ -51,18 +61,40 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
         sheet?.onToggle();
       }}
       onPointerDown={(event) => {
-        startY.current = event.clientY;
+        if (!sheet?.onSnap) return;
+        const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
+        if (!drawer) return;
+        drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const info = drag.current;
+        if (!info) return;
+        const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
+        if (!drawer) return;
+        const next = Math.min(window.innerHeight * 0.92, Math.max(160, info.height + (info.y - event.clientY)));
+        drawer.style.height = `${Math.round(next)}px`;
+        if (Math.abs(info.y - event.clientY) > 8) dragged.current = true;
       }}
       onPointerUp={(event) => {
-        if (startY.current == null || !sheet?.onSnap || !sheet.snap) return;
-        const dy = event.clientY - startY.current;
-        startY.current = null;
-        if (Math.abs(dy) < 28) return;
-        dragged.current = true;
-        const order: SheetSnap[] = ["peek", "half", "full"];
-        const index = Math.max(0, order.indexOf(sheet.snap));
-        const next = order[Math.min(order.length - 1, Math.max(0, index + (dy < 0 ? 1 : -1)))];
-        sheet.onSnap(next);
+        const info = drag.current;
+        drag.current = null;
+        const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
+        if (!info || !drawer || !sheet?.onSnap) return;
+        if (Math.abs(info.y - event.clientY) < 12) {
+          drawer.style.height = "";
+          return;
+        }
+        const snap = nearestSnap(drawer.getBoundingClientRect().height);
+        sheet.onSnap(snap);
+        window.requestAnimationFrame(() => {
+          drawer.style.height = "";
+        });
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        const drawer = document.querySelector(".drawer") as HTMLElement | null;
+        if (drawer) drawer.style.height = "";
       }}
     >
       {sheet?.expanded ? "Show less" : "Show more"}
@@ -214,30 +246,37 @@ export default function Detail({
       }}
     >
       <DrawerGrip />
-      <SheetHandle sheet={sheet} />
-      {banner}
-      <div className="card-hero-wrap">
+      <div className="drawer-head">
+        <SheetHandle sheet={sheet} />
         <button className="close" type="button" onClick={onClose}>Close</button>
-        <SitePhotos card={photos} />
       </div>
-      <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
-        {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
-        <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
-        {site.land_only ? <span className="badge pending">Land site</span> : null}
-        {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
-        {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
-      </div>
-      <h2>{site.name || site.address || site.site_id}</h2>
-      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
-      <p className="note">{site.address || "—"}</p>
-      <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
-      {linkedDeal ? <DealHeadline deal={linkedDeal} /> : null}
-      <div className="card-actions">
-        {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
-        {onAddCompare ? <button className="action primary" type="button" onClick={onAddCompare}>Add to compare</button> : null}
-        {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
-      </div>
+      {banner}
+      <div className="drawer-scroll">
+      <SitePhotos
+        card={photos}
+        between={(
+          <>
+            <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
+              {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
+              <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
+              {site.land_only ? <span className="badge pending">Land site</span> : null}
+              {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
+              {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
+            </div>
+            <h2>{site.name || site.address || site.site_id}</h2>
+            {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
+            <p className="note">{site.address || "—"}</p>
+            <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
+            {linkedDeal ? <DealHeadline deal={linkedDeal} /> : null}
+            <div className="card-actions">
+              {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
+              {onAddCompare ? <button className="action primary" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+              {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+            </div>
+          </>
+        )}
+      />
       {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
       <NextStepCard kind="site" id={site.site_id} />
@@ -392,6 +431,7 @@ export default function Detail({
         activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} />}
         discussion={extras}
       />
+      </div>
     </aside>
   );
 }
@@ -461,31 +501,38 @@ export function DealDetail({
       }}
     >
       <DrawerGrip />
-      <SheetHandle sheet={sheet} />
-      {banner}
-      <div className="card-hero-wrap">
+      <div className="drawer-head">
+        <SheetHandle sheet={sheet} />
         <button className="close" type="button" onClick={onClose}>Close</button>
-        <SitePhotos card={photos} />
       </div>
-      <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
-        {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
-        {deal.listed ? <span className="badge checked">Listed</span> : null}
-      </div>
-      <h2>{deal.name || deal.address}</h2>
-      <p className="note">{deal.address}</p>
-      <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
-      <DealHeadline deal={deal} />
-      <div className="card-actions">
-        {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
-        {onCompare ? (
-          <label className="compare-check">
-            <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
-            Compare
-          </label>
-        ) : null}
-        {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
-      </div>
+      {banner}
+      <div className="drawer-scroll">
+      <SitePhotos
+        card={photos}
+        between={(
+          <>
+            <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
+              {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
+              {deal.listed ? <span className="badge checked">Listed</span> : null}
+            </div>
+            <h2>{deal.name || deal.address}</h2>
+            <p className="note">{deal.address}</p>
+            <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
+            <DealHeadline deal={deal} />
+            <div className="card-actions">
+              {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
+              {onCompare ? (
+                <label className="compare-check">
+                  <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
+                  Compare
+                </label>
+              ) : null}
+              {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+            </div>
+          </>
+        )}
+      />
       {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
       <NextStepCard kind="deal" id={deal.deal_id} />
@@ -549,6 +596,7 @@ export function DealDetail({
         activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />}
         discussion={extras}
       />
+      </div>
     </aside>
   );
 }
@@ -568,8 +616,11 @@ export function UnscreenedDetail({
 }) {
   return (
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}>
-      <SheetHandle sheet={sheet} />
-      <button className="close" type="button" onClick={onClose}>Close</button>
+      <div className="drawer-head">
+        <SheetHandle sheet={sheet} />
+        <button className="close" type="button" onClick={onClose}>Close</button>
+      </div>
+      <div className="drawer-scroll">
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className="badge pending">Listed, not yet screened</span>
         <span className="badge checked">{row.kind}</span>
@@ -597,6 +648,7 @@ export function UnscreenedDetail({
             "No listing link on file"
           )}
         </div>
+      </div>
       </div>
     </aside>
   );

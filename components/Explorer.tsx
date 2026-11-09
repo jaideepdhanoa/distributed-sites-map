@@ -916,7 +916,7 @@ export default function Explorer() {
   const sheet = {
     expanded: sheetSnap === "full",
     snap: sheetSnap,
-    onToggle: () => setSheetSnap((snap) => (snap === "full" ? "half" : "full")),
+    onToggle: () => setSheetSnap((snap) => (snap === "full" ? "half" : snap === "peek" ? "half" : "full")),
     onSnap: setSheetSnap,
   };
   const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !dealPoint(deal));
@@ -1736,7 +1736,10 @@ export default function Explorer() {
           />
         ) : null}
         <aside className={`layers ${layersOpen ? "open" : ""}`}>
-          <button type="button" onClick={() => setLayersOpen((value) => { const next = !value; if (next) setFiltersOpen(false); return next; })}>{layersOpen ? "Hide layers" : "Layers"}</button>
+          <div className="layers-bar">
+            <button type="button" onClick={() => setLayersOpen((value) => { const next = !value; if (next) setFiltersOpen(false); return next; })}>{layersOpen ? "Hide layers" : "Layers"}</button>
+            {layersOpen ? <button type="button" className="layers-close" onClick={() => setLayersOpen(false)}>Close</button> : null}
+          </div>
           {layersOpen ? (
             <>
               <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>

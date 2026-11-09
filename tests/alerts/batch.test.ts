@@ -12,12 +12,12 @@ async function ready() {
   return sql;
 }
 
-async function enqueue(sql: Awaited<ReturnType<typeof ready>>, createdAt: string, id = randomUUID()) {
+async function enqueue(sql: Awaited<ReturnType<typeof ready>>, createdAt: string, id = randomUUID(), userId = "reviewer") {
   await sql.query(
     `INSERT INTO alert_outbox (
       id, idempotency_key, user_id, to_email, category, channel, site_id, site_label, summary, author_id, href, ref_id, created_at, status
-    ) VALUES ($1, $2, 'reviewer', 'reviewer@example.com', 'approvals', 'instant', 'PIPE-PHX-0067', 'Sinclair (PIPE-PHX-0067)', 'Next step proposed.', 'contributor', '/?view=review&site=PIPE-PHX-0067', $1, $3, 'pending')`,
-    [id, `approvals:${id}:reviewer`, createdAt],
+    ) VALUES ($1, $2, $4, $5, 'approvals', 'instant', 'PIPE-PHX-0067', 'Sinclair (PIPE-PHX-0067)', 'Next step proposed.', 'contributor', '/?view=review&site=PIPE-PHX-0067', $1, $3, 'pending')`,
+    [id, `approvals:${id}:${userId}`, createdAt, userId, userId === "jaideep" ? "jaideep@dhanoa.in" : "reviewer@example.com"],
   );
   return id;
 }
@@ -77,8 +77,9 @@ test("the daily cap records a warning and does not send", async () => {
     );
   }
   process.env.RESEND_API_KEY = "re_test_key";
-  process.env.ALERT_FROM = "Distributed Sites <alerts@distributedsites.com>";
-  await enqueue(sql, new Date(now.getTime() - 10 * 60_000).toISOString());
+  process.env.RESEND_EMAIL_DOMAIN = "distributedsites.com";
+  delete process.env.ALERT_FROM;
+  await enqueue(sql, new Date(now.getTime() - 10 * 60_000).toISOString(), randomUUID(), "jaideep");
   const original = globalThis.fetch;
   let called = 0;
   globalThis.fetch = (async () => {
@@ -90,6 +91,7 @@ test("the daily cap records a warning and does not send", async () => {
   } finally {
     globalThis.fetch = original;
     delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_EMAIL_DOMAIN;
     delete process.env.ALERT_FROM;
   }
   assert.equal(called, 0);
@@ -98,5 +100,33 @@ test("the daily cap records a warning and does not send", async () => {
   );
   assert.equal(capped.rows.length, 1);
   assert.match(capped.rows[0]?.warning || "", /400/);
+});
+
+test("a recipient who is not opted in is logged and is not sent", async () => {
+  delete process.env.SMTP_USER;
+  delete process.env.SMTP_PASS;
+  delete process.env.ALERT_FROM;
+  process.env.RESEND_API_KEY = "re_test_key";
+  process.env.RESEND_EMAIL_DOMAIN = "distributedsites.com";
+  const sql = await ready();
+  await enqueue(sql, new Date(Date.now() - 10 * 60_000).toISOString());
+  const original = globalThis.fetch;
+  let called = 0;
+  globalThis.fetch = (async () => {
+    called += 1;
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+  try {
+    await flushInstant(sql, new Date());
+  } finally {
+    globalThis.fetch = original;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_EMAIL_DOMAIN;
+  }
+  assert.equal(called, 0);
+  const logged = await sql.query<{ status: string; warning: string }>(`SELECT status, warning FROM alert_log`);
+  assert.equal(logged.rows.length, 1);
+  assert.equal(logged.rows[0]?.status, "would_send");
+  assert.match(logged.rows[0]?.warning || "", /not approved for live mail/);
 });
 });

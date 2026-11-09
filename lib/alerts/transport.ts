@@ -22,12 +22,27 @@ export function transportKind(): "resend" | "smtp" | null {
   return null;
 }
 
-/** Resend uses the verified from-address. Gmail falls back to the SMTP mailbox when ALERT_FROM is unset. */
+function emailDomain(): string {
+  const domain = (process.env.RESEND_EMAIL_DOMAIN || "").trim().toLowerCase().replace(/^@/, "");
+  if (!domain || domain.includes("/") || domain.includes(" ") || !domain.includes(".")) return "";
+  return domain;
+}
+
+/** ALERT_FROM wins. Otherwise From is Distributed Sites <alerts@RESEND_EMAIL_DOMAIN>. */
 export function alertFrom(): string {
   const configured = process.env.ALERT_FROM?.trim();
   if (configured) return configured;
+  const domain = emailDomain();
+  if (domain) return `${alertDefaults.fromName} <alerts@${domain}>`;
   if (transportKind() === "smtp") return process.env.SMTP_USER?.trim() || DEFAULT_FROM;
   return DEFAULT_FROM;
+}
+
+/** Live delivery is limited to opted-in accounts. Everyone else stays on the would-send log. */
+export function liveMailAllowed(userId: string): boolean {
+  const allowed = new Set(alertDefaults.liveUsernames.map((item) => item.trim().toLowerCase()).filter(Boolean));
+  const id = userId.trim().toLowerCase();
+  return Boolean(id) && allowed.has(id);
 }
 
 export function alertReplyTo(): string {

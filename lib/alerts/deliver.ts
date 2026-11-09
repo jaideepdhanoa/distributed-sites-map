@@ -8,7 +8,7 @@ import { renderBatch, type MailItem } from "./compose";
 import { discussionHref, reviewHomeHref } from "./links";
 import { digestEnabled, loadPreferences, shouldSendDigest, type AlertCategory } from "./preferences";
 import { accountEmail } from "./recipients";
-import { alertFrom, alertReplyTo, mailTransport } from "./transport";
+import { alertFrom, alertReplyTo, liveMailAllowed, mailTransport } from "./transport";
 
 export type OutboxRow = {
   id: string;
@@ -108,8 +108,10 @@ export async function deliverRows(
   await sql.query(`UPDATE alert_log SET subject = $2, body = $3 WHERE id = $1`, [claim.id, rendered.subject, rendered.body]);
   const transport = mailTransport();
   const from = alertFrom();
-  if (!transport || !from) {
-    await sql.query(`UPDATE alert_log SET status = 'would_send' WHERE id = $1`, [claim.id]);
+  const optedIn = liveMailAllowed(input.userId);
+  if (!transport || !from || !optedIn) {
+    const warning = transport && from && !optedIn ? "Recorded only. This account is not approved for live mail." : "";
+    await sql.query(`UPDATE alert_log SET status = 'would_send', warning = $2 WHERE id = $1`, [claim.id, warning]);
     await markRows(sql, input.rows.map((row) => row.id), "would_send", input.key);
     return "would_send";
   }

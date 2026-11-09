@@ -27,6 +27,7 @@ async function main() {
       DATABASE_SSL: "disable",
       ACTION_ROLE_MAP: JSON.stringify({ admin: "reviewer", user: "contributor" }),
       RESEND_API_KEY: "",
+      RESEND_EMAIL_DOMAIN: "",
       SMTP_USER: "",
       SMTP_PASS: "",
       ALERT_FROM: "",

@@ -41,18 +41,23 @@ test("email subject and body drop banned wording, links, and figures", () => {
 test("Resend is preferred, Gmail is the fallback, and the from-address is the verified domain", () => {
   const previous = {
     key: process.env.RESEND_API_KEY,
+    domain: process.env.RESEND_EMAIL_DOMAIN,
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
     from: process.env.ALERT_FROM,
     reply: process.env.ALERT_REPLY_TO,
   };
   delete process.env.RESEND_API_KEY;
+  delete process.env.RESEND_EMAIL_DOMAIN;
   delete process.env.SMTP_USER;
   delete process.env.SMTP_PASS;
   delete process.env.ALERT_FROM;
   delete process.env.ALERT_REPLY_TO;
   assert.equal(transportKind(), null);
   assert.equal(alertFrom(), DEFAULT_FROM);
+  process.env.RESEND_EMAIL_DOMAIN = "distributedsites.com";
+  assert.equal(alertFrom(), "Distributed Sites <alerts@distributedsites.com>");
+  delete process.env.RESEND_EMAIL_DOMAIN;
   assert.equal(alertReplyTo(), "jaideep@dhanoa.in");
   process.env.SMTP_USER = "jaideep@dhanoa.in";
   process.env.SMTP_PASS = "app-password";
@@ -65,7 +70,7 @@ test("Resend is preferred, Gmail is the fallback, and the from-address is the ve
   assert.equal(alertFrom(), "Distributed Sites <alerts@distributedsites.com>");
   assert.equal(alertReplyTo(), "jaideep@dhanoa.in");
   for (const [name, value] of Object.entries(previous)) {
-    const key = name === "key" ? "RESEND_API_KEY" : name === "user" ? "SMTP_USER" : name === "pass" ? "SMTP_PASS" : name === "from" ? "ALERT_FROM" : "ALERT_REPLY_TO";
+    const key = name === "key" ? "RESEND_API_KEY" : name === "domain" ? "RESEND_EMAIL_DOMAIN" : name === "user" ? "SMTP_USER" : name === "pass" ? "SMTP_PASS" : name === "from" ? "ALERT_FROM" : "ALERT_REPLY_TO";
     if (value == null) delete process.env[key];
     else process.env[key] = value;
   }

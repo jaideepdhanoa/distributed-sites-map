@@ -1,4 +1,6 @@
 {
+  "fromName": "Distributed Sites",
   "from": "Distributed Sites <alerts@distributedsites.com>",
-  "replyTo": "jaideep@dhanoa.in"
+  "replyTo": "jaideep@dhanoa.in",
+  "liveUsernames": ["jaideep"]
 }

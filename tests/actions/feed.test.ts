@@ -58,28 +58,73 @@ function row(id: string, extra: Partial<{ city: string; stageGroup: string; acti
   return { id, city: extra.city || "PHX", stage: "1 Desk screen", stageGroup: extra.stageGroup || "desk", active: extra.active ?? true };
 }
 
-test("queue order is flagged and mentioned, then approval, then new sites, then newest", () => {
+test("queue order is approval, then mentions, then assigned, then the rest", () => {
   const reasons: Record<string, QueueReason[]> = {
     mentioned: [{ at: "2026-11-05T20:00:00.000Z", summary: "Mentioned you.", type: "mention" }],
     flagged: [{ at: "2026-11-05T12:00:00.000Z", summary: "Flagged for you.", type: "flag" }],
     approval: [{ at: "2026-11-05T19:00:00.000Z", summary: "Next step proposed: Ask for the sales package", type: "next_proposed" }],
+    assigned: [{ at: "2026-11-05T11:00:00.000Z", summary: "Assigned to you.", type: "assignment" }],
     fresh: [{ at: "2026-11-04T00:00:00.000Z", summary: "New pipeline site.", type: "new_site" }],
     older: [{ at: "2026-11-03T00:00:00.000Z", summary: "New note.", type: "note" }],
     newer: [{ at: "2026-11-05T18:00:00.000Z", summary: "New note.", type: "note" }],
   };
   const rows = buildQueue({
-    sites: ["mentioned", "flagged", "approval", "fresh", "older", "newer"].map((id) => row(id)),
+    sites: ["mentioned", "flagged", "approval", "assigned", "fresh", "older", "newer"].map((id) => row(id)),
     reasons,
-    reviewedAt: { mentioned: "2026-11-01T00:00:00.000Z", flagged: "2026-11-01T00:00:00.000Z", approval: "2026-11-01T00:00:00.000Z", older: "2026-11-01T00:00:00.000Z", newer: "2026-11-01T00:00:00.000Z" },
+    reviewedAt: { mentioned: "2026-11-01T00:00:00.000Z", flagged: "2026-11-01T00:00:00.000Z", approval: "2026-11-01T00:00:00.000Z", assigned: "2026-11-01T00:00:00.000Z", older: "2026-11-01T00:00:00.000Z", newer: "2026-11-01T00:00:00.000Z" },
     snoozeUntil: {},
     flagged: new Set(["flagged"]),
     mentioned: new Set(["mentioned"]),
-    assigned: new Set(),
+    assigned: new Set(["assigned"]),
     needsApproval: new Set(["approval"]),
     today: "2026-11-05",
     filters: { market: "PHX", viable: true },
   });
-  assert.deepEqual(rows.map((item) => item.siteId), ["mentioned", "flagged", "approval", "fresh", "newer", "older"]);
+  assert.deepEqual(rows.map((item) => item.siteId), ["approval", "mentioned", "assigned", "flagged", "fresh", "newer", "older"]);
+});
+
+test("a hidden c-store stays out of the queue unless it needs approval", () => {
+  const sites = [row("store", { }), row("open")].map((item) => item.id === "store" ? { ...item, hidden: true } : item);
+  const hidden = buildQueue({
+    sites,
+    reasons: {},
+    reviewedAt: {},
+    snoozeUntil: {},
+    flagged: new Set(),
+    mentioned: new Set(),
+    assigned: new Set(),
+    needsApproval: new Set(),
+    today: "2026-11-05",
+    filters: { market: "all", viable: true },
+  });
+  assert.deepEqual(hidden.map((item) => item.siteId), ["open"]);
+  const surfaced = buildQueue({
+    sites,
+    reasons: { store: [{ at: "2026-11-05T12:00:00.000Z", summary: "Next step proposed: Drop from pipeline", type: "next_proposed" }] },
+    reviewedAt: { store: "2026-11-06T00:00:00.000Z" },
+    snoozeUntil: {},
+    flagged: new Set(),
+    mentioned: new Set(),
+    assigned: new Set(),
+    needsApproval: new Set(["store"]),
+    today: "2026-11-05",
+    filters: { market: "all", viable: true },
+  });
+  assert.equal(surfaced.some((item) => item.siteId === "store"), true);
+  const otherMarket = buildQueue({
+    sites: [{ ...row("store", { city: "LAS" }), hidden: true }, row("local")],
+    reasons: {},
+    reviewedAt: { store: "2026-11-06T00:00:00.000Z" },
+    snoozeUntil: {},
+    flagged: new Set(),
+    mentioned: new Set(),
+    assigned: new Set(),
+    needsApproval: new Set(["store"]),
+    today: "2026-11-05",
+    filters: { market: "PHX", stage: "desk", viable: true },
+  });
+  assert.equal(otherMarket.some((item) => item.siteId === "store"), true);
+  assert.equal(otherMarket[0]?.siteId, "store");
 });
 
 test("snooze hides a site until the date, and a later change or a flag brings it back", () => {

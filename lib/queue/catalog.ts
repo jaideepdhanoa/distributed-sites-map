@@ -17,6 +17,7 @@ type DealProps = {
   source_line?: string;
   firm?: string;
   folder_url?: string;
+  is_c_store?: boolean;
 };
 
 type SiteProps = {
@@ -42,6 +43,7 @@ export type CatalogSite = {
   folderUrl: string;
   lng: number | null;
   lat: number | null;
+  isCStore: boolean;
 };
 
 function readJson(name: string): unknown {
@@ -116,6 +118,7 @@ export function loadCatalog(): CatalogSite[] {
       folderUrl: /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(folder) ? folder : "",
       lng: Number.isFinite(lng) ? lng : null,
       lat: Number.isFinite(lat) ? lat : null,
+      isCStore: props.is_c_store === true,
     });
   }
   return out;

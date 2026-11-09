@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Distributed Infra",
-    short_name: "Distributed Infra",
+    name: "Distributed Sites",
+    short_name: "Distributed Sites",
     description: "Site pipeline map for Phoenix, Las Vegas and Miami",
     start_url: "/",
     display: "standalone",

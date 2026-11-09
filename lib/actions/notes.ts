@@ -3,6 +3,7 @@ import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { audit } from "./audit";
 import type { Sql } from "./db";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
+import { notifyNote } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
 import { fileLookup, type RecordLookup } from "./records";
 import { permanentSiteId } from "./suggestions";
@@ -146,6 +147,14 @@ export async function createNote(
     actorId: input.authorId,
     refId: id,
   });
+  await notifyNote(sql, {
+    noteId: id,
+    siteId,
+    body,
+    authorId: input.authorId,
+    parentId,
+    mentionIds,
+  });
   const saved = await loadNote(sql, id);
   const note = saved ? present(saved) : null;
   if (!note) throw new InputError("That note could not be saved.");
@@ -163,6 +172,14 @@ export async function editNote(sql: Sql, input: { id: string; body: string; acto
   if (mentionIds) {
     const siteId = await queueSiteId(sql, row.target_kind, row.target_id);
     await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "note", sourceId: row.id });
+    await notifyNote(sql, {
+      noteId: row.id,
+      siteId,
+      body,
+      authorId: input.actorId,
+      parentId: row.parent_id,
+      mentionIds,
+    });
   }
   await audit(sql, {
     actorId: input.actorId,

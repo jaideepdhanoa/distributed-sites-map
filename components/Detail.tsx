@@ -238,7 +238,7 @@ export default function Detail({
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" onClick={onClose}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {banner}
       <div className="drawer-scroll">
@@ -343,8 +343,8 @@ export default function Detail({
               </>
             ) : null}
             {cleanNote(site.evidence) ? (
-              <details>
-                <summary>Research notes</summary>
+              <details className="disclosure">
+                <summary className="disclosure">Research notes</summary>
                 <p>{cleanNote(site.evidence)}</p>
               </details>
             ) : null}
@@ -493,7 +493,7 @@ export function DealDetail({
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" onClick={onClose}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {banner}
       <div className="drawer-scroll">
@@ -514,7 +514,7 @@ export function DealDetail({
               {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
               {onCompare ? (
                 <label className="compare-check">
-                  <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
+                  <input className="check" type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
                   Compare
                 </label>
               ) : null}
@@ -608,7 +608,7 @@ export function UnscreenedDetail({
     <aside className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}>
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" onClick={onClose}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <div className="drawer-scroll">
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

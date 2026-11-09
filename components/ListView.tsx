@@ -65,6 +65,7 @@ export default function ListView({
         <label className="list-sort only-mobile">
           Sort
           <select
+            className="secondary"
             aria-label="Sort"
             value={`${sort.id}:${sort.desc ? "desc" : "asc"}`}
             onChange={(event) => {
@@ -78,7 +79,7 @@ export default function ListView({
             ])}
           </select>
         </label>
-        <button type="button" onClick={onExport}>Export CSV</button>
+        <button type="button" className="paper-btn" onClick={onExport}>Export CSV</button>
       </div>
       <div className="list-scroll">
         <table className="list-table">
@@ -89,7 +90,7 @@ export default function ListView({
                 const direction = active && sort.desc ? "descending" : active ? "ascending" : "none";
                 return (
                   <th key={column.id} aria-sort={direction}>
-                    <button type="button" onClick={() => onSort(column.id)}>
+                    <button type="button" className="sort-header" onClick={() => onSort(column.id)}>
                       {column.label}
                       {active ? (sort.desc ? " ↓" : " ↑") : ""}
                     </button>
@@ -101,12 +102,12 @@ export default function ListView({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className={row.id === selectedId ? "on" : ""} onClick={() => onOpen(row.id)}>
+              <tr key={row.id} className={row.id === selectedId ? "list-row on" : "list-row"} onClick={() => onOpen(row.id)}>
                 {LIST_COLUMNS.map((column) => (
                   <td key={column.id} title={row[column.id] || ""}>{row[column.id] || "—"}</td>
                 ))}
                 <td>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
+                  <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
                 </td>
               </tr>
             ))}
@@ -115,11 +116,11 @@ export default function ListView({
         <ul className="list-cards">
           {rows.map((row) => (
             <li key={row.id}>
-              <button type="button" className={row.id === selectedId ? "on" : ""} onClick={() => onOpen(row.id)}>
+              <button type="button" className={`list-row ${row.id === selectedId ? "on" : ""}`} onClick={() => onOpen(row.id)}>
                 <strong>{row.site}</strong>
                 <span>{[row.city, row.stage, row.tier, row.grade ? `Site capacity ${row.grade}` : ""].filter(Boolean).join(" · ")}</span>
               </button>
-              <button type="button" onClick={() => onShowMap(row.id)}>Show on map</button>
+              <button type="button" className="text-link" onClick={() => onShowMap(row.id)}>Show on map</button>
             </li>
           ))}
         </ul>

@@ -1725,6 +1725,7 @@ DEAL_FIELDS = (
     "source_line",
     "source_kind",
     "business_type",
+    "is_c_store",
     "broker_contacted",
     "last_broker_contact",
     "apn",
@@ -2055,6 +2056,27 @@ BUSINESS_TYPES = (
     "Land",
     "Other",
 )
+
+
+_CSTORE_TOKEN = re.compile(r"(?i)(?:c[\s-]*stores?|\bampm\b|am\s*/\s*pm)")
+
+
+def is_c_store_text(segment: str, name: str) -> bool:
+    """True when Segment or the deal name names a convenience store.
+
+    A segment that is only "Gas station" does not qualify. Branded tokens such
+    as ampm do, including when they sit in the deal name.
+    """
+    segment_text = re.sub(r"\s+", " ", str(segment or "")).strip()
+    name_text = re.sub(r"\s+", " ", str(name or "")).strip()
+    if re.fullmatch(r"(?i)gas station", segment_text) and not _CSTORE_TOKEN.search(name_text):
+        return False
+    return bool(_CSTORE_TOKEN.search(segment_text) or _CSTORE_TOKEN.search(name_text))
+
+
+def deal_is_c_store(kind: str, segment: str, name: str) -> bool:
+    """Pipeline deals only. Land rows stay on the land layer and are not flagged."""
+    return kind == "pipeline" and is_c_store_text(segment, name)
 
 
 def business_type_from_text(raw: str) -> str:
@@ -2544,6 +2566,11 @@ def build_deal_layer(
                 "source_line": source_line,
                 "source_kind": source_kind,
                 "business_type": business_type_from_row(row),
+                "is_c_store": deal_is_c_store(
+                    kind,
+                    str(row.get("Segment") or row.get("Segment group") or ""),
+                    scrub(row.get("Name") or address)[:160],
+                ),
                 "broker_contacted": bool(outreach.get(deal_id)),
                 "last_broker_contact": outreach.get(deal_id) or "",
                 "apn": apn_text(row.get("APN or folio") or row.get("APN") or ""),

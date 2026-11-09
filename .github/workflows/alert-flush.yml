@@ -1,0 +1,32 @@
+name: Alert flush
+
+# No path filter and no concurrency group. GitHub may start this later than the five-minute mark.
+# The flush itself is idempotent. Schedule runs only after this file is on the default branch.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flush:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post the pending alerts
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set. Skipping the flush."
+            exit 0
+          fi
+          base="${APP_URL:-https://distributedsites.com}"
+          base="${base%/}"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${base}/api/alerts/flush"
+          echo

@@ -1,11 +1,65 @@
 import { expect, test } from "@playwright/test";
 import { cityPipelineCounts } from "./pipeline-counts";
 
+test("satellite is the default basemap and a switch is remembered", async ({ page }, info) => {
+  await page.addInitScript(() => {
+    if (!window.sessionStorage.getItem("basemap-init")) {
+      window.localStorage.removeItem("basemap");
+      window.sessionStorage.setItem("basemap-init", "1");
+    }
+  });
+  if (info.project.name !== "mobile") await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/?funnel=pipeline&pstage=desk");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  const mobile = info.project.name === "mobile";
+  const chooser = mobile ? page.getByTestId("basemap") : page.getByTestId("basemap-desktop");
+  if (mobile) await page.locator(".map-tools-toggle").click();
+  await expect(chooser).toBeVisible();
+  if (!mobile) {
+    const close = page.getByRole("button", { name: "Close layers" });
+    await expect(close).toHaveCSS("background-color", "rgb(255, 253, 248)");
+    await expect(page.locator('.layers input[type="checkbox"]:checked').first()).toHaveCSS("background-color", "rgb(30, 70, 54)");
+    const bounds = await chooser.boundingBox();
+    expect(bounds && bounds.width > 20 && bounds.height > 20).toBeTruthy();
+  }
+  await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
+  await chooser.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
+  await page.reload();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
+  if (mobile) await page.locator(".map-tools-toggle").click();
+  await expect(chooser.getByRole("button", { name: "Map", exact: true })).toHaveClass(/on/);
+  await page.evaluate(() => window.localStorage.removeItem("basemap"));
+  await page.goto("/?review=1");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+});
+
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {
   const desk = cityPipelineCounts("PHX");
+  const withStores = cityPipelineCounts("PHX", { cstore: true });
+  await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list");
   await page.waitForSelector("[data-testid=pipeline-list]");
+  const summary = await page.getByTestId("summary-row").boundingBox();
+  const controls = await page.locator(".pipeline-list .list-bar").boundingBox();
+  expect(summary && controls).toBeTruthy();
+  if (summary && controls) expect(controls.y).toBeGreaterThanOrEqual(summary.y + summary.height - 1);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(desk.deskTotal));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/?funnel=pipeline&pstage=desk");
+  await page.waitForSelector("[data-pin-count]");
+  const pins = await page.locator(".shell").getAttribute("data-pin-count");
+  await page.goto("/?funnel=pipeline&pstage=desk&cstore=1");
+  await expect(page.locator(".shell")).toHaveAttribute("data-pin-count", pins || "");
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getSource: (id: string) => { serialize: () => { data?: { features?: unknown[] } } } } }).__sitesMap;
+    if (!map?.isStyleLoaded()) return false;
+    const data = map.getSource("deals")?.serialize()?.data;
+    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 10);
+  });
+  await page.goto("/?funnel=pipeline&pstage=desk&view=list&cstore=1");
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(withStores.deskTotal));
   await expect(page.locator(".no-pin").filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByTestId("summary-row")).toContainText("Median asking");
 

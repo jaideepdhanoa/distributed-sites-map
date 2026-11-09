@@ -4,6 +4,7 @@ type DealProps = {
   city?: string;
   kind?: string;
   stage_group?: string;
+  is_c_store?: boolean;
 };
 
 export type CityPipelineCounts = {
@@ -17,11 +18,11 @@ export type CityPipelineCounts = {
 };
 
 /** Phoenix pipeline copy is counted from the committed deals, the same way the funnel does. */
-export function cityPipelineCounts(city = "PHX"): CityPipelineCounts {
+export function cityPipelineCounts(city = "PHX", options: { cstore?: boolean } = {}): CityPipelineCounts {
   const data = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
     features: { properties: DealProps }[];
   };
-  const rows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city);
+  const rows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city && (options.cstore || !deal.is_c_store));
   const count = (kind: string, group?: string) =>
     rows.filter((deal) => deal.kind === kind && (group == null || deal.stage_group === group)).length;
   const pipeline = count("pipeline");

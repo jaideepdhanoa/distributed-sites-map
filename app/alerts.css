@@ -1,0 +1,77 @@
+.swatch.cstore {
+  background: #8d7350;
+}
+
+.queue-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #8d7350;
+  vertical-align: 1px;
+  opacity: 0.8;
+}
+
+.popover.alert-sheet {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  z-index: 40;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  background: #faf7f1;
+}
+
+.alert-sheet h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.alert-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.alert-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.alert-modes button {
+  min-width: 64px;
+}
+
+.alert-modes button.on {
+  background: #1c1914;
+  color: #faf7f1;
+  border-color: #1c1914;
+}
+
+.alert-mail {
+  margin: 0 0 12px;
+}
+
+.alert-log {
+  display: grid;
+  gap: 12px;
+}
+
+.alert-card {
+  border: 1px solid #e4dccb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fffdf8;
+}
+
+.alert-card p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.alert-warning {
+  color: #6b4e16;
+}

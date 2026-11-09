@@ -58,6 +58,7 @@ export type Deal = {
   business_type?: string;
   stage?: string;
   stage_group?: string;
+  is_c_store?: boolean;
 };
 
 type Feature<T> = { geometry: unknown; properties: T };
@@ -182,10 +183,11 @@ function placed(deal: Feature<Deal>, sites: Map<string, Feature<Site>>) {
   return Boolean(deal.geometry);
 }
 
-function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean } = {}) {
   return catalog.deals.filter((feature) => {
     const deal = feature.properties;
     if ((deal.kind !== "pipeline" && deal.kind !== "land") || deal.city !== city || deal.stage_group !== step) return false;
+    if (deal.is_c_store && !options.cstore) return false;
     if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
     if (options.query) {
       const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();
@@ -195,14 +197,14 @@ function stageDeals(catalog: Catalog, city: string, step: string, options: { typ
   });
 }
 
-export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean } = {}) {
   const sites = new Map(catalog.sites.map((feature) => [feature.properties.site_id, feature]));
   return stageDeals(catalog, city, step, options)
     .filter((feature) => placed(feature, sites))
     .map((feature) => feature.properties.deal_id);
 }
 
-export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string } = {}) {
+export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean } = {}) {
   return stageDeals(catalog, city, step, options).length;
 }
 

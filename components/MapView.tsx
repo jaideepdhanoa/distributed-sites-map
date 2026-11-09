@@ -26,6 +26,7 @@ type Props = {
   focusLat: number;
   focusZoom: number;
   reviewMarkers?: { id: string; lng: number; lat: number; n: number; current: boolean }[];
+  queueIds?: string[];
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   pinLabel?: PinLabel;
   onPinLabel?: (mode: PinLabel) => void;
@@ -97,7 +98,7 @@ function areaLabels(areas: GeoFeature[]) {
     });
   };
   place("las-100", "Core and ring 100 (current)");
-  place("las-300", "Rings 200 and 300 (later)", [0, 0.12]);
+  place("las-300", "Rings 200 and 300 (later)", [0.04, -0.16]);
   place("phx-service", "Phoenix service area (current)");
   place("mia-current", "Miami service area (current)");
   place("mia-extended", "Miami extended area (later)", [0.05, 0.08]);
@@ -138,6 +139,7 @@ export default function MapView(props: Props) {
   const radiusRef = useRef(radiusMiles);
   radiusRef.current = radiusMiles;
   const [readout, setReadout] = useState("");
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [mapGeneration, setMapGeneration] = useState(0);
   const points = useRef<[number, number][]>([]);
   const propsRef = useRef(props);
@@ -180,9 +182,9 @@ export default function MapView(props: Props) {
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
           { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f7e2a8", "line-dasharray": [1.2, 1.2], "line-width": 1.4, "line-opacity": 0.9 } },
           { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
-          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#dfeae1", "fill-opacity": 0.72 } },
+          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#dfeae1", "fill-opacity": 0.1 } },
           { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#b9cdbf", "line-width": 1.4 } },
-          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-allow-overlap": false, "text-padding": 6 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
+          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-max-width": 8, "text-offset": [0, 1.1], "text-allow-overlap": false, "text-padding": 8 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
           { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#9e4b3e", "line-width": 1.6, "line-dasharray": [1.5, 1.2] } },
@@ -490,7 +492,7 @@ export default function MapView(props: Props) {
     let observer: ResizeObserver | null = null;
     let cancelled = false;
     const boot = async () => {
-    const basemap = propsRef.current.basemap || "positron";
+    const basemap = propsRef.current.basemap || "satellite";
     let style: StyleSpecification | string = satelliteStyle;
     if (basemap !== "satellite") {
       try {
@@ -532,7 +534,7 @@ export default function MapView(props: Props) {
             const d = kind === "circle" ? Math.hypot(dx, dy) : Math.abs(dx) + Math.abs(dy);
             const limit = kind === "circle" ? 11.5 : 13;
             inside = d <= limit;
-            edge = inside && d >= limit - 2.4;
+            edge = inside && d >= limit - 3.4;
           }
           if (!inside) continue;
           const i = (y * size + x) * 4;
@@ -753,15 +755,54 @@ export default function MapView(props: Props) {
         if (points.current.length >= 3) setReadout(`${acresOf(points.current).toFixed(2)} acres`);
         else if (points.current.length === 2) setReadout("Add points, then read acres");
       });
-      if (propsRef.current.basemap !== "satellite") {
-        if (map.getLayer("area-labels")) {
-          map.setPaintProperty("area-labels", "text-color", "#5b554b");
-          map.setPaintProperty("area-labels", "text-halo-color", "#f6f3ec");
+      const satelliteOn = (propsRef.current.basemap || "satellite") === "satellite";
+      const paint = (id: string, prop: "circle-color" | "circle-opacity" | "circle-stroke-color" | "circle-stroke-opacity" | "circle-stroke-width" | "fill-opacity" | "line-color" | "line-width" | "text-color" | "text-halo-color" | "text-halo-width", value: string | number) => {
+        if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
+      };
+      const phoneScreen = window.matchMedia("(max-width: 767px)").matches;
+      if (!satelliteOn) {
+        paint("areas-op", "fill-opacity", 0.45);
+        paint("area-labels", "text-color", "#5b554b");
+        paint("area-labels", "text-halo-color", "#f6f3ec");
+        paint("depot-labels", "text-color", "#1d4e89");
+        paint("depot-labels", "text-halo-color", "#fffdf8");
+      } else {
+        paint("areas-op", "fill-opacity", phoneScreen ? 0.06 : 0.1);
+        paint("areas-op-line", "line-color", "#f4efe6");
+        paint("areas-op-line", "line-width", 2);
+        for (const id of ["tier-large", "tier-small"]) {
+          paint(id, "circle-stroke-color", "#fffdf8");
+          paint(id, "circle-stroke-width", 2);
         }
-        if (map.getLayer("depot-labels")) {
-          map.setPaintProperty("depot-labels", "text-color", "#1d4e89");
-          map.setPaintProperty("depot-labels", "text-halo-color", "#fffdf8");
+        for (const id of ["tier-large-halo", "tier-small-halo"]) {
+          paint(id, "circle-stroke-color", "#1c1914");
+          paint(id, "circle-stroke-width", 3);
+          paint(id, "circle-stroke-opacity", 0.9);
         }
+        paint("selected-halo", "circle-opacity", 0);
+        paint("selected-halo", "circle-stroke-color", "#1c1914");
+        paint("selected-halo", "circle-stroke-width", 6);
+        paint("selected", "circle-stroke-color", "#fffdf8");
+        paint("selected", "circle-stroke-width", 3);
+        paint("deal-halo", "circle-opacity", 0);
+        paint("deal-halo", "circle-stroke-color", "#1c1914");
+        paint("deal-halo", "circle-stroke-width", 6);
+        paint("deal-ring", "circle-stroke-color", "#fffdf8");
+        paint("deal-ring", "circle-stroke-width", 3);
+        paint("clusters", "circle-stroke-width", 3);
+        paint("clusters-halo", "circle-opacity", 0.5);
+        paint("clusters-halo", "circle-stroke-color", "#fffdf8");
+        paint("clusters-halo", "circle-stroke-width", 2);
+        paint("deal-pills", "text-halo-color", "#fffdf8");
+        paint("deal-pills", "text-halo-width", 4);
+        paint("deal-site-badge", "text-halo-width", 1.6);
+        paint("unscreened", "circle-stroke-width", 3);
+        paint("missing-parcel", "circle-stroke-color", "#f3d48a");
+        paint("missing-parcel", "circle-stroke-width", 3);
+        paint("missing-parcel-deals", "circle-stroke-color", "#f3d48a");
+        paint("missing-parcel-deals", "circle-stroke-width", 3);
+        paint("review-marks", "circle-stroke-width", 3);
+        paint("offmarket-selected", "circle-stroke-width", 3);
       }
       map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
       propsRef.current.onBounds(map.getBounds());
@@ -787,11 +828,12 @@ export default function MapView(props: Props) {
 
   const reviewFocusRef = useRef(props.reviewFocus);
   reviewFocusRef.current = props.reviewFocus;
-  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom},${props.basemap || "positron"}`;
+  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom},${props.basemap || "satellite"}`;
   const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");
   const appliedReview = useRef("");
   const appliedFit = useRef("");
+  const appliedPad = useRef("");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -812,6 +854,31 @@ export default function MapView(props: Props) {
           properties: publicDeal(feature.properties),
         })),
       });
+      const queued = new Set(props.queueIds || []);
+      const queueData = {
+        type: "FeatureCollection" as const,
+        features: props.deals.flatMap((feature) => {
+          if (!feature.geometry || !queued.has(feature.properties.deal_id)) return [];
+          return [{ type: "Feature" as const, properties: {}, geometry: feature.geometry }];
+        }),
+      };
+      const queueSource = map.getSource("queue-dots") as GeoJSONSource | undefined;
+      if (queueSource) queueSource.setData(queueData);
+      else {
+        map.addSource("queue-dots", { type: "geojson", data: queueData });
+        map.addLayer({
+          id: "queue-dots",
+          type: "circle",
+          source: "queue-dots",
+          paint: {
+            "circle-radius": (props.basemap || "satellite") === "satellite" ? 4 : 3.5,
+            "circle-color": (props.basemap || "satellite") === "satellite" ? "#1c1914" : "#8d7350",
+            "circle-stroke-width": (props.basemap || "satellite") === "satellite" ? 2 : 1,
+            "circle-stroke-color": "#fffdf8",
+            "circle-translate": [8, -8],
+          },
+        });
+      }
       const labelData = {
         type: "FeatureCollection" as const,
         features: dealLabelFeatures(props.deals, props.pinLabel || "none"),
@@ -941,17 +1008,27 @@ export default function MapView(props: Props) {
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
-      const fitKey = (props.fitPoints || []).map((point) => point.join(",")).join("|");
+      const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
+      const phonePad = phone && !reviewing;
+      const padKey = phonePad ? "clear" : "flush";
+      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : { top: 0, bottom: 0, left: 0, right: 0 });
+      if ((props.basemap || "satellite") === "satellite" && map.getLayer("areas-op")) {
+        map.setPaintProperty("areas-op", "fill-opacity", phone ? 0.06 : 0.1);
+      }
+      const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+      const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (reviewToken) {
         appliedReview.current = reviewToken;
-      } else if (phone && fitKey && appliedFit.current !== fitKey) {
+        appliedPad.current = "flush";
+      } else if (phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
+        appliedPad.current = padKey;
         appliedFocus.current = focusToken;
-        const lngs = props.fitPoints!.map((point) => point[0]);
-        const lats = props.fitPoints!.map((point) => point[1]);
+        const lngs = finiteFit.map((point) => point[0]);
+        const lats = finiteFit.map((point) => point[1]);
         map.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: { top: 56, bottom: 120, left: 28, right: 28 }, maxZoom: 13, duration: 0 },
+          { padding: { top: 176, bottom: 168, left: 28, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
       } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
@@ -965,7 +1042,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1193,56 +1270,58 @@ export default function MapView(props: Props) {
   }, [mapGeneration, props.reviewMarkers]);
 
   return (
-      <div className="stage-map" data-basemap={props.basemap || "positron"}>
+      <div className="stage-map" data-basemap={props.basemap || "satellite"}>
       <div ref={node} className="map" />
       <div className="map-tools">
-        <details className="map-chrome">
-          <summary>Map tools</summary>
+        <div className={`map-chrome ${toolsOpen ? "open" : ""}`}>
+          <button type="button" className="tool map-tools-toggle" aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}>Map tools</button>
+          <div className="map-chrome-body">
         <div className="pin-label" role="group" aria-label="Basemap" data-testid="basemap">
           <span>Base</span>
-          <button className={(props.basemap || "positron") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
-          <button className={props.basemap === "satellite" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
+          <button className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
+          <button className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
         </div>
         <div className="pin-label" role="group" aria-label="Pin label" data-testid="pin-label">
           <span>Pin label</span>
           {(["none", "asking", "acres", "peracre"] as const).map((mode) => (
-            <button key={mode} className={(props.pinLabel || "none") === mode ? "on" : ""} type="button" onClick={() => props.onPinLabel?.(mode)}>
+            <button key={mode} className={`tool ${(props.pinLabel || "none") === mode ? "on" : ""}`} type="button" onClick={() => props.onPinLabel?.(mode)}>
               {mode === "none" ? "None" : mode === "asking" ? "Asking" : mode === "acres" ? "Acres" : "Per acre"}
             </button>
           ))}
         </div>
-        <button className={measure ? "on" : ""} type="button" onClick={() => { setMeasure((value) => !value); setAreaTool("off"); points.current = []; setReadout(""); }}>
+        <button className={`tool ${measure ? "on" : ""}`} type="button" onClick={() => { setMeasure((value) => !value); setAreaTool("off"); points.current = []; setReadout(""); }}>
           Measure acres
         </button>
-        <button className={areaTool === "radius" ? "on" : ""} type="button" onClick={() => { setAreaTool((value) => value === "radius" ? "off" : "radius"); setMeasure(false); }}>
+        <button className={`tool ${areaTool === "radius" ? "on" : ""}`} type="button" onClick={() => { setAreaTool((value) => value === "radius" ? "off" : "radius"); setMeasure(false); }}>
           Radius
         </button>
         {areaTool === "radius" ? (
           <label className="map-readout">
             Miles
-            <select aria-label="Radius miles" value={radiusMiles} onChange={(event) => setRadiusMiles(Number(event.target.value))}>
+            <select className="secondary" aria-label="Radius miles" value={radiusMiles} onChange={(event) => setRadiusMiles(Number(event.target.value))}>
               {[0.5, 1, 2, 3, 5].map((miles) => <option key={miles} value={miles}>{miles}</option>)}
             </select>
           </label>
         ) : null}
-        <button className={areaTool === "draw" ? "on" : ""} type="button" onClick={() => { setAreaTool((value) => value === "draw" ? "off" : "draw"); setMeasure(false); setDraftPoints([]); }}>
+        <button className={`tool ${areaTool === "draw" ? "on" : ""}`} type="button" onClick={() => { setAreaTool((value) => value === "draw" ? "off" : "draw"); setMeasure(false); setDraftPoints([]); }}>
           Draw area
         </button>
         {areaTool === "draw" && draftPoints.length >= 3 ? (
-          <button type="button" onClick={() => { props.onArea?.({ kind: "polygon", points: draftPoints }); setAreaTool("off"); }}>
+          <button className="paper-btn" type="button" onClick={() => { props.onArea?.({ kind: "polygon", points: draftPoints }); setAreaTool("off"); }}>
             Use this area
           </button>
         ) : null}
         {props.area ? (
-          <button type="button" onClick={() => { props.onArea?.(null); setDraftPoints([]); setAreaTool("off"); }}>
+          <button className="paper-btn" type="button" onClick={() => { props.onArea?.(null); setDraftPoints([]); setAreaTool("off"); }}>
             Clear area
           </button>
         ) : null}
         {readout ? <span className="map-readout">{readout}</span> : null}
-        </details>
+          </div>
+        </div>
       </div>
       {coverageText ? <p className="map-coverage" data-testid="map-coverage">{coverageText}</p> : null}
-      <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
+      <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
     </div>
   );
 }

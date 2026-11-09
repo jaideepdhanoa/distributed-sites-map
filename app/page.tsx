@@ -4,7 +4,7 @@ import Explorer from "@/components/Explorer";
 import Wordmark from "@/components/Wordmark";
 
 export const metadata: Metadata = {
-  title: { absolute: "Map · Distributed Infra" },
+  title: { absolute: "Map · Distributed Sites" },
 };
 
 export default function HomePage() {

@@ -66,4 +66,14 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(page.locator("aside.drawer")).toContainText("Crexi");
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
   await page.screenshot({ path: `review-shots/${name}-unscreened.png`, fullPage: false });
+  await page.goto("/?funnel=pipeline&pstage=desk", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".shell");
+  if (name === "mobile") {
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Layers", exact: true }).click();
+  }
+  const layers = page.locator("aside.layers.open");
+  await expect(layers).toBeVisible();
+  await expect(page.getByTestId("basemap-desktop")).toBeVisible();
+  await layers.screenshot({ path: `review-shots/${name}-layers.png` });
 });

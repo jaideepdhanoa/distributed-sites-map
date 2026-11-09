@@ -45,7 +45,7 @@ export default async function AdminPage() {
           ))}
         </tbody>
       </table>
-      <p><Link href="/">Back to the map</Link></p>
+      <p><Link href="/admin/alerts">Alert preview</Link> · <Link href="/">Back to the map</Link></p>
     </main>
   );
 }

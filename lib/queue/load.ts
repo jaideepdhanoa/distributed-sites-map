@@ -4,6 +4,7 @@ import type { Sql } from "@/lib/actions/db";
 import { clearMentionsForSite, openMentions } from "@/lib/actions/mentions";
 import { permanentSiteId } from "@/lib/actions/suggestions";
 import { InputError, parseDate, stamp } from "@/lib/actions/text";
+import { notifyFlag } from "@/lib/alerts/notify";
 import { getUsers } from "@/lib/users";
 import { loadCatalog, readBuildEvents } from "./catalog";
 import { listAppEvents } from "./events";
@@ -70,10 +71,12 @@ export async function flagSite(sql: Sql, input: { fromUser: string; toUser: stri
   const note = input.note.trim() ? safeSnapshot(input.note, 200) : "";
   if (input.note.trim() && !note) throw new InputError("That text is not allowed on the map. Rephrase it and try again.");
   if (note) assertClean(note);
+  const id = randomUUID();
   await sql.query(
     `INSERT INTO queue_flags (id, site_id, from_user, to_user, note) VALUES ($1, $2, $3, $4, $5)`,
-    [randomUUID(), input.siteId, input.fromUser, toUser, note],
+    [id, input.siteId, input.fromUser, toUser, note],
   );
+  await notifyFlag(sql, { id, siteId: input.siteId, fromUser: input.fromUser, toUser, note });
 }
 
 export async function setFollow(sql: Sql, userId: string, siteId: string, follow: boolean): Promise<void> {
@@ -207,6 +210,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
       stage: site.stage,
       stageGroup: site.stageGroup,
       active: site.active,
+      hidden: site.isCStore,
     })),
     reasons,
     reviewedAt,

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { getUsers } from "@/lib/users";
+import { notifySuggestion } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
 import { audit } from "./audit";
@@ -248,6 +249,15 @@ export async function createSuggestion(
       refId: id,
     });
   }
+  await notifySuggestion(sql, {
+    id,
+    siteId,
+    authorId: input.authorId,
+    field,
+    summary: title || (field === "document_request" ? "Request documents" : proposedValue),
+    ownerId,
+    mentionIds,
+  });
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [id]);
   const suggestion = present(saved.rows[0]);
   if (!suggestion) throw new InputError("That suggestion could not be saved.");

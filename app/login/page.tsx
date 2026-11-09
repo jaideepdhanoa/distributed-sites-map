@@ -33,14 +33,14 @@ export default function LoginPage() {
         <h1>Sign in</h1>
         <label>
           Username
-          <input name="username" autoComplete="username" required />
+          <input className="field" name="username" autoComplete="username" required />
         </label>
         <label>
           Password
-          <input name="password" type="password" autoComplete="current-password" required />
+          <input className="field" name="password" type="password" autoComplete="current-password" required />
         </label>
         {error ? <p className="err">{error}</p> : null}
-        <button type="submit" disabled={pending}>{pending ? "Checking…" : "Sign in"}</button>
+        <button className="primary" type="submit" disabled={pending}>{pending ? "Checking…" : "Sign in"}</button>
       </form>
     </main>
   );

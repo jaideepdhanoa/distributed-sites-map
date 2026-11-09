@@ -1,3 +1,5 @@
+import alertDefaults from "../config/alerts.json";
+
 export type AuthUser = {
   u: string;
   h: string;
@@ -5,9 +7,21 @@ export type AuthUser = {
   roleLabel: string;
   actionRole: "viewer" | "contributor" | "reviewer" | null;
   displayName: string;
+  email: string;
 };
 
 const ACTION = new Set(["viewer", "contributor", "reviewer"]);
+const PROMOTED_ADMINS = new Set(
+  (Array.isArray(alertDefaults.adminUsernames) ? alertDefaults.adminUsernames : [])
+    .map((name) => String(name).trim().toLowerCase())
+    .filter(Boolean),
+);
+
+function previewAdmin(username: string): boolean {
+  if (process.env.VERCEL_ENV !== "preview") return false;
+  const names = Array.isArray(alertDefaults.previewAdmins) ? alertDefaults.previewAdmins : [];
+  return names.some((name) => String(name).trim().toLowerCase() === username);
+}
 
 export function getUsers(): AuthUser[] {
   const raw = process.env.AUTH_USERS;
@@ -31,7 +45,12 @@ export function getUsers(): AuthUser[] {
     const actionRole = ACTION.has(explicit) ? (explicit as AuthUser["actionRole"]) : ACTION.has(roleLabel) ? (roleLabel as AuthUser["actionRole"]) : null;
     const named = String(row.name ?? row.displayName ?? "").trim();
     const displayName = named || u;
-    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole, displayName });
+    const emailRaw = String(row.email ?? "").trim().toLowerCase();
+    const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : "";
+    const promoted = PROMOTED_ADMINS.has(u) || previewAdmin(u);
+    const accountRole = promoted ? "admin" : role;
+    const accountAction = promoted ? "reviewer" : actionRole;
+    if (u && h.startsWith("$2")) users.push({ u, h, role: accountRole, roleLabel, actionRole: accountAction, displayName, email });
   }
   return users;
 }

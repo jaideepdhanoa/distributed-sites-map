@@ -26,8 +26,8 @@ export function ActionsMenuButtons({ close }: { close: () => void }) {
   if (!status.enabled) return null;
   return (
     <>
-      <button type="button" onClick={() => { openPanel("suggestions"); close(); }}>Suggestions</button>
-      <button type="button" onClick={() => { openPanel("views"); close(); }}>Saved views</button>
+      <button type="button" onClick={() => { openPanel("suggestions"); close(); }} className="menu-item">Suggestions</button>
+      <button type="button" onClick={() => { openPanel("views"); close(); }} className="menu-item">Saved views</button>
     </>
   );
 }
@@ -99,12 +99,12 @@ function SuggestionsDialog() {
     <div className="act-layer">
       <button className="backdrop" type="button" aria-label="Close suggestions" onClick={() => openPanel(null)} />
       <section className="act-dialog" role="dialog" aria-modal="true" aria-labelledby="suggestions-title" data-testid="suggestions-panel">
-        <button className="close" type="button" onClick={() => openPanel(null)}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={() => openPanel(null)}><span aria-hidden="true">×</span></button>
         <h2 id="suggestions-title">Suggestions{openProposals ? ` · ${openProposals} open proposals` : ""}</h2>
         <p className="note">Accepting a row does not change the map. Apply it in the workbook. When a later sync matches, the row is marked applied.</p>
         <div className="act-row">
           {FILTERS.map((item) => (
-            <button key={item} type="button" className={filter === item ? "on" : ""} onClick={() => setFilter(item)}>{item}</button>
+            <button key={item} type="button" className={filter === item ? "chip on" : "chip"} onClick={() => setFilter(item)}>{item}</button>
           ))}
           <a href="/api/actions/suggestions/export">Download CSV</a>
           <a href="/api/actions/suggestions/export?kind=next">Approved next steps</a>
@@ -119,8 +119,8 @@ function SuggestionsDialog() {
                 <p className="note">{row.authorId} · {formatPacific(row.createdAt)}</p>
                 {canReview(status.actionRole) && row.status === "open" ? (
                   <div className="act-row">
-                    <button type="button" onClick={() => void decide(row.id, "accepted")}>Accept</button>
-                    <button type="button" onClick={() => void decide(row.id, "rejected")}>Reject</button>
+                    <button type="button" onClick={() => void decide(row.id, "accepted")} className="menu-item">Accept</button>
+                    <button type="button" onClick={() => void decide(row.id, "rejected")} className="menu-item">Reject</button>
                   </div>
                 ) : null}
               </li>
@@ -185,7 +185,7 @@ function ViewsDialog() {
     <div className="act-layer">
       <button className="backdrop" type="button" aria-label="Close saved views" onClick={() => openPanel(null)} />
       <section className="act-dialog" role="dialog" aria-modal="true" aria-labelledby="views-title" data-testid="views-panel">
-        <button className="close" type="button" onClick={() => openPanel(null)}>Close</button>
+        <button className="close" type="button" aria-label="Close" onClick={() => openPanel(null)}><span aria-hidden="true">×</span></button>
         <h2 id="views-title">Saved views</h2>
         <p className="note">A saved view stores this screen’s link, including filters, sort, columns, and the pin label. It does not copy site data.</p>
         <form
@@ -211,15 +211,15 @@ function ViewsDialog() {
         >
           <label>
             Name
-            <input data-testid="view-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
+            <input className="field" data-testid="view-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
           </label>
           {canReview(status.actionRole) ? (
             <label className="act-check">
-              <input type="checkbox" checked={team} onChange={(event) => setTeam(event.target.checked)} />
+              <input className="check" type="checkbox" checked={team} onChange={(event) => setTeam(event.target.checked)} />
               Share with the team
             </label>
           ) : null}
-          <button type="submit" disabled={pending}>Save this view</button>
+          <button type="submit" disabled={pending} className="menu-item">Save this view</button>
         </form>
         {error ? <p className="err" role="alert">{error}</p> : null}
         {views.length ? (
@@ -228,7 +228,7 @@ function ViewsDialog() {
               <li key={view.id}>
                 <p><strong>{view.name}</strong> {view.scope === "team" ? <span className="badge checked">Team</span> : null}</p>
                 <div className="act-row">
-                  <button type="button" onClick={() => { window.location.assign(view.query ? `/?${view.query}` : "/"); }}>Open</button>
+                  <button type="button" onClick={() => { window.location.assign(view.query ? `/?${view.query}` : "/"); }} className="menu-item">Open</button>
                   <button
                     type="button"
                     onClick={async () => {
@@ -240,7 +240,7 @@ function ViewsDialog() {
                       }
                       await load();
                     }}
-                  >
+                   className="menu-item">
                     Remove
                   </button>
                 </div>

@@ -160,6 +160,8 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any&qassign=1");
+  const assignedName = (card?.snapshot as { name?: string } | null)?.name || deal;
+  await page.getByTestId("review-assigned").getByRole("button", { name: assignedName }).click();
   await page.getByTestId("panel-tab-discussion").click();
   const panel = page.locator(".drawer");
   await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");
@@ -284,4 +286,83 @@ test("the empty queue and the phone layout", async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId("queue-empty")).toBeVisible();
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-empty-mobile.png" });
+});
+
+test("the review inbox keeps its sections, and an approval ignores market and stage", async ({ page, request }) => {
+  await login(request, "contributor");
+  const created = await request.post("/api/actions/suggestions", {
+    data: {
+      targetKind: "deal",
+      targetId: "PIPE-PHX-0067",
+      field: "proposed_next_step",
+      title: "Drop the c-store",
+      targetOn: "2026-12-01",
+      proposedValue: "Drop the c-store",
+    },
+  });
+  expect(created.status()).toBe(201);
+  await login(request, "reviewer");
+  const queued = await queue(request, "market=LAS&stage=dropped&viable=1");
+  expect(queued.items.some((item) => item.siteId === "PIPE-PHX-0067")).toBeTruthy();
+
+  await openAs(page, "reviewer", "/?review=1&qmarket=LAS&qstage=dropped");
+  await expect(page.getByTestId("review-approvals")).toContainText("Needs my approval");
+  await expect(page.getByTestId("review-mentions")).toContainText("Mentions");
+  await expect(page.getByTestId("review-assigned")).toContainText("Assigned");
+  const approval = page.getByTestId("review-approvals").getByRole("button", { name: /Sinclair/ });
+  await expect(approval).toBeVisible();
+  await expect(approval.locator(".queue-dot")).toBeVisible();
+});
+
+test("also in review matches the other inbox sections", async ({ page }) => {
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
+  const desktop = page.getByTestId("review-other");
+  await expect(desktop.getByRole("heading", { name: "Also in review" })).toBeVisible();
+  const desktopRow = desktop.getByRole("button").first();
+  await expect(desktopRow).toBeVisible();
+  await expect.poll(() => desktopRow.evaluate((el) => getComputedStyle(el).display)).toBe("grid");
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByTestId("review-position").click();
+  const sheet = page.getByTestId("review-feed");
+  const other = sheet.getByTestId("review-other-sheet");
+  const heading = other.getByRole("heading", { name: "Also in review" });
+  await expect(heading).toBeVisible();
+  const assigned = sheet.getByTestId("review-assigned-sheet").getByRole("heading", { name: "Assigned" });
+  const headingPad = await heading.evaluate((el) => getComputedStyle(el).paddingTop);
+  const assignedPad = await assigned.evaluate((el) => getComputedStyle(el).paddingTop);
+  expect(headingPad).toBe(assignedPad);
+  const row = other.getByRole("button").first();
+  await expect(row).toBeVisible();
+  await expect.poll(() => row.evaluate((el) => getComputedStyle(el).display)).toBe("grid");
+  await expect.poll(() => row.evaluate((el) => getComputedStyle(el).textAlign)).toBe("left");
+});
+
+test("the review filter menu stays inside a 390px screen", async ({ page }) => {
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByTestId("queue-filters").click();
+  const pop = page.locator(".queue-pop");
+  await expect(pop).toBeVisible();
+  const box = await pop.boundingBox();
+  expect(box).toBeTruthy();
+  if (box) {
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+  }
+  await expect(pop.getByRole("button", { name: "Active" })).toBeVisible();
+  await expect(pop.getByLabel("Queue market")).toBeVisible();
+  await expect(pop.getByLabel("Queue stage")).toBeVisible();
+  await page.getByTestId("queue-filters").click();
+  await expect(pop).toBeHidden();
+  await page.getByTestId("review-position").click();
+  await expect(page.getByTestId("review-feed")).toBeVisible();
+  await page.getByTestId("queue-filters").click();
+  await expect(pop.getByRole("button", { name: "Active" })).toBeVisible();
+  const covered = await pop.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 28);
+    return hit ? !el.contains(hit) : true;
+  });
+  expect(covered).toBe(false);
 });

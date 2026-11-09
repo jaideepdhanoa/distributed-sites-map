@@ -19,12 +19,14 @@ jobs:
       - run: python tests/test_sync_workbook.py
       - run: python tests/test_sync_push.py
       - run: python tests/test_key_numbers.py
+      - run: python tests/test_cstore.py
       - run: python tests/test_financials.py
       - run: python scripts/check_surface.py
       - run: python scripts/test_review_fixes.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: node scripts/check_controls.mjs
       - run: node --experimental-strip-types scripts/test-stage-detail.ts
       - run: node --experimental-strip-types scripts/test-drawer-width.ts
       - run: node --experimental-strip-types scripts/test-key-numbers.ts

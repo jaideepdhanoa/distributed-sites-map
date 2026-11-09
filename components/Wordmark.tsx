@@ -16,7 +16,7 @@ export default function Wordmark({
 }) {
   useEffect(() => {
     if (!view) return;
-    document.title = `${view === "list" ? "List" : "Map"} · Distributed Infra`;
+    document.title = `${view === "list" ? "List" : "Map"} · Distributed Sites`;
   }, [view]);
 
   const Tag = level;
@@ -29,7 +29,7 @@ export default function Wordmark({
         </svg>
       </span>
       <span className="name">
-        Distributed <br className="compact-break" />Infra
+        Distributed <br className="compact-break" />Sites
       </span>
     </Tag>
   );

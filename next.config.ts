@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  serverExternalPackages: ["nodemailer"],
   outputFileTracingIncludes: {
     "/api/actions/**": ["./db/migrations/**/*.sql", "./config/display-policy.json", "./data/generated/*.geojson"],
+    "/api/alerts/**": ["./db/migrations/**/*.sql", "./config/display-policy.json", "./data/generated/**"],
     "/api/data/timeline": ["./config/timeline-terms.json"],
     "/api/data/photos/**": ["./data/generated/photos/**"],
   },

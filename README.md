@@ -29,7 +29,7 @@ Set these in Vercel. A change applies on the next deployment.
 | `UPSTASH_REDIS_REST_URL` | alternative | Used when `KV_REST_API_URL` is unset. |
 | `UPSTASH_REDIS_REST_TOKEN` | alternative | Pair to the Upstash URL. |
 | `RESEND_API_KEY` | for live mail | Resend API key. Mail is sent from `distributedsites.com`. |
-| `ALERT_FROM` | with Resend | `Distributed Infra <alerts@distributedsites.com>` |
+| `ALERT_FROM` | with Resend | `Distributed Sites <alerts@distributedsites.com>` |
 | `APP_URL` | no | Host for links in alert mail. Defaults to `https://distributedsites.com`. |
 | `ALERT_REPLY_TO` | no | Reply-To. Defaults to `jaideep@dhanoa.in`. |
 | `ALERT_EMAILS` | no | JSON map of username to mailbox. Overrides the optional `email` on an account. |
@@ -130,7 +130,7 @@ Resend is the sender. Mail comes from the verified domain `distributedsites.com`
 2. Add the SPF, DKIM, and DMARC DNS records Resend lists. Create those records in Vercel DNS for `distributedsites.com`.
 3. Wait until Resend marks the domain verified.
 4. In Vercel, set `RESEND_API_KEY` to the Resend API key.
-5. Set `ALERT_FROM` to `Distributed Infra <alerts@distributedsites.com>`.
+5. Set `ALERT_FROM` to `Distributed Sites <alerts@distributedsites.com>`.
 6. Set `APP_URL` to `https://distributedsites.com`. Links in the mail use `APP_URL`. If it is unset, they use `https://distributedsites.com`.
 
 Replies go to `jaideep@dhanoa.in`. Set `ALERT_REPLY_TO` only to use a different reply address.

@@ -8,11 +8,11 @@ const serif = Newsreader({ subsets: ["latin"], variable: "--font-serif" });
 
 export const metadata: Metadata = {
   title: {
-    default: "Distributed Infra · Site pipeline",
-    template: "%s · Distributed Infra",
+    default: "Distributed Sites · Site pipeline",
+    template: "%s · Distributed Sites",
   },
   description: "Site pipeline map for Phoenix, Las Vegas and Miami",
-  applicationName: "Distributed Infra",
+  applicationName: "Distributed Sites",
   robots: { index: false, follow: false },
 };
 

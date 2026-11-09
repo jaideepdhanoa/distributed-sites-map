@@ -62,7 +62,7 @@ test("Resend is preferred, Gmail is the fallback, and the from-address is the ve
   process.env.ALERT_FROM = DEFAULT_FROM;
   process.env.ALERT_REPLY_TO = "jaideep@dhanoa.in";
   assert.equal(transportKind(), "resend");
-  assert.equal(alertFrom(), "Distributed Infra <alerts@distributedsites.com>");
+  assert.equal(alertFrom(), "Distributed Sites <alerts@distributedsites.com>");
   assert.equal(alertReplyTo(), "jaideep@dhanoa.in");
   for (const [name, value] of Object.entries(previous)) {
     const key = name === "key" ? "RESEND_API_KEY" : name === "user" ? "SMTP_USER" : name === "pass" ? "SMTP_PASS" : name === "from" ? "ALERT_FROM" : "ALERT_REPLY_TO";

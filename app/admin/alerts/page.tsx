@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { TestAlertButton } from "@/components/alerts/TestAlertButton";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { migrate, whenReady } from "@/lib/actions/migrate";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
@@ -55,8 +56,9 @@ export default async function AlertPreviewPage() {
     <main className="card" style={{ margin: 40, width: "min(720px, calc(100% - 48px))" }} data-testid="alert-preview">
       <h1>Alert preview</h1>
       <p className="note">
-        These rows were not sent. They appear when neither Resend nor Gmail is configured, or when the daily cap of 400 was reached.
+        These rows were not sent. They appear when neither Resend nor Gmail is configured, when the account is not approved for live mail, or when the daily cap of 400 was reached.
       </p>
+      {actionsEnabled() ? <TestAlertButton /> : null}
       {note ? <p>{note}</p> : null}
       {rows.length ? (
         <div className="alert-log">

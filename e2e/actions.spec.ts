@@ -323,6 +323,32 @@ test("the account menu stays above the review bar", async ({ page }) => {
   await expect(page.getByTestId("alert-settings")).toBeVisible();
 });
 
+test("an admin can preview a sample alert without mailing anyone else", async ({ page, request }) => {
+  await login(request, "contributor");
+  const denied = await request.post("/api/alerts/test");
+  expect(denied.status()).toBe(403);
+
+  await login(request, "reviewer");
+  const sent = await request.post("/api/alerts/test");
+  expect(sent.status()).toBe(200);
+  const body = (await sent.json()) as { delivery: string; email: string; message: string };
+  expect(body.delivery).toBe("would_send");
+  expect(body.email).toBe("reviewer@example.com");
+  expect(body.message).toContain("would-send log");
+  expect(body.message).toContain("not approved for live mail");
+
+  const again = await request.post("/api/alerts/test");
+  expect(again.status()).toBe(429);
+
+  await openAs(page, "reviewer", "/admin/alerts");
+  const preview = page.getByTestId("alert-preview");
+  await expect(preview.getByTestId("send-test-alert")).toBeVisible();
+  await expect(preview).toContainText("[Test]");
+  await expect(preview).toContainText("Sample site");
+  await preview.getByTestId("send-test-alert").click();
+  await expect(preview.getByTestId("test-alert-result")).toContainText("five minutes");
+});
+
 test("a mention with no mail credentials is logged as would-send", async ({ page, request }) => {
   await login(request, "contributor");
   const response = await request.post("/api/actions/notes", {

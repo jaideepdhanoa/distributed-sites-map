@@ -83,7 +83,7 @@ async function claimLog(
 
 export async function deliverRows(
   sql: Sql,
-  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date },
+  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string },
 ): Promise<string> {
   const now = input.now || new Date();
   const day = losAngelesParts(now).day;
@@ -93,11 +93,12 @@ export async function deliverRows(
     await markRows(sql, input.rows.map((row) => row.id), "skipped", input.key);
     return "skipped";
   }
+  const subject = input.subjectPrefix ? `${input.subjectPrefix} ${rendered.subject}`.replace(/\s+/g, " ").trim() : rendered.subject;
   const claim = await claimLog(sql, {
     key: input.key,
     userId: input.userId,
     email: input.email,
-    subject: rendered.subject,
+    subject,
     body: rendered.body,
     day,
   });
@@ -105,7 +106,7 @@ export async function deliverRows(
     await markRows(sql, input.rows.map((row) => row.id), claim.status, input.key);
     return claim.status;
   }
-  await sql.query(`UPDATE alert_log SET subject = $2, body = $3 WHERE id = $1`, [claim.id, rendered.subject, rendered.body]);
+  await sql.query(`UPDATE alert_log SET subject = $2, body = $3 WHERE id = $1`, [claim.id, subject, rendered.body]);
   const transport = mailTransport();
   const from = alertFrom();
   const optedIn = liveMailAllowed(input.userId);
@@ -127,7 +128,7 @@ export async function deliverRows(
       to: input.email,
       from,
       replyTo: alertReplyTo(),
-      subject: rendered.subject,
+      subject,
       text: rendered.body,
     });
   } catch {

@@ -1741,7 +1741,7 @@ export default function Explorer() {
             {layersOpen ? <button type="button" className="layers-close" onClick={() => setLayersOpen(false)}>Close</button> : null}
           </div>
           {layersOpen ? (
-            <>
+            <div className="layers-body">
               <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
               <label><input type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
               <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
@@ -1761,7 +1761,7 @@ export default function Explorer() {
                 </span>
               </label>
               <p className="layer-meta">A blank stays off a workbook layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</p>
-            </>
+            </div>
           ) : null}
         </aside>
         <div className={`legend ${legendOpen ? "open" : ""}`} onMouseLeave={() => setTip("")}>

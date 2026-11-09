@@ -7,6 +7,7 @@ import Timeline from "./timeline/Timeline";
 import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
+import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
@@ -28,7 +29,6 @@ function websiteLabel(url: string) {
 
 const FOLDER_URL = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/;
 
-type SheetSnap = "peek" | "half" | "full";
 type SheetControl = {
   expanded: boolean;
   snap?: SheetSnap;
@@ -36,69 +36,57 @@ type SheetControl = {
   onSnap?: (snap: SheetSnap) => void;
 };
 
-function nearestSnap(height: number): SheetSnap {
-  const view = window.innerHeight;
-  const stops: { id: SheetSnap; y: number }[] = [
-    { id: "peek", y: Math.min(240, view * 0.32) },
-    { id: "half", y: view * 0.5 },
-    { id: "full", y: view * 0.88 },
-  ];
-  return stops.reduce((best, item) => (Math.abs(item.y - height) < Math.abs(best.y - height) ? item : best)).id;
-}
-
 function SheetHandle({ sheet }: { sheet?: SheetControl }) {
   const drag = useRef<{ y: number; height: number } | null>(null);
-  const dragged = useRef(false);
+  const snap = sheet?.snap ?? "half";
   return (
-    <button
-      className="sheet-handle"
-      type="button"
-      onClick={() => {
-        if (dragged.current) {
-          dragged.current = false;
-          return;
-        }
-        sheet?.onToggle();
-      }}
-      onPointerDown={(event) => {
-        if (!sheet?.onSnap) return;
-        const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
-        if (!drawer) return;
-        drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        const info = drag.current;
-        if (!info) return;
-        const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
-        if (!drawer) return;
-        const next = Math.min(window.innerHeight * 0.92, Math.max(160, info.height + (info.y - event.clientY)));
-        drawer.style.height = `${Math.round(next)}px`;
-        if (Math.abs(info.y - event.clientY) > 8) dragged.current = true;
-      }}
-      onPointerUp={(event) => {
-        const info = drag.current;
-        drag.current = null;
-        const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
-        if (!info || !drawer || !sheet?.onSnap) return;
-        if (Math.abs(info.y - event.clientY) < 12) {
-          drawer.style.height = "";
-          return;
-        }
-        const snap = nearestSnap(drawer.getBoundingClientRect().height);
-        sheet.onSnap(snap);
-        window.requestAnimationFrame(() => {
-          drawer.style.height = "";
-        });
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-        const drawer = document.querySelector(".drawer") as HTMLElement | null;
-        if (drawer) drawer.style.height = "";
-      }}
-    >
-      {sheet?.expanded ? "Show less" : "Show more"}
-    </button>
+    <div className="sheet-handle" data-testid="sheet-handle">
+      {snap === "peek" ? <span className="sheet-step" /> : (
+        <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "less"))}>Show less</button>
+      )}
+      <button
+        type="button"
+        className="sheet-grab"
+        aria-label="Drag sheet"
+        onPointerDown={(event) => {
+          if (!sheet?.onSnap) return;
+          const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
+          if (!drawer) return;
+          drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={(event) => {
+          const info = drag.current;
+          if (!info) return;
+          const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
+          if (!drawer) return;
+          const next = Math.min(window.innerHeight * 0.92, Math.max(140, info.height + (info.y - event.clientY)));
+          drawer.style.height = `${Math.round(next)}px`;
+        }}
+        onPointerUp={(event) => {
+          const info = drag.current;
+          drag.current = null;
+          const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
+          if (!info || !drawer || !sheet?.onSnap) return;
+          if (Math.abs(info.y - event.clientY) < 10) {
+            drawer.style.height = "";
+            return;
+          }
+          sheet.onSnap(nearestSheetSnap(drawer.getBoundingClientRect().height, window.innerHeight));
+          window.requestAnimationFrame(() => {
+            drawer.style.height = "";
+          });
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+          const drawer = document.querySelector(".drawer") as HTMLElement | null;
+          if (drawer) drawer.style.height = "";
+        }}
+      />
+      {snap === "full" ? <span className="sheet-step" /> : (
+        <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "more"))}>Show more</button>
+      )}
+    </div>
   );
 }
 

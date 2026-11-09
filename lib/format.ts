@@ -83,6 +83,13 @@ function roadWord(word: string, index: number) {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
+/** Show an address in title case without dropping or inventing any part of it. */
+export function displayAddress(value?: string | null) {
+  const text = (value || "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  return text.split(" ").map((word, index) => (/^\d+$/.test(word) ? word : roadWord(word, index))).join(" ");
+}
+
 /** Turn a traffic-count label such as "07 MCDOWELL RD" or "S 101" into a plain road name. */
 export function plainRoad(value?: string | null) {
   let text = (value || "").trim().replace(/\s+/g, " ");

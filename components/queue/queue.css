@@ -15,10 +15,10 @@
 .review-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-height: 56px;
-  padding: 8px 14px;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-height: 44px;
+  padding: 6px 12px;
   background: #1e4636;
   color: #faf7f1;
   position: relative;
@@ -38,17 +38,21 @@
   background: transparent;
   color: inherit;
   border-radius: 999px;
-  min-height: 36px;
-  padding: 4px 12px;
+  min-height: 32px;
+  padding: 2px 10px;
+  font-size: 13px;
 }
 .review-bar .primary, .review-done button, .review-toast button { background: #faf7f1; color: #1e4636; border-color: #faf7f1; font-weight: 650; }
 .review-count { display: grid; justify-items: start; line-height: 1.1; text-align: left; color: #faf7f1; }
 .review-kicker { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
-.review-meter { width: 120px; height: 4px; border-radius: 99px; background: rgba(250, 247, 241, 0.25); overflow: hidden; flex: none; }
+.review-meter { width: 72px; height: 4px; border-radius: 99px; background: rgba(250, 247, 241, 0.25); overflow: hidden; flex: none; }
 .review-meter span { display: block; height: 100%; background: #f3d48a; }
-.review-step { min-width: 108px; font-size: 16px; }
-.review-hint { font-size: 12px; opacity: 0.8; }
-.review-exit { margin-left: auto; }
+.review-nav { display: inline-flex; flex: none; gap: 4px; align-items: center; }
+.review-step { min-width: 0; }
+.review-summary { min-width: 0; }
+.review-summary button { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-short { display: none; }
+.review-exit { margin-left: auto; flex: none; }
 .review-filters { position: relative; }
 .review-menu, .queue-pop {
   position: absolute;
@@ -65,8 +69,8 @@
   box-shadow: var(--shadow);
 }
 .review-menu { left: 16px; right: auto; width: min(320px, calc(100vw - 32px)); max-height: min(420px, 52vh); overflow: auto; }
-.review-verbs { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
-.review-verbs button { font-size: 12px; min-height: 28px; padding: 2px 10px; }
+.review-menu-actions { display: grid; gap: 6px; }
+.review-menu-actions .note { margin: 0; color: var(--muted); }
 .queue-pop { left: 0; }
 .queue-pop button.on { background: var(--ink); color: #faf7f1; }
 .review-menu form, .review-menu label, .queue-pop { }
@@ -147,21 +151,39 @@
 .review-sheet-head h2 { margin: 0; font-size: 16px; color: var(--ink); }
 .review-sheet-head button { color: var(--ink); border-color: #8d8376; background: white; }
 @media (max-width: 767px) {
-  .review-hint, .review-kicker, .review-rail { display: none; }
-  .review-bar button.review-step { min-width: 44px; font-size: 0; }
-  .review-bar button.review-step::after { font-size: 18px; }
+  .review-kicker, .review-rail, .review-meter, .review-long { display: none; }
+  .review-short { display: inline; }
+  .review-bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "count summary exit"
+      "nav reviewed more";
+    gap: 6px 8px;
+    align-items: center;
+    min-height: 0;
+    padding: 6px 8px;
+  }
+  .review-count { grid-area: count; }
+  .review-summary { grid-area: summary; }
+  .review-summary button { max-width: 100%; }
+  .review-exit { grid-area: exit; margin-left: 0; justify-self: end; }
+  .review-nav { grid-area: nav; }
+  .review-bar .primary { grid-area: reviewed; justify-self: start; }
+  .review-more { grid-area: more; justify-self: end; }
+  .review-bar button.review-step { min-width: 36px; width: 36px; padding: 0; font-size: 0; }
+  .review-bar button.review-step::after { font-size: 18px; line-height: 1; }
   .review-bar .review-step[aria-label="Previous"]::after { content: "‹"; }
   .review-bar .review-step[aria-label="Next"]::after { content: "›"; }
-  .review-meter { width: 56px; }
   .review-noloc, .review-done { left: 50%; transform: translateX(-50%); }
   .shell.reviewing .map-stage { display: flex; flex-direction: column; }
-  .shell.reviewing .stage-map { position: relative; height: 40%; flex: none; width: 100%; }
+  .shell.reviewing .stage-map { position: relative; height: auto; flex: 1 1 46%; min-height: 180px; width: 100%; }
   .shell.reviewing .drawer {
     position: relative;
-    flex: 1;
+    flex: 1 1 46%;
     width: 100%;
     height: auto;
-    max-height: none;
+    max-height: 54%;
     top: auto;
     right: auto;
     bottom: auto;

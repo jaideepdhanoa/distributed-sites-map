@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { canReview, canWrite, useActionStatus } from "./actions/panel";
 import {
   PERIODS,
@@ -52,10 +52,27 @@ export default function FinancialsPanel({
   const [openRequests, setOpenRequests] = useState<{ id: string; proposedValue: string; ownerName: string | null }[]>([]);
   const writable = canWrite(status.actionRole);
   const reviewer = canReview(status.actionRole);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setPanel(initial);
   }, [initial]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      onClose();
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 767px)").matches;
+    if (phone) closeRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!status.enabled) return undefined;
@@ -146,15 +163,15 @@ export default function FinancialsPanel({
   }
 
   return (
-    <section className="fin-sheet" role="dialog" aria-label="Financials" data-testid="financials-panel">
+    <section className="fin-sheet" role="dialog" aria-modal="true" aria-label="Financials" data-testid="financials-panel">
       <header className="fin-head">
         <h3>Financials</h3>
-        <button type="button" onClick={onClose}>Close</button>
+        <button ref={closeRef} type="button" onClick={onClose}>Close</button>
       </header>
       <p className="fin-headline" data-testid="financials-headline">
         <strong>{shownAmount(panel.headline.text, "Not asked yet")}</strong>
-        {panel.headline.metric ? <span>{panel.headline.metric}</span> : null}
-        {panel.headline.claim ? <em>{panel.headline.claim}</em> : null}
+        {panel.headline.metric ? <span className="fin-metric">{panel.headline.metric}</span> : null}
+        {panel.headline.claim ? <em className="fin-claim">{panel.headline.claim}</em> : null}
       </p>
       {panel.packageLine ? <p>{panel.packageLine}{panel.packageHref ? <> · <a href={panel.packageHref} target="_blank" rel="noopener noreferrer">Open package</a></> : null}</p> : null}
       <div className="fin-switch" role="group" aria-label="Period">
@@ -197,9 +214,11 @@ export default function FinancialsPanel({
         <h3>Broker said, documents show</h3>
         {panel.claims.map((item) => (
           <p key={item.topic}>
-            <span>{item.topic}</span>
-            <small>Broker said {item.broker || stateLine("Not asked yet")}</small>
-            <small>Documents show {item.documents || stateLine("Not asked yet")}</small>
+            <span className="fin-topic">{item.topic}</span>
+            <span className="fin-label">Broker said</span>
+            <strong>{item.broker || stateLine("Not asked yet")}</strong>
+            <span className="fin-label">Documents show</span>
+            <strong>{item.documents || stateLine("Not asked yet")}</strong>
           </p>
         ))}
       </div>
@@ -235,7 +254,7 @@ export default function FinancialsPanel({
           }}
         >
           <h3>Request documents</h3>
-          <p>Stage stays as it is. The map does not email anyone.</p>
+          <p>Pending until approved. Names one owner. Does not email brokers or sellers, and does not change Stage.</p>
           {missing.map((item) => (
             <label key={item.id}>
               <input

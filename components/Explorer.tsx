@@ -19,13 +19,22 @@ import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, type SavedSearch, type Shortlist } from "@/lib/savedSets";
 import { clearHidden, hideSite, readHidden } from "@/lib/hide";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
-import { leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { displayAddress, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
+
+function searchLead(hit: SearchHit) {
+  const address = displayAddress(hit.address);
+  const named = Boolean(hit.title) && hit.title !== hit.id && hit.title !== hit.address;
+  if (named) {
+    return { title: hit.title, address: address && address !== hit.title ? address : "", id: hit.id };
+  }
+  return { title: address || hit.id, address: "", id: address ? hit.id : "" };
+}
 
 const PIPE_STEPS: { id: PipeId; label: string }[] = [
   { id: "desk", label: "Desk screen" },
@@ -1190,7 +1199,7 @@ export default function Explorer() {
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
           <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
-          <button className={filtersOpen ? "on" : ""} type="button" onClick={() => { setFiltersOpen((value) => !value); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
+          <button className={filtersOpen ? "on" : ""} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {searchOpen ? (
           <input className="search mobile-search" aria-label="Search" placeholder="Name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
@@ -1199,18 +1208,20 @@ export default function Explorer() {
           <div className="search-hits" role="listbox" aria-label="Search results" data-testid="search-hits">
             {universeWide || pipelineWide ? (
               <div className="search-wide" data-testid="search-wide">
-                <p className="search-note">No matches in this view. Showing matches from every stage and market.</p>
-                <p className="search-note search-wide-warn">The 0 on this step is this view only. Matches below are from other steps or markets, so the site can still be on the map.</p>
+                <p className="search-note">No matches in this view, showing other stages and markets.</p>
               </div>
             ) : null}
-            {searchHits.length ? searchHits.map((hit) => (
-              <button key={`${hit.kind}-${hit.id}`} type="button" role="option" onClick={() => openHit(hit)}>
-                <span className="hit-title">{hit.title}</span>
-                <span className="hit-address">{hit.address || "Address not on file"}</span>
-                <span className="hit-id">{hit.id}</span>
-                <span className="hit-meta">{[marketName(hit.city), hit.kind === "deal" ? stageTitle(hit.stage) : (STEPS.find((step) => step.id === hit.stage)?.label || "Universe")].filter(Boolean).join(" · ")}</span>
-              </button>
-            )) : <p className="search-note">No matches.</p>}
+            {searchHits.length ? searchHits.map((hit) => {
+              const lead = searchLead(hit);
+              return (
+                <button key={`${hit.kind}-${hit.id}`} type="button" role="option" onClick={() => openHit(hit)}>
+                  <span className="hit-title">{lead.title}</span>
+                  {lead.address ? <span className="hit-address">{lead.address}</span> : null}
+                  <span className="hit-meta">{[marketName(hit.city), hit.kind === "deal" ? stageTitle(hit.stage) : (STEPS.find((step) => step.id === hit.stage)?.label || "Universe")].filter(Boolean).join(" · ")}</span>
+                  {lead.id ? <span className="hit-id">{lead.id}</span> : null}
+                </button>
+              );
+            }) : <p className="search-note">No matches.</p>}
           </div>
         ) : null}
         <div className="funnel-row">
@@ -1335,7 +1346,7 @@ export default function Explorer() {
             {summaryText()}
           </span>
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
-          <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => !value); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
+          <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
             {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
           </button>
@@ -1474,7 +1485,9 @@ export default function Explorer() {
               <button className={funnel === "universe" ? "on" : ""} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
               <button className={funnel === "pipeline" ? "on" : ""} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
             </div>
-            <button type="button" onClick={() => { setFiltersOpen(true); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
+            <div className="menu-group" role="group" aria-label="Find">
+              <button type="button" onClick={() => { setFiltersOpen(true); setLayersOpen(false); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
+            </div>
             <div className="menu-overlays" role="group" aria-label="Workbook overlays">
               {OVERLAYS.map((item) => (
                 <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "on" : ""} onClick={() => toggleOverlay(item.id)}>
@@ -1482,24 +1495,28 @@ export default function Explorer() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => { setLayersOpen(true); setMenuOpen(false); }}>Layers</button>
-            <button type="button" onClick={() => { setLegendOpen(true); setMenuOpen(false); }}>Legend</button>
-            <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
-            <button type="button" onClick={exportTable}>Export CSV</button>
-            <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
-            <ActionsMenuButtons close={() => setMenuOpen(false)} />
-            <button type="button" onClick={() => { write({ view: listView ? null : "list", review: null, i: null }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
-            {me?.actionsEnabled ? (
-              <button type="button" onClick={() => { write({ review: "1", i: "1", view: null, table: null }); setMenuOpen(false); }}>Review{queueCount ? ` (${queueCount})` : ""}</button>
-            ) : null}
-            <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
-            {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
-            ) : null}
+            <div className="menu-group" role="group" aria-label="Tools">
+              <button type="button" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+              <button type="button" onClick={() => { setLegendOpen(true); setMenuOpen(false); }}>Legend</button>
+              <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }}>{tableOpen ? "Hide table" : "Table"}</button>
+              <button type="button" onClick={exportTable}>Export CSV</button>
+              <button type="button" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy link"}</button>
+              <ActionsMenuButtons close={() => setMenuOpen(false)} />
+              <button type="button" onClick={() => { write({ view: listView ? null : "list", review: null, i: null }); setMenuOpen(false); }}>{listView ? "Map" : "List"}</button>
+              {me?.actionsEnabled ? (
+                <button type="button" onClick={() => { write({ review: "1", i: "1", view: null, table: null }); setMenuOpen(false); }}>Review{queueCount ? ` (${queueCount})` : ""}</button>
+              ) : null}
+              <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }}>How to read this</button>
+              {funnel === "pipeline" && unplacedDeals.length > 0 ? (
+                <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }}>Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
+              ) : null}
+            </div>
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
-            <p className="menu-note">{me?.u}</p>
-            {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
-            <button type="button" onClick={logout}>Sign out</button>
+            <div className="menu-group menu-account">
+              {me?.u ? <p className="menu-note menu-identity"><span>Signed in</span>{me.u}</p> : null}
+              {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
+              <button type="button" onClick={logout}>Sign out</button>
+            </div>
           </div>
         ) : null}
         {withheldOpen ? (
@@ -1550,7 +1567,6 @@ export default function Explorer() {
           onExit={() => write({ review: null, i: null })}
           onOpenFeed={() => setFeedSheet(true)}
           onSnooze={snoozeCurrent}
-          onNotFit={() => { if (reviewCurrent?.siteId) setHiddenIds(hideSite(reviewCurrent.siteId)); }}
           filters={(
             <FilterPopover
               summary={filterSummary}
@@ -1705,7 +1721,7 @@ export default function Explorer() {
           />
         ) : null}
         <aside className={`layers ${layersOpen ? "open" : ""}`}>
-          <button type="button" onClick={() => setLayersOpen((value) => !value)}>{layersOpen ? "Hide layers" : "Layers"}</button>
+          <button type="button" onClick={() => setLayersOpen((value) => { const next = !value; if (next) setFiltersOpen(false); return next; })}>{layersOpen ? "Hide layers" : "Layers"}</button>
           {layersOpen ? (
             <>
               <label><input type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>

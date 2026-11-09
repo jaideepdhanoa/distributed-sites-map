@@ -50,10 +50,7 @@ function mapsLinks(
         <a href={`https://www.google.com/maps/search/?api=1&query=${point}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
       ) : null}
       {street ? (
-        <>
-          {hasMap ? " · " : null}
-          <a href={street} target="_blank" rel="noopener noreferrer" data-testid="street-view-link">Street View</a>
-        </>
+        <a href={street} target="_blank" rel="noopener noreferrer" data-testid="street-view-link">Street View</a>
       ) : null}
       {showListing && cue ? (
         cue.url ? (
@@ -141,7 +138,11 @@ export default function Detail({
       {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
       <p className="note">{site.address || "—"}</p>
       <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
-      {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
+      <div className="card-actions">
+        {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
+        {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+        {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
@@ -153,8 +154,6 @@ export default function Detail({
       <SitePhotos card={photos} />
       {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
       {related}
-      {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
-      {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
         overview={
@@ -387,14 +386,16 @@ export function DealDetail({
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
-      {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
-      {onCompare ? (
-        <label className="compare-check">
-          <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
-          Compare
-        </label>
-      ) : null}
-      {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+      <div className="card-actions">
+        {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
+        {onCompare ? (
+          <label className="compare-check">
+            <input type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
+            Compare
+          </label>
+        ) : null}
+        {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+      </div>
       <SitePhotos card={photos} />
       {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
       {related}

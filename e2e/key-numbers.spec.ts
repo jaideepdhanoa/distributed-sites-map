@@ -3,9 +3,12 @@ import { cityPipelineCounts } from "./pipeline-counts";
 
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {
   const desk = cityPipelineCounts("PHX");
+  const withStores = cityPipelineCounts("PHX", { cstore: true });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list");
   await page.waitForSelector("[data-testid=pipeline-list]");
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(desk.deskTotal));
+  await page.goto("/?funnel=pipeline&pstage=desk&view=list&cstore=1");
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(withStores.deskTotal));
   await expect(page.locator(".no-pin").filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByTestId("summary-row")).toContainText("Median asking");
 

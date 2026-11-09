@@ -1,6 +1,27 @@
 import { expect, test } from "@playwright/test";
 import { cityPipelineCounts } from "./pipeline-counts";
 
+test("satellite is the default basemap and a switch is remembered", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!window.sessionStorage.getItem("basemap-init")) {
+      window.localStorage.removeItem("basemap");
+      window.sessionStorage.setItem("basemap-init", "1");
+    }
+  });
+  await page.goto("/?funnel=pipeline&pstage=desk");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await page.locator(".map-chrome").evaluate((el: HTMLDetailsElement) => { el.open = true; });
+  const chooser = page.getByTestId("basemap");
+  await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
+  await chooser.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
+  await page.reload();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
+  await page.evaluate(() => window.localStorage.removeItem("basemap"));
+  await page.goto("/?review=1");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+});
+
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {
   const desk = cityPipelineCounts("PHX");
   const withStores = cityPipelineCounts("PHX", { cstore: true });

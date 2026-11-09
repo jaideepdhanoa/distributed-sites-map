@@ -491,7 +491,7 @@ export default function MapView(props: Props) {
     let observer: ResizeObserver | null = null;
     let cancelled = false;
     const boot = async () => {
-    const basemap = propsRef.current.basemap || "positron";
+    const basemap = propsRef.current.basemap || "satellite";
     let style: StyleSpecification | string = satelliteStyle;
     if (basemap !== "satellite") {
       try {
@@ -533,7 +533,7 @@ export default function MapView(props: Props) {
             const d = kind === "circle" ? Math.hypot(dx, dy) : Math.abs(dx) + Math.abs(dy);
             const limit = kind === "circle" ? 11.5 : 13;
             inside = d <= limit;
-            edge = inside && d >= limit - 2.4;
+            edge = inside && d >= limit - 3.4;
           }
           if (!inside) continue;
           const i = (y * size + x) * 4;
@@ -754,15 +754,52 @@ export default function MapView(props: Props) {
         if (points.current.length >= 3) setReadout(`${acresOf(points.current).toFixed(2)} acres`);
         else if (points.current.length === 2) setReadout("Add points, then read acres");
       });
-      if (propsRef.current.basemap !== "satellite") {
-        if (map.getLayer("area-labels")) {
-          map.setPaintProperty("area-labels", "text-color", "#5b554b");
-          map.setPaintProperty("area-labels", "text-halo-color", "#f6f3ec");
+      const satelliteOn = (propsRef.current.basemap || "satellite") === "satellite";
+      const paint = (id: string, prop: "circle-color" | "circle-opacity" | "circle-stroke-color" | "circle-stroke-opacity" | "circle-stroke-width" | "fill-opacity" | "line-color" | "line-width" | "text-color" | "text-halo-color" | "text-halo-width", value: string | number) => {
+        if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
+      };
+      if (!satelliteOn) {
+        paint("area-labels", "text-color", "#5b554b");
+        paint("area-labels", "text-halo-color", "#f6f3ec");
+        paint("depot-labels", "text-color", "#1d4e89");
+        paint("depot-labels", "text-halo-color", "#fffdf8");
+      } else {
+        paint("areas-op", "fill-opacity", 0.14);
+        paint("areas-op-line", "line-color", "#f4efe6");
+        paint("areas-op-line", "line-width", 2);
+        for (const id of ["tier-large", "tier-small"]) {
+          paint(id, "circle-stroke-color", "#fffdf8");
+          paint(id, "circle-stroke-width", 2);
         }
-        if (map.getLayer("depot-labels")) {
-          map.setPaintProperty("depot-labels", "text-color", "#1d4e89");
-          map.setPaintProperty("depot-labels", "text-halo-color", "#fffdf8");
+        for (const id of ["tier-large-halo", "tier-small-halo"]) {
+          paint(id, "circle-stroke-color", "#1c1914");
+          paint(id, "circle-stroke-width", 3);
+          paint(id, "circle-stroke-opacity", 0.9);
         }
+        paint("selected-halo", "circle-opacity", 0);
+        paint("selected-halo", "circle-stroke-color", "#1c1914");
+        paint("selected-halo", "circle-stroke-width", 6);
+        paint("selected", "circle-stroke-color", "#fffdf8");
+        paint("selected", "circle-stroke-width", 3);
+        paint("deal-halo", "circle-opacity", 0);
+        paint("deal-halo", "circle-stroke-color", "#1c1914");
+        paint("deal-halo", "circle-stroke-width", 6);
+        paint("deal-ring", "circle-stroke-color", "#fffdf8");
+        paint("deal-ring", "circle-stroke-width", 3);
+        paint("clusters", "circle-stroke-width", 3);
+        paint("clusters-halo", "circle-opacity", 0.5);
+        paint("clusters-halo", "circle-stroke-color", "#fffdf8");
+        paint("clusters-halo", "circle-stroke-width", 2);
+        paint("deal-pills", "text-halo-color", "#fffdf8");
+        paint("deal-pills", "text-halo-width", 4);
+        paint("deal-site-badge", "text-halo-width", 1.6);
+        paint("unscreened", "circle-stroke-width", 3);
+        paint("missing-parcel", "circle-stroke-color", "#f3d48a");
+        paint("missing-parcel", "circle-stroke-width", 3);
+        paint("missing-parcel-deals", "circle-stroke-color", "#f3d48a");
+        paint("missing-parcel-deals", "circle-stroke-width", 3);
+        paint("review-marks", "circle-stroke-width", 3);
+        paint("offmarket-selected", "circle-stroke-width", 3);
       }
       map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
       propsRef.current.onBounds(map.getBounds());
@@ -788,7 +825,7 @@ export default function MapView(props: Props) {
 
   const reviewFocusRef = useRef(props.reviewFocus);
   reviewFocusRef.current = props.reviewFocus;
-  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom},${props.basemap || "positron"}`;
+  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom},${props.basemap || "satellite"}`;
   const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");
   const appliedReview = useRef("");
@@ -830,10 +867,10 @@ export default function MapView(props: Props) {
           type: "circle",
           source: "queue-dots",
           paint: {
-            "circle-radius": 3.5,
-            "circle-color": "#8d7350",
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#f7f3ea",
+            "circle-radius": (props.basemap || "satellite") === "satellite" ? 4 : 3.5,
+            "circle-color": (props.basemap || "satellite") === "satellite" ? "#1c1914" : "#8d7350",
+            "circle-stroke-width": (props.basemap || "satellite") === "satellite" ? 2 : 1,
+            "circle-stroke-color": "#fffdf8",
             "circle-translate": [8, -8],
           },
         });
@@ -1220,15 +1257,15 @@ export default function MapView(props: Props) {
   }, [mapGeneration, props.reviewMarkers]);
 
   return (
-      <div className="stage-map" data-basemap={props.basemap || "positron"}>
+      <div className="stage-map" data-basemap={props.basemap || "satellite"}>
       <div ref={node} className="map" />
       <div className="map-tools">
         <details className="map-chrome">
           <summary>Map tools</summary>
         <div className="pin-label" role="group" aria-label="Basemap" data-testid="basemap">
           <span>Base</span>
-          <button className={(props.basemap || "positron") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
-          <button className={props.basemap === "satellite" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
+          <button className={(props.basemap || "satellite") === "positron" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("positron")}>Map</button>
+          <button className={(props.basemap || "satellite") === "satellite" ? "on" : ""} type="button" onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
         </div>
         <div className="pin-label" role="group" aria-label="Pin label" data-testid="pin-label">
           <span>Pin label</span>
@@ -1269,7 +1306,7 @@ export default function MapView(props: Props) {
         </details>
       </div>
       {coverageText ? <p className="map-coverage" data-testid="map-coverage">{coverageText}</p> : null}
-      <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
+      <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
     </div>
   );
 }

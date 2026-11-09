@@ -212,7 +212,7 @@ export default function Explorer() {
   const pipelineColumns = parseColumns(params.get("cols"));
   const pillParam = params.get("pill");
   const [rememberedPill, setRememberedPill] = useState<PinLabel>("none");
-  const [basemap, setBasemap] = useState<"positron" | "satellite">("positron");
+  const [basemap, setBasemap] = useState<"positron" | "satellite">("satellite");
   const pinLabel: PinLabel = pillParam === "asking" || pillParam === "acres" || pillParam === "peracre" || pillParam === "none"
     ? pillParam
     : rememberedPill;

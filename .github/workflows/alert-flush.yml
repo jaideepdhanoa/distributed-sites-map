@@ -1,10 +1,14 @@
 name: Alert flush
 
-# GitHub may start this later than the five-minute mark. The flush itself is idempotent.
+# No path filter and no concurrency group. GitHub may start this later than the five-minute mark.
+# The flush itself is idempotent. Schedule runs only after this file is on the default branch.
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   flush:

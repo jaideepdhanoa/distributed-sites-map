@@ -5,6 +5,7 @@ export type AuthUser = {
   roleLabel: string;
   actionRole: "viewer" | "contributor" | "reviewer" | null;
   displayName: string;
+  email: string;
 };
 
 const ACTION = new Set(["viewer", "contributor", "reviewer"]);
@@ -31,7 +32,9 @@ export function getUsers(): AuthUser[] {
     const actionRole = ACTION.has(explicit) ? (explicit as AuthUser["actionRole"]) : ACTION.has(roleLabel) ? (roleLabel as AuthUser["actionRole"]) : null;
     const named = String(row.name ?? row.displayName ?? "").trim();
     const displayName = named || u;
-    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole, displayName });
+    const emailRaw = String(row.email ?? "").trim().toLowerCase();
+    const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : "";
+    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole, displayName, email });
   }
   return users;
 }

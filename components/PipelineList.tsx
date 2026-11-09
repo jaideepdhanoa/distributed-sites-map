@@ -87,6 +87,7 @@ export default function PipelineList({
   onColumns,
   onResetColumns,
   onRanges,
+  unreadIds,
 }: {
   rows: PipelineRow[];
   columns: PipelineColumnId[];
@@ -101,7 +102,9 @@ export default function PipelineList({
   onColumns: (next: PipelineColumnId[]) => void;
   onResetColumns: () => void;
   onRanges: (next: RangeFilter) => void;
+  unreadIds?: string[];
 }) {
+  const unread = new Set(unreadIds || []);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const maxOpen = Math.max(1, ...rows.map((row) => row.deal.open_land_sqft || 0));
   const summary = useMemo(() => summaryOf(rows.map((row) => row.deal)), [rows]);
@@ -233,6 +236,7 @@ export default function PipelineList({
                         <span className="capacity-cell" title={factsForDeal(row.deal).map((fact) => fact.basis).filter(Boolean).join(" · ")}>{cell(row, column)}</span>
                       ) : column === "site" ? (
                         <span className="site-name">
+                          {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                           <span className="site-name-text">{cell(row, column)}</span>
                           <ListingIcon deal={row.deal} />
                         </span>
@@ -253,7 +257,7 @@ export default function PipelineList({
           {ordered.map((row) => (
             <li key={row.deal.deal_id}>
               <button type="button" className={row.deal.deal_id === selectedId ? "on" : ""} onClick={() => onOpen(row.deal.deal_id)}>
-                <strong>{row.deal.name || row.deal.address}</strong>
+                <strong>{unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}{row.deal.name || row.deal.address}</strong>
                 <span>{dealAsking(row)} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
                 <span>
                   {row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"}

@@ -28,6 +28,13 @@ Set these in Vercel. A change applies on the next deployment.
 | `KV_REST_API_TOKEN` | yes on Vercel | Pair to the URL above. |
 | `UPSTASH_REDIS_REST_URL` | alternative | Used when `KV_REST_API_URL` is unset. |
 | `UPSTASH_REDIS_REST_TOKEN` | alternative | Pair to the Upstash URL. |
+| `RESEND_API_KEY` | for live mail | Resend API key. Mail is sent from `moove.dhanoa.in`. |
+| `ALERT_FROM` | with Resend | `Distributed Infra <alerts@moove.dhanoa.in>` |
+| `ALERT_REPLY_TO` | no | Reply-To. Defaults to `jaideep@dhanoa.in`. |
+| `ALERT_EMAILS` | no | JSON map of username to mailbox. Overrides the optional `email` on an account. |
+| `SMTP_USER` | fallback | Gmail address, used only when `RESEND_API_KEY` is unset. |
+| `SMTP_PASS` | fallback | Google app password for that mailbox. |
+| `CRON_SECRET` | for the digest | Bearer token Vercel Cron sends to the alert routes. |
 
 Planned accounts, none created here: `jaideep` (admin), `cindel`, `ming`, `ricardo`, `yuka`, `muse`, `indie`. Admin only opens the accounts page. Everyone else sees the same map.
 
@@ -73,11 +80,62 @@ The owner of a next step, or a reviewer, can mark it Done. That is recorded in t
 
 ### Review queue
 
-Queue sits next to Map and List. It lists pipeline sites with something new since you last marked that site reviewed. The first time through, every active pipeline site is shown as new, and Mark all reviewed clears that baseline. Build changes are stored in `data/generated/queue_changes.json`. Notes, replies, and next-step decisions are stored in the database. There is no email.
+Queue sits next to Map and List. It lists pipeline sites with something new since you last marked that site reviewed. The first time through, every active pipeline site is shown as new, and Mark all reviewed clears that baseline. Build changes are stored in `data/generated/queue_changes.json`. Notes, replies, and next-step decisions are stored in the database. Mail is described under Alerts.
 
 Typing @ in a note, a reply, or a next-step title opens the account list. The chosen account is stored as an id and shown as a chip. That person gets a Mentioned you item at the top of their queue. Marking the site reviewed, or opening the thread, clears it. The Mentions filter shows only those items.
 
 The next-step owner is the assignment. Assigned to me lists open and approved steps you own, with their target dates.
+
+Review opens with Needs my approval, then Mentions, then Assigned. A pipeline deal marked as a c-store stays out of that default list. An open approval on it still shows.
+
+### C-stores
+
+The workbook Segment column is free text, and the generated business type folds c-stores into Gas station. During the data build, a pipeline deal gets `is_c_store` when Segment or the deal name contains "c-store" (any case) or a branded token such as ampm. A segment that is only "Gas station" does not qualify. Land rows stay on the land layer and are not flagged. The workbook is not edited.
+
+Those deals are hidden on the map, the list, the counts, and the default Review queue until the C-stores filter is on (`cstore=1`). Search still finds one by name or id. Open approvals on a hidden c-store stay in Needs my approval.
+
+### Alerts
+
+Instant mail goes only to the person involved:
+
+- an open next-step proposal or document request waiting for their approval
+- an @mention
+- a reply on a thread they wrote or were mentioned in
+- a flag or an assignment to them
+
+A burst for one person is held until it has been quiet for about five minutes, then sent as one email. The person who took the action is not mailed about it.
+
+The daily digest runs at 7:00 AM America/Los_Angeles. It covers other notes and proposals on sites the person follows, plus the count waiting in their Review queue. Nothing is sent when there is nothing to report. Vercel Cron calls `/api/alerts/flush` every five minutes and `/api/alerts/digest` every hour. The digest route sends only during that 7:00 AM hour. Set `CRON_SECRET` to a long random string. Cron requests must send it as `Authorization: Bearer <CRON_SECRET>`.
+
+A link opens the site's Discussion tab or Review, for example `/?view=review&site=PIPE-...`, and the map still requires sign-in. The message shows the site name or id, the type, a short note, and the author. It does not include a package link or a financial figure. Subject and body go through the same wording check as the map.
+
+Only app accounts are mailed. Add an optional `email` on that person's `AUTH_USERS` object, or set `ALERT_EMAILS` so the password hash does not have to be rebuilt:
+
+```json
+{"cindel":"cindel.pena@moove.io","jaideep":"jaideep@dhanoa.in"}
+```
+
+`cindel` should be `cindel.pena@moove.io`. `jaideep` should be `jaideep@dhanoa.in`. An address that is not mapped to an app account is not used. Brokers and sellers are not mailed.
+
+The account menu opens a settings sheet. Each of approvals, mentions, replies, flags, and assignments can be Instant, Digest, or Off. The daily digest can be on or off. A reviewer starts with instant approvals, mentions, flags, and assignments, and the digest on. A contributor starts with instant mentions, flags, and assignments, and the digest on. A viewer starts with mentions only, and the digest off. Replies follow mentions for a reviewer or contributor, and stay off for a viewer.
+
+#### Resend
+
+Resend is the sender. Mail comes from the verified subdomain `moove.dhanoa.in`.
+
+1. In Resend, add the domain `moove.dhanoa.in`.
+2. Add the SPF, DKIM, and DMARC DNS records Resend lists for that domain.
+3. Wait until Resend marks the domain verified.
+4. In Vercel, set `RESEND_API_KEY` to the Resend API key.
+5. Set `ALERT_FROM` to `Distributed Infra <alerts@moove.dhanoa.in>`.
+
+Replies go to `jaideep@dhanoa.in`. Set `ALERT_REPLY_TO` only to use a different reply address.
+
+Gmail is an optional fallback, used only when `RESEND_API_KEY` is unset. Set `SMTP_USER` to `jaideep@dhanoa.in` and `SMTP_PASS` to a Google app password. The host is `smtp.gmail.com`, port 465, with TLS. An app password requires 2-Step Verification on that Google account. Turn that on, then create the password at [App passwords](https://myaccount.google.com/apppasswords). Use the 16-character password, not the normal account password.
+
+If neither transport is configured, the action still saves. The app records a would-send row and does not throw. An admin can read those rows at `/admin/alerts` before mail is live.
+
+Sends stop at 400 in a Pacific day. The log keeps a warning, and that delivery is not sent again. Each delivery has an idempotency key.
 
 Failed attempts are counted for unknown usernames as well as known ones, with the same message. A separate Redis counter limits attempts per IP (10 in 15 minutes). A username locks after 5 failures in 15 minutes.
 

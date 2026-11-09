@@ -234,6 +234,72 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   expect(await after.text()).toBe(beforeBody);
 });
 
+test("c-stores stay hidden until the filter is on, and review leads with approvals", async ({ page, request }) => {
+  await mkdir("/opt/cursor/artifacts", { recursive: true });
+  await openAs(page, "reviewer", "/?funnel=pipeline&pstage=desk&view=list");
+  await expect(page.getByTestId("pipeline-list")).toBeVisible();
+  await expect(page.getByTestId("pipeline-list")).not.toContainText("Sinclair");
+  await page.screenshot({ path: "/opt/cursor/artifacts/cstore-hidden-list.png" });
+  await page.locator("button.tool", { hasText: "Filters" }).click();
+  await page.getByTestId("cstore-toggle").click();
+  await expect(page).toHaveURL(/cstore=1/);
+  const sinclair = page.getByTestId("pipeline-list").getByText("Sinclair").first();
+  await expect(sinclair).toBeVisible();
+  await sinclair.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/opt/cursor/artifacts/cstore-shown-list.png" });
+
+  await login(request, "contributor");
+  const mention = await request.post("/api/actions/notes", {
+    data: { targetKind: "deal", targetId: "PIPE-PHX-0008", body: "Please look at the frontage.", mentions: ["reviewer"] },
+  });
+  expect(mention.ok()).toBeTruthy();
+  const approval = await request.post("/api/actions/suggestions", {
+    data: {
+      targetKind: "deal",
+      targetId: "PIPE-LAS-0016",
+      field: "proposed_next_step",
+      title: "Confirm the spare land",
+      targetOn: "2026-11-20",
+      ownerId: "reviewer",
+    },
+  });
+  expect(approval.ok()).toBeTruthy();
+
+  await openAs(page, "reviewer", "/?review=1&qmarket=all&qviable=0");
+  const firstCard = page.getByTestId("review-rail").locator("button").first();
+  await expect(firstCard).toContainText("Wash N Go");
+  await page.screenshot({ path: "/opt/cursor/artifacts/review-order.png" });
+
+  await page.goto("/?funnel=pipeline&pstage=desk");
+  await page.getByRole("button", { name: /Account menu/ }).click();
+  await page.getByRole("menuitem", { name: "Alerts" }).click();
+  const settings = page.getByTestId("alert-settings");
+  await expect(settings).toBeVisible();
+  await expect(settings).toContainText("Approvals");
+  await expect(settings).toContainText("Instant");
+  await settings.screenshot({ path: "/opt/cursor/artifacts/alert-settings.png" });
+});
+
+test("a mention with no mail credentials is logged as would-send", async ({ page, request }) => {
+  await login(request, "contributor");
+  const response = await request.post("/api/actions/notes", {
+    data: {
+      targetKind: "deal",
+      targetId: deal,
+      body: "Please look at the frontage.",
+      mentions: ["reviewer"],
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  await openAs(page, "reviewer", "/admin/alerts");
+  const preview = page.getByTestId("alert-preview");
+  await expect(preview).toContainText("would-send");
+  await expect(preview).toContainText(deal);
+  await expect(preview).toContainText("Please look at the frontage.");
+  await mkdir("/opt/cursor/artifacts", { recursive: true });
+  await page.screenshot({ path: "/opt/cursor/artifacts/alert-would-send.png" });
+});
+
 test("a saved view round-trips the current link", async ({ request }) => {
   await login(request, "viewer");
   const saved = await request.post("/api/actions/views", {

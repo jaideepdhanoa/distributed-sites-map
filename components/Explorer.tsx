@@ -23,6 +23,8 @@ import { displayAddress, leadSourceLine, plainRoad, shownBroker, shownFirm, show
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import AlertSettings from "./alerts/AlertSettings";
+import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
@@ -139,6 +141,7 @@ export default function Explorer() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
@@ -159,6 +162,7 @@ export default function Explorer() {
   const verdict = params.get("verdict") || "any";
   const listed = params.get("listed") || "any";
   const landSites = params.get("land") === "1";
+  const showCStores = params.get("cstore") === "1";
   const query = params.get("q") || "";
   useEffect(() => {
     if (!searchFocused.current) setQueryDraft(query);
@@ -184,7 +188,7 @@ export default function Explorer() {
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
-  const reviewing = params.get("review") === "1";
+  const reviewing = params.get("review") === "1" || params.get("view") === "review";
   const queueMarket = params.get("qmarket") || city;
   const queueStage = params.get("qstage") || (funnel === "pipeline" ? pipeStage : "any");
   const queueViable = params.get("qviable") !== "0";
@@ -509,6 +513,12 @@ export default function Explorer() {
     return matchesQuery(query, dealSearchParts(deal));
   }
 
+  function cStoreHidden(deal: DealProps, wide: boolean) {
+    if (!deal.is_c_store || showCStores || wide) return false;
+    if (selected === deal.deal_id) return false;
+    return true;
+  }
+
   function inDealMarket(deal: DealProps, wide: boolean) {
     if (wide || allCities) return true;
     const feature = dealFeatures.find((item) => item.properties.deal_id === deal.deal_id);
@@ -519,6 +529,7 @@ export default function Explorer() {
   const localDealMatches = query
     ? dealRows.filter((deal) => {
         if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
+        if (cStoreHidden(deal, false)) return false;
         if (!inDealMarket(deal, false)) return false;
         if (!allPipes && !who && deal.stage_group !== pipeStage) return false;
         if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
@@ -536,6 +547,7 @@ export default function Explorer() {
 
   const pipelineDeals = dealRows.filter((deal) => {
     if (deal.kind !== "pipeline") return false;
+    if (cStoreHidden(deal, pipelineWide)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
     if (!dealWide && deal.stage_group !== pipeStage) return false;
@@ -776,6 +788,7 @@ export default function Explorer() {
   function countLiveContactedDeals() {
     return dealRows.filter((deal) => {
       if (!isLiveContactedDeal(deal) || (!allCities && deal.city !== city)) return false;
+      if (cStoreHidden(deal, false)) return false;
       if (!typeOn(deal.business_type || "Other")) return false;
       if (!query) return true;
       return dealQueryHit(deal);
@@ -912,7 +925,7 @@ export default function Explorer() {
   }
 
   const sheet = { expanded: sheetExpanded, onToggle: () => setSheetExpanded((value) => !value) };
-  const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !dealPoint(deal));
+  const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !dealPoint(deal) && !cStoreHidden(deal, false));
   const offMarketPool = universeWide && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
     if (!feature.geometry) return false;
@@ -1015,6 +1028,7 @@ export default function Explorer() {
   if (verdict !== "any") activeFilters.push({ id: "verdict", label: plainVerdict(verdict), clear: () => write({ verdict: null }) });
   if (listed === "yes") activeFilters.push({ id: "listed", label: "Listed", clear: () => write({ listed: null }) });
   if (landSites) activeFilters.push({ id: "land", label: "Land sites", clear: () => write({ land: null }) });
+  if (showCStores) activeFilters.push({ id: "cstore", label: "C-stores", clear: () => write({ cstore: null }) });
   if (compare) activeFilters.push({ id: "compare", label: "Reviews disagree", clear: () => write({ disagree: null }) });
   if (showDropped) activeFilters.push({ id: "ruled", label: "Ruled out", clear: () => write({ ruled: null }) });
   if (extra === "held") activeFilters.push({ id: "held", label: "Held outside the service area", clear: () => write({ extra: null }) });
@@ -1035,13 +1049,14 @@ export default function Explorer() {
     setFiltersOpen(false);
     setMoreOpen(false);
     setUserOpen(false);
+    setAlertsOpen(false);
     setMenuOpen(false);
     setUnplacedOpen(false);
   }
 
   function summaryText() {
     if (funnel === "pipeline") {
-    const deals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city));
+    const deals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !cStoreHidden(deal, false));
     const land = dealRows.filter((deal) => deal.kind === "land" && (allCities || deal.city === city));
       const activeDeals = deals.filter((deal) => deal.stage_group !== "dropped").length;
       const droppedDeals = deals.length - activeDeals;
@@ -1123,6 +1138,7 @@ export default function Explorer() {
       ? { lng: reviewCoords[0], lat: reviewCoords[1], zoom: 15.5 }
       : { lng: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[0], lat: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[1], zoom: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).zoom })
     : null;
+  const openQueueIds = feed.filter((site) => site.status === "open").map((site) => site.siteId);
   const reviewMarkers = reviewing ? visibleFeed.flatMap((site, index) => {
     const deal = dealRows.find((row) => row.deal_id === site.siteId);
     const point = (deal ? dealPoint(deal) : null) || (site.lng != null && site.lat != null ? [site.lng, site.lat] as [number, number] : null);
@@ -1132,9 +1148,10 @@ export default function Explorer() {
 
   return (
     <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
-      {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen) ? (
+      {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
+      {alertsOpen ? <AlertSettings onClose={() => setAlertsOpen(false)} /> : null}
       <header className="bar">
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
@@ -1176,6 +1193,8 @@ export default function Explorer() {
               <div className="menu" role="menu">
                 <p className="menu-note">{me?.u}</p>
                 {me?.role === "admin" ? <a role="menuitem" href="/admin">Accounts</a> : null}
+                {me?.u ? <button type="button" role="menuitem" onClick={() => { setAlertsOpen(true); setUserOpen(false); }}>Alerts</button> : null}
+                {me?.role === "admin" ? <a role="menuitem" href="/admin/alerts">Alert preview</a> : null}
                 <button type="button" role="menuitem" onClick={logout}>Sign out</button>
               </div>
             ) : null}
@@ -1244,6 +1263,7 @@ export default function Explorer() {
                     <span>All</span>
                     <strong>{dealRows.filter((deal) => {
                       if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
+                      if (cStoreHidden(deal, false)) return false;
                       if (!allCities && deal.city !== city) return false;
                       if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
                       if (!typeOn(deal.business_type || "Other")) return false;
@@ -1285,6 +1305,7 @@ export default function Explorer() {
             }) : PIPE_STEPS.map((step, index) => {
               const rows = dealRows.filter((deal) => {
                 if (deal.kind !== "pipeline" || deal.stage_group !== step.id) return false;
+                if (cStoreHidden(deal, false)) return false;
                 if (!allCities && deal.city !== city) return false;
                 if (!typeOn(deal.business_type || "Other")) return false;
                 if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
@@ -1470,6 +1491,14 @@ export default function Explorer() {
                 </div>
               </>
             ) : null}
+            {funnel === "pipeline" ? (
+              <>
+                <h3>Deals</h3>
+                <div className="chips">
+                  <button className={showCStores ? "on" : ""} type="button" data-testid="cstore-toggle" onClick={() => write({ cstore: showCStores ? null : "1" })}>C-stores</button>
+                </div>
+              </>
+            ) : null}
           </div>
         ) : null}
         {menuOpen ? (
@@ -1515,6 +1544,8 @@ export default function Explorer() {
             <div className="menu-group menu-account">
               {me?.u ? <p className="menu-note menu-identity"><span>Signed in</span>{me.u}</p> : null}
               {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
+              {me?.u ? <button type="button" onClick={() => { setAlertsOpen(true); setMenuOpen(false); }}>Alerts</button> : null}
+              {me?.role === "admin" ? <a href="/admin/alerts">Alert preview</a> : null}
               <button type="button" onClick={logout}>Sign out</button>
             </div>
           </div>
@@ -1638,6 +1669,7 @@ export default function Explorer() {
           focusLat={focus.center[1]}
           focusZoom={focus.zoom}
           reviewMarkers={reviewMarkers}
+          queueIds={openQueueIds}
           reviewFocus={reviewFocus}
           pinLabel={pinLabel}
           onPinLabel={setPinLabel}
@@ -1691,6 +1723,7 @@ export default function Explorer() {
         {listView && funnel === "pipeline" ? (
           <PipelineList
             rows={pipelineRows}
+            unreadIds={openQueueIds}
             columns={pipelineColumns}
             selectedId={selected}
             compareIds={compareIds}
@@ -1729,6 +1762,7 @@ export default function Explorer() {
               <label><input type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
               <label><input type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
               <label><input type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land Sites</label>
+              <label><input type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
               <label><input type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
               <label><input type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
               <label>

@@ -31,10 +31,12 @@ export type QueueFilters = {
 };
 
 function rank(row: QueueRow): number {
-  if (row.flagged || row.mentioned) return 0;
-  if (row.needsApproval) return 1;
-  if (row.isNew) return 2;
-  return 3;
+  if (row.needsApproval) return 0;
+  if (row.mentioned) return 1;
+  if (row.assigned) return 2;
+  if (row.flagged) return 3;
+  if (row.isNew) return 4;
+  return 5;
 }
 
 export function compareQueue(a: QueueRow, b: QueueRow): number {
@@ -59,15 +61,16 @@ export function queueMembership(input: {
   return input.reasons.some((reason) => reason.at > input.reviewedAt!);
 }
 
-function placeholder(input: { flagged: boolean; mentioned: boolean; assigned: boolean; at: string }): QueueReason {
-  if (input.flagged) return { at: input.at, summary: "Flagged for you.", type: "flag" };
+function placeholder(input: { flagged: boolean; mentioned: boolean; assigned: boolean; needsApproval: boolean; at: string }): QueueReason {
+  if (input.needsApproval) return { at: input.at, summary: "Needs your approval.", type: "document_request" };
   if (input.mentioned) return { at: input.at, summary: "Mentioned you.", type: "mention" };
   if (input.assigned) return { at: input.at, summary: "Assigned to you.", type: "assignment" };
+  if (input.flagged) return { at: input.at, summary: "Flagged for you.", type: "flag" };
   return { at: input.at, summary: "New pipeline site.", type: "new_site" };
 }
 
 export function buildQueue(input: {
-  sites: { id: string; city: string; stage: string; stageGroup: string; active: boolean }[];
+  sites: { id: string; city: string; stage: string; stageGroup: string; active: boolean; hidden?: boolean }[];
   reasons: Record<string, QueueReason[]>;
   reviewedAt: Record<string, string>;
   snoozeUntil: Record<string, string>;
@@ -89,8 +92,9 @@ export function buildQueue(input: {
     const mentioned = input.mentioned.has(site.id);
     const assigned = input.assigned.has(site.id);
     const needsApproval = input.needsApproval.has(site.id);
+    if (site.hidden && !needsApproval && !mentioned && !flagged && !assigned) continue;
     const neverReviewed = !reviewedAt;
-    const baseline = neverReviewed && site.active && !reasons.some((reason) => reason.type === "new_site")
+    const baseline = !site.hidden && neverReviewed && site.active && !reasons.some((reason) => reason.type === "new_site")
       ? [{ at: input.today, summary: "New pipeline site.", type: "new_site" }]
       : [];
     const visible = [...baseline, ...reasons];
@@ -100,7 +104,7 @@ export function buildQueue(input: {
     if (input.filters.approvalOnly && !needsApproval) continue;
     if (input.filters.mentionsOnly && !mentioned) continue;
     if (input.filters.assignedOnly && !assigned) continue;
-    const queued = input.filters.assignedOnly || queueMembership({
+    const queued = needsApproval || input.filters.assignedOnly || queueMembership({
       active: site.active,
       reviewedAt: reviewedAt || null,
       snoozeUntil: input.snoozeUntil[site.id] || null,
@@ -110,7 +114,7 @@ export function buildQueue(input: {
       reasons: visible,
     });
     if (!queued) continue;
-    const shown = visible.length ? visible : [placeholder({ flagged, mentioned, assigned, at: input.today })];
+    const shown = visible.length ? visible : [placeholder({ flagged, mentioned, assigned, needsApproval, at: input.today })];
     const newestAt = shown.reduce((latest, reason) => (reason.at > latest ? reason.at : latest), reviewedAt || input.today);
     rows.push({
       siteId: site.id,

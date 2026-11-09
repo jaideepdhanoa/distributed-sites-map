@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/alerts/flush",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/alerts/digest",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

@@ -26,6 +26,12 @@ async function main() {
       DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:55433/postgres",
       DATABASE_SSL: "disable",
       ACTION_ROLE_MAP: JSON.stringify({ admin: "reviewer", user: "contributor" }),
+      RESEND_API_KEY: "",
+      SMTP_USER: "",
+      SMTP_PASS: "",
+      ALERT_FROM: "",
+      ALERT_BATCH_MS: "0",
+      ALERT_EMAILS: JSON.stringify({ reviewer: "reviewer@example.com" }),
     },
   });
 

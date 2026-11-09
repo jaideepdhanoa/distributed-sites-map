@@ -25,6 +25,7 @@ type Props = {
   focusLat: number;
   focusZoom: number;
   reviewMarkers?: { id: string; lng: number; lat: number; n: number; current: boolean }[];
+  queueIds?: string[];
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   pinLabel?: PinLabel;
   onPinLabel?: (mode: PinLabel) => void;
@@ -694,6 +695,31 @@ export default function MapView(props: Props) {
           properties: publicDeal(feature.properties),
         })),
       });
+      const queued = new Set(props.queueIds || []);
+      const queueData = {
+        type: "FeatureCollection" as const,
+        features: props.deals.flatMap((feature) => {
+          if (!feature.geometry || !queued.has(feature.properties.deal_id)) return [];
+          return [{ type: "Feature" as const, properties: {}, geometry: feature.geometry }];
+        }),
+      };
+      const queueSource = map.getSource("queue-dots") as GeoJSONSource | undefined;
+      if (queueSource) queueSource.setData(queueData);
+      else {
+        map.addSource("queue-dots", { type: "geojson", data: queueData });
+        map.addLayer({
+          id: "queue-dots",
+          type: "circle",
+          source: "queue-dots",
+          paint: {
+            "circle-radius": 3.5,
+            "circle-color": "#8d7350",
+            "circle-stroke-width": 1,
+            "circle-stroke-color": "#f7f3ea",
+            "circle-translate": [8, -8],
+          },
+        });
+      }
       const labelData = {
         type: "FeatureCollection" as const,
         features: dealLabelFeatures(props.deals, props.pinLabel || "none"),
@@ -843,7 +869,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;

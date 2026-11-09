@@ -181,6 +181,8 @@ export type DealProps = {
   source_line: string;
   source_kind?: string;
   business_type?: string;
+  /** Derived at build time. Hidden until the C-stores filter is on. */
+  is_c_store?: boolean;
   land_acres?: number | null;
   land_acres_basis?: "Verified" | "Estimated" | "Unknown" | "";
   open_land_sqft?: number | null;

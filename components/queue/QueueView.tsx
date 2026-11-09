@@ -269,9 +269,9 @@ export function FilterPopover({
       <button type="button" data-testid="queue-filters" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{summary}</button>
       {open ? (
         <div className="queue-pop" role="dialog" aria-label="Queue filters">
+          <button type="button" className={approvalOnly ? "on" : ""} onClick={() => onFilter({ qapprove: approvalOnly ? null : "1" })}>Needs my approval</button>
           <button type="button" className={mentionsOnly ? "on" : ""} onClick={() => onFilter({ qmention: mentionsOnly ? null : "1" })}>Mentions</button>
           <button type="button" className={assignedOnly ? "on" : ""} onClick={() => onFilter({ qassign: assignedOnly ? null : "1" })}>Assigned to me</button>
-          <button type="button" className={approvalOnly ? "on" : ""} onClick={() => onFilter({ qapprove: approvalOnly ? null : "1" })}>Needs my approval</button>
           <button type="button" className={freshOnly ? "on" : ""} onClick={() => onFilter({ qnew: freshOnly ? null : "1" })}>New sites</button>
           <button type="button" className={viable ? "on" : ""} onClick={() => onFilter({ qviable: viable ? "0" : null })}>Active</button>
           <button type="button" className={flaggedOnly ? "on" : ""} onClick={() => onFilter({ qflag: flaggedOnly ? null : "1" })}>Flagged to me</button>
@@ -305,7 +305,7 @@ export function ReviewRail({
           className={`${site.siteId === currentId ? "on" : ""} ${site.status === "reviewed" ? "done" : ""}`}
           onClick={() => onPick(index)}
         >
-          <strong>{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
+          <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
           <span>{marketLabel(site.city)}</span>
           <span className="review-row-chips">
             {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}

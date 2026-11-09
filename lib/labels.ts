@@ -8,6 +8,7 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
   { id: "listing", label: "Listing", note: "A site or deal that is on the market." },
   { id: "desk", label: "Desk screen", note: "A first review of the listing or lead." },
   { id: "land", label: "Land site", note: "Land without an operating wash. Hidden until that layer is turned on." },
+  { id: "cstore", label: "C-store", note: "Hidden until that filter is turned on." },
   { id: "depot", label: "Depot", note: "Existing operating depot." },
   { id: "offmarket", label: "Off-market, other types", note: "Sites we found ourselves that are not in the car-wash census. No broker or listing yet. Choose a category with Business type." },
 ];

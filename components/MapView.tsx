@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
+import { mutedPositronStyle } from "@/lib/mutedStyle";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
@@ -137,6 +138,7 @@ export default function MapView(props: Props) {
   const radiusRef = useRef(radiusMiles);
   radiusRef.current = radiusMiles;
   const [readout, setReadout] = useState("");
+  const [mapGeneration, setMapGeneration] = useState(0);
   const points = useRef<[number, number][]>([]);
   const propsRef = useRef(props);
   propsRef.current = props;
@@ -178,19 +180,19 @@ export default function MapView(props: Props) {
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
           { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f7e2a8", "line-dasharray": [1.2, 1.2], "line-width": 1.4, "line-opacity": 0.9 } },
           { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
-          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#b7f0c8", "fill-opacity": 0.14 } },
-          { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#f4fff7", "line-width": 2.4 } },
+          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#dfeae1", "fill-opacity": 0.72 } },
+          { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#b9cdbf", "line-width": 1.4 } },
           { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-allow-overlap": false, "text-padding": 6 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
-          { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#ffb4a8", "line-width": 2.6 } },
+          { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#9e4b3e", "line-width": 1.6, "line-dasharray": [1.5, 1.2] } },
           {
             id: "missing-parcel",
             type: "circle",
             source: "sites",
             minzoom: 14,
             filter: ["==", ["get", "parcel_match"], "none"],
-            paint: { "circle-radius": 13, "circle-color": "transparent", "circle-stroke-color": "#e0a100", "circle-stroke-width": 2 },
+            paint: { "circle-radius": 13, "circle-color": "transparent", "circle-stroke-color": "#a8711b", "circle-stroke-width": 2 },
           },
           {
             id: "missing-parcel-deals",
@@ -198,40 +200,53 @@ export default function MapView(props: Props) {
             source: "deals",
             minzoom: 14,
             filter: ["==", ["get", "parcel_match"], "none"],
-            paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#e0a100", "circle-stroke-width": 2 },
+            paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#a8711b", "circle-stroke-width": 2 },
+          },
+          {
+            id: "offmarket-halo",
+            type: "circle",
+            source: "offmarket",
+            filter: ["==", ["get", "site_id"], ""],
+            paint: { "circle-radius": 22, "circle-color": "#8a8173", "circle-opacity": 0.16 },
           },
           {
             id: "offmarket",
-            type: "circle",
+            type: "symbol",
             source: "offmarket",
-            paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 6, 14, 8],
-              "circle-color": "#5c4d8a",
-              "circle-stroke-color": "#f4efe6",
-              "circle-stroke-width": 2,
-            },
+            layout: { "icon-image": "dia-stone", "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "offmarket-selected",
             type: "circle",
             source: "offmarket",
             filter: ["==", ["get", "site_id"], ""],
-            paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
+            paint: { "circle-radius": 16, "circle-color": "transparent", "circle-stroke-color": "#fffdf8", "circle-stroke-width": 2 },
+          },
+          {
+            id: "clusters-halo",
+            type: "circle",
+            source: "sites",
+            filter: ["has", "point_count"],
+            paint: {
+              "circle-color": "#1e4636",
+              "circle-opacity": 0.14,
+              "circle-radius": ["+", ["step", ["get", "point_count"], 16, 20, 20, 80, 26], 6],
+            },
           },
           {
             id: "clusters",
             type: "circle",
             source: "sites",
             filter: ["has", "point_count"],
-            paint: { "circle-color": "#2c5d8f", "circle-radius": ["step", ["get", "point_count"], 16, 20, 20, 80, 26], "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2, "circle-opacity": 0.92 },
+            paint: { "circle-color": "#1e4636", "circle-radius": ["step", ["get", "point_count"], 15, 20, 18, 80, 22], "circle-stroke-color": "#fffdf8", "circle-stroke-width": 2.5, "circle-opacity": 1 },
           },
           {
             id: "cluster-count",
             type: "symbol",
             source: "sites",
             filter: ["has", "point_count"],
-            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 11 },
-            paint: { "text-color": "#faf7f1" },
+            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 13 },
+            paint: { "text-color": "#fffdf8" },
           },
           {
             id: "tier-large-halo",
@@ -239,10 +254,11 @@ export default function MapView(props: Props) {
             source: "sites",
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 10, 14, 16],
               "circle-color": "transparent",
-              "circle-stroke-color": "#f4f7fb",
-              "circle-stroke-width": 6,
+              "circle-stroke-color": "#cfc6b6",
+              "circle-stroke-width": 1,
+              "circle-stroke-opacity": 0.45,
             },
           },
           {
@@ -253,8 +269,8 @@ export default function MapView(props: Props) {
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
               "circle-color": "transparent",
-              "circle-stroke-color": "#3e4d60",
-              "circle-stroke-width": 2.6,
+              "circle-stroke-color": "#c4b8a4",
+              "circle-stroke-width": 1.2,
             },
           },
           {
@@ -263,10 +279,11 @@ export default function MapView(props: Props) {
             source: "sites",
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 7, 14, 11],
               "circle-color": "transparent",
-              "circle-stroke-color": "#f4f7fb",
-              "circle-stroke-width": 5,
+              "circle-stroke-color": "#cfc6b6",
+              "circle-stroke-width": 1,
+              "circle-stroke-opacity": 0.4,
             },
           },
           {
@@ -277,38 +294,56 @@ export default function MapView(props: Props) {
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
               "circle-color": "transparent",
-              "circle-stroke-color": "#3e4d60",
-              "circle-stroke-width": 2.2,
+              "circle-stroke-color": "#c4b8a4",
+              "circle-stroke-width": 1,
             },
           },
           {
-            id: "sites",
+            id: "selected-halo",
             type: "circle",
             source: "sites",
-            filter: ["!", ["has", "point_count"]],
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 12, 7, 15, 10],
+              "circle-radius": 24,
+              "circle-opacity": 0.16,
               "circle-color": [
                 "case",
-                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "#2c5d8f",
-                ["==", ["get", "verdict"], "PASS"], "#2f6a4e",
-                ["==", ["get", "verdict"], "MAYBE"], "#a56a10",
-                ["==", ["get", "verdict"], "UNRESOLVED"], "#9b4336",
-                ["==", ["get", "verdict"], "FAIL"], "#9b4336",
-                ["==", ["get", "verdict"], "NOT_A_WASH"], "#6d655b",
-                "#e7e0d2",
+                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "#1d4e89",
+                ["==", ["get", "verdict"], "PASS"], "#387156",
+                ["==", ["get", "verdict"], "MAYBE"], "#a8711b",
+                ["==", ["get", "verdict"], "UNRESOLVED"], "#9e4b3e",
+                ["==", ["get", "verdict"], "FAIL"], "#9e4b3e",
+                ["==", ["get", "verdict"], "NOT_A_WASH"], "#9e4b3e",
+                "#8a8173",
               ],
-              "circle-stroke-color": "#1c1914",
-              "circle-stroke-width": ["case", ["==", ["get", "verdict"], "UNRESOLVED"], 3, ["!", ["has", "verdict"]], 1.6, 1.2],
-              "circle-opacity": 0.95,
             },
           },
           {
             id: "selected",
             type: "circle",
             source: "sites",
-            filter: ["==", ["get", "site_id"], ""],
-            paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 3 },
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
+            paint: { "circle-radius": 15, "circle-color": "#fffdf8", "circle-stroke-width": 0 },
+          },
+          {
+            id: "sites",
+            type: "symbol",
+            source: "sites",
+            filter: ["!", ["has", "point_count"]],
+            layout: {
+              "icon-image": [
+                "case",
+                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "dia-held",
+                ["==", ["get", "verdict"], "PASS"], "dia-moss",
+                ["==", ["get", "verdict"], "MAYBE"], "dia-amber",
+                ["==", ["get", "verdict"], "UNRESOLVED"], "dia-clay",
+                ["==", ["get", "verdict"], "FAIL"], "dia-clay",
+                ["==", ["get", "verdict"], "NOT_A_WASH"], "dia-clay",
+                "dia-stone",
+              ],
+              "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.74, 14, 0.92],
+              "icon-allow-overlap": true,
+            },
           },
           {
             id: "linked",
@@ -316,6 +351,31 @@ export default function MapView(props: Props) {
             source: "sites",
             filter: ["all", ["has", "linked_deal_id"], ["!=", ["get", "linked_deal_id"], ""]],
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#f7f3ea", "circle-stroke-width": 2 },
+          },
+          {
+            id: "deal-halo",
+            type: "circle",
+            source: "deals",
+            filter: ["==", ["get", "deal_id"], ""],
+            paint: {
+              "circle-radius": 24,
+              "circle-opacity": 0.16,
+              "circle-color": [
+                "match",
+                ["get", "stage_group"],
+                "desk", "#a8711b",
+                "dropped", "#9e4b3e",
+                "sourced", "#8a8173",
+                "#387156",
+              ],
+            },
+          },
+          {
+            id: "deal-ring",
+            type: "circle",
+            source: "deals",
+            filter: ["==", ["get", "deal_id"], ""],
+            paint: { "circle-radius": 15, "circle-color": "#fffdf8", "circle-stroke-width": 0 },
           },
           {
             id: "deals-pipe",
@@ -362,7 +422,7 @@ export default function MapView(props: Props) {
             type: "symbol",
             source: "deals",
             filter: ["==", ["get", "kind"], "land"],
-            layout: { "icon-image": "tri-land", "icon-size": 0.95, "icon-allow-overlap": true },
+            layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "deal-pills",
@@ -382,7 +442,7 @@ export default function MapView(props: Props) {
             id: "depots",
             type: "symbol",
             source: "depots",
-            layout: { "icon-image": "depot", "icon-size": 1, "icon-allow-overlap": true },
+            layout: { "icon-image": "depot", "icon-size": 0.72, "icon-allow-overlap": true },
           },
           {
             id: "depot-labels",
@@ -426,49 +486,82 @@ export default function MapView(props: Props) {
           },
         ],
       } as StyleSpecification;
+    let active: Map | null = null;
+    let observer: ResizeObserver | null = null;
+    let cancelled = false;
+    const boot = async () => {
     const basemap = propsRef.current.basemap || "positron";
+    let style: StyleSpecification | string = satelliteStyle;
+    if (basemap !== "satellite") {
+      try {
+        style = await mutedPositronStyle();
+      } catch {
+        style = "https://tiles.openfreemap.org/styles/positron";
+      }
+    }
+    if (cancelled || !node.current) return;
     const map = new Map({
       container: node.current,
-      style: basemap === "satellite" ? satelliteStyle : "https://tiles.openfreemap.org/styles/positron",
+      style,
       center: [props.focusLng, props.focusLat],
       zoom: props.focusZoom,
       attributionControl: false,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       fadeDuration: 0,
     });
+    active = map;
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     const size = 36;
-    const image = new Uint8Array(size * size * 4);
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        const dx = Math.abs(x - 17.5) / 15;
-        const dy = Math.abs(y - 17.5) / 15;
-        const diamond = dx + dy;
-        if (diamond <= 1) {
-          const i = (y * size + x) * 4;
-          const edge = diamond > 0.72;
-          image[i] = edge ? 29 : 244;
-          image[i + 1] = edge ? 78 : 239;
-          image[i + 2] = edge ? 137 : 230;
-          image[i + 3] = 255;
-        }
-      }
-    }
-    const square = (rgb: [number, number, number]) => {
+    const marker = (kind: "circle" | "diamond" | "depot", rgb: [number, number, number]) => {
       const pixels = new Uint8Array(size * size * 4);
+      const cream: [number, number, number] = [255, 253, 248];
       for (let y = 0; y < size; y += 1) {
         for (let x = 0; x < size; x += 1) {
-          if (x < 5 || y < 5 || x > 30 || y > 30) continue;
+          const dx = x - 17.5;
+          const dy = y - 17.5;
+          let inside = false;
+          let edge = false;
+          if (kind === "depot") {
+            const ax = Math.abs(dx);
+            const ay = Math.abs(dy);
+            const box = Math.max(ax, ay);
+            const corner = Math.max(0, ax - 8) + Math.max(0, ay - 8);
+            inside = box <= 12 && corner <= 6;
+            edge = inside && (box >= 10.2 || corner >= 4.2);
+          } else {
+            const d = kind === "circle" ? Math.hypot(dx, dy) : Math.abs(dx) + Math.abs(dy);
+            const limit = kind === "circle" ? 11.5 : 13;
+            inside = d <= limit;
+            edge = inside && d >= limit - 2.4;
+          }
+          if (!inside) continue;
           const i = (y * size + x) * 4;
-          const edge = x < 8 || y < 8 || x > 27 || y > 27;
-          pixels[i] = edge ? 28 : rgb[0];
-          pixels[i + 1] = edge ? 25 : rgb[1];
-          pixels[i + 2] = edge ? 20 : rgb[2];
+          const fill = edge ? cream : rgb;
+          pixels[i] = fill[0];
+          pixels[i + 1] = fill[1];
+          pixels[i + 2] = fill[2];
           pixels[i + 3] = 255;
+        }
+      }
+      if (kind === "depot") {
+        for (let y = 8; y < 28; y += 1) {
+          for (let x = 12; x < 24; x += 1) {
+            const ny = (y - 8) / 20;
+            const spine = 18 - ny * 6;
+            const bolt = Math.abs(x - spine) < 2.2 && (ny < 0.48 ? x < spine + 1 : x > spine - 1);
+            if (!bolt) continue;
+            const i = (y * size + x) * 4;
+            pixels[i] = 255;
+            pixels[i + 1] = 253;
+            pixels[i + 2] = 248;
+            pixels[i + 3] = 255;
+          }
         }
       }
       return pixels;
     };
+    const image = marker("depot", [29, 78, 137]);
+    const square = (rgb: [number, number, number]) => marker("circle", rgb);
     const triangle = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
@@ -485,6 +578,33 @@ export default function MapView(props: Props) {
       }
     }
     map.on("load", () => {
+      if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
+      const pinColors: Record<string, [number, number, number]> = {
+        stone: [138, 129, 115],
+        amber: [168, 113, 27],
+        moss: [56, 113, 86],
+        clay: [158, 75, 62],
+        held: [29, 78, 137],
+      };
+      for (const [name, rgb] of Object.entries(pinColors)) {
+        const id = `dia-${name}`;
+        if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: marker("diamond", rgb) });
+      }
+      const squares: Record<string, [number, number, number]> = {
+        sourced: pinColors.stone,
+        desk: pinColors.amber,
+        financial: pinColors.moss,
+        checks: pinColors.moss,
+        close: pinColors.moss,
+        contacted: pinColors.moss,
+        later: pinColors.moss,
+        dropped: pinColors.clay,
+      };
+      for (const [name, rgb] of Object.entries(squares)) {
+        const id = `sq-${name}`;
+        if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });
+      }
+      node.current?.setAttribute("data-deal-markers", "square");
       map.resize();
       requestAnimationFrame(() => map.resize());
       window.setTimeout(() => {
@@ -500,22 +620,6 @@ export default function MapView(props: Props) {
           map.addLayer(layer);
         }
       }
-      if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
-      const squares: Record<string, [number, number, number]> = {
-        sourced: [44, 93, 143],
-        desk: [165, 106, 16],
-        financial: [30, 70, 54],
-        checks: [47, 106, 78],
-        close: [18, 49, 42],
-        contacted: [30, 70, 54],
-        later: [47, 106, 78],
-        dropped: [231, 224, 210],
-      };
-      for (const [name, rgb] of Object.entries(squares)) {
-        const id = `sq-${name}`;
-        if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });
-      }
-      node.current?.setAttribute("data-deal-markers", "square");
       if (!map.hasImage("tri-land")) map.addImage("tri-land", { width: size, height: size, data: triangle });
       map.on("click", "clusters", (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
@@ -649,19 +753,33 @@ export default function MapView(props: Props) {
         if (points.current.length >= 3) setReadout(`${acresOf(points.current).toFixed(2)} acres`);
         else if (points.current.length === 2) setReadout("Add points, then read acres");
       });
+      if (propsRef.current.basemap !== "satellite") {
+        if (map.getLayer("area-labels")) {
+          map.setPaintProperty("area-labels", "text-color", "#5b554b");
+          map.setPaintProperty("area-labels", "text-halo-color", "#f6f3ec");
+        }
+        if (map.getLayer("depot-labels")) {
+          map.setPaintProperty("depot-labels", "text-color", "#1d4e89");
+          map.setPaintProperty("depot-labels", "text-halo-color", "#fffdf8");
+        }
+      }
       map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
       propsRef.current.onBounds(map.getBounds());
     });
     const observed = node.current;
-    const observer = new ResizeObserver(() => map.resize());
+    observer = new ResizeObserver(() => map.resize());
     observer.observe(observed);
     mapRef.current = map;
     (window as Window & { __sitesMap?: Map }).__sitesMap = map;
+    if (!cancelled) setMapGeneration((value) => value + 1);
+    };
+    void boot();
     return () => {
-      observer.disconnect();
-      map.remove();
+      cancelled = true;
+      observer?.disconnect();
+      active?.remove();
       mapRef.current = null;
-      if ((window as Window & { __sitesMap?: Map }).__sitesMap === map) delete (window as Window & { __sitesMap?: Map }).__sitesMap;
+      if (active && (window as Window & { __sitesMap?: Map }).__sitesMap === active) delete (window as Window & { __sitesMap?: Map }).__sitesMap;
     };
     // Recreate the map when the basemap changes. Later effects push data in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -725,7 +843,7 @@ export default function MapView(props: Props) {
           type: "line",
           source: "grid",
           filter: ["==", ["get", "kind"], "line"],
-          paint: { "line-color": "#2c5d8f", "line-width": 3, "line-opacity": 0.9 },
+          paint: { "line-color": "#1d4e89", "line-width": 3, "line-opacity": 0.9 },
         });
       }
       if (!map.getLayer("grid-substation")) {
@@ -734,7 +852,7 @@ export default function MapView(props: Props) {
           type: "fill",
           source: "grid",
           filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Polygon"]],
-          paint: { "fill-color": "#2c5d8f", "fill-opacity": 0.35 },
+          paint: { "fill-color": "#1d4e89", "fill-opacity": 0.28 },
         });
       }
       if (!map.getLayer("grid-substation-line")) {
@@ -815,7 +933,11 @@ export default function MapView(props: Props) {
         map.setFilter("parcels-selected", ["all", ["==", ["get", "site_id"], props.selectedId || ""], ["!=", ["get", "role"], "adjoining"]]);
       }
       if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["==", ["get", "site_id"], props.selectedId || ""]);
+      if (map.getLayer("offmarket-halo")) map.setFilter("offmarket-halo", ["==", ["get", "site_id"], props.selectedId || ""]);
       map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
+      if (map.getLayer("selected-halo")) map.setFilter("selected-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], props.selectedId || ""]]);
+      if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
+      if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -843,7 +965,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -895,7 +1017,7 @@ export default function MapView(props: Props) {
       map.off("moveend", report);
       map.off("idle", report);
     };
-  }, [props.sites, props.coverage, props.showSites]);
+  }, [mapGeneration, props.sites, props.coverage, props.showSites]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -913,7 +1035,9 @@ export default function MapView(props: Props) {
       vis("rings", props.showRings);
       vis("sites", props.showSites);
       vis("clusters", props.showSites);
+      vis("clusters-halo", props.showSites);
       vis("cluster-count", props.showSites);
+      vis("selected-halo", props.showSites);
       vis("tier-large", props.showSites);
       vis("tier-large-halo", props.showSites);
       vis("tier-small", props.showSites);
@@ -923,7 +1047,7 @@ export default function MapView(props: Props) {
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [props.showAreas, props.showDepots, props.showSites]);
+  }, [mapGeneration, props.showAreas, props.showDepots, props.showSites]);
 
   const selectedOnMap =
     props.sites.some((feature) => feature.properties.site_id === props.selectedId) ||
@@ -967,7 +1091,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.gridFeatures]);
+  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.gridFeatures]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -992,7 +1116,7 @@ export default function MapView(props: Props) {
       window.clearInterval(timer);
       window.clearTimeout(stop);
     };
-  }, [reviewToken, props.reviewFocus]);
+  }, [mapGeneration, reviewToken, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1030,9 +1154,10 @@ export default function MapView(props: Props) {
         else if (prop === "icon-opacity") map.setPaintProperty(id, "icon-opacity", value);
         else map.setPaintProperty(id, "text-opacity", value);
       };
-      set("sites", "circle-opacity", dimmed ? 0.3 : 0.95);
-      set("offmarket", "circle-opacity", dimmed ? 0.3 : 1);
-      set("clusters", "circle-opacity", dimmed ? 0.3 : 0.88);
+      set("sites", "icon-opacity", dimmed ? 0.3 : 1);
+      set("offmarket", "icon-opacity", dimmed ? 0.3 : 1);
+      set("clusters", "circle-opacity", dimmed ? 0.3 : 1);
+      set("clusters-halo", "circle-opacity", dimmed ? 0.05 : 0.14);
       set("unscreened", "circle-stroke-opacity", dimmed ? 0.3 : 1);
       set("deals-pipe", "icon-opacity", dimmed ? 0 : 1);
       set("deals-land", "icon-opacity", dimmed ? 0 : 1);
@@ -1046,7 +1171,7 @@ export default function MapView(props: Props) {
       window.clearInterval(timer);
       window.clearTimeout(stop);
     };
-  }, [props.reviewMarkers]);
+  }, [mapGeneration, props.reviewMarkers]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1065,10 +1190,10 @@ export default function MapView(props: Props) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [props.reviewMarkers]);
+  }, [mapGeneration, props.reviewMarkers]);
 
   return (
-    <div className="stage-map">
+      <div className="stage-map" data-basemap={props.basemap || "positron"}>
       <div ref={node} className="map" />
       <div className="map-tools">
         <details className="map-chrome">

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import DrawerGrip from "./DrawerGrip";
@@ -27,6 +27,89 @@ function websiteLabel(url: string) {
 }
 
 const FOLDER_URL = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/;
+
+type SheetSnap = "peek" | "half" | "full";
+type SheetControl = {
+  expanded: boolean;
+  snap?: SheetSnap;
+  onToggle: () => void;
+  onSnap?: (snap: SheetSnap) => void;
+};
+
+function SheetHandle({ sheet }: { sheet?: SheetControl }) {
+  const startY = useRef<number | null>(null);
+  const dragged = useRef(false);
+  return (
+    <button
+      className="sheet-handle"
+      type="button"
+      onClick={() => {
+        if (dragged.current) {
+          dragged.current = false;
+          return;
+        }
+        sheet?.onToggle();
+      }}
+      onPointerDown={(event) => {
+        startY.current = event.clientY;
+      }}
+      onPointerUp={(event) => {
+        if (startY.current == null || !sheet?.onSnap || !sheet.snap) return;
+        const dy = event.clientY - startY.current;
+        startY.current = null;
+        if (Math.abs(dy) < 28) return;
+        dragged.current = true;
+        const order: SheetSnap[] = ["peek", "half", "full"];
+        const index = Math.max(0, order.indexOf(sheet.snap));
+        const next = order[Math.min(order.length - 1, Math.max(0, index + (dy < 0 ? 1 : -1)))];
+        sheet.onSnap(next);
+      }}
+    >
+      {sheet?.expanded ? "Show less" : "Show more"}
+    </button>
+  );
+}
+
+function FigureSkeleton() {
+  return (
+    <div className="skeleton-block" data-testid="figures-loading" aria-busy="true">
+      <span className="skeleton" />
+      <span className="skeleton short" />
+      <span className="skeleton" />
+      <p className="sr">Loading figures</p>
+    </div>
+  );
+}
+
+function DealHeadline({ deal }: { deal: DealProps }) {
+  const cash = cashTile(deal);
+  const spare = deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
+  const bays = deal.bays_that_fit == null ? "Not provided" : String(Math.round(deal.bays_that_fit));
+  const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
+  const cashLabel = deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow";
+  const negative = deal.stated_cash_flow != null && deal.stated_cash_flow < 0;
+  return (
+    <div className="headline" data-testid="headline">
+      <div>
+        <span>Spare land</span>
+        <strong>{spare}</strong>
+        {deal.open_land_sqft != null ? <small>Sheet spare area, square feet</small> : null}
+      </div>
+      <div>
+        <span>Bays that fit</span>
+        <strong>{bays}</strong>
+        {land ? <small>{land}</small> : null}
+      </div>
+      {cash.hidden ? null : (
+        <div>
+          <span>{cashLabel}</span>
+          <strong className={negative ? "neg" : ""}>{cash.value}</strong>
+          {[cash.note, cash.basis].filter(Boolean).length ? <small>{[cash.note, cash.basis].filter(Boolean).join(" · ")}</small> : null}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function mapsLinks(
   lat?: number | null,
@@ -97,7 +180,7 @@ export default function Detail({
   onNotFit?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
-  sheet?: { expanded: boolean; onToggle: () => void };
+  sheet?: SheetControl;
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
@@ -114,7 +197,7 @@ export default function Detail({
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   return (
     <aside
-      className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
+      className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
       onTouchStart={(event) => {
         if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
         (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
@@ -131,19 +214,13 @@ export default function Detail({
       }}
     >
       <DrawerGrip />
-      <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
+      <SheetHandle sheet={sheet} />
       {banner}
-      <button className="close" type="button" onClick={onClose}>Close</button>
-      <h2>{site.name || site.address || site.site_id}</h2>
-      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
-      <p className="note">{site.address || "—"}</p>
-      <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
-      <div className="card-actions">
-        {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
-        {onAddCompare ? <button className="action" type="button" onClick={onAddCompare}>Add to compare</button> : null}
-        {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+      <div className="card-hero-wrap">
+        <button className="close" type="button" onClick={onClose}>Close</button>
+        <SitePhotos card={photos} />
       </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
         {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
@@ -151,8 +228,17 @@ export default function Detail({
         {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
         {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
       </div>
-      <SitePhotos card={photos} />
-      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      <h2>{site.name || site.address || site.site_id}</h2>
+      {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
+      <p className="note">{site.address || "—"}</p>
+      <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
+      {linkedDeal ? <DealHeadline deal={linkedDeal} /> : null}
+      <div className="card-actions">
+        {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
+        {onAddCompare ? <button className="action primary" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+        {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
+      </div>
+      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
       <NextStepCard kind="site" id={site.site_id} />
       <PanelSections
@@ -345,7 +431,7 @@ export function DealDetail({
   onCompare?: (on: boolean) => void;
   onNotFit?: () => void;
   compared?: boolean;
-  sheet?: { expanded: boolean; onToggle: () => void };
+  sheet?: SheetControl;
   extras?: ReactNode;
   banner?: ReactNode;
   onSwipe?: (direction: "next" | "prev") => void;
@@ -358,7 +444,7 @@ export function DealDetail({
   const cash = cashTile(deal);
   return (
     <aside
-      className={`drawer ${sheet?.expanded ? "expanded" : ""}`}
+      className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
       onTouchStart={(event) => {
         if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
         (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
@@ -375,10 +461,13 @@ export function DealDetail({
       }}
     >
       <DrawerGrip />
-      <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
+      <SheetHandle sheet={sheet} />
       {banner}
-      <button className="close" type="button" onClick={onClose}>Close</button>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="card-hero-wrap">
+        <button className="close" type="button" onClick={onClose}>Close</button>
+        <SitePhotos card={photos} />
+      </div>
+      <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
         {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
         {deal.listed ? <span className="badge checked">Listed</span> : null}
@@ -386,6 +475,7 @@ export function DealDetail({
       <h2>{deal.name || deal.address}</h2>
       <p className="note">{deal.address}</p>
       <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
+      <DealHeadline deal={deal} />
       <div className="card-actions">
         {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
         {onCompare ? (
@@ -396,8 +486,7 @@ export function DealDetail({
         ) : null}
         {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
       </div>
-      <SitePhotos card={photos} />
-      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <p className="note" data-testid="figures-loading">Loading figures</p>}
+      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
       <NextStepCard kind="deal" id={deal.deal_id} />
       <PanelSections
@@ -475,11 +564,11 @@ export function UnscreenedDetail({
   lat?: number | null;
   lng?: number | null;
   onClose?: () => void;
-  sheet?: { expanded: boolean; onToggle: () => void };
+  sheet?: SheetControl;
 }) {
   return (
-    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""}`}>
-      <button className="sheet-handle" type="button" onClick={sheet?.onToggle}>{sheet?.expanded ? "Show less" : "Show more"}</button>
+    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}>
+      <SheetHandle sheet={sheet} />
       <button className="close" type="button" onClick={onClose}>Close</button>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span className="badge pending">Listed, not yet screened</span>

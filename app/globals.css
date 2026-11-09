@@ -556,6 +556,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   width: 100%;
   height: 100%;
 }
+.basemap-toggle { display: none; }
 .map-tools {
   position: absolute; z-index: 2; left: 12px; top: 12px;
   display: flex; flex-wrap: wrap; gap: 6px; max-width: 560px;
@@ -1904,6 +1905,30 @@ span.listing-link.muted { text-decoration: none; }
 .layers-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .layers-close { min-width: 72px; }
 .map-tools { left: 12px; top: 56px; flex-direction: column; align-items: flex-start; max-width: 280px; }
+.basemap-toggle {
+  display: inline-flex;
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  right: 52px;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.basemap-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  min-height: 32px;
+  padding: 4px 12px;
+  font: inherit;
+}
+.basemap-toggle button.on { background: #1c1914; color: #fffdf8; }
+@media (max-width: 767px) {
+  .basemap-toggle { display: none; }
+}
 .map-chrome {
   background: var(--paper-card);
   border: 1px solid var(--line);

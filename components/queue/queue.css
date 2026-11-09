@@ -16,6 +16,7 @@
   position: relative;
   z-index: 8;
 }
+.review-bar:has(.queue-pop) { z-index: 30; }
 .review-bar {
   display: flex;
   align-items: center;
@@ -191,8 +192,10 @@
   .review-bar .review-step[aria-label="Next"]::after { content: "›"; }
   .review-filters { position: static; }
   .queue-pop {
+    position: absolute;
     left: 8px;
     right: 8px;
+    top: calc(100% + 8px);
     width: auto;
     max-height: min(70vh, 480px);
     overflow: auto;

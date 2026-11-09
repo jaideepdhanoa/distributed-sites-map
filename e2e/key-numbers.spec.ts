@@ -1,22 +1,34 @@
 import { expect, test } from "@playwright/test";
 import { cityPipelineCounts } from "./pipeline-counts";
 
-test("satellite is the default basemap and a switch is remembered", async ({ page }) => {
+test("satellite is the default basemap and a switch is remembered", async ({ page }, info) => {
   await page.addInitScript(() => {
     if (!window.sessionStorage.getItem("basemap-init")) {
       window.localStorage.removeItem("basemap");
       window.sessionStorage.setItem("basemap-init", "1");
     }
   });
+  if (info.project.name !== "mobile") await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk");
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
-  await page.locator(".map-chrome").evaluate((el: HTMLDetailsElement) => { el.open = true; });
-  const chooser = page.getByTestId("basemap");
+  const chooser = info.project.name === "mobile"
+    ? page.getByTestId("basemap")
+    : page.getByTestId("basemap-desktop");
+  if (info.project.name === "mobile") {
+    const tools = page.locator(".map-chrome > summary");
+    if (await tools.isVisible()) await tools.click();
+  }
+  await expect(chooser).toBeVisible();
   await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
   await chooser.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
   await page.reload();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
+  if (info.project.name === "mobile") {
+    const tools = page.locator(".map-chrome > summary");
+    if (await tools.isVisible()) await tools.click();
+  }
+  await expect(chooser.getByRole("button", { name: "Map", exact: true })).toHaveClass(/on/);
   await page.evaluate(() => window.localStorage.removeItem("basemap"));
   await page.goto("/?review=1");
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");

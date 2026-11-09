@@ -353,4 +353,16 @@ test("the review filter menu stays inside a 390px screen", async ({ page }) => {
   await expect(pop.getByRole("button", { name: "Active" })).toBeVisible();
   await expect(pop.getByLabel("Queue market")).toBeVisible();
   await expect(pop.getByLabel("Queue stage")).toBeVisible();
+  await page.getByTestId("queue-filters").click();
+  await expect(pop).toBeHidden();
+  await page.getByTestId("review-position").click();
+  await expect(page.getByTestId("review-feed")).toBeVisible();
+  await page.getByTestId("queue-filters").click();
+  await expect(pop.getByRole("button", { name: "Active" })).toBeVisible();
+  const covered = await pop.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 28);
+    return hit ? !el.contains(hit) : true;
+  });
+  expect(covered).toBe(false);
 });

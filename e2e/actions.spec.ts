@@ -239,6 +239,13 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await openAs(page, "reviewer", "/?funnel=pipeline&pstage=desk&view=list");
   await expect(page.getByTestId("pipeline-list")).toBeVisible();
   await expect(page.getByTestId("pipeline-list")).not.toContainText("Sinclair");
+  await page.getByRole("textbox", { name: "Search" }).first().fill("Sinclair");
+  await expect(page.getByTestId("search-hits")).toBeVisible();
+  await expect(page.getByTestId("search-hits")).not.toContainText("PIPE-PHX-0067");
+  await page.getByRole("textbox", { name: "Search" }).first().fill("PIPE-MIA-0075");
+  await expect(page.getByTestId("search-hits")).toContainText("PIPE-MIA-0075");
+  await page.getByRole("textbox", { name: "Search" }).first().fill("");
+  await page.waitForFunction(() => !location.search.includes("q="));
   await page.screenshot({ path: "/opt/cursor/artifacts/cstore-hidden-list.png" });
   await page.locator("button.tool", { hasText: "Filters" }).click();
   await page.getByTestId("cstore-toggle").click();
@@ -247,6 +254,23 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await expect(sinclair).toBeVisible();
   await sinclair.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/opt/cursor/artifacts/cstore-shown-list.png" });
+  await page.setViewportSize({ width: 390, height: 800 });
+  const summary = await page.getByTestId("summary-row").boundingBox();
+  const controls = await page.locator(".pipeline-list .list-bar").boundingBox();
+  expect(summary && controls).toBeTruthy();
+  if (summary && controls) expect(controls.y).toBeGreaterThanOrEqual(summary.y + summary.height - 1);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?funnel=pipeline&pstage=desk");
+  await page.waitForSelector("[data-pin-count]");
+  const pins = await page.locator(".shell").getAttribute("data-pin-count");
+  await page.goto("/?funnel=pipeline&pstage=desk&cstore=1");
+  await expect(page.locator(".shell")).toHaveAttribute("data-pin-count", pins || "");
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getSource: (id: string) => { serialize: () => { data?: { features?: unknown[] } } } } }).__sitesMap;
+    if (!map?.isStyleLoaded()) return false;
+    const data = map.getSource("deals")?.serialize()?.data;
+    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 10);
+  });
 
   await login(request, "contributor");
   const mention = await request.post("/api/actions/notes", {
@@ -266,8 +290,19 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   expect(approval.ok()).toBeTruthy();
 
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qviable=0");
-  const firstCard = page.getByTestId("review-rail").locator("button").first();
+  await expect(page.getByTestId("review-approvals")).toBeVisible();
+  const firstCard = page.getByTestId("review-approvals").locator("button").first();
   await expect(firstCard).toContainText("Wash N Go");
+  await page.setViewportSize({ width: 390, height: 800 });
+  const searchBox = await page.getByRole("textbox", { name: "Search" }).locator("visible=true").first().boundingBox();
+  const stageBox = await page.locator(".phone-step").boundingBox();
+  const reviewBox = await page.getByTestId("review-bar").boundingBox();
+  const overlaps = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  expect(searchBox && stageBox && reviewBox).toBeTruthy();
+  if (searchBox && reviewBox) expect(overlaps(searchBox, reviewBox)).toBe(false);
+  if (stageBox && reviewBox) expect(overlaps(stageBox, reviewBox)).toBe(false);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: "/opt/cursor/artifacts/review-order.png" });
 
   await page.goto("/?funnel=pipeline&pstage=desk");

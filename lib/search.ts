@@ -56,6 +56,7 @@ export type SearchHit = {
 
 type DealHitSource = {
   deal_id: string;
+  kind?: string;
   name?: string;
   address?: string;
   city?: string;
@@ -63,6 +64,12 @@ type DealHitSource = {
   broker?: string;
   firm?: string;
   universe_id?: string;
+  is_c_store?: boolean;
+};
+
+export type SearchOptions = {
+  /** C-store deals stay out of suggestions until that filter is on. */
+  cStores?: boolean;
 };
 
 type SiteHitSource = {
@@ -91,16 +98,22 @@ export function collectSearchHits(
   deals: DealHitSource[],
   sites: SiteHitSource[],
   siteStage: (site: SiteHitSource) => string = () => "universe",
+  options: SearchOptions = {},
 ): SearchHit[] {
   const needle = foldSearch(query);
   if (needle.length < 2) return [];
-  const byDeal = new Map(deals.map((deal) => [deal.deal_id, deal]));
+  const cStores = options.cStores === true;
+  const visibleDeals = deals.filter((deal) => cStores || deal.is_c_store !== true);
+  const hiddenCStoreIds = new Set(
+    cStores ? [] : deals.filter((deal) => deal.is_c_store === true).flatMap((deal) => [deal.deal_id, deal.universe_id || ""]).filter(Boolean),
+  );
+  const byDeal = new Map(visibleDeals.map((deal) => [deal.deal_id, deal]));
   const byUniverse = new Map<string, DealHitSource>();
-  for (const deal of deals) {
+  for (const deal of visibleDeals) {
     if (deal.universe_id) byUniverse.set(deal.universe_id, deal);
   }
   const hits: SearchHit[] = [];
-  for (const deal of deals) {
+  for (const deal of visibleDeals) {
     if (!matchesQuery(query, dealSearchParts(deal))) continue;
     hits.push({
       id: deal.deal_id,
@@ -114,7 +127,7 @@ export function collectSearchHits(
   const linkedUniverse = new Set(hits.filter((hit) => hit.kind === "deal").map((hit) => byDeal.get(hit.id)?.universe_id || "").filter(Boolean));
   for (const id of linkedUniverse) {
     if (sites.some((site) => site.site_id === id)) continue;
-    const deal = deals.find((item) => item.universe_id === id);
+    const deal = visibleDeals.find((item) => item.universe_id === id);
     if (!deal) continue;
     hits.push({
       id,
@@ -134,6 +147,7 @@ export function collectSearchHits(
       linked?.deal_id,
       linked?.name,
     ];
+    if (hiddenCStoreIds.has(site.site_id) || (site.linked_deal_id && hiddenCStoreIds.has(site.linked_deal_id))) continue;
     if (!matchesQuery(query, parts)) continue;
     hits.push({
       id: site.site_id,

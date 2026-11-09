@@ -111,6 +111,20 @@ test("a hidden c-store stays out of the queue unless it needs approval", () => {
     filters: { market: "all", viable: true },
   });
   assert.equal(surfaced.some((item) => item.siteId === "store"), true);
+  const otherMarket = buildQueue({
+    sites: [{ ...row("store", { city: "LAS" }), hidden: true }, row("local")],
+    reasons: {},
+    reviewedAt: { store: "2026-11-06T00:00:00.000Z" },
+    snoozeUntil: {},
+    flagged: new Set(),
+    mentioned: new Set(),
+    assigned: new Set(),
+    needsApproval: new Set(["store"]),
+    today: "2026-11-05",
+    filters: { market: "PHX", stage: "desk", viable: true },
+  });
+  assert.equal(otherMarket.some((item) => item.siteId === "store"), true);
+  assert.equal(otherMarket[0]?.siteId, "store");
 });
 
 test("snooze hides a site until the date, and a later change or a flag brings it back", () => {

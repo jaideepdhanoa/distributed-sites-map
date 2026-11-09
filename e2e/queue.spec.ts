@@ -160,6 +160,8 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any&qassign=1");
+  const assignedName = (card?.snapshot as { name?: string } | null)?.name || deal;
+  await page.getByTestId("review-assigned").getByRole("button", { name: assignedName }).click();
   await page.getByTestId("panel-tab-discussion").click();
   const panel = page.locator(".drawer");
   await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");

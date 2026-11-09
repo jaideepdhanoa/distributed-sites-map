@@ -1,3 +1,4 @@
+import alertDefaults from "../../config/alerts.json";
 import { getUsers } from "@/lib/users";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,11 +21,17 @@ export function alertEmailMap(): Record<string, string> {
   }
 }
 
-/** Mailbox for an app account. ALERT_EMAILS overrides the optional email on the account. */
+function configuredEmail(id: string): string {
+  const table = alertDefaults.emails;
+  if (!table || typeof table !== "object") return "";
+  return String((table as Record<string, string>)[id] || "").trim().toLowerCase();
+}
+
+/** Mailbox for an app account. ALERT_EMAILS overrides the account, then the config map. */
 export function accountEmail(username: string): string | null {
   const id = username.trim().toLowerCase();
   if (!id || !getUsers().some((user) => user.u === id)) return null;
-  const email = alertEmailMap()[id] || getUsers().find((user) => user.u === id)?.email || "";
+  const email = alertEmailMap()[id] || getUsers().find((user) => user.u === id)?.email || configuredEmail(id);
   return EMAIL.test(email) ? email : null;
 }
 

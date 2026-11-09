@@ -1,3 +1,5 @@
+import alertDefaults from "../config/alerts.json";
+
 export type AuthUser = {
   u: string;
   h: string;
@@ -9,6 +11,11 @@ export type AuthUser = {
 };
 
 const ACTION = new Set(["viewer", "contributor", "reviewer"]);
+const PROMOTED_ADMINS = new Set(
+  (Array.isArray(alertDefaults.adminUsernames) ? alertDefaults.adminUsernames : [])
+    .map((name) => String(name).trim().toLowerCase())
+    .filter(Boolean),
+);
 
 export function getUsers(): AuthUser[] {
   const raw = process.env.AUTH_USERS;
@@ -34,7 +41,10 @@ export function getUsers(): AuthUser[] {
     const displayName = named || u;
     const emailRaw = String(row.email ?? "").trim().toLowerCase();
     const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : "";
-    if (u && h.startsWith("$2")) users.push({ u, h, role, roleLabel, actionRole, displayName, email });
+    const promoted = PROMOTED_ADMINS.has(u);
+    const accountRole = promoted ? "admin" : role;
+    const accountAction = promoted ? "reviewer" : actionRole;
+    if (u && h.startsWith("$2")) users.push({ u, h, role: accountRole, roleLabel, actionRole: accountAction, displayName, email });
   }
   return users;
 }

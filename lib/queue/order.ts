@@ -83,15 +83,16 @@ export function buildQueue(input: {
 }): QueueRow[] {
   const rows: QueueRow[] = [];
   for (const site of input.sites) {
-    if (input.filters.market && input.filters.market !== "all" && site.city !== input.filters.market) continue;
-    if (input.filters.stage && input.filters.stage !== "any" && site.stageGroup !== input.filters.stage) continue;
-    if (input.filters.viable && !site.active) continue;
+    const needsApproval = input.needsApproval.has(site.id);
+    const mentioned = input.mentioned.has(site.id);
+    const assigned = input.assigned.has(site.id);
+    const personal = needsApproval || mentioned || assigned;
+    if (!personal && input.filters.market && input.filters.market !== "all" && site.city !== input.filters.market) continue;
+    if (!personal && input.filters.stage && input.filters.stage !== "any" && site.stageGroup !== input.filters.stage) continue;
+    if (!personal && input.filters.viable && !site.active) continue;
     const reviewedAt = input.reviewedAt[site.id] || "";
     const reasons = (input.reasons[site.id] || []).filter((reason) => !reviewedAt || reason.at > reviewedAt);
     const flagged = input.flagged.has(site.id);
-    const mentioned = input.mentioned.has(site.id);
-    const assigned = input.assigned.has(site.id);
-    const needsApproval = input.needsApproval.has(site.id);
     if (site.hidden && !needsApproval && !mentioned && !flagged && !assigned) continue;
     const neverReviewed = !reviewedAt;
     const baseline = !site.hidden && neverReviewed && site.active && !reasons.some((reason) => reason.type === "new_site")

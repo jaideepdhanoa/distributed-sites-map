@@ -196,8 +196,8 @@ export default function Explorer() {
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
-  const queueMarket = params.get("qmarket") || city;
-  const queueStage = params.get("qstage") || (funnel === "pipeline" ? pipeStage : "any");
+  const queueMarket = params.get("qmarket") || (reviewing ? "all" : city);
+  const queueStage = params.get("qstage") || (reviewing ? "any" : (funnel === "pipeline" ? pipeStage : "any"));
   const queueViable = params.get("qviable") !== "0";
   const queueFresh = params.get("qnew") === "1";
   const queueFlagged = params.get("qflag") === "1";
@@ -352,7 +352,7 @@ export default function Explorer() {
     let cancel = false;
     fetch(`/api/queue?${q}`).then(async (response) => {
       if (cancel || !response.ok) return;
-      const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
+      const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
       const next = (payload.items || []).map((item) => ({
         siteId: item.siteId,
         name: item.snapshot?.name || item.siteId,
@@ -360,6 +360,9 @@ export default function Explorer() {
         lng: item.snapshot?.lng ?? null,
         lat: item.snapshot?.lat ?? null,
         followed: Boolean(item.followed),
+        needsApproval: Boolean(item.needsApproval),
+        mentioned: Boolean(item.mentioned),
+        assigned: Boolean(item.assigned),
         reasons: item.reasons || [],
         status: "open" as const,
         previous: null,
@@ -525,8 +528,8 @@ export default function Explorer() {
     return matchesQuery(query, dealSearchParts(deal));
   }
 
-  function cStoreHidden(deal: DealProps, wide: boolean) {
-    if (!deal.is_c_store || showCStores || wide) return false;
+  function cStoreHidden(deal: DealProps, _wide: boolean) {
+    if (!deal.is_c_store || showCStores) return false;
     if (selected === deal.deal_id) return false;
     return true;
   }
@@ -621,11 +624,11 @@ export default function Explorer() {
     if (deal.universe_id) {
       const site = poolById.get(deal.universe_id);
       const coords = site?.geometry?.coordinates;
-      if (coords) return [coords[0], coords[1]];
+      if (coords && Number.isFinite(coords[0]) && Number.isFinite(coords[1])) return [coords[0], coords[1]];
     }
     const feature = dealFeatures.find((item) => item.properties.deal_id === deal.deal_id);
     const coords = feature?.geometry?.coordinates;
-    return coords ? [coords[0], coords[1]] : null;
+    return coords && Number.isFinite(coords[0]) && Number.isFinite(coords[1]) ? [coords[0], coords[1]] : null;
   }
 
   function asSquare(deal: DealProps): DealFeature | null {
@@ -724,11 +727,19 @@ export default function Explorer() {
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
   const withheldHere = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && !feature.properties.pinned) : [];
 
+  const selectedDealId = dealRows.some((deal) => deal.deal_id === selected) ? selected : "";
+  const selectedSiteId = selectedDealId
+    ? (dealRows.find((deal) => deal.deal_id === selectedDealId)?.universe_id || "")
+    : (selected || "");
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || !data) return;
+    if (!selectedSiteId) {
+      setFiguresReady(true);
+      return;
+    }
     let cancel = false;
     setFiguresReady(false);
-    fetch(`/api/data/sites/${encodeURIComponent(selected)}`).then(async (response) => {
+    fetch(`/api/data/sites/${encodeURIComponent(selectedSiteId)}`).then(async (response) => {
       if (cancel) return;
       if (response.ok) setDetail(presentSite((await response.json()) as SiteProps));
       setFiguresReady(true);
@@ -738,7 +749,7 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [selected]);
+  }, [selected, selectedSiteId, data]);
 
   function choose(id: string | null) {
     setSelected(id);
@@ -881,6 +892,7 @@ export default function Explorer() {
     dealRows,
     (catalog ?? features).map((feature) => feature.properties),
     (site) => deepestStage(presentSite(site as SiteProps)),
+    { cStores: showCStores },
   );
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const focus = (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : (CITY_VIEW[city] ?? CITY_VIEW.PHX);
@@ -1199,7 +1211,7 @@ export default function Explorer() {
             <button className={listView && !reviewing ? "on" : ""} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
           </div>
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${reviewing ? "on" : ""}`} type="button" onClick={() => write({ review: reviewing ? null : "1", i: reviewing ? null : "1", view: null, table: null })}>
+            <button className={`review-launch ${reviewing ? "on" : ""}`} type="button" onClick={() => write({ review: reviewing ? null : "1", i: reviewing ? null : "1", view: null, table: null, qmarket: reviewing ? null : "all", qstage: reviewing ? null : "any" })}>
               Review{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
             </button>
           ) : null}
@@ -1624,7 +1636,7 @@ export default function Explorer() {
               assignedOnly={queueAssigned}
               onFilter={(patch) => {
                 const next = { ...patch, review: "1", i: "1" };
-                if ("qmarket" in next && next.qmarket === city) next.qmarket = null;
+                if (!reviewing && "qmarket" in next && next.qmarket === city) next.qmarket = null;
                 write(next);
               }}
             />

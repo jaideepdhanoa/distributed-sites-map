@@ -967,14 +967,15 @@ export default function MapView(props: Props) {
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
-      const fitKey = (props.fitPoints || []).map((point) => point.join(",")).join("|");
+      const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+      const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (reviewToken) {
         appliedReview.current = reviewToken;
       } else if (phone && fitKey && appliedFit.current !== fitKey) {
         appliedFit.current = fitKey;
         appliedFocus.current = focusToken;
-        const lngs = props.fitPoints!.map((point) => point[0]);
-        const lats = props.fitPoints!.map((point) => point[1]);
+        const lngs = finiteFit.map((point) => point[0]);
+        const lats = finiteFit.map((point) => point[1]);
         map.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 56, bottom: 120, left: 28, right: 28 }, maxZoom: 13, duration: 0 },

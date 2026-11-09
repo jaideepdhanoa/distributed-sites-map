@@ -4,9 +4,27 @@ import { cityPipelineCounts } from "./pipeline-counts";
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {
   const desk = cityPipelineCounts("PHX");
   const withStores = cityPipelineCounts("PHX", { cstore: true });
+  await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list");
   await page.waitForSelector("[data-testid=pipeline-list]");
+  const summary = await page.getByTestId("summary-row").boundingBox();
+  const controls = await page.locator(".pipeline-list .list-bar").boundingBox();
+  expect(summary && controls).toBeTruthy();
+  if (summary && controls) expect(controls.y).toBeGreaterThanOrEqual(summary.y + summary.height - 1);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(desk.deskTotal));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/?funnel=pipeline&pstage=desk");
+  await page.waitForSelector("[data-pin-count]");
+  const pins = await page.locator(".shell").getAttribute("data-pin-count");
+  await page.goto("/?funnel=pipeline&pstage=desk&cstore=1");
+  await expect(page.locator(".shell")).toHaveAttribute("data-pin-count", pins || "");
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getSource: (id: string) => { serialize: () => { data?: { features?: unknown[] } } } } }).__sitesMap;
+    if (!map?.isStyleLoaded()) return false;
+    const data = map.getSource("deals")?.serialize()?.data;
+    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 10);
+  });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&cstore=1");
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(withStores.deskTotal));
   await expect(page.locator(".no-pin").filter({ visible: true }).first()).toBeVisible();

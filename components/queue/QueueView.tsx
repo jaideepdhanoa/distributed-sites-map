@@ -13,10 +13,33 @@ export type FeedSite = {
   lng: number | null;
   lat: number | null;
   followed: boolean;
+  needsApproval?: boolean;
+  mentioned?: boolean;
+  assigned?: boolean;
   reasons: QueueReason[];
   status: "open" | "reviewed" | "snoozed";
   previous: string | null;
 };
+
+function reviewGroups(sites: FeedSite[]) {
+  const claimed = new Set<string>();
+  const take = (label: string, testId: string, match: (site: FeedSite) => boolean) => {
+    const rows = sites.flatMap((site, index) => {
+      if (claimed.has(site.siteId) || !match(site)) return [];
+      claimed.add(site.siteId);
+      return [{ site, index }];
+    });
+    return { label, testId, rows };
+  };
+  return {
+    groups: [
+      take("Needs my approval", "review-approvals", (site) => Boolean(site.needsApproval)),
+      take("Mentions", "review-mentions", (site) => Boolean(site.mentioned)),
+      take("Assigned", "review-assigned", (site) => Boolean(site.assigned)),
+    ].filter((group) => group.rows.length > 0),
+    rest: sites.flatMap((site, index) => (claimed.has(site.siteId) ? [] : [{ site, index }])),
+  };
+}
 
 const STAGES = [
   { id: "any", label: "Any stage" },
@@ -296,23 +319,36 @@ export function ReviewRail({
   currentId: string;
   onPick: (index: number) => void;
 }) {
+  const { groups, rest } = reviewGroups(sites);
+  const row = (site: FeedSite, index: number) => (
+    <button
+      key={site.siteId}
+      type="button"
+      className={`${site.siteId === currentId ? "on" : ""} ${site.status === "reviewed" ? "done" : ""}`}
+      onClick={() => onPick(index)}
+    >
+      <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
+      <span>{marketLabel(site.city)}</span>
+      <span className="review-row-chips">
+        {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
+        {site.reasons[0] ? <time>{reasonWhen(site.reasons[0].at)}</time> : null}
+      </span>
+    </button>
+  );
   return (
     <aside className="review-rail" data-testid="review-rail">
-      {sites.map((site, index) => (
-        <button
-          key={site.siteId}
-          type="button"
-          className={`${site.siteId === currentId ? "on" : ""} ${site.status === "reviewed" ? "done" : ""}`}
-          onClick={() => onPick(index)}
-        >
-          <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
-          <span>{marketLabel(site.city)}</span>
-          <span className="review-row-chips">
-            {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
-            {site.reasons[0] ? <time>{reasonWhen(site.reasons[0].at)}</time> : null}
-          </span>
-        </button>
+      {groups.map((group) => (
+        <section key={group.testId} data-testid={group.testId}>
+          <h2>{group.label}</h2>
+          {group.rows.map(({ site, index }) => row(site, index))}
+        </section>
       ))}
+      {rest.length ? (
+        <section data-testid="review-other">
+          {groups.length ? <h2>Also in review</h2> : null}
+          {rest.map(({ site, index }) => row(site, index))}
+        </section>
+      ) : null}
     </aside>
   );
 }
@@ -334,17 +370,31 @@ export function ReviewFeedSheet({
         <h2>Review</h2>
         <button type="button" onClick={onClose}>Close</button>
       </div>
-      {sites.map((site, index) => (
-        <button
-          key={site.siteId}
-          type="button"
-          className={site.siteId === currentId ? "on" : ""}
-          onClick={() => { onPick(index); onClose(); }}
-        >
-          <strong>{index + 1}. {site.name}</strong>
-          <span>{marketLabel(site.city)} · {chips(site.reasons).map((chip) => chip.label).join(", ")}</span>
-        </button>
-      ))}
+      {(() => {
+        const { groups, rest } = reviewGroups(sites);
+        const row = (site: FeedSite, index: number) => (
+          <button
+            key={site.siteId}
+            type="button"
+            className={site.siteId === currentId ? "on" : ""}
+            onClick={() => { onPick(index); onClose(); }}
+          >
+            <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{index + 1}. {site.name}</strong>
+            <span>{marketLabel(site.city)} · {chips(site.reasons).map((chip) => chip.label).join(", ")}</span>
+          </button>
+        );
+        return (
+          <>
+            {groups.map((group) => (
+              <section key={group.testId}>
+                <h3>{group.label}</h3>
+                {group.rows.map(({ site, index }) => row(site, index))}
+              </section>
+            ))}
+            {rest.map(({ site, index }) => row(site, index))}
+          </>
+        );
+      })()}
     </div>
   );
 }

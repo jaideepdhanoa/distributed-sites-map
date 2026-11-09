@@ -2,5 +2,9 @@
   "fromName": "Distributed Sites",
   "from": "Distributed Sites <alerts@distributedsites.com>",
   "replyTo": "jaideep@dhanoa.in",
-  "liveUsernames": ["jaideep"]
+  "liveUsernames": ["jaideep"],
+  "adminUsernames": ["jaideep"],
+  "emails": {
+    "jaideep": "jaideep@dhanoa.in"
+  }
 }

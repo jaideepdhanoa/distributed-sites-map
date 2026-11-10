@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { resolveActionRole } from "@/lib/actions/roles";
+import { stageTitle } from "@/lib/labels";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
 import { DAILY_CAP, batchWindowMs, losAngelesParts, stampOf } from "./clock";
@@ -33,6 +34,8 @@ function batchKey(prefix: string, userId: string, ids: string[]): string {
 }
 
 function asItem(row: OutboxRow): MailItem {
+  const hit = loadCatalog().find((item) => item.id === row.site_id);
+  const stage = hit ? stageTitle(hit.stageGroup) : "";
   return {
     category: row.category,
     siteId: row.site_id,
@@ -40,6 +43,8 @@ function asItem(row: OutboxRow): MailItem {
     summary: row.summary,
     authorId: row.author_id,
     href: row.href,
+    market: hit?.city || "",
+    stage: stage === "Deal" ? "" : stage,
   };
 }
 
@@ -83,12 +88,12 @@ async function claimLog(
 
 export async function deliverRows(
   sql: Sql,
-  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string },
+  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string; kind?: "instant" | "digest" },
 ): Promise<string> {
   const now = input.now || new Date();
   const day = losAngelesParts(now).day;
   const items = [...(input.extra || []), ...input.rows.map(asItem)];
-  const rendered = renderBatch(items);
+  const rendered = renderBatch(items, { now, kind: input.kind });
   if (!rendered) {
     await markRows(sql, input.rows.map((row) => row.id), "skipped", input.key);
     return "skipped";
@@ -130,6 +135,7 @@ export async function deliverRows(
       replyTo: alertReplyTo(),
       subject,
       text: rendered.body,
+      html: rendered.html,
     });
   } catch {
     await sql.query(`UPDATE alert_log SET status = 'pending', warning = $2 WHERE id = $1`, [claim.id, "Send failed. It will be tried again."]);
@@ -278,6 +284,7 @@ export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
       extra,
       key: `digest:${user.u}:${day}`,
       now,
+      kind: "digest",
     });
     if (status === "error") continue;
     await sql.query(

@@ -9,6 +9,7 @@ export type OutboundMail = {
   replyTo: string;
   subject: string;
   text: string;
+  html?: string;
 };
 
 export interface MailTransport {
@@ -63,6 +64,7 @@ async function sendResend(mail: OutboundMail): Promise<void> {
       to: [mail.to],
       subject: mail.subject,
       text: mail.text,
+      ...(mail.html ? { html: mail.html } : {}),
       ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
     }),
   });
@@ -92,6 +94,7 @@ export function mailTransport(): MailTransport | null {
         ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
         subject: mail.subject,
         text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
       });
     },
   };

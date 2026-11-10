@@ -24,7 +24,7 @@ test("a test alert stays on the would-send log unless the account is approved fo
   const logs = await sql.query<{ subject: string; body: string; to_email: string; status: string }>(
     `SELECT subject, body, to_email, status FROM alert_log ORDER BY subject`,
   );
-  assert.equal(logs.rows.length, 2);
+  assert.equal(logs.rows.length, 6);
   for (const row of logs.rows) {
     assert.equal(row.status, "would_send");
     assert.equal(row.to_email, "reviewer@example.com");
@@ -43,7 +43,7 @@ test("a test alert stays on the would-send log unless the account is approved fo
   assert.equal(limited.limited, true);
   assert.match(limited.message, /five minutes/);
   const still = await sql.query(`SELECT id FROM alert_log`);
-  assert.equal(still.rows.length, 2);
+  assert.equal(still.rows.length, 6);
 });
 
 test("an approved account receives one sample instant alert and one sample digest", async () => {
@@ -54,9 +54,9 @@ test("an approved account receives one sample instant alert and one sample diges
   process.env.RESEND_EMAIL_DOMAIN = "distributedsites.com";
   const sql = await ready();
   const original = globalThis.fetch;
-  const sent: { to?: string[]; subject?: string; text?: string }[] = [];
+  const sent: { to?: string[]; subject?: string; text?: string; html?: string }[] = [];
   globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
-    sent.push(JSON.parse(String(init?.body || "{}")) as { to?: string[]; subject?: string; text?: string });
+    sent.push(JSON.parse(String(init?.body || "{}")) as { to?: string[]; subject?: string; text?: string; html?: string });
     return new Response("{}", { status: 200 });
   }) as typeof fetch;
   try {
@@ -64,19 +64,28 @@ test("an approved account receives one sample instant alert and one sample diges
     assert.equal(result.delivery, "sent");
     assert.equal(result.instant, "sent");
     assert.equal(result.digest, "sent");
-    assert.match(result.message, /Sent a sample instant alert and a sample daily digest to jaideep@dhanoa.in/);
+    assert.match(result.message, /Sent a sample of each alert and a daily digest to jaideep@dhanoa.in/);
   } finally {
     globalThis.fetch = original;
   }
-  assert.equal(sent.length, 2);
+  assert.equal(sent.length, 6);
   for (const mail of sent) {
     assert.deepEqual(mail.to, ["jaideep@dhanoa.in"]);
     assert.match(mail.subject || "", /^\[Test\] /);
     assert.match(mail.text || "", /Sample site/);
-    assert.doesNotMatch(mail.text || "", /PIPE-|\$\d/);
+    assert.doesNotMatch(mail.text || "", /https?:\/\//);
+    assert.match(mail.html || "", /#1e4636/);
+    assert.match(mail.html || "", /#fffdf8/);
+    assert.doesNotMatch(mail.html || "", />https?:\/\//);
   }
-  assert.equal(sent.filter((mail) => /sample instant alert/.test(mail.text || "")).length, 1);
-  assert.equal(sent.filter((mail) => /sample note for the daily digest/.test(mail.text || "")).length, 1);
+  const subjects = sent.map((mail) => mail.subject || "");
+  assert.equal(subjects.filter((subject) => subject.startsWith("[Test] Approval needed:")).length, 1);
+  assert.equal(subjects.filter((subject) => subject.includes("mentioned you")).length, 1);
+  assert.equal(subjects.filter((subject) => subject.includes("replied on")).length, 1);
+  assert.equal(subjects.filter((subject) => subject.includes("flagged")).length, 1);
+  assert.equal(subjects.filter((subject) => subject.includes("assigned")).length, 1);
+  assert.equal(subjects.filter((subject) => subject.includes("daily digest")).length, 1);
+  assert.equal(new Set(subjects).size, 6);
   const outbox = await sql.query(`SELECT id FROM alert_outbox`);
   assert.equal(outbox.rows.length, 0);
 
@@ -96,5 +105,5 @@ test("an approved account receives one sample instant alert and one sample diges
     delete process.env.RESEND_API_KEY;
     delete process.env.RESEND_EMAIL_DOMAIN;
   }
-  assert.equal(calls, 2);
+  assert.equal(calls, 6);
 });

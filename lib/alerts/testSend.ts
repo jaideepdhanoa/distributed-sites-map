@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { stampOf } from "./clock";
 import { deliverRows } from "./deliver";
-import { reviewHomeHref } from "./links";
+import { discussionHref, reviewHref } from "./links";
 import { liveMailAllowed } from "./transport";
 import type { MailItem } from "./compose";
 
@@ -18,55 +18,54 @@ export type TestAlertResult = {
   message: string;
 };
 
-function sampleInstant(): MailItem {
+const SAMPLE_NOTES: Record<MailItem["category"], string> = {
+  approvals: "Please review the next step on this sample site.",
+  mentions: "Please take a look at this sample note.",
+  replies: "Adding a sample reply on the thread.",
+  flags: "Flagging this sample site for a closer look.",
+  assignments: "This sample site is assigned to you.",
+  followed: "This is a sample note for the daily digest.",
+  queue: "A sample item is waiting in Review.",
+};
+
+function sampleItem(category: MailItem["category"]): MailItem {
   return {
-    category: "approvals",
+    category,
     siteId: "sample",
     siteLabel: "Sample site",
-    summary: "This is a sample instant alert. Nothing on the map changed.",
-    authorId: "sample",
-    href: reviewHomeHref(),
+    summary: SAMPLE_NOTES[category],
+    authorId: "Ana",
+    href: category === "mentions" || category === "replies" ? discussionHref("sample") : reviewHref("sample"),
+    market: "PHX",
+    stage: "Desk screen",
   };
 }
 
+function sampleInstants(): MailItem[] {
+  return (["approvals", "mentions", "replies", "flags", "assignments"] as const).map(sampleItem);
+}
+
 function sampleDigest(): MailItem[] {
-  return [
-    {
-      category: "queue",
-      siteId: "sample",
-      siteLabel: "Sample site",
-      summary: "A sample item is waiting in Review.",
-      authorId: "sample",
-      href: reviewHomeHref(),
-    },
-    {
-      category: "followed",
-      siteId: "sample",
-      siteLabel: "Sample site",
-      summary: "This is a sample note for the daily digest.",
-      authorId: "sample",
-      href: reviewHomeHref(),
-    },
-  ];
+  return sampleInstants();
 }
 
 export function testAlertMessage(delivery: TestAlertResult["delivery"], email: string, live: boolean): string {
-  if (delivery === "sent") return `Sent a sample instant alert and a sample daily digest to ${email}.`;
+  if (delivery === "sent") return `Sent a sample of each alert and a daily digest to ${email}.`;
   if (delivery === "capped") return "The daily send cap was reached, so the sample alerts were not mailed.";
   if (delivery === "would_send" && !live) {
-    return `Nothing was mailed to ${email}. A sample instant alert and a sample daily digest were written to the would-send log, because this account is not approved for live mail.`;
+    return `Nothing was mailed to ${email}. A sample of each alert and a daily digest were written to the would-send log, because this account is not approved for live mail.`;
   }
   if (delivery === "would_send") {
-    return `Nothing was mailed to ${email}. A sample instant alert and a sample daily digest were written to the would-send log, because mail is not configured.`;
+    return `Nothing was mailed to ${email}. A sample of each alert and a daily digest were written to the would-send log, because mail is not configured.`;
   }
   return "The sample alerts could not be mailed.";
 }
 
-function combined(instant: string, digest: string): TestAlertResult["delivery"] {
-  if (instant === "error" || digest === "error") return "error";
-  if (instant === "capped" || digest === "capped") return "capped";
-  if (instant === "would_send" || digest === "would_send") return "would_send";
-  if (instant === "skipped" || digest === "skipped") return "skipped";
+function combined(statuses: string[]): TestAlertResult["delivery"] {
+  if (statuses.some((status) => status === "error")) return "error";
+  if (statuses.some((status) => status === "capped")) return "capped";
+  if (statuses.some((status) => status === "would_send")) return "would_send";
+  if (statuses.some((status) => status === "skipped")) return "skipped";
   return "sent";
 }
 
@@ -99,15 +98,19 @@ export async function sendTestAlerts(sql: Sql, input: { userId: string; email: s
     };
   }
   const nonce = `${now.getTime()}-${randomUUID()}`;
-  const instant = await deliverRows(sql, {
-    userId: input.userId,
-    email,
-    rows: [],
-    extra: [sampleInstant()],
-    key: `test:instant:${input.userId}:${nonce}`,
-    now,
-    subjectPrefix: TEST_SUBJECT_PREFIX,
-  });
+  const statuses: string[] = [];
+  for (const item of sampleInstants()) {
+    statuses.push(await deliverRows(sql, {
+      userId: input.userId,
+      email,
+      rows: [],
+      extra: [item],
+      key: `test:instant:${item.category}:${input.userId}:${nonce}`,
+      now,
+      subjectPrefix: TEST_SUBJECT_PREFIX,
+      kind: "instant",
+    }));
+  }
   const digest = await deliverRows(sql, {
     userId: input.userId,
     email,
@@ -116,7 +119,9 @@ export async function sendTestAlerts(sql: Sql, input: { userId: string; email: s
     key: `test:digest:${input.userId}:${nonce}`,
     now,
     subjectPrefix: TEST_SUBJECT_PREFIX,
+    kind: "digest",
   });
-  const delivery = combined(instant, digest);
-  return { limited: false, delivery, email, instant, digest, message: testAlertMessage(delivery, email, live) };
+  statuses.push(digest);
+  const delivery = combined(statuses);
+  return { limited: false, delivery, email, instant: statuses[0] || "skipped", digest, message: testAlertMessage(delivery, email, live) };
 }

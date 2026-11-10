@@ -36,7 +36,11 @@ Set these in Vercel. A change applies on the next deployment.
 | `ALERT_EMAILS` | no | JSON map of username to mailbox. Overrides the optional `email` on an account. |
 | `SMTP_USER` | fallback | Gmail address, used only when `RESEND_API_KEY` is unset. |
 | `SMTP_PASS` | fallback | Google app password for that mailbox. |
-| `CRON_SECRET` | for the digest | Bearer token Vercel Cron sends to the alert routes. |
+| `CRON_SECRET` | for the digest | Bearer token Vercel Cron sends to the alert routes. It does not authenticate the agent feed. |
+| `AGENT_INBOX_SECRET` | for the agent feed | Bearer token for `GET /api/agent/inbox`, the ack route, and recommendation writes. Separate from `CRON_SECRET`. |
+| `XAI_API_KEY` | for Ask | Direct xAI key. Ask stays in the "isn't set up yet" state until this is set. Not an AI Gateway key. |
+| `ASK_MODEL` | no | Ask model. Defaults to `grok-4.7`. |
+| `ASK_DAILY_LIMIT` | no | Questions per person per Pacific day. Defaults to 40. Counted in Upstash Redis. |
 
 Planned accounts, none created here: `jaideep` (admin), `cindel`, `ming`, `ricardo`, `yuka`, `muse`, `indie`. Admin only opens the accounts page. Everyone else sees the same map.
 
@@ -268,6 +272,101 @@ python3 scripts/build_timeline.py --workbook path/to/export.xlsx
 ```
 
 That command only reads. It writes `data/generated/timeline.json`.
+
+## Agent feed contract
+
+Muse reads the feed and writes drafts. She does not post, approve, reject, resolve, or assign. Those actions stay on the signed-in routes, and only a person can call them. The feed routes do not accept `CRON_SECRET`.
+
+Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `401`. The compare is constant-time.
+
+### Pull
+
+`GET /api/agent/inbox?after=<cursor>&limit=<1-100>`
+
+`limit` defaults to 50. `after` is the `cursor` of the last row you have already stored. Omit it to start at the oldest row. A bad cursor is `400`.
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "kind": "reply",
+      "subtype": null,
+      "ref_id": "note-or-proposal-id",
+      "site_id": "PIPE-PHX-0008",
+      "actor": "cindel",
+      "text": "Full text of the note, proposal, flag, or decision.",
+      "thread": { "key": "note:root-id", "context": "Parent text or the proposal being decided." },
+      "proposal_id": null,
+      "proposal_status": null,
+      "stage": null,
+      "workbook_stage": false,
+      "status": "new",
+      "created_at": "2026-11-10T00:00:00.000Z",
+      "cursor": "opaque"
+    }
+  ],
+  "next": null
+}
+```
+
+`kind` is `note`, `reply`, `mention`, `suggestion` (with `subtype` for the proposal type, such as `stage_move`), `flag`, `decision`, or `ask_gap`. `status` is `new`, `picked`, `done`, or `superseded`. A newer event on the same thread marks older open rows `superseded`. Skip those.
+
+The idempotency key is `kind:ref_id`. Posting the same event twice does not create a second row.
+
+`next` is the cursor to pass as `after`, or `null` when this page is the end.
+
+### Ack
+
+`POST /api/agent/inbox/ack`
+
+```json
+{ "ids": ["uuid"], "status": "picked" }
+```
+
+`status` is `picked` or `done`. Superseded rows stay superseded.
+
+### Recommendation
+
+`POST /api/agent/inbox/<id>/recommendation`
+
+```json
+{
+  "kind": "reply",
+  "draft_text": "The driveway is the tight part.",
+  "decision": "none",
+  "rationale": "The thread is about the frontage.",
+  "sources": [{ "label": "Discussion", "url": "/?site=PIPE-PHX-0008&panel=discussion" }],
+  "confidence": "medium",
+  "model": "muse"
+}
+```
+
+`kind` is `reply` (decision `none`) or `decision` (`approve` or `reject`). `confidence` is `high`, `medium`, or `low`. `sources` is required. Each source has a `label` and a `url` (`https://` or a map link starting `/?`) or a `ref`.
+
+The draft and the rationale go through the map wording check. A superseded inbox row, or a proposal that is no longer open, is `409`. Nothing in this response is posted.
+
+A stage_move that Jaideep approves adds a `decision` row with `workbook_stage: true` and `stage` set to the approved stage id. That is the signal to write the workbook Stage column. The app does not ask again.
+
+Unanswered Ask questions are logged as `ask_gap`.
+
+### What a person sees
+
+Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills his composer. Post, Approve, and Reject are still his buttons, and the saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline.
+
+## Ask
+
+Ask streams from the API catch-all, which has a 300 second `maxDuration`. It sits in the top bar for every signed-in account. It answers from the same sanitized map data, with a server-side tool loop of at most 5 steps. Quarantined rows, including `PIPE-PHX-0006`, are named quarantined and their values are not sent to the model. Non-reviewers get the map wording check. Reviewers may see internal terms. Both tiers refuse walk-away, max-pay, savings, and offer-price language, refuse drafted broker or seller messages, and refuse autonomous-vehicle or charging language framed for a broker.
+
+Ask does not approve, propose, assign, email, or change the workbook. If it cannot answer, the panel offers Make it a work item, which opens the existing work-item composer. The question is also written to the agent feed as `ask_gap`.
+
+The workbook sync does not publish a Rules file or a Task Board file, so Ask has no tool for those.
+
+Financials stay available to every signed-in role. The route checks `FINANCIALS_ROLES` in `lib/agent/access.ts`, which lists viewer, contributor, and reviewer. Narrow that list to change who can read them.
+
+Without `XAI_API_KEY`, the panel says Ask isn't set up yet. Usage by user and day, and the month-to-date estimated cost, is on `/admin` for an admin. The estimate uses the rates in `lib/ask/cost.ts`. It is not an invoice.
+
+`db/migrations` apply on the first notes, suggestions, saved-view, agent-feed, or admin request, or when someone runs `npm run db:migrate`. A deploy by itself does not run them.
 
 ## Not in this version
 

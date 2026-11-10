@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { getUsers } from "@/lib/users";
+import { ingestDecision } from "@/lib/agent/inbox";
+import { attachRecommendation } from "@/lib/agent/recommend";
 import { notifySuggestion } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
@@ -266,7 +268,7 @@ export async function createSuggestion(
 
 export async function decideSuggestion(
   sql: Sql,
-  input: { id: string; status: "accepted" | "rejected"; actorId: string; note?: string },
+  input: { id: string; status: "accepted" | "rejected"; actorId: string; note?: string; recommendationId?: string | null },
 ): Promise<Suggestion> {
   if (input.status !== "accepted" && input.status !== "rejected") {
     throw new InputError("A reviewer can accept or reject an open suggestion.");
@@ -277,11 +279,17 @@ export async function decideSuggestion(
   const row = existing.rows[0];
   if (!row) throw new InputError("That suggestion is not in the queue.", 404);
   if (row.status !== "open") throw new InputError("Only an open suggestion can be accepted or rejected.");
+  const attached = await attachRecommendation(sql, {
+    recommendationId: input.recommendationId,
+    actorId: input.actorId,
+    kind: "decision",
+  });
   await sql.query(
     `UPDATE suggestions
-     SET status = $2, decided_by = $3, decided_at = now(), decision_note = $4
+     SET status = $2, decided_by = $3, decided_at = now(), decision_note = $4,
+         recommendation_id = $5, drafted_by_agent = $6
      WHERE id = $1 AND status = 'open'`,
-    [input.id, input.status, input.actorId, note || null],
+    [input.id, input.status, input.actorId, note || null, attached.recommendationId, attached.draftedByAgent],
   );
   await audit(sql, {
     actorId: input.actorId,
@@ -289,7 +297,20 @@ export async function decideSuggestion(
     targetKind: row.target_kind,
     targetId: row.target_id,
     before: { id: row.id, status: "open" },
-    after: { id: row.id, status: input.status, note },
+    after: { id: row.id, status: input.status, note, recommendationId: attached.recommendationId, draftedByAgent: attached.draftedByAgent },
+  });
+  await ingestDecision(sql, {
+    id: input.id,
+    status: input.status,
+    actorId: input.actorId,
+    note,
+    siteId: permanentSiteId(row.target_kind, row.target_id),
+    recordId: row.target_id,
+    field: row.field_name,
+    detail: row.detail,
+    title: row.title,
+    proposedValue: row.proposed_value,
+    reason: row.reason,
   });
   if (input.status === "accepted" && row.field_name === "document_request" && row.target_on) {
     const day = dayOf(row.target_on);

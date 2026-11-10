@@ -6,7 +6,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const session = await openActions("reviewer");
   if (isResponse(session)) return session;
   const { id } = await context.params;
-  let body: { status?: string; note?: string };
+  let body: { status?: string; note?: string; recommendationId?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -16,7 +16,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return jsonError("A reviewer can accept or reject an open suggestion.", 400);
   }
   const suggestion = await runWrite(session, { action: "suggestion.decide", targetId: id }, (sql) =>
-    decideSuggestion(sql, { id, status: body.status as "accepted" | "rejected", actorId: session.u, note: body.note }),
+    decideSuggestion(sql, { id, status: body.status as "accepted" | "rejected", actorId: session.u, note: body.note, recommendationId: body.recommendationId }),
   );
   if (isResponse(suggestion)) return suggestion;
   return jsonOk({ suggestion });

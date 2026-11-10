@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { NextRequest } from "next/server";
 import { allowHeader, apiRoutes, dispatch } from "../../lib/api/dispatch.ts";
+import * as askHandler from "../../lib/api/handlers/ask.ts";
+import * as askStatus from "../../lib/api/handlers/ask-status.ts";
+import * as recommendations from "../../lib/api/handlers/actions/recommendations.ts";
+import * as recommendationsDismiss from "../../lib/api/handlers/actions/recommendations-dismiss.ts";
 
 const expected = [
   "GET /api/actions/accounts",
@@ -20,6 +25,8 @@ const expected = [
   "PATCH /api/actions/suggestions/:id",
   "GET /api/actions/suggestions",
   "POST /api/actions/suggestions",
+  "POST /api/actions/recommendations/:id/dismiss",
+  "GET /api/actions/recommendations",
   "DELETE /api/actions/views/:id",
   "GET /api/actions/views",
   "POST /api/actions/views",
@@ -29,6 +36,11 @@ const expected = [
   "GET /api/alerts/preferences",
   "PUT /api/alerts/preferences",
   "POST /api/alerts/test",
+  "POST /api/agent/inbox/ack",
+  "POST /api/agent/inbox/:id/recommendation",
+  "GET /api/agent/inbox",
+  "GET /api/ask/status",
+  "POST /api/ask",
   "GET /api/data/areas",
   "GET /api/data/deals",
   "GET /api/data/depots",
@@ -88,6 +100,44 @@ test("options advertises the methods of that path", async () => {
   assert.equal((await call("OPTIONS", "/api/actions/suggestions/export")).headers.get("allow"), "GET, HEAD, OPTIONS");
   assert.equal((await call("OPTIONS", "/api/actions/suggestions/abc")).headers.get("allow"), "OPTIONS, PATCH, POST");
   assert.equal((await call("OPTIONS", "/api/alerts/flush")).headers.get("allow"), "GET, HEAD, OPTIONS, POST");
+  assert.equal((await call("OPTIONS", "/api/agent/inbox")).headers.get("allow"), "GET, HEAD, OPTIONS");
+  assert.equal((await call("OPTIONS", "/api/agent/inbox/ack")).headers.get("allow"), "OPTIONS, POST");
+  assert.equal((await call("OPTIONS", "/api/agent/inbox/inbox-row-1/recommendation")).headers.get("allow"), "OPTIONS, POST");
+  assert.equal((await call("OPTIONS", "/api/actions/recommendations")).headers.get("allow"), "GET, HEAD, OPTIONS");
+  assert.equal((await call("OPTIONS", "/api/actions/recommendations/rec-1/dismiss")).headers.get("allow"), "OPTIONS, POST");
+  assert.equal((await call("OPTIONS", "/api/ask")).headers.get("allow"), "OPTIONS, POST");
+  assert.equal((await call("OPTIONS", "/api/ask/status")).headers.get("allow"), "GET, HEAD, OPTIONS");
+});
+
+test("the new agent and ask routes dispatch to their handlers", async () => {
+  assert.equal((await call("GET", "/api/agent/inbox/ack")).status, 405);
+  assert.equal((await call("POST", "/api/ask/status")).status, 405);
+  assert.equal((await call("GET", "/api/ask")).status, 405);
+  const previous = process.env.AGENT_INBOX_SECRET;
+  delete process.env.AGENT_INBOX_SECRET;
+  try {
+    assert.equal((await call("GET", "/api/agent/inbox")).status, 401);
+    assert.equal((await call("POST", "/api/agent/inbox/ack")).status, 401);
+    assert.equal((await call("POST", "/api/agent/inbox/inbox-row-1/recommendation")).status, 401);
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_INBOX_SECRET;
+    else process.env.AGENT_INBOX_SECRET = previous;
+  }
+  const byPath = new Map(apiRoutes.map((route) => [route.path, route]));
+  assert.equal(byPath.get("/api/ask")?.methods.POST, askHandler.POST);
+  assert.equal(byPath.get("/api/ask/status")?.methods.GET, askStatus.GET);
+  assert.equal(byPath.get("/api/actions/recommendations")?.methods.GET, recommendations.GET);
+  assert.equal(byPath.get("/api/actions/recommendations/:id/dismiss")?.methods.POST, recommendationsDismiss.POST);
+});
+
+test("ask streams from the catch-all instead of its own function", () => {
+  const ask = readFileSync("lib/api/handlers/ask.ts", "utf8");
+  const route = readFileSync("app/api/[...route]/route.ts", "utf8");
+  assert.match(ask, /streamAnswer/);
+  assert.equal(ask.includes("maxDuration"), false);
+  assert.match(route, /maxDuration = 300/);
+  assert.match(route, /return dispatch/);
+  assert.equal(route.includes("app/api/ask"), false);
 });
 
 test("an unknown path is the app not-found", async () => {

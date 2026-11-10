@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { formatPacific } from "@/lib/actions/time";
+import type { VisibleRecommendation } from "@/lib/agent/recommend";
+import { SuggestedBlock } from "../agent/SuggestedBlock";
+import { useRecommendations } from "../agent/useRecommendations";
 import { MentionChips, MentionField, type MentionAccount } from "./MentionField";
 import { canReview, canWrite, useActionStatus, type ActionRole } from "./panel";
 
@@ -86,6 +89,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   const [pending, setPending] = useState(false);
   const writable = canWrite(status.actionRole);
   const reviewer = canReview(status.actionRole);
+  const suggestionsForSite = useRecommendations(id);
 
   async function reload() {
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
@@ -168,7 +172,9 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
           pending={pending}
           accounts={accounts}
           onOpen={openThread}
-          onReply={(parentId, body, mentions) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions }, () => undefined)}
+          recommendations={suggestionsForSite.rows}
+          onDismissRecommendation={(recommendationId) => void suggestionsForSite.dismiss(recommendationId)}
+          onReply={(parentId, body, mentions, recommendationId) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions, recommendationId }, () => undefined)}
           onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
           onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
           onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
@@ -312,7 +318,9 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
             pending={pending}
             accounts={accounts}
             onOpen={openThread}
-            onReply={(parentId, body, mentions) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions }, () => undefined)}
+            recommendations={suggestionsForSite.rows}
+          onDismissRecommendation={(recommendationId) => void suggestionsForSite.dismiss(recommendationId)}
+          onReply={(parentId, body, mentions, recommendationId) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions, recommendationId }, () => undefined)}
             onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
             onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
             onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
@@ -365,6 +373,8 @@ function NoteThread({
   pending,
   actor,
   accounts,
+  recommendations = [],
+  onDismissRecommendation,
   onReply,
   onEdit,
   onDelete,
@@ -379,7 +389,9 @@ function NoteThread({
   pending: boolean;
   actor: string;
   accounts: Account[];
-  onReply: (parentId: string, body: string, mentions: string[]) => void;
+  recommendations?: VisibleRecommendation[];
+  onDismissRecommendation?: (id: string) => void;
+  onReply: (parentId: string, body: string, mentions: string[], recommendationId?: string) => void;
   onEdit: (id: string, body: string, mentions: string[]) => void;
   onDelete: (id: string) => void;
   onResolve: (id: string) => void;
@@ -387,6 +399,7 @@ function NoteThread({
   onOpen: (id: string) => void;
 }) {
   const [reply, setReply] = useState("");
+  const [replyRecommendationId, setReplyRecommendationId] = useState<string | null>(null);
   const [replying, setReplying] = useState(false);
   const [replyMentions, setReplyMentions] = useState<Account[]>([]);
   const [editing, setEditing] = useState(false);
@@ -394,6 +407,7 @@ function NoteThread({
   const [draftMentions, setDraftMentions] = useState<Account[]>(note.mentions || []);
   const [confirming, setConfirming] = useState(false);
   const mentionedMe = [note, ...replies].some((item) => item.mentions?.some((mention) => mention.id === actor));
+  const suggested = recommendations.filter((item) => item.kind === "reply" && item.threadKey === `note:${note.id}`);
   return (
     <details
       className="act-thread"
@@ -443,9 +457,21 @@ function NoteThread({
           ))}
         </ul>
       ) : null}
+      {suggested.map((item) => (
+        <SuggestedBlock
+          key={item.id}
+          item={item}
+          onUse={(draft, recommendationId) => {
+            setReply(draft);
+            setReplyRecommendationId(recommendationId);
+            setReplying(true);
+          }}
+          onDismiss={(recommendationId) => onDismissRecommendation?.(recommendationId)}
+        />
+      ))}
       {writable && !note.deleted ? (
         replying ? (
-          <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply, replyMentions.map((item) => item.id)); setReply(""); setReplyMentions([]); setReplying(false); }}>
+          <form onSubmit={(event) => { event.preventDefault(); onReply(note.id, reply, replyMentions.map((item) => item.id), replyRecommendationId || undefined); setReply(""); setReplyMentions([]); setReplyRecommendationId(null); setReplying(false); }}>
             <MentionField label="Reply" value={reply} onChange={setReply} mentions={replyMentions} onMentions={setReplyMentions} accounts={accounts} testId="note-reply" rows={2} maxLength={2000} />
             <button type="submit" disabled={pending} className="menu-item">Reply</button>
           </form>

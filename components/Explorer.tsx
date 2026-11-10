@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, WhatChanged, marketLabel, type FeedSite } from "./queue/QueueView";
+import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import Wordmark from "./Wordmark";
@@ -105,6 +106,8 @@ export default function Explorer() {
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionRole?: string; actionsEnabled?: boolean } | null>(null);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askSite, setAskSite] = useState<{ id: string; name: string } | null>(null);
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
@@ -1171,6 +1174,9 @@ export default function Explorer() {
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
       {alertsOpen ? <AlertSettings onClose={() => setAlertsOpen(false)} /> : null}
+      {askOpen && me?.u ? (
+        <AskPanel open site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
+      ) : null}
       <header className="bar">
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
@@ -1205,6 +1211,21 @@ export default function Explorer() {
           {me?.actionsEnabled ? (
             <button className={`review-launch ${reviewing ? "on" : ""}`} type="button" onClick={() => write({ review: reviewing ? null : "1", i: reviewing ? null : "1", view: null, table: null, qmarket: reviewing ? null : "all", qstage: reviewing ? null : "any" })}>
               Review{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
+            </button>
+          ) : null}
+          {me?.u ? (
+            <button
+              type="button"
+              className="paper-btn ask-launch"
+              data-testid="ask-open"
+              onClick={() => {
+                if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
+                else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
+                else setAskSite(null);
+                setAskOpen(true);
+              }}
+            >
+              Ask
             </button>
           ) : null}
           <div className="user-menu only-desktop">

@@ -3,6 +3,7 @@ import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { audit } from "./audit";
 import type { Sql } from "./db";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
+import { attachRecommendation } from "@/lib/agent/recommend";
 import { notifyNote } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
 import { fileLookup, type RecordLookup } from "./records";
@@ -96,7 +97,7 @@ export async function listNotes(sql: Sql, targetKind: ThreadKind, targetId: stri
 
 export async function createNote(
   sql: Sql,
-  input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; parentId?: string | null; mentions?: unknown },
+  input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; parentId?: string | null; mentions?: unknown; recommendationId?: string | null },
   lookup: RecordLookup = fileLookup(),
 ): Promise<Note> {
   const parentId = input.parentId?.trim() || null;
@@ -126,17 +127,23 @@ export async function createNote(
   const body = parseBody(input.body, "note", 2000);
   assertClean(body);
   const mentionIds = parseMentionIds(input.mentions);
+  const attached = await attachRecommendation(sql, {
+    recommendationId: input.recommendationId,
+    actorId: input.authorId,
+    kind: "reply",
+  });
   const id = randomUUID();
   await sql.query(
-    `INSERT INTO notes (id, target_kind, target_id, parent_id, body, author_id) VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, targetKind, targetId, parentId, body, input.authorId],
+    `INSERT INTO notes (id, target_kind, target_id, parent_id, body, author_id, recommendation_id, drafted_by_agent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, targetKind, targetId, parentId, body, input.authorId, attached.recommendationId, attached.draftedByAgent],
   );
   await audit(sql, {
     actorId: input.authorId,
     action: parentId ? "note.reply" : "note.create",
     targetKind,
     targetId,
-    after: { id, parentId, body, mentions: mentionIds },
+    after: { id, parentId, body, mentions: mentionIds, recommendationId: attached.recommendationId, draftedByAgent: attached.draftedByAgent },
   });
   const siteId = await queueSiteId(sql, targetKind, targetId);
   await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "note", sourceId: id });
@@ -150,6 +157,7 @@ export async function createNote(
   await notifyNote(sql, {
     noteId: id,
     siteId,
+    recordId: targetId,
     body,
     authorId: input.authorId,
     parentId,
@@ -175,6 +183,7 @@ export async function editNote(sql: Sql, input: { id: string; body: string; acto
     await notifyNote(sql, {
       noteId: row.id,
       siteId,
+      recordId: row.target_id,
       body,
       authorId: input.actorId,
       parentId: row.parent_id,

@@ -1,0 +1,37 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export const ASK_SYSTEM = [
+  "You are Ask on the Distributed Sites map.",
+  "Answer questions about sites, the portfolio, and the market using only the tools.",
+  "Never approve, reject, propose, assign, email, or change the workbook.",
+  "Each claim cites a source as a markdown link: a site card (/?site=ID), a Discussion post (/?site=ID&panel=discussion), or a rule id.",
+  "If you have no source, say you don't know.",
+  "Never discuss walk-away, max-pay, savings, or an offer price.",
+  "Never draft a message to a broker or a seller.",
+  "Never mention autonomous vehicles or charging in anything framed for a broker.",
+  "A quarantined record is named as quarantined. Do not use its values.",
+].join(" ");
+
+type FunnelFile = { stages?: { id?: string; name?: string; total?: number }[] };
+
+let cachedSummary: string | null = null;
+
+export function portfolioSummary(): string {
+  if (cachedSummary) return cachedSummary;
+  try {
+    const file = JSON.parse(readFileSync(join(process.cwd(), "data", "generated", "funnel.json"), "utf8")) as FunnelFile;
+    const lines = (file.stages || [])
+      .filter((stage) => stage && stage.name && typeof stage.total === "number")
+      .map((stage) => `${stage.name}: ${stage.total}`);
+    cachedSummary = lines.length ? `Portfolio counts. ${lines.join(". ")}.` : "Portfolio counts are not loaded.";
+  } catch {
+    cachedSummary = "Portfolio counts are not loaded.";
+  }
+  return cachedSummary;
+}
+
+/** Stable prefix. Role and the question stay after it so this text can be cached. */
+export function askPrefix(): string {
+  return `${ASK_SYSTEM}\n\n${portfolioSummary()}`;
+}

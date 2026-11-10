@@ -83,7 +83,7 @@ test("queue order is approval, then mentions, then assigned, then the rest", () 
   assert.deepEqual(rows.map((item) => item.siteId), ["approval", "mentioned", "assigned", "flagged", "fresh", "newer", "older"]);
 });
 
-test("a hidden c-store stays out of the queue unless it needs approval", () => {
+test("a hidden c-store stays out of every review section", () => {
   const sites = [row("store", { }), row("open")].map((item) => item.id === "store" ? { ...item, hidden: true } : item);
   const hidden = buildQueue({
     sites,
@@ -103,18 +103,18 @@ test("a hidden c-store stays out of the queue unless it needs approval", () => {
     reasons: { store: [{ at: "2026-11-05T12:00:00.000Z", summary: "Next step proposed: Drop from pipeline", type: "next_proposed" }] },
     reviewedAt: { store: "2026-11-06T00:00:00.000Z" },
     snoozeUntil: {},
-    flagged: new Set(),
-    mentioned: new Set(),
-    assigned: new Set(),
+    flagged: new Set(["store"]),
+    mentioned: new Set(["store"]),
+    assigned: new Set(["store"]),
     needsApproval: new Set(["store"]),
     today: "2026-11-05",
     filters: { market: "all", viable: true },
   });
-  assert.equal(surfaced.some((item) => item.siteId === "store"), true);
+  assert.equal(surfaced.some((item) => item.siteId === "store"), false);
   const otherMarket = buildQueue({
     sites: [{ ...row("store", { city: "LAS" }), hidden: true }, row("local")],
     reasons: {},
-    reviewedAt: { store: "2026-11-06T00:00:00.000Z" },
+    reviewedAt: {},
     snoozeUntil: {},
     flagged: new Set(),
     mentioned: new Set(),
@@ -123,8 +123,8 @@ test("a hidden c-store stays out of the queue unless it needs approval", () => {
     today: "2026-11-05",
     filters: { market: "PHX", stage: "desk", viable: true },
   });
-  assert.equal(otherMarket.some((item) => item.siteId === "store"), true);
-  assert.equal(otherMarket[0]?.siteId, "store");
+  assert.equal(otherMarket.some((item) => item.siteId === "store"), false);
+  assert.equal(otherMarket[0]?.siteId, "local");
 });
 
 test("snooze hides a site until the date, and a later change or a flag brings it back", () => {

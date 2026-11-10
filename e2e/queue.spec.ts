@@ -317,23 +317,24 @@ test("the review inbox keeps its sections, and an approval ignores market and st
   const created = await request.post("/api/actions/suggestions", {
     data: {
       targetKind: "deal",
-      targetId: "PIPE-PHX-0067",
+      targetId: "PIPE-PHX-0081",
       field: "proposed_next_step",
-      title: "Drop the c-store",
+      title: "Confirm the frontage",
       targetOn: "2026-12-01",
-      proposedValue: "Drop the c-store",
+      proposedValue: "Confirm the frontage",
     },
   });
   expect(created.status()).toBe(201);
   await login(request, "reviewer");
   const queued = await queue(request, "market=LAS&stage=dropped&viable=1");
-  expect(queued.items.some((item) => item.siteId === "PIPE-PHX-0067")).toBeTruthy();
+  expect(queued.items.some((item) => item.siteId === "PIPE-PHX-0081")).toBeTruthy();
+  expect(queued.items.some((item) => item.siteId === "PIPE-PHX-0067")).toBeFalsy();
 
   await openAs(page, "reviewer", "/?review=1&qmarket=LAS&qstage=dropped");
   await expect(page.getByTestId("review-approvals")).toContainText("Needs my approval");
   await expect(page.getByTestId("review-mentions")).toContainText("Mentions");
   await expect(page.getByTestId("review-assigned")).toContainText("Assigned");
-  const approval = page.getByTestId("review-approvals").getByRole("button", { name: /Sinclair/ });
+  const approval = page.getByTestId("review-approvals").getByRole("button", { name: /Rinse My Ride/ });
   await expect(approval).toBeVisible();
   await expect(approval.locator(".queue-dot")).toBeVisible();
 });

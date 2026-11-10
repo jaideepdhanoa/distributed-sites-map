@@ -13,7 +13,7 @@ import { loadCatalog } from "../../lib/queue/catalog";
 import { loadQueue, markAllReviewed } from "../../lib/queue/load";
 import { memorySql } from "../helpers/sql";
 
-const active = loadCatalog().find((item) => item.active);
+const active = loadCatalog().find((item) => item.active && !item.isCStore);
 if (!active) throw new Error("expected an active pipeline deal");
 const deal = Object.freeze({ deal_id: active.id, stage: active.stage, name: "Sample deal" });
 const lookup: RecordLookup = (kind, id) => (kind === "deal" && id === deal.deal_id ? deal : null);

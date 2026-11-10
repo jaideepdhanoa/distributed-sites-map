@@ -6,7 +6,7 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
-import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, openLandText, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
@@ -38,7 +38,6 @@ type SheetControl = {
 
 function SheetHandle({ sheet }: { sheet?: SheetControl }) {
   const drag = useRef<{ y: number; height: number } | null>(null);
-  const snap = sheet?.snap ?? "peek";
   return (
     <div className="sheet-handle" data-testid="sheet-handle">
       <button
@@ -67,6 +66,7 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           if (!info || !drawer || !sheet?.onSnap) return;
           if (Math.abs(info.y - event.clientY) < 10) {
             drawer.style.height = "";
+            sheet.onSnap(stepSheet(sheet.snap ?? "peek", "more"));
             return;
           }
           sheet.onSnap(nearestSheetSnap(drawer.getBoundingClientRect().height, window.innerHeight));
@@ -80,14 +80,6 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           if (drawer) drawer.style.height = "";
         }}
       />
-      <div className="sheet-steps">
-        {snap === "peek" ? <span className="sheet-step" /> : (
-          <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "less"))}>Show less</button>
-        )}
-        {snap === "full" ? <span className="sheet-step" /> : (
-          <button type="button" className="sheet-step" onClick={() => sheet?.onSnap?.(stepSheet(snap, "more"))}>Show more</button>
-        )}
-      </div>
     </div>
   );
 }
@@ -103,9 +95,9 @@ function FigureSkeleton() {
   );
 }
 
-function DealHeadline({ deal }: { deal: DealProps }) {
+function DealHeadline({ deal, censusAcres }: { deal: DealProps; censusAcres?: number | null }) {
   const cash = cashTile(deal);
-  const spare = deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
+  const spare = spareLandSqft(deal.open_land_sqft, censusAcres);
   const bays = deal.bays_that_fit == null ? "Not provided" : String(Math.round(deal.bays_that_fit));
   const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
   const cashLabel = deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow";
@@ -114,8 +106,8 @@ function DealHeadline({ deal }: { deal: DealProps }) {
     <div className="headline" data-testid="headline">
       <div>
         <span>Spare land</span>
-        <strong>{spare}</strong>
-        {deal.open_land_sqft != null ? <small>Sheet spare area, square feet</small> : null}
+        <strong>{spare.value}</strong>
+        {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div>
         <span>Bays that fit</span>
@@ -180,6 +172,8 @@ export default function Detail({
   onOpenParty,
   linkedDeal,
   onAddCompare,
+  compared = false,
+  onOpenReview,
   onNotFit,
   sameOwner,
   onClose,
@@ -199,6 +193,8 @@ export default function Detail({
   onOpenParty?: (name: string) => void;
   linkedDeal?: DealProps | null;
   onAddCompare?: () => void;
+  compared?: boolean;
+  onOpenReview?: () => void;
   onNotFit?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
@@ -258,10 +254,11 @@ export default function Detail({
             {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
             <p className="note">{site.address || "—"}</p>
             <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
-            {linkedDeal ? <DealHeadline deal={linkedDeal} /> : null}
+            {linkedDeal ? <DealHeadline deal={linkedDeal} censusAcres={site.spare_ac_own} /> : null}
             <div className="card-actions">
               {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
-              {onAddCompare ? <button className="action primary" type="button" onClick={onAddCompare}>Add to compare</button> : null}
+              {onOpenReview ? <button className="action primary" type="button" onClick={onOpenReview}>Open in Review</button> : null}
+              {onAddCompare ? <button className={`paper-btn${compared ? " on" : ""}`} type="button" aria-pressed={compared} onClick={onAddCompare}>{compared ? "In compare" : "Add to compare"}</button> : null}
               {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
             </div>
           </>
@@ -391,8 +388,7 @@ export default function Detail({
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Universe own spare</span><div>{acres(site.spare_ac_own, site.spare_ac_own_text)} · Census own-parcel spare, acres</div>
-              {linkedDeal?.open_land_sqft != null ? <><span>Workbook spare</span><div>{openLandText(linkedDeal.open_land_sqft)} · Sheet spare area, square feet</div></> : null}
+              <span>Spare land</span><div>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
               <span>Site capacity</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
@@ -438,6 +434,7 @@ export function DealDetail({
   onOpenParty,
   onClose,
   onCompare,
+  onOpenReview,
   onNotFit,
   compared,
   sheet,
@@ -459,6 +456,7 @@ export function DealDetail({
   onOpenParty?: (name: string) => void;
   onClose?: () => void;
   onCompare?: (on: boolean) => void;
+  onOpenReview?: () => void;
   onNotFit?: () => void;
   compared?: boolean;
   sheet?: SheetControl;
@@ -509,14 +507,12 @@ export function DealDetail({
             <h2>{deal.name || deal.address}</h2>
             <p className="note">{deal.address}</p>
             <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
-            <DealHeadline deal={deal} />
+            <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} />
             <div className="card-actions">
               {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
+              {onOpenReview ? <button className="action primary" type="button" onClick={onOpenReview}>Open in Review</button> : null}
               {onCompare ? (
-                <label className="compare-check">
-                  <input className="check" type="checkbox" checked={Boolean(compared)} onChange={(event) => onCompare?.(event.currentTarget.checked)} />
-                  Compare
-                </label>
+                <button className={`paper-btn${compared ? " on" : ""}`} type="button" aria-pressed={Boolean(compared)} onClick={() => onCompare?.(!compared)}>{compared ? "In compare" : "Add to compare"}</button>
               ) : null}
               {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
             </div>
@@ -574,8 +570,8 @@ export function DealDetail({
               </div>
               <span>Per acre</span>
               <div>{deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "Not provided"}</div>
-              <span>Open land</span>
-              <div>{deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"}</div>
+              <span>Spare land</span>
+              <div>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
               <span>Site capacity</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {cash.hidden ? null : <span>{deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow"}</span>}

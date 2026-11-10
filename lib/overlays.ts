@@ -22,10 +22,9 @@ function roadLabel(value?: string | null) {
 }
 
 export const OVERLAYS = [
-  { id: "traffic", label: "Nearest traffic" },
-  { id: "trafficMax", label: "Max traffic" },
-  { id: "population", label: "3-mile population" },
-  { id: "washes", label: "Nearby washes" },
+  { id: "traffic", label: "Traffic" },
+  { id: "population", label: "Population" },
+  { id: "washes", label: "Washes nearby" },
   { id: "growth", label: "Growth" },
   { id: "income", label: "Income" },
 ] as const;
@@ -33,8 +32,11 @@ export const OVERLAYS = [
 export type OverlayId = (typeof OVERLAYS)[number]["id"];
 
 export function parseOverlays(value: string | null): OverlayId[] {
-  const known = new Set(OVERLAYS.map((item) => item.id));
-  const picked = (value || "").split("|").filter((id): id is OverlayId => known.has(id as OverlayId));
+  const known = new Set<string>(OVERLAYS.map((item) => item.id));
+  const picked = (value || "").split("|").flatMap((id) => {
+    if (id === "traffic" || id === "trafficMax") return ["traffic" as OverlayId];
+    return known.has(id) ? [id as OverlayId] : [];
+  });
   return [...new Set(picked)];
 }
 
@@ -47,13 +49,13 @@ export function overlayFeatures(deals: Pointed[], active: OverlayId[]) {
     if (!feature.geometry) return [];
     const deal = feature.properties;
     const parts: string[] = [];
-    if (active.includes("traffic") && deal.trade_aadt != null) {
+    if (active.includes("traffic") && (deal.trade_aadt != null || deal.trade_aadt_max != null)) {
+      const count = deal.trade_aadt != null ? Math.round(deal.trade_aadt).toLocaleString() : "";
+      const max = deal.trade_aadt_max != null ? Math.round(deal.trade_aadt_max).toLocaleString() : "";
+      const shown = count && max && count !== max ? `${count} (max ${max})` : count || max;
       const road = roadLabel(deal.trade_aadt_road);
-      const count = Math.round(deal.trade_aadt).toLocaleString();
-      parts.push(road.name ? `${count} on ${road.name}${road.freeway ? " freeway" : ""}` : `${count} vehicles/day`);
-    }
-    if (active.includes("trafficMax") && deal.trade_aadt_max != null) {
-      parts.push(`max ${Math.round(deal.trade_aadt_max).toLocaleString()}`);
+      const where = road.name ? ` on ${road.name}${road.freeway ? ", freeway" : ""}` : "";
+      if (shown) parts.push(`${shown}${where}`);
     }
     if (active.includes("population") && deal.trade_population != null) {
       parts.push(`${Math.round(deal.trade_population).toLocaleString()} people`);

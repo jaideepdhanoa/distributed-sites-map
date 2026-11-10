@@ -11,19 +11,19 @@ import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
-import SiteTable, { DealTable, siteExportHeaders, siteExportRow, type ActivitySummary } from "./SiteTable";
+import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
-import { readSearches, readShortlists, removeSearch, removeShortlist, saveSearch, saveShortlist, type SavedSearch, type Shortlist } from "@/lib/savedSets";
+import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
 import { clearHidden, hideSite, readHidden } from "@/lib/hide";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
-import { displayAddress, leadSourceLine, plainRoad, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { displayAddress, leadSourceLine, plainRoad } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
-import { AREA_KIND_LABEL, AREA_NOTES, BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, TIER_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
@@ -106,15 +106,11 @@ export default function Explorer() {
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionRole?: string; actionsEnabled?: boolean } | null>(null);
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-  const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
   const [handoff, setHandoff] = useState("");
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
-  const [searchName, setSearchName] = useState("");
-  const [listName, setListName] = useState("");
   const [queueCount, setQueueCount] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
@@ -142,7 +138,6 @@ export default function Explorer() {
   const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
   const [changesNote, setChangesNote] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
-  const [legendOpen, setLegendOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -220,10 +215,36 @@ export default function Explorer() {
 
   const mapArea = parseMapArea(params);
   useEffect(() => {
-    setSavedSearches(readSearches());
-    setShortlists(readShortlists());
     setHiddenIds(readHidden());
   }, []);
+  useEffect(() => {
+    if (!me?.u) return;
+    const searches = readSearches();
+    const lists = readShortlists();
+    if (!searches.length && !lists.length) return;
+    let cancel = false;
+    void (async () => {
+      for (const item of searches) {
+        const response = await fetch("/api/actions/views", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: item.name, query: item.query, scope: "personal" }),
+        });
+        if (response.ok && !cancel) removeSearch(item.name);
+      }
+      for (const item of lists) {
+        const response = await fetch("/api/actions/views", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: item.name, query: `compare=${item.ids.join("|")}`, scope: "personal" }),
+        });
+        if (response.ok && !cancel) removeShortlist(item.name);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [me?.u]);
   useEffect(() => {
     let cancel = false;
     fetch("/api/data/grid").then(async (response) => {
@@ -353,7 +374,12 @@ export default function Explorer() {
     fetch(`/api/queue?${q}`).then(async (response) => {
       if (cancel || !response.ok) return;
       const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
-      const next = (payload.items || []).map((item) => ({
+      const next = (payload.items || []).filter((item) => !isPipelineStore({
+        kind: "pipeline",
+        name: item.snapshot?.name,
+        business_type: (item.snapshot as { businessType?: string } | null)?.businessType,
+        description: (item.snapshot as { description?: string } | null)?.description,
+      })).map((item) => ({
         siteId: item.siteId,
         name: item.snapshot?.name || item.siteId,
         city: item.snapshot?.city || item.city || "",
@@ -529,9 +555,9 @@ export default function Explorer() {
   }
 
   function cStoreHidden(deal: DealProps, _wide: boolean) {
-    if (!deal.is_c_store || showCStores) return false;
+    if (showCStores) return false;
     if (selected === deal.deal_id) return false;
-    return true;
+    return Boolean(deal.is_c_store) || isPipelineStore(deal);
   }
 
   function inDealMarket(deal: DealProps, wide: boolean) {
@@ -580,36 +606,9 @@ export default function Explorer() {
     return true;
   });
 
-  function activityCells(id: string | undefined) {
-    const touch = id ? activity[id] : undefined;
-    return [touch?.lastTouched || "", touch?.materials || 0];
-  }
-
-  function exportTable() {
-    const filterLine = `Filters: city ${city}, ${funnel === "pipeline" ? `pipeline ${pipeStage}` : `step ${stage}`}${query ? `, search ${query}` : ""}${landTier !== "any" ? `, tier ${landTier}` : ""}${verdict !== "any" ? `, verdict ${verdict}` : ""}${listed === "yes" ? ", listed" : ""}${businessTypes ? `, types ${businessTypes.join(" ")}` : ""}. As of ${new Date().toISOString().slice(0, 10)}.`;
-    const headers = tableTab === "universe"
-      ? [...siteExportHeaders(), "Last touched", "Materials"]
-      : ["Deal", "Name", "City", "Stage", "Firm", "Broker", "Asking", "Asking source", "Site capacity", "Depot mi", "Universe site", "Last touched", "Materials"];
-    const body = tableTab === "universe"
-      ? visibleSites.map((row) => [...siteExportRow(row, dealRows), ...activityCells(row.linked_deal_id)])
-      : (tableTab === "land" ? landDeals : pipelineDeals).map((row) => [
-          row.deal_id, row.name, row.city, stageDetail(row.stage, row.stage_group), shownFirm(row), shownBroker(row), row.asking_price_display, shownPriceSource(row), capacitySummary(factsForDeal(row)), row.miles_to_depot, row.universe_id, ...activityCells(row.deal_id),
-        ]);
-    const lines = [`# ${filterLine}`, headers.join(","), ...body.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`).join(","))];
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${city}-${tableTab}.csv`;
-    link.click();
-    setMoreOpen(false);
-    setMenuOpen(false);
-    if (me?.actionsEnabled) {
-      void fetch("/api/actions/exports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "table" }),
-      }).catch(() => undefined);
-    }
+  function openInReview(id: string) {
+    const at = visibleFeed.findIndex((site) => site.siteId === id);
+    write({ review: "1", i: String(at >= 0 ? at + 1 : 1), view: null, table: null, funnel: "pipeline", qmarket: "all", qstage: "any" });
   }
 
   function setCompared(id: string, on?: boolean) {
@@ -1082,18 +1081,11 @@ export default function Explorer() {
   }
 
   function summaryText() {
-    if (funnel === "pipeline") {
-    const deals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !cStoreHidden(deal, false));
-    const land = dealRows.filter((deal) => deal.kind === "land" && (allCities || deal.city === city));
-      const activeDeals = deals.filter((deal) => deal.stage_group !== "dropped").length;
-      const droppedDeals = deals.length - activeDeals;
-      const activeLand = land.filter((deal) => deal.stage_group !== "dropped").length;
-      const droppedLand = land.length - activeLand;
-      return `${activeDeals} deals + ${activeLand} land sites, ${droppedDeals} dropped deals + ${droppedLand} dropped land sites`;
-    }
-    const candidates = sites.filter((site) => site.city === city && inStage(site, "land")).length;
-    const cleared = sites.filter((site) => site.city === city && inStage(site, "cleared")).length;
-    return `${candidates} candidates, ${cleared} cleared`;
+    if (funnel !== "pipeline") return "";
+    const rows = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !cStoreHidden(deal, false));
+    const onMap = rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length;
+    const dropped = rows.filter((deal) => deal.stage_group === "dropped").length;
+    return `${onMap.toLocaleString()} on the map · ${dropped.toLocaleString()} dropped, hidden`;
   }
 
   function goReview(index: number) {
@@ -1223,8 +1215,8 @@ export default function Explorer() {
               <div className="menu" role="menu">
                 <p className="menu-note">{me?.u}</p>
                 {me?.role === "admin" ? <a role="menuitem" href="/admin">Accounts</a> : null}
-                {me?.u ? <button type="button" role="menuitem" onClick={() => { setAlertsOpen(true); setUserOpen(false); }} className="menu-item">Alerts</button> : null}
-                {me?.role === "admin" ? <a role="menuitem" href="/admin/alerts">Alert preview</a> : null}
+                {me?.u ? <button type="button" role="menuitem" onClick={() => { setAlertsOpen(true); setUserOpen(false); }} className="menu-item">Alert settings</button> : null}
+                {me?.role === "admin" ? <a role="menuitem" href="/admin/alerts">Alerts admin</a> : null}
                 <button type="button" role="menuitem" onClick={logout} className="menu-item">Sign out</button>
               </div>
             ) : null}
@@ -1235,11 +1227,11 @@ export default function Explorer() {
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Spare land"))}
           </button>
           <input className="search mobile-search" aria-label="Search" placeholder="Search sites" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
-          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLegendOpen(false); setLayersOpen(false); }}>
+          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
-        <div className="funnel-switch only-mobile" role="group" aria-label="Map or list">
+        <div className="funnel-switch map-switch only-mobile" role="group" aria-label="Map or list">
           <button className={!listView && !reviewing ? "chip on" : "chip"} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
           <button className={listView && !reviewing ? "chip on" : "chip"} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
         </div>
@@ -1271,17 +1263,7 @@ export default function Explorer() {
         <div className="funnel-row">
           <button className="close only-mobile" type="button" aria-label="Close steps" onClick={() => setStepsOpen(false)}><span aria-hidden="true">×</span></button>
           <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
-            {funnel === "universe" ? (
-              <>
-                <span className="step">
-                  <button className={allStages && !extra ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allStages && !extra ? "step" : undefined} title="Every site in this market, at every step." onClick={() => write({ stage: allStages ? null : "all", extra: null, ruled: null }, true)}>
-                    <span>All</span>
-                    <strong>{sitePool.filter((site) => (allCities || site.city === city) && inStage(site, "universe") && passesChips(site, false)).length.toLocaleString()}</strong>
-                  </button>
-                </span>
-                <span className="chev" aria-hidden="true">›</span>
-              </>
-            ) : (
+            {funnel === "universe" ? null : (
               <>
                 <span className="step">
                   <button className={allPipes ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes ? "step" : undefined} title="Every deal in this market, at every stage." onClick={() => write({ pstage: allPipes ? null : "all" }, true)}>
@@ -1383,14 +1365,11 @@ export default function Explorer() {
               return <button className="aside" type="button" onClick={() => write({ stage: "universe" }, true)}>{more.toLocaleString()} more at other steps</button>;
             })()
           ) : null}
-          <span
-            className="summary-chip"
-            title={funnel === "pipeline" ? SUMMARY_NOTES.pipeline : SUMMARY_NOTES.universe}
-            onMouseEnter={() => setTip(funnel === "pipeline" ? SUMMARY_NOTES.pipeline : SUMMARY_NOTES.universe)}
-            onMouseLeave={() => setTip("")}
-          >
-            {summaryText()}
-          </span>
+          {summaryText() ? (
+            <span className="summary-chip" title={SUMMARY_NOTES.pipeline}>
+              {summaryText()}
+            </span>
+          ) : null}
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters
@@ -1400,8 +1379,6 @@ export default function Explorer() {
             <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
             {moreOpen ? (
               <div className="menu" role="menu">
-                <button type="button" onClick={exportTable} className="menu-item">Export CSV</button>
-                <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMoreOpen(false); }} className="menu-item">{tableOpen ? "Hide table" : "Table"}</button>
                 <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
                 <ActionsMenuButtons close={() => setMoreOpen(false)} />
                 <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
@@ -1460,67 +1437,30 @@ export default function Explorer() {
               }}
             />
             <h3>Spare land</h3>
-            <div className="chips">
-              {(["any", "L10", "L4"] as const).map((item) => (
-                <button key={item} className={landTier === item ? "chip on" : "chip"} type="button" title={item === "any" ? "" : TIER_NOTES[item].note} onMouseEnter={() => item !== "any" && setTip(TIER_NOTES[item].note)} onMouseLeave={() => setTip("")} onClick={() => write({ tier: item === "any" ? null : item })}>
-                  {item === "any" ? "All tiers" : <><i className={`swatch ${item === "L10" ? "l10" : "l4"}`} /> {TIER_NOTES[item].label}</>}
-                </button>
+            <div className="segmented" role="group" aria-label="Spare land">
+              {([["any", "Any"], ["L10", "10k+ sq ft"], ["L4", "4k+ sq ft"]] as const).map(([item, label]) => (
+                <button key={item} type="button" className={`segmented ${landTier === item ? "on" : ""}`} onClick={() => write({ tier: item === "any" ? null : item })}>{label}</button>
               ))}
             </div>
-            <h3>Saved searches</h3>
-            <form className="saved-search" onSubmit={(event) => {
-              event.preventDefault();
-              setSavedSearches(saveSearch(searchName, window.location.search.replace(/^\?/, "")));
-              setSearchName("");
-            }}>
-              <input className="field" aria-label="Saved search name" placeholder="Name this search" value={searchName} onChange={(event) => setSearchName(event.target.value)} maxLength={80} />
-              <button type="submit" className="menu-item">Save search</button>
-            </form>
-            {savedSearches.length ? (
-              <ul className="saved-list">
-                {savedSearches.map((item) => (
-                  <li key={item.name}>
-                    <button type="button" onClick={() => { window.location.assign(item.query ? `/?${item.query}` : "/"); }} className="menu-item">{item.name}</button>
-                    <button type="button" onClick={() => setSavedSearches(removeSearch(item.name))} className="menu-item">Remove</button>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="note">No saved searches yet.</p>}
             {funnel === "universe" ? (
               <>
-                <h3>Status</h3>
-                <div className="chips">
-                  {[
-                    ["any", "All statuses"],
+                <h3>Verdict</h3>
+                <div className="segmented" role="group" aria-label="Verdict">
+                  {([
+                    ["any", "All"],
                     ["PASS", "Cleared"],
                     ["MAYBE", "Possible"],
                     ["UNRESOLVED", "Unresolved"],
-                  ].map(([item, label]) => (
-                    <button key={item} className={verdict === item ? "chip on" : "chip"} type="button" onClick={() => write({ verdict: item === "any" ? null : item })}>
-                      {label}
-                    </button>
+                  ] as const).map(([item, label]) => (
+                    <button key={item} type="button" className={`segmented ${verdict === item ? "on" : ""}`} onClick={() => write({ verdict: item === "any" ? null : item })}>{label}</button>
                   ))}
-                  <button className={listed === "yes" ? "chip on" : "chip"} type="button" onClick={() => write({ listed: listed === "yes" ? null : "yes" })}>Listed</button>
-                  <button className={landSites ? "chip on" : "chip"} type="button" onClick={() => write({ land: landSites ? null : "1" })}>Land sites</button>
-                  <button className={compare ? "chip on" : "chip"} type="button" onClick={() => write({ disagree: compare ? null : "1" })}>Reviews disagree</button>
-                  {dropCount > 0 ? (
-                    <button className={showDropped ? "chip on" : "chip"} type="button" onClick={() => write({ ruled: showDropped ? null : "1" })}>
-                      Ruled out ({dropCount.toLocaleString()})
-                    </button>
-                  ) : null}
-                  {heldCount > 0 ? (
-                    <button className={extra === "held" ? "chip on" : "chip"} type="button" onClick={() => write({ stage: null, extra: extra === "held" ? null : "held" })}>
-                      Held outside the service area ({heldCount.toLocaleString()})
-                    </button>
-                  ) : null}
                 </div>
-              </>
-            ) : null}
-            {funnel === "pipeline" ? (
-              <>
-                <h3>Deals</h3>
-                <div className="chips">
-                  <button className={showCStores ? "chip on" : "chip"} type="button" data-testid="cstore-toggle" onClick={() => write({ cstore: showCStores ? null : "1" })}>C-stores</button>
+                <div className="filter-checks">
+                  <label><input className="check" type="checkbox" checked={listed === "yes"} onChange={() => write({ listed: listed === "yes" ? null : "yes" })} /> Listed</label>
+                  <label><input className="check" type="checkbox" checked={landSites} onChange={() => write({ land: landSites ? null : "1" })} /> Land sites</label>
+                  <label><input className="check" type="checkbox" checked={compare} onChange={() => write({ disagree: compare ? null : "1" })} /> Reviews disagree</label>
+                  {dropCount > 0 ? <label><input className="check" type="checkbox" checked={showDropped} onChange={() => write({ ruled: showDropped ? null : "1" })} /> Ruled out ({dropCount.toLocaleString()})</label> : null}
+                  {heldCount > 0 ? <label><input className="check" type="checkbox" checked={extra === "held"} onChange={() => write({ stage: null, extra: extra === "held" ? null : "held" })} /> Held outside the service area ({heldCount.toLocaleString()})</label> : null}
                 </div>
               </>
             ) : null}
@@ -1542,24 +1482,9 @@ export default function Explorer() {
             <div className="menu-group" role="group" aria-label="Find">
               <button type="button" onClick={() => { setFiltersOpen(true); setLayersOpen(false); setMenuOpen(false); }} className="menu-item">Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
             </div>
-            <div className="menu-overlays" role="group" aria-label="Workbook overlays">
-              {OVERLAYS.map((item) => (
-                <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "chip on" : "chip"} onClick={() => toggleOverlay(item.id)}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
             <div className="menu-group" role="group" aria-label="Tools">
-              <button type="button" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }} className="menu-item">Layers</button>
-              <button type="button" onClick={() => { setLegendOpen(true); setMenuOpen(false); }} className="menu-item">Legend</button>
-              <button type="button" onClick={() => { write({ table: tableOpen ? null : "1" }); setMenuOpen(false); }} className="menu-item">{tableOpen ? "Hide table" : "Table"}</button>
-              <button type="button" onClick={exportTable} className="menu-item">Export CSV</button>
               <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
               <ActionsMenuButtons close={() => setMenuOpen(false)} />
-              <button type="button" onClick={() => { write({ view: listView ? null : "list", review: null, i: null }); setMenuOpen(false); }} className="menu-item">{listView ? "Map" : "List"}</button>
-              {me?.actionsEnabled ? (
-                <button type="button" onClick={() => { write({ review: "1", i: "1", view: null, table: null }); setMenuOpen(false); }} className="menu-item">Review{queueCount ? ` (${queueCount})` : ""}</button>
-              ) : null}
               <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }} className="menu-item">How to read this</button>
               {funnel === "pipeline" && unplacedDeals.length > 0 ? (
                 <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
@@ -1569,8 +1494,8 @@ export default function Explorer() {
             <div className="menu-group menu-account">
               {me?.u ? <p className="menu-note menu-identity"><span>Signed in</span>{me.u}</p> : null}
               {me?.role === "admin" ? <a href="/admin">Accounts</a> : null}
-              {me?.u ? <button type="button" onClick={() => { setAlertsOpen(true); setMenuOpen(false); }} className="menu-item">Alerts</button> : null}
-              {me?.role === "admin" ? <a href="/admin/alerts">Alert preview</a> : null}
+              {me?.u ? <button type="button" onClick={() => { setAlertsOpen(true); setMenuOpen(false); }} className="menu-item">Alert settings</button> : null}
+              {me?.role === "admin" ? <a href="/admin/alerts">Alerts admin</a> : null}
               <button type="button" onClick={logout} className="menu-item">Sign out</button>
             </div>
           </div>
@@ -1713,20 +1638,11 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
-        <div className="overlay-bar" role="group" aria-label="Workbook overlays">
-          <div className="overlay-chips">
-            {OVERLAYS.map((item) => (
-              <button key={item.id} type="button" className={overlaysOn.includes(item.id) ? "chip on" : "chip"} onClick={() => toggleOverlay(item.id)}>
-                {item.label}
-              </button>
-            ))}
-          </div>
-          {hiddenIds.length ? (
-            <button type="button" onClick={() => { setHiddenIds(clearHidden()); setShowHidden(false); }} className="menu-item">
-              Clear {hiddenIds.length} hidden
-            </button>
-          ) : null}
-        </div>
+        {hiddenIds.length ? (
+          <button type="button" onClick={() => { setHiddenIds(clearHidden()); setShowHidden(false); }} className="menu-item clear-hidden">
+            Clear {hiddenIds.length} hidden
+          </button>
+        ) : null}
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
@@ -1749,7 +1665,7 @@ export default function Explorer() {
           <aside className="phone-peek" data-testid="phone-peek">
             <span className="sheet-grab" aria-hidden="true" />
             <div>
-              <strong>{summaryText()}</strong>
+              {summaryText() ? <strong>{summaryText()}</strong> : null}
               {data.funnel.workbook_as_of ? <p>Data as of {data.funnel.workbook_as_of}</p> : null}
             </div>
             <button type="button" aria-label="Open the list" onClick={() => write({ view: "list" })} className="menu-item">List</button>
@@ -1796,18 +1712,21 @@ export default function Explorer() {
                 <button type="button" className="close" aria-label="Close layers" onClick={() => setLayersOpen(false)}><span aria-hidden="true">×</span></button>
               </div>
               <div className="layers-body">
-                <p className="eyebrow">Basemap</p>
-                <div className="segmented" role="group" aria-label="Basemap" data-testid="basemap-desktop">
-                  <button type="button" className={`segmented ${basemap === "satellite" ? "on" : ""}`} onClick={() => chooseBasemap("satellite")}>Satellite</button>
-                  <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Map</button>
+                <div className="only-mobile">
+                  <p className="eyebrow">Basemap</p>
+                  <div className="segmented" role="group" aria-label="Basemap" data-testid="basemap">
+                    <button type="button" className={`segmented ${basemap === "satellite" ? "on" : ""}`} onClick={() => chooseBasemap("satellite")}>Satellite</button>
+                    <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Map</button>
+                  </div>
                 </div>
                 <p className="eyebrow">Sites</p>
-                <label><input className="check" type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
-                <label><input className="check" type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
-                <label><input className="check" type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land Sites</label>
-                <label><input className="check" type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
-                <label><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
+                <label><i className="pin-sample diamond" /><input className="check" type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
+                <label><i className="pin-sample circle" /><input className="check" type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
+                <label><i className="swatch land" /><input className="check" type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land sites</label>
+                <label><i className="swatch cstore" /><input className="check" type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
+                <label><i className="swatch stage-dropped" /><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
                 <label>
+                  <i className="swatch listing" />
                   <input className="check" type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
                   <span>
                     Listed, not yet screened
@@ -1818,45 +1737,34 @@ export default function Explorer() {
                     </span>
                   </span>
                 </label>
+                <p className="eyebrow">Pin labels</p>
+                <div className="segmented pin-modes" role="group" aria-label="Pin labels">
+                  {([["none", "Off"], ["asking", "Price"], ["acres", "Acres"], ["peracre", "$/ac"]] as const).map(([id, label]) => (
+                    <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} onClick={() => write({ pill: id === "none" ? null : id })}>{label}</button>
+                  ))}
+                </div>
+                <p className="eyebrow">Also show</p>
+                {OVERLAYS.map((item) => (
+                  <label key={item.id}><input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} /> {item.label}</label>
+                ))}
                 <p className="eyebrow">Context</p>
-                <label><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
-                <label><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
-                <label><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
-                <p className="layer-meta">A blank stays off a workbook layer. Sites under 20,000 vehicles/day or 25,000 people stay on the map.</p>
+                <label><i className="swatch current-area" /><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
+                <label><i className="pin-sample depot" /><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
+                <label><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
+                <p className="eyebrow">Key</p>
+                <p className="layer-key"><i className="swatch cleared" /> Cleared</p>
+                <p className="layer-key"><i className="swatch possible" /> Possible</p>
+                <p className="layer-key"><i className="swatch unresolved" /> Unresolved</p>
+                <p className="layer-key"><i className="swatch held" /> Held</p>
+                <p className="layer-key"><i className="swatch l10" /> 10k+ sq ft</p>
+                <p className="layer-key"><i className="swatch l4" /> 4k+ sq ft</p>
               </div>
             </>
           ) : (
-            <button type="button" className="paper-btn" onClick={() => { setLayersOpen(true); setFiltersOpen(false); }}>Layers</button>
+            <button type="button" className="paper-btn" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
           )}
         </aside>
-        <div className={`legend ${legendOpen ? "open" : ""}`} onMouseLeave={() => setTip("")}>
-          <button type="button" className="paper-btn" onClick={() => { setLegendOpen((value) => !value); setMenuOpen(false); }}>{legendOpen ? "Hide legend" : "Legend"}</button>
-          {legendOpen ? (
-            <>
-            <div className="legend-family">
-              <p className="eyebrow">On the map</p>
-              <p><i className="pin-sample circle" />Pipeline deal</p>
-              <p><i className="pin-sample diamond" />Universe site</p>
-              <p><i className="pin-sample cluster">3</i>Group of nearby pins</p>
-              <p><i className="pin-sample depot" />Depot</p>
-              <p><i className="pin-sample line" />High-voltage line</p>
-            </div>
-            <p className="eyebrow">Stage</p>
-            <ul>
-              {STATUS_NOTES.map((item) => (
-                <li key={item.id} onMouseEnter={() => setTip(item.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(item.note)}>
-                  <i className={`swatch ${item.id}`} /> {item.label}
-                </li>
-              ))}
-              <li onMouseEnter={() => setTip(TIER_NOTES.L10.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(TIER_NOTES.L10.note)}><i className="swatch l10" /> {TIER_NOTES.L10.label}</li>
-              <li onMouseEnter={() => setTip(TIER_NOTES.L4.note)} onMouseLeave={() => setTip("")} onClick={() => setTip(TIER_NOTES.L4.note)}><i className="swatch l4" /> {TIER_NOTES.L4.label}</li>
-              <li onMouseEnter={() => setTip(AREA_NOTES.current)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.current)}><i className="swatch current-area" /> {AREA_KIND_LABEL.current}</li>
-              <li onMouseEnter={() => setTip(AREA_NOTES.later)} onMouseLeave={() => setTip("")} onClick={() => setTip(AREA_NOTES.later)}><i className="swatch later-area" /> {AREA_KIND_LABEL.later}</li>
-            </ul>
-            </>
-          ) : null}
-          {tip ? <p className="tip">{tip}</p> : null}
-        </div>
+        {tip ? <p className="tip">{tip}</p> : null}
         {guideOpen ? (
           <aside className="guide">
             <button className="close" type="button" aria-label="Close" onClick={() => setGuideOpen(false)}><span aria-hidden="true">×</span></button>
@@ -1884,6 +1792,7 @@ export default function Explorer() {
             onOpenParty={openParty}
             onClose={() => choose(null)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
+            onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             onNotFit={() => { setHiddenIds(hideSite(selectedDeal.deal_id)); choose(null); }}
             compared={compareIds.includes(selectedDeal.deal_id)}
             sheet={sheet}
@@ -1917,6 +1826,8 @@ export default function Explorer() {
             onOpenDeal={selectedSite.linked_deal_id ? () => choose(selectedSite.linked_deal_id || null) : undefined}
             onOpenParty={openParty}
             onAddCompare={() => setCompared(selectedSite.site_id, !compareIds.includes(selectedSite.site_id))}
+            compared={compareIds.includes(selectedSite.site_id)}
+            onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             onNotFit={() => { setHiddenIds(hideSite(selectedSite.site_id)); choose(null); }}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
@@ -1942,21 +1853,12 @@ export default function Explorer() {
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}
           >
-            {compareIds.length >= 2 ? (
-              <form className="shortlist-save" onSubmit={(event) => {
-                event.preventDefault();
-                const next = saveShortlist(listName, compareIds);
-                setShortlists(next);
-                write({ slist: listName.trim() || null });
-                setListName("");
-              }}>
-                <input className="field" aria-label="Shortlist name" placeholder="Name this shortlist" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={80} />
-                <button type="submit" className="menu-item">Save shortlist</button>
-                {shortlists.map((item) => (
-                  <button key={item.name} type="button" onClick={() => write({ compare: item.ids.join("|"), slist: item.name })} className="menu-item">{item.name}</button>
-                ))}
-                {params.get("slist") ? <button type="button" onClick={() => setShortlists(removeShortlist(params.get("slist") || ""))} className="menu-item">Remove {params.get("slist")}</button> : null}
-              </form>
+            {compareIds.length >= 2 && me?.u ? (
+              <button type="button" className="paper-btn" onClick={() => void fetch("/api/actions/views", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ name: `Compare ${compareIds.length}`, query: `compare=${compareIds.join("|")}`, scope: "personal" }),
+              })}>Save view</button>
             ) : null}
           </CompareTray>
         ) : null}

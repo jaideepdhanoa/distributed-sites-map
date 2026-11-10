@@ -49,7 +49,7 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
   return (
     <div className="popover alert-sheet" role="dialog" aria-label="Alert settings" data-testid="alert-settings">
       <div className="popover-head">
-        <h2>Alerts</h2>
+        <h2>Alert settings</h2>
         <button type="button" className="close" aria-label="Close alerts" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <p className="note alert-mail">{email ? `Mail goes to ${email}.` : "No mailbox is set for this account."}</p>

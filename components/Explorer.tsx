@@ -446,14 +446,29 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
-    const panel = params.get("panel");
-    const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal";
-    if (linked && window.matchMedia("(max-width: 767px)").matches) {
-      setSheetSnap("full");
-      return;
-    }
-    setSheetSnap(initialSheetSnap(sheetQueryRef.current));
+    const apply = () => {
+      const panel = params.get("panel");
+      const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal";
+      if (linked && window.matchMedia("(max-width: 767px)").matches) {
+        setSheetSnap("full");
+        return;
+      }
+      setSheetSnap(initialSheetSnap(sheetQueryRef.current));
+    };
+    apply();
+    const media = window.matchMedia("(max-width: 767px)");
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
   }, [selected, params]);
+
+  useEffect(() => {
+    function onSnap(event: Event) {
+      const next = (event as CustomEvent<string>).detail;
+      if (next === "peek" || next === "half" || next === "full") setSheetSnap(next);
+    }
+    window.addEventListener("sites-sheet-snap", onSnap);
+    return () => window.removeEventListener("sites-sheet-snap", onSnap);
+  }, []);
 
   useEffect(() => {
     setSelected(params.get("site"));

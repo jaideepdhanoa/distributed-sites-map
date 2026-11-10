@@ -73,69 +73,180 @@
 .composer-box { position: relative; }
 .act .hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 .next-card {
-  margin: 12px 0;
-  padding: 12px 14px;
-  border: 1px solid #e4dccb;
+  margin: 16px 0 8px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: #f7f3ea;
+  background: #fffdf8;
   display: grid;
+  gap: 10px;
+}
+.next-card.empty {
+  margin-top: 8px;
+  padding: 4px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.drawer .next-card h3,
+.next-card h3 {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.next-card > h3:first-child,
+.next-card form > h3:first-child { margin-top: 0; }
+.drawer .next-card .proposal-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-transform: none;
+  color: var(--ink);
+}
+.next-card .proposal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
-.next-card.pending { background: #fbf6ee; border-color: #e6d3a8; }
-.next-card.knock { background: #fdf4f2; border-color: #efd0c8; }
-.next-card.approved { background: #e7f3ea; border-color: #b7d7c2; }
-.next-card .kicker, .next-card .approved-kicker, .next-card .wait, .next-card .type {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.next-card .kicker { color: var(--muted); margin: 0; }
-.next-card h3 { margin: 0; font-size: 16px; }
-.next-card .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.next-card .wait, .next-card .type, .next-card .approved-kicker {
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-.next-card .wait { background: #f3e2b8; color: #8a5a10; }
-.next-card .type { background: white; color: var(--ink); border: 1px solid var(--line); }
-.next-card .approved-kicker { background: #d5eadc; color: #1f6b45; }
-.next-card .reason { margin: 0; background: white; border-radius: 10px; padding: 8px 10px; }
-.next-card form { display: grid; gap: 6px; }
-.next-card form > p { margin: 0; }
-.next-card button {
-  border: 1px solid var(--line);
-  background: white;
-  border-radius: 999px;
-  padding: 3px 8px;
-  min-height: 28px;
+.next-card .proposal-kind,
+.next-card .proposal-meta,
+.next-card .hint {
+  margin: 0;
+  color: var(--ink-3);
   font-size: 12px;
+  line-height: 16px;
 }
-.next-card button.propose { background: var(--pine); color: #faf7f1; border-color: var(--pine); }
-.next-card .type-chips, .next-card .split { display: flex; flex-wrap: wrap; gap: 6px; }
-.next-card .type-chips button.on { background: var(--ink); color: #faf7f1; border-color: var(--ink); }
-.next-card .need-list { margin: 0; padding-left: 18px; font-size: 13px; }
-.next-card .need-list li { margin: 4px 0; }
-.next-card select.secondary { border-radius: 999px; min-height: 36px; background: #fffdf8; }
-.next-card button.propose { min-height: 36px; }
-@media (max-width: 720px) {
-  .next-card select.secondary,
-  .next-card button.propose,
-  .next-card textarea.field,
-  .next-card input.field { min-height: 44px; }
+.next-card .proposal-kind { color: var(--ink-2); font-size: 13px; line-height: 18px; }
+.next-card .proposal-reason {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
 }
-.next-card .split { display: grid; grid-template-columns: 1fr 1fr; }
-.next-card .split label, .next-card form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
-.next-card input, .next-card textarea, .next-card select {
-  width: 100%;
+.next-card .proposal-reason span {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.next-card .proposal-needs,
+.next-card .proposal-notes,
+.next-card .proposal-hold,
+.next-card form { display: grid; gap: 8px; }
+.next-card form.proposal-decide {
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.next-card .type-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.next-card .type-chips .chip {
   border: 1px solid var(--line);
-  background: white;
+  background: #fffdf8;
+  box-shadow: var(--shadow-1);
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+}
+.next-card .type-chips .chip.on {
+  background: #1c1914;
+  border-color: #1c1914;
+  color: #fffdf8;
+}
+.next-card .proposal-needs ul,
+.next-card .proposal-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.next-card .proposal-needs li,
+.next-card .proposal-notes li {
+  margin: 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.next-card .proposal-needs li + li,
+.next-card .proposal-notes li + li { margin-top: 8px; }
+.next-card .proposal-needs .hint { display: block; margin-top: 2px; }
+.next-card .proposal-notes p { margin: 0; }
+.next-card .step-actions { display: grid; gap: 8px; justify-items: start; }
+.next-card .step-actions .paper-btn { max-width: 100%; }
+.next-card .act-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+.next-card form label,
+.next-card .proposal-hold label {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.next-card .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.next-card select.secondary {
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+  background-color: #fffdf8;
+}
+.next-card .act-row select.secondary { min-width: min(100%, 12rem); }
+.next-card input.field,
+.next-card textarea.field {
+  width: 100%;
+  min-height: 36px;
+  background: #fffdf8;
+  border: 1px solid #d6cebe;
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--ink);
 }
+.next-card textarea.field { min-height: 56px; resize: vertical; line-height: 20px; }
+.next-card button.propose {
+  appearance: none;
+  border: 0;
+  background: #1e4636;
+  color: #fffdf8;
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.next-card button.propose:disabled { opacity: 0.45; }
+.next-card button.text-link { justify-self: start; width: auto; text-align: left; }
+.next-card .proposal-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
 @media (max-width: 767px) {
-  .next-card .split { grid-template-columns: 1fr; }
+  .next-card select.secondary,
+  .next-card button.propose,
+  .next-card button.paper-btn,
+  .next-card button.text-link,
+  .next-card .type-chips .chip,
+  .next-card textarea.field,
+  .next-card input.field { min-height: 44px; }
+  .next-card button.text-link { display: inline-flex; align-items: center; }
+  .next-card .proposal-send button.propose { width: 100%; }
 }
 .mention-pop { list-style: none; margin: 0; padding: 4px; position: absolute; left: 0; right: 0; top: 100%; z-index: 6; background: white; border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
 .mention-pop button { width: 100%; text-align: left; border-radius: 6px; background: transparent; }

@@ -105,12 +105,35 @@ test("a cold Miami discussion link centers the map", async ({ page }) => {
   expect(lng).toBeLessThan(-79.5);
 });
 
-test("a cold review link for a dropped site leaves review", async ({ page }) => {
-  await openAs(page, "contributor", "/?view=review&site=PIPE-PHX-0008");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
-  await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
-  await expect(page.getByTestId("review-bar")).toHaveCount(0);
-});
+for (const width of [1024, 1280]) {
+  test(`a cold review link for a dropped site leaves review at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    let reviewQueueSettled = false;
+    await page.route("**/api/queue**", async (route) => {
+      if (!page.url().includes("view=review")) {
+        await route.continue();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      reviewQueueSettled = true;
+      await route.continue();
+    });
+    await openAs(page, "contributor", "/?view=review&site=PIPE-PHX-0008");
+    await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+    await expect(page.getByTestId("review-bar")).toHaveCount(0, { timeout: 2000 });
+    expect(reviewQueueSettled).toBe(false);
+    await expect(page.locator(".review-rail")).toHaveCount(0);
+    await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+    await expect.poll(() => page.url()).not.toMatch(/view=review|review=1/);
+    await expect.poll(() => page.url()).toMatch(/funnel=pipeline/);
+    await expect.poll(() => page.url()).toMatch(/pstage=dropped/);
+    await mapFillsFrame(page);
+    await page.waitForTimeout(800);
+    await expect(page.getByTestId("review-bar")).toHaveCount(0);
+    await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+    await expect.poll(() => page.url()).not.toMatch(/view=review|review=1/);
+  });
+}
 
 test("a review link highlights that site, or leaves review when it is not queued", async ({ page }) => {
   const errors: string[] = [];

@@ -42,6 +42,14 @@ Planned accounts, none created here: `jaideep` (admin), `cindel`, `ming`, `ricar
 
 On Vercel, sign-in refuses to run if neither Redis pair is set. Locally, without Redis, lockout is skipped.
 
+## Hobby plan
+
+This project stays on the Vercel Hobby plan. Hobby allows at most 12 Serverless Functions per deployment. Vercel packs routes into a function until the traced files approach the size limit, then starts another function. `data/generated/photos` is large enough that tracing it into every route splits the deployment past 12, and a workbook sync then fails to deploy.
+
+API handlers live in `lib/api/handlers` and are served by one catch-all, `app/api/[...route]/route.ts` (`runtime` nodejs, `maxDuration` 300, which covers the digest cron). Photo bytes stay on `app/api/data/photos/[id]` (`maxDuration` 60) so they are not copied into the other function. `outputFileTracingExcludes` drops the photo directory from routes that do not serve images. `outputFileTracingIncludes` adds the generated files and SQL migrations those routes read. The cron path stays `/api/alerts/digest`. The map worker stays a static route.
+
+To add a route, register it in `lib/api/dispatch.ts` and put the handler under `lib/api/handlers`. Do not add another `app/api/**/route.ts` unless that route needs its own file trace or its own `maxDuration`. A separate route file is its own function once the trace no longer fits in an existing group. `node scripts/check-function-count.mjs` fails when a `vercel build` produces more than 10 Node.js functions, leaving room under the Hobby cap.
+
 ## Actions
 
 Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes a stage, and it never writes to the workbook or the Google Sheet.

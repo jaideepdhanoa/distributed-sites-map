@@ -1,0 +1,9 @@
+import { NextResponse } from "next/server";
+import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
+
+export async function GET() {
+  const session = await requireUser();
+  if (!isSession(session)) return session;
+  console.info(JSON.stringify({ event: "data", user: session.u, part: "unscreened" }));
+  return NextResponse.json(readGenerated("unscreened.geojson"), { headers: privateHeaders });
+}

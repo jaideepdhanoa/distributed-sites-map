@@ -44,7 +44,6 @@
 .ask-log::-webkit-scrollbar-track { background: transparent; }
 .ask-form { flex: none; display: grid; gap: 8px; }
 .ask-form .field {
-  resize: none;
   overflow: hidden;
   line-height: 22px;
   min-height: 44px;
@@ -77,6 +76,9 @@ textarea.field {
   padding: 8px 10px;
   font: inherit;
   resize: vertical;
+}
+textarea#ask-question {
+  resize: none;
 }
 @media (max-width: 767px) {
   .ask-launch { min-height: 44px; }

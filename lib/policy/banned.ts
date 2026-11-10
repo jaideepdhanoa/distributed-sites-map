@@ -3,11 +3,12 @@ import { join } from "node:path";
 
 export const POLICY_MESSAGE = "That text is not allowed on the map. Rephrase it and try again.";
 
-type PolicyFile = { words: string[]; phrases: string[]; units: string[] };
+type PolicyFile = { words: string[]; phrases: string[]; units: string[]; allow?: string[] };
 
 type Compiled = {
   words: RegExp[];
   phrases: RegExp[];
+  allow: RegExp[];
   unit: RegExp;
   phone: RegExp;
 };
@@ -24,13 +25,23 @@ function decodeTerm(value: string): string {
   return text.startsWith(prefix) ? text.slice(prefix.length) : text;
 }
 
+function maskAllowances(value: string, patterns: RegExp[]): string {
+  // Longer phrases are compiled first. Blank a diligence phrase so the word
+  // list does not treat the ordinary words inside it as a private term.
+  let text = value;
+  for (const pattern of patterns) text = text.replace(new RegExp(pattern.source, "gi"), " ");
+  return text;
+}
+
 function loadPolicy(): Compiled {
   if (compiled) return compiled;
   const file = JSON.parse(readFileSync(join(process.cwd(), "config", "display-policy.json"), "utf8")) as PolicyFile;
   const units = file.units.map((item) => escapeRegExp(decodeTerm(item))).join("|");
+  const allowances = (file.allow || []).map((item) => decodeTerm(item)).filter(Boolean).sort((a, b) => b.length - a.length);
   compiled = {
     words: file.words.map((item) => new RegExp(`\\b${escapeRegExp(decodeTerm(item))}\\b`, "i")),
     phrases: file.phrases.map((item) => new RegExp(escapeRegExp(decodeTerm(item)), "i")),
+    allow: allowances.map((item) => new RegExp(`\\b${escapeRegExp(item)}\\b`, "i")),
     unit: new RegExp(`(?<![A-Za-z])\\d+(?:\\.\\d+)?\\s*(?:${units})\\b`, "i"),
     phone: /(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\b\d{3})[-.\s]\d{3}[-.\s]\d{4}\b/,
   };
@@ -39,7 +50,7 @@ function loadPolicy(): Compiled {
 
 export function findPolicyHits(text: string): number {
   const policy = loadPolicy();
-  const value = text || "";
+  const value = maskAllowances(text || "", policy.allow);
   let hits = 0;
   if (policy.phone.test(value)) hits += 1;
   if (policy.unit.test(value)) hits += 1;

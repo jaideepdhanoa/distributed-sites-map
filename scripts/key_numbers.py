@@ -158,9 +158,9 @@ def _fact_text(value) -> str:
     text = str(value or "").strip()
     if not text or _SHEET_ERROR.search(text) or _SCRIPT_SOURCE.search(text):
         return ""
-    from scripts.build_data import _DISPLAY_TERMS, banned_hits
+    from scripts.build_data import banned_hits, blocked_display_term
 
-    if banned_hits(text) or _DISPLAY_TERMS.search(text):
+    if banned_hits(text) or blocked_display_term(text):
         return ""
     return text
 

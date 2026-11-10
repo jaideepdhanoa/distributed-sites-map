@@ -33,10 +33,7 @@
     "dGVybTp0b3JxdWU=",
     "dGVybTppbmRpZQ==",
     "dGVybTpncm9r",
-    "dGVybTpuZGE=",
     "dGVybTpsb2k=",
-    "dGVybTpob2xk",
-    "dGVybTpob2xkcw==",
     "dGVybTpvZmZlcg==",
     "dGVybTpvZmZlcnM=",
     "dGVybTprd2g="
@@ -50,5 +47,14 @@
   "units": [
     "dGVybTptdw==",
     "dGVybTprdw=="
+  ],
+  "allow": [
+    "dGVybTplbGVjdHJpY2FsIHNlcnZpY2U=",
+    "dGVybTplbGVjdHJpY2FsIHNlcnZpY2Vz",
+    "dGVybTp1dGlsaXR5IGJpbGw=",
+    "dGVybTp1dGlsaXR5IGJpbGxz",
+    "dGVybTp1dGlsaXR5IGVhc2VtZW50",
+    "dGVybTp1dGlsaXR5IGVhc2VtZW50cw==",
+    "dGVybTp3YXRlciBhbmQgdXRpbGl0eSBiaWxscw=="
   ]
 }

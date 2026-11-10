@@ -56,6 +56,7 @@ class ChangeCounts(unittest.TestCase):
 
 
 from test_broward_parcels import BrowardParcels  # noqa: E402,F401
+from test_display_language import DisplayAllowances  # noqa: E402,F401
 from test_review_fixes import BrokerContactDates, OneMatcher, RegisterLayer, ShippedCounts, StageBuckets  # noqa: E402,F401
 
 if __name__ == "__main__":

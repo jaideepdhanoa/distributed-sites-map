@@ -5008,6 +5008,44 @@ _DISPLAY_TERMS = re.compile(
     r"\b(?:charging|ev|av|stalls?|power|utility|electric|kw|cindel|ming|ricardo|yuka|jaideep|jesse|muse|torque|indie|grok)\b",
     re.I,
 )
+_DISPLAY_ALLOW: list[re.Pattern[str]] | None = None
+
+
+def display_allowances() -> list[re.Pattern[str]]:
+    """Diligence phrases from the posted-text policy. Longer phrases come first."""
+    global _DISPLAY_ALLOW
+    if _DISPLAY_ALLOW is None:
+        payload = json.loads((ROOT / "config" / "display-policy.json").read_text())
+        decoded = []
+        for item in payload.get("allow") or []:
+            text = base64.b64decode(item).decode()
+            prefix = "term:"
+            if text.startswith(prefix):
+                text = text[len(prefix) :]
+            text = text.strip()
+            if text:
+                decoded.append(text)
+        decoded.sort(key=len, reverse=True)
+        _DISPLAY_ALLOW = [re.compile(rf"\b{re.escape(phrase)}\b", re.I) for phrase in decoded]
+    return _DISPLAY_ALLOW
+
+
+def display_span_allowed(text: str, start: int, end: int) -> bool:
+    for pattern in display_allowances():
+        for match in pattern.finditer(text):
+            if match.start() <= start and match.end() >= end:
+                return True
+    return False
+
+
+def blocked_display_term(text: str) -> bool:
+    """True when display text hits the surface list outside an allowed phrase."""
+    value = text or ""
+    for found in _DISPLAY_TERMS.finditer(value):
+        if display_span_allowed(value, found.start(), found.end()):
+            continue
+        return True
+    return False
 
 
 def display_language_problems(loaded: dict) -> list[str]:
@@ -5043,8 +5081,8 @@ def display_language_problems(loaded: dict) -> list[str]:
                     or re.search(r"(?i)power[\s-](?:rd|road)\b", obj)
                 ):
                     continue
-                # A recorded utility easement is a deed fact, not the proximity grade.
-                if word == "utility" and re.search(r"(?i)utility\s+easement\b", obj):
+                # Deed facts and bill lines use the same allowlist as a posted draft.
+                if display_span_allowed(obj, found.start(), found.end()):
                     continue
                 problems.append(f"banned term {found.group(0)!r} in {path}: {obj[:120]!r}")
                 break
@@ -5055,9 +5093,12 @@ def display_language_problems(loaded: dict) -> list[str]:
         for path in (ROOT / folder).rglob("*"):
             if path.suffix not in {".ts", ".tsx"}:
                 continue
-            found = _DISPLAY_TERMS.search(path.read_text())
-            if found:
+            text = path.read_text()
+            for found in _DISPLAY_TERMS.finditer(text):
+                if display_span_allowed(text, found.start(), found.end()):
+                    continue
                 problems.append(f"banned term {found.group(0)!r} in {path.relative_to(ROOT)}")
+                break
     return problems
 
 

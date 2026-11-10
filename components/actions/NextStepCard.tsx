@@ -102,7 +102,28 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
 
   useEffect(() => {
     if (!proposal || !status.enabled) return;
-    cardRef.current?.scrollIntoView({ block: "nearest" });
+    const node = cardRef.current;
+    const scroller = node?.closest(".drawer-scroll");
+    if (!node || !(scroller instanceof HTMLElement)) return;
+    let frame = 0;
+    const align = () => {
+      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      const next = Math.max(0, top - 4);
+      if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
+    };
+    const sizes = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(align);
+    });
+    sizes.observe(scroller);
+    for (const child of scroller.children) sizes.observe(child);
+    align();
+    const stop = window.setTimeout(() => sizes.disconnect(), 8000);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(stop);
+      sizes.disconnect();
+    };
   }, [proposal, status.enabled, id]);
 
   useEffect(() => {

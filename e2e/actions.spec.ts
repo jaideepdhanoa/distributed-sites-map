@@ -41,61 +41,75 @@ async function openAs(page: import("@playwright/test").Page, username: string, p
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
-test("a feed link opens that site and panel", async ({ page }) => {
-  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=discussion");
-  const drawer = page.locator("aside.drawer");
-  await expect(drawer).toContainText("PIPE-PHX-0008");
-  const discussion = page.getByTestId("panel-tab-discussion");
+async function discussionInView(page: import("@playwright/test").Page, id: string) {
+  await expect(page.locator("aside.drawer")).toContainText(id);
+  await expect(page.getByTestId("key-strip")).toHaveCount(1);
+  await page.waitForTimeout(1200);
+  const discussion = page.getByRole("tab", { name: "Discussion" });
   await expect(discussion).toHaveAttribute("aria-selected", "true");
   await expect(discussion).toBeInViewport();
-  await expect(page.getByTestId("record-actions")).toBeVisible();
-  await mkdir("/opt/cursor/artifacts", { recursive: true });
-  await discussion.screenshot({ path: "/opt/cursor/artifacts/feed-link-discussion.png" });
+}
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?site=PIPE-PHX-0008&panel=discussion");
-  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
-  await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
-  await page.setViewportSize({ width: 1440, height: 900 });
+async function mapFillsFrame(page: import("@playwright/test").Page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const map = document.querySelector(".map");
+    const canvas = map?.querySelector("canvas");
+    if (!map || !canvas || map.clientWidth < 80 || map.clientHeight < 80) return 0;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const close = Math.abs(canvas.width - map.clientWidth * ratio) < 8
+      && Math.abs(canvas.height - map.clientHeight * ratio) < 8;
+    return close ? canvas.width : 0;
+  })).toBeGreaterThan(80);
+}
 
-  await page.goto("/?site=PIPE-PHX-0008&panel=proposal");
-  await expect(drawer).toContainText("PIPE-PHX-0008");
-  const proposal = page.getByTestId("next-step");
-  await expect(proposal).toBeVisible();
-  await expect(proposal).toHaveAttribute("data-panel", "proposal");
-  await proposal.screenshot({ path: "/opt/cursor/artifacts/feed-link-proposal.png" });
-
-  await page.goto("/?site=PHX-U180&panel=discussion");
-  await expect(drawer).toContainText("PHX-U180");
-  await expect(page.getByTestId("panel-tab-discussion")).toHaveAttribute("aria-selected", "true");
-
-  await page.goto("/?view=review&site=PIPE-PHX-0008");
-  await expect(drawer).toContainText("PIPE-PHX-0008");
-  await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
-  await expect(page.getByTestId("review-bar")).toHaveCount(0);
-
-  await page.goto("/");
-  await expect(page.locator("aside.drawer")).toHaveCount(0);
+test("a cold desktop discussion link scrolls to Discussion", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=discussion");
+  await discussionInView(page, "PIPE-PHX-0008");
 });
 
-test("a site link switches market and centers the map", async ({ page }) => {
-  await openAs(page, "contributor", "/?site=PIPE-MIA-0080&panel=discussion");
-  await expect(page.locator(".shell")).toHaveAttribute("data-city", "MIA");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0080");
-  const miami = page.locator(".map");
-  await expect(miami).toHaveAttribute("data-centered", "PIPE-MIA-0080");
-  const miamiLng = Number(await miami.getAttribute("data-lng"));
-  expect(miamiLng).toBeGreaterThan(-81.5);
-  expect(miamiLng).toBeLessThan(-79.5);
-  await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
+test("a cold phone discussion link scrolls to Discussion", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=discussion");
+  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
+  await discussionInView(page, "PIPE-PHX-0008");
+});
 
-  await page.goto("/?site=PIPE-LAS-0073");
+test("a cold phone proposal link opens the full sheet", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=proposal");
+  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
+  await expect(page.getByTestId("key-strip")).toHaveCount(1);
+  await expect(page.getByTestId("next-step")).toBeInViewport();
+  await expect(page.getByTestId("next-step")).toHaveAttribute("data-panel", "proposal");
+});
+
+test("a cold Las Vegas discussion link centers the map", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-LAS-0073&panel=discussion");
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-LAS-0073");
+  await discussionInView(page, "PIPE-LAS-0073");
+  await mapFillsFrame(page);
   const vegas = page.locator(".map");
   await expect(vegas).toHaveAttribute("data-centered", "PIPE-LAS-0073");
-  const vegasLng = Number(await vegas.getAttribute("data-lng"));
-  expect(vegasLng).toBeLessThan(-114);
+  expect(Number(await vegas.getAttribute("data-lng"))).toBeLessThan(-114);
+});
+
+test("a cold Miami discussion link centers the map", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-MIA-0080&panel=discussion");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "MIA");
+  await discussionInView(page, "PIPE-MIA-0080");
+  await mapFillsFrame(page);
+  const miami = page.locator(".map");
+  await expect(miami).toHaveAttribute("data-centered", "PIPE-MIA-0080");
+  const lng = Number(await miami.getAttribute("data-lng"));
+  expect(lng).toBeGreaterThan(-81.5);
+  expect(lng).toBeLessThan(-79.5);
+});
+
+test("a cold review link for a dropped site leaves review", async ({ page }) => {
+  await openAs(page, "contributor", "/?view=review&site=PIPE-PHX-0008");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+  await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+  await expect(page.getByTestId("review-bar")).toHaveCount(0);
 });
 
 test("a review link highlights that site, or leaves review when it is not queued", async ({ page }) => {

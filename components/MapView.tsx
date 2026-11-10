@@ -522,6 +522,8 @@ export default function MapView(props: Props) {
       } as StyleSpecification;
     let active: Map | null = null;
     let observer: ResizeObserver | null = null;
+    let resizeTimer = 0;
+    let resizeStop = 0;
     let cancelled = false;
     const boot = async () => {
     const basemap = propsRef.current.basemap || "satellite";
@@ -844,8 +846,28 @@ export default function MapView(props: Props) {
       propsRef.current.onBounds(map.getBounds());
     });
     const observed = node.current;
-    observer = new ResizeObserver(() => map.resize());
+    const recenter = () => {
+      if (!map.isStyleLoaded()) return;
+      map.resize();
+      if (propsRef.current.reviewFocus) return;
+      const id = propsRef.current.selectedId;
+      if (!id) return;
+      const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === id);
+      const site = propsRef.current.sites.find((feature) => feature.properties.site_id === id);
+      const off = propsRef.current.offMarket.find((feature) => feature.properties.site_id === id);
+      const geometry = deal?.geometry || site?.geometry || off?.geometry;
+      if (!geometry || geometry.type !== "Point") return;
+      const pin = geometry.coordinates as [number, number];
+      if (!Number.isFinite(pin[0]) || !Number.isFinite(pin[1])) return;
+      markCentered(map, id, pin[0], pin[1]);
+      const center = map.getCenter();
+      const near = Math.abs(center.lng - pin[0]) < 0.01 && Math.abs(center.lat - pin[1]) < 0.01 && map.getZoom() >= 13;
+      if (!near) map.jumpTo({ center: pin, zoom: 15 });
+    };
+    observer = new ResizeObserver(() => recenter());
     observer.observe(observed);
+    resizeTimer = window.setInterval(recenter, 250);
+    resizeStop = window.setTimeout(() => window.clearInterval(resizeTimer), 4000);
     mapRef.current = map;
     (window as Window & { __sitesMap?: Map }).__sitesMap = map;
     if (!cancelled) setMapGeneration((value) => value + 1);
@@ -853,6 +875,8 @@ export default function MapView(props: Props) {
     void boot();
     return () => {
       cancelled = true;
+      window.clearInterval(resizeTimer);
+      window.clearTimeout(resizeStop);
       observer?.disconnect();
       active?.remove();
       mapRef.current = null;

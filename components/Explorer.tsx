@@ -381,7 +381,11 @@ export default function Explorer() {
     });
     let cancel = false;
     fetch(`/api/queue?${q}`).then(async (response) => {
-      if (cancel || !response.ok) return;
+      if (cancel) return;
+      if (!response.ok) {
+        if (reviewing) setFeedLoaded(true);
+        return;
+      }
       const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
       const next = (payload.items || []).filter((item) => !isPipelineStore({
         kind: "pipeline",
@@ -407,7 +411,9 @@ export default function Explorer() {
         setFeed(next);
         setFeedLoaded(true);
       }
-    }).catch(() => undefined);
+    }).catch(() => {
+      if (!cancel && reviewing) setFeedLoaded(true);
+    });
     return () => {
       cancel = true;
     };
@@ -422,8 +428,14 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
+    const panel = params.get("panel");
+    const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal";
+    if (linked && window.matchMedia("(max-width: 767px)").matches) {
+      setSheetSnap("full");
+      return;
+    }
     setSheetSnap(initialSheetSnap(sheetQueryRef.current));
-  }, [selected]);
+  }, [selected, params]);
 
   useEffect(() => {
     setSelected(params.get("site"));
@@ -875,28 +887,23 @@ export default function Explorer() {
     if (Object.keys(patch).length) write(patch);
   }, [data, selected, reviewing, params]);
 
-  useEffect(() => {
-    const panel = params.get("panel") || "";
-    if (!selected || (panel !== "discussion" && panel !== "numbers" && panel !== "activity")) return;
-    const media = window.matchMedia("(max-width: 767px)");
-    const apply = () => {
-      if (media.matches) setSheetSnap("full");
-    };
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, [selected, params]);
-
   const reviewSiteId = reviewing && !caughtUp ? reviewCurrent?.siteId : undefined;
   useEffect(() => {
+    if (!reviewing || !reviewDeepSite || !data) return;
+    const outsideDefaultQueue = dealRows.some((deal) => deal.deal_id === reviewDeepSite && deal.stage_group === "dropped")
+      && params.get("qviable") !== "0";
+    const queueSettled = feedLoaded || (me != null && !me.actionsEnabled);
+    if (!outsideDefaultQueue && !queueSettled) return;
+    if (!outsideDefaultQueue && reviewDeepIndex >= 0) return;
+    if (params.get("view") !== "review" && params.get("review") !== "1") return;
+    placedSite.current = reviewDeepSite;
+    setSelected(reviewDeepSite);
+    write({ ...selectionPatch(reviewDeepSite), view: null, review: null, i: null, site: reviewDeepSite });
+  }, [reviewing, reviewDeepSite, reviewDeepIndex, feedLoaded, data, me, params]);
+
+  useEffect(() => {
     if (!reviewing || !feedLoaded) return;
-    if (reviewDeepSite && reviewDeepIndex < 0) {
-      setSelected(reviewDeepSite);
-      if (!data || (params.get("view") !== "review" && params.get("review") !== "1")) return;
-      placedSite.current = reviewDeepSite;
-      write({ ...selectionPatch(reviewDeepSite), view: null, review: null, i: null, site: reviewDeepSite });
-      return;
-    }
+    if (reviewDeepSite && reviewDeepIndex < 0) return;
     if (!reviewSiteId) {
       setSelected(null);
       return;

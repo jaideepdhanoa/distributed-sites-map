@@ -33,17 +33,37 @@ export default function PanelSections({
   }, [site, panel]);
   useEffect(() => {
     if (panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    const node = sections.current;
+    const scroller = node?.closest(".drawer-scroll");
+    if (!node || !(scroller instanceof HTMLElement)) return;
+    let frame = 0;
     const align = () => {
-      const node = sections.current;
-      const scroller = node?.closest(".drawer-scroll");
-      if (!node || !scroller) return;
       const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-      scroller.scrollTo({ top: Math.max(0, top - 4) });
+      const next = Math.max(0, top - 4);
+      if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
     };
+    const sizes = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(align);
+    });
+    const watch = (element: Element) => sizes.observe(element);
+    watch(scroller);
+    for (const child of scroller.children) watch(child);
+    const added = new MutationObserver(() => {
+      for (const child of scroller.children) watch(child);
+      align();
+    });
+    added.observe(scroller, { childList: true, subtree: true });
     align();
-    const timers = [50, 250, 700].map((delay) => window.setTimeout(align, delay));
+    const stop = window.setTimeout(() => {
+      sizes.disconnect();
+      added.disconnect();
+    }, 8000);
     return () => {
-      for (const timer of timers) window.clearTimeout(timer);
+      cancelAnimationFrame(frame);
+      window.clearTimeout(stop);
+      sizes.disconnect();
+      added.disconnect();
     };
   }, [site, panel, tab]);
   const body = tab === "overview" ? overview : tab === "numbers" ? numbers : tab === "activity" ? activity : discussion;

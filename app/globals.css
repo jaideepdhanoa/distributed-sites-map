@@ -828,7 +828,22 @@ tr { cursor: pointer; }
 .card h1 { font-family: var(--font-serif), Georgia, serif; font-weight: 550; margin: 0 0 16px; }
 .card label { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
 .card input { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: white; }
+.login .card label { font-size: 14px; color: var(--ink); }
+.login .card input.field {
+  background: #fffdf8;
+  border: 1px solid #d6cebe;
+  border-radius: 8px;
+  color: var(--ink);
+}
 .card button { width: 100%; background: var(--pine); color: white; border: 0; border-radius: 10px; padding: 10px; }
+.login .card button.primary {
+  width: 100%;
+  background: #1e4636;
+  color: #fffdf8;
+  border: 0;
+  border-radius: 999px;
+  min-height: 44px;
+}
 .err { color: var(--clay); font-size: 13px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .compare { padding: 16px 20px 40px; overflow: auto; height: 100%; }

@@ -323,6 +323,32 @@ test("the account menu stays above the review bar", async ({ page }) => {
   await expect(page.getByTestId("alert-settings")).toBeVisible();
 });
 
+test("sign-in accepts a username or the alert mailbox", async ({ page, request }) => {
+  const generic = "Wrong username or password.";
+  const named = await request.post("/api/login", { data: { username: "reviewer", password } });
+  expect(named.ok()).toBeTruthy();
+
+  const byEmail = await request.post("/api/login", { data: { username: "  Reviewer@Example.COM ", password } });
+  expect(byEmail.ok()).toBeTruthy();
+
+  const unknown = await request.post("/api/login", { data: { username: "nobody@example.com", password } });
+  expect(unknown.status()).toBe(401);
+  expect((await unknown.json()).error).toBe(generic);
+
+  const wrong = await request.post("/api/login", { data: { username: "reviewer", password: "not-the-password" } });
+  expect(wrong.status()).toBe(401);
+  expect((await wrong.json()).error).toBe(generic);
+
+  await page.goto("/login");
+  const field = page.locator("#username");
+  await expect(page.getByLabel("Username or email")).toHaveAttribute("name", "username");
+  await expect(field).toHaveAttribute("autocomplete", "username");
+  await field.fill("REVIEWER@example.com");
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL((url) => url.pathname === "/");
+});
+
 test("an admin can preview a sample alert without mailing anyone else", async ({ page, request }) => {
   await login(request, "contributor");
   const denied = await request.post("/api/alerts/test");

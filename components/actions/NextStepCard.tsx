@@ -602,7 +602,7 @@ function OutcomeForm({
           <option value="reply">Reply only</option>
         </select>
       </label>
-      {stageMove && outcome === "accepted" ? <p className="hint">The stage is written when Jaideep accepts.</p> : null}
+      {stageMove && outcome === "accepted" ? <p className="hint">The stage is written when the workbook approver accepts.</p> : null}
       {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
       <label>
         Reply

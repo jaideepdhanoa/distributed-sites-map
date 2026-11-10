@@ -1,0 +1,8 @@
+import { NextResponse } from "next/server";
+import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
+
+export async function GET() {
+  const session = await requireUser();
+  if (!isSession(session)) return session;
+  return NextResponse.json(readGenerated("grid.geojson"), { headers: privateHeaders });
+}

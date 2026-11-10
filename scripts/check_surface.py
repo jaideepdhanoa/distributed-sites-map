@@ -37,8 +37,8 @@ PANEL_FILES = {
     "components/CompareTray.tsx",
     "lib/keyNumbers.ts",
     "lib/types.ts",
-    "app/api/data/sites/route.ts",
-    "app/api/data/sites/[id]/route.ts",
+    "lib/api/handlers/data/sites.ts",
+    "lib/api/handlers/data/sites-id.ts",
 }
 SURFACE = ("components", "lib", "app")
 

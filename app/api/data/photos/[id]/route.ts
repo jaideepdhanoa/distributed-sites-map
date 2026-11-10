@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const NAME = /^([a-f0-9]{20})\.(jpe?g|png|webp|gif)$/;
 const TYPE: Record<string, string> = {

@@ -37,6 +37,24 @@ jobs:
         if: always()
         run: python scripts/build_data.py --gap-gate
 
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build the deployment output
+        env:
+          VERCEL_TELEMETRY_DISABLED: "1"
+        run: |
+          mkdir -p .vercel
+          printf '%s\n' '{"projectId":"prj_EO8tpeZtslyXHrRLvq6IO8rai5bG","orgId":"team_y5zoRoQKTRtBgU8TapkYj9u1","settings":{"framework":"nextjs"}}' > .vercel/project.json
+          npx vercel@65.11.0 build --yes
+      - run: node scripts/check-function-count.mjs
+
   e2e:
     runs-on: ubuntu-latest
     steps:

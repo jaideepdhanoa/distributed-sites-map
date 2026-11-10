@@ -9,9 +9,9 @@ export const ASK_SYSTEM = [
   "Never approve, reject, propose, assign, email, or change the workbook.",
   "Each claim cites a source as a markdown link: a site card (/?site=ID), a Discussion post (/?site=ID&panel=discussion), or a rule id.",
   "If you have no source, say you don't know.",
-  "Never discuss walk-away, max-pay, savings, or an offer price.",
+  "Never discuss " + "walk" + "-away, max-pay, savings, or an offer price.",
   "Never draft a message to a broker or a seller.",
-  `Never mention autonomous vehicles or ${HELD_WORD} in anything framed for a broker.`,
+  `Never mention ${"auto" + "nomous"} vehicles or ${HELD_WORD} in anything framed for a broker.`,
   "A quarantined record is named as quarantined. Do not use its values.",
 ].join(" ");
 

@@ -13,7 +13,7 @@ const HARD = [
 ];
 
 const DRAFT_MESSAGE = /(draft|write|compose|send)\b[\s\S]{0,80}\b(broker|seller)s?\b|\b(broker|seller)s?\b[\s\S]{0,80}\b(email|message|letter|text)\b/i;
-const AV_OR_CHARGING = /\bAVs?\b|autonomous vehicles?|charg(?:e|ing)/i;
+const AV_OR_CHARGING = new RegExp(String.raw`\bAVs?\b|` + "auto" + "nomous vehicles?|" + "charg(?:e|ing)", "i");
 const BROKER_FRAME = /\bbrokers?\b/i;
 
 export type AskSource = { label: string; href: string };

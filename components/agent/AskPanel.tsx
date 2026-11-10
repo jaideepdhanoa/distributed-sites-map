@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { EMPTY_ANSWER } from "@/lib/ask/empty";
+import { AskMarkdown } from "./AskMarkdown";
 import "./agent.css";
 
 type Source = { label: string; href: string };
-type Turn = { role: "user" | "ask"; text: string; gap?: boolean; sources?: Source[] };
+type Turn = { role: "user" | "ask"; text: string; gap?: boolean; error?: boolean; sources?: Source[] };
 
 export function AskPanel({
   open,
@@ -22,6 +24,13 @@ export function AskPanel({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = logRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [turns, pending, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -35,12 +44,12 @@ export function AskPanel({
 
   if (!open) return null;
 
-  async function send() {
-    const text = question.trim();
+  async function send(preset?: string) {
+    const text = (preset ?? question).trim();
     if (!text || pending || ready === false) return;
     setPending(true);
     setNotice("");
-    setQuestion("");
+    if (!preset) setQuestion("");
     setTurns((current) => [...current, { role: "user", text }, { role: "ask", text: "" }]);
     try {
       const response = await fetch("/api/ask", {
@@ -51,7 +60,7 @@ export function AskPanel({
       if (!response.ok || !response.body) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         const message = payload.error || "Ask isn't set up yet";
-        setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: message }));
+        setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: message, error: true }));
         return;
       }
       const reader = response.body.getReader();
@@ -67,25 +76,26 @@ export function AskPanel({
         for (const chunk of chunks) {
           const line = chunk.split("\n").find((item) => item.startsWith("data: "));
           if (!line) continue;
-          const event = JSON.parse(line.slice(6)) as { delta?: string; done?: boolean; text?: string; gap?: boolean; sources?: Source[] };
+          const event = JSON.parse(line.slice(6)) as { delta?: string; done?: boolean; text?: string; gap?: boolean; error?: boolean; sources?: Source[] };
           if (event.delta) {
             shown += event.delta;
             const snapshot = shown;
             setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: snapshot }));
           }
           if (event.done) {
-            const finalText = event.text || shown;
+            const finalText = (event.text || shown).trim() || EMPTY_ANSWER;
             setTurns((current) => current.slice(0, -1).concat({
               role: "ask",
               text: finalText,
               gap: event.gap,
+              error: event.error || finalText === EMPTY_ANSWER,
               sources: event.sources || [],
             }));
           }
         }
       }
     } catch {
-      setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: "Ask isn't set up yet" }));
+      setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: EMPTY_ANSWER, error: true }));
     } finally {
       setPending(false);
     }
@@ -116,10 +126,15 @@ export function AskPanel({
         <p className="note" data-testid="ask-scope">Portfolio and markets</p>
       )}
       {unset ? <p data-testid="ask-unset">Ask isn&apos;t set up yet</p> : null}
-      <div className="ask-log">
+      <div className="ask-log" ref={logRef}>
         {turns.map((turn, index) => (
           <div key={`${turn.role}-${index}`}>
-            <p className="ask-bubble">{turn.text}</p>
+            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} /> : <p className="ask-bubble">{turn.text}</p>}
+            {turn.error ? (
+              <button type="button" className="paper-btn" data-testid="ask-retry" disabled={pending} onClick={() => void send(turns[index - 1]?.text || "")}>
+                Try again
+              </button>
+            ) : null}
             {turn.gap ? (
               <button type="button" className="paper-btn" data-testid="ask-work-item" onClick={() => makeWorkItem(turns[index - 1]?.text || turn.text)}>
                 Make it a work item
@@ -131,6 +146,7 @@ export function AskPanel({
       {notice ? <p className="note">{notice}</p> : null}
       {unset ? null : (
         <form
+          className="ask-form"
           onSubmit={(event) => {
             event.preventDefault();
             void send();

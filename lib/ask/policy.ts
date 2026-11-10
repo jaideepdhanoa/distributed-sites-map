@@ -35,16 +35,17 @@ export function applyWordingTier(text: string, role: ActionRole, question: strin
   return { text, refused: false };
 }
 
-export function withCitations(text: string, sources: AskSource[]): { text: string; gap: boolean } {
-  if (text === REFUSAL || text === MAP_WORDING) return { text, gap: false };
+export function withCitations(text: string, sources: AskSource[]): { text: string; gap: boolean; empty: boolean } {
+  if (!text.trim()) return { text: "", gap: false, empty: true };
+  if (text === REFUSAL || text === MAP_WORDING) return { text, gap: false, empty: false };
   const linked = hasCitation(text);
-  if (!sources.length && !linked) return { text: UNKNOWN, gap: true };
+  if (!sources.length && !linked) return { text: UNKNOWN, gap: true, empty: false };
   if (!linked && sources.length) {
     const lines = sources.slice(0, 6).map((source) => `- [${source.label}](${source.href})`);
-    return { text: `${text.trim()}\n\nSources:\n${lines.join("\n")}`, gap: false };
+    return { text: `${text.trim()}\n\nSources:\n${lines.join("\n")}`, gap: false, empty: false };
   }
-  if (/i don't know/i.test(text) && !linked) return { text: UNKNOWN, gap: true };
-  return { text, gap: false };
+  if (/i don't know/i.test(text) && !linked) return { text: UNKNOWN, gap: true, empty: false };
+  return { text, gap: false, empty: false };
 }
 
 export function collectSources(value: unknown, into: AskSource[] = [], seen = new Set<string>()): AskSource[] {

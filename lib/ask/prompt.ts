@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { listedCountLine } from "./counts";
 
 const HELD_WORD = "charg" + "ing";
 
@@ -8,6 +9,7 @@ export const ASK_SYSTEM = [
   "Answer questions about sites, the portfolio, and the market using only the tools.",
   "Never approve, reject, propose, assign, email, or change the workbook.",
   "Each claim cites a source as a markdown link: a site card (/?site=ID), a Discussion post (/?site=ID&panel=discussion), or a rule id.",
+  "Start with the answer in sentences. Use the listed-deal counts you are given. Do not count rows yourself.",
   "If you have no source, say you don't know.",
   "Never discuss " + "walk" + "-away, max-pay, savings, or an offer price.",
   "Never draft a message to a broker or a seller.",
@@ -26,9 +28,9 @@ export function portfolioSummary(): string {
     const lines = (file.stages || [])
       .filter((stage) => stage && stage.name && typeof stage.total === "number")
       .map((stage) => `${stage.name}: ${stage.total}`);
-    cachedSummary = lines.length ? `Portfolio counts. ${lines.join(". ")}.` : "Portfolio counts are not loaded.";
+    cachedSummary = lines.length ? `Portfolio counts. ${lines.join(". ")}. ${listedCountLine()}` : listedCountLine();
   } catch {
-    cachedSummary = "Portfolio counts are not loaded.";
+    cachedSummary = listedCountLine();
   }
   return cachedSummary;
 }

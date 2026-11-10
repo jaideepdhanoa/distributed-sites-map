@@ -3,6 +3,7 @@ import { ingestAskGap } from "@/lib/agent/inbox";
 import { actionsEnabled, withSql, type Sql } from "@/lib/actions/db";
 import type { ActionRole } from "@/lib/actions/roles";
 import { estimateCost } from "./cost";
+import { EMPTY_ANSWER } from "./empty";
 import { liveAskModel, type AskModelInput, type AskModelOutput } from "./model";
 import { applyWordingTier, withCitations, type AskSource } from "./policy";
 import { askPrefix } from "./prompt";
@@ -12,6 +13,7 @@ export type AskRunner = (input: AskModelInput) => Promise<AskModelOutput>;
 export type AskAnswer = {
   text: string;
   gap: boolean;
+  error: boolean;
   sources: AskSource[];
   toolsCalled: string[];
   promptTokens: number;
@@ -70,6 +72,7 @@ export async function answerQuestion(input: {
     answer = {
       text: screened.text,
       gap: false,
+      error: false,
       sources: [],
       toolsCalled: [],
       promptTokens: 0,
@@ -88,19 +91,33 @@ export async function answerQuestion(input: {
         role: input.role,
       });
     } catch {
-      draft = { text: "Ask couldn't complete that. I don't know.", toolsCalled: [], sources: [], promptTokens: 0, completionTokens: 0 };
+      draft = { text: "", toolsCalled: [], sources: [], promptTokens: 0, completionTokens: 0 };
     }
-    const worded = applyWordingTier(draft.text, input.role, question);
-    const cited = withCitations(worded.text, worded.refused ? [] : draft.sources);
-    answer = {
-      text: cited.text,
-      gap: cited.gap,
-      sources: worded.refused ? [] : draft.sources,
-      toolsCalled: draft.toolsCalled,
-      promptTokens: draft.promptTokens,
-      completionTokens: draft.completionTokens,
-      estimatedCost: estimateCost(draft.promptTokens, draft.completionTokens),
-    };
+    if (!draft.text.trim()) {
+      answer = {
+        text: EMPTY_ANSWER,
+        gap: false,
+        error: true,
+        sources: [],
+        toolsCalled: draft.toolsCalled,
+        promptTokens: draft.promptTokens,
+        completionTokens: draft.completionTokens,
+        estimatedCost: estimateCost(draft.promptTokens, draft.completionTokens),
+      };
+    } else {
+      const worded = applyWordingTier(draft.text, input.role, question);
+      const cited = withCitations(worded.text, worded.refused ? [] : draft.sources);
+      answer = {
+        text: cited.empty ? EMPTY_ANSWER : cited.text,
+        gap: cited.empty ? false : cited.gap,
+        error: cited.empty,
+        sources: worded.refused || cited.empty ? [] : draft.sources,
+        toolsCalled: draft.toolsCalled,
+        promptTokens: draft.promptTokens,
+        completionTokens: draft.completionTokens,
+        estimatedCost: estimateCost(draft.promptTokens, draft.completionTokens),
+      };
+    }
   }
   await remember({
     userId: input.userId,
@@ -125,6 +142,7 @@ export function streamAnswer(answer: AskAnswer): ReadableStream<Uint8Array> {
         done: true,
         text: payload,
         gap: answer.gap,
+        error: answer.error,
         sources: answer.sources,
       })}\n\n`));
       controller.close();

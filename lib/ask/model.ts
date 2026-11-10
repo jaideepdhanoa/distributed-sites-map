@@ -1,5 +1,6 @@
 import { ASK_TOOLS, MAX_ASK_STEPS, runAskTool } from "@/lib/ask/tools";
 import type { ActionRole } from "@/lib/actions/roles";
+import { listedCountLine } from "./counts";
 import type { AskSource } from "./policy";
 
 export type AskModelInput = {
@@ -126,25 +127,44 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
   };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45_000);
+  const shared = {
+    model: xai(askModelName()),
+    system: input.system,
+    abortSignal: controller.signal,
+    maxOutputTokens: 1200,
+    providerOptions: { xai: { promptCacheKey: "ask-portfolio-v1", reasoningEffort: "none" as const } },
+  };
   try {
-    const result = streamText({
-      model: xai(askModelName()),
-      system: input.system,
+    const first = streamText({
+      ...shared,
       prompt: input.prompt,
       tools,
       stopWhen: stepCountIs(MAX_ASK_STEPS),
-      abortSignal: controller.signal,
-      providerOptions: { xai: { promptCacheKey: "ask-portfolio-v1" } },
     });
-    const [text, usage] = await Promise.all([result.text, result.usage]);
+    const [steps, usage] = await Promise.all([first.steps, first.usage]);
+    let text = steps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
+    let promptTokens = usage.inputTokens || 0;
+    let completionTokens = usage.outputTokens || 0;
+    if (!text) {
+      const facts = [listedCountLine(), ...gathered.map((value) => JSON.stringify(value))].join("\n").slice(0, 6000);
+      const follow = streamText({
+        ...shared,
+        prompt: `${input.prompt}\n\nFacts already looked up:\n${facts}\n\nWrite the answer in sentences. Do not call tools.`,
+        stopWhen: stepCountIs(1),
+      });
+      const [followSteps, followUsage] = await Promise.all([follow.steps, follow.usage]);
+      text = followSteps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
+      promptTokens += followUsage.inputTokens || 0;
+      completionTokens += followUsage.outputTokens || 0;
+    }
     const sources: AskSource[] = [];
     for (const value of gathered) collectSources(value, sources);
     return {
       text,
       toolsCalled: called.filter((name) => (ASK_TOOLS as readonly string[]).includes(name)),
       sources,
-      promptTokens: usage.inputTokens || 0,
-      completionTokens: usage.outputTokens || 0,
+      promptTokens,
+      completionTokens,
     };
   } finally {
     clearTimeout(timer);

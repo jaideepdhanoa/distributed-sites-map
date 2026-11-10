@@ -11,6 +11,7 @@ import { listAppEvents } from "@/lib/queue/events";
 import { dealSearchParts, matchesQuery, siteSearchParts } from "@/lib/search";
 import { presentCard } from "@/lib/timeline/filter";
 import type { DealProps } from "@/lib/types";
+import { listedDealsByMarket } from "./counts";
 import { redactPayload } from "./redact";
 
 export const MAX_ASK_STEPS = 5;
@@ -163,6 +164,7 @@ function portfolio() {
     label: "Portfolio",
     generatedAt: report.generated_at || "",
     changes: report.changes || {},
+    listedByMarket: listedDealsByMarket(),
   };
 }
 

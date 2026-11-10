@@ -135,6 +135,37 @@ for (const width of [1024, 1280]) {
   });
 }
 
+test("a cold in-queue review link highlights that row", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openAs(page, "contributor", "/?view=review&site=PIPE-LAS-0073");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-LAS-0073");
+  await expect(page.locator(".shell")).toHaveClass(/reviewing/);
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
+  await expect(page.getByTestId("review-position")).toContainText(/\d+ of \d+/);
+  const highlighted = page.locator(".review-row.on");
+  await expect(highlighted).toHaveCount(1);
+  await expect(highlighted).toContainText("Former car wash building, now four tenants");
+  await expect.poll(() => page.url()).toMatch(/city=LAS/);
+  await expect.poll(() => page.url()).toMatch(/review=1/);
+  await expect.poll(() => page.url()).not.toMatch(/view=review/);
+  await expect(page.getByTestId("queue-count")).not.toHaveText("0");
+  await expect.poll(async () => page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { project: (lnglat: [number, number]) => { x: number }; getContainer: () => HTMLElement } }).__sitesMap;
+    const node = document.querySelector(".map");
+    const drawer = document.querySelector("aside.drawer");
+    if (!map || !node || !drawer) return -1;
+    const lng = Number(node.getAttribute("data-lng"));
+    const lat = Number(node.getAttribute("data-lat"));
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return -1;
+    const point = map.project([lng, lat]);
+    const canvas = map.getContainer().getBoundingClientRect();
+    const panel = drawer.getBoundingClientRect();
+    const visibleRight = panel.left - canvas.left;
+    if (visibleRight < 120) return -1;
+    return Math.abs(point.x - visibleRight / 2);
+  })).toBeLessThan(70);
+});
+
 test("a review link highlights that site, or leaves review when it is not queued", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {

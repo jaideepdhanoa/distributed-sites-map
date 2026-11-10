@@ -75,11 +75,21 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       },
     }),
     portfolio: tool({
-      description: "Portfolio summary and the latest build changes.",
+      description: "Portfolio summary, listed counts, and a stage row for every in-play listed deal.",
       inputSchema: z.object({}),
       execute: async () => {
         called.push("portfolio");
         const value = await runAskTool("portfolio", {}, role);
+        gathered.push(value);
+        return value;
+      },
+    }),
+    stages: tool({
+      description: "Stage rows for every in-play listed deal. Optional filters: market (Phoenix, Las Vegas, Miami) and stage name. Quarantined records are omitted. No financial figures.",
+      inputSchema: z.object({ market: z.string().optional(), stage: z.string().optional() }),
+      execute: async ({ market, stage }) => {
+        called.push("stages");
+        const value = await runAskTool("stages", { market, stage }, role);
         gathered.push(value);
         return value;
       },

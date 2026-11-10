@@ -7,6 +7,7 @@ import { EMPTY_ANSWER } from "../../lib/ask/empty";
 import { parseAskMarkdown } from "../../lib/ask/markdown";
 import { liveAskModel } from "../../lib/ask/model";
 import { applyWordingTier, hardRefuse, MAP_WORDING, REFUSAL, UNKNOWN, withCitations } from "../../lib/ask/policy";
+import { listedStageRows } from "../../lib/ask/stages";
 import { askPrefix } from "../../lib/ask/prompt";
 import { redactPayload } from "../../lib/ask/redact";
 import { answerQuestion } from "../../lib/ask/run";
@@ -185,6 +186,38 @@ test("an empty model response surfaces an error, not a blank answer", async () =
   const cited = withCitations("  ", [{ label: "Funnel", href: "/?funnel=pipeline" }]);
   assert.equal(cited.empty, true);
   assert.equal(cited.text, "");
+});
+
+test("portfolio context lists a stage for every in-play listed deal", async () => {
+  const file = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
+    features: { properties: { deal_id?: string; listed?: boolean; stage_group?: string } }[];
+  };
+  const expected = file.features
+    .map((feature) => feature.properties)
+    .filter((props) => props.listed === true && props.stage_group !== "dropped" && props.deal_id && !isQuarantined(props.deal_id));
+  const rows = listedStageRows(isQuarantined);
+  const ids = new Set(rows.map((row) => row.id));
+  assert.equal(ids.size, expected.length);
+  assert.ok(expected.length > 8);
+  for (const props of expected) assert.equal(ids.has(String(props.deal_id)), true);
+  assert.equal(ids.has("PIPE-PHX-0006"), false);
+  const prefix = askPrefix();
+  for (const id of ids) assert.equal(prefix.includes(id), true, id);
+  assert.equal(prefix.includes("PIPE-PHX-0006"), false);
+  for (const row of rows) {
+    assert.deepEqual(Object.keys(row).sort(), ["id", "lastActivity", "market", "name", "stage"]);
+    assert.equal(/\$\d|EBITDA|Revenue|cash flow/i.test(JSON.stringify(row)), false);
+  }
+  const portfolio = await runAskTool("portfolio", {}, "viewer") as { stages?: { id: string }[] };
+  assert.equal(portfolio.stages?.length, rows.length);
+  const phoenix = await runAskTool("stages", { market: "Phoenix" }, "viewer") as { count: number; rows: { id: string; market: string; stage: string }[] };
+  const phoenixExpected = rows.filter((row) => row.market === "Phoenix");
+  assert.equal(phoenix.count, phoenixExpected.length);
+  assert.equal(phoenix.rows.every((row) => row.market === "Phoenix"), true);
+  assert.equal(phoenix.rows.some((row) => row.id === "PIPE-PHX-0006"), false);
+  const financial = await runAskTool("stages", { market: "PHX", stage: "Financial" }, "viewer") as { rows: { stage: string }[] };
+  assert.ok(financial.rows.length > 0);
+  assert.equal(financial.rows.every((row) => /financial/i.test(row.stage)), true);
 });
 
 test("portfolio context includes listed deals counted from the data", () => {

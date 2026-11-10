@@ -25,12 +25,23 @@ export function AskPanel({
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const node = logRef.current;
     if (!node) return;
-    node.scrollTop = node.scrollHeight;
+    const pin = () => { node.scrollTop = node.scrollHeight; };
+    pin();
+    const frame = requestAnimationFrame(pin);
+    return () => cancelAnimationFrame(frame);
   }, [turns, pending, open]);
+
+  useEffect(() => {
+    const node = composerRef.current;
+    if (!node) return;
+    node.style.height = "44px";
+    node.style.height = `${Math.min(node.scrollHeight, 112)}px`;
+  }, [question, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -115,16 +126,17 @@ export function AskPanel({
   return (
     <aside className="ask-panel open" data-testid="ask-panel" aria-label="Ask">
       <div className="ask-head">
-        <p className="eyebrow">Ask</p>
+        <div className="ask-title">
+          <p className="eyebrow">Ask</p>
+          {site ? null : <p className="layer-meta" data-testid="ask-scope">Portfolio and markets</p>}
+        </div>
         <button type="button" className="close" aria-label="Close Ask" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {site ? (
         <button type="button" className="removable" data-testid="ask-chip" onClick={onClearSite}>
           {site.name}<span aria-hidden="true">×</span>
         </button>
-      ) : (
-        <p className="note" data-testid="ask-scope">Portfolio and markets</p>
-      )}
+      ) : null}
       {unset ? <p data-testid="ask-unset">Ask isn&apos;t set up yet</p> : null}
       <div className="ask-log" ref={logRef}>
         {turns.map((turn, index) => (
@@ -153,7 +165,23 @@ export function AskPanel({
           }}
         >
           <label className="sr" htmlFor="ask-question">Question</label>
-          <textarea id="ask-question" className="field" data-testid="ask-composer" rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={site ? "Ask about this site" : "Ask about the portfolio"} />
+          <textarea
+            id="ask-question"
+            ref={composerRef}
+            className="field"
+            data-testid="ask-composer"
+            rows={1}
+            maxLength={2000}
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder={site ? "Ask about this site" : "Ask about the portfolio"}
+          />
           <button type="submit" className="primary" disabled={pending || !question.trim()}>Ask</button>
         </form>
       )}

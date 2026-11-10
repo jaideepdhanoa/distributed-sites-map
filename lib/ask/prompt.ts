@@ -1,15 +1,17 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { listedCountLine } from "./counts";
+import { listedStageRows, stageTableText } from "./stages";
+import { isQuarantined } from "./tools";
 
 const HELD_WORD = "charg" + "ing";
 
 export const ASK_SYSTEM = [
   "You are Ask on the Distributed Sites map.",
-  "Answer questions about sites, the portfolio, and the market using only the tools.",
+  "Answer questions about sites, the portfolio, and the market from the counts and stage table in this prompt, and from the tools.",
   "Never approve, reject, propose, assign, email, or change the workbook.",
   "Each claim cites a source as a markdown link: a site card (/?site=ID), a Discussion post (/?site=ID&panel=discussion), or a rule id.",
-  "Start with the answer in sentences. Use the listed-deal counts you are given. Do not count rows yourself.",
+  "Start with the answer in sentences. Use the listed-deal counts and the stage table you are given. The table lists every in-play listed deal. Do not say a stage is missing for a deal in that table. Do not count rows yourself.",
   "If you have no source, say you don't know.",
   "Never discuss " + "walk" + "-away, max-pay, savings, or an offer price.",
   "Never draft a message to a broker or a seller.",
@@ -28,9 +30,10 @@ export function portfolioSummary(): string {
     const lines = (file.stages || [])
       .filter((stage) => stage && stage.name && typeof stage.total === "number")
       .map((stage) => `${stage.name}: ${stage.total}`);
-    cachedSummary = lines.length ? `Portfolio counts. ${lines.join(". ")}. ${listedCountLine()}` : listedCountLine();
+    const counts = lines.length ? `Portfolio counts. ${lines.join(". ")}. ${listedCountLine()}` : listedCountLine();
+    cachedSummary = `${counts}\n\n${stageTableText(listedStageRows(isQuarantined))}`;
   } catch {
-    cachedSummary = listedCountLine();
+    cachedSummary = `${listedCountLine()}\n\n${stageTableText(listedStageRows(isQuarantined))}`;
   }
   return cachedSummary;
 }

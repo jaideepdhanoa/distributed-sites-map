@@ -12,6 +12,7 @@ import { dealSearchParts, matchesQuery, siteSearchParts } from "@/lib/search";
 import { presentCard } from "@/lib/timeline/filter";
 import type { DealProps } from "@/lib/types";
 import { listedDealsByMarket } from "./counts";
+import { filterStageRows, listedStageRows } from "./stages";
 import { redactPayload } from "./redact";
 
 export const MAX_ASK_STEPS = 5;
@@ -21,6 +22,7 @@ export const ASK_TOOLS = [
   "getSite",
   "funnel",
   "portfolio",
+  "stages",
   "discussion",
   "financials",
   "timeline",
@@ -165,6 +167,17 @@ function portfolio() {
     generatedAt: report.generated_at || "",
     changes: report.changes || {},
     listedByMarket: listedDealsByMarket(),
+    stages: listedStageRows(isQuarantined),
+  };
+}
+
+function stages(market?: string, stage?: string) {
+  const rows = filterStageRows(listedStageRows(isQuarantined), market, stage);
+  return {
+    href: "/",
+    label: "Stages",
+    count: rows.length,
+    rows,
   };
 }
 
@@ -255,6 +268,7 @@ export async function runAskTool(
   else if (name === "getSite") raw = getSite(id);
   else if (name === "funnel") raw = funnel();
   else if (name === "portfolio") raw = portfolio();
+  else if (name === "stages") raw = stages(String(args.market || ""), String(args.stage || ""));
   else if (name === "discussion") raw = await discussion(id);
   else if (name === "financials") raw = financials(id);
   else if (name === "timeline") raw = timeline(id);

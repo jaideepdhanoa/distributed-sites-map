@@ -5043,6 +5043,9 @@ def display_language_problems(loaded: dict) -> list[str]:
                     or re.search(r"(?i)power[\s-](?:rd|road)\b", obj)
                 ):
                     continue
+                # A recorded utility easement is a deed fact, not the proximity grade.
+                if word == "utility" and re.search(r"(?i)utility\s+easement\b", obj):
+                    continue
                 problems.append(f"banned term {found.group(0)!r} in {path}: {obj[:120]!r}")
                 break
 

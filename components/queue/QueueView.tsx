@@ -236,7 +236,7 @@ function ReviewMenu({ mode, siteId, followed, onClose, onShowSnooze, onSnooze }:
       ) : null}
       {mode === "more" ? (
         <div className="review-menu-actions" role="group" aria-label="Review actions">
-          <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "stage_move" })); }} className="menu-item">Advance</button>
+          <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "stage_move" })); }} className="menu-item">Prioritize: push to Financials</button>
           <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "knock_off" })); }} className="menu-item">Drop with a reason</button>
           <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "mark_duplicate" })); }} className="menu-item">Mark duplicate</button>
           <button type="button" onClick={onShowSnooze} className="menu-item">Snooze until a package arrives</button>

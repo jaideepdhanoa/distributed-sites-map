@@ -1,3 +1,4 @@
+import { listOpenNeeds } from "@/lib/actions/blockers";
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 import { createSuggestion, listSuggestions, reconcileSuggestions } from "@/lib/actions/suggestions";
 import { InputError, parseTarget, type TargetKind } from "@/lib/actions/text";
@@ -18,12 +19,14 @@ export async function GET(request: Request) {
   } catch (error) {
     return jsonError(error instanceof InputError ? error.message : "Choose a site or a deal.", 400);
   }
-  const suggestions = await runWrite(session, { action: "suggestion.list" }, async (sql) => {
+  const payload = await runWrite(session, { action: "suggestion.list" }, async (sql) => {
     await reconcileSuggestions(sql);
-    return listSuggestions(sql, filter);
+    const suggestions = await listSuggestions(sql, filter);
+    const needs = filter.targetKind && filter.targetId ? await listOpenNeeds(sql, filter.targetKind, filter.targetId) : [];
+    return { suggestions, needs };
   });
-  if (isResponse(suggestions)) return suggestions;
-  return jsonOk({ suggestions });
+  if (isResponse(payload)) return payload;
+  return jsonOk(payload);
 }
 
 export async function POST(request: Request) {

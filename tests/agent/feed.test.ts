@@ -335,6 +335,10 @@ test("a feed item links to the site and panel for that kind", () => {
       proposalStatus: null,
       stage: null,
       workbookStage: false,
+      currentStage: null,
+      proposalOutcome: null,
+      openBlockers: [],
+      stale: false,
       status: "new",
       createdAt: "2026-01-02T15:00:00.000Z",
       cursor: "opaque",
@@ -344,6 +348,13 @@ test("a feed item links to the site and panel for that kind", () => {
     assert.equal(toFeedItem({ ...note, kind: "mention" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
     assert.equal(toFeedItem({ ...note, kind: "suggestion" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
     assert.equal(toFeedItem({ ...note, kind: "decision" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
+    assert.equal(toFeedItem({ ...note, kind: "proposal_ready" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
+    assert.equal(toFeedItem({ ...note, kind: "proposal_overtaken" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
+    const shaped = toFeedItem(note);
+    assert.equal(shaped.current_stage, null);
+    assert.equal(shaped.proposal_outcome, null);
+    assert.deepEqual(shaped.open_blockers, []);
+    assert.equal(shaped.stale, false);
     assert.equal(toFeedItem({ ...note, kind: "flag" }).site_url, "https://distributedsites.com/?view=review&site=PIPE-PHX-0008");
     assert.equal(toFeedItem({ ...note, kind: "ask_gap", siteId: "portfolio" }).site_url, "https://distributedsites.com/");
     assert.equal(
@@ -393,4 +404,32 @@ test("ingestDecision is callable for a rejected proposal", async () => {
   });
   const rows = await sql.query<{ n: string }>(`SELECT count(*)::text AS n FROM agent_inbox WHERE kind = 'decision' AND ref_id = $1`, [suggestion.id]);
   assert.equal(Number(rows.rows[0].n), 1);
+});
+
+test("recommendation drafts cover a status reply and the new outcomes", async () => {
+  const sql = await ready();
+  const suggestion = await createSuggestion(sql, {
+    targetKind: "deal",
+    targetId: "PIPE-PHX-0008",
+    field: "proposed_next_step",
+    detail: "stage_move",
+    proposedValue: "financial",
+    reason: "",
+    authorId: "writer",
+  }, lookup);
+  const before = suggestion.status;
+  const inbox = (await listInbox(sql, {})).items.find((item) => item.kind === "suggestion" && item.refId === suggestion.id);
+  assert.ok(inbox);
+  const statusReply = parseRecommendation(draft({ kind: "status_reply", decision: "none", draft_text: "Waiting on the broker package." }));
+  assert.equal(statusReply.kind, "status_reply");
+  assert.equal(statusReply.decision, "none");
+  await addRecommendation(sql, inbox.id, statusReply);
+  const still = await sql.query<{ status: string }>(`SELECT status FROM suggestions WHERE id = $1`, [suggestion.id]);
+  assert.equal(still.rows[0].status, before);
+  await addRecommendation(sql, inbox.id, parseRecommendation(draft({ kind: "decision", decision: "agree_waiting", draft_text: "Agree, and wait on the file." })));
+  await addRecommendation(sql, inbox.id, parseRecommendation(draft({ kind: "decision", decision: "close_overtaken", draft_text: "The site was already dropped." })));
+  await assert.rejects(async () => parseRecommendation(draft({ kind: "status_reply", decision: "approve" })), /keeps the proposal open/);
+  await assert.rejects(async () => parseRecommendation(draft({ kind: "decision", decision: "agree_waiting", draft_text: `See ${blockedWord()}` })), PolicyError);
+  await assert.rejects(async () => parseRecommendation(draft({ kind: "decision", decision: "close_overtaken", sources: [] })), /source/);
+  await assert.rejects(async () => parseRecommendation(draft({ kind: "decision", decision: "none" })), /outcome/);
 });

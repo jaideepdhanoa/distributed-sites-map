@@ -26,7 +26,14 @@ type Step = {
   ownerId: string | null;
   ownerName: string | null;
   doneAt: string | null;
+  stale?: boolean;
+  currentStage?: string | null;
+  blockers?: { id: string; kind: string; label: string; party: string; askedOn: string | null; followUpOn: string | null; closed: boolean }[];
 };
+type Need = { kind: string; label: string; party: string; askedOn: string | null; followUpOn: string | null };
+type ProposalNote = { id: string; body: string; authorId: string; createdAt: string };
+
+const PRIORITIZE = NEXT_STEP_TYPES.find((item) => item.id === "stage_move")?.label || "Prioritize: push to Financials";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -64,6 +71,13 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   const [pending, setPending] = useState(false);
   const [decisionNote, setDecisionNote] = useState("");
   const [decisionRecommendationId, setDecisionRecommendationId] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState("accepted");
+  const [holdLabel, setHoldLabel] = useState("");
+  const [holdParty, setHoldParty] = useState("");
+  const [holdAsked, setHoldAsked] = useState("");
+  const [holdFollow, setHoldFollow] = useState("");
+  const [needs, setNeeds] = useState<Need[]>([]);
+  const [proposalNotes, setProposalNotes] = useState<ProposalNote[]>([]);
   const siteRecommendations = useRecommendations(id);
   const [reassigning, setReassigning] = useState(false);
   const [dating, setDating] = useState(false);
@@ -75,8 +89,9 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     const response = await fetch(`/api/actions/suggestions?${query}`);
     if (!response.ok) return;
-    const body = (await response.json()) as { suggestions?: Step[] };
+    const body = (await response.json()) as { suggestions?: Step[]; needs?: Need[] };
     setSteps((body.suggestions || []).filter((item) => item.field === "proposed_next_step"));
+    setNeeds(body.needs || []);
   }
 
   useEffect(() => {
@@ -133,8 +148,9 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     Promise.all([fetch(`/api/actions/suggestions?${query}`), fetch("/api/actions/accounts")]).then(async ([stepsRes, accountsRes]) => {
       if (cancel) return;
       if (stepsRes.ok) {
-        const body = (await stepsRes.json()) as { suggestions?: Step[] };
+        const body = (await stepsRes.json()) as { suggestions?: Step[]; needs?: Need[] };
         setSteps((body.suggestions || []).filter((item) => item.field === "proposed_next_step"));
+        setNeeds(body.needs || []);
       }
       if (accountsRes.ok) setAccounts(((await accountsRes.json()) as { accounts: Account[] }).accounts || []);
     }).catch(() => undefined);
@@ -143,13 +159,44 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     };
   }, [status.enabled, kind, id]);
 
+  const pendingSteps = steps.filter((item) => item.status === "open" && !item.doneAt);
+  const readySteps = steps.filter((item) => item.status === "ready" && !item.doneAt);
+  const waitingSteps = steps.filter((item) => item.status === "agreed_waiting" && !item.doneAt);
+  const focus = readySteps[0] || pendingSteps[0] || waitingSteps[0] || null;
+
+  useEffect(() => {
+    if (!focus) return;
+    if (focus.status === "ready") setOutcome("accepted");
+    else if (focus.status === "agreed_waiting") setOutcome("reply");
+    else if (nextStepType(focus.detail) === "stage_move") setOutcome("agreed_waiting");
+    else setOutcome("accepted");
+    setDecisionNote("");
+    setDecisionRecommendationId(null);
+    setHoldLabel("");
+    setHoldParty("");
+    setHoldAsked("");
+    setHoldFollow("");
+  }, [focus?.id, focus?.status]);
+
+  useEffect(() => {
+    if (!status.enabled || !focus) return undefined;
+    let cancel = false;
+    const query = new URLSearchParams({ targetKind: "suggestion", targetId: focus.id });
+    fetch(`/api/actions/notes?${query}`).then(async (response) => {
+      if (cancel || !response.ok) return;
+      const body = (await response.json()) as { notes?: ProposalNote[] };
+      setProposalNotes(body.notes || []);
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [status.enabled, focus?.id, steps]);
+
   if (!status.enabled) return null;
 
-  const pendingSteps = steps.filter((item) => item.status === "open" && !item.doneAt);
   const approved = steps
     .filter((item) => item.status === "accepted" && !item.doneAt)
     .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""))[0];
-  const focus = pendingSteps[0] || null;
 
   function resetForm() {
     setOpen(false);
@@ -231,7 +278,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       <p className="kicker">Propose next step</p>
       <div className="type-chips" role="group" aria-label="Next step type">
         {NEXT_STEP_TYPES.map((item) => (
-          <button key={item.id} type="button" className={type === item.id ? "chip on" : "chip"} onClick={() => setType(item.id)}>{item.label}</button>
+          <button key={item.id} type="button" className={type === item.id ? "chip on" : "chip"} onClick={() => { setType(item.id); if (item.id === "stage_move" && !stage) setStage("financial"); }}>{item.label}</button>
         ))}
       </div>
       {type === "work_item" ? (
@@ -268,6 +315,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           </select>
         </label>
       ) : null}
+      {type === "stage_move" ? <NeedList items={needs} /> : null}
       {type && allowsAssignee(type) ? (
         <div className="split">
           <label>
@@ -297,7 +345,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
     body = (
       <>
         <div className="chip-row">
-          <span className="wait">Waiting for approval</span>
+          <span className="wait">{focus.status === "ready" ? "Ready for approval" : focus.status === "agreed_waiting" ? "Agreed, waiting" : "Waiting for approval"}</span>
           <span className="type">{nextStepTypeLabel(focus.detail)}</span>
         </div>
         <h3>{focus.title || focus.proposedValue}</h3>
@@ -307,31 +355,71 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
         {(knock || stepType === "mark_duplicate") && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
-        {siteRecommendations.rows.filter((item) => item.kind === "decision" && item.proposalId === focus.id).map((item) => (
+        {focus.stale ? <p className="hint">The stage changed after this proposal{focus.currentStage ? ` (${focus.currentStage})` : ""}.</p> : null}
+        {stepType === "stage_move" && focus.status === "open" ? <NeedList items={needs} /> : null}
+        <BlockerList
+          blockers={focus.blockers || []}
+          onClear={reviewer ? (blockerId) => void submit(`/api/actions/suggestions/${focus.id}`, { clearBlockerId: blockerId }) : undefined}
+        />
+        {proposalNotes.length ? (
+          <ul className="need-list">
+            {proposalNotes.map((note) => (
+              <li key={note.id}>{note.body} <span className="hint">{who(accounts, note.authorId)} · {formatPacific(note.createdAt)}</span></li>
+            ))}
+          </ul>
+        ) : null}
+        {siteRecommendations.rows.filter((item) => (item.kind === "decision" || item.kind === "status_reply") && item.proposalId === focus.id).map((item) => (
           <SuggestedBlock
             key={item.id}
             item={item}
             onUse={(draft, recommendationId) => {
               setDecisionNote(draft);
               setDecisionRecommendationId(recommendationId);
+              if (item.kind === "status_reply" || item.decision === "none") setOutcome("reply");
+              else if (item.decision === "agree_waiting") setOutcome("agreed_waiting");
+              else if (item.decision === "close_overtaken") setOutcome("overtaken");
+              else if (item.decision === "approve") setOutcome("accepted");
+              else if (item.decision === "reject") setOutcome("rejected");
             }}
             onDismiss={(recommendationId) => void siteRecommendations.dismiss(recommendationId)}
           />
         ))}
-        {decisionRecommendationId ? (
-          <label>
-            Decision note
-            <textarea className="field" aria-label="Decision note" data-testid="decision-note" value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} rows={3} maxLength={2000} />
-          </label>
-        ) : null}
         {reviewer ? (
-          <div className="act-row">
-            <button type="button" className="propose" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "accepted", note: decisionNote, recommendationId: decisionRecommendationId })}>Accept</button>
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "rejected", note: decisionNote, recommendationId: decisionRecommendationId })} className="menu-item">Reject</button>
-            <button type="button" onClick={() => startEdit(focus)} className="menu-item">Edit</button>
-          </div>
-        ) : writable && focus.authorId === status.username ? (
-          <button type="button" onClick={() => startEdit(focus)} className="menu-item">Edit</button>
+          <OutcomeForm
+            outcome={outcome}
+            onOutcome={setOutcome}
+            reply={decisionNote}
+            onReply={setDecisionNote}
+            allowAccept={focus.status !== "agreed_waiting"}
+            allowWaiting={focus.status === "open"}
+            holdLabel={holdLabel}
+            holdParty={holdParty}
+            holdAsked={holdAsked}
+            holdFollow={holdFollow}
+            onHoldLabel={setHoldLabel}
+            onHoldParty={setHoldParty}
+            onHoldAsked={setHoldAsked}
+            onHoldFollow={setHoldFollow}
+            pending={pending}
+            stageMove={stepType === "stage_move"}
+            needsCount={needs.length}
+            onSend={() => {
+              if (outcome === "reply") {
+                void submit("/api/actions/notes", { targetKind: "suggestion", targetId: focus.id, body: decisionNote, recommendationId: decisionRecommendationId });
+                return;
+              }
+              void submit(`/api/actions/suggestions/${focus.id}`, {
+                status: outcome,
+                reply: decisionNote,
+                note: decisionNote,
+                recommendationId: decisionRecommendationId,
+                hold: outcome === "agreed_waiting" ? { label: holdLabel, party: holdParty, askedOn: holdAsked, followUpOn: holdFollow } : undefined,
+              });
+            }}
+          />
+        ) : null}
+        {focus.status === "open" && ((reviewer) || (writable && focus.authorId === status.username)) ? (
+          <button type="button" onClick={() => startEdit(focus)} className="text-link">Edit</button>
         ) : null}
       </>
     );
@@ -384,7 +472,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       <>
         <p className="kicker">Next step</p>
         <div className="type-chips" role="group" aria-label="Next step type">
-          <button type="button" onClick={() => { setType("stage_move"); setOpen(true); }} className="menu-item">Advance</button>
+          <button type="button" onClick={() => { setType("stage_move"); setStage("financial"); setOpen(true); }} className="menu-item">{PRIORITIZE}</button>
           <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }} className="menu-item">Drop with a reason</button>
           <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }} className="menu-item">Mark duplicate</button>
         </div>
@@ -399,5 +487,150 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
     </section>
+  );
+}
+
+function needDetail(item: { party?: string; askedOn?: string | null; followUpOn?: string | null }) {
+  return [
+    item.party ? `from ${item.party}` : "",
+    item.askedOn ? `asked ${item.askedOn}` : "",
+    item.followUpOn ? `follow up ${item.followUpOn}` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+function NeedList({ items }: { items: Need[] }) {
+  return (
+    <div>
+      <p className="kicker">Still needed</p>
+      {items.length ? (
+        <ul className="need-list">
+          {items.map((item) => (
+            <li key={`${item.kind}-${item.label}-${item.askedOn || ""}`}>
+              {item.label}
+              {needDetail(item) ? <span className="hint"> {needDetail(item)}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="hint">Nothing is filed as still needed. Add an NDA or hold if that is what you are waiting on.</p>
+      )}
+    </div>
+  );
+}
+
+function BlockerList({
+  blockers,
+  onClear,
+}: {
+  blockers: NonNullable<Step["blockers"]>;
+  onClear?: (id: string) => void;
+}) {
+  if (!blockers.length) return null;
+  return (
+    <ul className="need-list">
+      {blockers.map((item) => (
+        <li key={item.id}>
+          {item.closed ? "Cleared: " : ""}{item.label}
+          {needDetail(item) ? <span className="hint"> {needDetail(item)}</span> : null}
+          {onClear && item.kind === "hold" && !item.closed ? (
+            <label className="act-check">
+              <input className="check" type="checkbox" checked={false} onChange={() => onClear(item.id)} />
+              Cleared
+            </label>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function OutcomeForm({
+  outcome,
+  onOutcome,
+  reply,
+  onReply,
+  allowAccept,
+  allowWaiting,
+  holdLabel,
+  holdParty,
+  holdAsked,
+  holdFollow,
+  onHoldLabel,
+  onHoldParty,
+  onHoldAsked,
+  onHoldFollow,
+  pending,
+  stageMove,
+  needsCount,
+  onSend,
+}: {
+  outcome: string;
+  onOutcome: (value: string) => void;
+  reply: string;
+  onReply: (value: string) => void;
+  allowAccept: boolean;
+  allowWaiting: boolean;
+  holdLabel: string;
+  holdParty: string;
+  holdAsked: string;
+  holdFollow: string;
+  onHoldLabel: (value: string) => void;
+  onHoldParty: (value: string) => void;
+  onHoldAsked: (value: string) => void;
+  onHoldFollow: (value: string) => void;
+  pending: boolean;
+  stageMove: boolean;
+  needsCount: number;
+  onSend: () => void;
+}) {
+  const replyNeeded = outcome === "reply" || outcome === "agreed_waiting" || outcome === "overtaken";
+  const holdNeeded = outcome === "agreed_waiting" && needsCount === 0 && !holdLabel.trim();
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSend();
+      }}
+    >
+      <label>
+        Outcome
+        <select className="secondary" aria-label="Outcome" value={outcome} onChange={(event) => onOutcome(event.target.value)}>
+          {allowAccept ? <option value="accepted">Accept</option> : null}
+          {allowWaiting ? <option value="agreed_waiting">Agreed, waiting on…</option> : null}
+          <option value="rejected">Reject</option>
+          <option value="overtaken">Closed, overtaken</option>
+          <option value="reply">Reply only</option>
+        </select>
+      </label>
+      {stageMove && outcome === "accepted" ? <p className="hint">The stage is written when Jaideep accepts.</p> : null}
+      {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
+      <label>
+        Reply
+        <textarea className="field" aria-label="Reply to the proposer" data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={3} maxLength={2000} required={replyNeeded} />
+      </label>
+      {outcome === "agreed_waiting" ? (
+        <>
+          <label>
+            Waiting on
+            <input className="field" aria-label="Waiting on" value={holdLabel} onChange={(event) => onHoldLabel(event.target.value)} maxLength={200} placeholder="Signature, file, or a pause" />
+          </label>
+          <label>
+            From
+            <input className="field" aria-label="From" value={holdParty} onChange={(event) => onHoldParty(event.target.value)} maxLength={120} />
+          </label>
+          <div className="split">
+            <label>
+              Asked
+              <input className="field" aria-label="Date asked" type="date" value={holdAsked} onChange={(event) => onHoldAsked(event.target.value)} />
+            </label>
+            <label>
+              Next follow-up
+              <input className="field" aria-label="Next follow-up" type="date" value={holdFollow} onChange={(event) => onHoldFollow(event.target.value)} />
+            </label>
+          </div>
+        </>
+      ) : null}
+      <button type="submit" className="propose" disabled={pending || holdNeeded || (replyNeeded && !reply.trim())}>Send</button>
+    </form>
   );
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { assertClean, safeSnapshot } from "@/lib/policy/banned";
 import { getUsers } from "@/lib/users";
-import { ingestDecision } from "@/lib/agent/inbox";
+import { ingestDecision, ingestProposalEvent } from "@/lib/agent/inbox";
 import { attachRecommendation } from "@/lib/agent/recommend";
 import { notifySuggestion } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
@@ -10,6 +10,7 @@ import { audit } from "./audit";
 import type { Sql } from "./db";
 import { allowsAssignee, allowsDate, exportStage, normalizeNextStep } from "./nextStep";
 import { parseDocumentRequest } from "@/lib/financials";
+import { blockersBySuggestion, clearHoldBlocker, linkWaitingBlockers, parseHold, refreshProposalReadiness, stagesDiffer, type Blocker } from "./blockers";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
 import {
   csvCell,
@@ -24,7 +25,7 @@ import {
   type TargetKind,
 } from "./text";
 
-export type SuggestionStatus = "open" | "accepted" | "rejected" | "applied";
+export type SuggestionStatus = "open" | "accepted" | "rejected" | "applied" | "agreed_waiting" | "ready" | "overtaken";
 
 export type Suggestion = {
   id: string;
@@ -48,6 +49,10 @@ export type Suggestion = {
   doneAt: string | null;
   doneBy: string | null;
   mentions: Mention[];
+  stageAt: string | null;
+  currentStage: string | null;
+  stale: boolean;
+  blockers: Blocker[];
 };
 
 type SuggestionRow = {
@@ -70,9 +75,10 @@ type SuggestionRow = {
   owner_id: string | null;
   done_at: Date | string | null;
   done_by: string | null;
+  stage_at: string | null;
 };
 
-const SELECT = `id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, created_at, decided_by, decided_at, applied_at, title, target_on, owner_id, done_at, done_by`;
+const SELECT = `id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, created_at, decided_by, decided_at, applied_at, title, target_on, owner_id, done_at, done_by, stage_at`;
 
 function dayOf(value: Date | string | null): string | null {
   if (!value) return null;
@@ -118,7 +124,25 @@ function present(row: SuggestionRow): Suggestion | null {
     doneAt: row.done_at ? stamp(row.done_at) : null,
     doneBy: row.done_by,
     mentions: [],
+    stageAt: row.stage_at || null,
+    currentStage: null,
+    stale: false,
+    blockers: [],
   };
+}
+
+async function decorate(sql: Sql, rows: Suggestion[], lookup: RecordLookup): Promise<Suggestion[]> {
+  const mentioned = await withMentions(sql, rows);
+  const blockers = await blockersBySuggestion(sql, mentioned.map((row) => row.id));
+  return mentioned.map((row) => {
+    const current = recordField(lookup(row.targetKind, row.targetId), "stage", null);
+    return {
+      ...row,
+      currentStage: current || null,
+      stale: stagesDiffer(row.stageAt, current),
+      blockers: blockers.get(row.id) || [],
+    };
+  });
 }
 
 async function withMentions(sql: Sql, rows: Suggestion[]): Promise<Suggestion[]> {
@@ -138,7 +162,9 @@ export function permanentSiteId(kind: TargetKind, id: string, lookup: RecordLook
 export async function listSuggestions(
   sql: Sql,
   filter?: { targetKind?: TargetKind; targetId?: string; status?: SuggestionStatus },
+  lookup: RecordLookup = fileLookup(),
 ): Promise<Suggestion[]> {
+  await refreshProposalReadiness(sql, lookup);
   const clauses: string[] = [];
   const values: unknown[] = [];
   if (filter?.targetKind && filter.targetId) {
@@ -155,7 +181,7 @@ export async function listSuggestions(
     values,
   );
   const suggestions = rows.rows.map(present).filter((row): row is Suggestion => Boolean(row));
-  return withMentions(sql, suggestions);
+  return decorate(sql, suggestions, lookup);
 }
 
 export async function createSuggestion(
@@ -216,11 +242,12 @@ export async function createSuggestion(
   const mentionIds = nextStep ? parseMentionIds(input.mentions) : [];
   const id = randomUUID();
   const currentValue = nextStep ? "" : safeSnapshot(recordField(record, field, detail));
+  const stageAt = recordField(record, "stage", null);
   await sql.query(
     `INSERT INTO suggestions (
-      id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, title, target_on, owner_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open', $9, $10, $11, $12)`,
-    [id, target.targetKind, target.targetId, field, detail, currentValue, proposedValue, reason, input.authorId, title, targetOn, ownerId],
+      id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason, status, author_id, title, target_on, owner_id, stage_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open', $9, $10, $11, $12, $13)`,
+    [id, target.targetKind, target.targetId, field, detail, currentValue, proposedValue, reason, input.authorId, title, targetOn, ownerId, stageAt || null],
   );
   await audit(sql, {
     actorId: input.authorId,
@@ -263,55 +290,125 @@ export async function createSuggestion(
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [id]);
   const suggestion = present(saved.rows[0]);
   if (!suggestion) throw new InputError("That suggestion could not be saved.");
-  return (await withMentions(sql, [suggestion]))[0];
+  return (await decorate(sql, [suggestion], lookup))[0];
 }
+
+const DECISION_ACTION = {
+  accepted: "suggestion.accept",
+  rejected: "suggestion.reject",
+  agreed_waiting: "suggestion.agree_waiting",
+  overtaken: "suggestion.overtaken",
+} as const;
 
 export async function decideSuggestion(
   sql: Sql,
-  input: { id: string; status: "accepted" | "rejected"; actorId: string; note?: string; recommendationId?: string | null },
+  input: {
+    id: string;
+    status: "accepted" | "rejected" | "agreed_waiting" | "overtaken";
+    actorId: string;
+    note?: string;
+    reply?: string;
+    recommendationId?: string | null;
+    hold?: unknown;
+  },
+  lookup: RecordLookup = fileLookup(),
 ): Promise<Suggestion> {
-  if (input.status !== "accepted" && input.status !== "rejected") {
-    throw new InputError("A reviewer can accept or reject an open suggestion.");
+  if (input.status !== "accepted" && input.status !== "rejected" && input.status !== "agreed_waiting" && input.status !== "overtaken") {
+    throw new InputError("Choose accept, reject, agreed and waiting, or closed as overtaken.");
   }
-  const note = input.note?.trim() ? parseBody(input.note, "note", 2000) : "";
-  if (note) assertClean(note);
+  const reply = input.reply?.trim() ? parseBody(input.reply, "reply", 2000) : "";
+  const note = input.note?.trim() ? parseBody(input.note, "note", 2000) : reply;
+  if (reply) assertClean(reply);
+  if (note && note !== reply) assertClean(note);
+  if (input.status === "overtaken" && !note) throw new InputError("Add the reason.");
+  if (input.status === "agreed_waiting" && !note) throw new InputError("Tell the proposer what you are waiting on.");
+  const hold = input.status === "agreed_waiting" ? parseHold(input.hold) : null;
   const existing = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
   const row = existing.rows[0];
   if (!row) throw new InputError("That suggestion is not in the queue.", 404);
-  if (row.status !== "open") throw new InputError("Only an open suggestion can be accepted or rejected.");
+  const open = row.status === "open";
+  const waiting = row.status === "agreed_waiting";
+  const ready = row.status === "ready";
+  if (input.status === "agreed_waiting" && !open) throw new InputError("Only an open proposal can be marked waiting.");
+  if (input.status === "accepted" && waiting) throw new InputError("That proposal is waiting on blockers.");
+  if (input.status === "accepted" && !open && !ready) throw new InputError("Only an open suggestion can be accepted or rejected.");
+  if ((input.status === "rejected" || input.status === "overtaken") && !open && !waiting && !ready) {
+    throw new InputError("Only an open suggestion can be accepted or rejected.");
+  }
+  if (input.status === "agreed_waiting") {
+    const linked = await linkWaitingBlockers(sql, {
+      suggestionId: row.id,
+      kind: row.target_kind,
+      id: row.target_id,
+      hold,
+    }, lookup);
+    if (!linked) throw new InputError("Name what this is waiting on.");
+  }
   const attached = await attachRecommendation(sql, {
     recommendationId: input.recommendationId,
     actorId: input.actorId,
     kind: "decision",
   });
-  await sql.query(
+  const from = input.status === "accepted" ? ["open", "ready"] : input.status === "agreed_waiting" ? ["open"] : ["open", "agreed_waiting", "ready"];
+  const updated = await sql.query(
     `UPDATE suggestions
      SET status = $2, decided_by = $3, decided_at = now(), decision_note = $4,
          recommendation_id = $5, drafted_by_agent = $6
-     WHERE id = $1 AND status = 'open'`,
-    [input.id, input.status, input.actorId, note || null, attached.recommendationId, attached.draftedByAgent],
+     WHERE id = $1 AND status = ANY($7::text[])
+     RETURNING id`,
+    [input.id, input.status, input.actorId, note || null, attached.recommendationId, attached.draftedByAgent, from],
   );
+  if (!updated.rows.length) throw new InputError("Only an open suggestion can be accepted or rejected.");
   await audit(sql, {
     actorId: input.actorId,
-    action: input.status === "accepted" ? "suggestion.accept" : "suggestion.reject",
+    action: DECISION_ACTION[input.status],
     targetKind: row.target_kind,
     targetId: row.target_id,
-    before: { id: row.id, status: "open" },
+    before: { id: row.id, status: row.status },
     after: { id: row.id, status: input.status, note, recommendationId: attached.recommendationId, draftedByAgent: attached.draftedByAgent },
   });
-  await ingestDecision(sql, {
-    id: input.id,
-    status: input.status,
-    actorId: input.actorId,
-    note,
-    siteId: permanentSiteId(row.target_kind, row.target_id),
-    recordId: row.target_id,
-    field: row.field_name,
-    detail: row.detail,
-    title: row.title,
-    proposedValue: row.proposed_value,
-    reason: row.reason,
-  });
+  const siteId = permanentSiteId(row.target_kind, row.target_id, lookup);
+  if (input.status === "overtaken") {
+    await ingestProposalEvent(sql, {
+      kind: "proposal_overtaken",
+      id: input.id,
+      actorId: input.actorId,
+      note,
+      siteId,
+      recordId: row.target_id,
+      field: row.field_name,
+      detail: row.detail,
+      title: row.title,
+      proposedValue: row.proposed_value,
+      reason: row.reason,
+    });
+  } else {
+    await ingestDecision(sql, {
+      id: input.id,
+      refId: input.status === "agreed_waiting" ? `${input.id}:waiting` : input.id,
+      status: input.status,
+      actorId: input.actorId,
+      note,
+      siteId,
+      recordId: row.target_id,
+      field: row.field_name,
+      detail: row.detail,
+      title: row.title,
+      proposedValue: row.proposed_value,
+      reason: row.reason,
+    });
+  }
+  if (reply) {
+    const { createNote } = await import("./notes");
+    const mention = row.author_id !== input.actorId && getUsers().some((user) => user.u === row.author_id) ? [row.author_id] : [];
+    await createNote(sql, {
+      targetKind: "suggestion",
+      targetId: row.id,
+      body: reply,
+      authorId: input.actorId,
+      mentions: mention,
+    }, lookup);
+  }
   if (input.status === "accepted" && row.field_name === "document_request" && row.target_on) {
     const day = dayOf(row.target_on);
     const siteId = permanentSiteId(row.target_kind, row.target_id);
@@ -323,11 +420,11 @@ export async function decideSuggestion(
       );
     }
   }
-  if (row.field_name === "proposed_next_step") {
+  if (row.field_name === "proposed_next_step" && (input.status === "accepted" || input.status === "rejected")) {
     const title = safeSnapshot(row.title || row.proposed_value, 120);
     if (title) {
       await recordAppEvent(sql, {
-        siteId: permanentSiteId(row.target_kind, row.target_id),
+        siteId: permanentSiteId(row.target_kind, row.target_id, lookup),
         type: input.status === "accepted" ? "next_accepted" : "next_rejected",
         summary: input.status === "accepted" ? `Next step approved: ${title}` : `Next step rejected: ${title}`,
         actorId: input.actorId,
@@ -335,10 +432,23 @@ export async function decideSuggestion(
       });
     }
   }
+  await refreshProposalReadiness(sql, lookup);
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
   const suggestion = present(saved.rows[0]);
   if (!suggestion) throw new InputError("That suggestion could not be updated.");
-  return (await withMentions(sql, [suggestion]))[0];
+  return (await decorate(sql, [suggestion], lookup))[0];
+}
+
+export async function clearSuggestionBlocker(
+  sql: Sql,
+  input: { id: string; blockerId: string; actorId: string },
+  lookup: RecordLookup = fileLookup(),
+): Promise<Suggestion> {
+  await clearHoldBlocker(sql, { suggestionId: input.id, blockerId: input.blockerId, actorId: input.actorId }, lookup);
+  const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
+  const suggestion = present(saved.rows[0]);
+  if (!suggestion) throw new InputError("That suggestion could not be updated.");
+  return (await decorate(sql, [suggestion], lookup))[0];
 }
 
 export async function completeSuggestion(

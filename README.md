@@ -301,6 +301,10 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
       "proposal_status": null,
       "stage": null,
       "workbook_stage": false,
+      "current_stage": null,
+      "proposal_outcome": null,
+      "open_blockers": [],
+      "stale": false,
       "status": "new",
       "created_at": "2026-11-10T00:00:00.000Z",
       "site_url": "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion",
@@ -311,17 +315,28 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
 }
 ```
 
-`kind` is `note`, `reply`, `mention`, `suggestion` (with `subtype` for the proposal type, such as `stage_move`), `flag`, `decision`, or `ask_gap`. `status` is `new`, `picked`, `done`, or `superseded`. A newer event on the same thread marks older open rows `superseded`. Skip those.
+`kind` is `note`, `reply`, `mention`, `suggestion` (with `subtype` for the proposal type, such as `stage_move`), `flag`, `decision`, `ask_gap`, `proposal_ready`, or `proposal_overtaken`. `status` is `new`, `picked`, `done`, or `superseded`. A newer event on the same thread marks older open rows `superseded`. Skip those.
+
+On `suggestion`, `decision`, `proposal_ready`, and `proposal_overtaken` rows, four fields describe the proposal as it stands now:
+
+- `current_stage` is the site's stage on the map.
+- `proposal_outcome` is the live proposal status: `open`, `agreed_waiting`, `ready`, `accepted`, `rejected`, `overtaken`, or `applied`. `proposal_status` stays the status recorded on that event.
+- `open_blockers` lists blockers that are still open. Each has `id`, `kind` (`document_request`, `checklist`, or `hold`), `label`, `party`, `asked_on`, and `follow_up_on`.
+- `stale` is true when the site's stage changed after the proposal was made. Older proposals with no stored stage are not marked stale.
+
+Other kinds send `current_stage` and `proposal_outcome` as null, `open_blockers` as `[]`, and `stale` as false.
+
+`proposal_ready` is written once, when every blocker linked to an agreed proposal has closed. It does not set `workbook_stage`. `proposal_overtaken` is written once, with the reason, when a proposal is closed because events made it moot. Both use the idempotency key `kind:ref_id`, where `ref_id` is the proposal id.
 
 The idempotency key is `kind:ref_id`. Posting the same event twice does not create a second row.
 
-`site_url` is an absolute link to that row on the map. The host is the request host (`x-forwarded-host`, then `Host`). When the request has no host, the link uses `APP_URL`, or `https://distributedsites.com` when that is unset. Notes, replies, and mentions open Discussion (`/?site=ID&panel=discussion`). Suggestions and decisions open the proposal on that site (`/?site=ID&panel=proposal`). Flags open Review on that site (`/?view=review&site=ID`). An `ask_gap` for one site opens that site. `site_id` `portfolio` opens the home map (`/`).
+`site_url` is an absolute link to that row on the map. The host is the request host (`x-forwarded-host`, then `Host`). When the request has no host, the link uses `APP_URL`, or `https://distributedsites.com` when that is unset. Notes, replies, and mentions open Discussion (`/?site=ID&panel=discussion`). Suggestions, decisions, `proposal_ready`, and `proposal_overtaken` open the proposal on that site (`/?site=ID&panel=proposal`). Flags open Review on that site (`/?view=review&site=ID`). An `ask_gap` for one site opens that site. `site_id` `portfolio` opens the home map (`/`).
 
 `next` is the cursor to pass as `after`, or `null` when this page is the end.
 
 ### Backfill
 
-The feed only recorded events after it shipped. This reads the existing notes, replies, mentions, flags, and suggestions and inserts the feed rows the live path would have written, including a `decision` for an accepted, rejected, or later-applied proposal. `created_at`, the idempotency key, the thread, and the actor come from the original event. A newer row on a thread supersedes older `new` or `picked` rows. Running it again inserts nothing. It does not create `ask_gap` rows.
+The feed only recorded events after it shipped. This reads the existing notes, replies, mentions, flags, and suggestions and inserts the feed rows the live path would have written, including a `decision` for an accepted, rejected, agreed-and-waiting, or later-applied proposal, a `proposal_ready` row for a proposal whose blockers have cleared, and a `proposal_overtaken` row for a proposal closed as overtaken. It does not change proposal rows. `created_at`, the idempotency key, the thread, and the actor come from the original event. A newer row on a thread supersedes older `new` or `picked` rows. Running it again inserts nothing. It does not create `ask_gap` rows.
 
 Preview and production share one `DATABASE_URL`. `--write` updates that database. Do not run `--write` from CI. Dry-run only reads, and prints counts by kind and by actor:
 
@@ -356,17 +371,21 @@ npm run backfill-inbox -- --write
 }
 ```
 
-`kind` is `reply` (decision `none`) or `decision` (`approve` or `reject`). `confidence` is `high`, `medium`, or `low`. `sources` is required. Each source has a `label` and a `url` (`https://` or a map link starting `/?`) or a `ref`.
+`kind` is `reply` (decision `none`), `status_reply` (decision `none`, the proposal stays open), or `decision`. A decision is `approve`, `reject`, `agree_waiting`, or `close_overtaken`. `confidence` is `high`, `medium`, or `low`. `sources` is required. Each source has a `label` and a `url` (`https://` or a map link starting `/?`) or a `ref`.
 
-The draft and the rationale go through the map wording check. A superseded inbox row, or a proposal that is no longer open, is `409`. Nothing in this response is posted.
+The draft and the rationale go through the map wording check. A superseded inbox row, or a proposal that is no longer open, is `409`. `agree_waiting` is only accepted while the proposal is open. `approve` and `reject` are refused while it is waiting on blockers. Nothing in this response is posted.
 
-A stage_move that Jaideep approves adds a `decision` row with `workbook_stage: true` and `stage` set to the approved stage id. That is the signal to write the workbook Stage column. The app does not ask again.
+Agreed, waiting keeps the stage and links the site's open document requests, open diligence checklist items, and any NDA or hold named with the decision. When every linked blocker closes, the proposal becomes `ready` and the feed gains one `proposal_ready` row. That surfaces the stage move. It does not write the workbook.
+
+A stage_move that Jaideep approves adds a `decision` row with `workbook_stage: true` and `stage` set to the approved stage id. That is the signal to write the workbook Stage column. The app does not ask again. Accepting while the proposal is still waiting on blockers is refused. Closing a proposal as overtaken records the reason and adds one `proposal_overtaken` row. Reject stays for a real finding.
 
 Unanswered Ask questions are logged as `ask_gap`.
 
 ### What a person sees
 
-Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills his composer. Post, Approve, and Reject are still his buttons, and the saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline. Each draft includes a link to the site, using the same `site_url` rules as the feed.
+Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills the reply and selects the outcome. One Send records the outcome and, when the reply is filled in, posts that reply on the proposal. The saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline. Each draft includes a link to the site, using the same `site_url` rules as the feed.
+
+The proposal form calls the stage-move choice Prioritize: push to Financials. It lists what is still needed on that site: open document requests and diligence items that are not on file and not unavailable.
 
 ## Ask
 

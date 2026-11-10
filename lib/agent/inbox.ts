@@ -2,10 +2,20 @@ import { randomUUID } from "node:crypto";
 import { approvesWorkbookStage } from "@/lib/agent/access";
 import { absoluteSiteUrl, feedOrigin } from "@/lib/agent/links";
 import type { Sql } from "@/lib/actions/db";
-import { stamp } from "@/lib/actions/text";
+import { fileLookup, recordField, type RecordLookup } from "@/lib/actions/records";
+import { stamp, type TargetKind } from "@/lib/actions/text";
 import { stageTitle } from "@/lib/labels";
 
-export type InboxKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap";
+export type InboxKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap" | "proposal_ready" | "proposal_overtaken";
+
+export type FeedBlocker = {
+  id: string;
+  kind: "document_request" | "checklist" | "hold";
+  label: string;
+  party: string;
+  askedOn: string | null;
+  followUpOn: string | null;
+};
 export type InboxStatus = "new" | "picked" | "done" | "superseded";
 
 export type InboxItem = {
@@ -26,6 +36,10 @@ export type InboxItem = {
   status: InboxStatus;
   createdAt: string;
   cursor: string;
+  currentStage: string | null;
+  proposalOutcome: string | null;
+  openBlockers: FeedBlocker[];
+  stale: boolean;
 };
 
 type InboxRow = {
@@ -97,6 +111,10 @@ function present(row: InboxRow): InboxItem {
     status: row.status,
     createdAt,
     cursor: encodeCursor(createdAt, row.id),
+    currentStage: null,
+    proposalOutcome: null,
+    openBlockers: [],
+    stale: false,
   };
 }
 
@@ -341,9 +359,74 @@ export async function ingestFlag(
   if (id && input.supersede !== false) await supersedeOthers(sql, payload.threadKey, [id]);
 }
 
+export function proposalEventFeed(input: {
+  kind: "proposal_ready" | "proposal_overtaken";
+  id: string;
+  actorId: string;
+  note: string;
+  siteId: string;
+  recordId: string;
+  field: string;
+  detail: string | null;
+  title: string | null;
+  proposedValue: string;
+  reason: string;
+  createdAt?: string | null;
+}): FeedInsert {
+  const title = input.title || input.proposedValue;
+  const stageLabel = input.detail === "stage_move" && input.proposedValue ? stageTitle(input.proposedValue) : "";
+  const lines = input.kind === "proposal_ready"
+    ? [
+      `Ready: ${title}`,
+      stageLabel ? `Proposed stage: ${stageLabel} (${input.proposedValue}). The stage stays until it is accepted.` : "The blockers on this proposal are clear.",
+    ]
+    : [
+      `Closed, overtaken: ${title}`,
+      input.note ? `Reason: ${input.note}` : "",
+    ].filter(Boolean);
+  return {
+    kind: input.kind,
+    subtype: input.detail || input.field,
+    refId: input.id,
+    siteId: input.siteId,
+    recordId: input.recordId,
+    actor: input.actorId,
+    text: lines.join("\n"),
+    threadKey: `proposal:${input.id}`,
+    threadContext: [input.title, input.proposedValue, input.reason].filter(Boolean).join("\n"),
+    proposalId: input.id,
+    proposalStatus: input.kind === "proposal_ready" ? "ready" : "overtaken",
+    createdAt: input.createdAt,
+  };
+}
+
+export async function ingestProposalEvent(
+  sql: Sql,
+  input: {
+    kind: "proposal_ready" | "proposal_overtaken";
+    id: string;
+    actorId: string;
+    note: string;
+    siteId: string;
+    recordId: string;
+    field: string;
+    detail: string | null;
+    title: string | null;
+    proposedValue: string;
+    reason: string;
+    createdAt?: string | null;
+    supersede?: boolean;
+  },
+): Promise<void> {
+  const payload = proposalEventFeed(input);
+  const id = await insertFeedRow(sql, payload);
+  if (id && input.supersede !== false) await supersedeOthers(sql, payload.threadKey, [id]);
+}
+
 export function decisionFeed(input: {
   id: string;
-  status: "accepted" | "rejected";
+  refId?: string;
+  status: "accepted" | "rejected" | "agreed_waiting";
   actorId: string;
   note: string;
   siteId: string;
@@ -358,16 +441,17 @@ export function decisionFeed(input: {
   const stageMove = input.detail === "stage_move" && input.status === "accepted" && approvesWorkbookStage(input.actorId);
   const stage = stageMove ? input.proposedValue : null;
   const stageLabel = stage ? stageTitle(stage) : "";
-  const verb = input.status === "accepted" ? "Approved" : "Rejected";
+  const verb = input.status === "accepted" ? "Approved" : input.status === "agreed_waiting" ? "Agreed, waiting" : "Rejected";
   const lines = [
     `${verb}: ${input.title || input.proposedValue}`,
     stageLabel ? `Approved stage: ${stageLabel} (${stage}). Write this stage on the workbook Stage column.` : "",
+    input.status === "agreed_waiting" ? "The stage is unchanged." : "",
     input.note ? `Note: ${input.note}` : "",
   ].filter(Boolean);
   return {
     kind: "decision",
     subtype: stageMove ? "stage_move" : input.detail || input.field,
-    refId: input.id,
+    refId: input.refId || input.id,
     siteId: input.siteId,
     recordId: input.recordId,
     actor: input.actorId,
@@ -386,7 +470,8 @@ export async function ingestDecision(
   sql: Sql,
   input: {
     id: string;
-    status: "accepted" | "rejected";
+    refId?: string;
+    status: "accepted" | "rejected" | "agreed_waiting";
     actorId: string;
     note: string;
     siteId: string;
@@ -424,7 +509,85 @@ export async function ingestAskGap(
   return refId;
 }
 
-export async function listInbox(sql: Sql, input: { after?: string | null; limit?: number }): Promise<{ items: InboxItem[]; next: string | null }> {
+const PROPOSAL_KINDS = new Set<InboxKind>(["suggestion", "decision", "proposal_ready", "proposal_overtaken"]);
+
+function dayOf(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null;
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  return `${value.getUTCFullYear()}-${month}-${day}`;
+}
+
+async function enrichProposals(sql: Sql, items: InboxItem[], lookup: RecordLookup): Promise<InboxItem[]> {
+  const ids = [...new Set(items.flatMap((item) => (PROPOSAL_KINDS.has(item.kind) ? [item.proposalId || item.refId] : [])))];
+  if (!ids.length) return items;
+  const marks = ids.map((_, index) => `$${index + 1}`).join(", ");
+  const suggestions = await sql.query<{
+    id: string;
+    status: string;
+    stage_at: string | null;
+    target_kind: TargetKind;
+    target_id: string;
+  }>(
+    `SELECT id, status, stage_at, target_kind, target_id FROM suggestions WHERE id IN (${marks})`,
+    ids,
+  );
+  const byId = new Map(suggestions.rows.map((row) => [row.id, row]));
+  const blockers = await sql.query<{
+    id: string;
+    suggestion_id: string;
+    kind: FeedBlocker["kind"];
+    label: string;
+    party: string;
+    asked_on: Date | string | null;
+    follow_up_on: Date | string | null;
+  }>(
+    `SELECT id, suggestion_id, kind, label, party, asked_on, follow_up_on
+     FROM proposal_blockers
+     WHERE suggestion_id IN (${marks}) AND closed_at IS NULL
+     ORDER BY created_at ASC, id ASC`,
+    ids,
+  );
+  const open = new Map<string, FeedBlocker[]>();
+  for (const row of blockers.rows) {
+    const list = open.get(row.suggestion_id) || [];
+    list.push({
+      id: row.id,
+      kind: row.kind,
+      label: row.label,
+      party: row.party || "",
+      askedOn: dayOf(row.asked_on),
+      followUpOn: dayOf(row.follow_up_on),
+    });
+    open.set(row.suggestion_id, list);
+  }
+  return items.map((item) => {
+    if (!PROPOSAL_KINDS.has(item.kind)) return item;
+    const id = item.proposalId || item.refId;
+    const row = byId.get(id);
+    const blockersFor = open.get(id) || [];
+    if (!row) return { ...item, proposalOutcome: item.proposalStatus, openBlockers: blockersFor };
+    const current = recordField(lookup(row.target_kind, row.target_id), "stage", null);
+    const before = String(row.stage_at || "").trim().toLowerCase();
+    const after = current.trim().toLowerCase();
+    return {
+      ...item,
+      currentStage: current || null,
+      proposalOutcome: row.status,
+      openBlockers: blockersFor,
+      stale: Boolean(before && after && before !== after),
+    };
+  });
+}
+
+export async function listInbox(
+  sql: Sql,
+  input: { after?: string | null; limit?: number; lookup?: RecordLookup } = {},
+): Promise<{ items: InboxItem[]; next: string | null }> {
+  const lookup = input.lookup || fileLookup();
+  const { refreshProposalReadiness } = await import("@/lib/actions/blockers");
+  await refreshProposalReadiness(sql, lookup);
   const limit = input.limit && input.limit > 0 ? Math.min(100, Math.floor(input.limit)) : 50;
   const cursor = input.after ? decodeCursor(input.after) : null;
   if (input.after && !cursor) throw new FeedError("That cursor is not valid.");
@@ -440,7 +603,7 @@ export async function listInbox(sql: Sql, input: { after?: string | null; limit?
       `SELECT ${SELECT} FROM agent_inbox ORDER BY created_at ASC, id ASC LIMIT $1`,
       [limit],
     );
-  const items = rows.rows.map(present);
+  const items = await enrichProposals(sql, rows.rows.map(present), lookup);
   return { items, next: items.length === limit ? items[items.length - 1].cursor : null };
 }
 
@@ -478,6 +641,17 @@ export function toFeedItem(item: InboxItem, origin = feedOrigin()) {
     proposal_status: item.proposalStatus,
     stage: item.stage,
     workbook_stage: item.workbookStage,
+    current_stage: item.currentStage,
+    proposal_outcome: item.proposalOutcome,
+    open_blockers: item.openBlockers.map((blocker) => ({
+      id: blocker.id,
+      kind: blocker.kind,
+      label: blocker.label,
+      party: blocker.party,
+      asked_on: blocker.askedOn,
+      follow_up_on: blocker.followUpOn,
+    })),
+    stale: item.stale,
     status: item.status,
     created_at: item.createdAt,
     cursor: item.cursor,

@@ -425,8 +425,8 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
 
   await openAs(page, "reviewer", `/?funnel=pipeline&site=${target}`);
   const card = page.getByTestId("proposed-next-step");
-  await expect(card.getByRole("button", { name: "Accept" })).toBeVisible();
-  await card.getByRole("button", { name: "Accept" }).click();
+  await expect(card.getByRole("button", { name: "Send" })).toBeVisible();
+  await card.getByRole("button", { name: "Send" }).click();
   await expect(page.getByTestId("next-step")).toContainText("Drop from pipeline");
   await expect(page.getByTestId("next-step")).toContainText("Dropped");
   const after = await request.get("/api/data/deals");

@@ -30,19 +30,27 @@ export const FUNNEL_NOTES: Record<string, string> = {
   dropped: "The deal is no longer being pursued.",
 };
 
-const STORE_TEXT = /c[\s-]*stores?|\bampm\b|am\s*\/\s*pm/i;
+const STORE_TYPE = new Set(["gas station", "convenience store", "fuel", "service station"]);
+const STORE_TEXT = /\b(?:gas|fuel|convenience|service station|c[\s-]*stores?|shell|sinclair|arco|chevron|circle\s*k|76|valero|quik\s*trip|ampm|am\s*\/\s*pm)\b/i;
 
-/** Pipeline gas stations and c-stores stay out of the default queue and views. Universe car washes stay as they are. */
+/**
+ * Pipeline fuel and c-store deals stay out of the map, list, search, and Review.
+ * A car wash stays, including one whose name is Chevron or Circle K. Land listings stay.
+ */
 export function isPipelineStore(record: {
   kind?: string | null;
   business_type?: string | null;
   name?: string | null;
   description?: string | null;
+  source_line?: string | null;
 }) {
   if (record.kind !== "pipeline") return false;
   const type = (record.business_type || "").trim().toLowerCase();
-  if (type === "gas station" || type === "convenience store") return true;
-  return STORE_TEXT.test(`${record.name || ""} ${record.description || ""}`);
+  if (type === "car wash") return false;
+  if (STORE_TYPE.has(type)) return true;
+  const text = [record.name, record.description, record.source_line].filter(Boolean).join(" ");
+  if (/\bcar wash\b/i.test(text) && !/\b(?:gas|fuel|convenience|service station|c[\s-]*stores?)\b/i.test(text)) return false;
+  return STORE_TEXT.test(text);
 }
 
 export const BUSINESS_TYPES = [

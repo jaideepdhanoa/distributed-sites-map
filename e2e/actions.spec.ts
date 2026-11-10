@@ -414,6 +414,21 @@ test("a saved view round-trips the current link", async ({ request }) => {
   expect(team.status()).toBe(403);
 });
 
+test("the review queue omits gas stations and c-stores", async ({ request }) => {
+  await login(request, "reviewer");
+  const response = await request.get("/api/queue?market=all&stage=any&viable=1");
+  expect(response.ok()).toBeTruthy();
+  const body = (await response.json()) as { items?: { siteId: string; snapshot?: { name?: string } | null }[] };
+  const ids = (body.items || []).map((item) => item.siteId);
+  const names = (body.items || []).map((item) => item.snapshot?.name || "");
+  for (const id of ["PIPE-LAS-0070", "PIPE-LAS-0071", "PIPE-MIA-0075", "PIPE-MIA-0076", "PIPE-PHX-0067", "PIPE-PHX-0068", "PIPE-PHX-0069"]) {
+    expect(ids, id).not.toContain(id);
+  }
+  expect(names.join("\n")).not.toMatch(/c-store|Sinclair|ARCO|service station/i);
+  expect(ids).toContain("PIPE-LAS-0073");
+  expect(ids).toContain("PIPE-MIA-0079");
+});
+
 function dealStage(payload: { features?: { properties?: { deal_id?: string; stage?: string } }[] }, id: string) {
   const feature = payload.features?.find((item) => item.properties?.deal_id === id);
   return feature?.properties?.stage ?? null;

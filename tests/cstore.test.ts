@@ -51,9 +51,13 @@ test("search suggestions omit c-stores and gas stations until the filter is on",
 test("gas stations and c-stores stay out of the default review queue", () => {
   assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Gas station", name: "Operating c-store with gas and gaming" }), true);
   assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Convenience store", name: "Shop" }), true);
-  assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Other", name: "Operating c-store with gas and gaming" }), true);
+  assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Other", name: "Corner service station with a tenant" }), true);
+  assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Other", name: "Sinclair station" }), true);
+  assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Car wash", name: "Chevron" }), false);
+  assert.equal(isPipelineStore({ kind: "pipeline", business_type: "Car wash", name: "Circle K" }), false);
   assert.equal(isPipelineStore({ kind: "site", business_type: "Car wash", name: "Chevron" }), false);
   assert.equal(isPipelineStore({ kind: "site", business_type: "Car wash", name: "Circle K" }), false);
+  assert.equal(isPipelineStore({ kind: "land", business_type: "Gas station", name: "Closed gas station and c-store across from the airport" }), false);
   const catalog = loadCatalog();
   for (const id of ["PIPE-LAS-0070", "PIPE-LAS-0071", "PIPE-MIA-0075", "PIPE-MIA-0076"]) {
     assert.equal(catalog.find((site) => site.id === id)?.isCStore, true, id);

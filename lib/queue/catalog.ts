@@ -123,9 +123,15 @@ export function loadCatalog(): CatalogSite[] {
       folderUrl: /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(folder) ? folder : "",
       lng: Number.isFinite(lng) ? lng : null,
       lat: Number.isFinite(lat) ? lat : null,
-      isCStore: props.is_c_store === true || isPipelineStore(props),
+      isCStore: props.is_c_store === true || isPipelineStore({
+        kind: props.kind,
+        business_type: props.business_type,
+        name: props.name,
+        description: props.description,
+        source_line: props.source_line,
+      }),
       businessType: String(props.business_type || ""),
-      description: String(props.description || ""),
+      description: String(props.description || props.source_line || ""),
     });
   }
   return out;

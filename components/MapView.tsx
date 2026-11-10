@@ -1266,7 +1266,7 @@ export default function MapView(props: Props) {
             <div className="measure-bar">
               <span>{readout || "Tap the corners"}</span>
               <button type="button" className="paper-btn" onClick={undoMeasure}>Undo</button>
-              <button type="button" className="paper-btn" data-testid="measure-done" onClick={() => setMeasureDone(true)}>Done</button>
+              <button type="button" className="paper-btn" data-testid="measure-done" onClick={() => setMeasure(false)}>Done</button>
             </div>
           ) : null}
           <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" onClick={() => setMeasure((value) => !value)}>Measure</button>

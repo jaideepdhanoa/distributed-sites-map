@@ -374,7 +374,12 @@ export default function Explorer() {
     fetch(`/api/queue?${q}`).then(async (response) => {
       if (cancel || !response.ok) return;
       const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
-      const next = (payload.items || []).map((item) => ({
+      const next = (payload.items || []).filter((item) => !isPipelineStore({
+        kind: "pipeline",
+        name: item.snapshot?.name,
+        business_type: (item.snapshot as { businessType?: string } | null)?.businessType,
+        description: (item.snapshot as { description?: string } | null)?.description,
+      })).map((item) => ({
         siteId: item.siteId,
         name: item.snapshot?.name || item.siteId,
         city: item.snapshot?.city || item.city || "",

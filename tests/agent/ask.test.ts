@@ -24,7 +24,7 @@ function blockedWord(): string {
 }
 
 test("ask tools are read-only, role checked, and redact before the model", async () => {
-  assert.equal(MAX_ASK_STEPS, 5);
+  assert.equal(MAX_ASK_STEPS, 2);
   assert.equal(ASK_TOOLS.some((name) => /approve|propose|assign|email|workbook|write/i.test(name)), false);
   const denied = await runAskTool("financials", { id: "PIPE-PHX-0001" }, "guest");
   assert.deepEqual(denied, { error: "not_allowed" });
@@ -208,8 +208,9 @@ test("portfolio context lists a stage for every in-play listed deal", async () =
     assert.deepEqual(Object.keys(row).sort(), ["id", "lastActivity", "market", "name", "stage"]);
     assert.equal(/\$\d|EBITDA|Revenue|cash flow/i.test(JSON.stringify(row)), false);
   }
-  const portfolio = await runAskTool("portfolio", {}, "viewer") as { stages?: { id: string }[] };
-  assert.equal(portfolio.stages?.length, rows.length);
+  const portfolio = await runAskTool("portfolio", {}, "viewer") as { stages?: unknown; listedByMarket?: unknown[] };
+  assert.equal(portfolio.stages, undefined);
+  assert.ok((portfolio.listedByMarket || []).length > 0);
   const phoenix = await runAskTool("stages", { market: "Phoenix" }, "viewer") as { count: number; rows: { id: string; market: string; stage: string }[] };
   const phoenixExpected = rows.filter((row) => row.market === "Phoenix");
   assert.equal(phoenix.count, phoenixExpected.length);

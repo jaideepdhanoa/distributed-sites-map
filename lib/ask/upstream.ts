@@ -20,6 +20,14 @@ export function describeUpstream(error: unknown): UpstreamDetail {
   return { status, body };
 }
 
+export function isAbortError(error: unknown, seen = new Set<unknown>()): boolean {
+  if (!error || typeof error !== "object" || seen.has(error)) return false;
+  seen.add(error);
+  const row = error as { name?: string; cause?: unknown };
+  if (row.name === "AbortError" || row.name === "TimeoutError") return true;
+  return isAbortError(row.cause, seen);
+}
+
 export function logUpstream(error: unknown): UpstreamDetail {
   const detail = describeUpstream(error);
   console.error(JSON.stringify({ event: "ask_upstream", status: detail.status, body: detail.body }));

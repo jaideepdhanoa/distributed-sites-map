@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { EMPTY_ANSWER } from "@/lib/ask/empty";
+import { askFailure, beginAsk, composerAfter, finishAsk, markStillWorking, showAskText, ASK_CLIENT_TIMEOUT_MS, ASK_STILL_WORKING_MS, type AskTurn } from "@/lib/ask/wait";
 import { AskMarkdown } from "./AskMarkdown";
+import { AskThinking } from "./AskThinking";
 import "./agent.css";
 
 type Source = { label: string; href: string };
-type Turn = { role: "user" | "ask"; text: string; gap?: boolean; error?: boolean; sources?: Source[] };
+type Turn = AskTurn & { sources?: Source[] };
 
 export function AskPanel({
   open,
@@ -26,6 +28,14 @@ export function AskPanel({
   const [notice, setNotice] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const runId = useRef(0);
+  const flight = useRef<AbortController | null>(null);
+  const alive = useRef(true);
+
+  useEffect(() => () => {
+    alive.current = false;
+    flight.current?.abort();
+  }, []);
 
   useEffect(() => {
     const node = logRef.current;
@@ -58,20 +68,32 @@ export function AskPanel({
   async function send(preset?: string) {
     const text = (preset ?? question).trim();
     if (!text || pending || ready === false) return;
+    const requestId = runId.current + 1;
+    runId.current = requestId;
     setPending(true);
     setNotice("");
-    if (!preset) setQuestion("");
-    setTurns((current) => [...current, { role: "user", text }, { role: "ask", text: "" }]);
+    setTurns((current) => beginAsk(current, text));
+    const controller = new AbortController();
+    flight.current = controller;
+    const slowTimer = window.setTimeout(() => {
+      if (runId.current === requestId && alive.current) setTurns((current) => markStillWorking(current));
+    }, ASK_STILL_WORKING_MS);
+    const timeoutTimer = window.setTimeout(() => controller.abort(), ASK_CLIENT_TIMEOUT_MS);
+    let succeeded = false;
+    let settled = false;
     try {
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, siteId: site?.id || null }),
+        signal: controller.signal,
       });
+      if (runId.current !== requestId || !alive.current) return;
       if (!response.ok || !response.body) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        const message = payload.error || "Ask isn't set up yet";
-        setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: message, error: true }));
+        const message = payload.error || askFailure(new Error("network")).text;
+        settled = true;
+        setTurns((current) => finishAsk(current, { text: message, error: true, linkRetry: true }));
         return;
       }
       const reader = response.body.getReader();
@@ -81,6 +103,7 @@ export function AskPanel({
       while (true) {
         const step = await reader.read();
         if (step.done) break;
+        if (runId.current !== requestId || !alive.current) return;
         buffer += decoder.decode(step.value, { stream: true });
         const chunks = buffer.split("\n\n");
         buffer = chunks.pop() || "";
@@ -91,12 +114,13 @@ export function AskPanel({
           if (event.delta) {
             shown += event.delta;
             const snapshot = shown;
-            setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: snapshot }));
+            setTurns((current) => showAskText(current, snapshot));
           }
           if (event.done) {
             const finalText = (event.text || shown).trim() || EMPTY_ANSWER;
-            setTurns((current) => current.slice(0, -1).concat({
-              role: "ask",
+            succeeded = !event.error && finalText !== EMPTY_ANSWER;
+            settled = true;
+            setTurns((current) => finishAsk(current, {
               text: finalText,
               gap: event.gap,
               error: event.error || finalText === EMPTY_ANSWER,
@@ -105,10 +129,19 @@ export function AskPanel({
           }
         }
       }
-    } catch {
-      setTurns((current) => current.slice(0, -1).concat({ role: "ask", text: EMPTY_ANSWER, error: true }));
+    } catch (error) {
+      if (runId.current !== requestId || !alive.current) return;
+      settled = true;
+      setTurns((current) => finishAsk(current, askFailure(error)));
     } finally {
-      setPending(false);
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(timeoutTimer);
+      if (flight.current === controller) flight.current = null;
+      if (runId.current === requestId && alive.current) {
+        if (!settled) setTurns((current) => finishAsk(current, askFailure(new Error("network"))));
+        setPending(false);
+        setQuestion((current) => composerAfter(text, current, succeeded));
+      }
     }
   }
 
@@ -141,9 +174,16 @@ export function AskPanel({
       <div className="ask-log" ref={logRef}>
         {turns.map((turn, index) => (
           <div key={`${turn.role}-${index}`}>
-            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} /> : <p className="ask-bubble">{turn.text}</p>}
-            {turn.error ? (
-              <button type="button" className="paper-btn" data-testid="ask-retry" disabled={pending} onClick={() => void send(turns[index - 1]?.text || "")}>
+            {turn.role === "ask" && turn.pending && !turn.text ? <AskThinking slow={turn.slow} /> : null}
+            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} /> : null}
+            {turn.role === "user" ? <p className="ask-bubble">{turn.text}</p> : null}
+            {turn.error && turn.linkRetry ? (
+              <button type="button" className="text-link" data-testid="ask-retry" disabled={pending} onClick={() => void send(turns[index - 1]?.text || question)}>
+                Try again
+              </button>
+            ) : null}
+            {turn.error && !turn.linkRetry ? (
+              <button type="button" className="paper-btn" data-testid="ask-retry" disabled={pending} onClick={() => void send(turns[index - 1]?.text || question)}>
                 Try again
               </button>
             ) : null}
@@ -173,6 +213,8 @@ export function AskPanel({
             rows={1}
             maxLength={2000}
             value={question}
+            disabled={pending}
+            aria-busy={pending}
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -182,7 +224,7 @@ export function AskPanel({
             }}
             placeholder={site ? "Ask about this site" : "Ask about the portfolio"}
           />
-          <button type="submit" className="primary" disabled={pending || !question.trim()}>Ask</button>
+          <button type="submit" className="primary" disabled={pending || !question.trim()} aria-busy={pending}>{pending ? "Thinking…" : "Ask"}</button>
         </form>
       )}
     </aside>

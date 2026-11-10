@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-10T03:38:59+00:00",
+  "generated_at": "2026-11-10T21:46:11+00:00",
   "records": {
     "LAND-LAS-0001": {
       "folder_url": "https://drive.google.com/drive/folders/1b1nRtWO5Kcm-weYghZOajqXMhEmWXU55",
@@ -128,8 +128,15 @@
     },
     "LAND-PHX-0034": {
       "folder_url": "https://drive.google.com/drive/folders/1T2Ug8EIoTnpqeVNDWPASebcyaAWW6ubs",
-      "materials": [],
-      "last_touched": "2026-10-30"
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 1,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "LAND-PHX-0035": {
       "folder_url": "https://drive.google.com/drive/folders/1o2HyR7UJ2u0RkCkaWRt-WEJQ4B1yGKdU",
@@ -208,11 +215,11 @@
         {
           "category": "property_legal",
           "label": "Property and legal",
-          "count": 17,
-          "latest": "2026-11-09"
+          "count": 18,
+          "latest": "2026-11-10"
         }
       ],
-      "last_touched": "2026-11-09"
+      "last_touched": "2026-11-10"
     },
     "LAND-PHX-0045": {
       "folder_url": "https://drive.google.com/drive/folders/1NX9PGyy6xdW3B6-XChiOT9y6eBX3bPmz",
@@ -273,8 +280,15 @@
     },
     "LAND-PHX-0056": {
       "folder_url": "https://drive.google.com/drive/folders/1Cyf2mPqS6Nwx3UTzLsO7G4_O2Hxb_B7b",
-      "materials": [],
-      "last_touched": ""
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 71,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "LAND-PHX-0057": {
       "folder_url": "https://drive.google.com/drive/folders/1KXIDNxUN7iL9XAaBPAz3gWErXtV0YjJf",
@@ -287,6 +301,11 @@
         }
       ],
       "last_touched": "2026-11-09"
+    },
+    "LAND-PHX-0058": {
+      "folder_url": "https://drive.google.com/drive/folders/1ZuK1MmraisYFf-_6YQ5gtJbUL2m1E0UF",
+      "materials": [],
+      "last_touched": ""
     },
     "PIPE-LAS-0011": {
       "folder_url": "https://drive.google.com/drive/folders/1-CCIYhfPrH724_TzN-YR4f3MK2dLDqQ-",
@@ -536,8 +555,15 @@
     },
     "PIPE-PHX-0083": {
       "folder_url": "https://drive.google.com/drive/folders/12uKO16mHPcXYvKQOIPosMuxmsBEcqnag",
-      "materials": [],
-      "last_touched": ""
+      "materials": [
+        {
+          "category": "financials",
+          "label": "Financials",
+          "count": 5,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "PIPE-PHX-0084": {
       "folder_url": "https://drive.google.com/drive/folders/1BtLDQGLPm7jM8mtbnLWgSl5ZpYtw9ssC",

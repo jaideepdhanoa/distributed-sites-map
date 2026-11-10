@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-11-10T03:36:24Z",
+  "generated_at": "2026-11-10T21:42:59Z",
   "workbook_as_of": "2026-11-10",
   "stages": [
     {
       "id": "census",
       "name": "Census rows",
       "unit": "rows",
-      "total": 1744,
+      "total": 1746,
       "by_city": {
         "LAS": 440,
-        "PHX": 586,
+        "PHX": 588,
         "MIA": 717,
         "SNA": 1
       },
@@ -19,10 +19,10 @@
       "id": "unique",
       "name": "Unique sites",
       "unit": "sites",
-      "total": 1700,
+      "total": 1702,
       "by_city": {
         "LAS": 429,
-        "PHX": 580,
+        "PHX": 582,
         "MIA": 691
       },
       "by_class": {
@@ -35,18 +35,18 @@
         "Licence-only": 18,
         "Closed": 1,
         "Quarantined": 3,
-        "Unknown": 42
+        "Unknown": 44
       },
-      "note": "Counted rows on the Universe tab: 1700. The tab has 1744 rows in all. Census file records not on a counted row are left out (24)."
+      "note": "Counted rows on the Universe tab: 1702. The tab has 1746 rows in all. Census file records not on a counted row are left out (24)."
     },
     {
       "id": "in_area",
       "name": "In service area",
       "unit": "sites",
-      "total": 1075,
+      "total": 1076,
       "by_city": {
         "LAS": 186,
-        "PHX": 277,
+        "PHX": 278,
         "MIA": 612
       },
       "by_class": {
@@ -56,7 +56,7 @@
         "Not a wash": 45,
         "Licence-only": 15,
         "Quarantined": 2,
-        "Unknown": 32
+        "Unknown": 33
       },
       "by_city_class": {
         "LAS": {
@@ -72,7 +72,7 @@
           "Embedded": 63,
           "Gas-attached": 63,
           "Core": 128,
-          "Unknown": 23
+          "Unknown": 24
         },
         "MIA": {
           "Gas-attached": 291,
@@ -318,10 +318,10 @@
       "id": "contacted",
       "name": "Deals contacted",
       "unit": "deals",
-      "total": 33,
+      "total": 34,
       "by_city": {
         "LAS": 11,
-        "PHX": 16,
+        "PHX": 17,
         "MIA": 6
       },
       "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."

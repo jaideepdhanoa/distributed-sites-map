@@ -790,6 +790,76 @@
       "type": "stage",
       "at": "2026-11-10T03:38:17.690Z",
       "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "activity:LAND-PHX-0034:2026-11-10T21:44:59.244Z:A-000161",
+      "siteId": "LAND-PHX-0034",
+      "type": "activity",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "activity:LAND-PHX-0033:2026-11-10T21:44:59.244Z:A-000159",
+      "siteId": "LAND-PHX-0033",
+      "type": "activity",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "New activity: Listing noted"
+    },
+    {
+      "id": "materials:LAND-LAS-0013:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "LAND-LAS-0013",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:LAND-LAS-0014:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "LAND-LAS-0014",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 4."
+    },
+    {
+      "id": "materials:LAND-PHX-0003:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "LAND-PHX-0003",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 11."
+    },
+    {
+      "id": "materials:LAND-PHX-0044:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "LAND-PHX-0044",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 17."
+    },
+    {
+      "id": "materials:LAND-PHX-0052:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "LAND-PHX-0052",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 12."
+    },
+    {
+      "id": "materials:LAND-PHX-0057:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "LAND-PHX-0057",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 31."
+    },
+    {
+      "id": "materials:PIPE-MIA-0080:2026-11-10T21:44:59.244Z:financials",
+      "siteId": "PIPE-MIA-0080",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Financials count is now 3."
+    },
+    {
+      "id": "materials:PIPE-PHX-0014:2026-11-10T21:44:59.244Z:property_legal",
+      "siteId": "PIPE-PHX-0014",
+      "type": "materials",
+      "at": "2026-11-10T21:44:59.244Z",
+      "summary": "Property and legal count is now 1."
     }
   ],
   "baseline": [
@@ -1356,6 +1426,16 @@
       "summary": "Listing noted"
     },
     {
+      "id": "A-000161",
+      "siteId": "LAND-PHX-0034",
+      "summary": "Listing noted"
+    },
+    {
+      "id": "A-000159",
+      "siteId": "LAND-PHX-0033",
+      "summary": "Listing noted"
+    },
+    {
       "id": "A-000146",
       "siteId": "LAND-LAS-0014",
       "summary": "Listing noted"
@@ -1500,6 +1580,24 @@
       "count": 1
     },
     {
+      "siteId": "LAND-LAS-0013",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
+    },
+    {
+      "siteId": "LAND-LAS-0014",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 4
+    },
+    {
+      "siteId": "LAND-PHX-0003",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 11
+    },
+    {
       "siteId": "LAND-PHX-0036",
       "category": "financials",
       "label": "Financials",
@@ -1527,7 +1625,19 @@
       "siteId": "LAND-PHX-0044",
       "category": "property_legal",
       "label": "Property and legal",
-      "count": 2
+      "count": 17
+    },
+    {
+      "siteId": "LAND-PHX-0052",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 12
+    },
+    {
+      "siteId": "LAND-PHX-0057",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 31
     },
     {
       "siteId": "PIPE-LAS-0016",
@@ -1557,7 +1667,7 @@
       "siteId": "PIPE-MIA-0080",
       "category": "financials",
       "label": "Financials",
-      "count": 1
+      "count": 3
     },
     {
       "siteId": "PIPE-PHX-0001",
@@ -1594,6 +1704,12 @@
       "category": "financials",
       "label": "Financials",
       "count": 5
+    },
+    {
+      "siteId": "PIPE-PHX-0014",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
     },
     {
       "siteId": "PIPE-PHX-0081",

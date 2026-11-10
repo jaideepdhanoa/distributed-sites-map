@@ -3138,7 +3138,7 @@ PHX-U274,Pipeline,PHX 1220 N Horne
 PHX-U435,Pipeline,PHX 515 E Union Hills Dr
 PIPE-PHX-0006,Pipeline,"PHX Flex-serve wash, northeast Phoenix"
 PHX-U346,Pipeline,PHX 3510 W Cactus Rd
-PIPE-PHX-0008,Pipeline,"PHX Auto repair, Maricopa County"
+WB-PHX-0038,Pipeline,"PHX Auto repair, Maricopa County"
 PIPE-PHX-0009,Pipeline,"PHX Auto service, Mesa"
 PHX-U309,Pipeline,PHX 10480 Cotton Crossing
 LAS-U858,Pipeline,LAS 4860 S Topaz St
@@ -3209,3 +3209,4 @@ WB-PHX-0033,Land Sites,PHX 1822 W Glendale Ave (pads)
 WB-PHX-0034,Land Sites,PHX 7011-7013 N 19th Ave (land)
 WB-PHX-0035,Land Sites,PHX 338 E Willetta St (land)
 WB-PHX-0036,Land Sites,PHX 2833 E Broadway Rd (land)
+WB-PHX-0037,Land Sites,PHX 9232 N 11th Ave (land)

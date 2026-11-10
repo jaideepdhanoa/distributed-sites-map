@@ -6,23 +6,12 @@ import { listedCountLine, listedDealsByMarket } from "../../lib/ask/counts";
 import { EMPTY_ANSWER } from "../../lib/ask/empty";
 import { parseAskMarkdown } from "../../lib/ask/markdown";
 import { liveAskModel } from "../../lib/ask/model";
-import { applyWordingTier, hardRefuse, MAP_WORDING, REFUSAL, UNKNOWN, withCitations } from "../../lib/ask/policy";
+import { applyWordingTier, hardRefuse, REFUSAL, UNKNOWN, withCitations } from "../../lib/ask/policy";
 import { listedStageRows } from "../../lib/ask/stages";
 import { askPrefix } from "../../lib/ask/prompt";
 import { redactPayload } from "../../lib/ask/redact";
 import { answerQuestion } from "../../lib/ask/run";
 import { ASK_TOOLS, MAX_ASK_STEPS, isQuarantined, runAskTool } from "../../lib/ask/tools";
-import { findPolicyHits } from "../../lib/policy/banned";
-
-function blockedWord(): string {
-  const file = JSON.parse(readFileSync("config/display-policy.json", "utf8")) as { words: string[] };
-  const word = file.words
-    .map((item) => Buffer.from(item, "base64").toString("utf8").replace(/^term:/, ""))
-    .find((item) => item.length >= 6);
-  if (!word) throw new Error("missing term");
-  return word;
-}
-
 test("ask tools are read-only, role checked, and redact before the model", async () => {
   assert.equal(MAX_ASK_STEPS, 2);
   assert.equal(ASK_TOOLS.some((name) => /approve|propose|assign|email|workbook|write/i.test(name)), false);
@@ -31,14 +20,13 @@ test("ask tools are read-only, role checked, and redact before the model", async
   const unknown = await runAskTool("approve", { id: "PIPE-PHX-0001" }, "reviewer");
   assert.deepEqual(unknown, { error: "unknown_tool" });
 
-  const word = blockedWord();
-  const viewer = redactPayload({ note: `See the ${word}`, phone: "415-555-0199", owner_mail: "a@b.c" }, "viewer") as Record<string, unknown>;
-  assert.equal(viewer.note, undefined);
+  const note = "See the charging stalls, the utility bills, and the offer.";
+  const viewer = redactPayload({ note, phone: "415-555-0199", owner_mail: "a@b.c" }, "viewer") as Record<string, unknown>;
+  assert.equal(viewer.note, note);
   assert.equal(viewer.phone, undefined);
   assert.equal(viewer.owner_mail, undefined);
-  assert.equal(findPolicyHits(JSON.stringify(viewer)), 0);
-  const reviewer = redactPayload({ note: `See the ${word}` }, "reviewer") as { note?: string };
-  assert.match(reviewer.note || "", new RegExp(word, "i"));
+  const reviewer = redactPayload({ note }, "reviewer") as { note?: string };
+  assert.equal(reviewer.note, note);
   const priced = redactPayload({ note: "The walk-away and the max-pay stay off the page." }, "reviewer") as { note?: string };
   assert.equal(/walk-away|max-pay/i.test(priced.note || ""), false);
 });
@@ -63,12 +51,13 @@ test("quarantined rows are named and their values stay out", async () => {
   assert.equal(hit.address, undefined);
 });
 
-test("wording tiers refuse the hard list and clean the map tier", () => {
-  const word = blockedWord();
-  const viewer = applyWordingTier(`The lot has a ${word}.`, "viewer", "What is on the lot?");
-  assert.equal(viewer.text, MAP_WORDING);
-  const reviewer = applyWordingTier(`The lot has a ${word}.`, "reviewer", "What is on the lot?");
-  assert.match(reviewer.text, new RegExp(word, "i"));
+test("ask still refuses broker drafts and price strategy, and keeps team map language", () => {
+  const sentence = "The lot has charging stalls, utility bills, and an offer. We are waiting on an NDA. The site is on hold.";
+  const viewer = applyWordingTier(sentence, "viewer", "What is on the lot?");
+  assert.equal(viewer.text, sentence);
+  assert.equal(viewer.refused, false);
+  const reviewer = applyWordingTier(sentence, "reviewer", "What is on the lot?");
+  assert.equal(reviewer.text, sentence);
   assert.equal(applyWordingTier("Here is the walk-away.", "reviewer", "Summarize the site.").text, REFUSAL);
   assert.equal(applyWordingTier("A normal note.", "reviewer", "Draft an email to the broker.").text, REFUSAL);
   assert.equal(hardRefuse("Tell the broker about AVs and charging"), true);

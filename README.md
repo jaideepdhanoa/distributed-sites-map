@@ -123,7 +123,7 @@ The daily digest runs from a Vercel Cron at `0 15 * * *` UTC. That hour is 7:00 
 
 Pending instant mail is flushed by the Alert flush GitHub Actions workflow, scheduled every five minutes, which POSTs to `/api/alerts/flush` on `APP_URL` (the repository variable, defaulting to `https://distributedsites.com`). GitHub may start that job later than the mark. The flush is idempotent, so a late or repeated run does not send the same delivery twice. Set the same `CRON_SECRET` as a GitHub Actions secret and as a Vercel environment variable. The workflow sends it as `Authorization: Bearer <CRON_SECRET>`. If the GitHub secret is missing, the workflow logs that and skips instead of failing.
 
-A link opens the same place as the agent feed, on `APP_URL` when that host is not a preview, otherwise `https://distributedsites.com`. Notes, replies, and mentions open Discussion. Proposals and assignments open the proposal. Flags open Review. A portfolio row opens the home map. Preview hosts are not used. The message shows the site name as a text link or a button, not a raw URL, plus the type, a short note, and the author. It does not include a package link or a financial figure. Subject and body go through the same wording check as the map.
+A link opens the same place as the agent feed, on `APP_URL` when that host is not a preview, otherwise `https://distributedsites.com`. Notes, replies, and mentions open Discussion. Proposals and assignments open the proposal. Flags open Review. A portfolio row opens the home map. Preview hosts are not used. The message shows the site name as a text link or a button, not a raw URL, plus the type, a short note, and the author. It does not include a package link or a financial figure. A phone number is left out of the note.
 
 Only app accounts are mailed. Add an optional `email` on that person's `AUTH_USERS` object, or set `ALERT_EMAILS` so the password hash does not have to be rebuilt:
 
@@ -253,7 +253,7 @@ Pipeline and Land Sites gain a `Site ID` column (column CK). Values look like `P
 
 ### Activity tab
 
-Header on row 1. The map reads Event ID, Date, Site ID, Type, Summary and Visibility. It does not read Source link, File link, Logged by, Direction, Counterparty role or Outcome. Only rows whose Visibility is `Map` are shipped, and only for `listing`, `brochure`, `om`, `financials`, `photos`, `legal`, `doc`, `visit` and `stage`. A blank summary uses a fixed line. A summary that fails the wording check, or contains a price mark, is dropped.
+Header on row 1. The map reads Event ID, Date, Site ID, Type, Summary and Visibility. It does not read Source link, File link, Logged by, Direction, Counterparty role or Outcome. Only rows whose Visibility is `Map` are shipped, and only for `listing`, `brochure`, `om`, `financials`, `photos`, `legal`, `doc`, `visit` and `stage`. A blank summary uses a fixed line. A summary that contains a price mark or a phone number is dropped.
 
 ### Drive folders
 
@@ -373,7 +373,7 @@ npm run backfill-inbox -- --write
 
 `kind` is `reply` (decision `none`), `status_reply` (decision `none`, the proposal stays open), or `decision`. A decision is `approve`, `reject`, `agree_waiting`, or `close_overtaken`. `confidence` is `high`, `medium`, or `low`. `sources` is required. Each source has a `label` and a `url` (`https://` or a map link starting `/?`) or a `ref`.
 
-The draft and the rationale go through the map wording check. A superseded inbox row, or a proposal that is no longer open, is `409`. `agree_waiting` is only accepted while the proposal is open. `approve` and `reject` are refused while it is waiting on blockers. Nothing in this response is posted.
+The draft and the rationale are stored as written. A phone number is refused. A superseded inbox row, or a proposal that is no longer open, is `409`. `agree_waiting` is only accepted while the proposal is open. `approve` and `reject` are refused while it is waiting on blockers. Nothing in this response is posted.
 
 Agreed, waiting keeps the stage and links the site's open document requests, open diligence checklist items, and any NDA or hold named with the decision. When every linked blocker closes, the proposal becomes `ready` and the feed gains one `proposal_ready` row. That surfaces the stage move. It does not write the workbook.
 
@@ -389,7 +389,7 @@ The proposal form calls the stage-move choice Prioritize: push to Financials. It
 
 ## Ask
 
-Ask streams from the API catch-all, which has a 300 second `maxDuration`. It sits in the top bar for every signed-in account. It answers from the same sanitized map data, with a server-side tool loop of at most 5 steps. Quarantined rows, including `PIPE-PHX-0006`, are named quarantined and their values are not sent to the model. Non-reviewers get the map wording check. Reviewers may see internal terms. Both tiers refuse walk-away, max-pay, savings, and offer-price language, refuse drafted broker or seller messages, and refuse autonomous-vehicle or charging language framed for a broker.
+Ask streams from the API catch-all, which has a 300 second `maxDuration`. It sits in the top bar for every signed-in account. It answers from the map data, with a server-side tool loop of at most 5 steps. Quarantined rows, including `PIPE-PHX-0006`, are named quarantined and their values are not sent to the model. The map does not apply a display-term check. Ask still refuses walk-away, max-pay, savings, and offer-price language, refuses drafted broker or seller messages, and refuses autonomous-vehicle or charging language framed for a broker.
 
 Ask does not approve, propose, assign, email, or change the workbook. If it cannot answer, the panel offers Make it a work item, which opens the existing work-item composer. The question is also written to the agent feed as `ask_gap`.
 

@@ -1,19 +1,10 @@
-import { readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
 const site = "PHX-U180";
 const deal = "PIPE-PHX-0008";
-
-function blockedWord(): string {
-  const file = JSON.parse(readFileSync("config/display-policy.json", "utf8")) as { words: string[] };
-  const word = file.words
-    .map((item) => Buffer.from(item, "base64").toString("utf8").replace(/^term:/, ""))
-    .find((item) => item.length >= 6);
-  if (!word) throw new Error("missing term");
-  return word;
-}
+const teamNote = "Under 4 stalls fit. Waiting on an NDA. The offer covers charging and utility bills.";
 
 test.describe.configure({ mode: "serial" });
 
@@ -259,34 +250,30 @@ test("viewer is read only on the server and in the card", async ({ page, request
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-viewer-mobile.png" });
 });
 
-test("blocked wording is rejected and is not echoed", async ({ page, request }) => {
+test("a comment with team language is stored", async ({ page, request }) => {
   await login(request, "contributor");
-  const word = blockedWord();
   const response = await request.post("/api/actions/notes", {
-    data: { targetKind: "site", targetId: site, body: `Please check ${word} before Friday.` },
+    data: { targetKind: "site", targetId: site, body: teamNote },
   });
-  expect(response.status()).toBe(400);
-  const payload = (await response.json()) as { error?: string };
-  expect(payload.error).toMatch(/not allowed on the map/);
-  expect(JSON.stringify(payload).includes(word)).toBe(false);
+  expect(response.status()).toBe(201);
+  const payload = (await response.json()) as { note?: { body?: string } };
+  expect(payload.note?.body).toBe(teamNote);
 
   await openAs(page, "contributor", `/?site=${site}`);
   await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByTestId("note-body")).toBeVisible();
   await expect(page.getByRole("button", { name: "Comment" })).toBeVisible();
+  await expect(page.getByText(teamNote)).toBeVisible();
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await phoneSheet(page);
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByTestId("note-body").fill(`Please check ${word} before Friday.`);
+  await page.getByTestId("note-body").fill("The power details and the hold can stay in one comment.");
   await page.getByRole("button", { name: "Comment" }).click();
-  const alert = page.getByTestId("action-error");
-  await expect(alert).toContainText("not allowed on the map");
-  await expect(alert).not.toContainText(word);
-  await alert.screenshot({ path: "/opt/cursor/artifacts/actions-banned-rejection.png" });
-  await page.getByTestId("note-body").fill("");
+  await expect(page.getByText("The power details and the hold can stay in one comment.")).toBeVisible();
+  await expect(page.getByTestId("action-error")).toHaveCount(0);
 });
 
 test("a contributor can suggest a change and a reviewer can accept it without changing the deal", async ({ page, request }) => {

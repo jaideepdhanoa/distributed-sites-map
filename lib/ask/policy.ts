@@ -1,9 +1,7 @@
-import { findPolicyHits } from "@/lib/policy/banned";
 import type { ActionRole } from "@/lib/actions/roles";
 
 export const REFUSAL = "I can't help with that. Ask can look things up. It doesn't discuss price strategy, and it doesn't draft messages.";
 export const UNKNOWN = "I don't know. I don't have a source for that.";
-export const MAP_WORDING = "I can't answer that in the wording this map allows.";
 
 const HARD = [
   /walk[-\s]?away/i,
@@ -29,15 +27,14 @@ function hasCitation(text: string): boolean {
   return /\[[^\]]+\]\((\/|\s*https:\/\/)/.test(text) || /https:\/\/\S+/.test(text);
 }
 
-export function applyWordingTier(text: string, role: ActionRole, question: string): { text: string; refused: boolean } {
+export function applyWordingTier(text: string, _role: ActionRole, question: string): { text: string; refused: boolean } {
   if (hardRefuse(question) || hardRefuse(text)) return { text: REFUSAL, refused: true };
-  if (role !== "reviewer" && findPolicyHits(text)) return { text: MAP_WORDING, refused: true };
   return { text, refused: false };
 }
 
 export function withCitations(text: string, sources: AskSource[]): { text: string; gap: boolean; empty: boolean } {
   if (!text.trim()) return { text: "", gap: false, empty: true };
-  if (text === REFUSAL || text === MAP_WORDING) return { text, gap: false, empty: false };
+  if (text === REFUSAL) return { text, gap: false, empty: false };
   const linked = hasCitation(text);
   if (!sources.length && !linked) return { text: UNKNOWN, gap: true, empty: false };
   if (!linked && sources.length) {

@@ -41,10 +41,7 @@ export function blockedText(text: string): boolean {
   const rules = policy();
   const value = text || "";
   if (value.includes("$") || value.includes("@")) return true;
-  if (rules.phone.test(value)) return true;
-  if (rules.unit?.test(value)) return true;
-  if (rules.phrases.some((pattern) => pattern.test(value))) return true;
-  return rules.words.some((pattern) => pattern.test(value));
+  return rules.phone.test(value);
 }
 
 export function showActivityLines(): boolean {

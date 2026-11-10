@@ -8,7 +8,6 @@ kept; new pipeline and land rows get stable ids stored in data/id_registry.json.
 from __future__ import annotations
 
 import argparse
-import base64
 import csv
 import hashlib
 import json
@@ -44,48 +43,11 @@ PARCEL_CACHE = ROOT / "data" / "cache" / "parcel_cache.json"
 
 KML_NS = {"k": "http://www.opengis.net/kml/2.2"}
 
-def _w(blob: str) -> str:
-    return base64.b64decode(blob).decode()
-
-
-# Display text is checked against a private term list. Patterns are stored encoded.
-_WORD = [
-    "d2F5bW8=",
-    "bW9vdmU=",
-    "Y2hhcmdpbmc=",
-    "Y2hhcmdl",
-    "Y2hhcmdlcg==",
-    "YXV0b25vbW91cw==",
-    "cm9ib3RheGk=",
-    "Y3J1aXNl",
-    "dm9sdGVyYQ==",
-    "cGl0c3RvcA==",
-    "a2lsb3dhdHQ=",
-    "bWVnYXdhdHQ=",
-    "d2Fsay1hd2F5",
-    "d2Fsa2F3YXk=",
-    "ZWxlY3RyaWMgdmVoaWNsZQ==",
-    "ZXY=",
-    "bXc=",
-    "a3c=",
-]
-BANNED_PATTERNS = [re.compile(rf"\b{re.escape(_w(item))}\b", re.I) for item in _WORD]
-_UNIT = f"(?:{_w('bXc=')}|{_w('a3c=')})"
-BANNED_PATTERNS.append(re.compile(rf"(?<![A-Za-z])\d+(?:\.\d+)?\s*{_UNIT}\b", re.I))
-
+# Financial fields stay off the public card payload. Display terms do not.
 FORBIDDEN_KEYS = {
-    "offer",
-    "offer_price",
-    "target_price",
     "ebitda",
     "revenue",
-    _w("d2Fsa2F3YXk="),
-    _w("d2Fsay1hd2F5").replace("-", "_"),
     "most_can_pay",
-    _w("a3c="),
-    _w("bXc="),
-    _w("cG93ZXJfa3c="),
-    _w("a2lsb3dhdHQ="),
 }
 
 AREA_NAMES = {
@@ -180,8 +142,6 @@ def scrub(value) -> str:
     if value is None:
         return ""
     text = str(value)
-    for pattern in BANNED_PATTERNS:
-        text = pattern.sub("", text)
     text = re.sub(r"(?i)\bodd\b", "service area", text)
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"\s+([,.;:])", r"\1", text)
@@ -270,16 +230,8 @@ def plain_note(value) -> str:
 
 
 def strip_stall(text: str) -> str:
-    """Ship no stall wording. A numbered tier becomes a land-size phrase."""
-
-    def tier(match: re.Match) -> str:
-        number = int(match.group(1))
-        return "larger land tier" if number >= 10 else "smaller land tier"
-
-    cleaned = re.sub(r"(?i)\b(\d+)\s*-?\s*stalls?\s+tier\b", tier, text or "")
-    cleaned = re.sub(r"(?i)\bstalls\b", "bays", cleaned)
-    cleaned = re.sub(r"(?i)\bstall\b", "bay", cleaned)
-    return re.sub(r"\s+", " ", cleaned).strip()
+    """Keep stall wording. The map is private to the team."""
+    return re.sub(r"\s+", " ", text or "").strip()
 
 
 def _title_if_shouting(text: str) -> str:
@@ -431,10 +383,6 @@ def site_note_problems(props: dict) -> list[str]:
         if re.search(r"(?i)\b(muse|indie|torque)\b", author):
             problems.append(f"{sid} reviewer: {author}")
     return problems
-
-
-def banned_hits(text: str) -> list[str]:
-    return [p.pattern for p in BANNED_PATTERNS if p.search(text or "")]
 
 
 def norm_apn(value) -> str:
@@ -924,7 +872,7 @@ def _format_phone(raw: str) -> str:
 
 
 def _gap_text_ok(text: str) -> bool:
-    return bool(text) and not banned_hits(text) and not re.search(r"(?i)\bstalls?\b", text)
+    return bool(text)
 
 
 def apply_gap_fills(sites: list[dict]) -> dict:
@@ -1335,11 +1283,9 @@ def _row_delist(row: dict, index: dict[str, str]) -> str:
 
 
 def scrub_drift_reason(text: str) -> str:
-    """Keep the drift report free of restricted wording. It is never served."""
+    """Shorten a drift-report reason. The report is never served on the map."""
     cleaned = re.sub(r"(?i)under\s+\d+\s+stalls?\s+fit", "Lot too small", str(text or ""))
     cleaned = re.sub(r"(?i)\bstalls?\b", "spaces", cleaned)
-    for pattern in BANNED_PATTERNS:
-        cleaned = pattern.sub("", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,;.")
     return cleaned or "Noted"
 
@@ -1685,13 +1631,11 @@ _STREET_DIRS = {
     "east": "e",
     "west": "w",
 }
-_DEAL_LEAK = re.compile(
-    r"(?i)\b(ebitda|revenue|moove|playbook|offer|target price|walk-?away|kilowatt|kwh|amps|voltage|electrical|power)\b"
-)
+_DEAL_LEAK = re.compile(r"(?i)\b(ebitda|revenue|playbook)\b")
 _DEAL_PRIVATE = re.compile(
     r"(?i)("
     r"\b(?:cindel|ming|ricardo|yuka|jaideep|jesse)\b"
-    r"|\b(?:outreach|approv\w*|wording|nda|docusign|redline)\b"
+    r"|\b(?:outreach|approv\w*|wording|docusign|redline)\b"
     r"|\b(?:replied|reply|copied|email|nudged|folder|memo)\b"
     r"|\b(?:ruled out|downgraded|task board|our side|no contact|no price|no reply)\b"
     r"|\b(?:lane broker|passed on|pass on|waiting for|followed up)\b"
@@ -2015,7 +1959,7 @@ def _public_source_clause(clause: str) -> str:
             break
     else:
         return ""
-    if _INTERNAL_SOURCE.search(head) or _DEAL_PRIVATE.search(head) or _DEAL_LEAK.search(head) or banned_hits(head):
+    if _INTERNAL_SOURCE.search(head) or _DEAL_PRIVATE.search(head) or _DEAL_LEAK.search(head):
         return ""
     dated = _source_date(text)
     return f"{head}, {dated}" if dated else head
@@ -2041,7 +1985,7 @@ def _broker_channel(broker: str) -> str:
     firm = re.split(r"\s+\(", text, maxsplit=1)[0]
     firm = re.split(r",\s*(?:exclusive|also|bizbuysell|loopnet|crexi)\b", firm, maxsplit=1, flags=re.I)[0]
     firm = firm.strip(" ,;")
-    if _DEAL_PRIVATE.search(firm) or _DEAL_LEAK.search(firm) or banned_hits(firm) or _NOTE_INTERNAL.search(firm):
+    if _DEAL_PRIVATE.search(firm) or _DEAL_LEAK.search(firm) or _NOTE_INTERNAL.search(firm):
         return ""
     return firm[:120]
 
@@ -2151,9 +2095,7 @@ def clean_research_text(row: dict) -> str:
             piece = sentence.strip(" ;")
             if not piece:
                 continue
-            if re.search(r"(?i)\b(kV|kW|MW|kilowatt|kilovolt)\b", piece):
-                continue
-            if _DEAL_PRIVATE.search(piece) or _DEAL_LEAK.search(piece) or banned_hits(piece) or _NOTE_INTERNAL.search(piece):
+            if _DEAL_PRIVATE.search(piece) or _DEAL_LEAK.search(piece) or _NOTE_INTERNAL.search(piece):
                 continue
             if re.search(r"https?://", piece):
                 continue
@@ -2287,7 +2229,7 @@ _DEAL_KEEP = re.compile(
     r"(?i)\b(?:confirm|check|verify|test-fit|identify|street view|deed|zoning|lease|easement|stalls?|spare|service area|lot size|parking|entitlement|survey|title report|environmental|assemblage|land)\b"
 )
 _DEAL_DROP = re.compile(
-    r"(?i)(?:\boffer\w*|\bprices?\b|\$|\bpackage\b|\breceipt\b|\broger\b|\bpencek\b|\bcrexi\b|\bbizbuysell\b|\bcomp\b|\brevisit\b|\bsold\b|\bwithdrawn\b|\bfolder\b|\bcall\b|\bemail\b|\bknocked out\b|\bdesk checks?\b|\bpipeline\b|\bask\b)"
+    r"(?i)(?:\$|\bpackage\b|\breceipt\b|\broger\b|\bpencek\b|\bcrexi\b|\bbizbuysell\b|\bcomp\b|\brevisit\b|\bsold\b|\bwithdrawn\b|\bfolder\b|\bcall\b|\bemail\b|\bknocked out\b|\bdesk checks?\b|\bpipeline\b|\bask\b)"
 )
 
 
@@ -2303,7 +2245,7 @@ def clean_deal_note(value) -> str:
         piece = chunk.strip(" ;")
         if not piece:
             continue
-        if _DEAL_LEAK.search(piece) or _DEAL_PRIVATE.search(piece) or banned_hits(piece) or _NOTE_INTERNAL.search(piece):
+        if _DEAL_LEAK.search(piece) or _DEAL_PRIVATE.search(piece) or _NOTE_INTERNAL.search(piece):
             continue
         if re.search(r"(?i)\bno spare\b", piece):
             kept.append("No spare land")
@@ -2334,7 +2276,7 @@ def deal_text_problems(deal_id: str, props: dict) -> list[str]:
             continue
         if key in {"next_step", "asking_price_source", "source_line"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
-        if _NOTE_INTERNAL.search(text) or banned_hits(text):
+        if _NOTE_INTERNAL.search(text):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
     if not str(props.get("source_line") or "").strip():
         problems.append(f"{deal_id} source_line is blank")
@@ -2582,7 +2524,7 @@ def build_deal_layer(
             extra = set(props) - set(DEAL_FIELDS)
             if extra:
                 raise SystemExit("Deal fields outside the whitelist: " + ", ".join(sorted(extra)))
-            if deal_text_problems(deal_id, props) or banned_hits(json.dumps(props)):
+            if deal_text_problems(deal_id, props):
                 props["next_step"] = ""
                 if _DEAL_PRIVATE.search(props["asking_price_source"] or "") or _DEAL_LEAK.search(props["asking_price_source"] or ""):
                     props["asking_price_source"] = firm or ""
@@ -3607,12 +3549,6 @@ def scan_obj(obj, path="$"):
     elif isinstance(obj, list):
         for i, value in enumerate(obj[:5000]):
             problems.extend(scan_obj(value, f"{path}[{i}]"))
-    elif isinstance(obj, str):
-        hits = banned_hits(obj)
-        if hits:
-            problems.append(f"banned text at {path}: {obj[:140]!r}")
-        if re.search(r"(?i)\bstalls?\b", obj):
-            problems.append(f"stall wording at {path}: {obj[:140]!r}")
     return problems
 
 
@@ -4996,7 +4932,7 @@ def build_depots() -> dict:
     fc = {"type": "FeatureCollection", "features": features}
     problems = scan_obj(fc)
     if problems:
-        raise SystemExit("Depot output failed the wording check:\n" + "\n".join(problems))
+        raise SystemExit("Depot output failed the data check:\n" + "\n".join(problems))
     return fc
 
 
@@ -5004,52 +4940,8 @@ def sources_present() -> bool:
     return (SRC / "universe_v3.csv").exists() and any(SRC.glob("*.xlsx"))
 
 
-_DISPLAY_TERMS = re.compile(
-    r"\b(?:charging|ev|av|stalls?|power|utility|electric|kw|cindel|ming|ricardo|yuka|jaideep|jesse|muse|torque|indie|grok)\b",
-    re.I,
-)
-_DISPLAY_ALLOW: list[re.Pattern[str]] | None = None
-
-
-def display_allowances() -> list[re.Pattern[str]]:
-    """Diligence phrases from the posted-text policy. Longer phrases come first."""
-    global _DISPLAY_ALLOW
-    if _DISPLAY_ALLOW is None:
-        payload = json.loads((ROOT / "config" / "display-policy.json").read_text())
-        decoded = []
-        for item in payload.get("allow") or []:
-            text = base64.b64decode(item).decode()
-            prefix = "term:"
-            if text.startswith(prefix):
-                text = text[len(prefix) :]
-            text = text.strip()
-            if text:
-                decoded.append(text)
-        decoded.sort(key=len, reverse=True)
-        _DISPLAY_ALLOW = [re.compile(rf"\b{re.escape(phrase)}\b", re.I) for phrase in decoded]
-    return _DISPLAY_ALLOW
-
-
-def display_span_allowed(text: str, start: int, end: int) -> bool:
-    for pattern in display_allowances():
-        for match in pattern.finditer(text):
-            if match.start() <= start and match.end() >= end:
-                return True
-    return False
-
-
-def blocked_display_term(text: str) -> bool:
-    """True when display text hits the surface list outside an allowed phrase."""
-    value = text or ""
-    for found in _DISPLAY_TERMS.finditer(value):
-        if display_span_allowed(value, found.start(), found.end()):
-            continue
-        return True
-    return False
-
-
 def display_language_problems(loaded: dict) -> list[str]:
-    """Shipped files and app text stay free of the private term list."""
+    """Removed proximity fields stay off the shipped files. Prose is not word-checked."""
     problems = []
 
     def walk(obj, path):
@@ -5062,43 +4954,9 @@ def display_language_problems(loaded: dict) -> list[str]:
         elif isinstance(obj, list):
             for index, value in enumerate(obj[:8000]):
                 walk(value, f"{path}[{index}]")
-        elif isinstance(obj, str):
-            key = path.rsplit(".", 1)[-1]
-            for found in _DISPLAY_TERMS.finditer(obj):
-                word = found.group(0).lower()
-                # Avenue abbreviations and a business named Power are not the private terms.
-                # A numbered "147 AV" in a traffic note is the same abbreviation.
-                if word == "av" and (
-                    key in {"aadt_road", "trade_aadt_road", "address", "name"}
-                    or (
-                        key == "research_note"
-                        and re.search(r"(?i)\d+\s+av\b", obj[max(0, found.start() - 8) : found.end()])
-                    )
-                ):
-                    continue
-                if word == "power" and (
-                    key in {"name", "owner", "also_known_as", "broker", "firm", "address", "aadt_road", "trade_aadt_road"}
-                    or re.search(r"(?i)power[\s-](?:rd|road)\b", obj)
-                ):
-                    continue
-                # Deed facts and bill lines use the same allowlist as a posted draft.
-                if display_span_allowed(obj, found.start(), found.end()):
-                    continue
-                problems.append(f"banned term {found.group(0)!r} in {path}: {obj[:120]!r}")
-                break
 
     for name, blob in loaded.items():
         walk(blob, name)
-    for folder in ("app", "components", "lib"):
-        for path in (ROOT / folder).rglob("*"):
-            if path.suffix not in {".ts", ".tsx"}:
-                continue
-            text = path.read_text()
-            for found in _DISPLAY_TERMS.finditer(text):
-                if display_span_allowed(text, found.start(), found.end()):
-                    continue
-                problems.append(f"banned term {found.group(0)!r} in {path.relative_to(ROOT)}")
-                break
     return problems
 
 
@@ -5174,12 +5032,6 @@ def validate_committed() -> None:
     for name, blob in loaded.items():
         problems.extend(scan_obj(blob, name))
     problems.extend(display_language_problems(loaded))
-    for folder in ("components", "lib", "app"):
-        for path in (ROOT / folder).rglob("*"):
-            if path.suffix not in {".ts", ".tsx"}:
-                continue
-            if banned_hits(path.read_text()):
-                problems.append(f"banned text in {path.relative_to(ROOT)}")
     if problems:
         raise SystemExit("Data check failed.\n" + "\n".join(problems[:30]))
 

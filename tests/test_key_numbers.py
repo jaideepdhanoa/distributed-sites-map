@@ -240,7 +240,7 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertEqual(fields["cap_a_source"], "OSM proximity (Overpass)")
         self.assertEqual(fields["cap_a_as_of"], "2026-11-03")
         self.assertEqual(fields["cap_a_confidence"], "Estimated")
-        self.assertNotIn("cap_b_source", fields)
+        self.assertEqual(fields["cap_b_source"], "utility hosting map")
         self.assertEqual(fields["cap_b_frontage"], 0)
         self.assertEqual(fields["cap_b_horizon"], "2028")
         self.assertEqual(fields["cap_c_amps"], 1200)

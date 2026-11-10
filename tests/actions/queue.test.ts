@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 import { listAudit } from "../../lib/actions/audit";
 import { migrate } from "../../lib/actions/migrate";
@@ -17,7 +16,6 @@ import {
 } from "../../lib/actions/suggestions";
 import { cleanQuery, InputError } from "../../lib/actions/text";
 import { createView, deleteView, listViews } from "../../lib/actions/views";
-import { PolicyError } from "../../lib/policy/banned";
 import { memorySql } from "../helpers/sql";
 
 const site = Object.freeze({ site_id: "PHX-U180", name: "Self Service Car Wash", pipeline_stage: "1 Desk screen", listed: false, linked_deal_id: "PIPE-PHX-0008" });
@@ -29,14 +27,7 @@ const lookup: RecordLookup = (kind, id) => {
   return null;
 };
 
-function blockedWord(): string {
-  const file = JSON.parse(readFileSync("config/display-policy.json", "utf8")) as { words: string[] };
-  const word = file.words
-    .map((item) => Buffer.from(item, "base64").toString("utf8").replace(/^term:/, ""))
-    .find((item) => item.length >= 6);
-  if (!word) throw new Error("missing term");
-  return word;
-}
+const TEAM_NOTE = "Under 4 stalls fit. Waiting on an NDA. The offer covers charging and utility bills.";
 
 async function ready() {
   const sql = await memorySql();
@@ -46,7 +37,7 @@ async function ready() {
   return sql;
 }
 
-test("notes store the author and reject blocked text", async () => {
+test("notes store the author and team language", async () => {
   const sql = await ready();
   const note = await createNote(sql, {
     targetKind: "site",
@@ -59,11 +50,9 @@ test("notes store the author and reject blocked text", async () => {
   const audit = await listAudit(sql);
   assert.equal(audit[0]?.action, "note.create");
   assert.equal(audit[0]?.actorId, "writer");
-  await assert.rejects(
-    () => createNote(sql, { targetKind: "site", targetId: "PHX-U180", body: `See ${blockedWord()}`, authorId: "writer" }, lookup),
-    (error: unknown) => error instanceof PolicyError && !error.message.includes(blockedWord()),
-  );
-  assert.equal((await listNotes(sql, "site", "PHX-U180")).length, 1);
+  const posted = await createNote(sql, { targetKind: "site", targetId: "PHX-U180", body: TEAM_NOTE, authorId: "writer" }, lookup);
+  assert.equal(posted.body, TEAM_NOTE);
+  assert.equal((await listNotes(sql, "site", "PHX-U180")).length, 2);
 });
 
 test("a suggestion never writes the record and can be marked applied when data matches", async () => {
@@ -195,18 +184,17 @@ test("an approved next step stays on the card and earlier approvals remain histo
   }, lookup);
   assert.equal(first.status, "open");
   assert.equal(first.targetOn, "2026-11-20");
-  await assert.rejects(
-    () => createSuggestion(sql, {
-      targetKind: "site",
-      targetId: "PHX-U180",
-      field: "proposed_next_step",
-      proposedValue: `See ${blockedWord()}`,
-      title: `See ${blockedWord()}`,
-      reason: "",
-      authorId: "writer",
-    }, lookup),
-    PolicyError,
-  );
+  const worded = await createSuggestion(sql, {
+    targetKind: "site",
+    targetId: "PHX-U180",
+    field: "proposed_next_step",
+    proposedValue: TEAM_NOTE,
+    title: TEAM_NOTE,
+    reason: "The site is on hold for the charging stalls.",
+    authorId: "writer",
+  }, lookup);
+  assert.equal(worded.proposedValue, TEAM_NOTE);
+  assert.equal(worded.title, TEAM_NOTE);
   await decideSuggestion(sql, { id: first.id, status: "accepted", actorId: "editor", note: "Approved." });
   const second = await createSuggestion(sql, {
     targetKind: "site",

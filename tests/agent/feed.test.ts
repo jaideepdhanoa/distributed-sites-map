@@ -13,7 +13,6 @@ import { migrate } from "../../lib/actions/migrate";
 import { createNote } from "../../lib/actions/notes";
 import type { RecordLookup } from "../../lib/actions/records";
 import { createSuggestion, decideSuggestion } from "../../lib/actions/suggestions";
-import { PolicyError } from "../../lib/policy/banned";
 import { proxy } from "../../proxy";
 import { memorySql } from "../helpers/sql";
 import { GET as pullInbox } from "../../lib/api/handlers/agent/inbox";
@@ -32,14 +31,7 @@ async function ready() {
   return sql;
 }
 
-function blockedWord(): string {
-  const file = JSON.parse(readFileSync("config/display-policy.json", "utf8")) as { words: string[] };
-  const word = file.words
-    .map((item) => Buffer.from(item, "base64").toString("utf8").replace(/^term:/, ""))
-    .find((item) => item.length >= 6);
-  if (!word) throw new Error("missing term");
-  return word;
-}
+const TEAM_DRAFT = "We asked for electrical service details (amps, voltage, phase, utility bills). We are waiting on an NDA. The site is on hold. Under 4 stalls fit. The offer covers charging at 50 kW.";
 
 function draft(over: Record<string, unknown> = {}) {
   return {
@@ -189,7 +181,8 @@ test("a superseded inbox row rejects a new recommendation", async () => {
   const row = (await listInbox(sql, {})).items[0];
   await sql.query(`UPDATE agent_inbox SET status = 'superseded' WHERE id = $1`, [row.id]);
   await assert.rejects(() => addRecommendation(sql, row.id, parseRecommendation(draft())), /superseded/);
-  await assert.rejects(async () => parseRecommendation(draft({ draft_text: `See ${blockedWord()}` })), PolicyError);
+  const teamDraft = parseRecommendation(draft({ draft_text: TEAM_DRAFT }));
+  assert.equal(teamDraft.draftText, TEAM_DRAFT);
   await assert.rejects(async () => parseRecommendation(draft({ sources: [] })), /source/);
 });
 
@@ -429,7 +422,8 @@ test("recommendation drafts cover a status reply and the new outcomes", async ()
   await addRecommendation(sql, inbox.id, parseRecommendation(draft({ kind: "decision", decision: "agree_waiting", draft_text: "Agree, and wait on the file." })));
   await addRecommendation(sql, inbox.id, parseRecommendation(draft({ kind: "decision", decision: "close_overtaken", draft_text: "The site was already dropped." })));
   await assert.rejects(async () => parseRecommendation(draft({ kind: "status_reply", decision: "approve" })), /keeps the proposal open/);
-  await assert.rejects(async () => parseRecommendation(draft({ kind: "decision", decision: "agree_waiting", draft_text: `See ${blockedWord()}` })), PolicyError);
+  const waiting = parseRecommendation(draft({ kind: "decision", decision: "agree_waiting", draft_text: TEAM_DRAFT }));
+  assert.equal(waiting.draftText, TEAM_DRAFT);
   await assert.rejects(async () => parseRecommendation(draft({ kind: "decision", decision: "close_overtaken", sources: [] })), /source/);
   await assert.rejects(async () => parseRecommendation(draft({ kind: "decision", decision: "none" })), /outcome/);
 });

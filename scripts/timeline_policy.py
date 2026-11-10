@@ -42,14 +42,8 @@ WORDS, PHRASES, UNIT, PHONE = load_policy()
 
 
 def blocked(text: str) -> bool:
-    value = text or ""
-    if PHONE.search(value):
-        return True
-    if UNIT and UNIT.search(value):
-        return True
-    if any(pattern.search(value) for pattern in PHRASES):
-        return True
-    return any(pattern.search(value) for pattern in WORDS)
+    """Activity lines stay. A phone number is still dropped."""
+    return bool(PHONE.search(text or ""))
 
 
 def drop_tokens(config: dict) -> list[str]:

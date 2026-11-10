@@ -1,34 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { HOLDS } from "./expect";
 import { PIN_HOOK } from "./hook";
-
-const BANNED = /\b(?:charging|evs?|avs?|stalls?|power|utility|electric|kw|cindel|ming|ricardo|yuka|jaideep|jesse|muse|torque|indie|grok|nda|loi|offers?|walk-?away|target price)\b/gi;
-
-function bannedHits(text: string) {
-  const hits = new Set<string>();
-  for (const match of text.matchAll(BANNED)) {
-    const word = match[0].toLowerCase();
-    const around = text.slice(Math.max(0, (match.index || 0) - 30), (match.index || 0) + match[0].length + 30);
-    if (word === "power" && /\bpower\s+(rd|road)\b/i.test(around)) continue;
-    // Stage 4 is labeled "Offer and close". The count is glued on in the bar text ("Offer and close0"), so this phrase is not an offer price.
-    if (word === "offer" && /\boffer\s+and\s+close/i.test(around)) continue;
-    if (word === "kw" && /\d[\d,]*\s+kw\b/i.test(around)) continue;
-    hits.add(match[0]);
-  }
-  return [...hits];
-}
-
-async function visibleText(page: Page) {
-  return page.evaluate(() => {
-    const shell = document.querySelector(".shell");
-    if (!shell) return "";
-    const copy = shell.cloneNode(true) as HTMLElement;
-    for (const note of copy.querySelectorAll(".menu-note")) {
-      if (!note.textContent?.includes("published build")) note.remove();
-    }
-    return copy.innerText;
-  });
-}
 
 function parseCsv(text: string) {
   const rows: string[][] = [];
@@ -130,7 +102,7 @@ test("export matches the rows and columns on screen", async ({ page }) => {
   expect(parsed.slice(1).map((row) => row[0]).sort()).toEqual([...rowIds].sort());
 });
 
-test("review holds are Possible and the page has no banned terms", async ({ page }, info) => {
+test("review holds are Possible", async ({ page }, info) => {
   await page.goto("/?site=PHX-U180", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
   for (const id of HOLDS) {
@@ -140,12 +112,6 @@ test("review holds are Possible and the page has no banned terms", async ({ page
     await expect(drawer).not.toContainText("Utility proximity");
     await expect(drawer).not.toContainText("Serving utility");
     await expect(drawer.locator(".badge.pending, .badge.checked, .badge.gone")).toHaveText("Possible");
-    expect(bannedHits(await drawer.innerText()), id).toEqual([]);
-  }
-  for (const query of ["", "city=LAS", "city=MIA", "funnel=pipeline&tab=pipeline", "city=LAS&funnel=pipeline&pstage=dropped"]) {
-    await page.goto(`/?${query}`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".shell");
-    expect(bannedHits(await visibleText(page)), query || "home").toEqual([]);
   }
   if (info.project.name === "mobile") {
     await page.getByRole("button", { name: "Menu" }).click();
@@ -155,7 +121,6 @@ test("review holds are Possible and the page has no banned terms", async ({ page
     await page.getByRole("button", { name: "How to read this" }).click();
   }
   await expect(page.locator(".guide")).toBeVisible();
-  expect(bannedHits(await page.locator(".guide").innerText())).toEqual([]);
 });
 
 test("signing out leaves the map and the data API", async ({ page }, info) => {

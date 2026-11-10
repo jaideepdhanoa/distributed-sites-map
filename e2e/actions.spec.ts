@@ -22,6 +22,15 @@ async function login(request: import("@playwright/test").APIRequestContext, user
   expect(response.ok()).toBeTruthy();
 }
 
+async function phoneSheet(page: import("@playwright/test").Page) {
+  if ((page.viewportSize()?.width ?? 1440) >= 768) return;
+  const next = new URL(page.url());
+  next.searchParams.set("sheet", "half");
+  next.searchParams.set("panel", "discussion");
+  await page.goto(next.toString());
+  await page.getByTestId("panel-tab-discussion").click();
+}
+
 async function openAs(page: import("@playwright/test").Page, username: string, path: string) {
   await page.goto("/login");
   await page.getByLabel("Username").fill(username);
@@ -52,11 +61,7 @@ test("viewer is read only on the server and in the card", async ({ page, request
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-viewer-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  if ((page.viewportSize()?.width ?? 1440) < 768) {
-    const next = new URL(page.url());
-    next.searchParams.set("sheet", "half");
-    await page.goto(next.toString());
-  }
+  await phoneSheet(page);
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-viewer-mobile.png" });
 });
 
@@ -78,11 +83,7 @@ test("blocked wording is rejected and is not echoed", async ({ page, request }) 
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  if ((page.viewportSize()?.width ?? 1440) < 768) {
-    const next = new URL(page.url());
-    next.searchParams.set("sheet", "half");
-    await page.goto(next.toString());
-  }
+  await phoneSheet(page);
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByTestId("note-body").fill(`Please check ${word} before Friday.`);
@@ -176,11 +177,7 @@ test("a contributor can reply, and a non-reviewer cannot approve a next step", a
   await expect(page.getByTestId("note-threads")).toContainText("The driveway is the tight part.");
   await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  if ((page.viewportSize()?.width ?? 1440) < 768) {
-    const next = new URL(page.url());
-    next.searchParams.set("sheet", "half");
-    await page.goto(next.toString());
-  }
+  await phoneSheet(page);
   await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-mobile.png" });
 });
 
@@ -214,11 +211,7 @@ test("a reviewer approval shows the next step on the card", async ({ page, reque
   await expect(next).toContainText("Nov 20");
   await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  if ((page.viewportSize()?.width ?? 1440) < 768) {
-    const next = new URL(page.url());
-    next.searchParams.set("sheet", "half");
-    await page.goto(next.toString());
-  }
+  await phoneSheet(page);
   await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-mobile.png" });
 });
 

@@ -1,0 +1,35 @@
+{
+  "id": "resp_recorded",
+  "object": "response",
+  "status": "completed",
+  "model": "grok-4.7",
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_1",
+      "status": "completed",
+      "summary": [{ "type": "summary_text", "text": "Look up the portfolio first." }]
+    },
+    {
+      "type": "function_call",
+      "id": "fc_1",
+      "call_id": "call_portfolio",
+      "name": "portfolio",
+      "arguments": "{}",
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Phoenix has 26 listed deals still in play. Las Vegas has 13. Miami has 8."
+        }
+      ]
+    }
+  ],
+  "usage": { "input_tokens": 120, "output_tokens": 40, "output_tokens_details": { "reasoning_tokens": 12 } }
+}

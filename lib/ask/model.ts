@@ -131,8 +131,9 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
     model: xai(askModelName()),
     system: input.system,
     abortSignal: controller.signal,
-    maxOutputTokens: 1200,
-    providerOptions: { xai: { promptCacheKey: "ask-portfolio-v1", reasoningEffort: "none" as const } },
+    maxOutputTokens: 4096,
+    // This model accepts low, medium, high, and xhigh. none is rejected.
+    providerOptions: { xai: { promptCacheKey: "ask-portfolio-v1", reasoningEffort: "low" as const } },
   };
   try {
     const first = streamText({
@@ -141,8 +142,8 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       tools,
       stopWhen: stepCountIs(MAX_ASK_STEPS),
     });
-    const [steps, usage] = await Promise.all([first.steps, first.usage]);
-    let text = steps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
+    const [finalText, steps, usage] = await Promise.all([first.text, first.steps, first.usage]);
+    let text = finalText.trim() || steps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
     let promptTokens = usage.inputTokens || 0;
     let completionTokens = usage.outputTokens || 0;
     if (!text) {
@@ -152,8 +153,8 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
         prompt: `${input.prompt}\n\nFacts already looked up:\n${facts}\n\nWrite the answer in sentences. Do not call tools.`,
         stopWhen: stepCountIs(1),
       });
-      const [followSteps, followUsage] = await Promise.all([follow.steps, follow.usage]);
-      text = followSteps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
+      const [followText, followSteps, followUsage] = await Promise.all([follow.text, follow.steps, follow.usage]);
+      text = followText.trim() || followSteps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
       promptTokens += followUsage.inputTokens || 0;
       completionTokens += followUsage.outputTokens || 0;
     }

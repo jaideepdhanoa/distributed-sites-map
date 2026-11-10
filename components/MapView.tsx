@@ -319,7 +319,7 @@ export default function MapView(props: Props) {
             type: "circle",
             source: "sites",
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
-            paint: { "circle-radius": 15, "circle-color": "#fffdf8", "circle-stroke-width": 0 },
+            paint: { "circle-radius": 15, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "sites",
@@ -371,7 +371,7 @@ export default function MapView(props: Props) {
             type: "circle",
             source: "deals",
             filter: ["==", ["get", "deal_id"], ""],
-            paint: { "circle-radius": 15, "circle-color": "#fffdf8", "circle-stroke-width": 0 },
+            paint: { "circle-radius": 15, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "deals-pipe",
@@ -774,15 +774,19 @@ export default function MapView(props: Props) {
           paint(id, "circle-stroke-width", 3);
           paint(id, "circle-stroke-opacity", 0.9);
         }
-        paint("selected-halo", "circle-opacity", 0);
-        paint("selected-halo", "circle-stroke-color", "#1c1914");
-        paint("selected-halo", "circle-stroke-width", 6);
-        paint("selected", "circle-stroke-color", "#fffdf8");
+        paint("selected-halo", "circle-color", "#1e4636");
+        paint("selected-halo", "circle-opacity", 0.2);
+        paint("selected-halo", "circle-stroke-color", "#1e4636");
+        paint("selected-halo", "circle-stroke-width", 3);
+        paint("selected", "circle-color", "#e7f0ea");
+        paint("selected", "circle-stroke-color", "#1e4636");
         paint("selected", "circle-stroke-width", 3);
-        paint("deal-halo", "circle-opacity", 0);
-        paint("deal-halo", "circle-stroke-color", "#1c1914");
-        paint("deal-halo", "circle-stroke-width", 6);
-        paint("deal-ring", "circle-stroke-color", "#fffdf8");
+        paint("deal-halo", "circle-color", "#1e4636");
+        paint("deal-halo", "circle-opacity", 0.2);
+        paint("deal-halo", "circle-stroke-color", "#1e4636");
+        paint("deal-halo", "circle-stroke-width", 3);
+        paint("deal-ring", "circle-color", "#e7f0ea");
+        paint("deal-ring", "circle-stroke-color", "#1e4636");
         paint("deal-ring", "circle-stroke-width", 3);
         paint("clusters", "circle-stroke-width", 3);
         paint("clusters-halo", "circle-opacity", 0.5);
@@ -1257,14 +1261,16 @@ export default function MapView(props: Props) {
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Map</button>
         </div>
-        <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" onClick={() => setMeasure((value) => !value)}>Measure</button>
-        {measure ? (
-          <div className="measure-bar">
-            <span>{readout || "Tap the corners"}</span>
-            <button type="button" className="paper-btn" onClick={undoMeasure}>Undo</button>
-            <button type="button" className="paper-btn" onClick={() => setMeasureDone(true)}>Done</button>
-          </div>
-        ) : null}
+        <div className="measure-row">
+          {measure ? (
+            <div className="measure-bar">
+              <span>{readout || "Tap the corners"}</span>
+              <button type="button" className="paper-btn" onClick={undoMeasure}>Undo</button>
+              <button type="button" className="paper-btn" data-testid="measure-done" onClick={() => setMeasureDone(true)}>Done</button>
+            </div>
+          ) : null}
+          <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" onClick={() => setMeasure((value) => !value)}>Measure</button>
+        </div>
       </div>
       <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
     </div>

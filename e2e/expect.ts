@@ -1,3 +1,5 @@
+import { isPipelineStore } from "../lib/labels";
+
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const STEPS = ["universe", "in_area", "land", "county", "cleared"] as const;
 export const PIPE_STEPS = ["desk", "financial", "checks", "close", "dropped"] as const;
@@ -187,7 +189,7 @@ function stageDeals(catalog: Catalog, city: string, step: string, options: { typ
   return catalog.deals.filter((feature) => {
     const deal = feature.properties;
     if ((deal.kind !== "pipeline" && deal.kind !== "land") || deal.city !== city || deal.stage_group !== step) return false;
-    if (deal.is_c_store && !options.cstore) return false;
+    if ((deal.is_c_store || isPipelineStore(deal)) && !options.cstore) return false;
     if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
     if (options.query) {
       const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();

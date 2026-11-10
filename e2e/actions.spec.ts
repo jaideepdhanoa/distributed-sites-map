@@ -248,7 +248,7 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await expect(page.getByTestId("search-hits")).toBeVisible();
   await expect(page.getByTestId("search-hits")).not.toContainText("PIPE-PHX-0067");
   await page.getByRole("textbox", { name: "Search" }).first().fill("PIPE-MIA-0075");
-  await expect(page.getByTestId("search-hits")).toContainText("PIPE-MIA-0075");
+  await expect(page.getByTestId("search-hits")).not.toContainText("PIPE-MIA-0075");
   await page.getByRole("textbox", { name: "Search" }).first().fill("");
   await page.waitForFunction(() => !location.search.includes("q="));
   await page.screenshot({ path: "/opt/cursor/artifacts/cstore-hidden-list.png" });

@@ -6,6 +6,7 @@ import { permanentSiteId } from "@/lib/actions/suggestions";
 import { InputError, parseDate, stamp } from "@/lib/actions/text";
 import { notifyFlag } from "@/lib/alerts/notify";
 import { getUsers } from "@/lib/users";
+import { isPipelineStore } from "@/lib/labels";
 import { loadCatalog, readBuildEvents } from "./catalog";
 import { listAppEvents } from "./events";
 import { buildQueue, type QueueFilters, type QueueReason } from "./order";
@@ -210,7 +211,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
       stage: site.stage,
       stageGroup: site.stageGroup,
       active: site.active,
-      hidden: site.isCStore,
+      hidden: site.isCStore || isPipelineStore({ kind: "pipeline", business_type: site.businessType, name: site.name, description: site.description }),
     })),
     reasons,
     reviewedAt,

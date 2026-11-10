@@ -23,7 +23,7 @@ import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/
 import { displayAddress, leadSourceLine, plainRoad } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
-import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
@@ -550,9 +550,9 @@ export default function Explorer() {
   }
 
   function cStoreHidden(deal: DealProps, _wide: boolean) {
-    if (!deal.is_c_store || showCStores) return false;
+    if (showCStores) return false;
     if (selected === deal.deal_id) return false;
-    return true;
+    return Boolean(deal.is_c_store) || isPipelineStore(deal);
   }
 
   function inDealMarket(deal: DealProps, wide: boolean) {

@@ -30,6 +30,21 @@ export const FUNNEL_NOTES: Record<string, string> = {
   dropped: "The deal is no longer being pursued.",
 };
 
+const STORE_TEXT = /c[\s-]*stores?|\bampm\b|am\s*\/\s*pm/i;
+
+/** Pipeline gas stations and c-stores stay out of the default queue and views. Universe car washes stay as they are. */
+export function isPipelineStore(record: {
+  kind?: string | null;
+  business_type?: string | null;
+  name?: string | null;
+  description?: string | null;
+}) {
+  if (record.kind !== "pipeline") return false;
+  const type = (record.business_type || "").trim().toLowerCase();
+  if (type === "gas station" || type === "convenience store") return true;
+  return STORE_TEXT.test(`${record.name || ""} ${record.description || ""}`);
+}
+
 export const BUSINESS_TYPES = [
   "Car wash",
   "Auto repair",

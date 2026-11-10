@@ -1,5 +1,7 @@
 /** Search text for the map. "&" and "and" are the same word, and punctuation does not hide a name. */
 
+import { isPipelineStore } from "./labels";
+
 export function foldSearch(value: string | null | undefined): string {
   return String(value || "")
     .toLowerCase()
@@ -65,6 +67,8 @@ type DealHitSource = {
   firm?: string;
   universe_id?: string;
   is_c_store?: boolean;
+  business_type?: string;
+  description?: string;
 };
 
 export type SearchOptions = {
@@ -103,9 +107,10 @@ export function collectSearchHits(
   const needle = foldSearch(query);
   if (needle.length < 2) return [];
   const cStores = options.cStores === true;
-  const visibleDeals = deals.filter((deal) => cStores || deal.is_c_store !== true);
+  const hiddenStore = (deal: DealHitSource) => deal.is_c_store === true || isPipelineStore(deal);
+  const visibleDeals = deals.filter((deal) => cStores || !hiddenStore(deal));
   const hiddenCStoreIds = new Set(
-    cStores ? [] : deals.filter((deal) => deal.is_c_store === true).flatMap((deal) => [deal.deal_id, deal.universe_id || ""]).filter(Boolean),
+    cStores ? [] : deals.filter(hiddenStore).flatMap((deal) => [deal.deal_id, deal.universe_id || ""]).filter(Boolean),
   );
   const byDeal = new Map(visibleDeals.map((deal) => [deal.deal_id, deal]));
   const byUniverse = new Map<string, DealHitSource>();

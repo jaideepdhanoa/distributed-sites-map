@@ -1,6 +1,6 @@
 /** Search text for the map. "&" and "and" are the same word, and punctuation does not hide a name. */
 
-import { isPipelineStore } from "./labels";
+import { isPipelineStore } from "./labels.ts";
 
 export function foldSearch(value: string | null | undefined): string {
   return String(value || "")

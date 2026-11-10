@@ -2,12 +2,13 @@ import { ASK_TOOLS, MAX_ASK_STEPS, runAskTool } from "@/lib/ask/tools";
 import type { ActionRole } from "@/lib/actions/roles";
 import { listedCountLine } from "./counts";
 import type { AskSource } from "./policy";
-import { ASK_UPSTREAM_TIMEOUT_MS } from "./wait";
+import { ASK_SERVER_BUDGET_MS, answeredByStageTable } from "./wait";
 
 export type AskModelInput = {
   system: string;
   prompt: string;
   role: ActionRole;
+  signal?: AbortSignal;
 };
 
 export type AskModelOutput = {
@@ -76,7 +77,7 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       },
     }),
     portfolio: tool({
-      description: "Portfolio summary, listed counts, and a stage row for every in-play listed deal.",
+      description: "Portfolio summary and listed counts. Stage rows are already in the prompt.",
       inputSchema: z.object({}),
       execute: async () => {
         called.push("portfolio");
@@ -86,7 +87,7 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       },
     }),
     stages: tool({
-      description: "Stage rows for every in-play listed deal. Optional filters: market (Phoenix, Las Vegas, Miami) and stage name. Quarantined records are omitted. No financial figures.",
+      description: "Filtered stage rows when the prompt table is not enough. Optional market (Phoenix, Las Vegas, Miami) and stage name. Quarantined records are omitted. No financial figures.",
       inputSchema: z.object({ market: z.string().optional(), stage: z.string().optional() }),
       execute: async ({ market, stage }) => {
         called.push("stages");
@@ -136,28 +137,29 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       },
     }),
   };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ASK_UPSTREAM_TIMEOUT_MS);
+  const budget = new AbortController();
+  const timer = setTimeout(() => budget.abort(), ASK_SERVER_BUDGET_MS);
+  const abortSignal = input.signal ? AbortSignal.any([budget.signal, input.signal]) : budget.signal;
+  const fromTable = answeredByStageTable(input.prompt);
   const shared = {
     model: xai(askModelName()),
     system: input.system,
-    abortSignal: controller.signal,
+    abortSignal,
     maxOutputTokens: 4096,
     // This model accepts low, medium, high, and xhigh. none is rejected.
-    providerOptions: { xai: { promptCacheKey: "ask-portfolio-v1", reasoningEffort: "low" as const } },
+    providerOptions: { xai: { promptCacheKey: "ask-portfolio-v2", reasoningEffort: "low" as const } },
   };
   try {
     const first = streamText({
       ...shared,
       prompt: input.prompt,
-      tools,
-      stopWhen: stepCountIs(MAX_ASK_STEPS),
+      ...(fromTable ? {} : { tools, stopWhen: stepCountIs(MAX_ASK_STEPS) }),
     });
     const [finalText, steps, usage] = await Promise.all([first.text, first.steps, first.usage]);
     let text = finalText.trim() || steps.map((step) => step.text.trim()).filter(Boolean).join("\n\n");
     let promptTokens = usage.inputTokens || 0;
     let completionTokens = usage.outputTokens || 0;
-    if (!text) {
+    if (!text && !fromTable) {
       const facts = [listedCountLine(), ...gathered.map((value) => JSON.stringify(value))].join("\n").slice(0, 6000);
       const follow = streamText({
         ...shared,

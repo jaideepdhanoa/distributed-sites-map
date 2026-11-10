@@ -1,9 +1,10 @@
-import { NETWORK_ANSWER, TIMEOUT_ANSWER } from "./empty";
+import { EMPTY_ANSWER, NETWORK_ANSWER, TIMEOUT_ANSWER, UPSTREAM_ANSWER } from "./empty";
 import { isAbortError } from "./upstream";
 
-/** The catch-all route allows 300s. Stop the model call before the platform does. */
-export const ASK_UPSTREAM_TIMEOUT_MS = 270_000;
-export const ASK_CLIENT_TIMEOUT_MS = 45_000;
+/** Whole Ask request, including every tool round and model call. */
+export const ASK_SERVER_BUDGET_MS = 40_000;
+/** Sits just above the server budget so a timeout response can still arrive. */
+export const ASK_CLIENT_TIMEOUT_MS = 50_000;
 export const ASK_STILL_WORKING_MS = 8_000;
 
 export type AskTurn = {
@@ -52,4 +53,19 @@ export function askFailure(error: unknown): { text: string; error: true; linkRet
 export function composerAfter(sent: string, current: string, succeeded: boolean): string {
   if (!succeeded) return current;
   return current.trim() === sent.trim() ? "" : current;
+}
+
+export function askOutcome(answer: { text: string; error: boolean; gap: boolean }): string {
+  if (answer.text === TIMEOUT_ANSWER) return "timeout";
+  if (answer.text === UPSTREAM_ANSWER) return "upstream";
+  if (answer.text === EMPTY_ANSWER) return "empty";
+  if (answer.gap) return "gap";
+  if (answer.error) return "error";
+  return "answer";
+}
+
+/** Furthest-along and stage questions are already in the prompt table. */
+export function answeredByStageTable(prompt: string): boolean {
+  const question = /Question:\s*([\s\S]*)$/.exec(prompt)?.[1] || prompt;
+  return /furthest|further along|\bstages?\b|financial screen|desk screen|site check/i.test(question);
 }

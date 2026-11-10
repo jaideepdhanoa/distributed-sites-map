@@ -7,9 +7,11 @@ import { EMPTY_ANSWER, NETWORK_ANSWER, TIMEOUT_ANSWER, UPSTREAM_ANSWER } from ".
 import { answerQuestion } from "../../lib/ask/run";
 import {
   ASK_CLIENT_TIMEOUT_MS,
+  ASK_SERVER_BUDGET_MS,
   ASK_STILL_WORKING_MS,
-  ASK_UPSTREAM_TIMEOUT_MS,
+  answeredByStageTable,
   askFailure,
+  askOutcome,
   beginAsk,
   composerAfter,
   finishAsk,
@@ -49,7 +51,8 @@ test("a timeout keeps the question and a retry sends it again", () => {
   assert.equal(retry[3]?.pending, true);
   const answered = finishAsk(retry, { text: "The furthest are at the financial screen.", error: false });
   assert.match(answered[3]?.text || "", /financial/);
-  assert.equal(ASK_CLIENT_TIMEOUT_MS, 45_000);
+  assert.match(renderToStaticMarkup(createElement(AskThinking)), /ask-thinking/);
+  assert.equal(ASK_CLIENT_TIMEOUT_MS, 50_000);
   assert.equal(ASK_STILL_WORKING_MS, 8_000);
 });
 
@@ -63,8 +66,10 @@ test("a network failure is not the empty-answer or upstream copy", () => {
 });
 
 test("an aborted model call returns a clean timeout instead of hanging", async () => {
-  assert.ok(ASK_UPSTREAM_TIMEOUT_MS < 300_000);
-  assert.ok(ASK_UPSTREAM_TIMEOUT_MS > ASK_CLIENT_TIMEOUT_MS);
+  assert.equal(ASK_SERVER_BUDGET_MS, 40_000);
+  assert.ok(ASK_SERVER_BUDGET_MS < ASK_CLIENT_TIMEOUT_MS);
+  assert.equal(answeredByStageTable("Scope: portfolio\nQuestion: Which Phoenix deals are furthest along?"), true);
+  assert.equal(answeredByStageTable("Scope: portfolio\nQuestion: How many listed deals are in Las Vegas?"), false);
   const logs: string[] = [];
   const original = console.error;
   console.error = (line?: unknown) => { logs.push(String(line ?? "")); };
@@ -80,6 +85,7 @@ test("an aborted model call returns a clean timeout instead of hanging", async (
     });
     assert.equal(answer.text, TIMEOUT_ANSWER);
     assert.equal(answer.error, true);
+    assert.equal(askOutcome(answer), "timeout");
     assert.notEqual(answer.text, UPSTREAM_ANSWER);
     assert.equal(logs.some((line) => line.includes("sk-")), false);
   } finally {

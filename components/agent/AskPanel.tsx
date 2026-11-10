@@ -29,6 +29,13 @@ export function AskPanel({
   const logRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const runId = useRef(0);
+  const flight = useRef<AbortController | null>(null);
+  const alive = useRef(true);
+
+  useEffect(() => () => {
+    alive.current = false;
+    flight.current?.abort();
+  }, []);
 
   useEffect(() => {
     const node = logRef.current;
@@ -67,8 +74,9 @@ export function AskPanel({
     setNotice("");
     setTurns((current) => beginAsk(current, text));
     const controller = new AbortController();
+    flight.current = controller;
     const slowTimer = window.setTimeout(() => {
-      if (runId.current === requestId) setTurns((current) => markStillWorking(current));
+      if (runId.current === requestId && alive.current) setTurns((current) => markStillWorking(current));
     }, ASK_STILL_WORKING_MS);
     const timeoutTimer = window.setTimeout(() => controller.abort(), ASK_CLIENT_TIMEOUT_MS);
     let succeeded = false;
@@ -80,7 +88,7 @@ export function AskPanel({
         body: JSON.stringify({ question: text, siteId: site?.id || null }),
         signal: controller.signal,
       });
-      if (runId.current !== requestId) return;
+      if (runId.current !== requestId || !alive.current) return;
       if (!response.ok || !response.body) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         const message = payload.error || askFailure(new Error("network")).text;
@@ -95,7 +103,7 @@ export function AskPanel({
       while (true) {
         const step = await reader.read();
         if (step.done) break;
-        if (runId.current !== requestId) return;
+        if (runId.current !== requestId || !alive.current) return;
         buffer += decoder.decode(step.value, { stream: true });
         const chunks = buffer.split("\n\n");
         buffer = chunks.pop() || "";
@@ -122,13 +130,14 @@ export function AskPanel({
         }
       }
     } catch (error) {
-      if (runId.current !== requestId) return;
+      if (runId.current !== requestId || !alive.current) return;
       settled = true;
       setTurns((current) => finishAsk(current, askFailure(error)));
     } finally {
       window.clearTimeout(slowTimer);
       window.clearTimeout(timeoutTimer);
-      if (runId.current === requestId) {
+      if (flight.current === controller) flight.current = null;
+      if (runId.current === requestId && alive.current) {
         if (!settled) setTurns((current) => finishAsk(current, askFailure(new Error("network"))));
         setPending(false);
         setQuestion((current) => composerAfter(text, current, succeeded));

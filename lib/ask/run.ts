@@ -64,6 +64,7 @@ export async function answerQuestion(input: {
   role: ActionRole;
   question: string;
   siteId: string | null;
+  signal?: AbortSignal;
   runner?: AskRunner;
 }): Promise<AskAnswer> {
   const question = input.question.trim().slice(0, 2000);
@@ -92,6 +93,7 @@ export async function answerQuestion(input: {
         system: askPrefix(),
         prompt: `${audience}\n${scopeLine}\nQuestion: ${question}`,
         role: input.role,
+        signal: input.signal,
       });
     } catch (error) {
       logUpstream(error);

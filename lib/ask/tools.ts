@@ -15,7 +15,7 @@ import { listedDealsByMarket } from "./counts";
 import { filterStageRows, listedStageRows } from "./stages";
 import { redactPayload } from "./redact";
 
-export const MAX_ASK_STEPS = 5;
+export const MAX_ASK_STEPS = 2;
 
 export const ASK_TOOLS = [
   "searchSites",
@@ -167,7 +167,6 @@ function portfolio() {
     generatedAt: report.generated_at || "",
     changes: report.changes || {},
     listedByMarket: listedDealsByMarket(),
-    stages: listedStageRows(isQuarantined),
   };
 }
 

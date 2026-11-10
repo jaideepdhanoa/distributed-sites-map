@@ -1,5 +1,6 @@
 import { findPolicyHits, safeSnapshot } from "@/lib/policy/banned";
 import { getUsers } from "@/lib/users";
+import { renderAlert } from "./template";
 import type { AlertCategory } from "./preferences";
 
 export type MailItem = {
@@ -9,6 +10,8 @@ export type MailItem = {
   summary: string;
   authorId: string;
   href: string;
+  market?: string;
+  stage?: string;
 };
 
 const LABELS: Record<MailItem["category"], string> = {
@@ -49,28 +52,6 @@ export function screenEmail(subject: string, body: string): { subject: string; b
   return { subject: nextSubject, body: nextBody };
 }
 
-export function renderBatch(items: MailItem[]): { subject: string; body: string } | null {
-  const blocks: string[] = [];
-  for (const item of items) {
-    if (item.category === "queue") {
-      const line = publicSnippet(item.summary) || "Waiting in Review";
-      blocks.push([line, item.href].filter(Boolean).join("\n"));
-      continue;
-    }
-    const snippet = publicSnippet(item.summary);
-    const lines = [item.siteLabel || item.siteId, categoryLabel(item.category)];
-    if (snippet) lines.push(snippet);
-    const author = authorName(item.authorId);
-    if (author) lines.push(author);
-    if (item.href) lines.push(item.href);
-    blocks.push(lines.join("\n"));
-  }
-  if (!blocks.length) return null;
-  const content = items.filter((item) => item.category !== "queue");
-  const subject = content.length === 1
-    ? `${categoryLabel(content[0].category)} · ${content[0].siteId}`
-    : content.length === 0
-      ? "Review queue"
-      : `Review updates (${content.length})`;
-  return screenEmail(subject, blocks.join("\n\n"));
+export function renderBatch(items: MailItem[], options?: { now?: Date; kind?: "instant" | "digest" }): { subject: string; body: string; html: string } | null {
+  return renderAlert(items, options);
 }

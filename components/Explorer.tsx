@@ -146,7 +146,7 @@ export default function Explorer() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(params.get("alerts") === "1");
   const [menuOpen, setMenuOpen] = useState(false);
   const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
   const [hitsOpen, setHitsOpen] = useState(false);

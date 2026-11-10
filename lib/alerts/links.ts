@@ -23,3 +23,7 @@ export function discussionHref(siteId: string): string {
 export function reviewHomeHref(): string {
   return withOrigin("/?view=review");
 }
+
+export function settingsHref(): string {
+  return withOrigin("/?alerts=1");
+}

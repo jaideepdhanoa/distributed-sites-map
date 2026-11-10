@@ -41,6 +41,200 @@ async function openAs(page: import("@playwright/test").Page, username: string, p
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
+async function discussionInView(page: import("@playwright/test").Page, id: string) {
+  await expect(page.locator("aside.drawer")).toContainText(id);
+  await expect(page.getByTestId("key-strip")).toHaveCount(1);
+  await page.waitForTimeout(1200);
+  const discussion = page.getByRole("tab", { name: "Discussion" });
+  await expect(discussion).toHaveAttribute("aria-selected", "true");
+  await expect(discussion).toBeInViewport();
+}
+
+async function mapFillsFrame(page: import("@playwright/test").Page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const map = document.querySelector(".map");
+    const canvas = map?.querySelector("canvas");
+    if (!map || !canvas || map.clientWidth < 80 || map.clientHeight < 80) return 0;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const close = Math.abs(canvas.width - map.clientWidth * ratio) < 8
+      && Math.abs(canvas.height - map.clientHeight * ratio) < 8;
+    return close ? canvas.width : 0;
+  })).toBeGreaterThan(80);
+}
+
+test("a cold desktop discussion link scrolls to Discussion", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=discussion");
+  await discussionInView(page, "PIPE-PHX-0008");
+});
+
+test("a cold phone discussion link scrolls to Discussion", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=discussion");
+  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
+  await discussionInView(page, "PIPE-PHX-0008");
+});
+
+test("a cold phone proposal link opens the full sheet", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=proposal");
+  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
+  await expect(page.getByTestId("key-strip")).toHaveCount(1);
+  await expect(page.getByTestId("next-step")).toBeInViewport();
+  await expect(page.getByTestId("next-step")).toHaveAttribute("data-panel", "proposal");
+});
+
+test("a cold Las Vegas discussion link centers the map", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-LAS-0073&panel=discussion");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
+  await discussionInView(page, "PIPE-LAS-0073");
+  await mapFillsFrame(page);
+  const vegas = page.locator(".map");
+  await expect(vegas).toHaveAttribute("data-centered", "PIPE-LAS-0073");
+  expect(Number(await vegas.getAttribute("data-lng"))).toBeLessThan(-114);
+});
+
+test("a cold Miami discussion link centers the map", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-MIA-0080&panel=discussion");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "MIA");
+  await discussionInView(page, "PIPE-MIA-0080");
+  await mapFillsFrame(page);
+  const miami = page.locator(".map");
+  await expect(miami).toHaveAttribute("data-centered", "PIPE-MIA-0080");
+  const lng = Number(await miami.getAttribute("data-lng"));
+  expect(lng).toBeGreaterThan(-81.5);
+  expect(lng).toBeLessThan(-79.5);
+});
+
+for (const width of [1024, 1280]) {
+  test(`a cold review link for a dropped site leaves review at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    let reviewQueueSettled = false;
+    await page.route("**/api/queue**", async (route) => {
+      if (!page.url().includes("view=review")) {
+        await route.continue();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      reviewQueueSettled = true;
+      await route.continue();
+    });
+    await openAs(page, "contributor", "/?view=review&site=PIPE-PHX-0008");
+    await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+    await expect(page.getByTestId("review-bar")).toHaveCount(0, { timeout: 2000 });
+    expect(reviewQueueSettled).toBe(false);
+    await expect(page.locator(".review-rail")).toHaveCount(0);
+    await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+    await expect.poll(() => page.url()).not.toMatch(/view=review|review=1/);
+    await expect.poll(() => page.url()).toMatch(/funnel=pipeline/);
+    await expect.poll(() => page.url()).toMatch(/pstage=dropped/);
+    await mapFillsFrame(page);
+    await page.waitForTimeout(800);
+    await expect(page.getByTestId("review-bar")).toHaveCount(0);
+    await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+    await expect.poll(() => page.url()).not.toMatch(/view=review|review=1/);
+  });
+}
+
+test("a cold in-queue review link highlights that row", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openAs(page, "contributor", "/?view=review&site=PIPE-LAS-0073");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-LAS-0073");
+  await expect(page.locator(".shell")).toHaveClass(/reviewing/);
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
+  await expect(page.getByTestId("review-position")).toContainText(/\d+ of \d+/);
+  const highlighted = page.locator(".review-row.on");
+  await expect(highlighted).toHaveCount(1);
+  await expect(highlighted).toContainText("Former car wash building, now four tenants");
+  await expect.poll(() => page.url()).toMatch(/city=LAS/);
+  await expect.poll(() => page.url()).toMatch(/review=1/);
+  await expect.poll(() => page.url()).not.toMatch(/view=review/);
+  await expect(page.getByTestId("queue-count")).not.toHaveText("0");
+  await expect.poll(async () => page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { project: (lnglat: [number, number]) => { x: number }; getContainer: () => HTMLElement } }).__sitesMap;
+    const node = document.querySelector(".map");
+    const drawer = document.querySelector("aside.drawer");
+    if (!map || !node || !drawer) return -1;
+    const lng = Number(node.getAttribute("data-lng"));
+    const lat = Number(node.getAttribute("data-lat"));
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return -1;
+    const point = map.project([lng, lat]);
+    const canvas = map.getContainer().getBoundingClientRect();
+    const panel = drawer.getBoundingClientRect();
+    const visibleRight = panel.left - canvas.left;
+    if (visibleRight < 120) return -1;
+    return Math.abs(point.x - visibleRight / 2);
+  })).toBeLessThan(70);
+});
+
+test("a review link highlights that site, or leaves review when it is not queued", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (/cannot fit within canvas/i.test(message.text())) errors.push(message.text());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", "/?review=1");
+  await expect(page.getByTestId("review-bar")).toBeVisible();
+  await page.waitForTimeout(1200);
+  expect(errors).toEqual([]);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const response = await page.request.get("/api/queue?market=all&stage=any&viable=1");
+  expect(response.ok()).toBeTruthy();
+  const body = (await response.json()) as { items?: { siteId: string; name?: string }[] };
+  const items = (body.items || []).filter((item) => item.siteId);
+  expect(items.length).toBeGreaterThan(1);
+  const target = items[items.length - 1];
+  await page.goto(`/?view=review&site=${target.siteId}`);
+  await expect(page.locator("aside.drawer")).toContainText(target.siteId);
+  await expect(page.locator(".shell")).toHaveClass(/reviewing/);
+  const highlighted = page.locator(".review-row.on");
+  await expect(highlighted).toHaveCount(1);
+  if (target.name) await expect(highlighted).toContainText(target.name);
+
+  await page.goto("/?view=review&site=PIPE-PHX-0008&panel=discussion");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+  await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+  await expect(page.getByTestId("review-bar")).toHaveCount(0);
+  await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
+});
+
+test("a suggested draft links to that site", async ({ page, request }) => {
+  await login(request, "contributor");
+  const note = await request.post("/api/actions/notes", {
+    data: { targetKind: "site", targetId: site, body: "The frontage needs another look." },
+  });
+  expect(note.status()).toBe(201);
+  const root = ((await note.json()) as { note: { id: string } }).note;
+  await page.route("**/api/actions/status", (route) => route.fulfill({
+    json: { enabled: true, actionRole: "reviewer", username: "jaideep" },
+  }));
+  await page.route("**/api/actions/recommendations**", (route) => route.fulfill({
+    json: {
+      recommendations: [{
+        id: "rec-link",
+        kind: "reply",
+        draftText: "The driveway is the tight part.",
+        decision: "none",
+        rationale: "It answers the note about the frontage.",
+        sources: [{ label: "Discussion", url: `/?site=${site}&panel=discussion`, ref: null }],
+        confidence: "medium",
+        threadKey: `note:${root.id}`,
+        proposalId: null,
+        siteId: deal,
+        siteUrl: `/?site=${deal}&panel=discussion`,
+      }],
+    },
+  }));
+  await openAs(page, "contributor", `/?site=${site}&panel=discussion`);
+  const link = page.getByTestId("suggested-site");
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", `/?site=${deal}&panel=discussion`);
+  await link.click();
+  await expect(page.locator("aside.drawer")).toContainText(deal);
+  await expect(page.getByTestId("panel-tab-discussion")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("record-actions")).toBeVisible();
+});
+
 test("viewer is read only on the server and in the card", async ({ page, request }) => {
   await login(request, "viewer");
   const note = await request.post("/api/actions/notes", {

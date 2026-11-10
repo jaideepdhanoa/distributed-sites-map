@@ -1,5 +1,5 @@
 import { findPolicyHits, safeSnapshot } from "@/lib/policy/banned";
-import { reviewHomeHref, settingsHref } from "./links";
+import { mailLink, reviewHomeHref, settingsHref } from "./links";
 import { authorName, categoryLabel, publicSnippet, screenEmail, type MailItem } from "./compose";
 
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
@@ -88,6 +88,9 @@ function whyLine(category: MailItem["category"] | "digest"): string {
 }
 
 function buttonLabel(item: MailItem): string {
+  if (item.siteId === "portfolio") return "Open the map";
+  if (item.category === "approvals" || item.category === "assignments") return "Open the proposal";
+  if (item.category === "flags") return "Open in Review";
   if (item.category === "mentions" || item.category === "replies" || item.category === "followed") return "Reply in Discussion";
   return "Open in Review";
 }
@@ -166,6 +169,7 @@ ${quote ? `<tr><td style="padding:12px 28px 0;"><table role="presentation" width
 function renderInstant(item: MailItem, settingsHref: string): { subject: string; text: string; rows: string } {
   const block = summaryBlock(item);
   const label = buttonLabel(item);
+  const href = mailLink(item);
   const text = [
     "Distributed Sites",
     "",
@@ -173,6 +177,7 @@ function renderInstant(item: MailItem, settingsHref: string): { subject: string;
     ...block.text,
     "",
     label,
+    href,
     "",
     "Manage alert settings",
     whyLine(item.category),
@@ -180,7 +185,7 @@ function renderInstant(item: MailItem, settingsHref: string): { subject: string;
   const rows = [
     eyebrow(categoryLabel(item.category)),
     block.html,
-    `<tr><td style="padding:20px 28px 8px;">${button(label, item.href || reviewHomeHref())}</td></tr>`,
+    `<tr><td style="padding:20px 28px 8px;">${button(label, href)}</td></tr>`,
     footer(whyLine(item.category), settingsHref),
   ].join("\n");
   return { subject: instantSubject(item), text, rows };
@@ -202,17 +207,19 @@ function renderDigest(items: MailItem[], now: Date, settingsHref: string): { sub
     html.push(eyebrow(`${section.title} · ${rows.length}`));
     for (const item of rows) {
       const name = siteName(item);
+      const href = mailLink(item);
       const meta = [marketCode(item), stageName(item), clean(actionLine(item), 120)].filter(Boolean).join(" · ");
       const quote = clean(item.summary, 140);
       textLines.push(name);
+      textLines.push(href);
       if (meta) textLines.push(meta);
       if (quote) textLines.push(`“${quote}”`);
-      html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.4;color:#1c1914;">${textLink(name, item.href || home)}</td></tr>`);
+      html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.4;color:#1c1914;">${textLink(name, href)}</td></tr>`);
       if (meta) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(meta)}</td></tr>`);
       if (quote) html.push(`<tr><td style="padding:2px 28px 8px;font-family:${SANS};font-size:14px;line-height:1.4;color:#1c1914;">“${esc(quote)}”</td></tr>`);
     }
   }
-  textLines.push("", "Open Review", "", "Manage alert settings", whyLine("digest"));
+  textLines.push("", "Open Review", home, "", "Manage alert settings", whyLine("digest"));
   html.push(`<tr><td style="padding:20px 28px 8px;">${button("Open Review", home)}</td></tr>`);
   html.push(footer(whyLine("digest"), settingsHref));
   return { subject: digestSubject(items, now), text: textLines.join("\n"), rows: html.join("\n") };

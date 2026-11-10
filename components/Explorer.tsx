@@ -117,6 +117,7 @@ export default function Explorer() {
   const [queueCount, setQueueCount] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
+  const [loadedQueueKey, setLoadedQueueKey] = useState("");
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
   const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
@@ -154,6 +155,9 @@ export default function Explorer() {
   const sheetQuery = params.get("sheet");
   const sheetQueryRef = useRef(sheetQuery);
   sheetQueryRef.current = sheetQuery;
+  const placedSite = useRef("");
+  const leaveSite = useRef("");
+  const wantedReview = useRef("");
   const [sheetSnap, setSheetSnap] = useState<SheetSnap>(() => initialSheetSnap(sheetQuery));
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
@@ -203,7 +207,12 @@ export default function Explorer() {
   const queueMentions = params.get("qmention") === "1";
   const queueAssigned = params.get("qassign") === "1";
   const visibleFeed = feed.filter((site) => site.status !== "snoozed" && (showHidden || !hiddenIds.includes(site.siteId)));
-  const reviewIndex = Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
+  // /?view=review&site=ID opens that site. After the link lands, review=1 follows the queue cursor.
+  const reviewDeepSite = params.get("view") === "review" ? params.get("site") : null;
+  const reviewDeepIndex = reviewDeepSite ? visibleFeed.findIndex((site) => site.siteId === reviewDeepSite) : -1;
+  const reviewIndex = reviewDeepIndex >= 0
+    ? reviewDeepIndex
+    : Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
   const reviewCurrent = visibleFeed[reviewIndex];
   const caughtUp = reviewing && feedLoaded && !feed.some((site) => site.status === "open");
   const ranges = rangesFromSearch(params);
@@ -278,7 +287,17 @@ export default function Explorer() {
   }
 
   function write(next: Record<string, string | null>, history = false) {
-    const url = new URLSearchParams(params.toString());
+    replaceSearch(params.toString(), next, history);
+  }
+
+  function stopReview(next: Record<string, string | null> = {}) {
+    wantedReview.current = "";
+    leaveSite.current = "";
+    write({ review: null, view: null, i: null, ...next });
+  }
+
+  function replaceSearch(base: string, next: Record<string, string | null>, history = false) {
+    const url = new URLSearchParams(base);
     for (const [key, value] of Object.entries(next)) {
       if (!value) url.delete(key);
       else url.set(key, value);
@@ -361,22 +380,29 @@ export default function Explorer() {
     };
   }, [needCatalog, catalog]);
 
+  const queueKey = new URLSearchParams({
+    market: queueMarket,
+    stage: queueStage,
+    viable: queueViable ? "1" : "0",
+    fresh: queueFresh ? "1" : "0",
+    flagged: queueFlagged ? "1" : "0",
+    approve: queueApproval ? "1" : "0",
+    mentions: queueMentions ? "1" : "0",
+    assigned: queueAssigned ? "1" : "0",
+  }).toString();
   useEffect(() => {
     if (!me?.actionsEnabled) return;
-    const q = new URLSearchParams({
-      market: queueMarket,
-      stage: queueStage,
-      viable: queueViable ? "1" : "0",
-      fresh: queueFresh ? "1" : "0",
-      flagged: queueFlagged ? "1" : "0",
-      approve: queueApproval ? "1" : "0",
-      mentions: queueMentions ? "1" : "0",
-      assigned: queueAssigned ? "1" : "0",
-    });
+    const key = queueKey;
     let cancel = false;
-    fetch(`/api/queue?${q}`).then(async (response) => {
-      if (cancel || !response.ok) return;
+    fetch(`/api/queue?${key}`).then(async (response) => {
+      if (cancel) return;
+      if (!response.ok) {
+        setLoadedQueueKey(key);
+        setFeedLoaded(true);
+        return;
+      }
       const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
+      if (cancel) return;
       const next = (payload.items || []).filter((item) => !isPipelineStore({
         kind: "pipeline",
         name: item.snapshot?.name,
@@ -397,15 +423,19 @@ export default function Explorer() {
         previous: null,
       }));
       setQueueCount(next.length);
-      if (reviewing) {
-        setFeed(next);
+      setFeed(next);
+      setLoadedQueueKey(key);
+      setFeedLoaded(true);
+    }).catch(() => {
+      if (!cancel) {
+        setLoadedQueueKey(key);
         setFeedLoaded(true);
       }
-    }).catch(() => undefined);
+    });
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, reviewing, queueMarket, queueStage, queueViable, queueFresh, queueFlagged, queueApproval, queueMentions, queueAssigned]);
+  }, [me?.actionsEnabled, queueKey]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
@@ -416,8 +446,14 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
+    const panel = params.get("panel");
+    const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal";
+    if (linked && window.matchMedia("(max-width: 767px)").matches) {
+      setSheetSnap("full");
+      return;
+    }
     setSheetSnap(initialSheetSnap(sheetQueryRef.current));
-  }, [selected]);
+  }, [selected, params]);
 
   useEffect(() => {
     setSelected(params.get("site"));
@@ -828,9 +864,142 @@ export default function Explorer() {
     window.location.href = "/login";
   }
 
-  const reviewSiteId = reviewing && !caughtUp ? reviewCurrent?.siteId : undefined;
+  function selectionPatch(id: string, search: URLSearchParams = params): Record<string, string | null> {
+    const patch: Record<string, string | null> = {};
+    const deal = dealRows.find((row) => row.deal_id === id);
+    if (deal) {
+      if (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA") {
+        const wantCity = deal.city === "PHX" ? null : deal.city;
+        if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
+      }
+      if (search.get("funnel") !== "pipeline") {
+        patch.funnel = "pipeline";
+        patch.tab = "pipeline";
+      }
+      const known = PIPE_STEPS.some((step) => step.id === deal.stage_group);
+      const wantStage = !known ? "all" : deal.stage_group === "desk" ? null : deal.stage_group;
+      const stageShown = search.get("pstage") === "all"
+        || (deal.stage_group === "desk" ? !search.get("pstage") : search.get("pstage") === deal.stage_group);
+      if (!stageShown) patch.pstage = wantStage;
+      if (deal.kind === "land" && search.get("landlayer") === "0") patch.landlayer = null;
+      return patch;
+    }
+    const site = features.find((feature) => feature.properties.site_id === id)?.properties;
+    if (!site) return patch;
+    if (site.city === "PHX" || site.city === "LAS" || site.city === "MIA") {
+      const wantCity = site.city === "PHX" ? null : site.city;
+      if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
+    }
+    if (search.get("funnel") === "pipeline") {
+      patch.funnel = null;
+      patch.tab = null;
+    }
+    return patch;
+  }
+
   useEffect(() => {
+    if (!data || !selected || reviewing) return;
+    if (placedSite.current === selected) return;
+    placedSite.current = selected;
+    const patch = selectionPatch(selected);
+    if (Object.keys(patch).length) write(patch);
+  }, [data, selected, reviewing, params]);
+
+  const linkedReviewSite = params.get("view") === "review" ? params.get("site") || "" : "";
+  const linkedReviewDeal = linkedReviewSite ? dealRows.find((deal) => deal.deal_id === linkedReviewSite) : undefined;
+  const droppedReviewLink = Boolean(
+    linkedReviewDeal && linkedReviewDeal.stage_group === "dropped" && params.get("qviable") !== "0",
+  );
+  const reviewQueueSettled = (feedLoaded && loadedQueueKey === queueKey) || (me != null && !me.actionsEnabled);
+  const linkedInQueue = Boolean(linkedReviewSite && feed.some((item) => item.siteId === linkedReviewSite && item.status !== "snoozed"));
+  const missingReviewLink = Boolean(linkedReviewSite && reviewQueueSettled && !linkedInQueue && !droppedReviewLink);
+  const leaveLinkedReview = droppedReviewLink || missingReviewLink;
+  if (linkedReviewSite) wantedReview.current = linkedReviewSite;
+  if (params.get("review") === "1" && wantedReview.current && params.get("site") === wantedReview.current) wantedReview.current = "";
+  if (linkedInQueue && !droppedReviewLink) leaveSite.current = "";
+  else if (leaveLinkedReview && linkedReviewSite) leaveSite.current = linkedReviewSite;
+  const inReview = reviewing && !leaveLinkedReview;
+
+  const reviewSiteId = inReview && !caughtUp ? reviewCurrent?.siteId : undefined;
+  useEffect(() => {
+    const id = leaveSite.current;
+    if (!id) return;
+    placedSite.current = id;
+    setSelected(id);
+    let timer = 0;
+    const apply = () => {
+      const search = new URLSearchParams(window.location.search);
+      const patch = selectionPatch(id, search);
+      const stillReview = search.get("view") === "review" || search.get("review") === "1";
+      const known = dealRows.some((deal) => deal.deal_id === id)
+        || features.some((feature) => feature.properties.site_id === id);
+      if (!stillReview && known && Object.keys(patch).length === 0) {
+        leaveSite.current = "";
+        wantedReview.current = "";
+        return true;
+      }
+      if (!stillReview && data && !known) {
+        leaveSite.current = "";
+        wantedReview.current = "";
+        return true;
+      }
+      if (feed.some((item) => item.siteId === id && item.status !== "snoozed") && !dealRows.some((deal) => deal.deal_id === id && deal.stage_group === "dropped" && search.get("qviable") !== "0")) {
+        leaveSite.current = "";
+        return true;
+      }
+      replaceSearch(search.toString(), {
+        ...patch,
+        site: id,
+        ...(stillReview ? { view: null, review: null, i: null } : {}),
+      });
+      return false;
+    };
+    if (!apply()) {
+      timer = window.setInterval(() => {
+        if (apply()) window.clearInterval(timer);
+      }, 200);
+    }
+    const stop = window.setTimeout(() => window.clearInterval(timer), 5000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, [leaveLinkedReview, data, feedLoaded, linkedReviewSite]);
+
+  useEffect(() => {
+    const restoreId = !reviewing ? wantedReview.current : "";
+    const restoreDeal = restoreId ? dealRows.find((row) => row.deal_id === restoreId) : undefined;
+    const restoreDropped = Boolean(restoreDeal && restoreDeal.stage_group === "dropped" && params.get("qviable") !== "0");
+    if (restoreId && !restoreDropped && feed.some((item) => item.siteId === restoreId && item.status !== "snoozed")) {
+      const at = feed.findIndex((item) => item.siteId === restoreId && item.status !== "snoozed");
+      const patch: Record<string, string | null> = { review: "1", view: null, i: String(at + 1), site: restoreId, funnel: "pipeline", tab: "pipeline", table: null };
+      if (restoreDeal && (restoreDeal.city === "PHX" || restoreDeal.city === "LAS" || restoreDeal.city === "MIA")) patch.city = restoreDeal.city === "PHX" ? null : restoreDeal.city;
+      if (restoreDeal && (restoreDeal.stage_group === "desk" || restoreDeal.stage_group === "contacted" || restoreDeal.stage_group === "later" || restoreDeal.stage_group === "dropped")) {
+        patch.pstage = restoreDeal.stage_group === "desk" ? null : restoreDeal.stage_group;
+      }
+      setSelected(restoreId);
+      write(patch);
+      return;
+    }
+    if (droppedReviewLink) return;
+    if (linkedReviewSite && reviewQueueSettled && !linkedInQueue) return;
+    if (linkedReviewSite && !reviewQueueSettled && data) {
+      const deal = dealRows.find((row) => row.deal_id === linkedReviewSite);
+      const patch: Record<string, string | null> = { site: linkedReviewSite, funnel: "pipeline", tab: "pipeline", table: null };
+      if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
+      if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
+        patch.pstage = deal.stage_group === "desk" ? null : deal.stage_group;
+      }
+      const placed = params.get("site") === linkedReviewSite
+        && params.get("funnel") === "pipeline"
+        && params.get("view") === "review"
+        && (params.get("city") || null) === (patch.city ?? null)
+        && (params.get("pstage") || null) === (patch.pstage ?? null);
+      if (!placed) write(patch);
+      return;
+    }
     if (!reviewing || !feedLoaded) return;
+    if (reviewDeepSite && reviewDeepIndex < 0) return;
     if (!reviewSiteId) {
       setSelected(null);
       return;
@@ -849,7 +1018,7 @@ export default function Explorer() {
       && (params.get("city") || null) === (patch.city ?? null)
       && (params.get("pstage") || null) === (patch.pstage ?? null);
     if (!aligned) write(patch);
-  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, dealFeatures.length, params]);
+  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, reviewDeepSite, reviewDeepIndex, dealFeatures.length, params, droppedReviewLink, linkedReviewSite, reviewQueueSettled, linkedInQueue, data, feed]);
 
   function relatedPanel(current: { id: string; kind: "site" | "deal"; name?: string | null; address?: string | null; apn?: string | null }) {
     const records = [
@@ -1155,13 +1324,13 @@ export default function Explorer() {
   const reviewCoords = reviewFromDeal
     || (reviewCurrent?.lng != null && reviewCurrent.lat != null ? [reviewCurrent.lng, reviewCurrent.lat] as [number, number] : null);
   const reviewMarket = reviewCurrent && (reviewCurrent.city === "PHX" || reviewCurrent.city === "LAS" || reviewCurrent.city === "MIA") ? reviewCurrent.city : city;
-  const reviewFocus = reviewing && reviewCurrent
+  const reviewFocus = inReview && reviewCurrent
     ? (reviewCoords
       ? { lng: reviewCoords[0], lat: reviewCoords[1], zoom: 15.5 }
       : { lng: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[0], lat: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[1], zoom: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).zoom })
     : null;
   const openQueueIds = feed.filter((site) => site.status === "open").map((site) => site.siteId);
-  const reviewMarkers = reviewing ? visibleFeed.flatMap((site, index) => {
+  const reviewMarkers = inReview ? visibleFeed.flatMap((site, index) => {
     const deal = dealRows.find((row) => row.deal_id === site.siteId);
     const point = (deal ? dealPoint(deal) : null) || (site.lng != null && site.lat != null ? [site.lng, site.lat] as [number, number] : null);
     if (!point) return [];
@@ -1169,7 +1338,7 @@ export default function Explorer() {
   }) : [];
 
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${reviewing ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -1205,11 +1374,11 @@ export default function Explorer() {
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
           </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
-            <button className={!listView && !reviewing ? "chip on" : "chip"} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
-            <button className={listView && !reviewing ? "chip on" : "chip"} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
+            <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
+            <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${reviewing ? "on" : ""}`} type="button" onClick={() => write({ review: reviewing ? null : "1", i: reviewing ? null : "1", view: null, table: null, qmarket: reviewing ? null : "all", qstage: reviewing ? null : "any" })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", view: null, table: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any" })}>
               Review{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
             </button>
           ) : null}
@@ -1253,8 +1422,8 @@ export default function Explorer() {
           </button>
         </div>
         <div className="funnel-switch map-switch only-mobile" role="group" aria-label="Map or list">
-          <button className={!listView && !reviewing ? "chip on" : "chip"} type="button" onClick={() => write({ view: null, review: null, i: null })}>Map</button>
-          <button className={listView && !reviewing ? "chip on" : "chip"} type="button" onClick={() => write({ view: "list", review: null, i: null })}>List</button>
+          <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
+          <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
         </div>
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
@@ -1555,7 +1724,7 @@ export default function Explorer() {
           </div>
         ) : null}
       </header>
-      {reviewing && me?.actionsEnabled ? (
+      {inReview && me?.actionsEnabled ? (
         <ReviewBar
           index={reviewIndex}
           total={visibleFeed.length}
@@ -1566,7 +1735,7 @@ export default function Explorer() {
           onPrev={() => goReview(reviewIndex - 1)}
           onNext={() => goReview(reviewIndex + 1)}
           onReviewed={() => void markCurrentReviewed()}
-          onExit={() => write({ review: null, i: null })}
+          onExit={() => stopReview()}
           onOpenFeed={() => setFeedSheet(true)}
           onSnooze={snoozeCurrent}
           filters={(
@@ -1592,16 +1761,16 @@ export default function Explorer() {
 
       <div className="map-stage">
         <ActionsDialogs />
-        {reviewing && !caughtUp ? (
+        {inReview && !caughtUp ? (
           <ReviewRail sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} />
         ) : null}
-        {caughtUp ? (
+        {inReview && caughtUp ? (
           <div className="review-done" data-testid="queue-empty">
             <p>All caught up</p>
-            <button type="button" onClick={() => write({ review: null, i: null })} className="menu-item">Back to map</button>
+            <button type="button" onClick={() => stopReview()} className="menu-item">Back to map</button>
           </div>
         ) : null}
-        {reviewing && reviewCurrent && !reviewCoords ? <p className="review-noloc" data-testid="review-noloc">No exact location yet</p> : null}
+        {inReview && reviewCurrent && !reviewCoords ? <p className="review-noloc" data-testid="review-noloc">No exact location yet</p> : null}
         {undo ? (
           <div className="review-toast" role="status">
             Marked reviewed.
@@ -1647,7 +1816,7 @@ export default function Explorer() {
           basemap={basemap}
           onBasemap={chooseBasemap}
           onSelect={(id) => {
-            if (reviewing) {
+            if (inReview) {
               const at = visibleFeed.findIndex((site) => site.siteId === id);
               if (at >= 0) {
                 goReview(at);
@@ -1817,8 +1986,8 @@ export default function Explorer() {
             onNotFit={() => { setHiddenIds(hideSite(selectedDeal.deal_id)); choose(null); }}
             compared={compareIds.includes(selectedDeal.deal_id)}
             sheet={sheet}
-            banner={reviewing && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
-            onSwipe={reviewing ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
+            banner={inReview && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
+            onSwipe={inReview ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
             signedIn={Boolean(me)}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             figuresReady={Boolean(selectedDeal) || figuresReady}

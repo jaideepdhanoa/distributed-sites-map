@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { allowsAssignee, allowsDate, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
@@ -43,6 +44,9 @@ function who(accounts: Account[], id: string | null | undefined) {
 }
 
 export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }) {
+  const params = useSearchParams();
+  const proposal = params.get("panel") === "proposal";
+  const cardRef = useRef<HTMLElement>(null);
   const status = useActionStatus();
   const [steps, setSteps] = useState<Step[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -95,6 +99,32 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       window.removeEventListener("sites-prefill-work-item", onPrefill);
     };
   }, []);
+
+  useEffect(() => {
+    if (!proposal || !status.enabled) return;
+    const node = cardRef.current;
+    const scroller = node?.closest(".drawer-scroll");
+    if (!node || !(scroller instanceof HTMLElement)) return;
+    let frame = 0;
+    const align = () => {
+      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      const next = Math.max(0, top - 4);
+      if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
+    };
+    const sizes = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(align);
+    });
+    sizes.observe(scroller);
+    for (const child of scroller.children) sizes.observe(child);
+    align();
+    const stop = window.setTimeout(() => sizes.disconnect(), 8000);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(stop);
+      sizes.disconnect();
+    };
+  }, [proposal, status.enabled, id]);
 
   useEffect(() => {
     if (!status.enabled) return undefined;
@@ -365,7 +395,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
 
   const tone = focus && !open ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved && !open && !focus ? "approved" : "empty";
   return (
-    <section className={`next-card ${tone}`} data-testid="next-step">
+    <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
     </section>

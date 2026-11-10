@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { approvesWorkbookStage } from "@/lib/agent/access";
+import { absoluteSiteUrl, feedOrigin } from "@/lib/agent/links";
 import type { Sql } from "@/lib/actions/db";
 import { stamp } from "@/lib/actions/text";
 import { stageTitle } from "@/lib/labels";
@@ -99,7 +100,7 @@ function present(row: InboxRow): InboxItem {
   };
 }
 
-type InsertInput = {
+export type FeedInsert = {
   kind: InboxKind;
   subtype?: string | null;
   refId: string;
@@ -113,16 +114,20 @@ type InsertInput = {
   proposalStatus?: string | null;
   stage?: string | null;
   workbookStage?: boolean;
+  createdAt?: string | null;
 };
 
-async function insertInbox(sql: Sql, input: InsertInput): Promise<string | null> {
+export function feedKey(kind: string, refId: string): string {
+  return `${kind}:${refId}`;
+}
+
+export async function insertFeedRow(sql: Sql, input: FeedInsert): Promise<string | null> {
   const id = randomUUID();
-  const key = `${input.kind}:${input.refId}`;
   const saved = await sql.query<{ id: string }>(
     `INSERT INTO agent_inbox (
       id, kind, subtype, ref_id, site_id, record_id, actor, body, thread_key, thread_context,
-      proposal_id, proposal_status, stage, workbook_stage, idempotency_key
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      proposal_id, proposal_status, stage, workbook_stage, idempotency_key, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16::timestamptz, now()))
     ON CONFLICT (idempotency_key) DO NOTHING
     RETURNING id`,
     [
@@ -140,7 +145,8 @@ async function insertInbox(sql: Sql, input: InsertInput): Promise<string | null>
       input.proposalStatus || null,
       input.stage || null,
       Boolean(input.workbookStage),
-      key,
+      feedKey(input.kind, input.refId),
+      input.createdAt || null,
     ],
   );
   return saved.rows[0]?.id || null;
@@ -156,10 +162,37 @@ async function supersedeOthers(sql: Sql, threadKey: string, keep: string[]): Pro
   );
 }
 
-async function parentBody(sql: Sql, parentId: string | null): Promise<string> {
+export async function noteThreadContext(sql: Sql, parentId: string | null): Promise<string> {
   if (!parentId) return "";
   const rows = await sql.query<{ body: string }>(`SELECT body FROM notes WHERE id = $1`, [parentId]);
   return String(rows.rows[0]?.body || "").slice(0, 2000);
+}
+
+export function noteFeed(input: {
+  noteId: string;
+  siteId: string;
+  recordId?: string;
+  body: string;
+  authorId: string;
+  parentId: string | null;
+  context: string;
+  createdAt?: string | null;
+}): FeedInsert {
+  return {
+    kind: input.parentId ? "reply" : "note",
+    refId: input.noteId,
+    siteId: input.siteId,
+    recordId: input.recordId,
+    actor: input.authorId,
+    text: input.body,
+    threadKey: `note:${input.parentId || input.noteId}`,
+    threadContext: input.context,
+    createdAt: input.createdAt,
+  };
+}
+
+export function mentionFeed(note: FeedInsert): FeedInsert {
+  return { ...note, kind: "mention" };
 }
 
 export async function ingestNote(
@@ -172,42 +205,72 @@ export async function ingestNote(
     authorId: string;
     parentId: string | null;
     mentionIds: string[];
+    createdAt?: string | null;
+    supersede?: boolean;
   },
 ): Promise<void> {
-  const root = input.parentId || input.noteId;
-  const threadKey = `note:${root}`;
-  const context = input.parentId ? await parentBody(sql, input.parentId) : "";
+  const context = await noteThreadContext(sql, input.parentId);
+  const note = noteFeed({ ...input, context });
   const keep: string[] = [];
-  const main = await insertInbox(sql, {
-    kind: input.parentId ? "reply" : "note",
-    refId: input.noteId,
+  const main = await insertFeedRow(sql, note);
+  if (main) keep.push(main);
+  if (input.mentionIds.length) {
+    const mention = await insertFeedRow(sql, mentionFeed(note));
+    if (mention) keep.push(mention);
+  }
+  if (input.supersede !== false) await supersedeOthers(sql, note.threadKey, keep);
+}
+
+export function suggestionFeed(input: {
+  id: string;
+  siteId: string;
+  recordId: string;
+  authorId: string;
+  field: string;
+  detail: string | null;
+  title: string | null;
+  proposedValue: string;
+  reason: string;
+  status: string;
+  summary?: string;
+  stored?: boolean;
+  createdAt?: string | null;
+}): FeedInsert {
+  const subtype = input.detail || input.field;
+  const text = input.stored
+    ? [input.title, input.proposedValue, input.reason].filter(Boolean).join("\n")
+    : (input.summary || "");
+  const context = input.stored
+    ? [input.field, subtype, input.title || ""].filter(Boolean).join(" · ")
+    : (input.summary || "");
+  return {
+    kind: "suggestion",
+    subtype,
+    refId: input.id,
     siteId: input.siteId,
     recordId: input.recordId,
     actor: input.authorId,
-    text: input.body,
-    threadKey,
+    text,
+    threadKey: `proposal:${input.id}`,
     threadContext: context,
-  });
-  if (main) keep.push(main);
-  if (input.mentionIds.length) {
-    const mention = await insertInbox(sql, {
-      kind: "mention",
-      refId: input.noteId,
-      siteId: input.siteId,
-      recordId: input.recordId,
-      actor: input.authorId,
-      text: input.body,
-      threadKey,
-      threadContext: context,
-    });
-    if (mention) keep.push(mention);
-  }
-  await supersedeOthers(sql, threadKey, keep);
+    proposalId: input.id,
+    proposalStatus: input.status,
+    createdAt: input.createdAt,
+  };
 }
 
 export async function ingestSuggestion(
   sql: Sql,
-  input: { id: string; siteId: string; authorId: string; field: string; summary: string },
+  input: {
+    id: string;
+    siteId: string;
+    authorId: string;
+    field: string;
+    summary: string;
+    createdAt?: string | null;
+    supersede?: boolean;
+    proposalStatus?: string;
+  },
 ): Promise<void> {
   const found = await sql.query<{
     title: string | null;
@@ -221,34 +284,34 @@ export async function ingestSuggestion(
     [input.id],
   );
   const row = found.rows[0];
-  const subtype = row?.detail || input.field;
-  const text = row
-    ? [row.title, row.proposed_value, row.reason].filter(Boolean).join("\n")
-    : input.summary;
-  const context = row
-    ? [input.field, subtype, row.title || ""].filter(Boolean).join(" · ")
-    : input.summary;
-  const id = await insertInbox(sql, {
-    kind: "suggestion",
-    subtype,
-    refId: input.id,
+  const payload = suggestionFeed({
+    id: input.id,
     siteId: input.siteId,
     recordId: row?.target_id || input.siteId,
-    actor: input.authorId,
-    text,
-    threadKey: `proposal:${input.id}`,
-    threadContext: context,
-    proposalId: input.id,
-    proposalStatus: row?.status || "open",
+    authorId: input.authorId,
+    field: input.field,
+    detail: row?.detail || null,
+    title: row?.title || null,
+    proposedValue: row?.proposed_value || "",
+    reason: row?.reason || "",
+    status: input.proposalStatus || row?.status || "open",
+    summary: row ? undefined : input.summary,
+    stored: Boolean(row),
+    createdAt: input.createdAt,
   });
-  if (id) await supersedeOthers(sql, `proposal:${input.id}`, [id]);
+  const id = await insertFeedRow(sql, payload);
+  if (id && input.supersede !== false) await supersedeOthers(sql, payload.threadKey, [id]);
 }
 
-export async function ingestFlag(
-  sql: Sql,
-  input: { id: string; siteId: string; fromUser: string; toUser: string; note: string },
-): Promise<void> {
-  const id = await insertInbox(sql, {
+export function flagFeed(input: {
+  id: string;
+  siteId: string;
+  fromUser: string;
+  toUser: string;
+  note: string;
+  createdAt?: string | null;
+}): FeedInsert {
+  return {
     kind: "flag",
     refId: input.id,
     siteId: input.siteId,
@@ -257,8 +320,66 @@ export async function ingestFlag(
     text: input.note || "Flagged for you.",
     threadKey: `flag:${input.id}`,
     threadContext: `For ${input.toUser}`,
-  });
-  if (id) await supersedeOthers(sql, `flag:${input.id}`, [id]);
+    createdAt: input.createdAt,
+  };
+}
+
+export async function ingestFlag(
+  sql: Sql,
+  input: {
+    id: string;
+    siteId: string;
+    fromUser: string;
+    toUser: string;
+    note: string;
+    createdAt?: string | null;
+    supersede?: boolean;
+  },
+): Promise<void> {
+  const payload = flagFeed(input);
+  const id = await insertFeedRow(sql, payload);
+  if (id && input.supersede !== false) await supersedeOthers(sql, payload.threadKey, [id]);
+}
+
+export function decisionFeed(input: {
+  id: string;
+  status: "accepted" | "rejected";
+  actorId: string;
+  note: string;
+  siteId: string;
+  recordId: string;
+  field: string;
+  detail: string | null;
+  title: string | null;
+  proposedValue: string;
+  reason: string;
+  createdAt?: string | null;
+}): FeedInsert {
+  const stageMove = input.detail === "stage_move" && input.status === "accepted" && approvesWorkbookStage(input.actorId);
+  const stage = stageMove ? input.proposedValue : null;
+  const stageLabel = stage ? stageTitle(stage) : "";
+  const verb = input.status === "accepted" ? "Approved" : "Rejected";
+  const lines = [
+    `${verb}: ${input.title || input.proposedValue}`,
+    stageLabel ? `Approved stage: ${stageLabel} (${stage}). Write this stage on the workbook Stage column.` : "",
+    input.note ? `Note: ${input.note}` : "",
+  ].filter(Boolean);
+  return {
+    kind: "decision",
+    subtype: stageMove ? "stage_move" : input.detail || input.field,
+    refId: input.id,
+    siteId: input.siteId,
+    recordId: input.recordId,
+    actor: input.actorId,
+    text: lines.join("\n"),
+    threadKey: `proposal:${input.id}`,
+    threadContext: [input.title, input.proposedValue, input.reason].filter(Boolean).join("\n"),
+    proposalId: input.id,
+    proposalStatus: input.status,
+    stage,
+    workbookStage: stageMove,
+    createdAt: input.createdAt,
+  };
 }
 
 export async function ingestDecision(
@@ -275,33 +396,13 @@ export async function ingestDecision(
     title: string | null;
     proposedValue: string;
     reason: string;
+    createdAt?: string | null;
+    supersede?: boolean;
   },
 ): Promise<void> {
-  const stageMove = input.detail === "stage_move" && input.status === "accepted" && approvesWorkbookStage(input.actorId);
-  const stage = stageMove ? input.proposedValue : null;
-  const stageLabel = stage ? stageTitle(stage) : "";
-  const verb = input.status === "accepted" ? "Approved" : "Rejected";
-  const lines = [
-    `${verb}: ${input.title || input.proposedValue}`,
-    stageLabel ? `Approved stage: ${stageLabel} (${stage}). Write this stage on the workbook Stage column.` : "",
-    input.note ? `Note: ${input.note}` : "",
-  ].filter(Boolean);
-  const id = await insertInbox(sql, {
-    kind: "decision",
-    subtype: stageMove ? "stage_move" : input.detail || input.field,
-    refId: input.id,
-    siteId: input.siteId,
-    recordId: input.recordId,
-    actor: input.actorId,
-    text: lines.join("\n"),
-    threadKey: `proposal:${input.id}`,
-    threadContext: [input.title, input.proposedValue, input.reason].filter(Boolean).join("\n"),
-    proposalId: input.id,
-    proposalStatus: input.status,
-    stage,
-    workbookStage: stageMove,
-  });
-  if (id) await supersedeOthers(sql, `proposal:${input.id}`, [id]);
+  const payload = decisionFeed(input);
+  const id = await insertFeedRow(sql, payload);
+  if (id && input.supersede !== false) await supersedeOthers(sql, payload.threadKey, [id]);
 }
 
 export async function ingestAskGap(
@@ -310,7 +411,7 @@ export async function ingestAskGap(
 ): Promise<string> {
   const refId = randomUUID();
   const siteId = input.siteId || "portfolio";
-  await insertInbox(sql, {
+  await insertFeedRow(sql, {
     kind: "ask_gap",
     refId,
     siteId,
@@ -362,13 +463,14 @@ export async function ackInbox(sql: Sql, input: { ids: string[]; status: "picked
   return count;
 }
 
-export function toFeedItem(item: InboxItem) {
+export function toFeedItem(item: InboxItem, origin = feedOrigin()) {
   return {
     id: item.id,
     kind: item.kind,
     subtype: item.subtype,
     ref_id: item.refId,
     site_id: item.siteId,
+    site_url: absoluteSiteUrl(origin, item.kind, item.siteId),
     actor: item.actor,
     text: item.text,
     thread: { key: item.threadKey, context: item.threadContext },

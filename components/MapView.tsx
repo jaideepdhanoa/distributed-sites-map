@@ -69,9 +69,59 @@ function geometryCoords(geometry: { type: string; coordinates: unknown } | null 
   return [];
 }
 
+function drawerInset(map: Map) {
+  if (window.matchMedia("(max-width: 767px)").matches) return 0;
+  const shell = map.getContainer().closest(".shell");
+  if (!shell?.classList.contains("drawer-open")) return 0;
+  const raw = Number.parseFloat(getComputedStyle(shell).getPropertyValue("--drawer-width"));
+  return Number.isFinite(raw) && raw > 0 ? raw : 380;
+}
+
+function pointPadding(map: Map) {
+  return { top: 0, bottom: 0, left: 0, right: drawerInset(map) };
+}
+
 function glide(map: Map, center: [number, number], zoom: number) {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  map.flyTo({ center, zoom, duration: reduce ? 0 : 300, essential: true });
+  map.flyTo({ center, zoom, padding: pointPadding(map), duration: reduce ? 0 : 300, essential: true });
+}
+
+function markCentered(map: Map, id: string, lng: number, lat: number) {
+  const node = map.getContainer();
+  node.dataset.centered = id;
+  node.dataset.lng = lng.toFixed(4);
+  node.dataset.lat = lat.toFixed(4);
+}
+
+function fitMap(
+  map: Map,
+  bounds: [[number, number], [number, number]],
+  options: { padding: { top: number; bottom: number; left: number; right: number }; maxZoom?: number; duration?: number },
+) {
+  const center: [number, number] = [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
+  const box = map.getContainer();
+  const spanLng = Math.abs(bounds[1][0] - bounds[0][0]);
+  const spanLat = Math.abs(bounds[1][1] - bounds[0][1]);
+  const reserved = map.getPadding();
+  const roomHeight = box.clientHeight - (reserved.top ?? 0) - (reserved.bottom ?? 0);
+  const roomWidth = box.clientWidth - (reserved.left ?? 0) - (reserved.right ?? 0);
+  if (roomWidth < 48 || roomHeight < 48 || (spanLng < 1e-6 && spanLat < 1e-6)) {
+    glide(map, center, options.maxZoom ?? 12);
+    return;
+  }
+  const cover = Math.max(drawerInset(map), reserved.right ?? 0);
+  const padding = {
+    top: Math.min(options.padding.top, Math.floor(roomHeight / 5)),
+    bottom: Math.min(options.padding.bottom, Math.floor(roomHeight / 5)),
+    left: Math.min(options.padding.left, Math.floor(roomWidth / 6)),
+    right: Math.min(Math.max(0, cover - (reserved.right ?? 0)), Math.max(0, roomWidth - 48)),
+  };
+  const fitted = { ...options, padding };
+  if (!map.cameraForBounds(bounds, fitted)) {
+    glide(map, center, options.maxZoom ?? 12);
+    return;
+  }
+  map.fitBounds(bounds, fitted);
 }
 
 function acresOf(coords: [number, number][]) {
@@ -485,6 +535,8 @@ export default function MapView(props: Props) {
       } as StyleSpecification;
     let active: Map | null = null;
     let observer: ResizeObserver | null = null;
+    let resizeTimer = 0;
+    let resizeStop = 0;
     let cancelled = false;
     const boot = async () => {
     const basemap = propsRef.current.basemap || "satellite";
@@ -807,8 +859,30 @@ export default function MapView(props: Props) {
       propsRef.current.onBounds(map.getBounds());
     });
     const observed = node.current;
-    observer = new ResizeObserver(() => map.resize());
+    const recenter = () => {
+      if (!map.isStyleLoaded()) return;
+      map.resize();
+      if (propsRef.current.reviewFocus) return;
+      const id = propsRef.current.selectedId;
+      if (!id) return;
+      const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === id);
+      const site = propsRef.current.sites.find((feature) => feature.properties.site_id === id);
+      const off = propsRef.current.offMarket.find((feature) => feature.properties.site_id === id);
+      const geometry = deal?.geometry || site?.geometry || off?.geometry;
+      if (!geometry || geometry.type !== "Point") return;
+      const pin = geometry.coordinates as [number, number];
+      if (!Number.isFinite(pin[0]) || !Number.isFinite(pin[1])) return;
+      markCentered(map, id, pin[0], pin[1]);
+      const center = map.getCenter();
+      const pad = pointPadding(map);
+      const padded = Math.abs((map.getPadding().right ?? 0) - pad.right) < 1;
+      const near = padded && Math.abs(center.lng - pin[0]) < 0.01 && Math.abs(center.lat - pin[1]) < 0.01 && map.getZoom() >= 13;
+      if (!near) map.jumpTo({ center: pin, zoom: 15, padding: pad });
+    };
+    observer = new ResizeObserver(() => recenter());
     observer.observe(observed);
+    resizeTimer = window.setInterval(recenter, 250);
+    resizeStop = window.setTimeout(() => window.clearInterval(resizeTimer), 4000);
     mapRef.current = map;
     (window as Window & { __sitesMap?: Map }).__sitesMap = map;
     if (!cancelled) setMapGeneration((value) => value + 1);
@@ -816,6 +890,8 @@ export default function MapView(props: Props) {
     void boot();
     return () => {
       cancelled = true;
+      window.clearInterval(resizeTimer);
+      window.clearTimeout(resizeStop);
       observer?.disconnect();
       active?.remove();
       mapRef.current = null;
@@ -1025,7 +1101,8 @@ export default function MapView(props: Props) {
         appliedFocus.current = focusToken;
         const lngs = finiteFit.map((point) => point[0]);
         const lats = finiteFit.map((point) => point[1]);
-        map.fitBounds(
+        fitMap(
+          map,
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 28, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
@@ -1094,6 +1171,7 @@ export default function MapView(props: Props) {
       if (!geometry || geometry.type !== "Point") return;
       const pin = geometry.coordinates as [number, number];
       const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
+      markCentered(map, props.selectedId || "", pin[0], pin[1]);
       if (!extra.length) {
         glide(map, pin, 16);
         return;
@@ -1102,7 +1180,8 @@ export default function MapView(props: Props) {
       const lngs = points.map((point) => point[0]);
       const lats = points.map((point) => point[1]);
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      map.fitBounds(
+      fitMap(
+        map,
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         { padding: { top: 88, bottom: 56, left: 48, right: 430 }, maxZoom: 15, duration: reduce ? 0 : 300 },
       );
@@ -1124,11 +1203,14 @@ export default function MapView(props: Props) {
     let cancel = false;
     const go = () => {
       if (cancel || !mapRef.current) return;
+      const pad = pointPadding(map);
       const center = map.getCenter();
-      const near = Math.abs(map.getZoom() - focus.zoom) < 0.4
+      const padded = Math.abs((map.getPadding().right ?? 0) - pad.right) < 1;
+      const near = padded && Math.abs(map.getZoom() - focus.zoom) < 0.4
         && Math.abs(center.lng - focus.lng) < 0.02
         && Math.abs(center.lat - focus.lat) < 0.02;
-      if (!near) map.jumpTo({ center: [focus.lng, focus.lat], zoom: focus.zoom });
+      markCentered(map, propsRef.current.selectedId || "", focus.lng, focus.lat);
+      if (!near) map.jumpTo({ center: [focus.lng, focus.lat], zoom: focus.zoom, padding: pad });
     };
     go();
     map.on("idle", go);

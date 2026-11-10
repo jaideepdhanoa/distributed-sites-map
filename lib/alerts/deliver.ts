@@ -6,7 +6,7 @@ import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
 import { DAILY_CAP, batchWindowMs, losAngelesParts, stampOf } from "./clock";
 import { renderBatch, type MailItem } from "./compose";
-import { discussionHref, reviewHomeHref } from "./links";
+import { discussionHref, proposalHref, reviewHomeHref } from "./links";
 import { digestEnabled, loadPreferences, shouldSendDigest, type AlertCategory } from "./preferences";
 import { accountEmail } from "./recipients";
 import { alertFrom, alertReplyTo, liveMailAllowed, mailTransport } from "./transport";
@@ -226,7 +226,7 @@ async function followedItems(sql: Sql, userId: string, since: Date): Promise<Mai
       siteLabel: siteLabel(row.target_id),
       summary: row.title || row.proposed_value,
       authorId: row.author_id,
-      href: discussionHref(row.target_id),
+      href: proposalHref(row.target_id),
     });
   }
   return items;

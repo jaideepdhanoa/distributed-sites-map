@@ -123,7 +123,7 @@ The daily digest runs from a Vercel Cron at `0 15 * * *` UTC. That hour is 7:00 
 
 Pending instant mail is flushed by the Alert flush GitHub Actions workflow, scheduled every five minutes, which POSTs to `/api/alerts/flush` on `APP_URL` (the repository variable, defaulting to `https://distributedsites.com`). GitHub may start that job later than the mark. The flush is idempotent, so a late or repeated run does not send the same delivery twice. Set the same `CRON_SECRET` as a GitHub Actions secret and as a Vercel environment variable. The workflow sends it as `Authorization: Bearer <CRON_SECRET>`. If the GitHub secret is missing, the workflow logs that and skips instead of failing.
 
-A link opens the site's Discussion tab or Review on `APP_URL` (default `https://distributedsites.com`), for example `https://distributedsites.com/?view=review&site=PIPE-...`, and the map still requires sign-in. The message shows the site name or id, the type, a short note, and the author. It does not include a package link or a financial figure. Subject and body go through the same wording check as the map.
+A link opens the same place as the agent feed, on `APP_URL` when that host is not a preview, otherwise `https://distributedsites.com`. Notes, replies, and mentions open Discussion. Proposals and assignments open the proposal. Flags open Review. A portfolio row opens the home map. Preview hosts are not used. The message shows the site name as a text link or a button, not a raw URL, plus the type, a short note, and the author. It does not include a package link or a financial figure. Subject and body go through the same wording check as the map.
 
 Only app accounts are mailed. Add an optional `email` on that person's `AUTH_USERS` object, or set `ALERT_EMAILS` so the password hash does not have to be rebuilt:
 
@@ -303,6 +303,7 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
       "workbook_stage": false,
       "status": "new",
       "created_at": "2026-11-10T00:00:00.000Z",
+      "site_url": "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion",
       "cursor": "opaque"
     }
   ],
@@ -314,7 +315,20 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
 
 The idempotency key is `kind:ref_id`. Posting the same event twice does not create a second row.
 
+`site_url` is an absolute link to that row on the map. The host is the request host (`x-forwarded-host`, then `Host`). When the request has no host, the link uses `APP_URL`, or `https://distributedsites.com` when that is unset. Notes, replies, and mentions open Discussion (`/?site=ID&panel=discussion`). Suggestions and decisions open the proposal on that site (`/?site=ID&panel=proposal`). Flags open Review on that site (`/?view=review&site=ID`). An `ask_gap` for one site opens that site. `site_id` `portfolio` opens the home map (`/`).
+
 `next` is the cursor to pass as `after`, or `null` when this page is the end.
+
+### Backfill
+
+The feed only recorded events after it shipped. This reads the existing notes, replies, mentions, flags, and suggestions and inserts the feed rows the live path would have written, including a `decision` for an accepted, rejected, or later-applied proposal. `created_at`, the idempotency key, the thread, and the actor come from the original event. A newer row on a thread supersedes older `new` or `picked` rows. Running it again inserts nothing. It does not create `ask_gap` rows.
+
+Preview and production share one `DATABASE_URL`. `--write` updates that database. Do not run `--write` from CI. Dry-run only reads, and prints counts by kind and by actor:
+
+```bash
+npm run backfill-inbox -- --dry-run
+npm run backfill-inbox -- --write
+```
 
 ### Ack
 
@@ -352,7 +366,7 @@ Unanswered Ask questions are logged as `ask_gap`.
 
 ### What a person sees
 
-Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills his composer. Post, Approve, and Reject are still his buttons, and the saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline.
+Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills his composer. Post, Approve, and Reject are still his buttons, and the saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline. Each draft includes a link to the site, using the same `site_url` rules as the feed.
 
 ## Ask
 

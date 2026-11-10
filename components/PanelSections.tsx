@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
 const TABS = [
@@ -26,13 +26,49 @@ export default function PanelSections({
   const params = useSearchParams();
   const site = params.get("site");
   const panel = params.get("panel");
+  const sections = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<TabId>(panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview");
   useEffect(() => {
     if (panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "overview") setTab(panel);
   }, [site, panel]);
+  useEffect(() => {
+    if (panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    const node = sections.current;
+    const scroller = node?.closest(".drawer-scroll");
+    if (!node || !(scroller instanceof HTMLElement)) return;
+    let frame = 0;
+    const align = () => {
+      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      const next = Math.max(0, top - 4);
+      if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
+    };
+    const sizes = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(align);
+    });
+    const watch = (element: Element) => sizes.observe(element);
+    watch(scroller);
+    for (const child of scroller.children) watch(child);
+    const added = new MutationObserver(() => {
+      for (const child of scroller.children) watch(child);
+      align();
+    });
+    added.observe(scroller, { childList: true, subtree: true });
+    align();
+    const stop = window.setTimeout(() => {
+      sizes.disconnect();
+      added.disconnect();
+    }, 8000);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(stop);
+      sizes.disconnect();
+      added.disconnect();
+    };
+  }, [site, panel, tab]);
   const body = tab === "overview" ? overview : tab === "numbers" ? numbers : tab === "activity" ? activity : discussion;
   return (
-    <div className="panel-sections">
+    <div className="panel-sections" ref={sections}>
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
         {TABS.map(([id, label]) => (
           <button

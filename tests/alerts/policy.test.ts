@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { publicSnippet, renderBatch, screenEmail } from "../../lib/alerts/compose";
 import { findPolicyHits } from "../../lib/policy/banned";
-import { discussionHref, reviewHref, appOrigin } from "../../lib/alerts/links";
+import { discussionHref, homeHref, proposalHref, reviewHref, appOrigin } from "../../lib/alerts/links";
 import { DEFAULT_FROM, alertFrom, alertReplyTo, transportKind } from "../../lib/alerts/transport";
 
 function blockedWord(): string {
@@ -31,7 +31,9 @@ test("email subject and body drop banned wording, links, and figures", () => {
   assert.equal(findPolicyHits(rendered.subject), 0);
   assert.equal(findPolicyHits(rendered.body), 0);
   assert.equal(rendered.body.includes(word), false);
-  assert.equal(rendered.body.includes("https://"), false);
+  assert.equal(rendered.body.includes("https://example.com"), false);
+  assert.equal(rendered.body.includes(discussionHref("PIPE-PHX-0008")), true);
+  assert.equal(rendered.html.includes(discussionHref("PIPE-PHX-0008").replace(/&/g, "&amp;")), true);
   assert.equal(rendered.body.includes("$"), false);
   assert.equal(rendered.body.includes("PIPE-PHX-0008"), true);
   assert.equal(screenEmail(`Update ${word}`, "A clean note.").subject, "Review update");
@@ -81,9 +83,17 @@ test("email links use APP_URL and default to https://distributedsites.com", () =
   delete process.env.APP_URL;
   assert.equal(appOrigin(), "https://distributedsites.com");
   assert.equal(discussionHref("PIPE-PHX-0008"), "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
+  assert.equal(proposalHref("PIPE-PHX-0008"), "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
   assert.equal(reviewHref("PIPE-LAS-0016"), "https://distributedsites.com/?view=review&site=PIPE-LAS-0016");
-  process.env.APP_URL = "https://preview.example/";
-  assert.equal(appOrigin(), "https://preview.example");
+  assert.equal(homeHref(), "https://distributedsites.com/");
+  process.env.APP_URL = "https://map.example.com/";
+  assert.equal(appOrigin(), "https://map.example.com");
+  assert.equal(discussionHref("PIPE-PHX-0008"), "https://map.example.com/?site=PIPE-PHX-0008&panel=discussion");
+  process.env.APP_URL = "https://preview.distributedsites.com";
+  assert.equal(appOrigin(), "https://distributedsites.com");
+  assert.equal(proposalHref("PIPE-PHX-0008"), "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
+  process.env.APP_URL = "https://sites-map-git-preview.vercel.app";
+  assert.equal(reviewHref("PIPE-PHX-0008"), "https://distributedsites.com/?view=review&site=PIPE-PHX-0008");
   if (previous == null) delete process.env.APP_URL;
   else process.env.APP_URL = previous;
 });

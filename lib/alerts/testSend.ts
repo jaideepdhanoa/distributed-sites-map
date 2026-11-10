@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { stampOf } from "./clock";
 import { deliverRows } from "./deliver";
-import { discussionHref, reviewHref } from "./links";
+import { discussionHref, proposalHref, reviewHomeHref, reviewHref } from "./links";
 import { liveMailAllowed } from "./transport";
 import type { MailItem } from "./compose";
 
@@ -28,6 +28,13 @@ const SAMPLE_NOTES: Record<MailItem["category"], string> = {
   queue: "A sample item is waiting in Review.",
 };
 
+function sampleHref(category: MailItem["category"]): string {
+  if (category === "approvals" || category === "assignments") return proposalHref("sample");
+  if (category === "flags") return reviewHref("sample");
+  if (category === "queue") return reviewHomeHref();
+  return discussionHref("sample");
+}
+
 function sampleItem(category: MailItem["category"]): MailItem {
   return {
     category,
@@ -35,7 +42,7 @@ function sampleItem(category: MailItem["category"]): MailItem {
     siteLabel: "Sample site",
     summary: SAMPLE_NOTES[category],
     authorId: "Ana",
-    href: category === "mentions" || category === "replies" ? discussionHref("sample") : reviewHref("sample"),
+    href: sampleHref(category),
     market: "PHX",
     stage: "Desk screen",
   };

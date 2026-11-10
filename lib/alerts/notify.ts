@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/actions/db";
 import { resolveActionRole } from "@/lib/actions/roles";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
-import { discussionHref, reviewHref } from "./links";
+import { discussionHref, proposalHref, reviewHref } from "./links";
 import { enqueueAlert, flushInstant } from "./deliver";
 import { loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
@@ -109,7 +109,7 @@ export async function notifySuggestion(
       category: "approvals",
       siteId: input.siteId,
       summary: input.summary,
-      href: reviewHref(input.siteId),
+      href: proposalHref(input.siteId),
       refId: input.id,
     })) instant = true;
     if (input.ownerId && await queueFor(sql, {
@@ -118,7 +118,7 @@ export async function notifySuggestion(
       category: "assignments",
       siteId: input.siteId,
       summary: input.summary,
-      href: reviewHref(input.siteId),
+      href: proposalHref(input.siteId),
       refId: input.id,
     })) instant = true;
   }

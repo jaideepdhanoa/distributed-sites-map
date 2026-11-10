@@ -14,7 +14,8 @@
     "test:actions": "E2E_ACTIONS=1 playwright test e2e/actions.spec.ts e2e/queue.spec.ts",
     "test:timeline": "python3 -m unittest tests/timeline/test_timeline.py tests/timeline/test_site_id.py && node --experimental-strip-types --test tests/timeline/filter.test.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
-    "reconcile-suggestions": "tsx scripts/reconcile-suggestions.ts"
+    "reconcile-suggestions": "tsx scripts/reconcile-suggestions.ts",
+    "backfill-inbox": "tsx scripts/backfill-inbox.ts"
   },
   "dependencies": {
     "@ai-sdk/xai": "^5.0.40",

@@ -50,9 +50,29 @@ function who(accounts: Account[], id: string | null | undefined) {
   return accounts.find((account) => account.id === id)?.name || id;
 }
 
+function sameIdea(title: string, kind: string) {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/^next /, "").trim();
+  const left = normalize(title);
+  const right = normalize(kind);
+  if (!left || !right) return true;
+  if (left === right || left.startsWith(right) || right.startsWith(left)) return true;
+  const leftWords = left.split(" ");
+  const rightWords = right.split(" ");
+  let shared = 0;
+  while (shared < leftWords.length && shared < rightWords.length && leftWords[shared] === rightWords[shared]) shared += 1;
+  return shared >= 3;
+}
+
+function statusMark(status: string) {
+  if (status === "ready") return { label: "Ready for approval", tone: "pending" };
+  if (status === "agreed_waiting") return { label: "Agreed, waiting", tone: "held" };
+  return { label: "Waiting for approval", tone: "pending" };
+}
+
 export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }) {
   const params = useSearchParams();
   const proposal = params.get("panel") === "proposal";
+  const reviewing = params.get("review") === "1" || params.get("view") === "review";
   const cardRef = useRef<HTMLElement>(null);
   const status = useActionStatus();
   const [steps, setSteps] = useState<Step[]>([]);
@@ -116,7 +136,8 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   }, []);
 
   useEffect(() => {
-    if (!proposal || !status.enabled) return;
+    const phone = window.matchMedia("(max-width: 767px)").matches;
+    if ((!proposal && !(reviewing && phone)) || !status.enabled) return;
     const node = cardRef.current;
     const scroller = node?.closest(".drawer-scroll");
     if (!node || !(scroller instanceof HTMLElement)) return;
@@ -139,7 +160,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       window.clearTimeout(stop);
       sizes.disconnect();
     };
-  }, [proposal, status.enabled, id]);
+  }, [proposal, reviewing, status.enabled, id]);
 
   useEffect(() => {
     if (!status.enabled) return undefined;
@@ -191,6 +212,13 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       cancel = true;
     };
   }, [status.enabled, focus?.id, steps]);
+
+  useEffect(() => {
+    if (!status.enabled || !reviewer || open || !focus) return;
+    if (!proposal && !reviewing) return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    window.dispatchEvent(new CustomEvent("sites-sheet-snap", { detail: "full" }));
+  }, [status.enabled, reviewer, open, focus, proposal, reviewing]);
 
   if (!status.enabled) return null;
 
@@ -275,7 +303,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         void submit("/api/actions/suggestions", body);
       }}
     >
-      <p className="kicker">Propose next step</p>
+      <h3>Propose next step</h3>
       <div className="type-chips" role="group" aria-label="Next step type">
         {NEXT_STEP_TYPES.map((item) => (
           <button key={item.id} type="button" className={type === item.id ? "chip on" : "chip"} onClick={() => { setType(item.id); if (item.id === "stage_move" && !stage) setStage("financial"); }}>{item.label}</button>
@@ -290,7 +318,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       {type === "knock_off" || type === "mark_duplicate" ? (
         <label>
           Reason
-          <textarea aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} required />
+          <textarea className="field" aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} required />
         </label>
       ) : null}
       {type === "mark_duplicate" ? (
@@ -327,13 +355,13 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           </label>
           <label>
             Due (optional)
-            <input aria-label="Due" type="date" value={due} onChange={(event) => setDue(event.target.value)} />
+            <input className="field" aria-label="Due" type="date" value={due} onChange={(event) => setDue(event.target.value)} />
           </label>
         </div>
       ) : null}
-      <div className="act-row">
-        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())} className="menu-item">Submit for approval</button>
-        <button type="button" onClick={resetForm} className="menu-item">Cancel</button>
+      <div className="proposal-send">
+        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())} className="propose">Submit for approval</button>
+        <button type="button" onClick={resetForm} className="text-link">Cancel</button>
       </div>
     </form>
   ) : null;
@@ -342,19 +370,26 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   if (!open && focus) {
     const stepType = nextStepType(focus.detail);
     const knock = stepType === "knock_off";
+    const mark = statusMark(focus.status);
+    const headline = focus.title || focus.proposedValue;
+    const kindLabel = nextStepTypeLabel(focus.detail);
+    const canEdit = focus.status === "open" && (reviewer || (writable && focus.authorId === status.username));
     body = (
       <>
-        <div className="chip-row">
-          <span className="wait">{focus.status === "ready" ? "Ready for approval" : focus.status === "agreed_waiting" ? "Agreed, waiting" : "Waiting for approval"}</span>
-          <span className="type">{nextStepTypeLabel(focus.detail)}</span>
+        <div className="proposal-head">
+          <span className={`badge ${mark.tone}`}>{mark.label}</span>
+          {canEdit ? <button type="button" onClick={() => startEdit(focus)} className="text-link">Edit</button> : null}
         </div>
-        <h3>{focus.title || focus.proposedValue}</h3>
-        <p className="who">
+        {sameIdea(headline, kindLabel) ? null : <p className="proposal-kind">{kindLabel}</p>}
+        <p className="proposal-title">{headline}</p>
+        <p className="proposal-meta">
           Proposed by {who(accounts, focus.authorId)} · {formatPacific(focus.createdAt)}
           {focus.ownerName ? ` · Assignee ${focus.ownerName}` : knock ? " · No assignee" : ""}
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
-        {(knock || stepType === "mark_duplicate") && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
+        {(knock || stepType === "mark_duplicate") && focus.reason ? (
+          <p className="proposal-reason"><span>Reason</span>{focus.reason}</p>
+        ) : null}
         {focus.stale ? <p className="hint">The stage changed after this proposal{focus.currentStage ? ` (${focus.currentStage})` : ""}.</p> : null}
         {stepType === "stage_move" && focus.status === "open" ? <NeedList items={needs} /> : null}
         <BlockerList
@@ -362,11 +397,17 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           onClear={reviewer ? (blockerId) => void submit(`/api/actions/suggestions/${focus.id}`, { clearBlockerId: blockerId }) : undefined}
         />
         {proposalNotes.length ? (
-          <ul className="need-list">
-            {proposalNotes.map((note) => (
-              <li key={note.id}>{note.body} <span className="hint">{who(accounts, note.authorId)} · {formatPacific(note.createdAt)}</span></li>
-            ))}
-          </ul>
+          <div className="proposal-notes">
+            <h3>Replies</h3>
+            <ul>
+              {proposalNotes.map((note) => (
+                <li key={note.id}>
+                  <p>{note.body}</p>
+                  <p className="proposal-meta">{who(accounts, note.authorId)} · {formatPacific(note.createdAt)}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {siteRecommendations.rows.filter((item) => (item.kind === "decision" || item.kind === "status_reply") && item.proposalId === focus.id).map((item) => (
           <SuggestedBlock
@@ -418,21 +459,18 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
             }}
           />
         ) : null}
-        {focus.status === "open" && ((reviewer) || (writable && focus.authorId === status.username)) ? (
-          <button type="button" onClick={() => startEdit(focus)} className="text-link">Edit</button>
-        ) : null}
       </>
     );
   } else if (!open && approved) {
     const stepType = nextStepType(approved.detail);
+    const headline = `Next: ${approved.title || approved.proposedValue}`;
+    const kindLabel = nextStepTypeLabel(approved.detail);
     body = (
       <>
-        <div className="chip-row">
-          <span className="approved-kicker">Next step · Approved</span>
-          <span className="type">{nextStepTypeLabel(approved.detail)}</span>
-        </div>
-        <h3>Next: {approved.title || approved.proposedValue}</h3>
-        <p className="who">
+        <span className="badge checked">Approved</span>
+        {sameIdea(headline, kindLabel) ? null : <p className="proposal-kind">{kindLabel}</p>}
+        <p className="proposal-title">{headline}</p>
+        <p className="proposal-meta">
           Approved by {who(accounts, approved.decidedBy) || "the approver"}
           {approved.decidedAt ? ` · ${formatPacific(approved.decidedAt)}` : ""}
           {approved.ownerName ? ` · Owner ${approved.ownerName}` : ""}
@@ -443,10 +481,10 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
             <button type="button" className="propose" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${approved.id}/done`, {})}>Mark done</button>
           ) : null}
           {allowsAssignee(approved.detail) && (reviewer || approved.ownerId === status.username) ? (
-            <button type="button" onClick={() => { setReassigning((value) => !value); setDating(false); setOwnerId(approved.ownerId || ""); }} className="menu-item">Reassign</button>
+            <button type="button" onClick={() => { setReassigning((value) => !value); setDating(false); setOwnerId(approved.ownerId || ""); }} className="paper-btn">Reassign</button>
           ) : null}
           {allowsDate(approved.detail) && (reviewer || approved.ownerId === status.username) ? (
-            <button type="button" onClick={() => { setDating((value) => !value); setReassigning(false); setDue(approved.targetOn || ""); }} className="menu-item">Change date</button>
+            <button type="button" onClick={() => { setDating((value) => !value); setReassigning(false); setDue(approved.targetOn || ""); }} className="paper-btn">Change date</button>
           ) : null}
         </div>
         {reassigning ? (
@@ -455,13 +493,13 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
               <option value="">No assignee</option>
               {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
             </select>
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { ownerId }, "PATCH")} className="menu-item">Save assignee</button>
+            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { ownerId }, "PATCH")} className="paper-btn">Save assignee</button>
           </div>
         ) : null}
         {dating ? (
           <div className="act-row">
-            <input aria-label="Due" type="date" value={due} onChange={(event) => setDue(event.target.value)} />
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { targetOn: due }, "PATCH")} className="menu-item">Save date</button>
+            <input className="field" aria-label="Due" type="date" value={due} onChange={(event) => setDue(event.target.value)} />
+            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { targetOn: due }, "PATCH")} className="paper-btn">Save date</button>
           </div>
         ) : null}
         {stepType === "knock_off" ? <p className="hint">The workbook export asks for stage Dropped.</p> : null}
@@ -470,18 +508,18 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   } else if (!open) {
     body = (
       <>
-        <p className="kicker">Next step</p>
-        <div className="type-chips" role="group" aria-label="Next step type">
-          <button type="button" onClick={() => { setType("stage_move"); setStage("financial"); setOpen(true); }} className="menu-item">{PRIORITIZE}</button>
-          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }} className="menu-item">Drop with a reason</button>
-          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }} className="menu-item">Mark duplicate</button>
+        <h3>Next step</h3>
+        <div className="step-actions" role="group" aria-label="Next step type">
+          <button type="button" onClick={() => { setType("stage_move"); setStage("financial"); setOpen(true); }} className="paper-btn">{PRIORITIZE}</button>
+          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }} className="text-link">Drop with a reason</button>
+          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }} className="text-link">Mark duplicate</button>
         </div>
         <p className="hint">Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
       </>
     );
   }
 
-  const tone = focus && !open ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved && !open && !focus ? "approved" : "empty";
+  const tone = open ? "compose" : focus ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved ? "approved" : "empty";
   return (
     <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
@@ -500,14 +538,14 @@ function needDetail(item: { party?: string; askedOn?: string | null; followUpOn?
 
 function NeedList({ items }: { items: Need[] }) {
   return (
-    <div>
-      <p className="kicker">Still needed</p>
+    <div className="proposal-needs">
+      <h3>Still needed</h3>
       {items.length ? (
-        <ul className="need-list">
+        <ul>
           {items.map((item) => (
             <li key={`${item.kind}-${item.label}-${item.askedOn || ""}`}>
               {item.label}
-              {needDetail(item) ? <span className="hint"> {needDetail(item)}</span> : null}
+              {needDetail(item) ? <span className="hint">{needDetail(item)}</span> : null}
             </li>
           ))}
         </ul>
@@ -527,20 +565,23 @@ function BlockerList({
 }) {
   if (!blockers.length) return null;
   return (
-    <ul className="need-list">
-      {blockers.map((item) => (
-        <li key={item.id}>
-          {item.closed ? "Cleared: " : ""}{item.label}
-          {needDetail(item) ? <span className="hint"> {needDetail(item)}</span> : null}
-          {onClear && item.kind === "hold" && !item.closed ? (
-            <label className="act-check">
-              <input className="check" type="checkbox" checked={false} onChange={() => onClear(item.id)} />
-              Cleared
-            </label>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+    <div className="proposal-needs">
+      <h3>Open blockers</h3>
+      <ul>
+        {blockers.map((item) => (
+          <li key={item.id}>
+            {item.closed ? "Cleared: " : ""}{item.label}
+            {needDetail(item) ? <span className="hint">{needDetail(item)}</span> : null}
+            {onClear && item.kind === "hold" && !item.closed ? (
+              <label className="act-check">
+                <input className="check" type="checkbox" checked={false} onChange={() => onClear(item.id)} />
+                Cleared
+              </label>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -583,10 +624,17 @@ function OutcomeForm({
   needsCount: number;
   onSend: () => void;
 }) {
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const replyNeeded = outcome === "reply" || outcome === "agreed_waiting" || outcome === "overtaken";
   const holdNeeded = outcome === "agreed_waiting" && needsCount === 0 && !holdLabel.trim();
+  const holdOptional = outcome === "agreed_waiting" && needsCount > 0;
+  const holdStarted = Boolean(holdLabel.trim() || holdParty.trim() || holdAsked || holdFollow);
+  const showHold = outcome === "agreed_waiting" && (!holdOptional || holdOpen || holdStarted);
+  const showReply = replyNeeded || noteOpen || Boolean(reply.trim());
   return (
     <form
+      className="proposal-decide"
       onSubmit={(event) => {
         event.preventDefault();
         onSend();
@@ -604,12 +652,17 @@ function OutcomeForm({
       </label>
       {stageMove && outcome === "accepted" ? <p className="hint">The stage is written when the workbook approver accepts.</p> : null}
       {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
-      <label>
-        Reply
-        <textarea className="field" aria-label="Reply to the proposer" data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={3} maxLength={2000} required={replyNeeded} />
-      </label>
-      {outcome === "agreed_waiting" ? (
-        <>
+      {showReply ? (
+        <label>
+          Reply
+          <textarea className="field" aria-label="Reply to the proposer" data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded} />
+        </label>
+      ) : (
+        <button type="button" className="text-link" aria-expanded="false" onClick={() => setNoteOpen(true)}>Add a note</button>
+      )}
+      {showHold ? (
+        <div className="proposal-hold">
+          <h3>Hold</h3>
           <label>
             Waiting on
             <input className="field" aria-label="Waiting on" value={holdLabel} onChange={(event) => onHoldLabel(event.target.value)} maxLength={200} placeholder="Signature, file, or a pause" />
@@ -628,9 +681,17 @@ function OutcomeForm({
               <input className="field" aria-label="Next follow-up" type="date" value={holdFollow} onChange={(event) => onHoldFollow(event.target.value)} />
             </label>
           </div>
-        </>
+          {holdOptional && !holdStarted ? (
+            <button type="button" className="text-link" aria-expanded="true" onClick={() => setHoldOpen(false)}>Hide hold</button>
+          ) : null}
+        </div>
       ) : null}
-      <button type="submit" className="propose" disabled={pending || holdNeeded || (replyNeeded && !reply.trim())}>Send</button>
+      {holdOptional && !showHold ? (
+        <button type="button" className="text-link" aria-expanded="false" onClick={() => setHoldOpen(true)}>Add a hold</button>
+      ) : null}
+      <div className="proposal-send">
+        <button type="submit" className="propose" disabled={pending || holdNeeded || (replyNeeded && !reply.trim())}>Send</button>
+      </div>
     </form>
   );
 }

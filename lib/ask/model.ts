@@ -2,6 +2,7 @@ import { ASK_TOOLS, MAX_ASK_STEPS, runAskTool } from "@/lib/ask/tools";
 import type { ActionRole } from "@/lib/actions/roles";
 import { listedCountLine } from "./counts";
 import type { AskSource } from "./policy";
+import { ASK_UPSTREAM_TIMEOUT_MS } from "./wait";
 
 export type AskModelInput = {
   system: string;
@@ -136,7 +137,7 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
     }),
   };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45_000);
+  const timer = setTimeout(() => controller.abort(), ASK_UPSTREAM_TIMEOUT_MS);
   const shared = {
     model: xai(askModelName()),
     system: input.system,

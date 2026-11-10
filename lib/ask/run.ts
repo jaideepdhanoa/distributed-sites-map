@@ -3,11 +3,11 @@ import { ingestAskGap } from "@/lib/agent/inbox";
 import { actionsEnabled, withSql, type Sql } from "@/lib/actions/db";
 import type { ActionRole } from "@/lib/actions/roles";
 import { estimateCost } from "./cost";
-import { EMPTY_ANSWER, UPSTREAM_ANSWER } from "./empty";
+import { EMPTY_ANSWER, TIMEOUT_ANSWER, UPSTREAM_ANSWER } from "./empty";
 import { liveAskModel, type AskModelInput, type AskModelOutput } from "./model";
 import { applyWordingTier, withCitations, type AskSource } from "./policy";
 import { askPrefix } from "./prompt";
-import { logUpstream } from "./upstream";
+import { logUpstream, isAbortError } from "./upstream";
 
 export type AskRunner = (input: AskModelInput) => Promise<AskModelOutput>;
 
@@ -86,6 +86,7 @@ export async function answerQuestion(input: {
     const audience = input.role === "reviewer" ? "Audience: internal" : "Audience: map";
     let draft: AskModelOutput;
     let upstream = false;
+    let timedOut = false;
     try {
       draft = await runner({
         system: askPrefix(),
@@ -94,10 +95,22 @@ export async function answerQuestion(input: {
       });
     } catch (error) {
       logUpstream(error);
-      upstream = true;
+      timedOut = isAbortError(error);
+      upstream = !timedOut;
       draft = { text: "", toolsCalled: [], sources: [], promptTokens: 0, completionTokens: 0 };
     }
-    if (upstream) {
+    if (timedOut) {
+      answer = {
+        text: TIMEOUT_ANSWER,
+        gap: false,
+        error: true,
+        sources: [],
+        toolsCalled: [],
+        promptTokens: 0,
+        completionTokens: 0,
+        estimatedCost: 0,
+      };
+    } else if (upstream) {
       answer = {
         text: UPSTREAM_ANSWER,
         gap: false,

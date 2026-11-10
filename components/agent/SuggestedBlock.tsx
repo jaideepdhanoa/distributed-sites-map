@@ -26,6 +26,13 @@ export function SuggestedBlock({
       </div>
       {decision ? <p><strong>{decision}</strong></p> : null}
       <p>{item.draftText}</p>
+      {item.siteUrl ? (
+        <p>
+          <a className="text-link" href={item.siteUrl} data-testid="suggested-site">
+            {item.siteId === "portfolio" ? "Open the map" : `Open ${item.siteId}`}
+          </a>
+        </p>
+      ) : null}
       <p>{item.rationale}</p>
       <ul>
         {item.sources.map((source) => (

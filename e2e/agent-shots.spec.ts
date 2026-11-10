@@ -23,6 +23,8 @@ const recommendation = {
   confidence: "medium",
   threadKey: "note:note-1",
   proposalId: null,
+  siteId: "PHX-U189",
+  siteUrl: "/?site=PHX-U189&panel=discussion",
 };
 
 async function installFeed(page: Page) {
@@ -51,6 +53,7 @@ test("suggested block and ask panel", async ({ page }, info) => {
   await expect(block).toBeVisible();
   await expect(block).toContainText("The driveway is the tight part.");
   await expect(block).toContainText("medium confidence");
+  await expect(block.getByTestId("suggested-site")).toHaveAttribute("href", "/?site=PHX-U189&panel=discussion");
   await block.screenshot({ path: `review-shots/${name}-suggested.png` });
   await page.getByTestId("suggested-use").click();
   await expect(page.getByTestId("note-reply")).toHaveValue("The driveway is the tight part.");

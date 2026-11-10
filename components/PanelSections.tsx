@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
 const TABS = [
@@ -26,13 +26,19 @@ export default function PanelSections({
   const params = useSearchParams();
   const site = params.get("site");
   const panel = params.get("panel");
+  const sections = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<TabId>(panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview");
   useEffect(() => {
     if (panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "overview") setTab(panel);
   }, [site, panel]);
+  useEffect(() => {
+    if (panel === "discussion" || panel === "numbers" || panel === "activity") {
+      sections.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [site, panel]);
   const body = tab === "overview" ? overview : tab === "numbers" ? numbers : tab === "activity" ? activity : discussion;
   return (
-    <div className="panel-sections">
+    <div className="panel-sections" ref={sections}>
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
         {TABS.map(([id, label]) => (
           <button

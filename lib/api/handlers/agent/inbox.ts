@@ -1,5 +1,6 @@
 import { requireInbox, agentOk, withAgentDb } from "@/lib/agent/http";
 import { listInbox, toFeedItem } from "@/lib/agent/inbox";
+import { feedOrigin } from "@/lib/agent/links";
 import { isResponse } from "@/lib/actions/http";
 
 export async function GET(request: Request) {
@@ -11,5 +12,6 @@ export async function GET(request: Request) {
   const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? limitRaw : 50;
   const result = await withAgentDb((sql) => listInbox(sql, { after, limit }));
   if (isResponse(result)) return result;
-  return agentOk({ items: result.items.map(toFeedItem), next: result.next });
+  const origin = feedOrigin(request);
+  return agentOk({ items: result.items.map((item) => toFeedItem(item, origin)), next: result.next });
 }

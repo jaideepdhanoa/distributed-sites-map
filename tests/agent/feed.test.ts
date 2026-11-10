@@ -6,8 +6,9 @@ import { NextRequest } from "next/server";
 import { seesRecommendations, showSuggestedBlock, RECOMMENDATION_RECIPIENTS, canReadFinancials, FINANCIALS_ROLES } from "../../lib/agent/access";
 import { authorizeInbox } from "../../lib/agent/auth";
 import { applySuggestedDraft } from "../../lib/agent/draft";
-import { ackInbox, ingestDecision, ingestNote, listInbox } from "../../lib/agent/inbox";
-import { addRecommendation, listVisibleRecommendations, parseRecommendation } from "../../lib/agent/recommend";
+import { ackInbox, ingestDecision, ingestNote, listInbox, toFeedItem, type InboxItem } from "../../lib/agent/inbox";
+import { feedOrigin } from "../../lib/agent/links";
+import { addRecommendation, listVisibleRecommendations, parseRecommendation, presentRecommendation } from "../../lib/agent/recommend";
 import { migrate } from "../../lib/actions/migrate";
 import { createNote } from "../../lib/actions/notes";
 import type { RecordLookup } from "../../lib/actions/records";
@@ -211,12 +212,16 @@ test("only jaideep is offered a suggested block, and use this does not post", as
   const visible = await listVisibleRecommendations(sql, "jaideep", "PIPE-PHX-0008");
   assert.equal(visible.length, 1);
   assert.equal(visible[0].draftText, "The driveway is the tight part.");
+  const linked = presentRecommendation(visible[0], "https://distributedsites.com");
+  assert.equal(linked.siteId, "PIPE-PHX-0008");
+  assert.equal(linked.siteUrl, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
 
   const filled = applySuggestedDraft(visible[0].draftText);
   assert.equal(filled.posted, false);
   assert.equal(filled.composer, visible[0].draftText);
   const block = readFileSync("components/agent/SuggestedBlock.tsx", "utf8");
   assert.match(block, /applySuggestedDraft/);
+  assert.match(block, /data-testid="suggested-site"/);
   assert.equal(block.includes("/api/actions/notes"), false);
   assert.equal(block.includes("decideSuggestion"), false);
 
@@ -309,6 +314,54 @@ test("financials access is an explicit role list that still includes every signe
   assert.equal(canReadFinancials("guest"), false);
   const route = readFileSync("lib/api/handlers/data/financials-id.ts", "utf8");
   assert.match(route, /canReadFinancials\(session\.actionRole\)/);
+});
+
+test("a feed item links to the site and panel for that kind", () => {
+  const previous = process.env.APP_URL;
+  delete process.env.APP_URL;
+  try {
+    const note = {
+      id: "row-1",
+      kind: "note",
+      subtype: null,
+      refId: "note-1",
+      siteId: "PIPE-PHX-0008",
+      recordId: "PIPE-PHX-0008",
+      actor: "cindel",
+      text: "The frontage needs another look.",
+      threadKey: "note:note-1",
+      threadContext: "",
+      proposalId: null,
+      proposalStatus: null,
+      stage: null,
+      workbookStage: false,
+      status: "new",
+      createdAt: "2026-01-02T15:00:00.000Z",
+      cursor: "opaque",
+    } satisfies InboxItem;
+    assert.equal(toFeedItem(note).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
+    assert.equal(toFeedItem({ ...note, kind: "reply" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
+    assert.equal(toFeedItem({ ...note, kind: "mention" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion");
+    assert.equal(toFeedItem({ ...note, kind: "suggestion" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
+    assert.equal(toFeedItem({ ...note, kind: "decision" }).site_url, "https://distributedsites.com/?site=PIPE-PHX-0008&panel=proposal");
+    assert.equal(toFeedItem({ ...note, kind: "flag" }).site_url, "https://distributedsites.com/?view=review&site=PIPE-PHX-0008");
+    assert.equal(toFeedItem({ ...note, kind: "ask_gap", siteId: "portfolio" }).site_url, "https://distributedsites.com/");
+    assert.equal(
+      toFeedItem(note, feedOrigin(new Request("http://internal/api/agent/inbox", {
+        headers: { "x-forwarded-host": "preview.distributedsites.com", "x-forwarded-proto": "https" },
+      }))).site_url,
+      "https://preview.distributedsites.com/?site=PIPE-PHX-0008&panel=discussion",
+    );
+    process.env.APP_URL = "https://configured.example/";
+    assert.equal(feedOrigin(), "https://configured.example");
+    assert.equal(
+      feedOrigin(new Request("https://distributedsites.com/api/agent/inbox")),
+      "https://distributedsites.com",
+    );
+  } finally {
+    if (previous === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = previous;
+  }
 });
 
 test("ingestDecision is callable for a rejected proposal", async () => {

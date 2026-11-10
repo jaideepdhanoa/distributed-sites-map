@@ -203,7 +203,12 @@ export default function Explorer() {
   const queueMentions = params.get("qmention") === "1";
   const queueAssigned = params.get("qassign") === "1";
   const visibleFeed = feed.filter((site) => site.status !== "snoozed" && (showHidden || !hiddenIds.includes(site.siteId)));
-  const reviewIndex = Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
+  // /?view=review&site=ID opens that site. After the link lands, review=1 follows the queue cursor.
+  const reviewDeepSite = params.get("view") === "review" ? params.get("site") : null;
+  const reviewDeepIndex = reviewDeepSite ? visibleFeed.findIndex((site) => site.siteId === reviewDeepSite) : -1;
+  const reviewIndex = reviewDeepIndex >= 0
+    ? reviewDeepIndex
+    : Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
   const reviewCurrent = visibleFeed[reviewIndex];
   const caughtUp = reviewing && feedLoaded && !feed.some((site) => site.status === "open");
   const ranges = rangesFromSearch(params);
@@ -831,6 +836,10 @@ export default function Explorer() {
   const reviewSiteId = reviewing && !caughtUp ? reviewCurrent?.siteId : undefined;
   useEffect(() => {
     if (!reviewing || !feedLoaded) return;
+    if (reviewDeepSite && reviewDeepIndex < 0) {
+      setSelected(reviewDeepSite);
+      return;
+    }
     if (!reviewSiteId) {
       setSelected(null);
       return;
@@ -849,7 +858,7 @@ export default function Explorer() {
       && (params.get("city") || null) === (patch.city ?? null)
       && (params.get("pstage") || null) === (patch.pstage ?? null);
     if (!aligned) write(patch);
-  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, dealFeatures.length, params]);
+  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, reviewDeepSite, reviewDeepIndex, dealFeatures.length, params]);
 
   function relatedPanel(current: { id: string; kind: "site" | "deal"; name?: string | null; address?: string | null; apn?: string | null }) {
     const records = [

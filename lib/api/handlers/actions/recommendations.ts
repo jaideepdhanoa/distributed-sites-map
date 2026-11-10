@@ -1,4 +1,5 @@
-import { listVisibleRecommendations } from "@/lib/agent/recommend";
+import { listVisibleRecommendations, presentRecommendation } from "@/lib/agent/recommend";
+import { feedOrigin } from "@/lib/agent/links";
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 
 export async function GET(request: Request) {
@@ -10,5 +11,6 @@ export async function GET(request: Request) {
     listVisibleRecommendations(sql, session.u, recordId),
   );
   if (isResponse(recommendations)) return recommendations;
-  return jsonOk({ recommendations });
+  const origin = feedOrigin(request);
+  return jsonOk({ recommendations: recommendations.map((row) => presentRecommendation(row, origin)) });
 }

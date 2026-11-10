@@ -41,6 +41,71 @@ async function openAs(page: import("@playwright/test").Page, username: string, p
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
+test("a feed link opens that site and panel", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-PHX-0008&panel=discussion");
+  const drawer = page.locator("aside.drawer");
+  await expect(drawer).toContainText("PIPE-PHX-0008");
+  const discussion = page.getByTestId("panel-tab-discussion");
+  await expect(discussion).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("record-actions")).toBeVisible();
+  await mkdir("/opt/cursor/artifacts", { recursive: true });
+  await discussion.screenshot({ path: "/opt/cursor/artifacts/feed-link-discussion.png" });
+
+  await page.goto("/?site=PIPE-PHX-0008&panel=proposal");
+  await expect(drawer).toContainText("PIPE-PHX-0008");
+  const proposal = page.getByTestId("next-step");
+  await expect(proposal).toBeVisible();
+  await expect(proposal).toHaveAttribute("data-panel", "proposal");
+  await proposal.screenshot({ path: "/opt/cursor/artifacts/feed-link-proposal.png" });
+
+  await page.goto("/?site=PHX-U180&panel=discussion");
+  await expect(drawer).toContainText("PHX-U180");
+  await expect(page.getByTestId("panel-tab-discussion")).toHaveAttribute("aria-selected", "true");
+
+  await page.goto("/?view=review&site=PIPE-PHX-0008");
+  await expect(drawer).toContainText("PIPE-PHX-0008");
+
+  await page.goto("/");
+  await expect(page.locator("aside.drawer")).toHaveCount(0);
+});
+
+test("a suggested draft links to that site", async ({ page, request }) => {
+  await login(request, "contributor");
+  const note = await request.post("/api/actions/notes", {
+    data: { targetKind: "site", targetId: site, body: "The frontage needs another look." },
+  });
+  expect(note.status()).toBe(201);
+  const root = ((await note.json()) as { note: { id: string } }).note;
+  await page.route("**/api/actions/status", (route) => route.fulfill({
+    json: { enabled: true, actionRole: "reviewer", username: "jaideep" },
+  }));
+  await page.route("**/api/actions/recommendations**", (route) => route.fulfill({
+    json: {
+      recommendations: [{
+        id: "rec-link",
+        kind: "reply",
+        draftText: "The driveway is the tight part.",
+        decision: "none",
+        rationale: "It answers the note about the frontage.",
+        sources: [{ label: "Discussion", url: `/?site=${site}&panel=discussion`, ref: null }],
+        confidence: "medium",
+        threadKey: `note:${root.id}`,
+        proposalId: null,
+        siteId: deal,
+        siteUrl: `/?site=${deal}&panel=discussion`,
+      }],
+    },
+  }));
+  await openAs(page, "contributor", `/?site=${site}&panel=discussion`);
+  const link = page.getByTestId("suggested-site");
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", `/?site=${deal}&panel=discussion`);
+  await link.click();
+  await expect(page.locator("aside.drawer")).toContainText(deal);
+  await expect(page.getByTestId("panel-tab-discussion")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("record-actions")).toBeVisible();
+});
+
 test("viewer is read only on the server and in the card", async ({ page, request }) => {
   await login(request, "viewer");
   const note = await request.post("/api/actions/notes", {

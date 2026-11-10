@@ -303,6 +303,7 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
       "workbook_stage": false,
       "status": "new",
       "created_at": "2026-11-10T00:00:00.000Z",
+      "site_url": "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion",
       "cursor": "opaque"
     }
   ],
@@ -314,7 +315,20 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
 
 The idempotency key is `kind:ref_id`. Posting the same event twice does not create a second row.
 
+`site_url` is an absolute link to that row on the map. The host is the request host (`x-forwarded-host`, then `Host`). When the request has no host, the link uses `APP_URL`, or `https://distributedsites.com` when that is unset. Notes, replies, and mentions open Discussion (`/?site=ID&panel=discussion`). Suggestions and decisions open the proposal on that site (`/?site=ID&panel=proposal`). Flags open Review on that site (`/?view=review&site=ID`). An `ask_gap` for one site opens that site. `site_id` `portfolio` opens the home map (`/`).
+
 `next` is the cursor to pass as `after`, or `null` when this page is the end.
+
+### Backfill
+
+The feed only recorded events after it shipped. This reads the existing notes, replies, mentions, flags, and suggestions and inserts the feed rows the live path would have written, including a `decision` for an accepted, rejected, or later-applied proposal. `created_at`, the idempotency key, the thread, and the actor come from the original event. A newer row on a thread supersedes older `new` or `picked` rows. Running it again inserts nothing. It does not create `ask_gap` rows.
+
+Preview and production share one `DATABASE_URL`. `--write` updates that database. Do not run `--write` from CI. Dry-run only reads, and prints counts by kind and by actor:
+
+```bash
+npm run backfill-inbox -- --dry-run
+npm run backfill-inbox -- --write
+```
 
 ### Ack
 
@@ -352,7 +366,7 @@ Unanswered Ask questions are logged as `ask_gap`.
 
 ### What a person sees
 
-Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills his composer. Post, Approve, and Reject are still his buttons, and the saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline.
+Suggested drafts render only for the usernames in `RECOMMENDATION_RECIPIENTS` (`jaideep`). Use this fills his composer. Post, Approve, and Reject are still his buttons, and the saved row records `recommendation_id` and `drafted_by_agent` for the audit log. The map does not show an agent byline. Each draft includes a link to the site, using the same `site_url` rules as the feed.
 
 ## Ask
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { seesRecommendations } from "@/lib/agent/access";
-import { FeedError } from "@/lib/agent/inbox";
+import { FeedError, type InboxKind } from "@/lib/agent/inbox";
+import { absoluteSiteUrl } from "@/lib/agent/links";
 import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
@@ -31,7 +32,11 @@ export type VisibleRecommendation = {
   confidence: Confidence;
   threadKey: string;
   proposalId: string | null;
+  siteId: string;
+  siteUrl: string;
 };
+
+export type ListedRecommendation = Omit<VisibleRecommendation, "siteUrl"> & { inboxKind: InboxKind };
 
 type SourceRow = { label?: string; url?: string; ref?: string };
 
@@ -112,7 +117,23 @@ export async function addRecommendation(sql: Sql, inboxId: string, draft: Recomm
   return id;
 }
 
-export async function listVisibleRecommendations(sql: Sql, username: string, recordId: string): Promise<VisibleRecommendation[]> {
+export function presentRecommendation(row: ListedRecommendation, origin: string): VisibleRecommendation {
+  return {
+    id: row.id,
+    kind: row.kind,
+    draftText: row.draftText,
+    decision: row.decision,
+    rationale: row.rationale,
+    sources: row.sources,
+    confidence: row.confidence,
+    threadKey: row.threadKey,
+    proposalId: row.proposalId,
+    siteId: row.siteId,
+    siteUrl: absoluteSiteUrl(origin, row.inboxKind, row.siteId),
+  };
+}
+
+export async function listVisibleRecommendations(sql: Sql, username: string, recordId: string): Promise<ListedRecommendation[]> {
   if (!seesRecommendations(username)) return [];
   const rows = await sql.query<{
     id: string;
@@ -124,8 +145,11 @@ export async function listVisibleRecommendations(sql: Sql, username: string, rec
     confidence: Confidence;
     thread_key: string;
     proposal_id: string | null;
+    site_id: string;
+    inbox_kind: InboxKind;
   }>(
-    `SELECT r.id, r.kind, r.draft_text, r.decision, r.rationale, r.sources, r.confidence, i.thread_key, i.proposal_id
+    `SELECT r.id, r.kind, r.draft_text, r.decision, r.rationale, r.sources, r.confidence,
+            i.thread_key, i.proposal_id, i.site_id, i.kind AS inbox_kind
      FROM agent_recommendations r
      JOIN agent_inbox i ON i.id = r.inbox_id
      WHERE r.dismissed_at IS NULL
@@ -148,6 +172,8 @@ export async function listVisibleRecommendations(sql: Sql, username: string, rec
     confidence: row.confidence,
     threadKey: row.thread_key,
     proposalId: row.proposal_id,
+    siteId: row.site_id,
+    inboxKind: row.inbox_kind,
   }));
 }
 

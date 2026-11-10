@@ -71,12 +71,16 @@ test("mobile layers and the menu are not open together", async ({ page }, info) 
   test.skip(info.project.name !== "mobile");
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
-  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.locator(".menu-sheet")).toBeVisible();
   await expect(page.locator(".legend")).toHaveCount(0);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator(".layers.open")).toBeVisible();
   await expect(page.locator(".menu-sheet")).toBeHidden();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(page.locator(".menu-sheet")).toBeVisible();
+  await expect(page.locator(".layers.open")).toHaveCount(0);
 });
 
 test("Back returns to the previous city and step", async ({ page }, info) => {
@@ -113,8 +117,8 @@ test("a shared link restores the city, step, filter, card, and table", async ({ 
 
 test("export matches the rows and columns on screen", async ({ page }) => {
   await page.goto("/?stage=cleared&view=list", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".list-pane tbody tr");
-  const headers = await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter(Boolean));
+  await page.waitForSelector(".list-pane tbody tr", { state: "attached" });
+  const headers = await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter((text) => text && text !== "Map"));
   const rowIds = await page.locator(".list-pane tbody tr td:first-child").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").trim()));
   expect(rowIds.length).toBeGreaterThan(0);
   const downloadPromise = page.waitForEvent("download");

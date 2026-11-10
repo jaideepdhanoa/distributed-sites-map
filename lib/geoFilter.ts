@@ -34,22 +34,9 @@ export function inMapArea(lng: number, lat: number, area: MapArea | null): boole
   return pointInRing(lng, lat, area.points);
 }
 
-export function parseMapArea(params: { get(name: string): string | null }): MapArea | null {
-  const ring = params.get("ring");
-  if (ring) {
-    const [lng, lat, miles] = ring.split(",").map(Number);
-    if ([lng, lat, miles].every((value) => Number.isFinite(value)) && miles > 0 && miles <= 30) {
-      return { kind: "radius", lng, lat, miles };
-    }
-  }
-  const poly = params.get("poly");
-  if (!poly) return null;
-  const points = poly.split(";").flatMap((pair) => {
-    const [lng, lat] = pair.split(",").map(Number);
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return [];
-    return [[lng, lat] as [number, number]];
-  });
-  return points.length >= 3 ? { kind: "polygon", points } : null;
+/** Old `ring=` and `poly=` links are ignored. They were hidden filters. */
+export function parseMapArea(_params: { get(name: string): string | null }): MapArea | null {
+  return null;
 }
 
 export function areaQuery(area: MapArea | null): { ring: string | null; poly: string | null } {

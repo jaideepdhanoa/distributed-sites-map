@@ -122,7 +122,7 @@ assert.equal(trafficLabels[0].properties.label.includes("people"), false);
 assert.match(trafficLabels[0].properties.label, /washes 1 in 1 mi, 6 in 3 mi/);
 assert.equal(inMapArea(-112.05, 33.46, { kind: "radius", lng: -112.05, lat: 33.46, miles: 1 }), true);
 assert.equal(inMapArea(-112.2, 33.46, { kind: "radius", lng: -112.05, lat: 33.46, miles: 1 }), false);
-assert.equal(parseMapArea({ get: (key) => key === "ring" ? "-112.05000,33.46000,1" : null })?.kind, "radius");
+assert.equal(parseMapArea({ get: (key) => key === "ring" ? "-112.05000,33.46000,1" : key === "poly" ? "-112,33;-112,34;-111,34" : null }), null);
 assert.deepEqual(capacityFacts({ cap_a_substation_mi: 0.96, cap_a_line_ft: 7873, cap_a_source: "OSM via diligence_sweep.py" }, "deal"), [
   { id: "a", lines: ["Substation 0.96 mi", "Line 7,873 ft"], basis: "" },
 ]);

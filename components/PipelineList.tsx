@@ -148,7 +148,7 @@ export default function PipelineList({
       </div>
       <div className="list-bar">
         <p>{rows.length.toLocaleString()} shown</p>
-        <div className="col-picker">
+        <div className="col-picker only-desktop">
           <button type="button" className="paper-btn" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((value) => !value)}>Columns</button>
           {columnsOpen ? (
             <div className="menu" role="group" aria-label="Columns">
@@ -179,7 +179,7 @@ export default function PipelineList({
             ])}
           </select>
         </label>
-        <button type="button" className="paper-btn" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Hide filters" : "Filter"}</button>
+        <button type="button" className="paper-btn" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Hide filters" : "Filters"}</button>
         <button type="button" className="paper-btn" onClick={() => {
           const blob = new Blob([pipelineCsv(ordered, columns)], { type: "text/csv" });
           const link = document.createElement("a");
@@ -192,16 +192,16 @@ export default function PipelineList({
         <div className="range-filters">
           {(
             [
-              ["Asking", "askMin", "askMax"],
-              ["Acres", "acMin", "acMax"],
-              ["Per acre", "paMin", "paMax"],
-              ["Open land", "olMin", "olMax"],
+              ["Asking", "$", "askMin", "askMax"],
+              ["Acres", "ac", "acMin", "acMax"],
+              ["Per acre", "$/ac", "paMin", "paMax"],
+              ["Open land", "sq ft", "olMin", "olMax"],
             ] as const
-          ).map(([label, minKey, maxKey]) => (
+          ).map(([label, unit, minKey, maxKey]) => (
             <label key={label}>
-              {label}
-              <input className="field" aria-label={`${label} minimum`} inputMode="decimal" value={ranges[minKey] ?? ""} onChange={(event) => setRange(minKey, event.target.value)} />
-              <input className="field" aria-label={`${label} maximum`} inputMode="decimal" value={ranges[maxKey] ?? ""} onChange={(event) => setRange(maxKey, event.target.value)} />
+              {label} ({unit})
+              <input className="field" aria-label={`${label} minimum`} placeholder="Min" inputMode="decimal" value={ranges[minKey] ?? ""} onChange={(event) => setRange(minKey, event.target.value)} />
+              <input className="field" aria-label={`${label} maximum`} placeholder="Max" inputMode="decimal" value={ranges[maxKey] ?? ""} onChange={(event) => setRange(maxKey, event.target.value)} />
             </label>
           ))}
         </div>

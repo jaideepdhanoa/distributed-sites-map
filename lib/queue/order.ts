@@ -93,7 +93,7 @@ export function buildQueue(input: {
     const reviewedAt = input.reviewedAt[site.id] || "";
     const reasons = (input.reasons[site.id] || []).filter((reason) => !reviewedAt || reason.at > reviewedAt);
     const flagged = input.flagged.has(site.id);
-    if (site.hidden && !needsApproval && !mentioned && !flagged && !assigned) continue;
+    if (site.hidden) continue;
     const neverReviewed = !reviewedAt;
     const baseline = !site.hidden && neverReviewed && site.active && !reasons.some((reason) => reason.type === "new_site")
       ? [{ at: input.today, summary: "New pipeline site.", type: "new_site" }]

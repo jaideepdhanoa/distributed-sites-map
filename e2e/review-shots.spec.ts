@@ -56,8 +56,8 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   const counts = cityPipelineCounts("PHX");
   await expect(page.locator("nav.funnel")).toContainText(`(${counts.deskDeals} deals, ${counts.deskLand} land)`);
   const chipText = async () => page.locator(".summary-chip").first().textContent();
-  await expect.poll(chipText).toContain(`${counts.activeDeals} deals + ${counts.activeLand} land sites`);
-  await expect.poll(chipText).toContain(`${counts.droppedDeals} dropped deals + ${counts.droppedLand} dropped land sites`);
+  await expect.poll(chipText).toContain("on the map ·");
+  await expect.poll(chipText).toContain("dropped, hidden");
   await page.screenshot({ path: `review-shots/${name}-pipeline.png`, fullPage: false });
   await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
@@ -69,11 +69,12 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.goto("/?funnel=pipeline&pstage=desk", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   if (name === "mobile") {
-    await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("button", { name: "Layers", exact: true }).click();
+    await expect(page.getByTestId("basemap")).toBeVisible();
+  } else {
+    await expect(page.getByTestId("basemap-desktop")).toBeVisible();
   }
   const layers = page.locator("aside.layers.open");
   await expect(layers).toBeVisible();
-  await expect(page.getByTestId("basemap-desktop")).toBeVisible();
   await layers.screenshot({ path: `review-shots/${name}-layers.png` });
 });

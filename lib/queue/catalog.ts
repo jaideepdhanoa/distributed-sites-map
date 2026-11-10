@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isPipelineStore } from "@/lib/labels";
 import { safeSnapshot } from "@/lib/policy/banned";
 import type { ChangeEvent } from "./diff";
 
@@ -18,6 +19,8 @@ type DealProps = {
   firm?: string;
   folder_url?: string;
   is_c_store?: boolean;
+  business_type?: string;
+  description?: string;
 };
 
 type SiteProps = {
@@ -44,6 +47,8 @@ export type CatalogSite = {
   lng: number | null;
   lat: number | null;
   isCStore: boolean;
+  businessType: string;
+  description: string;
 };
 
 function readJson(name: string): unknown {
@@ -118,7 +123,15 @@ export function loadCatalog(): CatalogSite[] {
       folderUrl: /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(folder) ? folder : "",
       lng: Number.isFinite(lng) ? lng : null,
       lat: Number.isFinite(lat) ? lat : null,
-      isCStore: props.is_c_store === true,
+      isCStore: props.is_c_store === true || isPipelineStore({
+        kind: props.kind,
+        business_type: props.business_type,
+        name: props.name,
+        description: props.description,
+        source_line: props.source_line,
+      }),
+      businessType: String(props.business_type || ""),
+      description: String(props.description || props.source_line || ""),
     });
   }
   return out;

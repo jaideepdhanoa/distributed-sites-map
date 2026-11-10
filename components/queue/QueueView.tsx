@@ -174,7 +174,7 @@ export function ReviewBar({
       </div>
       <button type="button" className="primary" data-testid="queue-reviewed" onClick={onReviewed}>
         <span className="review-long">Mark reviewed</span>
-        <span className="review-short">Reviewed</span>
+        <span className="review-short">Mark reviewed</span>
       </button>
       <button type="button" className="review-more" data-testid="queue-more" aria-expanded={menu != null} aria-label="More actions" onClick={() => setMenu((value) => value === "more" ? null : "more")}>
         <span className="review-long">Actions</span>

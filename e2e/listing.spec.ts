@@ -31,8 +31,11 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(figures).toContainText("Attractiveness");
   const photos = page.getByTestId("site-photos");
   await expect(photos).toBeVisible();
-  const more = page.getByRole("button", { name: "Show more" });
-  if (await more.isVisible()) await more.click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    const next = new URL(page.url());
+    next.searchParams.set("sheet", "half");
+    await page.goto(next.toString());
+  }
   const thumb = page.getByTestId("photo-thumb").first();
   await expect(thumb).toBeVisible();
   await expect(thumb.locator("img")).toHaveAttribute("src", /^\/api\/data\/photos\/[a-f0-9]{20}\.jpg$/);

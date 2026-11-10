@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
+import { isPipelineStore } from "../lib/labels";
 
 type DealProps = {
   city?: string;
   kind?: string;
   stage_group?: string;
   is_c_store?: boolean;
+  business_type?: string;
+  name?: string;
 };
 
 export type CityPipelineCounts = {
@@ -22,7 +25,7 @@ export function cityPipelineCounts(city = "PHX", options: { cstore?: boolean } =
   const data = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
     features: { properties: DealProps }[];
   };
-  const rows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city && (options.cstore || !deal.is_c_store));
+  const rows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city && (options.cstore || !(deal.is_c_store || isPipelineStore(deal))));
   const count = (kind: string, group?: string) =>
     rows.filter((deal) => deal.kind === kind && (group == null || deal.stage_group === group)).length;
   const pipeline = count("pipeline");

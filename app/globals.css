@@ -766,6 +766,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .drawer .action { margin: 0; }
 @media (min-width: 768px) {
   .shell.drawer-open .maplibregl-ctrl-top-right { right: var(--drawer-width); }
+  .shell.drawer-open .map-float { right: calc(var(--drawer-width) + 10px); }
   .shell.drawer-open .layers { right: calc(var(--drawer-width) + 10px); z-index: 5; }
   .shell.drawer-open { --drawer-offset: var(--drawer-width); }
   .shell.filters-open .layers { z-index: 8; }
@@ -777,7 +778,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-pane { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; background: #faf7f1; }
 .shell.list-open .list-pane { display: flex; }
 .shell.list-open.drawer-open .list-pane { right: var(--drawer-width); }
-.shell.list-open .legend, .shell.list-open .layers { display: none; }
+.shell.list-open .legend, .shell.list-open .layers, .shell.list-open .map-float { display: none; }
 .shell.list-open .map-coverage,
 .shell.list-open .empty-map,
 .shell.list-open .location-note { display: none; }
@@ -1071,7 +1072,19 @@ tr { cursor: pointer; }
   .shell.table-open { grid-template-rows: auto 1fr; }
   .shell.table-open .map-stage { display: none; }
   .dock-tabs button { min-height: 44px; }
-  .layers, .legend { display: none; }
+  .legend { display: none; }
+  .layers:not(.open) {
+    display: block;
+    position: fixed;
+    top: 236px;
+    right: 8px;
+    z-index: 4;
+    width: auto;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
   .layers.open, .legend.open {
     display: grid;
     position: fixed;
@@ -1731,12 +1744,13 @@ tr { cursor: pointer; }
   align-items: center;
   width: 100%;
   min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--cream-0);
+  padding: 8px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink);
-  box-shadow: var(--shadow-1);
+  box-shadow: none;
   text-align: left;
   text-decoration: none;
   font-weight: 550;
@@ -1745,10 +1759,11 @@ tr { cursor: pointer; }
 .menu-sheet .menu-group > a:hover { background: var(--paper); }
 .menu-sheet .menu-identity {
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--paper);
+  padding: 10px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink);
   font-size: 15px;
   font-weight: 650;
@@ -1793,7 +1808,7 @@ tr { cursor: pointer; }
 .cities button { background: transparent; border: 0; box-shadow: none; color: var(--ink-2); height: 26px; }
 .cities button.on { background: var(--paper-card); color: var(--ink); box-shadow: 0 1px 2px rgba(28, 25, 20, 0.12); }
 .funnel-switch { background: var(--sand); }
-.funnel-switch button.on { background: var(--paper-card); color: var(--ink); box-shadow: 0 1px 2px rgba(28, 25, 20, 0.12); }
+.funnel-switch button.on { background: #1c1914; color: #fffdf8; box-shadow: none; }
 .funnel-row { min-height: 44px; border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); }
 .funnel button:not(.sub) {
   position: relative;
@@ -2026,7 +2041,7 @@ span.listing-link.muted { text-decoration: none; }
   background: transparent;
   border: 0;
   box-shadow: none;
-  top: 88px;
+  top: 188px;
 }
 .layers-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .layers-close { min-width: 72px; }
@@ -2115,6 +2130,11 @@ span.listing-link.muted { text-decoration: none; }
   .top .icon-btn, .phone-step, .review-launch { min-height: 44px; min-width: 44px; }
   .maplibregl-ctrl-top-right { top: 112px !important; right: 8px; }
   .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: calc(var(--sheet-h, 120px) + 8px); }
+  .map-float { top: 188px; right: 8px; }
+  .layers:not(.open) { top: 252px; right: 8px; }
+  .measure-bar .paper-btn { min-height: 44px; }
+  .funnel-switch.map-switch.only-mobile { display: inline-flex !important; }
+  .shell.sheet-full .map-float { display: none; }
   .map-tools {
     top: 188px;
     right: 12px;
@@ -2219,4 +2239,65 @@ span.listing-link.muted { text-decoration: none; }
 }
 @media (prefers-reduced-motion: reduce) and (max-width: 767px) {
   .drawer { transition: none; }
+}
+
+.map-float {
+  position: absolute;
+  z-index: 5;
+  top: 96px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.map-float .map-basemap { box-shadow: var(--shadow-1); }
+.measure-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.measure-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(280px, calc(100vw - 72px));
+  background: #fffdf8;
+  border: 1px solid #d6cebe;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #1c1914;
+}
+@media (min-width: 768px) {
+  .measure-bar .paper-btn { min-height: 32px; }
+}
+.layers .segmented, .popover .segmented { display: flex; width: 100%; }
+.layers .segmented > button, .popover .segmented > button { flex: 1; white-space: nowrap; padding: 4px 4px; font-size: 12px; }
+.layers label i { flex: none; }
+.layer-key { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.swatch.cstore { background: #b4533a; }
+.swatch.stage-dropped { background: #8d8376; }
+.filter-checks { display: grid; gap: 6px; margin-top: 8px; }
+.filter-checks label { display: flex; align-items: center; gap: 8px; }
+button.tool.on,
+button.paper-btn.on,
+.segmented > button.segmented.on {
+  background: #1c1914;
+  color: #fffdf8;
+  border-color: #1c1914;
+}
+@media (min-width: 768px) {
+  .layers.open {
+    top: 200px;
+    max-height: calc(100% - 216px);
+    overflow: auto;
+  }
+}
+@media (max-width: 767px) {
+  .map-float { top: 188px; right: 8px; }
+  .layers:not(.open) { top: 252px; right: 8px; }
+  .measure-bar .paper-btn { min-height: 44px; }
 }

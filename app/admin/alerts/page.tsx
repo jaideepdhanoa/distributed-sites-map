@@ -27,7 +27,7 @@ export default async function AlertPreviewPage() {
   if (session.role !== "admin") {
     return (
       <main className="card" style={{ margin: 40 }}>
-        <h1>Alert preview</h1>
+        <h1>Alerts admin</h1>
         <p>Only an admin can open this page.</p>
         <p><Link href="/">Back</Link></p>
       </main>
@@ -54,7 +54,7 @@ export default async function AlertPreviewPage() {
   }
   return (
     <main className="card" style={{ margin: 40, width: "min(720px, calc(100% - 48px))" }} data-testid="alert-preview">
-      <h1>Alert preview</h1>
+      <h1>Alerts admin</h1>
       <p className="note">
         These rows were not sent. They appear when neither Resend nor Gmail is configured, when the account is not approved for live mail, or when the daily cap of 400 was reached.
       </p>

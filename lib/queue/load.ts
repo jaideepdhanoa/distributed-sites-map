@@ -6,6 +6,7 @@ import { permanentSiteId } from "@/lib/actions/suggestions";
 import { InputError, parseDate, stamp } from "@/lib/actions/text";
 import { notifyFlag } from "@/lib/alerts/notify";
 import { getUsers } from "@/lib/users";
+import { isPipelineStore } from "@/lib/labels";
 import { loadCatalog, readBuildEvents } from "./catalog";
 import { listAppEvents } from "./events";
 import { buildQueue, type QueueFilters, type QueueReason } from "./order";
@@ -203,6 +204,12 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
   }
   const openThreads = new Map(threads.rows.map((row) => [row.target_id, Number(row.count)]));
   const firstTime = reviews.rows.length === 0;
+  const hiddenIds = new Set(catalog.filter((site) => site.isCStore || isPipelineStore({
+    kind: "pipeline",
+    business_type: site.businessType,
+    name: site.name,
+    description: site.description,
+  })).map((site) => site.id));
   const items = buildQueue({
     sites: catalog.map((site) => ({
       id: site.id,
@@ -210,7 +217,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
       stage: site.stage,
       stageGroup: site.stageGroup,
       active: site.active,
-      hidden: site.isCStore,
+      hidden: hiddenIds.has(site.id),
     })),
     reasons,
     reviewedAt,
@@ -221,13 +228,15 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
     needsApproval,
     today: pacificDay(),
     filters,
-  }).map((row) => {
+  }).filter((row) => !hiddenIds.has(row.siteId)).map((row) => {
     const site = catalog.find((item) => item.id === row.siteId);
     return {
       ...row,
       followed: followed.has(row.siteId),
       snapshot: site ? {
         name: site.name,
+        businessType: site.businessType,
+        description: site.description,
         address: site.address,
         city: site.city,
         stage: site.stage,

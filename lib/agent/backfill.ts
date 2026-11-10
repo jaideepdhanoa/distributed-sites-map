@@ -9,6 +9,7 @@ import {
   mentionFeed,
   noteFeed,
   noteThreadContext,
+  proposalEventFeed,
   suggestionFeed,
   type FeedInsert,
 } from "@/lib/agent/inbox";
@@ -110,10 +111,17 @@ async function place(
   return { siteId: id, recordId: id };
 }
 
-function decisionStatus(status: string): "accepted" | "rejected" | null {
+function decisionStatus(status: string): "accepted" | "rejected" | "agreed_waiting" | null {
   if (status === "rejected") return "rejected";
   if (status === "accepted" || status === "applied") return "accepted";
+  if (status === "agreed_waiting") return "agreed_waiting";
   return null;
+}
+
+function later(value: string): string {
+  const time = Date.parse(value);
+  if (Number.isNaN(time)) return value;
+  return new Date(time + 1000).toISOString();
 }
 
 /** Feed rows the live ingest would have written for notes, mentions, flags, proposals, and decisions. */
@@ -170,23 +178,42 @@ export async function planInboxBackfill(sql: Sql, lookup: RecordLookup = fileLoo
       stored: true,
       createdAt: isoTime(row.created_at),
     }));
-    const status = decisionStatus(row.status);
     const actor = (row.decided_by || "").trim();
-    if (!status || !actor) continue;
-    events.push(decisionFeed({
-      id: row.id,
-      status,
-      actorId: actor,
-      note: row.decision_note || "",
-      siteId,
-      recordId: row.target_id,
-      field: row.field_name,
-      detail: row.detail,
-      title: row.title,
-      proposedValue: row.proposed_value,
-      reason: row.reason,
-      createdAt: isoTime(row.decided_at) || isoTime(row.created_at),
-    }));
+    const when = isoTime(row.decided_at) || isoTime(row.created_at);
+    const status = decisionStatus(row.status);
+    if (status && actor) {
+      events.push(decisionFeed({
+        id: row.id,
+        refId: status === "agreed_waiting" ? `${row.id}:waiting` : row.id,
+        status,
+        actorId: actor,
+        note: row.decision_note || "",
+        siteId,
+        recordId: row.target_id,
+        field: row.field_name,
+        detail: row.detail,
+        title: row.title,
+        proposedValue: row.proposed_value,
+        reason: row.reason,
+        createdAt: when,
+      }));
+    }
+    if (row.status === "ready" || row.status === "overtaken") {
+      events.push(proposalEventFeed({
+        kind: row.status === "ready" ? "proposal_ready" : "proposal_overtaken",
+        id: row.id,
+        actorId: row.status === "ready" ? "system" : (actor || row.author_id),
+        note: row.decision_note || "",
+        siteId,
+        recordId: row.target_id,
+        field: row.field_name,
+        detail: row.detail,
+        title: row.title,
+        proposedValue: row.proposed_value,
+        reason: row.reason,
+        createdAt: row.status === "ready" ? later(when) : when,
+      }));
+    }
   }
   for (const flag of flags.rows) {
     if (!flag.from_user || !flag.site_id) continue;
@@ -214,12 +241,21 @@ export async function reconcileInboxThreads(sql: Sql): Promise<number> {
         FROM agent_inbox
         GROUP BY thread_key
       ) latest ON latest.thread_key = row.thread_key AND latest.created_at = row.created_at
-      WHERE row.kind = 'decision'
+      WHERE row.kind IN ('proposal_ready', 'proposal_overtaken')
+         OR (
+           row.kind = 'decision'
+           AND NOT EXISTS (
+             SELECT 1 FROM agent_inbox ready
+             WHERE ready.thread_key = row.thread_key
+               AND ready.created_at = row.created_at
+               AND ready.kind IN ('proposal_ready', 'proposal_overtaken')
+           )
+         )
          OR NOT EXISTS (
            SELECT 1 FROM agent_inbox other
            WHERE other.thread_key = row.thread_key
              AND other.created_at = row.created_at
-             AND other.kind = 'decision'
+             AND other.kind IN ('decision', 'proposal_ready', 'proposal_overtaken')
          )
     )
     UPDATE agent_inbox SET status = 'superseded'

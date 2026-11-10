@@ -135,7 +135,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
   );
   const openSteps = reviewer
     ? await sql.query<{ target_kind: "site" | "deal"; target_id: string }>(
-      `SELECT target_kind, target_id FROM suggestions WHERE field_name = 'proposed_next_step' AND status = 'open'`,
+      `SELECT target_kind, target_id FROM suggestions WHERE field_name = 'proposed_next_step' AND status IN ('open', 'ready')`,
       [],
     )
     : { rows: [] as { target_kind: "site" | "deal"; target_id: string }[] };

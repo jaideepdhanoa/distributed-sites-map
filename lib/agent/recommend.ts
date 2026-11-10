@@ -6,8 +6,8 @@ import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 
-export type RecommendationKind = "reply" | "decision";
-export type RecommendationDecision = "approve" | "reject" | "none";
+export type RecommendationKind = "reply" | "decision" | "status_reply";
+export type RecommendationDecision = "approve" | "reject" | "none" | "agree_waiting" | "close_overtaken";
 export type Confidence = "high" | "medium" | "low";
 
 export type RecommendationSource = { label: string; url?: string; ref?: string };
@@ -62,8 +62,8 @@ function sourcesOf(value: unknown): VisibleRecommendation["sources"] {
 export function parseRecommendation(body: unknown): RecommendationDraft {
   if (!body || typeof body !== "object") throw new FeedError("The recommendation could not be read.");
   const row = body as Record<string, unknown>;
-  const kind = row.kind === "reply" || row.kind === "decision" ? row.kind : null;
-  const decision = row.decision === "approve" || row.decision === "reject" || row.decision === "none" ? row.decision : null;
+  const kind = row.kind === "reply" || row.kind === "decision" || row.kind === "status_reply" ? row.kind : null;
+  const decision = row.decision === "approve" || row.decision === "reject" || row.decision === "none" || row.decision === "agree_waiting" || row.decision === "close_overtaken" ? row.decision : null;
   const confidence = row.confidence === "high" || row.confidence === "medium" || row.confidence === "low" ? row.confidence : null;
   const draftText = String(row.draft_text || "").trim();
   const rationale = String(row.rationale || "").trim();
@@ -71,7 +71,11 @@ export function parseRecommendation(body: unknown): RecommendationDraft {
   const sources = Array.isArray(row.sources) ? row.sources : [];
   if (!kind || !decision || !confidence) throw new FeedError("The recommendation could not be read.");
   if (kind === "reply" && decision !== "none") throw new FeedError("A reply draft does not decide the proposal.");
-  if (kind === "decision" && decision === "none") throw new FeedError("A decision draft names approve or reject.");
+  if (kind === "status_reply" && decision !== "none") throw new FeedError("A status reply keeps the proposal open.");
+  if (kind === "decision" && (decision === "none" || decision == null)) throw new FeedError("A decision draft names an outcome.");
+  if (kind === "decision" && decision !== "approve" && decision !== "reject" && decision !== "agree_waiting" && decision !== "close_overtaken") {
+    throw new FeedError("A decision draft names an outcome.");
+  }
   if (!draftText || draftText.length > 2000) throw new FeedError("Write the draft in 2000 characters or fewer.");
   if (!rationale || rationale.length > 2000) throw new FeedError("Add the rationale.");
   if (!model || model.length > 80) throw new FeedError("Name the model.");
@@ -102,10 +106,20 @@ export async function addRecommendation(sql: Sql, inboxId: string, draft: Recomm
   const row = inbox.rows[0];
   if (!row) throw new FeedError("That inbox row is not in the feed.", 404);
   if (row.status === "superseded") throw new FeedError("That inbox row was superseded.", 409);
-  if (draft.kind === "decision" && !row.proposal_id) throw new FeedError("A decision needs an open proposal.", 409);
+  if ((draft.kind === "decision" || draft.kind === "status_reply") && !row.proposal_id) {
+    throw new FeedError(draft.kind === "status_reply" ? "A status reply needs an open proposal." : "A decision needs an open proposal.", 409);
+  }
   if (row.proposal_id) {
     const proposal = await sql.query<{ status: string }>(`SELECT status FROM suggestions WHERE id = $1`, [row.proposal_id]);
-    if (proposal.rows[0]?.status !== "open") throw new FeedError("That proposal is no longer open.", 409);
+    const status = proposal.rows[0]?.status || "";
+    const open = status === "open" || status === "agreed_waiting" || status === "ready";
+    if (!open) throw new FeedError("That proposal is no longer open.", 409);
+    if (draft.kind === "decision" && draft.decision === "agree_waiting" && status !== "open") {
+      throw new FeedError("That proposal is no longer open.", 409);
+    }
+    if (draft.kind === "decision" && (draft.decision === "approve" || draft.decision === "reject") && status === "agreed_waiting") {
+      throw new FeedError("That proposal is waiting on blockers.", 409);
+    }
   }
   const id = randomUUID();
   await sql.query(
@@ -157,7 +171,7 @@ export async function listVisibleRecommendations(sql: Sql, username: string, rec
        AND (i.record_id = $1 OR i.site_id = $1)
        AND (
          i.proposal_id IS NULL
-         OR EXISTS (SELECT 1 FROM suggestions s WHERE s.id = i.proposal_id AND s.status = 'open')
+         OR EXISTS (SELECT 1 FROM suggestions s WHERE s.id = i.proposal_id AND s.status IN ('open', 'agreed_waiting', 'ready'))
        )
      ORDER BY r.created_at DESC, r.id DESC`,
     [recordId],
@@ -197,7 +211,8 @@ export async function attachRecommendation(
     [id],
   );
   const row = rows.rows[0];
-  if (!row || row.kind !== input.kind) return { recommendationId: null, draftedByAgent: null };
+  const allowed = input.kind === "reply" ? ["reply", "status_reply"] : [input.kind];
+  if (!row || !allowed.includes(row.kind)) return { recommendationId: null, draftedByAgent: null };
   await sql.query(`UPDATE agent_recommendations SET used_at = now() WHERE id = $1`, [id]);
   return { recommendationId: row.id, draftedByAgent: row.model };
 }

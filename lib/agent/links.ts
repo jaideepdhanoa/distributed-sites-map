@@ -1,6 +1,6 @@
 const PRODUCTION_ORIGIN = "https://distributedsites.com";
 
-type FeedKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap";
+type FeedKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap" | "proposal_ready" | "proposal_overtaken";
 
 /** APP_URL when set, otherwise the production map. No trailing slash. */
 export function configuredOrigin(): string {
@@ -35,7 +35,7 @@ export function feedSitePath(kind: FeedKind, siteId: string): string {
   if (kind === "note" || kind === "reply" || kind === "mention") {
     return `/?site=${site}&panel=discussion`;
   }
-  if (kind === "suggestion" || kind === "decision") {
+  if (kind === "suggestion" || kind === "decision" || kind === "proposal_ready" || kind === "proposal_overtaken") {
     return `/?site=${site}&panel=proposal`;
   }
   if (kind === "flag") {

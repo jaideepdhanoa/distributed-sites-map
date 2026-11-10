@@ -156,3 +156,31 @@ test("backfill is idempotent and keeps the original time, key, and thread", asyn
   assert.equal(preview.inserted, 0);
   assert.deepEqual(preview.byKind, {});
 });
+
+test("backfill emits ready and overtaken once and leaves an open proposal open", async () => {
+  const sql = await memorySql();
+  await migrate(sql);
+  await sql.query(
+    `INSERT INTO suggestions (
+      id, target_kind, target_id, field_name, detail, proposed_value, reason, status, author_id, title, created_at, decided_by, decided_at, decision_note
+    ) VALUES
+      ('keep', 'deal', 'PIPE-PHX-0008', 'proposed_next_step', 'stage_move', 'financial', 'Interest.', 'open', 'cindel', 'Prioritize', '2026-02-01T15:00:00.000Z', NULL, NULL, NULL),
+      ('wait', 'deal', 'PIPE-PHX-0008', 'proposed_next_step', 'stage_move', 'financial', 'Interest.', 'agreed_waiting', 'cindel', 'Prioritize', '2026-02-02T15:00:00.000Z', 'reviewer', '2026-02-03T15:00:00.000Z', 'Waiting on the file.'),
+      ('go', 'deal', 'PIPE-PHX-0008', 'proposed_next_step', 'stage_move', 'financial', 'Interest.', 'ready', 'cindel', 'Prioritize', '2026-02-04T15:00:00.000Z', 'reviewer', '2026-02-05T15:00:00.000Z', 'Clear.'),
+      ('moot', 'deal', 'PIPE-PHX-0008', 'proposed_next_step', 'stage_move', 'financial', 'Interest.', 'overtaken', 'cindel', 'Prioritize', '2026-02-06T15:00:00.000Z', 'reviewer', '2026-02-07T15:00:00.000Z', 'The site was already dropped.')`,
+  );
+  const first = await backfillInbox(sql, { dryRun: false, lookup });
+  assert.equal(first.byKind.suggestion, 4);
+  assert.equal(first.byKind.decision, 1);
+  assert.equal(first.byKind.proposal_ready, 1);
+  assert.equal(first.byKind.proposal_overtaken, 1);
+  const second = await backfillInbox(sql, { dryRun: false, lookup });
+  assert.equal(second.inserted, 0);
+  const statuses = await sql.query<{ id: string; status: string }>(`SELECT id, status FROM suggestions ORDER BY id`);
+  assert.deepEqual(statuses.rows.map((row) => `${row.id}:${row.status}`), ["go:ready", "keep:open", "moot:overtaken", "wait:agreed_waiting"]);
+  const ready = await sql.query<{ workbook_stage: boolean; actor: string }>(
+    `SELECT workbook_stage, actor FROM agent_inbox WHERE idempotency_key = 'proposal_ready:go'`,
+  );
+  assert.equal(ready.rows[0].workbook_stage, false);
+  assert.equal(ready.rows[0].actor, "system");
+});

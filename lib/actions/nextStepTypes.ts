@@ -1,7 +1,7 @@
 import { stageTitle } from "@/lib/labels";
 
 export const NEXT_STEP_TYPES = [
-  { id: "stage_move", label: "Advance" },
+  { id: "stage_move", label: "Prioritize: push to Financials" },
   { id: "knock_off", label: "Drop with a reason" },
   { id: "mark_duplicate", label: "Mark duplicate" },
   { id: "bring_back", label: "Bring back" },

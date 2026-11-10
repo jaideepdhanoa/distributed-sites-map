@@ -13,9 +13,16 @@ export function SuggestedBlock({
   onUse: (draft: string, id: string) => void;
   onDismiss: (id: string) => void;
 }) {
-  const decision = item.kind === "decision" && item.decision !== "none"
-    ? item.decision === "approve" ? "Approve" : "Reject"
-    : "";
+  const decisionLabel = item.decision === "approve"
+    ? "Accept"
+    : item.decision === "reject"
+      ? "Reject"
+      : item.decision === "agree_waiting"
+        ? "Agreed, waiting"
+        : item.decision === "close_overtaken"
+          ? "Closed, overtaken"
+          : "";
+  const decision = item.kind === "status_reply" ? "Reply" : item.kind === "decision" ? decisionLabel : "";
   return (
     <section className="suggest" data-testid="suggested-block">
       <div className="suggest-head">

@@ -126,7 +126,7 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
   await panel.getByTestId("panel-tab-discussion").click();
   const proposal = panel.getByTestId("proposed-next-step").filter({ hasText: "Ask for the sales package" });
   await expect(proposal).toBeVisible();
-  await proposal.getByRole("button", { name: "Accept" }).click();
+  await proposal.getByRole("button", { name: "Send" }).click();
   await expect.poll(async () => {
     const listed = await request.get(`/api/actions/suggestions?targetKind=deal&targetId=${deal}`);
     const body = (await listed.json()) as { suggestions?: { title: string | null; status: string }[] };

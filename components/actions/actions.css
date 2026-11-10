@@ -114,6 +114,16 @@
 .next-card button.propose { background: var(--pine); color: #faf7f1; border-color: var(--pine); }
 .next-card .type-chips, .next-card .split { display: flex; flex-wrap: wrap; gap: 6px; }
 .next-card .type-chips button.on { background: var(--ink); color: #faf7f1; border-color: var(--ink); }
+.next-card .need-list { margin: 0; padding-left: 18px; font-size: 13px; }
+.next-card .need-list li { margin: 4px 0; }
+.next-card select.secondary { border-radius: 999px; min-height: 36px; background: #fffdf8; }
+.next-card button.propose { min-height: 36px; }
+@media (max-width: 720px) {
+  .next-card select.secondary,
+  .next-card button.propose,
+  .next-card textarea.field,
+  .next-card input.field { min-height: 44px; }
+}
 .next-card .split { display: grid; grid-template-columns: 1fr 1fr; }
 .next-card .split label, .next-card form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
 .next-card input, .next-card textarea, .next-card select {

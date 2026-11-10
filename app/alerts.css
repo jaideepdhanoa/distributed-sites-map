@@ -75,3 +75,14 @@
 .alert-warning {
   color: #6b4e16;
 }
+
+.alert-test {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin: 0 0 16px;
+}
+
+.alert-test p {
+  margin: 0;
+}

@@ -9,7 +9,7 @@
     "validate-data": "python3 scripts/build_data.py --check",
     "hash-password": "node scripts/hash-password.mjs",
     "add-user": "node scripts/hash-password.mjs --user",
-    "test": "node --import tsx --test tests/actions/*.test.ts tests/alerts/*.test.ts tests/api/*.test.ts tests/cstore.test.ts tests/review.test.ts tests/photos.test.ts tests/financials.test.ts tests/login.test.ts",
+    "test": "node --import tsx --test tests/actions/*.test.ts tests/alerts/*.test.ts tests/agent/*.test.ts tests/api/*.test.ts tests/cstore.test.ts tests/review.test.ts tests/photos.test.ts tests/financials.test.ts tests/login.test.ts",
     "test:e2e": "playwright test",
     "test:actions": "E2E_ACTIONS=1 playwright test e2e/actions.spec.ts e2e/queue.spec.ts",
     "test:timeline": "python3 -m unittest tests/timeline/test_timeline.py tests/timeline/test_site_id.py && node --experimental-strip-types --test tests/timeline/filter.test.ts",
@@ -17,7 +17,9 @@
     "reconcile-suggestions": "tsx scripts/reconcile-suggestions.ts"
   },
   "dependencies": {
+    "@ai-sdk/xai": "^5.0.40",
     "@tanstack/react-table": "^9.3.1",
+    "ai": "^7.0.166",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.68.0",
     "maplibre-gl": "^6.16.0",
@@ -25,7 +27,8 @@
     "nodemailer": "^10.4.0",
     "pg": "^8.23.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.15",

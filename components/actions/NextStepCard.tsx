@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { allowsAssignee, allowsDate, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
+import { SuggestedBlock } from "../agent/SuggestedBlock";
+import { useRecommendations } from "../agent/useRecommendations";
 import "./actions.css";
 import { canReview, canWrite, useActionStatus } from "./panel";
 
@@ -56,6 +58,9 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [decisionNote, setDecisionNote] = useState("");
+  const [decisionRecommendationId, setDecisionRecommendationId] = useState<string | null>(null);
+  const siteRecommendations = useRecommendations(id);
   const [reassigning, setReassigning] = useState(false);
   const [dating, setDating] = useState(false);
   const writable = canWrite(status.actionRole);
@@ -77,8 +82,18 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       setType(detail);
       setOpen(true);
     }
+    function onPrefill(event: Event) {
+      const detail = (event as CustomEvent<{ title?: string }>).detail;
+      setType("work_item");
+      setOpen(true);
+      if (detail?.title) setTitle(detail.title.slice(0, 120));
+    }
     window.addEventListener("sites-open-next-step", onOpen);
-    return () => window.removeEventListener("sites-open-next-step", onOpen);
+    window.addEventListener("sites-prefill-work-item", onPrefill);
+    return () => {
+      window.removeEventListener("sites-open-next-step", onOpen);
+      window.removeEventListener("sites-prefill-work-item", onPrefill);
+    };
   }, []);
 
   useEffect(() => {
@@ -262,10 +277,27 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
         {(knock || stepType === "mark_duplicate") && focus.reason ? <p className="reason"><strong>Reason:</strong> {focus.reason}</p> : null}
+        {siteRecommendations.rows.filter((item) => item.kind === "decision" && item.proposalId === focus.id).map((item) => (
+          <SuggestedBlock
+            key={item.id}
+            item={item}
+            onUse={(draft, recommendationId) => {
+              setDecisionNote(draft);
+              setDecisionRecommendationId(recommendationId);
+            }}
+            onDismiss={(recommendationId) => void siteRecommendations.dismiss(recommendationId)}
+          />
+        ))}
+        {decisionRecommendationId ? (
+          <label>
+            Decision note
+            <textarea className="field" aria-label="Decision note" data-testid="decision-note" value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} rows={3} maxLength={2000} />
+          </label>
+        ) : null}
         {reviewer ? (
           <div className="act-row">
-            <button type="button" className="propose" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "accepted" })}>Accept</button>
-            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "rejected" })} className="menu-item">Reject</button>
+            <button type="button" className="propose" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "accepted", note: decisionNote, recommendationId: decisionRecommendationId })}>Accept</button>
+            <button type="button" onClick={() => void submit(`/api/actions/suggestions/${focus.id}`, { status: "rejected", note: decisionNote, recommendationId: decisionRecommendationId })} className="menu-item">Reject</button>
             <button type="button" onClick={() => startEdit(focus)} className="menu-item">Edit</button>
           </div>
         ) : writable && focus.authorId === status.username ? (

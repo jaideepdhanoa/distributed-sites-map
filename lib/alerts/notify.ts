@@ -1,3 +1,4 @@
+import { ingestFlag, ingestNote, ingestSuggestion } from "@/lib/agent/inbox";
 import type { Sql } from "@/lib/actions/db";
 import { resolveActionRole } from "@/lib/actions/roles";
 import { loadCatalog } from "@/lib/queue/catalog";
@@ -60,7 +61,7 @@ function reviewerIds(): string[] {
 
 export async function notifyNote(
   sql: Sql,
-  input: { noteId: string; siteId: string; body: string; authorId: string; parentId: string | null; mentionIds: string[] },
+  input: { noteId: string; siteId: string; recordId?: string; body: string; authorId: string; parentId: string | null; mentionIds: string[] },
 ): Promise<void> {
   let instant = false;
   if (input.parentId) {
@@ -92,6 +93,7 @@ export async function notifyNote(
     refId: input.noteId,
   })) instant = true;
   if (instant) await flushInstant(sql);
+  await ingestNote(sql, input);
 }
 
 export async function notifySuggestion(
@@ -130,6 +132,7 @@ export async function notifySuggestion(
     refId: input.id,
   })) instant = true;
   if (instant) await flushInstant(sql);
+  await ingestSuggestion(sql, input);
 }
 
 export async function notifyFlag(
@@ -146,4 +149,5 @@ export async function notifyFlag(
     refId: input.id,
   });
   if (instant) await flushInstant(sql);
+  await ingestFlag(sql, input);
 }

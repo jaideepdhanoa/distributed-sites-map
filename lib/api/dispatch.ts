@@ -12,6 +12,13 @@ import * as suggestions from "@/lib/api/handlers/actions/suggestions";
 import * as suggestionsExport from "@/lib/api/handlers/actions/suggestions-export";
 import * as suggestionsId from "@/lib/api/handlers/actions/suggestions-id";
 import * as suggestionsDone from "@/lib/api/handlers/actions/suggestions-done";
+import * as recommendations from "@/lib/api/handlers/actions/recommendations";
+import * as recommendationsDismiss from "@/lib/api/handlers/actions/recommendations-dismiss";
+import * as agentInbox from "@/lib/api/handlers/agent/inbox";
+import * as agentInboxAck from "@/lib/api/handlers/agent/inbox-ack";
+import * as agentInboxRecommendation from "@/lib/api/handlers/agent/inbox-recommendation";
+import * as ask from "@/lib/api/handlers/ask";
+import * as askStatus from "@/lib/api/handlers/ask-status";
 import * as views from "@/lib/api/handlers/actions/views";
 import * as viewsId from "@/lib/api/handlers/actions/views-id";
 import * as digest from "@/lib/api/handlers/alerts/digest";
@@ -75,8 +82,13 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/actions/suggestions/:id/done", { POST: suggestionsDone.POST as Handler }),
   route("/api/actions/suggestions/:id", { POST: suggestionsId.POST as Handler, PATCH: suggestionsId.PATCH as Handler }),
   route("/api/actions/suggestions", { GET: suggestions.GET as Handler, POST: suggestions.POST as Handler }),
+  route("/api/actions/recommendations/:id/dismiss", { POST: recommendationsDismiss.POST as Handler }),
+  route("/api/actions/recommendations", { GET: recommendations.GET as Handler }),
   route("/api/actions/views/:id", { DELETE: viewsId.DELETE as Handler }),
   route("/api/actions/views", { GET: views.GET as Handler, POST: views.POST as Handler }),
+  route("/api/agent/inbox/ack", { POST: agentInboxAck.POST as Handler }),
+  route("/api/agent/inbox/:id/recommendation", { POST: agentInboxRecommendation.POST as Handler }),
+  route("/api/agent/inbox", { GET: agentInbox.GET as Handler }),
   route("/api/alerts/digest", { GET: digest.GET as Handler }),
   route("/api/alerts/flush", { GET: flush.GET as Handler, POST: flush.POST as Handler }),
   route("/api/alerts/preferences", { GET: preferences.GET as Handler, PUT: preferences.PUT as Handler }),
@@ -93,6 +105,8 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/timeline/summary", { GET: timelineSummary.GET as Handler }),
   route("/api/data/timeline", { GET: timeline.GET as Handler }),
   route("/api/data/unscreened", { GET: unscreened.GET as Handler }),
+  route("/api/ask/status", { GET: askStatus.GET as Handler }),
+  route("/api/ask", { POST: ask.POST as Handler }),
   route("/api/login", { POST: login.POST as Handler }),
   route("/api/logout", { POST: logout.POST as Handler }),
   route("/api/me", { GET: me.GET as Handler }),

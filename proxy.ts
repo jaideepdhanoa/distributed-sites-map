@@ -16,6 +16,7 @@ const OPEN = new Set([
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (OPEN.has(pathname) || pathname === "/maplibre-gl-worker.js") return NextResponse.next();
+  if (pathname.startsWith("/api/agent/")) return NextResponse.next();
   const session = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
   if (session) {
     const response = NextResponse.next();

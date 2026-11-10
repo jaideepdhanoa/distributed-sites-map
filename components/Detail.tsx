@@ -7,7 +7,7 @@ import Timeline from "./timeline/Timeline";
 import { spareTier } from "@/lib/filter";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
 import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
-import { nearestSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
+import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
@@ -66,6 +66,7 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           if (!info || !drawer || !sheet?.onSnap) return;
           if (Math.abs(info.y - event.clientY) < 10) {
             drawer.style.height = "";
+            sheet.onSnap(stepSheet(sheet.snap ?? "peek", "more"));
             return;
           }
           sheet.onSnap(nearestSheetSnap(drawer.getBoundingClientRect().height, window.innerHeight));

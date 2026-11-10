@@ -2,6 +2,7 @@
 data/source/
 node_modules
 .next
+.vercel/
 __pycache__/
 *.pyc
 .env

@@ -122,7 +122,7 @@
 .review-rail strong { font-size: 13px; }
 .review-rail span, .review-sheet span { font-size: 12px; color: var(--muted); }
 .review-row-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.review-row-chips em { font-style: normal; background: white; border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; font-size: 11px; color: var(--ink); }
+.review-row-chips em { font-style: normal; background: transparent; border: 0; border-radius: 0; padding: 0; font-size: 12px; color: var(--ink-3); }
 .queue-changes { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0; }
 .queue-changes li {
   display: inline-flex;

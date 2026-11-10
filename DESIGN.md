@@ -79,9 +79,18 @@ Do not put chrome in a `<details>` or `<summary>`. A closed `<details>` drops it
 
 Satellite is the default basemap. The choice is remembered in `localStorage` under `basemap` (`satellite` or `positron`). Street is the muted Positron style.
 
-On desktop the switch is the segmented control at the top of the Layers panel. On a phone it stays inside Map tools.
+On desktop the switch is one segmented control under the zoom buttons, always visible. On a phone it is only at the top of the Layers sheet.
 
-Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. Map tools stays inside the screen, clear of the zoom control.
+Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, and Measure. They stay inside the screen, clear of the zoom control.
+
+## One home for each control
+
+- A floating control is a pill on the map. Do not put a card behind a single button.
+- A single choice is a segmented control on one row. If it will not fit, use a secondary select. Do not wrap pills onto a second row.
+- On/off switches and single choices never share one chip row.
+- A control has one home. A new entry point replaces the old one.
+- Map chrome is only zoom, the basemap switch, Layers, and Measure. Anything else goes in Layers or More.
+- A filter shows as an active-filter chip and changes the counts, or it does not ship.
 
 ## CI guards
 

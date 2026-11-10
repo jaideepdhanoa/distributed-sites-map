@@ -253,6 +253,13 @@ export function openLandText(value?: number | null) {
   return `${Math.round(value).toLocaleString()} sq ft`;
 }
 
+/** One spare-land figure, in square feet. Workbook square feet win; otherwise own-parcel acres become a census estimate. */
+export function spareLandSqft(sqft?: number | null, acres?: number | null) {
+  if (sqft != null) return { value: openLandText(sqft), note: "Aerial check" };
+  if (acres != null) return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
+  return { value: "Not measured", note: "" };
+}
+
 function daySpan(iso: string, today: Date) {
   const then = new Date(`${iso.slice(0, 10)}T00:00:00`);
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());

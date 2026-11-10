@@ -67,17 +67,16 @@ test.beforeEach(async ({ page }) => {
   await page.route(/arcgisonline\.com/, (route) => route.abort());
 });
 
-test("mobile legend and menu are not open together", async ({ page }, info) => {
+test("mobile layers and the menu are not open together", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile");
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   await page.getByRole("button", { name: "Menu" }).click();
-  await page.getByRole("button", { name: "Legend" }).click();
-  await expect(page.locator(".legend.open")).toBeVisible();
-  await expect(page.locator(".menu-sheet")).toBeHidden();
-  await page.getByRole("button", { name: "Menu" }).click();
   await expect(page.locator(".menu-sheet")).toBeVisible();
-  await expect(page.locator(".legend.open")).toHaveCount(0);
+  await expect(page.locator(".legend")).toHaveCount(0);
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(page.locator(".layers.open")).toBeVisible();
+  await expect(page.locator(".menu-sheet")).toBeHidden();
 });
 
 test("Back returns to the previous city and step", async ({ page }, info) => {
@@ -112,30 +111,19 @@ test("a shared link restores the city, step, filter, card, and table", async ({ 
   expect(page.url()).toContain("table=1");
 });
 
-test("export matches the rows and columns on screen", async ({ page }, info) => {
-  await page.goto("/?stage=cleared&table=1", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(info.project.name === "mobile" ? ".dock .stack-list button" : ".dock tbody tr");
-  const headers = await page.locator(".dock thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()));
-  const rowIds = await page.locator(".dock tbody tr td:first-child").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").trim()));
+test("export matches the rows and columns on screen", async ({ page }) => {
+  await page.goto("/?stage=cleared&view=list", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".list-pane tbody tr");
+  const headers = await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter(Boolean));
+  const rowIds = await page.locator(".list-pane tbody tr td:first-child").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").trim()));
   expect(rowIds.length).toBeGreaterThan(0);
-  if (info.project.name === "mobile") {
-    await page.getByRole("button", { name: "Menu" }).click();
-  } else {
-    await page.getByRole("button", { name: "More" }).click();
-  }
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export CSV" }).click();
   const download = await downloadPromise;
   const csv = (await import("node:fs")).readFileSync((await download.path()) || "", "utf8");
-  const first = csv.split(/\r?\n/, 1)[0];
-  expect(first.startsWith("# Filters:")).toBeTruthy();
-  expect(first).toContain("city PHX");
-  expect(first).toContain("step cleared");
-  const parsed = parseCsv(csv.split(/\r?\n/).slice(1).join("\n")).filter((row) => row.some(Boolean));
+  const parsed = parseCsv(csv).filter((row) => row.some(Boolean));
   expect(parsed[0]).toEqual(headers);
   expect(parsed.slice(1).map((row) => row[0]).sort()).toEqual([...rowIds].sort());
-  if (info.project.name === "desktop") await expect(page.locator(".more-wrap .menu")).toBeHidden();
-  else await expect(page.locator(".menu-sheet")).toBeHidden();
 });
 
 test("review holds are Possible and the page has no banned terms", async ({ page }, info) => {

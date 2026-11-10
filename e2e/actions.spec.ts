@@ -52,8 +52,11 @@ test("viewer is read only on the server and in the card", async ({ page, request
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-viewer-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  const more = page.getByRole("button", { name: "Show more" });
-  if (await more.isVisible()) await more.click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    const next = new URL(page.url());
+    next.searchParams.set("sheet", "half");
+    await page.goto(next.toString());
+  }
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-viewer-mobile.png" });
 });
 
@@ -75,8 +78,11 @@ test("blocked wording is rejected and is not echoed", async ({ page, request }) 
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  const more = page.getByRole("button", { name: "Show more" });
-  if (await more.isVisible()) await more.click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    const next = new URL(page.url());
+    next.searchParams.set("sheet", "half");
+    await page.goto(next.toString());
+  }
   await page.getByTestId("record-actions").screenshot({ path: "/opt/cursor/artifacts/actions-contributor-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByTestId("note-body").fill(`Please check ${word} before Friday.`);
@@ -170,8 +176,11 @@ test("a contributor can reply, and a non-reviewer cannot approve a next step", a
   await expect(page.getByTestId("note-threads")).toContainText("The driveway is the tight part.");
   await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  const more = page.getByRole("button", { name: "Show more" });
-  if (await more.isVisible()) await more.click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    const next = new URL(page.url());
+    next.searchParams.set("sheet", "half");
+    await page.goto(next.toString());
+  }
   await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-mobile.png" });
 });
 
@@ -205,8 +214,11 @@ test("a reviewer approval shows the next step on the card", async ({ page, reque
   await expect(next).toContainText("Nov 20");
   await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  const more = page.getByRole("button", { name: "Show more" });
-  if (await more.isVisible()) await more.click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    const next = new URL(page.url());
+    next.searchParams.set("sheet", "half");
+    await page.goto(next.toString());
+  }
   await next.screenshot({ path: "/opt/cursor/artifacts/actions-next-step-mobile.png" });
 });
 
@@ -247,9 +259,10 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await page.getByRole("textbox", { name: "Search" }).first().fill("");
   await page.waitForFunction(() => !location.search.includes("q="));
   await page.screenshot({ path: "/opt/cursor/artifacts/cstore-hidden-list.png" });
-  await page.locator("button.tool", { hasText: "Filters" }).click();
-  await page.getByTestId("cstore-toggle").click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  await page.getByTestId("cstore-layer").click();
   await expect(page).toHaveURL(/cstore=1/);
+  await page.getByRole("button", { name: "List", exact: true }).click();
   const sinclair = page.getByTestId("pipeline-list").getByText("Sinclair").first();
   await expect(sinclair).toBeVisible();
   await sinclair.scrollIntoViewIfNeeded();
@@ -307,7 +320,7 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
 
   await page.goto("/?funnel=pipeline&pstage=desk");
   await page.getByRole("button", { name: /Account menu/ }).click();
-  await page.getByRole("menuitem", { name: "Alerts" }).click();
+  await page.getByRole("menuitem", { name: "Alert settings" }).click();
   const settings = page.getByTestId("alert-settings");
   await expect(settings).toBeVisible();
   await expect(settings).toContainText("Approvals");
@@ -319,7 +332,7 @@ test("the account menu stays above the review bar", async ({ page }) => {
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any");
   await expect(page.getByTestId("review-bar")).toBeVisible();
   await page.getByRole("button", { name: /Account menu/ }).click();
-  await page.getByRole("menuitem", { name: "Alerts" }).click();
+  await page.getByRole("menuitem", { name: "Alert settings" }).click();
   await expect(page.getByTestId("alert-settings")).toBeVisible();
 });
 

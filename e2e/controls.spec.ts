@@ -32,26 +32,21 @@ test("phone list, columns, compare, and layers are not browser controls", async 
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/?funnel=pipeline&city=LAS&pstage=desk&view=list");
   await expect(page.getByTestId("pipeline-list")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Columns" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Columns" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Filters" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Sort" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Show on map" }).first()).toBeVisible();
   expect(await nativeControls(page)).toEqual([]);
 
-  await page.getByRole("button", { name: "Columns" }).click();
-  await expect(page.locator(".col-picker input.check").first()).toBeVisible();
-  await expect(page.locator(".col-picker input.check:checked").first()).toHaveCSS("background-color", "rgb(30, 70, 54)");
-  expect(await nativeControls(page)).toEqual([]);
-  await page.getByRole("button", { name: "Columns" }).click();
-
   await page.locator(".list-cards button.list-row").first().click();
-  await expect(page.getByRole("checkbox", { name: "Compare" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /compare/i })).toBeVisible();
   expect(await nativeControls(page)).toEqual([]);
 
   await page.goto("/?funnel=pipeline&city=LAS&pstage=desk");
-  await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
-  await expect(page.getByTestId("basemap-desktop")).toBeVisible();
-  const tools = await page.getByRole("button", { name: "Map tools" }).boundingBox();
-  expect(tools && tools.x >= 0 && tools.x + tools.width <= 390).toBeTruthy();
+  await expect(page.getByTestId("basemap")).toBeVisible();
+  const measure = await page.getByTestId("measure").boundingBox();
+  expect(measure && measure.x >= 0 && measure.x + measure.width <= 390).toBeTruthy();
   expect(await nativeControls(page)).toEqual([]);
 });

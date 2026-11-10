@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { acreUnit, baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, showsFinancials, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { panelFromDeal, safePackageHref, type FinancialPanel } from "@/lib/financials";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
@@ -71,15 +71,14 @@ export function SitePacket({
   const facts = factsForSite(site);
   const capacity = capacityTiles(facts);
   const asking = site.asking_price_display || "";
-  const ownSpare = site.spare_ac_own != null ? acreUnit(site.spare_ac_own, site.spare_ac_own_text) : "";
+  const spare = spareLandSqft(null, site.spare_ac_own);
   const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
   return (
     <section className="key-strip packet" data-testid="key-strip">
       <h3 className="job">Space</h3>
       <div className="metrics">
         {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
-        {ownSpare ? <Metric icon={Trees} label="Universe own spare" value={ownSpare} note="Census own-parcel spare, acres" /> : null}
-        {!acres && !ownSpare ? <Metric icon={Trees} label="Spare" value="Not measured" /> : null}
+        <Metric icon={Trees} label="Spare land" value={spare.value} note={spare.note} />
       </div>
       <h3 className="job">Capacity</h3>
       {capacity.length ? (
@@ -148,7 +147,7 @@ export default function KeyStrip({
   const growth = trade.find((line) => line.startsWith("Growth "));
   const income = trade.find((line) => line.startsWith("Income "));
   const listing = listingCue(deal);
-  const ownSpare = universeSite?.spare_ac_own != null ? acreUnit(universeSite.spare_ac_own, universeSite.spare_ac_own_text) : "";
+  const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own);
   const trafficValue = deal.trade_aadt != null ? `${Math.round(deal.trade_aadt).toLocaleString()} vehicles/day` : "";
   const trafficNote = traffic
     .replace(/^[\d,]+ vehicles\/day · /, "")
@@ -161,8 +160,7 @@ export default function KeyStrip({
       <h3 className="job">Space</h3>
       <div className="metrics">
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
-        <Metric icon={Trees} label="Workbook spare" value={deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured"} note="Sheet spare area, square feet" />
-        {ownSpare ? <Metric icon={Trees} label="Universe own spare" value={ownSpare} note="Census own-parcel spare, acres" /> : null}
+        <Metric icon={Trees} label="Spare land" value={spare.value} note={spare.note} />
         <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "Not provided"} />
       </div>
       <h3 className="job">Capacity</h3>

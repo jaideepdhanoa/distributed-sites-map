@@ -2,7 +2,27 @@ import { mkdir } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
-const deal = "PIPE-PHX-0081";
+
+type DealProps = {
+  deal_id?: string;
+  kind?: string;
+  stage_group?: string;
+  is_c_store?: boolean;
+};
+
+// The viable queue hides dropped deals and c-stores. Pick one from the file so a sync can change which id that is.
+async function activePipelineDeal(request: APIRequestContext): Promise<string> {
+  const response = await request.get("/api/data/deals");
+  expect(response.ok()).toBeTruthy();
+  const body = (await response.json()) as { features?: { properties?: DealProps }[] };
+  const ids = (body.features || [])
+    .map((feature) => feature.properties || {})
+    .filter((props) => props.kind === "pipeline" && props.stage_group !== "dropped" && props.is_c_store !== true && props.deal_id)
+    .map((props) => String(props.deal_id))
+    .sort();
+  expect(ids.length).toBeGreaterThan(0);
+  return ids[0];
+}
 
 test.describe.configure({ mode: "serial" });
 
@@ -36,6 +56,7 @@ async function queue(request: APIRequestContext, query = "market=all&stage=any&v
 test("a new site can be reviewed, and a later note puts it back", async ({ page, request }) => {
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await login(request, "contributor");
+  const deal = await activePipelineDeal(request);
   // A failed later test retries this whole file, which can leave the site reviewed or snoozed.
   const unsnooze = await request.post("/api/queue/snooze", { data: { siteId: deal, until: "2000-01-01" } });
   expect(unsnooze.ok()).toBeTruthy();
@@ -63,6 +84,7 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
 
 test("flagging shows the site to the other account, and snooze hides it until the date", async ({ request }) => {
   await login(request, "contributor");
+  const deal = await activePipelineDeal(request);
   const flagged = await request.post("/api/queue/flag", { data: { siteId: deal, toUser: "reviewer", note: "Please take this one next." } });
   expect(flagged.ok()).toBeTruthy();
   await login(request, "reviewer");
@@ -79,6 +101,7 @@ test("flagging shows the site to the other account, and snooze hides it until th
 
 test("a reviewer can approve a next step from the queue", async ({ page, request }) => {
   await login(request, "contributor");
+  const deal = await activePipelineDeal(request);
   const before = await request.get("/api/data/deals");
   const beforeBody = await before.text();
   const created = await request.post("/api/actions/suggestions", {
@@ -136,6 +159,7 @@ test("a mention is queued only for the mentioned account", async ({ page, reques
 
 test("an assignment shows under Assigned to me, and a non-owner cannot mark it done", async ({ page, request }) => {
   await login(request, "contributor");
+  const deal = await activePipelineDeal(request);
   const created = await request.post("/api/actions/suggestions", {
     data: {
       targetKind: "deal",

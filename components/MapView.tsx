@@ -74,6 +74,43 @@ function glide(map: Map, center: [number, number], zoom: number) {
   map.flyTo({ center, zoom, duration: reduce ? 0 : 300, essential: true });
 }
 
+function markCentered(map: Map, id: string, lng: number, lat: number) {
+  const node = map.getContainer();
+  node.dataset.centered = id;
+  node.dataset.lng = lng.toFixed(4);
+  node.dataset.lat = lat.toFixed(4);
+}
+
+function fitMap(
+  map: Map,
+  bounds: [[number, number], [number, number]],
+  options: { padding: { top: number; bottom: number; left: number; right: number }; maxZoom?: number; duration?: number },
+) {
+  const center: [number, number] = [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
+  const box = map.getContainer();
+  const spanLng = Math.abs(bounds[1][0] - bounds[0][0]);
+  const spanLat = Math.abs(bounds[1][1] - bounds[0][1]);
+  const reserved = map.getPadding();
+  const roomHeight = box.clientHeight - (reserved.top ?? 0) - (reserved.bottom ?? 0);
+  const roomWidth = box.clientWidth - (reserved.left ?? 0) - (reserved.right ?? 0);
+  if (roomWidth < 48 || roomHeight < 48 || (spanLng < 1e-6 && spanLat < 1e-6)) {
+    glide(map, center, options.maxZoom ?? 12);
+    return;
+  }
+  const padding = {
+    top: Math.min(options.padding.top, Math.floor(roomHeight / 5)),
+    bottom: Math.min(options.padding.bottom, Math.floor(roomHeight / 5)),
+    left: Math.min(options.padding.left, Math.floor(roomWidth / 6)),
+    right: Math.min(options.padding.right, Math.floor(roomWidth / 6)),
+  };
+  const fitted = { ...options, padding };
+  if (!map.cameraForBounds(bounds, fitted)) {
+    glide(map, center, options.maxZoom ?? 12);
+    return;
+  }
+  map.fitBounds(bounds, fitted);
+}
+
 function acresOf(coords: [number, number][]) {
   const radius = 6378137;
   let area = 0;
@@ -1025,7 +1062,8 @@ export default function MapView(props: Props) {
         appliedFocus.current = focusToken;
         const lngs = finiteFit.map((point) => point[0]);
         const lats = finiteFit.map((point) => point[1]);
-        map.fitBounds(
+        fitMap(
+          map,
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 28, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
@@ -1094,6 +1132,7 @@ export default function MapView(props: Props) {
       if (!geometry || geometry.type !== "Point") return;
       const pin = geometry.coordinates as [number, number];
       const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
+      markCentered(map, props.selectedId || "", pin[0], pin[1]);
       if (!extra.length) {
         glide(map, pin, 16);
         return;
@@ -1102,7 +1141,8 @@ export default function MapView(props: Props) {
       const lngs = points.map((point) => point[0]);
       const lats = points.map((point) => point[1]);
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      map.fitBounds(
+      fitMap(
+        map,
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         { padding: { top: 88, bottom: 56, left: 48, right: 430 }, maxZoom: 15, duration: reduce ? 0 : 300 },
       );

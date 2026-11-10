@@ -154,6 +154,7 @@ export default function Explorer() {
   const sheetQuery = params.get("sheet");
   const sheetQueryRef = useRef(sheetQuery);
   sheetQueryRef.current = sheetQuery;
+  const placedSite = useRef("");
   const [sheetSnap, setSheetSnap] = useState<SheetSnap>(() => initialSheetSnap(sheetQuery));
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
@@ -833,11 +834,67 @@ export default function Explorer() {
     window.location.href = "/login";
   }
 
+  function selectionPatch(id: string): Record<string, string | null> {
+    const patch: Record<string, string | null> = {};
+    const deal = dealRows.find((row) => row.deal_id === id);
+    if (deal) {
+      if (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA") {
+        const wantCity = deal.city === "PHX" ? null : deal.city;
+        if ((params.get("city") || null) !== wantCity) patch.city = wantCity;
+      }
+      if (params.get("funnel") !== "pipeline") {
+        patch.funnel = "pipeline";
+        patch.tab = "pipeline";
+      }
+      const known = PIPE_STEPS.some((step) => step.id === deal.stage_group);
+      const wantStage = !known ? "all" : deal.stage_group === "desk" ? null : deal.stage_group;
+      const stageShown = params.get("pstage") === "all"
+        || (deal.stage_group === "desk" ? !params.get("pstage") : params.get("pstage") === deal.stage_group);
+      if (!stageShown) patch.pstage = wantStage;
+      if (deal.kind === "land" && params.get("landlayer") === "0") patch.landlayer = null;
+      return patch;
+    }
+    const site = features.find((feature) => feature.properties.site_id === id)?.properties;
+    if (!site) return patch;
+    if (site.city === "PHX" || site.city === "LAS" || site.city === "MIA") {
+      const wantCity = site.city === "PHX" ? null : site.city;
+      if ((params.get("city") || null) !== wantCity) patch.city = wantCity;
+    }
+    if (params.get("funnel") === "pipeline") {
+      patch.funnel = null;
+      patch.tab = null;
+    }
+    return patch;
+  }
+
+  useEffect(() => {
+    if (!data || !selected || reviewing) return;
+    if (placedSite.current === selected) return;
+    placedSite.current = selected;
+    const patch = selectionPatch(selected);
+    if (Object.keys(patch).length) write(patch);
+  }, [data, selected, reviewing, params]);
+
+  useEffect(() => {
+    const panel = params.get("panel") || "";
+    if (!selected || (panel !== "discussion" && panel !== "numbers" && panel !== "activity")) return;
+    const media = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      if (media.matches) setSheetSnap("full");
+    };
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [selected, params]);
+
   const reviewSiteId = reviewing && !caughtUp ? reviewCurrent?.siteId : undefined;
   useEffect(() => {
     if (!reviewing || !feedLoaded) return;
     if (reviewDeepSite && reviewDeepIndex < 0) {
       setSelected(reviewDeepSite);
+      if (!data || (params.get("view") !== "review" && params.get("review") !== "1")) return;
+      placedSite.current = reviewDeepSite;
+      write({ ...selectionPatch(reviewDeepSite), view: null, review: null, i: null, site: reviewDeepSite });
       return;
     }
     if (!reviewSiteId) {

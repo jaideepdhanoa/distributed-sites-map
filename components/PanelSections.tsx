@@ -32,10 +32,20 @@ export default function PanelSections({
     if (panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "overview") setTab(panel);
   }, [site, panel]);
   useEffect(() => {
-    if (panel === "discussion" || panel === "numbers" || panel === "activity") {
-      sections.current?.scrollIntoView({ block: "nearest" });
-    }
-  }, [site, panel]);
+    if (panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    const align = () => {
+      const node = sections.current;
+      const scroller = node?.closest(".drawer-scroll");
+      if (!node || !scroller) return;
+      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      scroller.scrollTo({ top: Math.max(0, top - 4) });
+    };
+    align();
+    const timers = [50, 250, 700].map((delay) => window.setTimeout(align, delay));
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [site, panel, tab]);
   const body = tab === "overview" ? overview : tab === "numbers" ? numbers : tab === "activity" ? activity : discussion;
   return (
     <div className="panel-sections" ref={sections}>

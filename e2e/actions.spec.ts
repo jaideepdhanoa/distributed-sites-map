@@ -47,9 +47,16 @@ test("a feed link opens that site and panel", async ({ page }) => {
   await expect(drawer).toContainText("PIPE-PHX-0008");
   const discussion = page.getByTestId("panel-tab-discussion");
   await expect(discussion).toHaveAttribute("aria-selected", "true");
+  await expect(discussion).toBeInViewport();
   await expect(page.getByTestId("record-actions")).toBeVisible();
   await mkdir("/opt/cursor/artifacts", { recursive: true });
   await discussion.screenshot({ path: "/opt/cursor/artifacts/feed-link-discussion.png" });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?site=PIPE-PHX-0008&panel=discussion");
+  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
+  await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   await page.goto("/?site=PIPE-PHX-0008&panel=proposal");
   await expect(drawer).toContainText("PIPE-PHX-0008");
@@ -64,9 +71,63 @@ test("a feed link opens that site and panel", async ({ page }) => {
 
   await page.goto("/?view=review&site=PIPE-PHX-0008");
   await expect(drawer).toContainText("PIPE-PHX-0008");
+  await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+  await expect(page.getByTestId("review-bar")).toHaveCount(0);
 
   await page.goto("/");
   await expect(page.locator("aside.drawer")).toHaveCount(0);
+});
+
+test("a site link switches market and centers the map", async ({ page }) => {
+  await openAs(page, "contributor", "/?site=PIPE-MIA-0080&panel=discussion");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "MIA");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0080");
+  const miami = page.locator(".map");
+  await expect(miami).toHaveAttribute("data-centered", "PIPE-MIA-0080");
+  const miamiLng = Number(await miami.getAttribute("data-lng"));
+  expect(miamiLng).toBeGreaterThan(-81.5);
+  expect(miamiLng).toBeLessThan(-79.5);
+  await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
+
+  await page.goto("/?site=PIPE-LAS-0073");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-LAS-0073");
+  const vegas = page.locator(".map");
+  await expect(vegas).toHaveAttribute("data-centered", "PIPE-LAS-0073");
+  const vegasLng = Number(await vegas.getAttribute("data-lng"));
+  expect(vegasLng).toBeLessThan(-114);
+});
+
+test("a review link highlights that site, or leaves review when it is not queued", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (/cannot fit within canvas/i.test(message.text())) errors.push(message.text());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", "/?review=1");
+  await expect(page.getByTestId("review-bar")).toBeVisible();
+  await page.waitForTimeout(1200);
+  expect(errors).toEqual([]);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const response = await page.request.get("/api/queue?market=all&stage=any&viable=1");
+  expect(response.ok()).toBeTruthy();
+  const body = (await response.json()) as { items?: { siteId: string; name?: string }[] };
+  const items = (body.items || []).filter((item) => item.siteId);
+  expect(items.length).toBeGreaterThan(1);
+  const target = items[items.length - 1];
+  await page.goto(`/?view=review&site=${target.siteId}`);
+  await expect(page.locator("aside.drawer")).toContainText(target.siteId);
+  await expect(page.locator(".shell")).toHaveClass(/reviewing/);
+  const highlighted = page.locator(".review-row.on");
+  await expect(highlighted).toHaveCount(1);
+  if (target.name) await expect(highlighted).toContainText(target.name);
+
+  await page.goto("/?view=review&site=PIPE-PHX-0008&panel=discussion");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+  await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
+  await expect(page.getByTestId("review-bar")).toHaveCount(0);
+  await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
 });
 
 test("a suggested draft links to that site", async ({ page, request }) => {

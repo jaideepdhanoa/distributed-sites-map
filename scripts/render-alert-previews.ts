@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
 import { renderAlert } from "../lib/alerts/template";
 import type { MailItem } from "../lib/alerts/compose";
-import { discussionHref, reviewHref } from "../lib/alerts/links";
+import { discussionHref, proposalHref, reviewHref } from "../lib/alerts/links";
 
 const now = new Date("2026-11-09T16:00:00.000Z");
 
@@ -13,7 +13,7 @@ function item(category: MailItem["category"], summary: string): MailItem {
     siteLabel: "Sample site",
     summary,
     authorId: "Ana",
-    href: category === "mentions" || category === "replies" ? discussionHref("sample") : reviewHref("sample"),
+    href: category === "approvals" || category === "assignments" ? proposalHref("sample") : category === "flags" ? reviewHref("sample") : discussionHref("sample"),
     market: "PHX",
     stage: "Desk screen",
   };

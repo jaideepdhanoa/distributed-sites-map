@@ -47,9 +47,11 @@ test("a test alert stays on the would-send log unless the account is approved fo
 });
 
 test("an approved account receives one sample instant alert and one sample digest", async () => {
+  const previousApp = process.env.APP_URL;
   delete process.env.SMTP_USER;
   delete process.env.SMTP_PASS;
   delete process.env.ALERT_FROM;
+  process.env.APP_URL = "https://preview.distributedsites.com";
   process.env.RESEND_API_KEY = "re_test_key";
   process.env.RESEND_EMAIL_DOMAIN = "distributedsites.com";
   const sql = await ready();
@@ -73,11 +75,24 @@ test("an approved account receives one sample instant alert and one sample diges
     assert.deepEqual(mail.to, ["jaideep@dhanoa.in"]);
     assert.match(mail.subject || "", /^\[Test\] /);
     assert.match(mail.text || "", /Sample site/);
-    assert.doesNotMatch(mail.text || "", /https?:\/\//);
+    assert.match(mail.text || "", /https:\/\/distributedsites\.com\//);
+    assert.doesNotMatch(mail.text || "", /preview\.|vercel\.app/);
+    assert.match(mail.html || "", /href="https:\/\/distributedsites\.com\//);
     assert.match(mail.html || "", /#1e4636/);
     assert.match(mail.html || "", /#fffdf8/);
     assert.doesNotMatch(mail.html || "", />https?:\/\//);
+    assert.doesNotMatch(mail.html || "", /preview\.|vercel\.app/);
   }
+  const approval = sent.find((mail) => (mail.subject || "").includes("Approval needed"));
+  const mention = sent.find((mail) => (mail.subject || "").includes("mentioned you"));
+  const flagged = sent.find((mail) => (mail.subject || "").includes("flagged"));
+  assert.match(approval?.text || "", /https:\/\/distributedsites\.com\/\?site=sample&panel=proposal/);
+  assert.match(approval?.html || "", /href="https:\/\/distributedsites\.com\/\?site=sample&amp;panel=proposal"/);
+  assert.match(approval?.html || "", /Open the proposal/);
+  assert.match(mention?.text || "", /https:\/\/distributedsites\.com\/\?site=sample&panel=discussion/);
+  assert.match(mention?.html || "", /href="https:\/\/distributedsites\.com\/\?site=sample&amp;panel=discussion"/);
+  assert.match(flagged?.text || "", /https:\/\/distributedsites\.com\/\?view=review&site=sample/);
+  assert.match(flagged?.html || "", /href="https:\/\/distributedsites\.com\/\?view=review&amp;site=sample"/);
   const subjects = sent.map((mail) => mail.subject || "");
   assert.equal(subjects.filter((subject) => subject.startsWith("[Test] Approval needed:")).length, 1);
   assert.equal(subjects.filter((subject) => subject.includes("mentioned you")).length, 1);
@@ -104,6 +119,8 @@ test("an approved account receives one sample instant alert and one sample diges
     globalThis.fetch = originalAgain;
     delete process.env.RESEND_API_KEY;
     delete process.env.RESEND_EMAIL_DOMAIN;
+    if (previousApp == null) delete process.env.APP_URL;
+    else process.env.APP_URL = previousApp;
   }
   assert.equal(calls, 6);
 });

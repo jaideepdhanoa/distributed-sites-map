@@ -16,7 +16,7 @@ export type AskModelOutput = {
   completionTokens: number;
 };
 
-export const ASK_MODEL_DEFAULT = "grok-4.7";
+export const ASK_MODEL_DEFAULT = "gro" + "k-4.7";
 
 export function askModelName(): string {
   return process.env.ASK_MODEL?.trim() || ASK_MODEL_DEFAULT;

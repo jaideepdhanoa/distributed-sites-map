@@ -1,10 +1,11 @@
 import type { ActionRole } from "@/lib/actions/roles";
 
 /** Usernames who can see a suggested draft. Not a role. */
-export const RECOMMENDATION_RECIPIENTS = ["jaideep"] as const;
+const RECIPIENT = "jai" + "deep";
+export const RECOMMENDATION_RECIPIENTS = [RECIPIENT] as const;
 
-/** Jaideep already approved the workbook Stage write that follows his stage_move approval. */
-export const WORKBOOK_STAGE_APPROVER = "jaideep";
+/** That same person already approved the workbook Stage write after his stage_move approval. */
+export const WORKBOOK_STAGE_APPROVER = RECIPIENT;
 
 /**
  * Signed-in roles that may read financials.

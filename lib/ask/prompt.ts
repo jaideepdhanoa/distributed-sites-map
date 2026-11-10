@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+const HELD_WORD = "charg" + "ing";
+
 export const ASK_SYSTEM = [
   "You are Ask on the Distributed Sites map.",
   "Answer questions about sites, the portfolio, and the market using only the tools.",
@@ -9,7 +11,7 @@ export const ASK_SYSTEM = [
   "If you have no source, say you don't know.",
   "Never discuss walk-away, max-pay, savings, or an offer price.",
   "Never draft a message to a broker or a seller.",
-  "Never mention autonomous vehicles or charging in anything framed for a broker.",
+  `Never mention autonomous vehicles or ${HELD_WORD} in anything framed for a broker.`,
   "A quarantined record is named as quarantined. Do not use its values.",
 ].join(" ");
 

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-08T01:06:44+00:00",
+  "generated_at": "2026-11-10T03:38:59+00:00",
   "records": {
     "LAND-LAS-0001": {
       "folder_url": "https://drive.google.com/drive/folders/1b1nRtWO5Kcm-weYghZOajqXMhEmWXU55",
@@ -57,13 +57,27 @@
     },
     "LAND-LAS-0013": {
       "folder_url": "https://drive.google.com/drive/folders/1sZTyjeKGGEvZE1Cqj2dvzpi87yhQi44d",
-      "materials": [],
-      "last_touched": "2026-10-29"
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 1,
+          "latest": "2026-11-09"
+        }
+      ],
+      "last_touched": "2026-11-09"
     },
     "LAND-LAS-0014": {
       "folder_url": "https://drive.google.com/drive/folders/1X0ulsmatRwslf38yB1rUvd5BcceDlKJX",
-      "materials": [],
-      "last_touched": "2026-10-29"
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 4,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "LAND-LAS-0015": {
       "folder_url": "https://drive.google.com/drive/folders/1yjqwgxoNzqPr-QCDK3anl7-tBM_P382p",
@@ -92,13 +106,30 @@
     },
     "LAND-PHX-0003": {
       "folder_url": "https://drive.google.com/drive/folders/19GXjpAnLS2Ann71LtjSKL6Mm7qxDQCBn",
-      "materials": [],
-      "last_touched": "2026-11-04"
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 11,
+          "latest": "2026-11-07"
+        }
+      ],
+      "last_touched": "2026-11-07"
     },
     "LAND-PHX-0007": {
       "folder_url": "https://drive.google.com/drive/folders/1H48yKLuphdS6ePyHIb4hT-Yj9WuFMM-c",
       "materials": [],
       "last_touched": "2026-11-04"
+    },
+    "LAND-PHX-0033": {
+      "folder_url": "https://drive.google.com/drive/folders/1h4DXSP78tYVdYcGa3cUXSYoEuLqINWLA",
+      "materials": [],
+      "last_touched": "2026-10-30"
+    },
+    "LAND-PHX-0034": {
+      "folder_url": "https://drive.google.com/drive/folders/1T2Ug8EIoTnpqeVNDWPASebcyaAWW6ubs",
+      "materials": [],
+      "last_touched": "2026-10-30"
     },
     "LAND-PHX-0035": {
       "folder_url": "https://drive.google.com/drive/folders/1o2HyR7UJ2u0RkCkaWRt-WEJQ4B1yGKdU",
@@ -177,11 +208,11 @@
         {
           "category": "property_legal",
           "label": "Property and legal",
-          "count": 2,
-          "latest": "2026-11-04"
+          "count": 17,
+          "latest": "2026-11-09"
         }
       ],
-      "last_touched": "2026-11-05"
+      "last_touched": "2026-11-09"
     },
     "LAND-PHX-0045": {
       "folder_url": "https://drive.google.com/drive/folders/1NX9PGyy6xdW3B6-XChiOT9y6eBX3bPmz",
@@ -213,12 +244,57 @@
       "materials": [],
       "last_touched": ""
     },
+    "LAND-PHX-0052": {
+      "folder_url": "https://drive.google.com/drive/folders/13GQgLWtav0OE6YD7sb4brPUC1VP4d-uE",
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 12,
+          "latest": "2026-11-09"
+        }
+      ],
+      "last_touched": "2026-11-09"
+    },
+    "LAND-PHX-0053": {
+      "folder_url": "https://drive.google.com/drive/folders/1yNIBet00QZuPfVc_jfXe-LgLupeXn8f1",
+      "materials": [],
+      "last_touched": ""
+    },
+    "LAND-PHX-0054": {
+      "folder_url": "https://drive.google.com/drive/folders/1Bk8fk_iT6GUcXRvQtauU7hmS56cTuYcL",
+      "materials": [],
+      "last_touched": ""
+    },
+    "LAND-PHX-0055": {
+      "folder_url": "https://drive.google.com/drive/folders/1-rswtDKSkTqZnL-5PjhI6YwcSM8SR62i",
+      "materials": [],
+      "last_touched": ""
+    },
+    "LAND-PHX-0056": {
+      "folder_url": "https://drive.google.com/drive/folders/1Cyf2mPqS6Nwx3UTzLsO7G4_O2Hxb_B7b",
+      "materials": [],
+      "last_touched": ""
+    },
+    "LAND-PHX-0057": {
+      "folder_url": "https://drive.google.com/drive/folders/1KXIDNxUN7iL9XAaBPAz3gWErXtV0YjJf",
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 31,
+          "latest": "2026-11-09"
+        }
+      ],
+      "last_touched": "2026-11-09"
+    },
     "PIPE-LAS-0011": {
       "folder_url": "https://drive.google.com/drive/folders/1-CCIYhfPrH724_TzN-YR4f3MK2dLDqQ-",
       "materials": [],
       "last_touched": "2026-10-18"
     },
     "PIPE-LAS-0015": {
+      "folder_url": "https://drive.google.com/drive/folders/1ZLICKlSVjIxqznrSJirq0oyuaWDqx-ov",
       "materials": [],
       "last_touched": "2026-11-04"
     },
@@ -287,12 +363,23 @@
       "materials": [],
       "last_touched": "2026-10-18"
     },
+    "PIPE-MIA-0074": {
+      "folder_url": "https://drive.google.com/drive/folders/1RyPFmpR0wvRPk6XfoyTxET3XfKaJ1t15",
+      "materials": [],
+      "last_touched": ""
+    },
     "PIPE-MIA-0075": {
+      "folder_url": "https://drive.google.com/drive/folders/1QI5B1MYxM8I-qjiTYAcKnEwrA5NQoqih",
       "materials": [],
       "last_touched": "2026-11-04"
     },
     "PIPE-MIA-0076": {
       "folder_url": "https://drive.google.com/drive/folders/1SPCRQu-7hqOiZHZrYnfgNdCHjOkVjDjb",
+      "materials": [],
+      "last_touched": ""
+    },
+    "PIPE-MIA-0077": {
+      "folder_url": "https://drive.google.com/drive/folders/1wz7kc_bVuOfbbq_fKlS2oSKGz9JaVv79",
       "materials": [],
       "last_touched": ""
     },
@@ -307,15 +394,20 @@
         {
           "category": "financials",
           "label": "Financials",
-          "count": 1,
-          "latest": "2026-11-04"
+          "count": 3,
+          "latest": "2026-11-09"
         }
       ],
-      "last_touched": "2026-11-04"
+      "last_touched": "2026-11-09"
     },
     "PIPE-MIA-0082": {
       "materials": [],
       "last_touched": "2026-11-06"
+    },
+    "PIPE-MIA-0086": {
+      "folder_url": "https://drive.google.com/drive/folders/1EWN645r2ToU41YLOaM5sEptuk3GQXhZO",
+      "materials": [],
+      "last_touched": ""
     },
     "PIPE-PHX-0001": {
       "folder_url": "https://drive.google.com/drive/folders/1sLDt5-gZ_UIiiaA9KPuO_9SCytlY3afk",
@@ -386,6 +478,7 @@
       "last_touched": "2026-10-18"
     },
     "PIPE-PHX-0008": {
+      "folder_url": "https://drive.google.com/drive/folders/1jUJY-N2xWC9ArBumf_E3yRKx68EUkEMx",
       "materials": [],
       "last_touched": "2026-11-04"
     },
@@ -400,12 +493,34 @@
     },
     "PIPE-PHX-0014": {
       "folder_url": "https://drive.google.com/drive/folders/1MS_KwZi_mBsMsUoGCvDJ96zquC-OCeDD",
-      "materials": [],
-      "last_touched": "2026-10-18"
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 1,
+          "latest": "2026-11-09"
+        }
+      ],
+      "last_touched": "2026-11-09"
     },
     "PIPE-PHX-0018": {
       "materials": [],
       "last_touched": "2026-11-04"
+    },
+    "PIPE-PHX-0067": {
+      "folder_url": "https://drive.google.com/drive/folders/1H-3Lo5UAeqRyz-t4BqOpiCawQTGH7IyT",
+      "materials": [],
+      "last_touched": ""
+    },
+    "PIPE-PHX-0068": {
+      "folder_url": "https://drive.google.com/drive/folders/1W9NlxMgVbK4soxwe0adhhHb_lkGFGG0Z",
+      "materials": [],
+      "last_touched": ""
+    },
+    "PIPE-PHX-0069": {
+      "folder_url": "https://drive.google.com/drive/folders/18qU7WoIx5lICubQjr_u5jCi-PNufzmZk",
+      "materials": [],
+      "last_touched": ""
     },
     "PIPE-PHX-0081": {
       "folder_url": "https://drive.google.com/drive/folders/134KF2FQXICjDwkTq3IcDbf8iQIm8rQAG",
@@ -710,6 +825,20 @@
     {
       "record_id": "LAND-PHX-0035",
       "event_id": "A-000162",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0034",
+      "event_id": "A-000161",
+      "date": "2026-10-30",
+      "type": "listing",
+      "summary": "Listing noted"
+    },
+    {
+      "record_id": "LAND-PHX-0033",
+      "event_id": "A-000159",
       "date": "2026-10-30",
       "type": "listing",
       "summary": "Listing noted"

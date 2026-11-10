@@ -1,11 +1,52 @@
 {
-  "new_sites": 1,
-  "removed_sites": 1,
+  "new_sites": 6,
+  "removed_sites": 2,
   "verdict_changes": 0,
-  "stage_moves": 0,
+  "stage_moves": 7,
   "sample_new": [
-    "WB-PHX-0030"
+    "WB-PHX-0031",
+    "WB-PHX-0032",
+    "WB-PHX-0033",
+    "WB-PHX-0034",
+    "WB-PHX-0035",
+    "WB-PHX-0036"
   ],
   "sample_verdicts": [],
-  "sample_stages": []
+  "sample_stages": [
+    {
+      "site_id": "MIA-U1274",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "site_id": "PHX-U326",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "site_id": "WB-PHX-0016",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "site_id": "WB-PHX-0017",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-PHX-0081",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "deal_id": "LAND-PHX-0033",
+      "before": "",
+      "after": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0034",
+      "before": "",
+      "after": "1 Desk screen"
+    }
+  ]
 }

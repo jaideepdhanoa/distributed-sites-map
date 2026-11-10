@@ -762,6 +762,34 @@
       "type": "activity",
       "at": "2026-11-08T01:05:55.173Z",
       "summary": "New activity: Stage set to Dropped on the broker's written word that the real estate is not for sale"
+    },
+    {
+      "id": "new_site:PIPE-MIA-0086:2026-11-10T03:38:17.690Z:new",
+      "siteId": "PIPE-MIA-0086",
+      "type": "new_site",
+      "at": "2026-11-10T03:38:17.690Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "price:PIPE-PHX-0006:2026-11-10T03:38:17.690Z:$725,000",
+      "siteId": "PIPE-PHX-0006",
+      "type": "price",
+      "at": "2026-11-10T03:38:17.690Z",
+      "summary": "Asking price is $725,000, from Car Wash Brokers Inc."
+    },
+    {
+      "id": "price:PIPE-PHX-0014:2026-11-10T03:38:17.690Z:$2,400,000",
+      "siteId": "PIPE-PHX-0014",
+      "type": "price",
+      "at": "2026-11-10T03:38:17.690Z",
+      "summary": "Asking price is $2,400,000, from Brad Ingarfield, Love Your Car LLC."
+    },
+    {
+      "id": "stage:PIPE-PHX-0081:2026-11-10T03:38:17.690Z:Dropped",
+      "siteId": "PIPE-PHX-0081",
+      "type": "stage",
+      "at": "2026-11-10T03:38:17.690Z",
+      "summary": "Stage is now Dropped."
     }
   ],
   "baseline": [
@@ -936,6 +964,16 @@
       "active": false
     },
     {
+      "id": "PIPE-MIA-0086",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$6,470,000",
+      "askingSource": "Alan Grobman",
+      "active": true
+    },
+    {
       "id": "PIPE-PHX-0001",
       "city": "PHX",
       "stage": "Dropped",
@@ -977,12 +1015,12 @@
     },
     {
       "id": "PIPE-PHX-0006",
-      "city": "12.0",
+      "city": "PHX",
       "stage": "Dropped",
       "stageGroup": "dropped",
       "verdict": "",
-      "askingPrice": "",
-      "askingSource": "PHX Auto repair, Maricopa County",
+      "askingPrice": "$725,000",
+      "askingSource": "Car Wash Brokers Inc",
       "active": false
     },
     {
@@ -1032,7 +1070,7 @@
       "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$2,400,000",
-      "askingSource": "Brad Ingarfield",
+      "askingSource": "Brad Ingarfield, Love Your Car LLC",
       "active": false
     },
     {
@@ -1078,12 +1116,12 @@
     {
       "id": "PIPE-PHX-0081",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "",
       "askingSource": "Car Wash Brokers Inc",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0083",

@@ -31,9 +31,9 @@ export default function LoginPage() {
       <form className="card" onSubmit={onSubmit}>
         <Wordmark level="p" />
         <h1>Sign in</h1>
-        <label>
-          Username
-          <input className="field" name="username" autoComplete="username" required />
+        <label htmlFor="username">
+          Username or email
+          <input id="username" className="field" name="username" autoComplete="username" required />
         </label>
         <label>
           Password

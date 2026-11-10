@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import { findUserByLogin, loginLockName, passwordMatches } from "@/lib/login";
 import { clearFailures, lockStatus, recordFailure } from "@/lib/lockout";
 import { sessionCookieOptions, signSession, SESSION_COOKIE } from "@/lib/session";
-import { getUsers } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
-const DUMMY_HASH = bcrypt.hashSync("timing-pad-not-a-password", 12);
 const GENERIC = "Wrong username or password.";
 const LOCKED = "Too many attempts. Try again in 15 minutes.";
 const USER_LIMIT = 5;
@@ -32,12 +30,14 @@ export async function POST(request: Request) {
   } catch {
     return denied(GENERIC);
   }
-  const username = String(body.username || "").trim().toLowerCase();
+  const submitted = String(body.username || "").trim().toLowerCase();
   const password = String(body.password || "");
+  const user = findUserByLogin(submitted);
+  const lockName = user?.u || loginLockName(submitted);
   const ip = clientIp(request);
   try {
     const ipState = await lockStatus(`ip:${ip}`);
-    const userState = username ? await lockStatus(`user:${username}`) : "open";
+    const userState = lockName ? await lockStatus(`user:${lockName}`) : "open";
     if (ipState === "unconfigured" || userState === "unconfigured") {
       return denied("Sign-in is temporarily unavailable.", 503);
     }
@@ -46,11 +46,10 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "lockout_error" }));
     return denied("Sign-in is temporarily unavailable.", 503);
   }
-  const user = username ? getUsers().find((item) => item.u === username) : undefined;
-  const ok = bcrypt.compareSync(password, user?.h || DUMMY_HASH);
+  const ok = passwordMatches(user, password);
   if (!user || !ok) {
     try {
-      if (username) await recordFailure(`user:${username}`, USER_LIMIT);
+      if (lockName) await recordFailure(`user:${lockName}`, USER_LIMIT);
       await recordFailure(`ip:${ip}`, IP_LIMIT);
     } catch {
       return denied("Sign-in is temporarily unavailable.", 503);
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
     return denied(GENERIC);
   }
   try {
-    await clearFailures(`user:${username}`);
+    await clearFailures(`user:${user.u}`);
   } catch {
     return denied("Sign-in is temporarily unavailable.", 503);
   }

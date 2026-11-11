@@ -1,4 +1,4 @@
-"""Shipped text stays free of private terms.
+"""Shipped files stay free of removed proximity fields.
 
 Site capacity may appear on the card, the key strip, and the list filter.
 Map pin code stays off that list, so a grade mark cannot land on a pin.

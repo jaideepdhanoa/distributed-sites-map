@@ -152,10 +152,6 @@ def _clean_note(value) -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     if not text or EMAIL_FOLDER.search(text):
         return ""
-    from scripts.build_data import banned_hits
-
-    if banned_hits(text):
-        return ""
     return text[:240]
 
 
@@ -875,7 +871,7 @@ def write_financials_file(workbook: Path, destination: Path, reg: dict | None = 
 
     problems = scan_obj(payload, "financials")
     if problems:
-        raise SystemExit("Financials payload failed the wording check:\n" + "\n".join(problems[:20]))
+        raise SystemExit("Financials payload failed the data check:\n" + "\n".join(problems[:20]))
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(payload))
     return {"sites": len(payload["sites"]), "open": sum(1 for item in payload["sites"].values() if item.get("open"))}

@@ -131,7 +131,7 @@ class PhotoContract(unittest.TestCase):
             roles,
             ["spare_land_annotated", "access_spare", "building", "street_level", "electrical", "listing", "street_frontage"],
         )
-        self.assertNotIn("caption", fields["photos"][0])
+        self.assertEqual(fields["photos"][0]["caption"], "Open ground beside the power room")
         self.assertNotIn("file_id", fields["photos"][0])
         self.assertNotIn("drive.google.com", json.dumps(fields))
         self.assertEqual(fields["street_view_url"], PANO)

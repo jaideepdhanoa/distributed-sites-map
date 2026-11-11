@@ -72,10 +72,6 @@ def _safe_text(value, limit: int = 240) -> str:
     text = _text(value)
     if not text:
         return ""
-    from scripts.build_data import _DISPLAY_TERMS, banned_hits
-
-    if banned_hits(text) or _DISPLAY_TERMS.search(text):
-        return ""
     text = re.sub(r"\s+", " ", text).strip()
     return text[:limit]
 

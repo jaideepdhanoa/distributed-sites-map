@@ -154,13 +154,9 @@ _SHEET_ERROR = re.compile(r"(?i)#(?:REF|N/A|VALUE|DIV/0|NAME|NULL|NUM|ERROR)!?")
 
 
 def _fact_text(value) -> str:
-    """Keep a typed source or confidence only when the map wording filter allows it."""
+    """Keep a typed source or confidence. Script names and sheet errors stay off the card."""
     text = str(value or "").strip()
     if not text or _SHEET_ERROR.search(text) or _SCRIPT_SOURCE.search(text):
-        return ""
-    from scripts.build_data import _DISPLAY_TERMS, banned_hits
-
-    if banned_hits(text) or _DISPLAY_TERMS.search(text):
         return ""
     return text
 
@@ -168,10 +164,6 @@ def _fact_text(value) -> str:
 def _access_note(value) -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     if not text or _SHEET_ERROR.search(text) or _SCRIPT_SOURCE.search(text):
-        return ""
-    from scripts.build_data import banned_hits
-
-    if banned_hits(text):
         return ""
     return text[:500]
 
@@ -338,10 +330,6 @@ def cash_flow_label(value) -> str:
         return "EBITDA"
     if len(text) > 40:
         return ""
-    from scripts.build_data import banned_hits
-
-    if banned_hits(text):
-        return ""
     return text
 
 
@@ -409,10 +397,6 @@ def _whole(value, *, allow_zero: bool = False, allow_negative: bool = False):
 def _road_name(value) -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     if not text:
-        return ""
-    from scripts.build_data import banned_hits
-
-    if banned_hits(text):
         return ""
     return text[:80]
 

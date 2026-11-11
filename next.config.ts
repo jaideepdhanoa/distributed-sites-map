@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
     // Brackets are literal segment names, so the glob escapes them.
     "/api/[[]...route[]]": [
       "./db/migrations/**/*.sql",
-      "./config/display-policy.json",
       "./config/timeline.json",
       "./config/timeline-terms.json",
       "./config/alerts.json",

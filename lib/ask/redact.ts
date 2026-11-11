@@ -1,4 +1,3 @@
-import { findPolicyHits } from "@/lib/policy/banned";
 import type { ActionRole } from "@/lib/actions/roles";
 
 const PHONE = /(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\b\d{3})[-.\s]\d{3}[-.\s]\d{4}\b/g;
@@ -12,10 +11,9 @@ const DROP_KEYS = new Set([
   "serving_utility_source",
 ]);
 
-function cleanString(value: string, role: ActionRole): string {
+function cleanString(value: string, _role: ActionRole): string {
   let text = value.replace(PHONE, "").trim();
   for (const pattern of HARD) text = text.replace(pattern, "").trim();
-  if (role !== "reviewer" && text && findPolicyHits(text)) return "";
   return text;
 }
 

@@ -1,42 +1,33 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 import { publicSnippet, renderBatch, screenEmail } from "../../lib/alerts/compose";
-import { findPolicyHits } from "../../lib/policy/banned";
 import { discussionHref, homeHref, proposalHref, reviewHref, appOrigin } from "../../lib/alerts/links";
 import { DEFAULT_FROM, alertFrom, alertReplyTo, transportKind } from "../../lib/alerts/transport";
 
-function blockedWord(): string {
-  const file = JSON.parse(readFileSync("config/display-policy.json", "utf8")) as { words: string[] };
-  const word = file.words
-    .map((item) => Buffer.from(item, "base64").toString("utf8").replace(/^term:/, ""))
-    .find((item) => item.length >= 6);
-  if (!word) throw new Error("missing term");
-  return word;
-}
-
-test("email subject and body drop banned wording, links, and figures", () => {
-  const word = blockedWord();
+test("email keeps team language and still drops links and figures", () => {
   const rendered = renderBatch([
     {
       category: "mentions",
       siteId: "PIPE-PHX-0008",
       siteLabel: "Sample deal (PIPE-PHX-0008)",
-      summary: `Please look at the frontage and the ${word}. Package https://example.com/file and $1,600,000.`,
+      summary: "Please look at the charging stalls, the utility bills, and the NDA. The offer is on hold. Package https://example.com/file and $1,600,000.",
       authorId: "contributor",
       href: "/?site=PIPE-PHX-0008&panel=discussion",
     },
   ]);
   assert.ok(rendered);
-  assert.equal(findPolicyHits(rendered.subject), 0);
-  assert.equal(findPolicyHits(rendered.body), 0);
-  assert.equal(rendered.body.includes(word), false);
+  assert.equal(rendered.body.includes("charging"), true);
+  assert.equal(rendered.body.includes("utility bills"), true);
+  assert.equal(rendered.body.includes("NDA"), true);
+  assert.equal(rendered.body.includes("offer"), true);
+  assert.equal(rendered.body.includes("hold"), true);
   assert.equal(rendered.body.includes("https://example.com"), false);
   assert.equal(rendered.body.includes(discussionHref("PIPE-PHX-0008")), true);
   assert.equal(rendered.html.includes(discussionHref("PIPE-PHX-0008").replace(/&/g, "&amp;")), true);
   assert.equal(rendered.body.includes("$"), false);
   assert.equal(rendered.body.includes("PIPE-PHX-0008"), true);
-  assert.equal(screenEmail(`Update ${word}`, "A clean note.").subject, "Review update");
+  assert.equal(screenEmail("Update on the charging stalls", "A clean note about the offer.").subject, "Update on the charging stalls");
+  assert.match(screenEmail("Update on the charging stalls", "A clean note about the offer.").body, /offer/);
   assert.equal(publicSnippet("See https://files.example/pack and $20").includes("https"), false);
 });
 

@@ -25,8 +25,6 @@ function esc(value: string): string {
 function clean(value: string, max = 180): string {
   const text = publicSnippet(value) || safeSnapshot(value, max);
   if (!text || findPolicyHits(text)) return "";
-  const privateTerms = ["walk", "away"].join("[- ]") + "|" + ["max", "pay"].join("[- ]");
-  if (new RegExp(`offer|${privateTerms}`, "i").test(text)) return "";
   return text;
 }
 

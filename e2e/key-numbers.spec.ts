@@ -58,33 +58,42 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     expect(bounds && bounds.width > 20 && bounds.height > 20).toBeTruthy();
   }
   await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
-  if (!mobile) {
-    await page.waitForFunction(() => {
-      const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
-      return Boolean(map?.isStyleLoaded());
-    });
-    await page.evaluate(() => {
-      const map = (window as unknown as { __sitesMap: { jumpTo: (camera: { center: [number, number]; zoom: number }) => void } }).__sitesMap;
-      map.jumpTo({ center: [-112.2, 33.55], zoom: 12.2 });
-    });
-  }
-  const before = mobile ? null : await page.evaluate(() => {
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
+    return Boolean(map?.isStyleLoaded());
+  });
+  await page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap: { jumpTo: (camera: { center: [number, number]; zoom: number }) => void } }).__sitesMap;
+    map.jumpTo({ center: [-112.2, 33.55], zoom: 12.2 });
+  });
+  const readCamera = () => page.evaluate(() => {
     const map = (window as unknown as { __sitesMap: { getZoom: () => number; getCenter: () => { lng: number; lat: number } } }).__sitesMap;
     const center = map.getCenter();
     return { zoom: map.getZoom(), lng: center.lng, lat: center.lat };
   });
+  const before = await readCamera();
+  const stillThere = async () => {
+    await page.waitForTimeout(1200);
+    const camera = await readCamera();
+    expect(Math.abs(camera.zoom - before.zoom)).toBeLessThan(0.25);
+    expect(Math.abs(camera.lng - before.lng)).toBeLessThan(0.03);
+    expect(Math.abs(camera.lat - before.lat)).toBeLessThan(0.03);
+  };
   await chooser.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
-  if (before) {
-    await page.waitForFunction((camera) => {
-      const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getZoom: () => number; getCenter: () => { lng: number; lat: number } } }).__sitesMap;
-      if (!map?.isStyleLoaded()) return false;
-      const center = map.getCenter();
-      return Math.abs(map.getZoom() - camera.zoom) < 0.25
-        && Math.abs(center.lng - camera.lng) < 0.03
-        && Math.abs(center.lat - camera.lat) < 0.03;
-    }, before);
-  }
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
+    return Boolean(map?.isStyleLoaded());
+  });
+  await stillThere();
+  await chooser.getByRole("button", { name: "Satellite", exact: true }).click();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
+    return Boolean(map?.isStyleLoaded());
+  });
+  await stillThere();
+  await chooser.getByRole("button", { name: "Map", exact: true }).click();
   await page.reload();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
   if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();

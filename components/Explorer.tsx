@@ -1246,12 +1246,20 @@ export default function Explorer() {
   const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
 
+  function siteTypeLabel(site: SiteProps): string {
+    if (siteCategory(site, links) !== "land") return site.business_type || "Car wash";
+    const deal = dealRows.find((row) => row.deal_id === site.linked_deal_id || row.universe_id === site.site_id);
+    const typed = deal?.business_type?.trim();
+    if (typed && typed.toLowerCase() !== "car wash") return typed;
+    return "Land";
+  }
+
   function siteRow(site: SiteProps): ListRow {
     const price = site.listed && site.asking_price_display ? `${site.asking_price_display}${site.asking_price_source ? ` · ${site.asking_price_source}` : ""}` : "";
     return {
       id: site.site_id,
       site: site.name || site.address || site.site_id,
-      type: site.business_type || "Car wash",
+      type: siteTypeLabel(site),
       city: site.city,
       stage: plainVerdict(site.verdict),
       tier: tierLabel(spareTier(site)) || "",
@@ -1365,7 +1373,10 @@ export default function Explorer() {
 
   function summaryText() {
     if (funnel !== "pipeline") return "";
-    const rows = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && dealAllowed(deal));
+    const stageView = !allPipes && !pipelineWide && !who;
+    const rows = stageView
+      ? [...pipelineDeals, ...stageLandRows]
+      : dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && dealAllowed(deal));
     const droppedRows = rows.filter((deal) => deal.stage_group === "dropped");
     return pipelineMapSummary({
       placed: rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length,
@@ -2074,7 +2085,7 @@ export default function Explorer() {
                 <label className="layer-row layer-sub" title={LAYER_TITLES.rings} onMouseEnter={(event) => setRingCursor({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setRingCursor(null)}>
                   <input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} />
                   <span className="layer-mark"><i className="pin-sample line" /></span>
-                  Depot rings
+                  <span className="layer-nest">Depot rings</span>
                 </label>
                 <p className="eyebrow">Area data</p>
                 {(["traffic", "population", "growth", "income", "washes"] as const).map((id) => {

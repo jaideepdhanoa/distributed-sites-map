@@ -204,7 +204,9 @@ export default function MapView(props: Props) {
   const node = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const keptCamera = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const heldView = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const skipViewReset = useRef(false);
+  const freezeCamera = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
@@ -629,7 +631,11 @@ export default function MapView(props: Props) {
     });
     active = map;
     keptCamera.current = null;
-    if (kept) skipViewReset.current = true;
+    heldView.current = kept;
+    if (kept) {
+      skipViewReset.current = true;
+      freezeCamera.current = true;
+    }
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     const size = 36;
     const marker = (kind: "circle" | "diamond" | "depot", rgb: [number, number, number]) => {
@@ -1292,6 +1298,14 @@ export default function MapView(props: Props) {
       if (reviewToken) {
         appliedReview.current = reviewToken;
         appliedPad.current = "flush";
+      } else if (freezeCamera.current) {
+        freezeCamera.current = false;
+        const held = heldView.current;
+        heldView.current = null;
+        if (held) map.jumpTo({ center: held.center, zoom: held.zoom });
+        appliedFit.current = fitKey;
+        appliedPad.current = padKey;
+        appliedFocus.current = focusToken;
       } else if (phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
@@ -1349,10 +1363,11 @@ export default function MapView(props: Props) {
     props.sites.some((feature) => feature.properties.site_id === props.selectedId) ||
     props.offMarket.some((feature) => feature.properties.site_id === props.selectedId) ||
     props.deals.some((feature) => feature.properties.deal_id === props.selectedId);
+  const gridToken = (props.gridFeatures || []).map((feature) => String(feature.properties?.deal_id || feature.properties?.site_id || "")).join(",");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (skipViewReset.current) {
+    if (skipViewReset.current || freezeCamera.current) {
       skipViewReset.current = false;
       return;
     }
@@ -1393,7 +1408,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, props.gridFeatures]);
+  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, gridToken]);
 
   useEffect(() => {
     const map = mapRef.current;

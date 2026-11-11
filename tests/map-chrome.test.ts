@@ -80,6 +80,7 @@ test("Miami layers are labeled in plain words and the mid-2027 line is its own r
 test("the map line calls dropped deals hidden only while they are not drawn", () => {
   const hidden = { placed: 23, dropped: 19, droppedPlaced: 15, droppedShown: false, droppedOnly: false };
   assert.equal(pipelineMapSummary(hidden), "23 on the map · 19 dropped, hidden");
+  assert.equal(pipelineMapSummary({ placed: 1, dropped: 0, droppedPlaced: 0, droppedShown: false, droppedOnly: false }), "1 on the map");
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true }), "23 on the map · 15 dropped on the map");
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true, droppedOnly: true }), "15 dropped on the map");
   assert.equal(pipelineMapSummary({ placed: 23, dropped: 19, droppedPlaced: 19, droppedShown: true, droppedOnly: false }).includes("hidden"), false);

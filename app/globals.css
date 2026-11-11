@@ -459,7 +459,7 @@ span.listing-link.muted {
   font-size: 14px;
 }
 .layers label.layer-row input.check { margin: 0; }
-.layers label.layer-sub { margin-left: 26px; }
+.layers label.layer-sub .layer-nest { padding-left: 14px; }
 .layer-mark {
   width: 18px;
   height: 18px;

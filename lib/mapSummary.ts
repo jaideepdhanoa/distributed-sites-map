@@ -10,6 +10,7 @@ export function pipelineMapSummary(view: {
   droppedOnly: boolean;
 }): string {
   if (!view.droppedShown) {
+    if (!view.dropped) return `${view.placed.toLocaleString()} on the map`;
     return `${view.placed.toLocaleString()} on the map · ${view.dropped.toLocaleString()} dropped, hidden`;
   }
   const droppedOnMap = `${view.droppedPlaced.toLocaleString()} dropped on the map`;

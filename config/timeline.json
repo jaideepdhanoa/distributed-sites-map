@@ -8,6 +8,7 @@
       "siteId": ["site id", "site_id", "record id"],
       "type": ["type", "kind"],
       "summary": ["summary"],
+      "sourceLink": ["source link", "source_link"],
       "visibility": ["visibility"]
     }
   },

@@ -1,16 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  counterparty,
+  mergeActivity,
+  summaryText,
+  whenParts,
+  type ActivityInput,
+  type CommsLine,
+  type MergedLine,
+} from "@/lib/comms";
 import "./timeline.css";
 
-type Item = { date: string; type: string; summary: string };
 type Material = { category: string; label: string; count: number; latest: string };
-type Payload = {
+type TimelinePayload = {
   folderUrl?: string;
   materials?: Material[];
   lastTouched?: string;
-  items?: Item[];
+  items?: ActivityInput[];
   showActivityLines?: boolean;
+};
+type CommsPayload = {
+  rows?: CommsLine[];
+  internal?: CommsLine[];
 };
 
 const LABELS: Record<string, string> = {
@@ -30,20 +42,76 @@ const LABELS: Record<string, string> = {
 
 const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop"]);
 
+function activityLine(item: MergedLine, index: number) {
+  return (
+    <li key={`${item.eventId}-${item.at}-${item.type}-${index}`}>
+      <p>
+        <strong>{LABELS[item.type] || "Document"}</strong>
+        {item.at ? ` · ${item.at}` : ""}
+      </p>
+      <p>{item.summary}</p>
+    </li>
+  );
+}
+
+function commsLine(item: MergedLine, index: number) {
+  const when = whenParts(item.at);
+  const party = counterparty(item);
+  const internal = item.direction.trim().toLowerCase() === "internal";
+  return (
+    <li
+      key={`${item.commsId}-${index}`}
+      className={internal ? "tl-internal" : undefined}
+      data-testid={`comms-${item.commsId}`}
+      data-direction={item.direction}
+    >
+      <p>
+        <strong>{item.direction}</strong>
+        {when.date ? ` · ${when.date}` : ""}
+        {when.time ? ` ${when.time} PT` : ""}
+        {item.channel ? ` · ${item.channel}` : ""}
+      </p>
+      {party ? <p>{party}</p> : null}
+      <p>{summaryText(item.summary)}</p>
+      {item.href ? (
+        <p>
+          <a className="text-link" href={item.href} target="_blank" rel="noopener noreferrer">
+            Open in Gmail ↗
+          </a>
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 export default function Timeline({ recordId, relatedId }: { recordId: string; relatedId?: string }) {
-  const [payload, setPayload] = useState<Payload | null>(null);
+  const [timeline, setTimeline] = useState<TimelinePayload | null>(null);
+  const [comms, setComms] = useState<CommsPayload | null>(null);
+  const [showInternal, setShowInternal] = useState(false);
 
   useEffect(() => {
     let cancel = false;
+    setTimeline(null);
+    setComms(null);
+    setShowInternal(false);
     const query = new URLSearchParams({ id: recordId });
     if (relatedId) query.set("related", relatedId);
     async function load() {
       try {
-        const response = await fetch(`/api/data/timeline?${query}`);
-        const next = response.ok ? ((await response.json()) as Payload) : {};
-        if (!cancel) setPayload(next);
+        const [timelineResponse, commsResponse] = await Promise.all([
+          fetch(`/api/data/timeline?${query}`),
+          fetch(`/api/data/comms?${query}`),
+        ]);
+        const nextTimeline = timelineResponse.ok ? ((await timelineResponse.json()) as TimelinePayload) : {};
+        const nextComms = commsResponse.ok ? ((await commsResponse.json()) as CommsPayload) : null;
+        if (cancel) return;
+        setTimeline(nextTimeline);
+        setComms(nextComms && Array.isArray(nextComms.rows) ? nextComms : null);
       } catch {
-        if (!cancel) setPayload({});
+        if (!cancel) {
+          setTimeline({});
+          setComms(null);
+        }
       }
     }
     void load();
@@ -57,17 +125,34 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     };
   }, [recordId, relatedId]);
 
-  const materials = payload?.materials || [];
-  const items = (payload?.items || []).filter((item) => KEPT_LINES.has(item.type) || payload?.showActivityLines !== false);
-  const folderUrl = payload?.folderUrl || "";
-  const lastTouched = payload?.lastTouched || "";
-  const empty = payload !== null && !folderUrl && materials.length === 0 && !lastTouched && items.length === 0;
+  const materials = timeline?.materials || [];
+  const activity = (timeline?.items || []).filter((item) => KEPT_LINES.has(item.type) || timeline?.showActivityLines !== false);
+  const commsRows = comms?.rows || [];
+  const internalRows = comms?.internal || [];
+  const merged = mergeActivity(activity, showInternal ? [...commsRows, ...internalRows] : commsRows, {
+    includeInternal: showInternal,
+  });
+  const folderUrl = timeline?.folderUrl || "";
+  const lastTouched = timeline?.lastTouched || "";
+  const empty = timeline !== null && !folderUrl && materials.length === 0 && !lastTouched && merged.length === 0;
 
   return (
     <section className="tl" data-testid="activity">
       <h3>Activity</h3>
-      {payload === null ? <p className="note">Loading activity.</p> : null}
+      {timeline === null ? <p className="note">Loading activity.</p> : null}
       {empty ? <p className="note">No materials on file.</p> : null}
+      {internalRows.length ? (
+        <label className="tl-toggle">
+          <input
+            className="check"
+            type="checkbox"
+            checked={showInternal}
+            data-testid="show-internal"
+            onChange={(event) => setShowInternal(event.target.checked)}
+          />
+          Show internal
+        </label>
+      ) : null}
       {folderUrl ? (
         <p><a href={folderUrl} target="_blank" rel="noopener noreferrer">Open site folder</a></p>
       ) : null}
@@ -79,17 +164,9 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
         </ul>
       ) : null}
       {lastTouched ? <p className="note">Last touched {lastTouched}</p> : null}
-      {items.length ? (
+      {merged.length ? (
         <ol className="tl-list">
-          {items.map((item, index) => (
-            <li key={`${item.date}-${item.type}-${index}`}>
-              <p>
-                <strong>{LABELS[item.type] || "Document"}</strong>
-                {item.date ? ` · ${item.date}` : ""}
-              </p>
-              <p>{item.summary}</p>
-            </li>
-          ))}
+          {merged.map((item, index) => (item.kind === "comms" ? commsLine(item, index) : activityLine(item, index)))}
         </ol>
       ) : null}
     </section>

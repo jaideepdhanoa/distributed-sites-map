@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { safeGmailLink } from "../comms";
 
 const ALLOWED = new Set(["listing", "brochure", "om", "financials", "photos", "legal", "doc", "visit", "stage"]);
 const CATEGORY_ORDER = ["financials", "property_legal", "operations"] as const;
@@ -60,6 +61,7 @@ export type TimelineItem = {
   type: string;
   summary: string;
   eventId: string;
+  sourceLink?: string;
 };
 
 export type MaterialCount = {
@@ -92,7 +94,10 @@ function presentItem(row: Record<string, unknown>): TimelineItem | null {
   if (!summary || blockedText(summary)) return null;
   const date = String(row.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return { date, type, summary, eventId: String(row.event_id || "") };
+  const item: TimelineItem = { date, type, summary, eventId: String(row.event_id || "") };
+  const sourceLink = safeGmailLink(row.source_link ?? row.sourceLink);
+  if (sourceLink) item.sourceLink = sourceLink;
+  return item;
 }
 
 function presentMaterials(value: unknown): MaterialCount[] {

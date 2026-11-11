@@ -92,7 +92,11 @@ def read_activity(workbook: Path | None, config: dict, known_ids: set[str] | Non
         summary = status_line(kind, str(_cell(row, index, "summary") or ""))
         if not summary:
             continue
-        items.append({"record_id": record_id, "event_id": event_id, "date": when, "type": kind, "summary": summary})
+        item = {"record_id": record_id, "event_id": event_id, "date": when, "type": kind, "summary": summary}
+        source_link = str(_cell(row, index, "sourceLink") or "").strip()
+        if source_link:
+            item["source_link"] = source_link
+        items.append(item)
     return items, warnings
 
 

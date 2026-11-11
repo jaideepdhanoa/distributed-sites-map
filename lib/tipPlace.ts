@@ -4,6 +4,18 @@ export function boxesOverlap(a: TipBox, b: TipBox): boolean {
   return a.right > b.left + 1 && a.left < b.right - 1 && a.bottom > b.top + 1 && a.top < b.bottom - 1;
 }
 
+/** A full-width sheet sitting on the bottom of the map. The note has to stay above it. */
+export function sheetCeiling(bounds: TipBox, obstacles: TipBox[]): number {
+  let bottom = bounds.bottom;
+  const width = bounds.right - bounds.left;
+  for (const item of obstacles) {
+    const spans = item.left <= bounds.left + 16 && item.right - item.left >= width - 32;
+    const onBottom = item.bottom >= bounds.bottom - 32 && item.top > bounds.top + 48;
+    if (spans && onBottom) bottom = Math.min(bottom, item.top);
+  }
+  return bottom;
+}
+
 /**
  * Put a hover note fully inside the map and outside the site card, Layers panel, and other chrome.
  * Wider notes are tried first. A later, narrower width is used only when the wider one has no open spot.
@@ -19,11 +31,12 @@ export function placeReadableTip(args: {
   above?: boolean;
 }): { left: number; top: number; width: number; height: number } {
   const margin = args.margin ?? 8;
+  const ceiling = sheetCeiling(args.bounds, args.obstacles);
   const region = {
     left: args.bounds.left + margin,
     top: args.bounds.top + margin,
     right: args.bounds.right - margin,
-    bottom: args.bounds.bottom - margin,
+    bottom: ceiling - margin,
   };
   const fits = (left: number, top: number, width: number, height: number) => {
     const rect = { left, right: left + width, top, bottom: top + height };
@@ -70,13 +83,16 @@ export function placeReadableTip(args: {
   const width = args.widths[args.widths.length - 1] ?? 160;
   const size = args.measure(width);
   const gap = 12;
+  const noteWidth = Math.min(size.width, Math.max(8, region.right - region.left));
   const preferredTop = args.above ? args.cursor.y - size.height - gap : args.cursor.y + gap;
   const left = Math.min(
-    Math.max(region.left, args.above ? args.cursor.x - size.width / 2 : args.cursor.x + gap),
-    Math.max(region.left, region.right - size.width),
+    Math.max(region.left, args.above ? args.cursor.x - noteWidth / 2 : args.cursor.x + gap),
+    Math.max(region.left, region.right - noteWidth),
   );
-  const top = Math.min(Math.max(region.top, preferredTop), Math.max(region.top, region.bottom - size.height));
-  return { left, top, width: Math.min(size.width, Math.max(8, region.right - region.left)), height: size.height };
+  // A note taller than the open map still ends at the sheet. It does not spill onto the card.
+  const maxTop = region.bottom - size.height;
+  const top = maxTop < region.top ? maxTop : Math.min(Math.max(region.top, preferredTop), maxTop);
+  return { left, top, width: noteWidth, height: size.height };
 }
 
 /** Service-area notes wait until the pointer has been still. A later move starts the wait over. */

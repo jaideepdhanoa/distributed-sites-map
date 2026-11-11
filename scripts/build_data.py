@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
+from scripts.nda import nda_mirror_fields
 from scripts.site_photos import index_photos, load_site_photos, photo_fields
 from scripts.timeline_drive import folder_id_from_row, folder_url_for
 
@@ -1680,6 +1681,14 @@ DEAL_FIELDS = (
     "photo_listing_count",
     "photos_checked",
     "photo_notes",
+    "nda_id",
+    "nda_status",
+    "nda_waiting_on",
+    "nda_gates",
+    "nda_days_open",
+    "nda_days_in_court",
+    "stage_blocker",
+    "stage_blocker_since",
     *FIGURE_FIELDS,
 )
 
@@ -2518,6 +2527,7 @@ def build_deal_layer(
                 "apn": apn_text(row.get("APN or folio") or row.get("APN") or ""),
                 **key_figures(row, kind),
                 **photo_fields(row, kind, deal_id, photo_index),
+                **nda_mirror_fields(row),
             }
             if props["business_type"] not in BUSINESS_TYPES:
                 raise SystemExit(f"{deal_id} business type is not allowed: {props['business_type']}")
@@ -4786,8 +4796,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         (OUT / "depots.geojson").write_text(json.dumps(depots))
         (OUT / "deals.geojson").write_text(json.dumps(deals_fc))
         from scripts.financials import write_financials_file
+        from scripts.nda import write_nda_file
 
         write_financials_file(workbook, OUT / "financials.json", reg)
+        write_nda_file(workbook, OUT / "nda.json")
         (OUT / "parcels.geojson").write_text(json.dumps(parcels_fc))
         for city_code in ("PHX", "LAS", "MIA"):
             city_fc = {
@@ -5018,6 +5030,7 @@ def validate_committed() -> None:
         "funnel.json",
         "build_report.json",
         "unscreened.geojson",
+        "nda.json",
     ]
     loaded = {}
     for name in required:

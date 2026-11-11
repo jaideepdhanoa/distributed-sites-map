@@ -246,6 +246,16 @@ export type DealProps = {
   access_notes?: string;
   score?: number | null;
   apn?: string;
+  /** Site mirror of NDA Register. Blank ID means Not required. */
+  nda_id?: string;
+  nda_status?: string;
+  nda_waiting_on?: string;
+  nda_gates?: string;
+  nda_days_open?: number | null;
+  nda_days_in_court?: number | null;
+  /** Typed stage blocker. "—" means the stage is not blocked. */
+  stage_blocker?: string;
+  stage_blocker_since?: string;
 };
 
 export type UnscreenedProps = {

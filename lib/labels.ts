@@ -64,19 +64,40 @@ export const BUSINESS_TYPES = [
   "Other",
 ] as const;
 
-export const CENSUS_NOTE = "Car washes. Land parcels and c-stores stay off until you turn those categories on.";
+/**
+ * Folded business types, plus the workbook segment group and the finer segments
+ * the sync maps onto Auto repair or Tire and lube. "Auto service" is not a car wash.
+ */
+const AUTO_BUSINESS_TYPES = new Set([
+  "auto repair",
+  "tire and lube",
+  "auto service",
+  "general auto repair",
+  "tire and light auto service",
+]);
+
+export function isAutoBusinessType(value: string | null | undefined): boolean {
+  return AUTO_BUSINESS_TYPES.has((value || "").trim().toLowerCase());
+}
+
+export const CENSUS_NOTE = "Car washes. Auto service is on for pipeline deals. Land parcels and c-stores stay off until you turn those categories on.";
 
 export const CATEGORY_NOTES = {
   wash: "Operating car washes. This is the usual view.",
+  auto: "Auto repair and tire and lube. An auto center belongs here once it is typed Auto repair.",
   land: "Vacant parcels, such as LAND-PHX. Not spare land on a wash.",
   store: "Fuel and convenience stores. Off until you turn them on.",
 } as const;
+
+export const UNSCREENED_LISTINGS_LABEL = "Unscreened market listings";
+
+export const UNSCREENED_LISTINGS_NOTE = "Listings not yet in Pipeline or Universe.";
 
 export const SPARE_LAND_NOTE = "Leftover land on an operating wash. This does not turn on vacant land parcels.";
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have spare land inside the service area. Cleared sites passed the county check.",
-  pipeline: "Deals in the categories you have on. Car washes are the usual view. Land parcels and c-stores stay off until you turn them on. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
+  pipeline: "Deals in the categories you have on. Car washes and auto service are the usual view. Land parcels and c-stores stay off until you turn them on. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
 };
 
 const STAGE_TITLES: Record<string, string> = {
@@ -138,7 +159,7 @@ export const LAYER_TITLES = {
   land: "Vacant land parcels, such as LAND-PHX. Off until the Land category is on. A chosen stage then includes the parcels at that stage.",
   cstore: "Fuel and convenience stores. Off until the C-stores category is on.",
   dropped: "Deals that are no longer being pursued.",
-  unscreened: "Listings that have not been screened yet.",
+  unscreened: UNSCREENED_LISTINGS_NOTE,
   traffic: "Workbook traffic count on each pin.",
   population: "Workbook population on each pin.",
   washes: "Washes nearby. Counts on each pin. With one site open, census washes within 3 miles are drawn.",

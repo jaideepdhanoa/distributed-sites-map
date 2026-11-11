@@ -20,6 +20,7 @@ jobs:
       - run: python tests/test_sync_push.py
       - run: python tests/test_key_numbers.py
       - run: python tests/test_cstore.py
+      - run: python tests/test_business_type.py
       - run: python tests/test_financials.py
       - run: python scripts/check_surface.py
       - run: python scripts/test_review_fixes.py

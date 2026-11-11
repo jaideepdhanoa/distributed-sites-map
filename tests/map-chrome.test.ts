@@ -9,6 +9,7 @@ import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
 import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
 import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets } from "../lib/depotRings.ts";
+import { previewChromePlacement } from "../lib/previewChrome.ts";
 import type { GeoFeature } from "../lib/types.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
@@ -150,6 +151,33 @@ test("depot rings are closed lines and stay outside a neighborhood view", () => 
   const framedLats = framed.map((point) => point[1]);
   assert.ok(Math.max(...framedLats) > 33.5 && Math.max(...framedLats) < 33.6);
   assert.ok(Math.min(...framedLats) < 33.4 && Math.min(...framedLats) > 33.28);
+});
+
+test("the preview comment button hides while a phone sheet or list covers it", () => {
+  const base = {
+    viewportWidth: 390,
+    viewportHeight: 844,
+    drawerLeft: 0,
+    drawerTop: 524,
+    phone: true,
+    abovePeek: false,
+  };
+  assert.equal(previewChromePlacement({ ...base, covered: true }).display, "none");
+  const parked = previewChromePlacement({ ...base, covered: false });
+  assert.equal(parked.display, "block");
+  assert.equal(parked.right, "12px");
+  assert.equal(parked.top, "468px");
+  const desktop = previewChromePlacement({
+    viewportWidth: 1280,
+    viewportHeight: 800,
+    drawerLeft: 900,
+    drawerTop: 140,
+    phone: false,
+    abovePeek: false,
+    covered: true,
+  });
+  assert.equal(desktop.display, "block");
+  assert.ok(parseFloat(desktop.left) < 900);
 });
 
 test("nearby washes use real pins and skip anything without a location", () => {

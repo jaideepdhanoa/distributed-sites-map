@@ -340,6 +340,17 @@ export default function Explorer() {
     if (funnelPref.version !== FUNNEL_VERSION || funnelPref.value !== "universe") return;
     write({ funnel: "universe" });
   }, [params, funnelPref]);
+  useEffect(() => {
+    if (!loopsVisible) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (window.matchMedia("(max-width: 767px)").matches) return;
+      event.preventDefault();
+      write({ loops: null });
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [loopsVisible, params]);
 
   function setPinLabel(next: PinLabel) {
     window.localStorage.setItem(PIN_LABEL_STORAGE, next);
@@ -361,7 +372,8 @@ export default function Explorer() {
   }
 
   function write(next: Record<string, string | null>, history = false) {
-    replaceSearch(params.toString(), next, history);
+    const live = typeof window === "undefined" ? params.toString() : window.location.search;
+    replaceSearch(live, next, history);
   }
 
   function stopReview(next: Record<string, string | null> = {}) {
@@ -371,12 +383,14 @@ export default function Explorer() {
   }
 
   function replaceSearch(base: string, next: Record<string, string | null>, history = false) {
-    const url = new URLSearchParams(base);
+    const url = new URLSearchParams(base.replace(/^\?/, ""));
     for (const [key, value] of Object.entries(next)) {
       if (!value) url.delete(key);
       else url.set(key, value);
     }
-    const href = `/?${url.toString()}`;
+    const query = url.toString();
+    // An empty `/?` does not clear a lone search param. `/` does, and it stays a client navigation.
+    const href = query ? `/?${query}` : "/";
     if (history) router.push(href, { scroll: false });
     else router.replace(href, { scroll: false });
   }

@@ -24,7 +24,10 @@ import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/
 import { displayAddress, leadSourceLine, plainRoad } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
-import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, LAYER_TITLES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
+import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
+import { parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
@@ -187,19 +190,19 @@ export default function Explorer() {
   }, []);
   const who = params.get("who") || "";
   const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
-  const showLandLayer = funnel === "pipeline" ? params.get("landlayer") !== "0" : params.get("landlayer") === "1";
+  const showLandLayer = params.get("landlayer") === "1";
   const extraParam = params.get("extra");
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
-  const allPipes = params.get("pstage") === "all";
-  const pipeParam = params.get("pstage") as PipeId | null;
-  const pipeStage: PipeId = !allPipes && pipeParam && PIPE_STEPS.some((step) => step.id === pipeParam) ? pipeParam : "desk";
+  const pipeView = parsePipeView(params.get("pstage"));
+  const allPipes = pipeView.all;
+  const pipeStage: PipeId = pipeView.stage;
   const listView = params.get("view") === "list";
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
   const queueMarket = params.get("qmarket") || (reviewing ? "all" : city);
-  const queueStage = params.get("qstage") || (reviewing ? "any" : (funnel === "pipeline" ? pipeStage : "any"));
+  const queueStage = params.get("qstage") || (reviewing || funnel !== "pipeline" || allPipes ? "any" : pipeStage);
   const queueViable = params.get("qviable") !== "0";
   const queueFresh = params.get("qnew") === "1";
   const queueFlagged = params.get("qflag") === "1";
@@ -218,11 +221,9 @@ export default function Explorer() {
   const ranges = rangesFromSearch(params);
   const pipelineColumns = parseColumns(params.get("cols"));
   const pillParam = params.get("pill");
-  const [rememberedPill, setRememberedPill] = useState<PinLabel>("none");
+  const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [basemap, setBasemap] = useState<"positron" | "satellite">("satellite");
-  const pinLabel: PinLabel = pillParam === "asking" || pillParam === "acres" || pillParam === "peracre" || pillParam === "none"
-    ? pillParam
-    : rememberedPill;
+  const pinLabel: PinLabel = resolvePinLabel(pillParam, pinPref);
   const pipelineSortId = (PIPELINE_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as PipelineColumnId;
 
   const mapArea = parseMapArea(params);
@@ -269,15 +270,18 @@ export default function Explorer() {
     };
   }, []);
   useEffect(() => {
-    const stored = window.localStorage.getItem("pin-label");
-    if (stored === "asking" || stored === "acres" || stored === "peracre" || stored === "none") setRememberedPill(stored);
+    setPinPref({
+      version: window.localStorage.getItem(PIN_LABEL_VERSION_KEY),
+      value: window.localStorage.getItem(PIN_LABEL_STORAGE),
+    });
     const base = window.localStorage.getItem("basemap");
     if (base === "satellite" || base === "positron") setBasemap(base);
   }, []);
 
   function setPinLabel(next: PinLabel) {
-    window.localStorage.setItem("pin-label", next);
-    setRememberedPill(next);
+    window.localStorage.setItem(PIN_LABEL_STORAGE, next);
+    window.localStorage.setItem(PIN_LABEL_VERSION_KEY, PIN_LABEL_VERSION);
+    setPinPref({ version: PIN_LABEL_VERSION, value: next });
     write({ pill: next });
   }
 
@@ -778,6 +782,28 @@ export default function Explorer() {
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
+  const washPoints = (() => {
+    if (!overlaysOn.includes("washes") || (!selectedDeal && !selectedSite)) return [];
+    const origin = selectedDeal ? dealPoint(selectedDeal) : (() => {
+      const coords = featureById.get(selectedSite?.site_id || "")?.geometry?.coordinates;
+      return coords ? [coords[0], coords[1]] as [number, number] : null;
+    })();
+    if (!origin) return [];
+    const pool = catalog && catalog.length ? catalog : features;
+    const exclude = new Set<string>();
+    if (selectedSite) exclude.add(selectedSite.site_id);
+    if (selectedDeal?.universe_id) exclude.add(selectedDeal.universe_id);
+    const rows: WashSite[] = pool.map((feature) => ({
+      id: feature.properties.site_id,
+      name: feature.properties.name || feature.properties.address || feature.properties.site_id,
+      lng: feature.geometry?.coordinates?.[0] ?? null,
+      lat: feature.geometry?.coordinates?.[1] ?? null,
+      businessType: feature.properties.business_type,
+      verdict: feature.properties.verdict,
+      landOnly: Boolean(feature.properties.land_only),
+    }));
+    return nearbyWashPoints(origin, rows, exclude);
+  })();
   const withheldHere = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && !feature.properties.pinned) : [];
 
   const selectedDealId = dealRows.some((deal) => deal.deal_id === selected) ? selected : "";
@@ -819,7 +845,7 @@ export default function Explorer() {
     const next = name.trim();
     if (!next) return;
     setSelected(null);
-    write({ who: next, funnel: "pipeline", tab: "pipeline", pstage: "all", city: "all", view: "list", site: null, q: null }, true);
+    write({ who: next, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list", site: null, q: null }, true);
   }
 
   function filtersOn() {
@@ -891,12 +917,11 @@ export default function Explorer() {
         patch.funnel = "pipeline";
         patch.tab = "pipeline";
       }
-      const known = PIPE_STEPS.some((step) => step.id === deal.stage_group);
-      const wantStage = !known ? "all" : deal.stage_group === "desk" ? null : deal.stage_group;
-      const stageShown = search.get("pstage") === "all"
-        || (deal.stage_group === "desk" ? !search.get("pstage") : search.get("pstage") === deal.stage_group);
-      if (!stageShown) patch.pstage = wantStage;
-      if (deal.kind === "land" && search.get("landlayer") === "0") patch.landlayer = null;
+      const viewingAll = parsePipeView(search.get("pstage")).all;
+      const known = PIPE_STEPS.some((step) => step.id === deal.stage_group) || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "sourced";
+      const stageShown = viewingAll || search.get("pstage") === deal.stage_group;
+      if (!stageShown) patch.pstage = known ? deal.stage_group : null;
+      if (deal.kind === "land" && search.get("landlayer") !== "1") patch.landlayer = "1";
       return patch;
     }
     const site = features.find((feature) => feature.properties.site_id === id)?.properties;
@@ -990,7 +1015,7 @@ export default function Explorer() {
       const patch: Record<string, string | null> = { review: "1", view: null, i: String(at + 1), site: restoreId, funnel: "pipeline", tab: "pipeline", table: null };
       if (restoreDeal && (restoreDeal.city === "PHX" || restoreDeal.city === "LAS" || restoreDeal.city === "MIA")) patch.city = restoreDeal.city === "PHX" ? null : restoreDeal.city;
       if (restoreDeal && (restoreDeal.stage_group === "desk" || restoreDeal.stage_group === "contacted" || restoreDeal.stage_group === "later" || restoreDeal.stage_group === "dropped")) {
-        patch.pstage = restoreDeal.stage_group === "desk" ? null : restoreDeal.stage_group;
+        patch.pstage = restoreDeal.stage_group;
       }
       setSelected(restoreId);
       write(patch);
@@ -1003,7 +1028,7 @@ export default function Explorer() {
       const patch: Record<string, string | null> = { site: linkedReviewSite, funnel: "pipeline", tab: "pipeline", table: null };
       if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
       if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
-        patch.pstage = deal.stage_group === "desk" ? null : deal.stage_group;
+        patch.pstage = deal.stage_group;
       }
       const placed = params.get("site") === linkedReviewSite
         && params.get("funnel") === "pipeline"
@@ -1023,7 +1048,7 @@ export default function Explorer() {
     const patch: Record<string, string | null> = { review: "1", i: String(reviewIndex + 1), site: reviewSiteId, funnel: "pipeline", tab: "pipeline", view: null, table: null };
     if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
     if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
-      patch.pstage = deal.stage_group === "desk" ? null : deal.stage_group;
+      patch.pstage = deal.stage_group;
     }
     setSelected(reviewSiteId);
     const aligned = params.get("site") === reviewSiteId
@@ -1109,7 +1134,7 @@ export default function Explorer() {
       const known = PIPE_STEPS.some((step) => step.id === hit.stage);
       patch.funnel = "pipeline";
       patch.tab = "pipeline";
-      patch.pstage = !known ? "all" : hit.stage === "desk" ? null : hit.stage;
+      patch.pstage = !known ? null : hit.stage;
       patch.view = listView ? "list" : null;
     } else {
       patch.funnel = null;
@@ -1256,7 +1281,7 @@ export default function Explorer() {
     },
   });
   if (allCities && !who) activeFilters.push({ id: "markets", label: "All markets", clear: () => write({ city: null }) });
-  if ((allStages || allPipes) && !who) activeFilters.push({ id: "all-stages", label: "All stages", clear: () => write(funnel === "pipeline" ? { pstage: null } : { stage: null }) });
+  if (allStages && funnel !== "pipeline" && !who) activeFilters.push({ id: "all-stages", label: "All stages", clear: () => write({ stage: null }) });
 
   function closeMenus() {
     setFiltersOpen(false);
@@ -1471,7 +1496,7 @@ export default function Explorer() {
             {funnel === "universe" ? null : (
               <>
                 <span className="step">
-                  <button className={allPipes ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes ? "step" : undefined} title="Every deal in this market, at every stage." onClick={() => write({ pstage: allPipes ? null : "all" }, true)}>
+                  <button className={allPipes ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes ? "step" : undefined} title="Every deal in this market, at every stage." onClick={() => write({ pstage: null }, true)}>
                     <span>All</span>
                     <strong>{dealRows.filter((deal) => {
                       if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
@@ -1540,7 +1565,7 @@ export default function Explorer() {
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
                   <span className="step">
-                    <button className={!allPipes && !pipelineWide && pipeStage === step.id ? "chip on" : "chip"} type="button" aria-current={!allPipes && !pipelineWide && pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id === "desk" ? null : step.id }, true)}>
+                    <button className={!allPipes && !pipelineWide && pipeStage === step.id ? "chip on" : "chip"} type="button" aria-current={!allPipes && !pipelineWide && pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id }, true)}>
                       <span>{step.label}</span>
                       <strong>{total.toLocaleString()}</strong>
                       {split ? <span className="split">{split}</span> : null}
@@ -1638,7 +1663,7 @@ export default function Explorer() {
                   write({ who: null });
                   return;
                 }
-                write({ who: next, funnel: "pipeline", tab: "pipeline", pstage: "all", city: "all", view: "list" });
+                write({ who: next, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list" });
               }}
             />
             <h3>Spare land</h3>
@@ -1809,6 +1834,7 @@ export default function Explorer() {
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
           overlayPoints={overlayPoints}
+          washPoints={washPoints}
           gridFeatures={gridFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
           areas={data.areas.features}
           depots={data.depots.features}
@@ -1925,12 +1951,12 @@ export default function Explorer() {
                   </div>
                 </div>
                 <p className="eyebrow">Sites</p>
-                <label><i className="pin-sample diamond" /><input className="check" type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
-                <label><i className="pin-sample circle" /><input className="check" type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
-                <label><i className="swatch land" /><input className="check" type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: funnel === "pipeline" ? (event.target.checked ? null : "0") : (event.target.checked ? "1" : null) })} /> Land sites</label>
-                <label><i className="swatch cstore" /><input className="check" type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
-                <label><i className="swatch stage-dropped" /><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
-                <label>
+                <label title={LAYER_TITLES.universe}><i className="pin-sample diamond" /><input className="check" type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
+                <label title={LAYER_TITLES.pipeline}><i className="pin-sample circle" /><input className="check" type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
+                <label title={LAYER_TITLES.land}><i className="swatch land" /><input className="check" type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: event.target.checked ? "1" : null })} /> Land sites</label>
+                <label title={LAYER_TITLES.cstore}><i className="swatch cstore" /><input className="check" type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
+                <label title={LAYER_TITLES.dropped}><i className="swatch stage-dropped" /><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
+                <label title={LAYER_TITLES.unscreened}>
                   <i className="swatch listing" />
                   <input className="check" type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
                   <span>
@@ -1944,18 +1970,18 @@ export default function Explorer() {
                 </label>
                 <p className="eyebrow">Pin labels</p>
                 <div className="segmented pin-modes" role="group" aria-label="Pin labels">
-                  {([["none", "Off"], ["asking", "Price"], ["acres", "Acres"], ["peracre", "$/ac"]] as const).map(([id, label]) => (
-                    <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} onClick={() => write({ pill: id === "none" ? null : id })}>{label}</button>
+                  {([["none", "Off", LAYER_TITLES.pinOff], ["asking", "Price", LAYER_TITLES.pinPrice], ["acres", "Acres", LAYER_TITLES.pinAcres], ["peracre", "$/ac", LAYER_TITLES.pinPerAcre]] as const).map(([id, label, title]) => (
+                    <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} title={title} onClick={() => setPinLabel(id)}>{label}</button>
                   ))}
                 </div>
                 <p className="eyebrow">Also show</p>
                 {OVERLAYS.map((item) => (
-                  <label key={item.id}><input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} /> {item.label}</label>
+                  <label key={item.id} title={LAYER_TITLES[item.id]}><input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} /> {item.label}</label>
                 ))}
                 <p className="eyebrow">Context</p>
-                <label><i className="swatch current-area" /><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
-                <label><i className="pin-sample depot" /><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
-                <label><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
+                <label title={LAYER_TITLES.areas}><i className="swatch current-area" /><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
+                <label title={LAYER_TITLES.depots}><i className="pin-sample depot" /><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
+                <label title={LAYER_TITLES.rings}><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
                 <p className="eyebrow">Key</p>
                 <p className="layer-key"><i className="swatch cleared" /> Cleared</p>
                 <p className="layer-key"><i className="swatch possible" /> Possible</p>

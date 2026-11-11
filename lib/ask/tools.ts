@@ -11,6 +11,7 @@ import { listAppEvents } from "@/lib/queue/events";
 import { dealSearchParts, matchesQuery, siteSearchParts } from "@/lib/search";
 import { presentCard } from "@/lib/timeline/filter";
 import type { DealProps } from "@/lib/types";
+import { dealCardFacts, siteCardFacts } from "./card";
 import { listedDealsByMarket } from "./counts";
 import { filterStageRows, listedStageRows } from "./stages";
 import { redactPayload } from "./redact";
@@ -134,17 +135,49 @@ function getSite(id: string) {
   if (isQuarantined(key)) return quarantinedRecord(key);
   const deal = findDeal(key);
   if (deal) {
+    const universe = deal.universe_id ? findSite(String(deal.universe_id)) : null;
     return {
       id: key,
       kind: "deal",
       label: deal.name || key,
       href: siteHref(key),
       ...pick(deal, ["city", "address", "stage", "stage_group", "business_type", "listed", "universe_id"]),
+      card: dealCardFacts(deal, universe),
     };
   }
   const site = findSite(key);
   if (!site) return { error: "not_found" };
-  return { id: key, kind: "site", label: site.name || key, href: siteHref(key), ...pick(site, SITE_FIELDS) };
+  const linked = site.linked_deal_id ? findDeal(String(site.linked_deal_id)) : null;
+  return {
+    id: key,
+    kind: "site",
+    label: site.name || key,
+    href: siteHref(key),
+    ...pick(site, SITE_FIELDS),
+    card: siteCardFacts(site, linked),
+  };
+}
+
+/** Scope line for one open site. Same card facts as getSite. */
+export function siteScopeLine(id: string): string {
+  const record = getSite(id) as Record<string, unknown>;
+  if (record.status === "quarantined") return `Scope: site ${id}. This record is quarantined.`;
+  const card = (record.card || {}) as Record<string, unknown>;
+  const bits: string[] = [];
+  const add = (label: string, value: unknown) => {
+    if (value == null || value === "") return;
+    bits.push(`${label} ${value}`);
+  };
+  add("asking", card.askingPrice);
+  if (typeof card.acres === "number") bits.push(`acres ${card.acres} ac`);
+  add("spare land", card.spareLand);
+  add("bays that fit", card.baysThatFit);
+  add("cash flow", card.cashFlow);
+  add("cash flow note", card.cashFlowNote);
+  add("package", card.packageStatus);
+  add("photos", card.photoSet);
+  const facts = bits.length ? ` Card: ${bits.join("; ")}.` : "";
+  return `Scope: site ${id}.${facts} Use the card facts. An empty activity list means no events were recorded. Do not invent events or change the stage.`;
 }
 
 function funnel() {
@@ -228,12 +261,14 @@ function timeline(id: string) {
   if (isQuarantined(id)) return quarantinedRecord(id);
   const raw = JSON.parse(readFileSync(join(process.cwd(), "data", "generated", "timeline.json"), "utf8"));
   const card = presentCard(raw, [id]);
+  const items = card.items.slice(0, 20).map((item) => ({ type: item.type, summary: item.summary, at: item.date, href: `${siteHref(id)}&panel=activity` }));
   return {
     id,
     href: `${siteHref(id)}&panel=activity`,
     label: "Timeline",
     lastTouched: card.lastTouched,
-    items: card.items.slice(0, 20).map((item) => ({ type: item.type, summary: item.summary, at: item.date, href: `${siteHref(id)}&panel=activity` })),
+    items,
+    ...(items.length ? {} : { note: "No events recorded." }),
   };
 }
 
@@ -250,7 +285,16 @@ async function activity(id: string) {
       href: `${siteHref(id)}&panel=activity`,
     }));
   }
-  return { id, href: card.href, label: "Activity", timeline: card.items || [], events };
+  const timelineItems = card.items || [];
+  const empty = timelineItems.length === 0 && events.length === 0;
+  return {
+    id,
+    href: card.href,
+    label: "Activity",
+    timeline: timelineItems,
+    events,
+    ...(empty ? { note: "No events recorded." } : {}),
+  };
 }
 
 export async function runAskTool(

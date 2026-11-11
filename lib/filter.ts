@@ -31,7 +31,7 @@ export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const CITY_VIEW: Record<string, { center: [number, number]; zoom: number }> = {
   PHX: { center: [-111.9, 33.46], zoom: 10.35 },
   LAS: { center: [-115.16, 36.13], zoom: 10.55 },
-  MIA: { center: [-80.28, 25.82], zoom: 10.3 },
+  MIA: { center: [-80.24, 25.92], zoom: 10.05 },
 };
 
 const ELIMINATED = new Set(["FAIL", "NOT_A_WASH"]);

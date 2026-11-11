@@ -149,15 +149,23 @@ function orderedImages(photos: SitePhoto[]) {
     .map((item) => item.photo);
 }
 
+function photoCount(count: number, kind: "site" | "listing") {
+  return `${count} ${kind} photo${count === 1 ? "" : "s"}`;
+}
+
+/** Photo-set status: whether the expected photos are on file, then site photos and listing photos. */
 export function photoStatusLine(status: string, diligenceCount: number | null, listingCount: number | null) {
   const label = text(status);
-  if (label === "Deferred") return "Deferred";
+  if (label === "Deferred") return "Photo set: deferred";
   const known = label === "Complete" || label === "Partial";
   const bits: string[] = [];
-  if (diligenceCount != null && (diligenceCount > 0 || known)) bits.push(`${diligenceCount} diligence`);
-  if (listingCount != null && (listingCount > 0 || known)) bits.push(`${listingCount} listing`);
+  if (diligenceCount != null && (diligenceCount > 0 || known)) bits.push(photoCount(diligenceCount, "site"));
+  if (listingCount != null && (listingCount > 0 || known)) bits.push(photoCount(listingCount, "listing"));
   const counts = bits.join(" · ");
-  if (known) return counts ? `${label} / ${counts}` : label;
+  if (label === "Complete" || label === "Partial") {
+    const word = label.toLowerCase();
+    return counts ? `Photo set: ${word} · ${counts}` : `Photo set: ${word}`;
+  }
   return counts;
 }
 

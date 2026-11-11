@@ -236,6 +236,21 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 -14px -14px;
+  padding: 10px 14px 12px;
+  background: #fffdf8;
+}
+.next-card .proposal-send button.propose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 20px;
+  color: #fffdf8;
+  background: #1e4636;
+  white-space: nowrap;
 }
 @media (max-width: 767px) {
   .next-card select.secondary,
@@ -246,7 +261,7 @@
   .next-card textarea.field,
   .next-card input.field { min-height: 44px; }
   .next-card button.text-link { display: inline-flex; align-items: center; }
-  .next-card .proposal-send button.propose { width: 100%; }
+  .next-card .proposal-send button.propose { width: 100%; min-height: 44px; }
 }
 .mention-pop { list-style: none; margin: 0; padding: 4px; position: absolute; left: 0; right: 0; top: 100%; z-index: 6; background: white; border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
 .mention-pop button { width: 100%; text-align: left; border-radius: 6px; background: transparent; }

@@ -1,26 +1,12 @@
+import { AREA_ROLE_MARK, areaLabel, areaRole } from "@/lib/areas";
 import { listingCue } from "@/lib/format";
 import { spareTier } from "@/lib/filter";
-import { AREA_KIND_LABEL, STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 import { acresText, depotLine, openLandText } from "@/lib/keyNumbers";
 
 export type TipMark = { swatch: string; label: string };
 export type TipFact = { label: string; value: string };
 export type TipModel = { title: string; marks: TipMark[]; extra?: string; facts?: TipFact[] };
-
-const AREA_NAMES: Record<string, string> = {
-  "phx-service": "Phoenix service area",
-  "las-core": "Las Vegas core",
-  "las-100": "Las Vegas service area",
-  "las-200": "Las Vegas later expansion",
-  "las-300": "Las Vegas later expansion",
-  "mia-current": "Miami service area",
-  "mia-launch": "Miami launch area",
-  "mia-extended": "Miami extended area",
-  "mia-future": "Miami future boundary",
-  "mia-pri-ftl": "Miami priority area",
-  "mia-pri-hl": "Miami priority area",
-  "mia-pri-fb": "Miami priority area",
-};
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -91,10 +77,32 @@ export function depotTip(props: Record<string, unknown>): TipModel {
 
 export function areaTip(props: Record<string, unknown>): TipModel {
   const id = text(props.id);
-  const later = props.group === "expansion";
+  const role = areaRole(id, text(props.role) || text(props.group));
+  const mark = AREA_ROLE_MARK[role];
   return {
-    title: AREA_NAMES[id] || text(props.name) || "Service area",
-    marks: [{ swatch: later ? "later-area" : "current-area", label: later ? AREA_KIND_LABEL.later : AREA_KIND_LABEL.current }],
+    title: areaLabel(id) || "Service area",
+    marks: [{ swatch: mark.swatch, label: mark.label }],
+  };
+}
+
+export function ringTip(props: Record<string, unknown>): TipModel {
+  const miles = Number(props.miles);
+  const which = miles === 5 || miles === 10 ? `${miles}-mile ring` : "Depot ring";
+  const depot = text(props.depot);
+  return {
+    title: depot ? `${which} around ${depot}` : which,
+    marks: [{ swatch: "depot", label: "Depot rings" }],
+    extra: "5- and 10-mile rings around each depot.",
+  };
+}
+
+export function washTip(props: Record<string, unknown>): TipModel {
+  const miles = Number(props.miles);
+  const distance = Number.isFinite(miles) ? `${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi` : "";
+  return {
+    title: text(props.name) || "Nearby wash",
+    marks: [{ swatch: "nearby", label: "Nearby wash" }],
+    extra: distance,
   };
 }
 

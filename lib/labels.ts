@@ -123,6 +123,28 @@ export const AREA_KIND_LABEL = {
   later: "Later expansion",
 } as const;
 
+/** Hover text for the Layers panel. */
+export const LAYER_TITLES = {
+  universe: "Universe sites. The car-wash census for this market.",
+  pipeline: "Pipeline deals.",
+  land: "Land without an operating wash. Off until you turn it on.",
+  cstore: "Fuel and convenience stores. Off until you turn them on.",
+  dropped: "Deals that are no longer being pursued.",
+  unscreened: "Listings that have not been screened yet.",
+  traffic: "Workbook traffic count on each pin.",
+  population: "Workbook population on each pin.",
+  washes: "Washes nearby. Counts on each pin. With one site open, census washes within 3 miles are drawn.",
+  growth: "Workbook growth on each pin.",
+  income: "Workbook income on each pin.",
+  areas: "Service areas. Current is solid. Later expansion is dashed.",
+  depots: "Existing operating depots.",
+  rings: "5- and 10-mile rings around each depot. Depots stay on the map while rings are on.",
+  pinOff: "No price or acre label on the pins.",
+  pinPrice: "Asking price on each pin.",
+  pinAcres: "Acreage on each pin.",
+  pinPerAcre: "Asking price per acre on each pin.",
+} as const;
+
 export const TIER_NOTES: Record<string, { label: string; note: string }> = {
   L10: {
     label: "Larger site (10,000+ sq ft spare)",

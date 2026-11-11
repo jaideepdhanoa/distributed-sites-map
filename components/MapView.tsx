@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { areaTip, clusterTip, dealTip, depotTip, siteTip, tipHtml, type TipModel } from "@/lib/markerTip";
+import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
+import type { NearbyWash } from "@/lib/nearbyWashes";
+import { areaTip, clusterTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
 import { mutedPositronStyle } from "@/lib/mutedStyle";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { MapArea } from "@/lib/geoFilter";
@@ -39,8 +41,23 @@ type Props = {
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
   overlayPoints?: { label: string; coordinates: [number, number] }[];
+  washPoints?: NearbyWash[];
   gridFeatures?: GeoFeature[];
 };
+
+const AREA_LAYER_IDS = [
+  "areas-later-case",
+  "areas-later",
+  "areas-priority",
+  "areas-priority-line",
+  "areas-current",
+  "areas-current-line",
+  "areas-launch",
+  "areas-launch-line",
+  "areas-future-case",
+  "areas-future",
+  "area-labels",
+];
 
 function ringPoint(lon: number, lat: number, miles: number, step: number): [number, number] {
   const angle = (step / 64) * Math.PI * 2;
@@ -55,7 +72,8 @@ function depotRings(depots: GeoFeature[]) {
     if (!coords) continue;
     for (const miles of [5, 10]) {
       const ring = Array.from({ length: 65 }, (_, index) => ringPoint(coords[0], coords[1], miles, index));
-      features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: { miles } });
+      const place = String(depot.properties.address || depot.properties.id || "this depot");
+      features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: { miles, depot: place } });
     }
   }
   return features;
@@ -136,23 +154,29 @@ function acresOf(coords: [number, number][]) {
 }
 
 function areaLabels(areas: GeoFeature[]) {
-  const labels: { type: "Feature"; geometry: { type: "Point"; coordinates: [number, number] }; properties: { name: string } }[] = [];
-  const place = (id: string, name: string, nudge: [number, number] = [0, 0]) => {
-    const feature = areas.find((item) => item.properties.id === id);
+  const labels: { type: "Feature"; geometry: { type: "Point"; coordinates: [number, number] }; properties: { name: string; id: string } }[] = [];
+  for (const item of AREA_LABELS) {
+    const feature = areas.find((area) => area.properties.id === item.id);
     const center = feature ? bboxCenter(feature) : null;
-    if (!center) return;
+    if (!center) continue;
+    const nudge = item.nudge || [0, 0];
     labels.push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [center[0] + nudge[0], center[1] + nudge[1]] },
-      properties: { name },
+      properties: { name: item.name, id: item.id },
     });
-  };
-  place("las-100", "Core and ring 100 (current)");
-  place("las-300", "Rings 200 and 300 (later)", [0.04, -0.16]);
-  place("phx-service", "Phoenix service area (current)");
-  place("mia-current", "Miami service area (current)");
-  place("mia-extended", "Miami extended area (later)", [0.05, 0.08]);
+  }
   return labels;
+}
+
+function presentAreas(areas: GeoFeature[]) {
+  return areas.map((feature) => ({
+    ...feature,
+    properties: {
+      ...feature.properties,
+      role: areaRole(String(feature.properties.id || ""), String(feature.properties.group || "")),
+    },
+  }));
 }
 
 function bboxCenter(feature: GeoFeature): [number, number] | null {
@@ -217,6 +241,7 @@ export default function MapView(props: Props) {
           unscreened: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          washes: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "review-ring": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "review-marks": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -224,11 +249,19 @@ export default function MapView(props: Props) {
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
           { id: "labels", type: "raster", source: "labels", layout: { visibility: "none" } },
-          { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f7e2a8", "line-dasharray": [1.2, 1.2], "line-width": 1.4, "line-opacity": 0.9 } },
-          { id: "expansion-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "expansion"], paint: { "line-color": "#d6e4f5", "line-dasharray": [2, 1.5], "line-width": 1.6, "line-opacity": 0.95 } },
-          { id: "areas-op", type: "fill", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "fill-color": "#dfeae1", "fill-opacity": 0.1 } },
-          { id: "areas-op-line", type: "line", source: "areas", filter: ["==", ["get", "group"], "service"], paint: { "line-color": "#b9cdbf", "line-width": 1.4 } },
-          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12, "text-max-width": 8, "text-offset": [0, 1.1], "text-allow-overlap": false, "text-padding": 8 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 } },
+          { id: "areas-later-case", type: "line", source: "areas", filter: ["==", ["get", "role"], "later"], paint: { "line-color": AREA_PAINT.caseLine, "line-width": 4, "line-opacity": 0.35 } },
+          { id: "areas-later", type: "line", source: "areas", filter: ["==", ["get", "role"], "later"], paint: { "line-color": AREA_PAINT.laterLineSatellite, "line-dasharray": [2, 1.4], "line-width": 2.2, "line-opacity": 0.95 } },
+          { id: "areas-priority", type: "fill", source: "areas", filter: ["==", ["get", "role"], "priority"], paint: { "fill-color": AREA_PAINT.priorityFill, "fill-opacity": 0.22 } },
+          { id: "areas-priority-line", type: "line", source: "areas", filter: ["==", ["get", "role"], "priority"], paint: { "line-color": AREA_PAINT.priorityLineSatellite, "line-width": 2.2 } },
+          { id: "areas-current", type: "fill", source: "areas", filter: ["==", ["get", "role"], "current"], paint: { "fill-color": AREA_PAINT.currentFill, "fill-opacity": 0.16 } },
+          { id: "areas-current-line", type: "line", source: "areas", filter: ["==", ["get", "role"], "current"], paint: { "line-color": AREA_PAINT.currentLineSatellite, "line-width": 2.6 } },
+          { id: "areas-launch", type: "fill", source: "areas", filter: ["==", ["get", "role"], "launch"], paint: { "fill-color": AREA_PAINT.launchFill, "fill-opacity": 0.32 } },
+          { id: "areas-launch-line", type: "line", source: "areas", filter: ["==", ["get", "role"], "launch"], paint: { "line-color": AREA_PAINT.launchLineSatellite, "line-width": 2.6 } },
+          { id: "areas-future-case", type: "line", source: "areas", filter: ["==", ["get", "role"], "future"], paint: { "line-color": AREA_PAINT.caseLine, "line-width": 6, "line-opacity": 0.55 } },
+          { id: "areas-future", type: "line", source: "areas", filter: ["==", ["get", "role"], "future"], paint: { "line-color": AREA_PAINT.futureLineSatellite, "line-dasharray": [1.4, 0.9], "line-width": 3.6 } },
+          { id: "rings-case", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": AREA_PAINT.caseLine, "line-width": 3.6, "line-opacity": 0.5 } },
+          { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f4efe6", "line-dasharray": [2, 1.3], "line-width": 1.8, "line-opacity": 0.95 } },
+          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 13, "text-max-width": 10, "text-offset": [0, 0.2], "text-allow-overlap": true, "text-padding": 2 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.6 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
           { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#9e4b3e", "line-width": 1.6, "line-dasharray": [1.5, 1.2] } },
@@ -505,6 +538,32 @@ export default function MapView(props: Props) {
             },
             paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 },
           },
+          {
+            id: "nearby-washes",
+            type: "circle",
+            source: "washes",
+            paint: {
+              "circle-radius": 5.5,
+              "circle-color": "#fffdf8",
+              "circle-stroke-color": "#1c1914",
+              "circle-stroke-width": 2,
+            },
+          },
+          {
+            id: "nearby-wash-labels",
+            type: "symbol",
+            source: "washes",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 11,
+              "text-offset": [0, 1.15],
+              "text-anchor": "top",
+              "text-allow-overlap": false,
+              "text-optional": true,
+            },
+            paint: { "text-color": "#1c1914", "text-halo-color": "#fffdf8", "text-halo-width": 1.4 },
+          },
           { id: "measure-fill", type: "fill", source: "measure", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#1e4636", "fill-opacity": 0.28 } },
           { id: "measure", type: "line", source: "measure", paint: { "line-color": "#fffdf8", "line-width": 2 } },
           {
@@ -711,9 +770,14 @@ export default function MapView(props: Props) {
         const id = event.features?.[0]?.properties?.listing_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
+      map.on("click", "nearby-washes", (event: MapLayerMouseEvent) => {
+        if (measureRef.current) return;
+        const id = event.features?.[0]?.properties?.id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
       const popup = new Popup({ closeButton: false, closeOnClick: false, closeOnMove: false, maxWidth: "280px", className: "map-tip-popup", offset: 14 });
-      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "expansion-line", "areas-op"];
-      const areaLayers = new Set(["expansion-line", "areas-op"]);
+      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "nearby-washes", "rings", "rings-case", ...AREA_LAYER_IDS];
+      const areaLayers = new Set([...AREA_LAYER_IDS, "rings", "rings-case"]);
       let shownKey = "";
       let request = 0;
       const hideTip = () => {
@@ -745,7 +809,7 @@ export default function MapView(props: Props) {
           return;
         }
         const layer = feature.layer.id;
-        map.getCanvas().style.cursor = layer === "areas-op" || layer === "expansion-line" ? "" : "pointer";
+        map.getCanvas().style.cursor = areaLayers.has(layer) ? "" : "pointer";
         const props = (feature.properties || {}) as Record<string, unknown>;
         if (layer === "clusters") {
           const clusterId = Number(props.cluster_id);
@@ -776,7 +840,11 @@ export default function MapView(props: Props) {
               ? dealTip(props)
               : layer === "depots"
                 ? depotTip(props)
-                : areaTip(props);
+                : layer === "nearby-washes" || layer === "nearby-wash-labels"
+                  ? washTip(props)
+                  : layer === "rings" || layer === "rings-case"
+                    ? ringTip(props)
+                    : areaTip(props);
         const key = `${layer}:${String(props.site_id || props.deal_id || props.id || "")}`;
         showTip(key, event.lngLat, model);
       });
@@ -808,15 +876,43 @@ export default function MapView(props: Props) {
       };
       const phoneScreen = window.matchMedia("(max-width: 767px)").matches;
       if (!satelliteOn) {
-        paint("areas-op", "fill-opacity", 0.45);
-        paint("area-labels", "text-color", "#5b554b");
+        paint("areas-current", "fill-opacity", 0.38);
+        paint("areas-current-line", "line-color", AREA_PAINT.currentLine);
+        paint("areas-current-line", "line-width", 2.4);
+        paint("areas-launch", "fill-opacity", 0.46);
+        paint("areas-launch-line", "line-color", AREA_PAINT.launchLine);
+        paint("areas-launch-line", "line-width", 2.4);
+        paint("areas-later", "line-color", AREA_PAINT.laterLine);
+        paint("areas-later", "line-width", 2.4);
+        paint("areas-priority", "fill-opacity", 0.4);
+        paint("areas-priority-line", "line-color", AREA_PAINT.priorityLine);
+        paint("areas-priority-line", "line-width", 2.2);
+        paint("areas-future", "line-color", AREA_PAINT.futureLine);
+        paint("areas-future", "line-width", 3.6);
+        paint("area-labels", "text-color", "#3d3832");
         paint("area-labels", "text-halo-color", "#f6f3ec");
+        paint("area-labels", "text-halo-width", 1.8);
         paint("depot-labels", "text-color", "#1d4e89");
         paint("depot-labels", "text-halo-color", "#fffdf8");
+        paint("rings", "line-color", "#6b5428");
+        paint("rings", "line-width", 1.8);
       } else {
-        paint("areas-op", "fill-opacity", phoneScreen ? 0.06 : 0.1);
-        paint("areas-op-line", "line-color", "#f4efe6");
-        paint("areas-op-line", "line-width", 2);
+        paint("areas-current", "fill-opacity", phoneScreen ? 0.1 : 0.18);
+        paint("areas-current-line", "line-color", AREA_PAINT.currentLineSatellite);
+        paint("areas-current-line", "line-width", 2.6);
+        paint("areas-launch", "fill-opacity", phoneScreen ? 0.22 : 0.32);
+        paint("areas-launch-line", "line-color", AREA_PAINT.launchLineSatellite);
+        paint("areas-launch-line", "line-width", 2.6);
+        paint("areas-later", "line-color", AREA_PAINT.laterLineSatellite);
+        paint("areas-later", "line-width", 2.2);
+        paint("areas-priority", "fill-opacity", phoneScreen ? 0.16 : 0.24);
+        paint("areas-priority-line", "line-color", AREA_PAINT.priorityLineSatellite);
+        paint("areas-priority-line", "line-width", 2.2);
+        paint("areas-future", "line-color", AREA_PAINT.futureLineSatellite);
+        paint("areas-future", "line-width", 3.6);
+        paint("area-labels", "text-color", "#f7f3ea");
+        paint("area-labels", "text-halo-color", "#1c1914");
+        paint("area-labels", "text-halo-width", 1.6);
         for (const id of ["tier-large", "tier-small"]) {
           paint(id, "circle-stroke-color", "#fffdf8");
           paint(id, "circle-stroke-width", 2);
@@ -956,7 +1052,7 @@ export default function MapView(props: Props) {
       }
       const labelData = {
         type: "FeatureCollection" as const,
-        features: dealLabelFeatures(props.deals, props.pinLabel || "none"),
+        features: dealLabelFeatures(props.deals, props.pinLabel ?? "asking"),
       };
       const labelSource = map.getSource("deal-labels") as GeoJSONSource | undefined;
       if (labelSource) labelSource.setData(labelData);
@@ -1066,9 +1162,19 @@ export default function MapView(props: Props) {
         });
       }
       (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
-      (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.areas });
+      (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: presentAreas(props.areas) });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
       (map.getSource("rings") as GeoJSONSource).setData({ type: "FeatureCollection", features: depotRings(props.depots) });
+      const washSource = map.getSource("washes") as GeoJSONSource | undefined;
+      const washData = {
+        type: "FeatureCollection" as const,
+        features: (props.washPoints || []).map((point) => ({
+          type: "Feature" as const,
+          properties: { id: point.id, name: point.name, miles: point.miles, band: point.band },
+          geometry: { type: "Point" as const, coordinates: point.coordinates },
+        })),
+      };
+      if (washSource) washSource.setData(washData);
       (map.getSource("parcels") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.parcels });
       (map.getSource("area-labels") as GeoJSONSource).setData({ type: "FeatureCollection", features: areaLabels(props.areas) });
       if (map.getLayer("parcels-selected")) {
@@ -1087,8 +1193,10 @@ export default function MapView(props: Props) {
       const phonePad = phone && !reviewing;
       const padKey = phonePad ? "clear" : "flush";
       map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : { top: 0, bottom: 0, left: 0, right: 0 });
-      if ((props.basemap || "satellite") === "satellite" && map.getLayer("areas-op")) {
-        map.setPaintProperty("areas-op", "fill-opacity", phone ? 0.06 : 0.1);
+      if ((props.basemap || "satellite") === "satellite") {
+        if (map.getLayer("areas-current")) map.setPaintProperty("areas-current", "fill-opacity", phone ? 0.1 : 0.18);
+        if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
+        if (map.getLayer("areas-priority")) map.setPaintProperty("areas-priority", "fill-opacity", phone ? 0.16 : 0.24);
       }
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
@@ -1118,7 +1226,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1127,13 +1235,12 @@ export default function MapView(props: Props) {
       const vis = (id: string, on: boolean) => {
         if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
       };
-      vis("areas-op", props.showAreas);
-      vis("areas-op-line", props.showAreas);
-      vis("expansion-line", props.showAreas);
-      vis("area-labels", props.showAreas);
-      vis("depots", props.showDepots);
-      vis("depot-labels", props.showDepots);
+      for (const id of AREA_LAYER_IDS) vis(id, props.showAreas);
+      const depotsOn = props.showDepots || props.showRings;
+      vis("depots", depotsOn);
+      vis("depot-labels", depotsOn);
       vis("rings", props.showRings);
+      vis("rings-case", props.showRings);
       vis("sites", props.showSites);
       vis("clusters", props.showSites);
       vis("clusters-halo", props.showSites);
@@ -1148,7 +1255,7 @@ export default function MapView(props: Props) {
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [mapGeneration, props.showAreas, props.showDepots, props.showSites]);
+  }, [mapGeneration, props.showAreas, props.showDepots, props.showRings, props.showSites]);
 
   const selectedOnMap =
     props.sites.some((feature) => feature.properties.site_id === props.selectedId) ||

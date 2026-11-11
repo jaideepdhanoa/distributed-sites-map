@@ -46,6 +46,7 @@ const ALLOW = new Set([
   "photo-shot",
   "hero-still",
   "hero-info",
+  "hero-expand",
   "photo-more",
   "propose",
   "check",

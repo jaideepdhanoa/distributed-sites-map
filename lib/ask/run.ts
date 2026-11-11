@@ -7,6 +7,7 @@ import { EMPTY_ANSWER, TIMEOUT_ANSWER, UPSTREAM_ANSWER } from "./empty";
 import { liveAskModel, type AskModelInput, type AskModelOutput } from "./model";
 import { applyWordingTier, withCitations, type AskSource } from "./policy";
 import { askPrefix } from "./prompt";
+import { siteScopeLine } from "./tools";
 import { logUpstream, isAbortError } from "./upstream";
 
 export type AskRunner = (input: AskModelInput) => Promise<AskModelOutput>;
@@ -83,7 +84,7 @@ export async function answerQuestion(input: {
     };
   } else {
     const runner = input.runner || liveAskModel;
-    const scopeLine = input.siteId ? `Scope: site ${input.siteId}` : "Scope: portfolio and markets";
+    const scopeLine = input.siteId ? siteScopeLine(input.siteId) : "Scope: portfolio and markets";
     const audience = input.role === "reviewer" ? "Audience: internal" : "Audience: map";
     let draft: AskModelOutput;
     let upstream = false;

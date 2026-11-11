@@ -46,6 +46,7 @@ test("mobile layers and the menu are not open together", async ({ page }, info) 
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.locator(".menu-sheet")).toBeVisible();
   await expect(page.locator(".legend")).toHaveCount(0);
+  await expect(page.locator(".map-key")).toBeHidden();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator(".layers.open")).toBeVisible();

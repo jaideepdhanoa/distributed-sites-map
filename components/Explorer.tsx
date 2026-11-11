@@ -2023,33 +2023,71 @@ export default function Explorer() {
                     <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} title={title} onClick={() => setPinLabel(id)}>{label}</button>
                   ))}
                 </div>
-                <p className="eyebrow">Also show</p>
+                <p className="eyebrow">On the map</p>
                 {funnel === "universe" ? (
-                  <label title={LAYER_TITLES.pipeline}><i className="pin-sample circle" /><input className="check" type="checkbox" checked={dealsOn} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
+                  <label className="layer-row" title={LAYER_TITLES.pipeline}>
+                    <input className="check" type="checkbox" checked={dealsOn} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} />
+                    <span className="layer-mark"><i className="pin-sample circle" /></span>
+                    Pipeline deals
+                  </label>
                 ) : (
-                  <label title={LAYER_TITLES.universe}><i className="pin-sample diamond" /><input className="check" type="checkbox" checked={pinsOn} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
+                  <label className="layer-row" title={LAYER_TITLES.universe}>
+                    <input className="check" type="checkbox" checked={pinsOn} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} />
+                    <span className="layer-mark"><i className="pin-sample diamond" /></span>
+                    Universe sites
+                  </label>
                 )}
-                <label title={LAYER_TITLES.dropped}><i className="swatch stage-dropped" /><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
-                {OVERLAYS.map((item) => (
-                  <label key={item.id} title={LAYER_TITLES[item.id]}><input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} /> {item.label}</label>
-                ))}
+                <label className="layer-row" title={LAYER_TITLES.dropped}>
+                  <input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} />
+                  <span className="layer-mark"><i className="swatch stage-dropped" /></span>
+                  Dropped deals
+                </label>
                 <p className="eyebrow">Context</p>
-                <label title={LAYER_TITLES.areas}><i className="swatch current-area" /><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
-                <label title={LAYER_TITLES.depots}><i className="pin-sample depot" /><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
-                <label onMouseEnter={(event) => setRingCursor({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setRingCursor(null)}><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
-                <p className="eyebrow">Key</p>
-                <p className="layer-key"><i className="swatch cleared" /> Cleared</p>
-                <p className="layer-key"><i className="swatch possible" /> Possible</p>
-                <p className="layer-key"><i className="swatch unresolved" /> Unresolved</p>
-                <p className="layer-key"><i className="swatch held" /> Held</p>
-                <p className="layer-key"><i className="swatch l10" /> 10k+ sq ft</p>
-                <p className="layer-key"><i className="swatch l4" /> 4k+ sq ft</p>
+                <label className="layer-row" title={LAYER_TITLES.areas}>
+                  <input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} />
+                  <span className="layer-mark"><i className="swatch current-area" /></span>
+                  Service areas
+                </label>
+                <label className="layer-row" title={LAYER_TITLES.depots}>
+                  <input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} />
+                  <span className="layer-mark"><i className="pin-sample depot" /></span>
+                  Depots
+                </label>
+                <label className="layer-row layer-sub" title={LAYER_TITLES.rings} onMouseEnter={(event) => setRingCursor({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setRingCursor(null)}>
+                  <input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} />
+                  <span className="layer-mark"><i className="pin-sample line" /></span>
+                  Depot rings
+                </label>
+                <p className="eyebrow">Area data</p>
+                {(["traffic", "population", "growth", "income", "washes"] as const).map((id) => {
+                  const item = OVERLAYS.find((entry) => entry.id === id);
+                  if (!item) return null;
+                  return (
+                    <label key={item.id} className="layer-row" title={LAYER_TITLES[item.id]}>
+                      <input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} />
+                      <span className="layer-mark" />
+                      {item.label}
+                    </label>
+                  );
+                })}
               </div>
             </>
           ) : (
             <button type="button" className="paper-btn" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
           )}
         </aside>
+        {!listView ? (
+          <aside className="map-key" aria-label="Key">
+            <ul>
+              <li><i className="swatch cleared" /> Cleared</li>
+              <li><i className="swatch possible" /> Possible</li>
+              <li><i className="swatch unresolved" /> Unresolved</li>
+              <li><i className="swatch held" /> Held</li>
+              <li><i className="swatch l10" /> 10k+ sq ft</li>
+              <li><i className="swatch l4" /> 4k+ sq ft</li>
+            </ul>
+          </aside>
+        ) : null}
         {tip ? <p className="tip">{tip}</p> : null}
         {guideOpen ? (
           <aside className="guide">

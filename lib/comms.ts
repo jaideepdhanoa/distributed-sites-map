@@ -310,7 +310,7 @@ function commsMerged(line: CommsLine): MergedLine {
     person: line.person,
     firm: line.firm,
     channel: line.channel,
-    href: line.href,
+    href: line.href || "",
   };
 }
 
@@ -335,7 +335,7 @@ export function mergeActivity(
   const kept: CommsLine[] = [];
   const seenMessages = new Set<string>();
   for (const line of visible) {
-    const gmail = messageKey(line.href, line.messageId);
+    const gmail = messageKey(line.href || "", line.messageId);
     if (gmail && seenMessages.has(gmail)) continue;
     const cited = line.citedEventIds.filter((id) => activityById.has(id));
     const gmailHit = gmail

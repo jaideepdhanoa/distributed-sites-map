@@ -1,3 +1,4 @@
+import { defaultCategories, landLinks, siteInCategories, type Categories } from "../lib/categories";
 import { isPipelineStore } from "../lib/labels";
 
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
@@ -39,6 +40,7 @@ export type Site = {
   contacted?: boolean;
   business_type?: string;
   land_only?: boolean;
+  linked_deal_id?: string | null;
   counts_as_site?: boolean;
   duplicate_of?: string | null;
   in_area?: boolean;
@@ -126,6 +128,7 @@ export type Chips = {
   types?: string[] | null;
   query?: string;
   land?: boolean;
+  categories?: Categories;
   extra?: "listed" | "contacted" | "held" | null;
 };
 
@@ -148,10 +151,14 @@ function chips(site: Site, options: Chips, loose: boolean) {
 }
 
 export function expectedSites(catalog: Catalog, city: string, stage: string, options: Chips = {}) {
+  const links = landLinks(catalog.deals.map((feature) => feature.properties));
+  const categories = options.categories ?? defaultCategories();
+  const allowed = (site: Site) => siteInCategories(site, links, categories);
   const rows = catalog.sites
     .filter((feature) => feature.properties.city === city && feature.properties.origin !== "off-market")
     .map((feature) => ({ feature, site: present(feature.properties) }));
   const chosen = rows.filter(({ site }) => {
+    if (!allowed(site)) return false;
     if (options.extra === "held") return held(site) && chips(site, options, true);
     if (options.extra === "listed") return inStage(site, stage) && Boolean(site.listed) && chips(site, options, true);
     if (options.extra === "contacted") return inStage(site, stage) && Boolean(site.contacted) && chips(site, options, true);
@@ -185,10 +192,12 @@ function placed(deal: Feature<Deal>, sites: Map<string, Feature<Site>>) {
   return Boolean(deal.geometry);
 }
 
-function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean } = {}) {
+function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean } = {}) {
   return catalog.deals.filter((feature) => {
     const deal = feature.properties;
-    if ((deal.kind !== "pipeline" && deal.kind !== "land") || deal.city !== city || deal.stage_group !== step) return false;
+    if (deal.city !== city || deal.stage_group !== step) return false;
+    if (deal.kind === "land") return Boolean(options.land);
+    if (deal.kind !== "pipeline") return false;
     if ((deal.is_c_store || isPipelineStore(deal)) && !options.cstore) return false;
     if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
     if (options.query) {
@@ -199,17 +208,18 @@ function stageDeals(catalog: Catalog, city: string, step: string, options: { typ
   });
 }
 
-export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean } = {}) {
+export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean } = {}) {
   const sites = new Map(catalog.sites.map((feature) => [feature.properties.site_id, feature]));
   return stageDeals(catalog, city, step, options)
     .filter((feature) => placed(feature, sites))
     .map((feature) => feature.properties.deal_id);
 }
 
-export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean } = {}) {
+export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean } = {}) {
   return stageDeals(catalog, city, step, options).length;
 }
 
 export function unfilteredCount(catalog: Catalog, city: string, stage: string) {
-  return catalog.sites.filter((feature) => feature.properties.city === city && inStage(present(feature.properties), stage)).length;
+  const links = landLinks(catalog.deals.map((feature) => feature.properties));
+  return catalog.sites.filter((feature) => feature.properties.city === city && inStage(present(feature.properties), stage) && siteInCategories(feature.properties, links, defaultCategories())).length;
 }

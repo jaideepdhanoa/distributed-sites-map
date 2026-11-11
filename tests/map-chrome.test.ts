@@ -31,9 +31,8 @@ test("pipeline all-stages is the default and not a filter", () => {
   assert.equal(droppedDealsShown({ all: false, stage: "dropped", droppedLayer: false, searchWide: false }), true);
   assert.equal(droppedDealsShown({ all: false, stage: "desk", droppedLayer: false, searchWide: false }), false);
   assert.equal(droppedDealsShown({ all: true, stage: "desk", droppedLayer: true, searchWide: false }), true);
-  assert.equal(stageLandShown({ all: true, landLayer: false }), false);
-  assert.equal(stageLandShown({ all: false, landLayer: false }), true);
-  assert.equal(stageLandShown({ all: true, landLayer: true }), true);
+  assert.equal(stageLandShown(false), false);
+  assert.equal(stageLandShown(true), true);
 });
 
 test("Miami layers are labeled in plain words and the mid-2027 line is its own role", () => {

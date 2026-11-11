@@ -54,7 +54,9 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await showFunnel(page, name);
   await waitForBasemap(page);
   const counts = cityPipelineCounts("PHX");
-  await expect(page.locator("nav.funnel")).toContainText(`(${counts.deskDeals} deals, ${counts.deskLand} land)`);
+  const desk = page.locator("nav.funnel .step").filter({ hasText: "Desk screen" });
+  await expect(desk.locator("strong")).toHaveText(String(counts.deskDeals));
+  await expect(page.locator("nav.funnel")).not.toContainText(`${counts.deskLand} land`);
   const chipText = async () => page.locator(".summary-chip").first().textContent();
   await expect.poll(chipText).toContain("on the map ·");
   await expect.poll(chipText).toContain("dropped, hidden");

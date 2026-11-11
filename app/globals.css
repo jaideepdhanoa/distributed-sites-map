@@ -2359,6 +2359,10 @@ span.listing-link.muted { text-decoration: none; }
 .swatch.stage-dropped { background: #8d8376; }
 .filter-checks { display: grid; gap: 6px; margin-top: 8px; }
 .filter-checks label { display: flex; align-items: center; gap: 8px; }
+.cat-row { display: grid; gap: 8px; }
+.cat-row label { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; }
+.cat-row label input.check { margin-top: 1px; }
+.filter-note { margin: 0 0 8px; color: var(--ink-3); font-size: 12px; line-height: 1.35; }
 button.tool.on,
 button.paper-btn.on,
 .segmented > button.segmented.on {

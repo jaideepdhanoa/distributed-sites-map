@@ -72,8 +72,10 @@ type DealHitSource = {
 };
 
 export type SearchOptions = {
-  /** C-store deals stay out of suggestions until that filter is on. */
+  /** C-store deals stay out of suggestions until that category is on. */
   cStores?: boolean;
+  /** Vacant land parcels stay out of suggestions until the Land category is on. */
+  land?: boolean;
 };
 
 type SiteHitSource = {
@@ -107,11 +109,17 @@ export function collectSearchHits(
   const needle = foldSearch(query);
   if (needle.length < 2) return [];
   const cStores = options.cStores === true;
+  const landOn = options.land === true;
   const hiddenStore = (deal: DealHitSource) => deal.is_c_store === true || isPipelineStore(deal);
-  const visibleDeals = deals.filter((deal) => cStores || !hiddenStore(deal));
-  const hiddenCStoreIds = new Set(
-    cStores ? [] : deals.filter(hiddenStore).flatMap((deal) => [deal.deal_id, deal.universe_id || ""]).filter(Boolean),
-  );
+  const hiddenLand = (deal: DealHitSource) => deal.kind === "land";
+  const visibleDeals = deals.filter((deal) => (cStores || !hiddenStore(deal)) && (landOn || !hiddenLand(deal)));
+  const hiddenIds = new Set<string>();
+  const hide = (deal: DealHitSource) => {
+    if (deal.deal_id) hiddenIds.add(deal.deal_id);
+    if (deal.universe_id) hiddenIds.add(deal.universe_id);
+  };
+  if (!cStores) deals.filter(hiddenStore).forEach(hide);
+  if (!landOn) deals.filter(hiddenLand).forEach(hide);
   const byDeal = new Map(visibleDeals.map((deal) => [deal.deal_id, deal]));
   const byUniverse = new Map<string, DealHitSource>();
   for (const deal of visibleDeals) {
@@ -152,7 +160,7 @@ export function collectSearchHits(
       linked?.deal_id,
       linked?.name,
     ];
-    if (hiddenCStoreIds.has(site.site_id) || (site.linked_deal_id && hiddenCStoreIds.has(site.linked_deal_id))) continue;
+    if (hiddenIds.has(site.site_id) || (site.linked_deal_id && hiddenIds.has(site.linked_deal_id))) continue;
     if (!matchesQuery(query, parts)) continue;
     hits.push({
       id: site.site_id,

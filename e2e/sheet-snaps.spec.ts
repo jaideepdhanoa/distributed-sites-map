@@ -109,15 +109,17 @@ test("phone layers list scrolls between the header and the sheet", async ({ page
   await page.goto(SONORAN);
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = page.locator(".layers.open");
-  const note = panel.locator(".layer-meta").last();
+  const note = panel.getByText("Depot rings");
   await note.scrollIntoViewIfNeeded();
   await expect(note).toBeVisible();
-  await expect(panel.getByText("Land sites")).toBeVisible();
+  await expect(panel.getByText("Land sites")).toHaveCount(0);
+  await expect(panel.getByText("C-stores")).toHaveCount(0);
+  await expect(panel.getByText("Listed, not yet screened")).toHaveCount(0);
   const bounds = await page.evaluate(() => {
     const layers = document.querySelector(".layers.open")!;
     const bar = document.querySelector("header.bar")!;
     const drawer = document.querySelector("aside.drawer")!;
-    const note = layers.querySelector(".layers-body .layer-meta:last-child")!;
+    const note = layers.querySelector(".layers-body label:last-of-type")!;
     const lr = layers.getBoundingClientRect();
     const br = bar.getBoundingClientRect();
     const dr = drawer.getBoundingClientRect();

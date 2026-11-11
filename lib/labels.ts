@@ -7,8 +7,8 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
   { id: "ruled-out", label: "Ruled out", note: "Closed, not a wash, or no spare land. Shown only at the funnel step where it drops out." },
   { id: "listing", label: "Listing", note: "A site or deal that is on the market." },
   { id: "desk", label: "Desk screen", note: "A first review of the listing or lead." },
-  { id: "land", label: "Land site", note: "Land without an operating wash. Hidden until that layer is turned on." },
-  { id: "cstore", label: "C-store", note: "Hidden until that filter is turned on." },
+  { id: "land", label: "Land site", note: "A vacant parcel, such as LAND-PHX. It stays off until the Land category is on. Spare land on a wash is separate." },
+  { id: "cstore", label: "C-store", note: "A fuel or convenience store. Hidden until the C-stores category is on." },
   { id: "depot", label: "Depot", note: "Existing operating depot." },
   { id: "offmarket", label: "Off-market, other types", note: "Sites we found ourselves that are not in the car-wash census. No broker or listing yet. Choose a category with Business type." },
 ];
@@ -21,7 +21,7 @@ export const FUNNEL_NOTES: Record<string, string> = {
   county: "In-area sites with enough spare land that also have a county verdict. The workbook checked 110 sites in all: 14 cleared, 30 possible, 47 ruled out, 15 not a car wash, and 4 unresolved. That full set includes sites outside the service area and sites without enough spare land.",
   cleared: "County records confirm an operating wash with enough spare land on its own parcel. The workbook clears 12. Charleston Car Wash and the Chandler Quick Quack stay Possible until review, so the map shows 10.",
   listed: "Sites on this step that are on the market.",
-  contacted: "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count.",
+  contacted: "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count.",
   desk: "A first review of the listing or lead.",
   financial: "The workbook's financial screen.",
   checks: "The workbook's site checks.",
@@ -64,11 +64,19 @@ export const BUSINESS_TYPES = [
   "Other",
 ] as const;
 
-export const CENSUS_NOTE = "Car washes. Other categories will get their own census. These counts are car washes only.";
+export const CENSUS_NOTE = "Car washes. Land parcels and c-stores stay off until you turn those categories on.";
+
+export const CATEGORY_NOTES = {
+  wash: "Operating car washes. This is the usual view.",
+  land: "Vacant parcels, such as LAND-PHX. Not spare land on a wash.",
+  store: "Fuel and convenience stores. Off until you turn them on.",
+} as const;
+
+export const SPARE_LAND_NOTE = "Leftover land on an operating wash. This does not turn on vacant land parcels.";
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have spare land inside the service area. Cleared sites passed the county check.",
-  pipeline: "Pipeline deals and Land Sites, with a split when both are in the step. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
+  pipeline: "Deals in the categories you have on. Car washes are the usual view. Land parcels and c-stores stay off until you turn them on. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
 };
 
 const STAGE_TITLES: Record<string, string> = {
@@ -127,8 +135,8 @@ export const AREA_KIND_LABEL = {
 export const LAYER_TITLES = {
   universe: "Universe sites. The car-wash census for this market.",
   pipeline: "Pipeline deals.",
-  land: "Land without an operating wash. Hidden on the all-stages map until you turn it on. A chosen stage still includes its land.",
-  cstore: "Fuel and convenience stores. Off until you turn them on.",
+  land: "Vacant land parcels, such as LAND-PHX. Off until the Land category is on. A chosen stage then includes the parcels at that stage.",
+  cstore: "Fuel and convenience stores. Off until the C-stores category is on.",
   dropped: "Deals that are no longer being pursued.",
   unscreened: "Listings that have not been screened yet.",
   traffic: "Workbook traffic count on each pin.",

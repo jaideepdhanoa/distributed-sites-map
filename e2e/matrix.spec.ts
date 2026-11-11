@@ -27,8 +27,6 @@ const FILTERS: { label: string; chips: Chips; query: string }[] = [
   { label: "verdict UNRESOLVED", chips: { verdict: "UNRESOLVED" }, query: "verdict=UNRESOLVED" },
   { label: "listed", chips: { listed: "yes" }, query: "listed=yes" },
   { label: "land", chips: { land: true }, query: "land=1" },
-  { label: "type Auto repair", chips: { types: ["Auto repair"] }, query: "types=Auto+repair" },
-  { label: "type Car wash", chips: { types: ["Car wash"] }, query: "types=Car+wash" },
   { label: "search car wash", chips: { query: "car wash" }, query: "q=car+wash" },
 ];
 
@@ -261,15 +259,15 @@ for (const city of CITIES) {
       await expect(page.locator(".map[data-deal-markers='square']"), "deal marker").toBeAttached();
     }
 
-    const repair = expectedSquares(catalog, city, "desk", { types: ["Auto repair"] });
-    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&types=Auto+repair`);
+    const withLand = expectedSquares(catalog, city, "desk", { land: true });
+    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|land`);
     await page.waitForFunction(
       (count) => (((window as unknown as { __src?: { deals?: unknown[] } }).__src?.deals) || []).length === count,
-      repair.length,
+      withLand.length,
       { timeout: 20_000 },
     );
-    same(`${city} pipeline type`, (await source(page, "deals")).map((pin) => pin.id), repair);
-    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { types: ["Auto repair"] }));
+    same(`${city} pipeline land`, (await source(page, "deals")).map((pin) => pin.id), withLand);
+    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { land: true }));
   });
 }
 

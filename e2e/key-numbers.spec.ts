@@ -56,7 +56,7 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
     const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getSource: (id: string) => { serialize: () => { data?: { features?: unknown[] } } } } }).__sitesMap;
     if (!map?.isStyleLoaded()) return false;
     const data = map.getSource("deals")?.serialize()?.data;
-    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 10);
+    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 1);
   });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&cstore=1");
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(withStores.deskTotal));

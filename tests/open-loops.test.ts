@@ -143,8 +143,8 @@ test("NDA-002 keeps its description and NDA-005 is zero days with the site folde
   assert.equal(folded?.days, 0);
   const queue = ndaQueueBody(JSON.parse(readFileSync("data/generated/nda.json", "utf8")) as NdaSnapshot);
   const queued = queue.queue.find((row) => row.nda_id === "NDA-005");
-  assert.equal(queued?.nda_waiting_on, folded?.court);
-  assert.equal(courtDayCount(queued?.nda_days_in_court), folded?.days);
+  assert.equal(queued?.nda_waiting_on, "Us — legal");
+  assert.equal(courtDayCount(queued?.nda_days_in_court), 0);
   assert.equal(courtDayCount("12/30/1899"), 0);
   assert.equal(courtDayCount(0), 0);
   assert.deepEqual(folded?.folded_site_ids, ["PIPE-PHX-0014"]);

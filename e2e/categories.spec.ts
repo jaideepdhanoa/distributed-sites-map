@@ -32,7 +32,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   const list = page.getByTestId("pipeline-list");
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(both.deskTotal));
   await expect(list).toContainText("Owner-operated repair shop");
-  await expect(list).toContainText("M Car Wash");
+  await expect(list).toContainText("Majestic Car Wash");
   await expect(page).not.toHaveURL(/[?&]cats=/);
 
   await page.locator("button.tool", { hasText: "Filters" }).click();
@@ -60,14 +60,14 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(washes.deskTotal));
   await expect(page.locator("nav.funnel").getByRole("button", { name: /Desk screen/ })).toContainText(String(washes.deskTotal));
   await expect(list).not.toContainText("Owner-operated repair shop");
-  await expect(list).toContainText("M Car Wash");
+  await expect(list).toContainText("Majestic Car Wash");
 
   await panel.getByTestId("wash-category").click();
   await panel.getByTestId("auto-category").click();
   await expect(page).toHaveURL(/[?&]cats=auto(?:&|$)/);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(autos.deskTotal));
   await expect(list).toContainText("Owner-operated repair shop");
-  await expect(list).not.toContainText("M Car Wash");
+  await expect(list).not.toContainText("Majestic Car Wash");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&cats=wash");
   await expect(page.getByTestId("pipeline-list")).toContainText("Black Canyon");

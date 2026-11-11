@@ -62,16 +62,16 @@ test("Phoenix listed and desk counts leave land parcels out until that category 
   const phx = sites.filter((site) => site.city === "PHX").map((site) => presentSite(site));
   const listed = phx.filter((site) => inStage(site, "in_area") && site.listed);
   const listedWashes = listed.filter((site) => siteInCategories(site, links, washes));
-  assert.equal(listed.length, 26);
+  assert.equal(listed.length, 29);
   assert.equal(listedWashes.length, 4);
   assert.ok(listedWashes.every((site) => !isLandParcelSite(site, links)));
-  assert.equal(listed.filter((site) => siteInCategories(site, links, withLand)).length, 26);
+  assert.equal(listed.filter((site) => siteInCategories(site, links, withLand)).length, 29);
 
   const desk = (categories: typeof washes) =>
     deals.filter((deal) => deal.city === "PHX" && deal.stage_group === "desk" && dealInCategories(deal, categories));
-  assert.equal(desk(washes).length, 2);
-  assert.equal(desk(withLand).length, 22);
-  assert.equal(desk({ ...washes, store: true }).length, 5);
+  assert.equal(desk(washes).length, 14);
+  assert.equal(desk(withLand).length, 44);
+  assert.equal(desk({ ...washes, store: true }).length, 17);
   assert.ok(desk(withLand).some((deal) => deal.kind === "land" && deal.deal_id.startsWith("LAND-PHX-")));
 });
 
@@ -107,11 +107,14 @@ test("auto service is a pipeline category, separate from car washes", () => {
   assert.ok(tires.length > 0);
   assert.ok(tires.every((deal) => dealCategory(deal) === "auto"));
 
-  // The workbook already types these. Generated geojson stays as synced until the next workbook drop.
-  for (const id of ["PIPE-PHX-0081", "PIPE-MIA-0082", "PIPE-PHX-0083", "PIPE-PHX-0085"]) {
-    assert.equal(row(id).business_type, "Other", id);
-    assert.equal(dealCategory(row(id)), "wash", id);
-  }
+  assert.equal(row("PIPE-PHX-0081").business_type, "Car wash");
+  assert.equal(dealCategory(row("PIPE-PHX-0081")), "wash");
+  assert.equal(row("PIPE-MIA-0082").business_type, "Car wash");
+  assert.equal(dealCategory(row("PIPE-MIA-0082")), "wash");
+  assert.equal(row("PIPE-PHX-0083").business_type, "Car wash");
+  assert.equal(dealCategory(row("PIPE-PHX-0083")), "wash");
+  assert.equal(row("PIPE-PHX-0085").business_type, "Auto repair");
+  assert.equal(dealCategory(row("PIPE-PHX-0085")), "auto");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Auto repair", name: "8812-8828 N Black Canyon Hwy (auto center)" }), "auto");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Car wash", name: "Rinse My Ride" }), "wash");
 
@@ -129,9 +132,9 @@ test("auto service is a pipeline category, separate from car washes", () => {
   const miamiDesk = (categories: typeof open) =>
     deals.filter((deal) => deal.city === "MIA" && deal.stage_group === "desk" && dealInCategories(deal, categories));
   const both = miamiDesk(open).map((deal) => deal.deal_id).sort();
-  assert.deepEqual(both, ["PIPE-MIA-0074", "PIPE-MIA-0077", "PIPE-MIA-0079", "PIPE-MIA-0086"]);
-  assert.deepEqual(miamiDesk(washesOnly).map((deal) => deal.deal_id).sort(), ["PIPE-MIA-0079", "PIPE-MIA-0086"]);
-  assert.deepEqual(miamiDesk(autosOnly).map((deal) => deal.deal_id).sort(), ["PIPE-MIA-0074", "PIPE-MIA-0077"]);
+  assert.deepEqual(both, ["PIPE-MIA-0012", "PIPE-MIA-0013", "PIPE-MIA-0074", "PIPE-MIA-0077", "PIPE-MIA-0086"]);
+  assert.deepEqual(miamiDesk(washesOnly).map((deal) => deal.deal_id).sort(), ["PIPE-MIA-0086"]);
+  assert.deepEqual(miamiDesk(autosOnly).map((deal) => deal.deal_id).sort(), ["PIPE-MIA-0012", "PIPE-MIA-0013", "PIPE-MIA-0074", "PIPE-MIA-0077"]);
 
   const found = collectSearchHits("PIPE-MIA-0074", deals, sites).map((hit) => hit.id);
   assert.equal(found.includes("PIPE-MIA-0074"), true);

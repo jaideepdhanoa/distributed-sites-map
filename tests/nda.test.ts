@@ -158,12 +158,12 @@ test("the queue is one open agreement per row, sorted by days in the current cou
   const ids = body.queue.map((row) => row.nda_id);
   assert.deepEqual(ids, ["NDA-002", "NDA-003", "NDA-004", "NDA-006", "NDA-007", "NDA-008", "NDA-001", "NDA-005"]);
   const current = body.queue.find((row) => row.nda_id === "NDA-005");
-  assert.equal(current?.nda_waiting_on, "Them — signer");
+  assert.equal(current?.nda_waiting_on, "Us — legal");
   assert.equal(courtDayCount(current?.nda_days_in_court), 0);
   assert.equal(courtDayCount("12/30/1899"), 0);
-  assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]), "With Moove legal · Them — signer · 3d open · 0d in court");
+  assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]), "With Moove legal · Us — legal · 3d open · 0d in court");
   assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]).includes("1899"), false);
-  assert.equal(body.queue[0]?.site_ids, "");
+  assert.equal(body.queue[0]?.site_ids, "Confidential Las Vegas business (identity withheld pending NDA)");
   assert.equal(coveredSites(body.queue[0]?.site_ids || "").ids.length, 0);
   assert.deepEqual(coveredSites("PIPE-LAS-0070; PIPE-LAS-0071").ids, ["PIPE-LAS-0070", "PIPE-LAS-0071"]);
   assert.deepEqual(coveredSites("PIPE-PHX-0018; Apache Junction tire business"), {
@@ -190,6 +190,6 @@ test("the NDA queue is signed in the same way as financials", () => {
   assert.equal(ndaQueueAllowed("guest"), false);
   assert.match(route, /requireUser\(/);
   assert.match(route, /ndaQueueAllowed\(session\.actionRole\)/);
-  assert.equal(snapshot.source, "fixture");
+  assert.equal(snapshot.source, "workbook");
   assert.equal(JSON.stringify(snapshot).includes("Not started"), false);
 });

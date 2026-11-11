@@ -11,8 +11,10 @@ assert.equal(isLiveContactedDeal({ kind: "pipeline", stage_group: "desk" }), fal
 assert.equal(isLiveContactedDeal({ stage_group: "desk", broker_contacted: true }), false);
 
 const note = FUNNEL_NOTES.contacted;
-assert.match(note, /Pipeline and Land deals/);
+assert.match(note, /categories you have on/);
 assert.match(note, /Dropped deals stay out/);
+assert.match(note, /Census sites are a separate count/);
+assert.doesNotMatch(note, /Pipeline and Land deals/);
 assert.doesNotMatch(note, /universe site/i);
 
 type Deal = { kind?: string; city?: string; stage_group?: string; broker_contacted?: boolean };

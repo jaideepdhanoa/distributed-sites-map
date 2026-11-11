@@ -5137,7 +5137,7 @@ def validate_committed() -> None:
 
 
 CONTACTED_DEAL_NOTE = (
-    "Pipeline and Land deals in this city with an outbound email or call to the broker on file. "
+    "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. "
     "Dropped deals stay out. Census sites are a separate count."
 )
 

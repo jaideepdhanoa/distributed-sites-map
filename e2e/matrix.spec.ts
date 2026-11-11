@@ -121,7 +121,7 @@ for (const city of CITIES) {
     test.setTimeout(480_000);
     const catalog = await loadCatalog(page, city);
     const cityQuery = city === "PHX" ? "" : `city=${city}&`;
-    await page.goto(`/?${cityQuery}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/?${cityQuery}funnel=universe`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
     await page.waitForFunction(() => ((window as unknown as { __src?: { sites?: unknown[] } }).__src?.sites || []).length > 0);
 
@@ -129,7 +129,7 @@ for (const city of CITIES) {
     for (const step of STEPS) {
       const expected = expectedSites(catalog, city, step);
       const off = expectedOffMarket(catalog, city, step);
-      await openMap(page, `${cityQuery}stage=${step}`, {
+      await openMap(page, `${cityQuery}funnel=universe&stage=${step}`, {
         city,
         stage: step,
         visible: String(expected.visible),
@@ -147,7 +147,7 @@ for (const city of CITIES) {
       for (const extra of ["listed", "contacted"] as const) {
         const subset = expectedSites(catalog, city, step, { extra });
         if (!subset.drawn.length && !subset.visible) continue;
-        await openMap(page, `${cityQuery}stage=${step}&extra=${extra}`, {
+        await openMap(page, `${cityQuery}funnel=universe&stage=${step}&extra=${extra}`, {
           city,
           stage: step,
           visible: String(subset.visible),
@@ -168,7 +168,7 @@ for (const city of CITIES) {
       for (const filter of FILTERS) {
         const expected = expectedSites(catalog, city, step, filter.chips);
         const off = expectedOffMarket(catalog, city, step, filter.chips);
-        await openMap(page, `${cityQuery}stage=${step}&${filter.query}`, {
+        await openMap(page, `${cityQuery}funnel=universe&stage=${step}&${filter.query}`, {
           city,
           stage: step,
           visible: String(expected.visible),
@@ -194,7 +194,7 @@ for (const city of CITIES) {
 
     for (const query of ["LLC", `${city}-U1`]) {
       const expected = expectedSites(catalog, city, "universe", { query });
-      await openMap(page, `${cityQuery}stage=universe&q=${encodeURIComponent(query)}`, {
+      await openMap(page, `${cityQuery}funnel=universe&stage=universe&q=${encodeURIComponent(query)}`, {
         city,
         stage: "universe",
         visible: String(expected.visible),
@@ -206,7 +206,7 @@ for (const city of CITIES) {
 
     const held = expectedSites(catalog, city, "land", { extra: "held" });
     if (held.visible || held.drawn.length) {
-      await openMap(page, `${cityQuery}extra=held`, {
+      await openMap(page, `${cityQuery}funnel=universe&extra=held`, {
         city,
         visible: String(held.visible),
         source: "sites",
@@ -216,7 +216,7 @@ for (const city of CITIES) {
     }
 
     const county = expectedSites(catalog, city, "county");
-    await openMap(page, `${cityQuery}stage=county`, {
+    await openMap(page, `${cityQuery}funnel=universe&stage=county`, {
       city,
       stage: "county",
       visible: String(county.visible),

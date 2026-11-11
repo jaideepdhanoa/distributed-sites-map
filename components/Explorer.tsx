@@ -28,6 +28,7 @@ import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange,
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
 import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
+import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineMapSummary } from "@/lib/mapSummary";
 import { placeReadableTip } from "@/lib/tipPlace";
@@ -226,7 +227,8 @@ export default function Explorer() {
     return () => document.removeEventListener("pointerdown", onPointer);
   }, []);
   const who = params.get("who") || "";
-  const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
+  const [funnelPref, setFunnelPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
+  const funnel = resolveFunnelMode(params.get("funnel"), funnelPref);
   const showUniverse = funnel === "universe" || pinsOn;
   const showPipeline = funnel === "pipeline" || dealsOn;
   const extraParam = params.get("extra");
@@ -312,15 +314,31 @@ export default function Explorer() {
       version: window.localStorage.getItem(PIN_LABEL_VERSION_KEY),
       value: window.localStorage.getItem(PIN_LABEL_STORAGE),
     });
+    setFunnelPref({
+      version: window.localStorage.getItem(FUNNEL_VERSION_KEY),
+      value: window.localStorage.getItem(FUNNEL_STORAGE),
+    });
     const base = window.localStorage.getItem("basemap");
     if (base === "satellite" || base === "positron") setBasemap(base);
   }, []);
+  useEffect(() => {
+    if (params.get("funnel")) return;
+    if (funnelPref.version !== FUNNEL_VERSION || funnelPref.value !== "universe") return;
+    write({ funnel: "universe" });
+  }, [params, funnelPref]);
 
   function setPinLabel(next: PinLabel) {
     window.localStorage.setItem(PIN_LABEL_STORAGE, next);
     window.localStorage.setItem(PIN_LABEL_VERSION_KEY, PIN_LABEL_VERSION);
     setPinPref({ version: PIN_LABEL_VERSION, value: next });
     write({ pill: next });
+  }
+
+  function chooseFunnel(next: FunnelMode) {
+    window.localStorage.setItem(FUNNEL_STORAGE, next);
+    window.localStorage.setItem(FUNNEL_VERSION_KEY, FUNNEL_VERSION);
+    setFunnelPref({ version: FUNNEL_VERSION, value: next });
+    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null });
   }
 
   function chooseBasemap(next: "positron" | "satellite") {
@@ -975,8 +993,8 @@ export default function Explorer() {
       const wantCity = site.city === "PHX" ? null : site.city;
       if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
     }
-    if (search.get("funnel") === "pipeline") {
-      patch.funnel = null;
+    if (resolveFunnelMode(search.get("funnel"), funnelPref) === "pipeline") {
+      patch.funnel = "universe";
       patch.tab = null;
     }
     if (isLandParcelSite(site, links)) {
@@ -1190,7 +1208,7 @@ export default function Explorer() {
       patch.pstage = !known ? null : hit.stage;
       patch.view = listView ? "list" : null;
     } else {
-      patch.funnel = null;
+      patch.funnel = "universe";
       patch.tab = null;
       patch.stage = !hit.stage || hit.stage === "land" ? null : hit.stage;
       patch.view = listView ? "list" : null;
@@ -1468,8 +1486,8 @@ export default function Explorer() {
             <kbd aria-hidden="true">/</kbd>
           </div>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
-            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
-            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
@@ -1524,8 +1542,8 @@ export default function Explorer() {
           <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
         </div>
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
-          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
-          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {hitsOpen && queryDraft.trim().length >= 2 ? (
@@ -1773,8 +1791,8 @@ export default function Explorer() {
               <button type="button" className="close" aria-label="Close menu" onClick={() => setMenuOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <div className="funnel-switch segment" role="group" aria-label="Which funnel">
-              <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
-              <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+              <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+              <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
             </div>
             <div className="menu-group" role="group" aria-label="Find">
               <button type="button" onClick={() => { setFiltersOpen(true); setLayersOpen(false); setMenuOpen(false); }} className="menu-item">Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>

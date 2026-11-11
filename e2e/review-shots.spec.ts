@@ -33,7 +33,7 @@ test.beforeAll(() => {
 
 test("save review screenshots from the local build", async ({ page }, info) => {
   const name = info.project.name;
-  await page.goto("/?stage=in_area&site=PHX-U189", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=universe&stage=in_area&site=PHX-U189", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
   await waitForBasemap(page);
   const drawer = page.locator("aside.drawer");
@@ -43,7 +43,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(drawer).toContainText("Census site");
   await expect(drawer).toContainText("County record not reviewed");
   await page.screenshot({ path: `review-shots/${name}-site-panel.png`, fullPage: false });
-  await page.goto("/?stage=in_area", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=universe&stage=in_area", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   await showFunnel(page, name);
   await waitForBasemap(page);

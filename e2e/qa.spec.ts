@@ -42,7 +42,7 @@ test("a site card does not show utility rows", async ({ page }) => {
 
 test("a filtered funnel badge matches the pins", async ({ page }) => {
   await signIn(page);
-  await page.goto("/?stage=land&tier=L4");
+  await page.goto("/?funnel=universe&stage=land&tier=L4");
   const strong = page.locator(".funnel .step button.on strong");
   await expect(strong).toContainText("of");
   const visible = await page.locator(".shell").getAttribute("data-visible");

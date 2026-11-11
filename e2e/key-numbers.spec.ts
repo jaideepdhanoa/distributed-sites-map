@@ -1,6 +1,41 @@
 import { expect, test } from "@playwright/test";
 import { cityPipelineCounts } from "./pipeline-counts";
 
+test("a bare visit opens Pipeline, and an explicit Universe link still opens Universe", async ({ page }, info) => {
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("funnel-mode");
+    window.localStorage.removeItem("funnel-mode-version");
+  });
+  if (info.project.name !== "mobile") await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".shell");
+  const mobile = info.project.name === "mobile";
+  if (mobile) {
+    await expect(page.locator(".phone-step")).toContainText("All deals");
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Pipeline", exact: true })).toHaveClass(/on/);
+    await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Close menu" }).click();
+    await page.locator(".phone-step").click();
+  } else {
+    await expect(page.getByRole("button", { name: "Pipeline", exact: true }).first()).toHaveClass(/on/);
+  }
+  await expect(page.locator("nav.funnel")).toBeVisible();
+  await expect(page.locator("nav.funnel")).toContainText("Desk screen");
+  await expect(page.locator("nav.funnel")).not.toContainText("Spare land");
+  if (mobile) await page.getByRole("button", { name: "Close steps" }).click();
+  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(page.locator("aside.layers.open")).toContainText("Universe sites");
+  await page.goto("/?funnel=universe", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".shell");
+  if (mobile) {
+    await expect(page.locator(".phone-step")).toContainText("Spare land");
+    await page.locator(".phone-step").click();
+  } else {
+    await expect(page.getByRole("button", { name: "Universe", exact: true }).first()).toHaveClass(/on/);
+  }
+  await expect(page.locator("nav.funnel")).toContainText("Spare land");
+});
+
 test("satellite is the default basemap and a switch is remembered", async ({ page }, info) => {
   await page.addInitScript(() => {
     if (!window.sessionStorage.getItem("basemap-init")) {

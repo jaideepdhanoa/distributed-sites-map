@@ -3,6 +3,7 @@ import test from "node:test";
 import { AREA_LABELS, AREA_PAINT, areaRole, miamiAreaLabels } from "../lib/areas.ts";
 import { areaTip, ringTip } from "../lib/markerTip.ts";
 import { nearbyWashPoints } from "../lib/nearbyWashes.ts";
+import { FUNNEL_VERSION, resolveFunnelMode } from "../lib/funnelMode.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
 import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
@@ -16,6 +17,16 @@ test("pin labels default to asking price and keep a later explicit choice", () =
   assert.equal(resolvePinLabel(null, { version: PIN_LABEL_VERSION, value: "acres" }), "acres");
   assert.equal(resolvePinLabel(null, { version: PIN_LABEL_VERSION, value: "none" }), "none");
   assert.equal(resolvePinLabel("asking", { version: PIN_LABEL_VERSION, value: "peracre" }), "asking");
+});
+
+test("a bare visit opens Pipeline, and an explicit Universe link still wins", () => {
+  assert.equal(resolveFunnelMode(null, { version: null, value: null }), "pipeline");
+  assert.equal(resolveFunnelMode(null, { version: null, value: "universe" }), "pipeline");
+  assert.equal(resolveFunnelMode(null, { version: "1", value: "universe" }), "pipeline");
+  assert.equal(resolveFunnelMode("universe", { version: null, value: null }), "universe");
+  assert.equal(resolveFunnelMode("pipeline", { version: FUNNEL_VERSION, value: "universe" }), "pipeline");
+  assert.equal(resolveFunnelMode(null, { version: FUNNEL_VERSION, value: "universe" }), "universe");
+  assert.equal(resolveFunnelMode(null, { version: FUNNEL_VERSION, value: "pipeline" }), "pipeline");
 });
 
 test("pipeline all-stages is the default and not a filter", () => {

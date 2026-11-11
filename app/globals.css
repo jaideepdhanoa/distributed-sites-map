@@ -2225,7 +2225,7 @@ span.listing-link.muted { text-decoration: none; }
   .shell.drawer-open.sheet-full { --sheet-h: 88vh; }
   .drawer.snap-peek .hero-frame,
   .drawer.snap-peek .photo-rest { display: none; }
-  .shell:not(.list-open):not(.table-open):not(.nda-open):not(.loops-open) .bar {
+  .shell:not(.list-open):not(.table-open):not(.nda-open):not(.loops-open):not(.reviewing) .bar {
     position: absolute;
     top: 0; left: 0; right: 0;
     z-index: 6;
@@ -2233,7 +2233,7 @@ span.listing-link.muted { text-decoration: none; }
     border: 0;
     pointer-events: none;
   }
-  .shell:not(.list-open):not(.table-open):not(.nda-open):not(.loops-open) .bar > * { pointer-events: auto; }
+  .shell:not(.list-open):not(.table-open):not(.nda-open):not(.loops-open):not(.reviewing) .bar > * { pointer-events: auto; }
   .shell.reviewing:not(.list-open):not(.table-open) .bar {
     position: relative;
     z-index: 7;

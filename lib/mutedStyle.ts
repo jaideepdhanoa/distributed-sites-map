@@ -55,6 +55,10 @@ function tone(id: string, prop: string): string | null {
 
 function mute(style: StyleSpecification): StyleSpecification {
   const next = structuredClone(style);
+  delete next.center;
+  delete next.zoom;
+  delete next.bearing;
+  delete next.pitch;
   for (const layer of next.layers) {
     if (/shield/i.test(layer.id)) {
       layer.layout = { ...(layer.layout || {}), visibility: "none" };

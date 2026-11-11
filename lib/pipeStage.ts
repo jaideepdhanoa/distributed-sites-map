@@ -35,9 +35,9 @@ export function droppedDealsShown(view: { all: boolean; stage: PipeId; droppedLa
 }
 
 /**
- * Land on the all-stages map follows the Land sites layer.
- * A chosen stage still includes the land at that stage.
+ * Land parcels join the map, the list, and the stage totals only when the Land category is on.
+ * A chosen stage still limits them to the parcels at that stage.
  */
-export function stageLandShown(view: { all: boolean; landLayer: boolean }): boolean {
-  return view.landLayer || !view.all;
+export function stageLandShown(landCategoryOn: boolean): boolean {
+  return landCategoryOn;
 }

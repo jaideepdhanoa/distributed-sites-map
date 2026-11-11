@@ -27,8 +27,6 @@ const FILTERS: { label: string; chips: Chips; query: string }[] = [
   { label: "verdict UNRESOLVED", chips: { verdict: "UNRESOLVED" }, query: "verdict=UNRESOLVED" },
   { label: "listed", chips: { listed: "yes" }, query: "listed=yes" },
   { label: "land", chips: { land: true }, query: "land=1" },
-  { label: "type Auto repair", chips: { types: ["Auto repair"] }, query: "types=Auto+repair" },
-  { label: "type Car wash", chips: { types: ["Car wash"] }, query: "types=Car+wash" },
   { label: "search car wash", chips: { query: "car wash" }, query: "q=car+wash" },
 ];
 
@@ -123,7 +121,7 @@ for (const city of CITIES) {
     test.setTimeout(480_000);
     const catalog = await loadCatalog(page, city);
     const cityQuery = city === "PHX" ? "" : `city=${city}&`;
-    await page.goto(`/?${cityQuery}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/?${cityQuery}funnel=universe`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
     await page.waitForFunction(() => ((window as unknown as { __src?: { sites?: unknown[] } }).__src?.sites || []).length > 0);
 
@@ -131,7 +129,7 @@ for (const city of CITIES) {
     for (const step of STEPS) {
       const expected = expectedSites(catalog, city, step);
       const off = expectedOffMarket(catalog, city, step);
-      await openMap(page, `${cityQuery}stage=${step}`, {
+      await openMap(page, `${cityQuery}funnel=universe&stage=${step}`, {
         city,
         stage: step,
         visible: String(expected.visible),
@@ -149,7 +147,7 @@ for (const city of CITIES) {
       for (const extra of ["listed", "contacted"] as const) {
         const subset = expectedSites(catalog, city, step, { extra });
         if (!subset.drawn.length && !subset.visible) continue;
-        await openMap(page, `${cityQuery}stage=${step}&extra=${extra}`, {
+        await openMap(page, `${cityQuery}funnel=universe&stage=${step}&extra=${extra}`, {
           city,
           stage: step,
           visible: String(subset.visible),
@@ -170,7 +168,7 @@ for (const city of CITIES) {
       for (const filter of FILTERS) {
         const expected = expectedSites(catalog, city, step, filter.chips);
         const off = expectedOffMarket(catalog, city, step, filter.chips);
-        await openMap(page, `${cityQuery}stage=${step}&${filter.query}`, {
+        await openMap(page, `${cityQuery}funnel=universe&stage=${step}&${filter.query}`, {
           city,
           stage: step,
           visible: String(expected.visible),
@@ -196,7 +194,7 @@ for (const city of CITIES) {
 
     for (const query of ["LLC", `${city}-U1`]) {
       const expected = expectedSites(catalog, city, "universe", { query });
-      await openMap(page, `${cityQuery}stage=universe&q=${encodeURIComponent(query)}`, {
+      await openMap(page, `${cityQuery}funnel=universe&stage=universe&q=${encodeURIComponent(query)}`, {
         city,
         stage: "universe",
         visible: String(expected.visible),
@@ -208,7 +206,7 @@ for (const city of CITIES) {
 
     const held = expectedSites(catalog, city, "land", { extra: "held" });
     if (held.visible || held.drawn.length) {
-      await openMap(page, `${cityQuery}extra=held`, {
+      await openMap(page, `${cityQuery}funnel=universe&extra=held`, {
         city,
         visible: String(held.visible),
         source: "sites",
@@ -218,7 +216,7 @@ for (const city of CITIES) {
     }
 
     const county = expectedSites(catalog, city, "county");
-    await openMap(page, `${cityQuery}stage=county`, {
+    await openMap(page, `${cityQuery}funnel=universe&stage=county`, {
       city,
       stage: "county",
       visible: String(county.visible),
@@ -261,15 +259,15 @@ for (const city of CITIES) {
       await expect(page.locator(".map[data-deal-markers='square']"), "deal marker").toBeAttached();
     }
 
-    const repair = expectedSquares(catalog, city, "desk", { types: ["Auto repair"] });
-    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&types=Auto+repair`);
+    const withLand = expectedSquares(catalog, city, "desk", { land: true });
+    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|land`);
     await page.waitForFunction(
       (count) => (((window as unknown as { __src?: { deals?: unknown[] } }).__src?.deals) || []).length === count,
-      repair.length,
+      withLand.length,
       { timeout: 20_000 },
     );
-    same(`${city} pipeline type`, (await source(page, "deals")).map((pin) => pin.id), repair);
-    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { types: ["Auto repair"] }));
+    same(`${city} pipeline land`, (await source(page, "deals")).map((pin) => pin.id), withLand);
+    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { land: true }));
   });
 }
 

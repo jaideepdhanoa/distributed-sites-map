@@ -3,10 +3,11 @@ import test from "node:test";
 import { AREA_LABELS, AREA_PAINT, areaRole, miamiAreaLabels } from "../lib/areas.ts";
 import { areaTip, ringTip } from "../lib/markerTip.ts";
 import { nearbyWashPoints } from "../lib/nearbyWashes.ts";
+import { FUNNEL_VERSION, resolveFunnelMode } from "../lib/funnelMode.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
 import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
-import { boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
+import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
   assert.equal(resolvePinLabel(null, { version: null, value: null }), "asking");
@@ -16,6 +17,16 @@ test("pin labels default to asking price and keep a later explicit choice", () =
   assert.equal(resolvePinLabel(null, { version: PIN_LABEL_VERSION, value: "acres" }), "acres");
   assert.equal(resolvePinLabel(null, { version: PIN_LABEL_VERSION, value: "none" }), "none");
   assert.equal(resolvePinLabel("asking", { version: PIN_LABEL_VERSION, value: "peracre" }), "asking");
+});
+
+test("a bare visit opens Pipeline, and an explicit Universe link still wins", () => {
+  assert.equal(resolveFunnelMode(null, { version: null, value: null }), "pipeline");
+  assert.equal(resolveFunnelMode(null, { version: null, value: "universe" }), "pipeline");
+  assert.equal(resolveFunnelMode(null, { version: "1", value: "universe" }), "pipeline");
+  assert.equal(resolveFunnelMode("universe", { version: null, value: null }), "universe");
+  assert.equal(resolveFunnelMode("pipeline", { version: FUNNEL_VERSION, value: "universe" }), "pipeline");
+  assert.equal(resolveFunnelMode(null, { version: FUNNEL_VERSION, value: "universe" }), "universe");
+  assert.equal(resolveFunnelMode(null, { version: FUNNEL_VERSION, value: "pipeline" }), "pipeline");
 });
 
 test("pipeline all-stages is the default and not a filter", () => {
@@ -31,9 +42,8 @@ test("pipeline all-stages is the default and not a filter", () => {
   assert.equal(droppedDealsShown({ all: false, stage: "dropped", droppedLayer: false, searchWide: false }), true);
   assert.equal(droppedDealsShown({ all: false, stage: "desk", droppedLayer: false, searchWide: false }), false);
   assert.equal(droppedDealsShown({ all: true, stage: "desk", droppedLayer: true, searchWide: false }), true);
-  assert.equal(stageLandShown({ all: true, landLayer: false }), false);
-  assert.equal(stageLandShown({ all: false, landLayer: false }), true);
-  assert.equal(stageLandShown({ all: true, landLayer: true }), true);
+  assert.equal(stageLandShown(false), false);
+  assert.equal(stageLandShown(true), true);
 });
 
 test("Miami layers are labeled in plain words and the mid-2027 line is its own role", () => {
@@ -70,6 +80,7 @@ test("Miami layers are labeled in plain words and the mid-2027 line is its own r
 test("the map line calls dropped deals hidden only while they are not drawn", () => {
   const hidden = { placed: 23, dropped: 19, droppedPlaced: 15, droppedShown: false, droppedOnly: false };
   assert.equal(pipelineMapSummary(hidden), "23 on the map · 19 dropped, hidden");
+  assert.equal(pipelineMapSummary({ placed: 1, dropped: 0, droppedPlaced: 0, droppedShown: false, droppedOnly: false }), "1 on the map");
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true }), "23 on the map · 15 dropped on the map");
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true, droppedOnly: true }), "15 dropped on the map");
   assert.equal(pipelineMapSummary({ placed: 23, dropped: 19, droppedPlaced: 19, droppedShown: true, droppedOnly: false }).includes("hidden"), false);
@@ -92,6 +103,17 @@ test("a ring note with the site card and Layers open stays in open map space", (
   assert.ok(note.left >= bounds.left && note.top >= bounds.top && note.right <= bounds.right && note.bottom <= bounds.bottom);
   assert.ok(placed.width >= 168);
   assert.match(ringTip({ miles: 10, depot: "Yale Substation" }).title, /10-mile ring/);
+  const above = placeReadableTip({
+    cursor: { x: 400, y: 500 },
+    bounds: { left: 0, top: 0, right: 800, bottom: 800 },
+    obstacles: [],
+    widths: [200],
+    measure: () => ({ width: 200, height: 80 }),
+    above: true,
+  });
+  assert.ok(above.top + above.height <= 500 - 12);
+  assert.ok(above.left <= 400 && above.left + above.width >= 400);
+  assert.equal(AREA_TIP_DWELL_MS >= 300 && AREA_TIP_DWELL_MS <= 700, true);
 });
 
 test("nearby washes use real pins and skip anything without a location", () => {

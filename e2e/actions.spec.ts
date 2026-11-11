@@ -434,8 +434,9 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await page.waitForFunction(() => !location.search.includes("q="));
   await page.screenshot({ path: "/opt/cursor/artifacts/cstore-hidden-list.png" });
   await page.getByRole("button", { name: "Map", exact: true }).click();
-  await page.getByTestId("cstore-layer").click();
-  await expect(page).toHaveURL(/cstore=1/);
+  await page.locator("button.tool", { hasText: "Filters" }).click();
+  await page.getByTestId("cstore-category").click();
+  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)store/);
   await page.getByRole("button", { name: "List", exact: true }).click();
   const sinclair = page.getByTestId("pipeline-list").getByText("Sinclair").first();
   await expect(sinclair).toBeVisible();
@@ -456,7 +457,7 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
     const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getSource: (id: string) => { serialize: () => { data?: { features?: unknown[] } } } } }).__sitesMap;
     if (!map?.isStyleLoaded()) return false;
     const data = map.getSource("deals")?.serialize()?.data;
-    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 10);
+    return Boolean(data && "features" in data && Array.isArray(data.features) && data.features.length >= 1);
   });
 
   await login(request, "contributor");

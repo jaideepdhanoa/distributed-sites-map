@@ -20,7 +20,7 @@ test("list rows match map pins for each city, step, and filter", async ({ page }
   for (const city of cities) {
     for (const step of steps) {
       for (const filter of filters) {
-        const query = `${city}stage=${step}${filter ? `&${filter}` : ""}`;
+        const query = `${city}funnel=universe&stage=${step}${filter ? `&${filter}` : ""}`;
         await page.goto(`/?${query}`, { waitUntil: "domcontentloaded" });
         await page.waitForSelector(".shell");
         const pins = await page.locator(".shell").getAttribute("data-pin-count");

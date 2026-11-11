@@ -25,12 +25,14 @@ import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/
 import { displayAddress, leadSourceLine, plainRoad } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
-import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, LAYER_TITLES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
+import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
+import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineMapSummary } from "@/lib/mapSummary";
 import { placeReadableTip } from "@/lib/tipPlace";
-import { droppedDealsShown, parsePipeView, stageLandShown } from "@/lib/pipeStage";
+import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
@@ -134,13 +136,11 @@ export default function Explorer() {
   const [layersOpen, setLayersOpen] = useState(false);
   const showAreas = params.get("areas") !== "0";
   const showDepots = params.get("depots") !== "0";
-  const showUniverse = params.get("pins") !== "0";
-  const showPipeline = params.get("deals") !== "0";
+  const pinsOn = params.get("pins") !== "0";
+  const dealsOn = params.get("deals") !== "0";
   const showUnscreened = params.get("newlist") === "1";
   const showDroppedDeals = params.get("dropped") === "1";
   const showRings = params.get("rings") === "1";
-  const typesParam = params.get("types");
-  const businessTypes = typesParam ? typesParam.split("|").filter(Boolean) : null;
   const tabParam = params.get("tab");
   const tableTab: "universe" | "pipeline" | "land" = tabParam === "pipeline" || tabParam === "land" ? tabParam : "universe";
   const [tip, setTip] = useState("");
@@ -208,7 +208,11 @@ export default function Explorer() {
   const verdict = params.get("verdict") || "any";
   const listed = params.get("listed") || "any";
   const landSites = params.get("land") === "1";
-  const showCStores = params.get("cstore") === "1";
+  const categories = parseCategories({
+    cats: params.get("cats"),
+    landlayer: params.get("landlayer"),
+    cstore: params.get("cstore"),
+  });
   const query = params.get("q") || "";
   useEffect(() => {
     if (!searchFocused.current) setQueryDraft(query);
@@ -223,8 +227,10 @@ export default function Explorer() {
     return () => document.removeEventListener("pointerdown", onPointer);
   }, []);
   const who = params.get("who") || "";
-  const funnel = params.get("funnel") === "pipeline" ? "pipeline" : "universe";
-  const showLandLayer = params.get("landlayer") === "1";
+  const [funnelPref, setFunnelPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
+  const funnel = resolveFunnelMode(params.get("funnel"), funnelPref);
+  const showUniverse = funnel === "universe" || pinsOn;
+  const showPipeline = funnel === "pipeline" || dealsOn;
   const extraParam = params.get("extra");
   const extra = extraParam === "listed" || extraParam === "contacted" || extraParam === "held" ? extraParam : null;
   const pipeView = parsePipeView(params.get("pstage"));
@@ -308,15 +314,31 @@ export default function Explorer() {
       version: window.localStorage.getItem(PIN_LABEL_VERSION_KEY),
       value: window.localStorage.getItem(PIN_LABEL_STORAGE),
     });
+    setFunnelPref({
+      version: window.localStorage.getItem(FUNNEL_VERSION_KEY),
+      value: window.localStorage.getItem(FUNNEL_STORAGE),
+    });
     const base = window.localStorage.getItem("basemap");
     if (base === "satellite" || base === "positron") setBasemap(base);
   }, []);
+  useEffect(() => {
+    if (params.get("funnel")) return;
+    if (funnelPref.version !== FUNNEL_VERSION || funnelPref.value !== "universe") return;
+    write({ funnel: "universe" });
+  }, [params, funnelPref]);
 
   function setPinLabel(next: PinLabel) {
     window.localStorage.setItem(PIN_LABEL_STORAGE, next);
     window.localStorage.setItem(PIN_LABEL_VERSION_KEY, PIN_LABEL_VERSION);
     setPinPref({ version: PIN_LABEL_VERSION, value: next });
     write({ pill: next });
+  }
+
+  function chooseFunnel(next: FunnelMode) {
+    window.localStorage.setItem(FUNNEL_STORAGE, next);
+    window.localStorage.setItem(FUNNEL_VERSION_KEY, FUNNEL_VERSION);
+    setFunnelPref({ version: FUNNEL_VERSION, value: next });
+    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null });
   }
 
   function chooseBasemap(next: "positron" | "satellite") {
@@ -560,32 +582,17 @@ export default function Explorer() {
 
   function passesChips(site: SiteProps, loose: boolean, anyMarket = false) {
     if (!anyMarket && !allCities && site.city !== city) return false;
+    if (!siteInCategories(site, links, categories)) return false;
     if (query && !matchesQuery(query, siteSearchParts(site))) return false;
     if (loose) return true;
-    if (!matchesLandTier(site, landTier)) return false;
+    if (siteCategory(site, links) === "wash" && !matchesLandTier(site, landTier)) return false;
     if (verdict !== "any" && (site.verdict || "none") !== verdict) return false;
     if (listed === "yes" && !site.listed) return false;
-    if (!typeOn(site.business_type || "Car wash")) return false;
     return true;
   }
 
-  function typeOn(type: string) {
-    return businessTypes === null || businessTypes.includes(type);
-  }
-
-  function setBusinessTypes(next: string[] | null) {
-    write({ types: next && next.length ? next.join("|") : null });
-  }
-
-  function toggleType(type: string) {
-    if (businessTypes === null) {
-      setBusinessTypes(BUSINESS_TYPES.filter((item) => item !== type));
-      return;
-    }
-    const next = businessTypes.includes(type)
-      ? businessTypes.filter((item) => item !== type)
-      : [...businessTypes, type];
-    setBusinessTypes(next.length === 0 || next.length === BUSINESS_TYPES.length ? null : next);
+  function setCategory(id: CategoryId, on: boolean) {
+    write(categorySearch({ ...categories, [id]: on }));
   }
 
   useEffect(() => {
@@ -594,6 +601,7 @@ export default function Explorer() {
 
   const dealFeatures = data?.deals.features ?? [];
   const dealRows = dealFeatures.map((feature) => feature.properties);
+  const links = landLinks(dealRows);
   const viewStage: StageId = allStages ? "universe" : stage;
   const localSiteMatches = query
     ? sites.filter((site) => inStage(site, viewStage) && passesChips(site, false)).length
@@ -630,7 +638,7 @@ export default function Explorer() {
     return [...byId.values()].sort(compareSites);
     // passesChips closes over the chip state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, businessTypes, who, data?.deals]);
+  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, categories, who, data?.deals, links]);
 
   const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
     const feature = poolById.get(site.site_id);
@@ -646,10 +654,9 @@ export default function Explorer() {
     return matchesQuery(query, dealSearchParts(deal));
   }
 
-  function cStoreHidden(deal: DealProps, _wide: boolean) {
-    if (showCStores) return false;
-    if (selected === deal.deal_id) return false;
-    return Boolean(deal.is_c_store) || isPipelineStore(deal);
+  function dealAllowed(deal: DealProps, keepSelected = false): boolean {
+    if (keepSelected && selected === deal.deal_id) return true;
+    return dealInCategories(deal, categories);
   }
 
   function inDealMarket(deal: DealProps, wide: boolean) {
@@ -662,11 +669,10 @@ export default function Explorer() {
   const localDealMatches = query
     ? dealRows.filter((deal) => {
         if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-        if (cStoreHidden(deal, false)) return false;
+        if (!dealAllowed(deal)) return false;
         if (!inDealMarket(deal, false)) return false;
         if (!allPipes && !who && deal.stage_group !== pipeStage) return false;
         if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
-        if (!typeOn(deal.business_type || "Other")) return false;
         return dealQueryHit(deal);
       }).length
     : 0;
@@ -678,8 +684,6 @@ export default function Explorer() {
     droppedLayer: showDroppedDeals,
     searchWide: pipelineWide || Boolean(who),
   });
-  const showStageLand = stageLandShown({ all: funnel === "pipeline" ? allPipes : true, landLayer: showLandLayer });
-
   function includeDropped(group: string) {
     if (group !== "dropped") return true;
     return showDroppedRows;
@@ -687,21 +691,20 @@ export default function Explorer() {
 
   const pipelineDeals = dealRows.filter((deal) => {
     if (deal.kind !== "pipeline") return false;
-    if (cStoreHidden(deal, pipelineWide)) return false;
+    if (!dealAllowed(deal, true)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
     if (!dealWide && deal.stage_group !== pipeStage) return false;
     if (!includeDropped(deal.stage_group)) return false;
-    if (!typeOn(deal.business_type || "Other")) return false;
     if (query && !dealQueryHit(deal)) return false;
     return true;
   });
   const landDeals = dealRows.filter((deal) => {
     if (deal.kind !== "land") return false;
+    if (!dealAllowed(deal, true)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
     if (!includeDropped(deal.stage_group)) return false;
-    if (!typeOn(deal.business_type || "Other")) return false;
     if (query && !dealQueryHit(deal)) return false;
     return true;
   });
@@ -739,16 +742,21 @@ export default function Explorer() {
 
   const pipelineStepRows = pipelineDeals;
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
-  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage);
+  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage || deal.deal_id === selected);
   const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
+  const landSiteDrawn = new Set(
+    visibleFeatures
+      .filter((feature) => feature.geometry && isLandParcelSite(feature.properties, links))
+      .map((feature) => feature.properties.site_id),
+  );
   const drawnDealsBase: DealFeature[] = funnel === "pipeline"
     ? [
         ...(showPipeline ? pipelineSquares : []),
-        ...(showStageLand ? stageLandSquares : []),
+        ...stageLandSquares,
       ]
     : [
         ...(showPipeline ? pipelineDeals.filter((deal) => !deal.universe_id) : []),
-        ...(showLandLayer ? landDeals : []),
+        ...landDeals.filter((deal) => !deal.universe_id || !landSiteDrawn.has(deal.universe_id)),
       ]
         .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
         .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
@@ -762,7 +770,7 @@ export default function Explorer() {
     ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "In service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
     : handoff;
   const areaDeals = (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
-    if (funnel === "pipeline" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
+    if (funnel === "pipeline" && dealCategory(feature.properties) === "wash" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
     if (!mapArea) return true;
     const coords = feature.geometry?.coordinates;
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
@@ -891,11 +899,11 @@ export default function Explorer() {
   }
 
   function filtersOn() {
-    return Boolean(query || businessTypes || landTier !== "any" || verdict !== "any" || listed === "yes" || landSites || compare || showDropped);
+    return Boolean(query || landTier !== "any" || verdict !== "any" || listed === "yes" || landSites || compare || showDropped);
   }
 
   function count(step: StageId) {
-    return sitePool.filter((site) => (allCities || site.city === city) && inStage(site, step)).length;
+    return sitePool.filter((site) => (allCities || site.city === city) && inStage(site, step) && siteInCategories(site, links, categories)).length;
   }
 
   function filteredAt(step: StageId) {
@@ -932,14 +940,13 @@ export default function Explorer() {
   function countLiveContactedDeals() {
     return dealRows.filter((deal) => {
       if (!isLiveContactedDeal(deal) || (!allCities && deal.city !== city)) return false;
-      if (cStoreHidden(deal, false)) return false;
-      if (!typeOn(deal.business_type || "Other")) return false;
+      if (!dealAllowed(deal)) return false;
       if (!query) return true;
       return dealQueryHit(deal);
     }).length;
   }
 
-  const heldCount = sites.filter((site) => site.city === city && heldOutside(site)).length;
+  const heldCount = sites.filter((site) => site.city === city && heldOutside(site) && siteInCategories(site, links, categories)).length;
   const censusForCity = data?.funnel.stages.find((item) => item.id === "census")?.by_city?.[city] ?? 0;
 
   async function logout() {
@@ -969,7 +976,15 @@ export default function Explorer() {
       });
       const stageShown = (view.all || search.get("pstage") === deal.stage_group) && (deal.stage_group !== "dropped" || droppedVisible);
       if (!stageShown) patch.pstage = known ? deal.stage_group : null;
-      if (deal.kind === "land" && search.get("landlayer") !== "1") patch.landlayer = "1";
+      const category = dealCategory(deal);
+      if (category === "land" || category === "store") {
+        const current = parseCategories({
+          cats: search.get("cats"),
+          landlayer: search.get("landlayer"),
+          cstore: search.get("cstore"),
+        });
+        if (!current[category]) Object.assign(patch, categorySearch({ ...current, [category]: true }));
+      }
       return patch;
     }
     const site = features.find((feature) => feature.properties.site_id === id)?.properties;
@@ -978,9 +993,17 @@ export default function Explorer() {
       const wantCity = site.city === "PHX" ? null : site.city;
       if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
     }
-    if (search.get("funnel") === "pipeline") {
-      patch.funnel = null;
+    if (resolveFunnelMode(search.get("funnel"), funnelPref) === "pipeline") {
+      patch.funnel = "universe";
       patch.tab = null;
+    }
+    if (isLandParcelSite(site, links)) {
+      const current = parseCategories({
+        cats: search.get("cats"),
+        landlayer: search.get("landlayer"),
+        cstore: search.get("cstore"),
+      });
+      if (!current.land) Object.assign(patch, categorySearch({ ...current, land: true }));
     }
     return patch;
   }
@@ -1151,11 +1174,11 @@ export default function Explorer() {
     dealRows,
     (catalog ?? features).map((feature) => feature.properties),
     (site) => deepestStage(presentSite(site as SiteProps)),
-    { cStores: showCStores },
+    { cStores: categories.store, land: categories.land },
   );
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const focus = (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : (CITY_VIEW[city] ?? CITY_VIEW.PHX);
-  const dropCount = sites.filter((site) => droppedAt(site, stage) && (allCities || site.city === city)).length;
+  const dropCount = sites.filter((site) => droppedAt(site, stage) && (allCities || site.city === city) && siteInCategories(site, links, categories)).length;
 
   function onSearchInput(value: string) {
     setQueryDraft(value);
@@ -1185,7 +1208,7 @@ export default function Explorer() {
       patch.pstage = !known ? null : hit.stage;
       patch.view = listView ? "list" : null;
     } else {
-      patch.funnel = null;
+      patch.funnel = "universe";
       patch.tab = null;
       patch.stage = !hit.stage || hit.stage === "land" ? null : hit.stage;
       patch.view = listView ? "list" : null;
@@ -1211,7 +1234,7 @@ export default function Explorer() {
     onToggle: () => setSheetSnap((snap) => (snap === "full" ? "half" : snap === "peek" ? "half" : "full")),
     onSnap: setSheetSnap,
   };
-  const unplacedDeals = dealRows.filter((deal) => deal.kind === "pipeline" && (allCities || deal.city === city) && !dealPoint(deal) && !cStoreHidden(deal, false));
+  const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !dealPoint(deal) && dealAllowed(deal));
   const offMarketPool = universeWide && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
     if (!feature.geometry) return false;
@@ -1220,15 +1243,23 @@ export default function Explorer() {
   });
   const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry && !personallyHidden(feature.properties.site_id)) : [];
   const unscreenedPins = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : [];
-  const pinCount = (funnel === "pipeline" ? pipelineSquares.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
+  const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
+
+  function siteTypeLabel(site: SiteProps): string {
+    if (siteCategory(site, links) !== "land") return site.business_type || "Car wash";
+    const deal = dealRows.find((row) => row.deal_id === site.linked_deal_id || row.universe_id === site.site_id);
+    const typed = deal?.business_type?.trim();
+    if (typed && typed.toLowerCase() !== "car wash") return typed;
+    return "Land";
+  }
 
   function siteRow(site: SiteProps): ListRow {
     const price = site.listed && site.asking_price_display ? `${site.asking_price_display}${site.asking_price_source ? ` · ${site.asking_price_source}` : ""}` : "";
     return {
       id: site.site_id,
       site: site.name || site.address || site.site_id,
-      type: site.business_type || "Car wash",
+      type: siteTypeLabel(site),
       city: site.city,
       stage: plainVerdict(site.verdict),
       tier: tierLabel(spareTier(site)) || "",
@@ -1290,14 +1321,12 @@ export default function Explorer() {
     const diff = left.localeCompare(right, undefined, { numeric: true });
     return sortDesc ? -diff : diff;
   });
-  const tierOn = (deal: DealProps) => matchesOpenLandTier(deal.open_land_sqft, landTier) && (!mapArea || (() => {
+  const tierOn = (deal: DealProps) => (dealCategory(deal) !== "wash" || matchesOpenLandTier(deal.open_land_sqft, landTier)) && (!mapArea || (() => {
     const point = dealPoint(deal);
     return point ? inMapArea(point[0], point[1], mapArea) : false;
   })());
   const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
-  const landForList = showStageLand
-    ? landDeals.filter((deal) => (dealWide || deal.stage_group === pipeStage) && inRange(deal, ranges) && tierOn(deal))
-    : [];
+  const landForList = stageLandRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
   const pipelineRows: PipelineRow[] = [...rangedPipeline, ...landForList].map((deal) => ({ deal, noPin: !dealPoint(deal) }));
 
   function exportList() {
@@ -1309,12 +1338,14 @@ export default function Explorer() {
   }
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
-  if (businessTypes) activeFilters.push({ id: "types", label: businessTypes.join(", "), clear: () => setBusinessTypes(null) });
+  if (!categories.wash) activeFilters.push({ id: "wash", label: "Car washes off", clear: () => setCategory("wash", true) });
+  if (categories.land) activeFilters.push({ id: "landcat", label: "Land", clear: () => setCategory("land", false) });
+  if (categories.store) activeFilters.push({ id: "store", label: "C-stores", clear: () => setCategory("store", false) });
   if (landTier !== "any") activeFilters.push({ id: "tier", label: tierLabel(landTier) || "Spare land", clear: () => write({ tier: null }) });
   if (verdict !== "any") activeFilters.push({ id: "verdict", label: plainVerdict(verdict), clear: () => write({ verdict: null }) });
   if (listed === "yes") activeFilters.push({ id: "listed", label: "Listed", clear: () => write({ listed: null }) });
   if (landSites) activeFilters.push({ id: "land", label: "Land sites", clear: () => write({ land: null }) });
-  if (showCStores) activeFilters.push({ id: "cstore", label: "C-stores", clear: () => write({ cstore: null }) });
+  if (showUnscreened) activeFilters.push({ id: "newlist", label: "Listed, not yet screened", clear: () => write({ newlist: null }) });
   if (compare) activeFilters.push({ id: "compare", label: "Reviews disagree", clear: () => write({ disagree: null }) });
   if (showDropped) activeFilters.push({ id: "ruled", label: "Ruled out", clear: () => write({ ruled: null }) });
   if (extra === "held") activeFilters.push({ id: "held", label: "Held outside the service area", clear: () => write({ extra: null }) });
@@ -1342,7 +1373,10 @@ export default function Explorer() {
 
   function summaryText() {
     if (funnel !== "pipeline") return "";
-    const rows = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !cStoreHidden(deal, false));
+    const stageView = !allPipes && !pipelineWide && !who;
+    const rows = stageView
+      ? [...pipelineDeals, ...stageLandRows]
+      : dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && dealAllowed(deal));
     const droppedRows = rows.filter((deal) => deal.stage_group === "dropped");
     return pipelineMapSummary({
       placed: rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length,
@@ -1463,8 +1497,8 @@ export default function Explorer() {
             <kbd aria-hidden="true">/</kbd>
           </div>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
-            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
-            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
@@ -1519,8 +1553,8 @@ export default function Explorer() {
           <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
         </div>
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
-          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
-          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {hitsOpen && queryDraft.trim().length >= 2 ? (
@@ -1553,10 +1587,9 @@ export default function Explorer() {
                     <span>All</span>
                     <strong>{dealRows.filter((deal) => {
                       if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-                      if (cStoreHidden(deal, false)) return false;
+                      if (!dealAllowed(deal)) return false;
                       if (!allCities && deal.city !== city) return false;
                       if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
-                      if (!typeOn(deal.business_type || "Other")) return false;
                       if (query && !dealQueryHit(deal)) return false;
                       return true;
                     }).length.toLocaleString()}</strong>
@@ -1595,17 +1628,16 @@ export default function Explorer() {
             }) : PIPE_STEPS.map((step, index) => {
               const rows = dealRows.filter((deal) => {
                 if (deal.kind !== "pipeline" || deal.stage_group !== step.id) return false;
-                if (cStoreHidden(deal, false)) return false;
+                if (!dealAllowed(deal)) return false;
                 if (!allCities && deal.city !== city) return false;
-                if (!typeOn(deal.business_type || "Other")) return false;
                 if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
                 if (!query) return true;
                 return dealQueryHit(deal);
               });
               const landHere = dealRows.filter((deal) => {
                 if (deal.kind !== "land" || deal.stage_group !== step.id) return false;
+                if (!dealAllowed(deal)) return false;
                 if (!allCities && deal.city !== city) return false;
-                if (!typeOn(deal.business_type || "Other")) return false;
                 if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
                 if (!query) return true;
                 return dealQueryHit(deal);
@@ -1613,7 +1645,7 @@ export default function Explorer() {
               const total = rows.length + landHere.length;
               const unmapped = [...rows, ...landHere].filter((deal) => !dealPoint(deal)).length;
               const brokerHere = [...rows, ...landHere].filter((deal) => deal.broker_contacted).length;
-              const split = landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
+              const split = rows.length > 0 && landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
               return (
                 <Fragment key={step.id}>
                   {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
@@ -1687,22 +1719,20 @@ export default function Explorer() {
               <h2>Filters</h2>
               <button type="button" className="close" aria-label="Close filters" onClick={() => setFiltersOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
-            <h3>Business type</h3>
-            <div className="type-filters">
-              <button type="button" className={businessTypes === null ? "chip on" : "chip"} onClick={() => setBusinessTypes(null)}>All types</button>
-              {BUSINESS_TYPES.map((type) => {
-                const inStep = sitePool.filter((site) => (allCities || site.city === city) && inStage(site, allStages ? "universe" : stage) && (site.business_type || "Car wash") === type).length;
-                const offCount = offMarketFeatures.filter((feature) => (feature.properties.business_type || "Other") === type).length;
-                const shown = funnel === "pipeline"
-                  ? pipelineDeals.filter((deal) => (deal.business_type || "Other") === type && Boolean(dealPoint(deal))).length
-                  : inStep || offCount;
-                if (shown === 0 && type !== "Car wash") return null;
-                return (
-                  <button key={type} type="button" title={type === "Car wash" ? CENSUS_NOTE : undefined} className={businessTypes === null || typeOn(type) ? "chip on" : "chip"} onClick={() => toggleType(type)}>
-                    {type} {shown.toLocaleString()}
-                  </button>
-                );
-              })}
+            <h3>Categories</h3>
+            <div className="cat-row">
+              <label title={CATEGORY_NOTES.wash}>
+                <input className="check" type="checkbox" data-testid="wash-category" checked={categories.wash} onChange={() => setCategory("wash", !categories.wash)} />
+                <span>Car washes<span className="layer-meta">{CATEGORY_NOTES.wash}</span></span>
+              </label>
+              <label title={CATEGORY_NOTES.land}>
+                <input className="check" type="checkbox" data-testid="land-category" checked={categories.land} onChange={() => setCategory("land", !categories.land)} />
+                <span>Land<span className="layer-meta">{CATEGORY_NOTES.land}</span></span>
+              </label>
+              <label title={CATEGORY_NOTES.store}>
+                <input className="check" type="checkbox" data-testid="cstore-category" checked={categories.store} onChange={() => setCategory("store", !categories.store)} />
+                <span>C-stores<span className="layer-meta">{CATEGORY_NOTES.store}</span></span>
+              </label>
             </div>
             <h3>Broker or firm</h3>
             <input
@@ -1720,6 +1750,7 @@ export default function Explorer() {
               }}
             />
             <h3>Spare land</h3>
+            <p className="filter-note">{SPARE_LAND_NOTE}</p>
             <div className="segmented" role="group" aria-label="Spare land">
               {([["any", "Any"], ["L10", "10k+ sq ft"], ["L4", "4k+ sq ft"]] as const).map(([item, label]) => (
                 <button key={item} type="button" className={`segmented ${landTier === item ? "on" : ""}`} onClick={() => write({ tier: item === "any" ? null : item })}>{label}</button>
@@ -1739,14 +1770,26 @@ export default function Explorer() {
                   ))}
                 </div>
                 <div className="filter-checks">
-                  <label><input className="check" type="checkbox" checked={listed === "yes"} onChange={() => write({ listed: listed === "yes" ? null : "yes" })} /> Listed</label>
-                  <label><input className="check" type="checkbox" checked={landSites} onChange={() => write({ land: landSites ? null : "1" })} /> Land sites</label>
                   <label><input className="check" type="checkbox" checked={compare} onChange={() => write({ disagree: compare ? null : "1" })} /> Reviews disagree</label>
                   {dropCount > 0 ? <label><input className="check" type="checkbox" checked={showDropped} onChange={() => write({ ruled: showDropped ? null : "1" })} /> Ruled out ({dropCount.toLocaleString()})</label> : null}
                   {heldCount > 0 ? <label><input className="check" type="checkbox" checked={extra === "held"} onChange={() => write({ stage: null, extra: extra === "held" ? null : "held" })} /> Held outside the service area ({heldCount.toLocaleString()})</label> : null}
                 </div>
               </>
             ) : null}
+            <h3>Listings</h3>
+            <div className="cat-row">
+              <label title={LAYER_TITLES.unscreened}>
+                <input className="check" type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
+                <span>
+                  Listed, not yet screened
+                  <span className="layer-meta">
+                    {unscreened.filter((feature) => feature.properties.pinned).length.toLocaleString()} on the map
+                    {" · "}
+                    {unscreened.filter((feature) => !feature.properties.pinned).length.toLocaleString()} address withheld
+                  </span>
+                </span>
+              </label>
+            </div>
           </div>
         ) : null}
         {menuOpen ? (
@@ -1759,8 +1802,8 @@ export default function Explorer() {
               <button type="button" className="close" aria-label="Close menu" onClick={() => setMenuOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <div className="funnel-switch segment" role="group" aria-label="Which funnel">
-              <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: null, tab: null })}>Universe</button>
-              <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => write({ funnel: "pipeline", tab: "pipeline" })}>Pipeline</button>
+              <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+              <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
             </div>
             <div className="menu-group" role="group" aria-label="Find">
               <button type="button" onClick={() => { setFiltersOpen(true); setLayersOpen(false); setMenuOpen(false); }} className="menu-item">Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
@@ -2003,60 +2046,87 @@ export default function Explorer() {
                     <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Map</button>
                   </div>
                 </div>
-                <p className="eyebrow">Sites</p>
-                <label title={LAYER_TITLES.universe}><i className="pin-sample diamond" /><input className="check" type="checkbox" checked={showUniverse} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} /> Universe sites</label>
-                <label title={LAYER_TITLES.pipeline}><i className="pin-sample circle" /><input className="check" type="checkbox" checked={showPipeline} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} /> Pipeline deals</label>
-                <label title={LAYER_TITLES.land}><i className="swatch land" /><input className="check" type="checkbox" checked={showLandLayer} onChange={(event) => write({ landlayer: event.target.checked ? "1" : null })} /> Land sites</label>
-                <label title={LAYER_TITLES.cstore}><i className="swatch cstore" /><input className="check" type="checkbox" data-testid="cstore-layer" checked={showCStores} onChange={(event) => write({ cstore: event.target.checked ? "1" : null })} /> C-stores</label>
-                <label title={LAYER_TITLES.dropped}><i className="swatch stage-dropped" /><input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} /> Dropped deals</label>
-                <label title={LAYER_TITLES.unscreened}>
-                  <i className="swatch listing" />
-                  <input className="check" type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
-                  <span>
-                    Listed, not yet screened
-                    <span className="layer-meta">
-                      {unscreened.filter((feature) => feature.properties.pinned).length.toLocaleString()} on the map
-                      {" · "}
-                      {unscreened.filter((feature) => !feature.properties.pinned).length.toLocaleString()} address withheld
-                    </span>
-                  </span>
-                </label>
                 <p className="eyebrow">Pin labels</p>
                 <div className="segmented pin-modes" role="group" aria-label="Pin labels">
                   {([["none", "Off", LAYER_TITLES.pinOff], ["asking", "Price", LAYER_TITLES.pinPrice], ["acres", "Acres", LAYER_TITLES.pinAcres], ["peracre", "$/ac", LAYER_TITLES.pinPerAcre]] as const).map(([id, label, title]) => (
                     <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} title={title} onClick={() => setPinLabel(id)}>{label}</button>
                   ))}
                 </div>
-                <p className="eyebrow">Also show</p>
-                {OVERLAYS.map((item) => (
-                  <label key={item.id} title={LAYER_TITLES[item.id]}><input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} /> {item.label}</label>
-                ))}
+                <p className="eyebrow">On the map</p>
+                {funnel === "universe" ? (
+                  <label className="layer-row" title={LAYER_TITLES.pipeline}>
+                    <input className="check" type="checkbox" checked={dealsOn} onChange={(event) => write({ deals: event.target.checked ? null : "0" })} />
+                    <span className="layer-mark"><i className="pin-sample circle" /></span>
+                    Pipeline deals
+                  </label>
+                ) : (
+                  <label className="layer-row" title={LAYER_TITLES.universe}>
+                    <input className="check" type="checkbox" checked={pinsOn} onChange={(event) => write({ pins: event.target.checked ? null : "0" })} />
+                    <span className="layer-mark"><i className="pin-sample diamond" /></span>
+                    Universe sites
+                  </label>
+                )}
+                <label className="layer-row" title={LAYER_TITLES.dropped}>
+                  <input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} />
+                  <span className="layer-mark"><i className="swatch stage-dropped" /></span>
+                  Dropped deals
+                </label>
                 <p className="eyebrow">Context</p>
-                <label title={LAYER_TITLES.areas}><i className="swatch current-area" /><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
-                <label title={LAYER_TITLES.depots}><i className="pin-sample depot" /><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
-                <label onMouseEnter={(event) => setRingCursor({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setRingCursor(null)}><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
-                <p className="eyebrow">Key</p>
-                <p className="layer-key"><i className="swatch cleared" /> Cleared</p>
-                <p className="layer-key"><i className="swatch possible" /> Possible</p>
-                <p className="layer-key"><i className="swatch unresolved" /> Unresolved</p>
-                <p className="layer-key"><i className="swatch held" /> Held</p>
-                <p className="layer-key"><i className="swatch l10" /> 10k+ sq ft</p>
-                <p className="layer-key"><i className="swatch l4" /> 4k+ sq ft</p>
+                <label className="layer-row" title={LAYER_TITLES.areas}>
+                  <input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} />
+                  <span className="layer-mark"><i className="swatch current-area" /></span>
+                  Service areas
+                </label>
+                <label className="layer-row" title={LAYER_TITLES.depots}>
+                  <input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} />
+                  <span className="layer-mark"><i className="pin-sample depot" /></span>
+                  Depots
+                </label>
+                <label className="layer-row layer-sub" title={LAYER_TITLES.rings} onMouseEnter={(event) => setRingCursor({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setRingCursor(null)}>
+                  <input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} />
+                  <span className="layer-mark"><i className="pin-sample line" /></span>
+                  <span className="layer-nest">Depot rings</span>
+                </label>
+                <p className="eyebrow">Area data</p>
+                {(["traffic", "population", "growth", "income", "washes"] as const).map((id) => {
+                  const item = OVERLAYS.find((entry) => entry.id === id);
+                  if (!item) return null;
+                  return (
+                    <label key={item.id} className="layer-row" title={LAYER_TITLES[item.id]}>
+                      <input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} />
+                      <span className="layer-mark" />
+                      {item.label}
+                    </label>
+                  );
+                })}
               </div>
             </>
           ) : (
             <button type="button" className="paper-btn" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
           )}
         </aside>
+        {!listView ? (
+          <aside className="map-key" aria-label="Key">
+            <ul>
+              <li><i className="swatch cleared" /> Cleared</li>
+              <li><i className="swatch possible" /> Possible</li>
+              <li><i className="swatch unresolved" /> Unresolved</li>
+              <li><i className="swatch held" /> Held</li>
+              <li><i className="swatch l10" /> 10k+ sq ft</li>
+              <li><i className="swatch l4" /> 4k+ sq ft</li>
+            </ul>
+          </aside>
+        ) : null}
         {tip ? <p className="tip">{tip}</p> : null}
         {guideOpen ? (
           <aside className="guide">
             <button className="close" type="button" aria-label="Close" onClick={() => setGuideOpen(false)}><span aria-hidden="true">×</span></button>
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
-            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000.</p>
+            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000. Spare land is leftover land on an operating wash. It is not a vacant parcel.</p>
+            <p>Filters chooses the working set. Car washes are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
             <p>Site capacity sits beside spare land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
-            <p>Deals contacted, beside Universe, counts Pipeline and Land deals in this city with an outbound email or call on file. Dropped deals stay out of that count.</p>
+            <p>Deals contacted, beside Universe, counts deals in the categories you have on, in this city, with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>
             <ul>
               {STATUS_NOTES.map((item) => <li key={item.id}><strong>{item.label}.</strong> {item.note}</li>)}

@@ -46,6 +46,7 @@ test("mobile layers and the menu are not open together", async ({ page }, info) 
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.locator(".menu-sheet")).toBeVisible();
   await expect(page.locator(".legend")).toHaveCount(0);
+  await expect(page.locator(".map-key")).toBeHidden();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator(".layers.open")).toBeVisible();
@@ -62,10 +63,10 @@ test("Back returns to the previous city and step", async ({ page }, info) => {
   else await page.getByRole("button", { name: "Miami" }).click();
   await page.waitForURL(/city=MIA/);
   if (info.project.name === "mobile") await page.locator(".phone-step").click();
-  await page.locator(".funnel .step button", { hasText: "Cleared" }).first().click();
-  await page.waitForURL(/stage=cleared/);
+  await page.locator(".funnel .step button", { hasText: "Desk screen" }).first().click();
+  await page.waitForURL(/pstage=desk/);
   await page.goBack();
-  await page.waitForFunction(() => !location.search.includes("stage=cleared"));
+  await page.waitForFunction(() => !location.search.includes("pstage=desk"));
   expect(page.url()).toContain("city=MIA");
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "MIA");
   await expect(page.locator(".shell")).toHaveAttribute("data-stage", "land");
@@ -75,7 +76,7 @@ test("Back returns to the previous city and step", async ({ page }, info) => {
 });
 
 test("a shared link restores the city, step, filter, card, and table", async ({ page }, info) => {
-  await page.goto("/?city=LAS&stage=cleared&tier=L10&site=LAS-U129&table=1", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=universe&city=LAS&stage=cleared&tier=L10&site=LAS-U129&table=1", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
   await expect(page.locator(".shell")).toHaveAttribute("data-stage", "cleared");
@@ -88,7 +89,7 @@ test("a shared link restores the city, step, filter, card, and table", async ({ 
 });
 
 test("export matches the rows and columns on screen", async ({ page }) => {
-  await page.goto("/?stage=cleared&view=list", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=universe&stage=cleared&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".list-pane tbody tr", { state: "attached" });
   const headers = await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter((text) => text && text !== "Map"));
   const rowIds = await page.locator(".list-pane tbody tr td:first-child").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").trim()));

@@ -324,7 +324,7 @@
         "PHX": 16,
         "MIA": 6
       },
-      "note": "Pipeline and Land deals in this city with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
+      "note": "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
     }
   ],
   "candidates": {

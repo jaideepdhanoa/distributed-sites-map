@@ -56,7 +56,7 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
   ];
   const card = cardPhotos({ photos, photo_status: "Partial", photo_diligence_count: 2, photo_listing_count: 4 });
   const model = galleryModel(card);
-  assert.equal(model.statusLine, "Partial / 2 diligence · 4 listing");
+  assert.equal(model.statusLine, "Photo set: partial · 2 site photos · 4 listing photos");
   assert.deepEqual(model.slides.map((item) => item.role), [
     "spare_land_annotated",
     "lot_aerial",
@@ -77,7 +77,9 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
   assert.match(streetViewEmbedSrc(PANO), /output=svembed/);
   assert.equal(streetViewEmbedSrc(STILL), "");
   assert.equal(galleryModel(cardPhotos({ photos, photo_status: "Deferred" })).showGallery, false);
-  assert.equal(galleryModel(cardPhotos({ photos, photo_status: "Deferred" })).statusLine, "Deferred");
+  assert.equal(galleryModel(cardPhotos({ photos, photo_status: "Deferred" })).statusLine, "Photo set: deferred");
+  assert.equal(photoStatusLine("Complete", 5, 7), "Photo set: complete · 5 site photos · 7 listing photos");
+  assert.equal(photoStatusLine("Complete", 1, 1), "Photo set: complete · 1 site photo · 1 listing photo");
   assert.equal(galleryModel(cardPhotos({ photos, photo_status: "Deferred" })).frontageUrl, "");
   assert.equal(galleryModel(cardPhotos({})).visible, false);
   assert.equal(photoStatusLine("", 0, 0), "");

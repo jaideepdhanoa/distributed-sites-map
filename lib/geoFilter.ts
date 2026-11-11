@@ -2,7 +2,7 @@ export type MapArea =
   | { kind: "radius"; lng: number; lat: number; miles: number }
   | { kind: "polygon"; points: [number, number][] };
 
-function milesBetween(lng1: number, lat1: number, lng2: number, lat2: number) {
+export function milesBetween(lng1: number, lat1: number, lng2: number, lat2: number) {
   const radius = 3958.8;
   const phi1 = (lat1 * Math.PI) / 180;
   const phi2 = (lat2 * Math.PI) / 180;

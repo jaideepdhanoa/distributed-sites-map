@@ -104,7 +104,7 @@ Adding a class means updating this list and `scripts/check_controls.mjs` in the 
 
 Core: `primary`, `paper-btn`, `text-link`, `tool`, `icon-btn`, `close`, `segmented`, `secondary`, `action`, `check`, `field`, `search`, `sort-header`.
 
-Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`, `sub`, `aside`, `chip`, `menu-item`, `funnel-step`, `overlay-chip`, `search-hit`, `list-row`, `removable`, `sheet-grab`, `sheet-step`, `review-row`, `review-step`, `review-count`, `review-more`, `review-exit`, `compare-go`, `fin-tile`, `photo-shot`, `hero-still`, `hero-info`, `photo-more`, `propose`, `disclosure`, `act-thread`.
+Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`, `sub`, `aside`, `chip`, `menu-item`, `funnel-step`, `overlay-chip`, `search-hit`, `list-row`, `removable`, `sheet-grab`, `sheet-step`, `review-row`, `review-step`, `review-count`, `review-more`, `review-exit`, `compare-go`, `fin-tile`, `photo-shot`, `hero-still`, `hero-info`, `hero-expand`, `photo-more`, `propose`, `disclosure`, `act-thread`.
 
 ## Definition of done for UI changes
 

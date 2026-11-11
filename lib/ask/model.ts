@@ -57,7 +57,7 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       },
     }),
     getSite: tool({
-      description: "Read one sanitized site or deal. Quarantined rows return only the quarantined status.",
+      description: "Read one sanitized site or deal, including the card facts: asking price, spare land, bays, acreage, cash flow, package status, and photo set. Quarantined rows return only the quarantined status. Does not change stage.",
       inputSchema: id,
       execute: async ({ id: siteId }) => {
         called.push("getSite");

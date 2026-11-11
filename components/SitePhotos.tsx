@@ -51,9 +51,11 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
   const model = galleryModel(card);
   const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
   const [open, setOpen] = useState<number | null>(null);
+  const [streetOpen, setStreetOpen] = useState(false);
   const [hero, setHero] = useState<"street" | "photos">(model.showGallery ? "photos" : embed ? "street" : "photos");
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const streetRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -63,6 +65,15 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
     }
     if (!dialog.open) dialog.showModal();
   }, [open]);
+  useEffect(() => {
+    const dialog = streetRef.current;
+    if (!dialog) return;
+    if (!streetOpen) {
+      if (dialog.open) dialog.close();
+      return;
+    }
+    if (!dialog.open) dialog.showModal();
+  }, [streetOpen]);
 
   const credits = Array.from(new Set(model.slides.map((photo) => photo.attribution || esriCredit(photo)).filter(Boolean)));
   if (!model.visible) {
@@ -94,54 +105,104 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
     if (index >= 0) setOpen(index);
   }
 
+  function openGallery() {
+    if (!model.slides.length) {
+      setHero("photos");
+      return;
+    }
+    setHero("photos");
+    setOpen(0);
+  }
+
+  function expandHero() {
+    if (hero === "street" && embed) {
+      setStreetOpen(true);
+      return;
+    }
+    openGallery();
+  }
+
   return (
     <section className="site-photos card-hero" data-testid="site-photos">
-      <div className="hero-frame">
-        {embed && hero === "street" ? (
-          <iframe
-            title="Street View"
-            data-testid="street-view-frame"
-            src={embed}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            allowFullScreen
-          />
-        ) : null}
-        {hero === "photos" && model.slides[0] ? (
-          <button type="button" className="hero-still" onClick={() => openAt(model.slides[0])}>
-            <Frame photo={model.slides[0]} size="full" />
-          </button>
-        ) : null}
-        {!embed && !model.slides.length ? (
-          <div className="empty-hero">
-            <p>No street view or photos on file</p>
-          </div>
-        ) : null}
-        <div className="hero-tabs" role="tablist" aria-label="Site view">
-          {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
-          {model.showGallery ? <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "chip on" : "chip"} onClick={() => setHero("photos")}>Photos{model.slides.length ? ` · ${model.slides.length}` : ""}</button> : null}
+      <div className="hero-slot">
+        <div className="hero-frame">
+          {embed && hero === "street" ? (
+            <iframe
+              title="Street View"
+              data-testid="street-view-frame"
+              src={embed}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          ) : null}
+          {hero === "photos" && model.slides[0] ? (
+            <button type="button" className="hero-still" onClick={() => openAt(model.slides[0])}>
+              <Frame photo={model.slides[0]} size="full" />
+            </button>
+          ) : null}
+          {!embed && !model.slides.length ? (
+            <div className="empty-hero">
+              <p>No street view or photos on file</p>
+            </div>
+          ) : null}
         </div>
-        {credits.length ? (
-          <>
+        <div className="hero-chrome">
+          <div className="hero-tabs" role="tablist" aria-label="Site view">
+            {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
+            {model.showGallery ? (
+              <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "chip on" : "chip"} data-testid="photo-tab" onClick={openGallery}>
+                Photos{model.slides.length ? ` · ${model.slides.length}` : ""}
+              </button>
+            ) : null}
+          </div>
+          {embed || model.slides.length ? (
+            <button type="button" className="hero-expand" data-testid="hero-expand" aria-label={hero === "street" && embed ? "Expand Street View" : "Expand photos"} onClick={expandHero}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" /></svg>
+            </button>
+          ) : null}
+          {credits.length ? (
             <button className="hero-info" type="button" aria-expanded={sourcesOpen} aria-label="Sources" onClick={() => setSourcesOpen((value) => !value)}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
             </button>
-            {sourcesOpen ? (
-              <div className="hero-sources" role="note">
-                {credits.map((credit) => <p key={credit} className="photo-credit" data-testid="photo-attribution">{credit}</p>)}
-              </div>
-            ) : null}
-          </>
-        ) : null}
+          ) : null}
+          {sourcesOpen && credits.length ? (
+            <div className="hero-sources" role="note">
+              {credits.map((credit) => <p key={credit} className="photo-credit" data-testid="photo-attribution">{credit}</p>)}
+            </div>
+          ) : null}
+        </div>
       </div>
+      {embed ? (
+        <dialog
+          ref={streetRef}
+          className="street-dialog"
+          aria-label="Street View"
+          data-testid="street-dialog"
+          onClose={() => setStreetOpen(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setStreetOpen(false);
+          }}
+        >
+          {streetOpen ? (
+            <div className="street-stage">
+              <iframe title="Street View expanded" src={embed} referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+              <div className="photo-nav">
+                <span>Street View</span>
+                <button type="button" className="close" aria-label="Close Street View" onClick={() => setStreetOpen(false)}><span aria-hidden="true">×</span></button>
+              </div>
+            </div>
+          ) : null}
+        </dialog>
+      ) : null}
       {between}
       <div className="photo-rest">
-      {model.statusLine ? <p className="photo-status" data-testid="photo-status">{model.statusLine}</p> : null}
+      {model.statusLine ? <p className="photo-status" data-testid="photo-status" title="Photo set on file: site photos, then listing photos.">{model.statusLine}</p> : null}
       {model.showGallery ? (
         <>
           {model.diligence.length ? (
             <div className="photo-group">
-              {both ? <h3>Diligence</h3> : null}
+              {both ? <h3>Site photos</h3> : null}
               <div className="photo-grid">
                 {model.diligence.map((photo, index) => (
                   <Thumb key={`${photo.role}-${photo.file_id || photo.view_url}-${index}`} photo={photo} onOpen={() => openAt(photo)} />

@@ -11,7 +11,8 @@ import { listedStageRows } from "../../lib/ask/stages";
 import { askPrefix } from "../../lib/ask/prompt";
 import { redactPayload } from "../../lib/ask/redact";
 import { answerQuestion } from "../../lib/ask/run";
-import { ASK_TOOLS, MAX_ASK_STEPS, isQuarantined, runAskTool } from "../../lib/ask/tools";
+import { ASK_TOOLS, MAX_ASK_STEPS, isQuarantined, runAskTool, siteScopeLine } from "../../lib/ask/tools";
+
 test("ask tools are read-only, role checked, and redact before the model", async () => {
   assert.equal(MAX_ASK_STEPS, 2);
   assert.equal(ASK_TOOLS.some((name) => /approve|propose|assign|email|workbook|write/i.test(name)), false);
@@ -208,6 +209,42 @@ test("portfolio context lists a stage for every in-play listed deal", async () =
   const financial = await runAskTool("stages", { market: "PHX", stage: "Financial" }, "viewer") as { rows: { stage: string }[] };
   assert.ok(financial.rows.length > 0);
   assert.equal(financial.rows.every((row) => /financial/i.test(row.stage)), true);
+});
+
+test("getSite returns the card facts for 3520 N 16th St without restaging it", async () => {
+  const file = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
+    features: { properties: Record<string, unknown> }[];
+  };
+  const props = file.features.find((feature) => feature.properties.deal_id === "PIPE-PHX-0084")?.properties;
+  if (!props) throw new Error("missing PIPE-PHX-0084");
+  const result = await runAskTool("getSite", { id: "PIPE-PHX-0084" }, "reviewer") as {
+    stage?: string;
+    stage_group?: string;
+    business_type?: string;
+    card?: Record<string, unknown>;
+  };
+  assert.equal(result.stage, props.stage);
+  assert.equal(result.stage_group, props.stage_group);
+  assert.equal(result.business_type, props.business_type);
+  assert.equal(result.card?.askingPrice, props.asking_price_display);
+  assert.equal(result.card?.acres, props.land_acres);
+  assert.equal(result.card?.baysThatFit, props.bays_that_fit);
+  assert.equal(result.card?.packageStatus, "Package asked for");
+  assert.equal(result.card?.cashFlow, "Not provided");
+  assert.match(String(result.card?.spareLand), /9,000 sq ft/);
+  assert.match(String(result.card?.photoSet), /Photo set: complete/);
+  assert.match(String(result.card?.photoSet), /5 site photos/);
+  assert.match(String(result.card?.photoSet), /7 listing photos/);
+  assert.equal(JSON.stringify(result).includes("timeline"), false);
+  const scope = siteScopeLine("PIPE-PHX-0084");
+  assert.match(scope, /\$1,750,000/);
+  assert.match(scope, /Package asked for/);
+  assert.match(scope, /9,000 sq ft/);
+  assert.match(scope, /no events were recorded/i);
+  const activity = await runAskTool("activity", { id: "PIPE-PHX-0084" }, "reviewer") as { timeline?: unknown[]; events?: unknown[]; note?: string };
+  if (!(activity.timeline || []).length && !(activity.events || []).length) {
+    assert.equal(activity.note, "No events recorded.");
+  }
 });
 
 test("portfolio context includes listed deals counted from the data", () => {

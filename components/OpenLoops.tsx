@@ -123,7 +123,7 @@ export default function OpenLoops({
               )}
               <p className="nda-court"><span>{row.loop_class}</span>{row.court}</p>
               {row.loop_class === "Site" ? <p>{[row.market, row.stage].filter(Boolean).join(" · ")}</p> : null}
-              <p>{row.days}d · {row.owner}</p>
+              <p>{row.days}d · {row.owner}{row.brief_flagged ? " · In brief" : ""}</p>
               <p>{row.loop_class === "NDA" ? "Gates" : "Blocker"}: {row.detail || "—"}</p>
               {row.next_step ? <p>{row.next_step}</p> : null}
               {row.parked ? <p>{PARKED_BADGE}</p> : null}

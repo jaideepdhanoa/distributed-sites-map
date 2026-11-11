@@ -32,6 +32,8 @@ export function commentButtonCovered(input: {
   layersOpen: boolean;
   menuOpen: boolean;
   popoverOpen: boolean;
+  ndaOpen: boolean;
+  loopsOpen: boolean;
 }): boolean {
   if (!input.phone) return false;
   return input.drawerOpen
@@ -41,7 +43,9 @@ export function commentButtonCovered(input: {
     || input.tableOpen
     || input.layersOpen
     || input.menuOpen
-    || input.popoverOpen;
+    || input.popoverOpen
+    || input.ndaOpen
+    || input.loopsOpen;
 }
 
 /** Place the preview comment button in the map, clear of the drawer and any open sheet. */

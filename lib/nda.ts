@@ -79,6 +79,16 @@ export function dayCount(value: unknown): number | null {
   return Math.round(number);
 }
 
+/** Days in the current court. A date-formatted zero (12/30/1899) is 0, not a calendar date. */
+export function courtDayCount(value: unknown): number | null {
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(raw)) return raw === "12/30/1899" || raw === "12/30/99" ? 0 : null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.startsWith("1899-12-30") ? 0 : null;
+  }
+  return dayCount(value);
+}
+
 /** Blank on a site with no NDA ID is Not required. "Not started" is not a status. */
 export function displayStatus(value: unknown, linked: boolean): string {
   const raw = text(value);
@@ -110,7 +120,7 @@ export function normalizeMirror(value: Partial<NdaMirror> | Record<string, unkno
     nda_waiting_on: text(row.nda_waiting_on) || (linked ? "" : NO_VALUE),
     nda_gates: text(row.nda_gates) || (linked ? "" : NOT_GATING),
     nda_days_open: dayCount(row.nda_days_open),
-    nda_days_in_court: dayCount(row.nda_days_in_court),
+    nda_days_in_court: courtDayCount(row.nda_days_in_court),
     stage_blocker: text(row.stage_blocker) || NO_VALUE,
     stage_blocker_since: text(row.stage_blocker_since),
   };

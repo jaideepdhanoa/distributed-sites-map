@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { ndaQueueAllowed } from "../lib/nda.ts";
+import { ndaQueueAllowed, ndaQueueBody, type NdaSnapshot } from "../lib/nda.ts";
 import {
   OPEN_LOOP_FILTERS,
   PARKED_BADGE,
   briefSet,
   courtDayCount,
   deriveOpenLoops,
+  isClosedOrDropped,
   isParkedDecision,
   siteCourt,
   visibleLoops,
@@ -24,14 +25,8 @@ const panel = readFileSync("components/OpenLoops.tsx", "utf8");
 
 const EXPECTED = [
   "NDA-004",
-  "LAND-PHX-0043",
-  "PIPE-PHX-0005",
-  "LAND-PHX-0049",
   "LAND-PHX-0050",
   "LAND-PHX-0053",
-  "LAND-PHX-0054",
-  "LAND-PHX-0055",
-  "PIPE-PHX-0081",
   "LAND-LAS-0012",
   "LAND-PHX-0052",
   "LAND-LAS-0008",
@@ -44,18 +39,12 @@ const EXPECTED = [
   "NDA-002",
   "NDA-003",
   "LAND-LAS-0013",
-  "PIPE-PHX-0001",
-  "PIPE-PHX-0003",
-  "PIPE-PHX-0004",
   "PIPE-PHX-0007",
-  "PIPE-LAS-0011",
-  "PIPE-MIA-0012",
   "PIPE-PHX-0084",
   "LAND-LAS-0004",
   "PIPE-PHX-0006",
   "PIPE-PHX-0008",
   "PIPE-PHX-0009",
-  "PIPE-PHX-0018",
   "PIPE-LAS-0072",
   "PIPE-MIA-0075",
   "PIPE-PHX-0085",
@@ -99,10 +88,10 @@ function byId(id: string) {
   return derived.loops.find((row) => row.id === id);
 }
 
-test("the Nov 11 fixture is 56 loops and the brief set is the three NDA lines", () => {
+test("the Nov 11 fixture keeps the brief set as the three NDA lines", () => {
   assert.equal(snapshot.source, "fixture");
   assert.equal(snapshot.as_of, "2026-11-11");
-  assert.equal(derived.loops.length, 56);
+  assert.equal(derived.loops.length, EXPECTED.length);
   assert.deepEqual(derived.loops.map((row) => row.id).slice().sort(), EXPECTED.slice().sort());
   assert.equal(derived.loops[0]?.id, "NDA-004");
   assert.equal(derived.loops[0]?.court, "Us — signer");
@@ -111,8 +100,10 @@ test("the Nov 11 fixture is 56 loops and the brief set is the three NDA lines", 
   const flagged = briefSet(derived.loops);
   assert.deepEqual(flagged.map((row) => row.id), ["NDA-004", "NDA-002", "NDA-003"]);
   assert.deepEqual(flagged.map((row) => row.days), [8, 20, 16]);
-  assert.equal(derived.loops.filter((row) => row.owner === "Brief").length, 25);
-  assert.equal(derived.loops.filter((row) => row.owner === "Chase check").length, 31);
+  assert.equal(derived.loops.filter((row) => row.owner === "Brief").length, 19);
+  assert.equal(derived.loops.filter((row) => row.owner === "Chase check").length, 25);
+  assert.equal(derived.loops.filter((row) => row.brief_flagged).length, 3);
+  assert.match(panel, /brief_flagged \? " · In brief"/);
   assert.equal(derived.loops.filter((row) => row.owner === "Panel only").length, 0);
   let group = -1;
   let previousDays = 999;
@@ -148,14 +139,19 @@ test("NDA-002 keeps its description and NDA-005 is zero days with the site folde
   assert.equal(confidential?.days, 20);
   assert.equal(JSON.stringify(confidential).toLowerCase().includes("missing"), false);
   const folded = byId("NDA-005");
+  assert.equal(folded?.court, "Them — signer");
   assert.equal(folded?.days, 0);
+  const queue = ndaQueueBody(JSON.parse(readFileSync("data/generated/nda.json", "utf8")) as NdaSnapshot);
+  const queued = queue.queue.find((row) => row.nda_id === "NDA-005");
+  assert.equal(queued?.nda_waiting_on, folded?.court);
+  assert.equal(courtDayCount(queued?.nda_days_in_court), folded?.days);
   assert.equal(courtDayCount("12/30/1899"), 0);
   assert.equal(courtDayCount(0), 0);
   assert.deepEqual(folded?.folded_site_ids, ["PIPE-PHX-0014"]);
   assert.equal(derived.loops.some((row) => row.id === "PIPE-PHX-0014"), false);
   const separate = byId("NDA-003");
   assert.deepEqual(separate?.folded_site_ids, []);
-  assert.equal(byId("PIPE-PHX-0018")?.owner, "Chase check");
+  assert.equal(derived.loops.some((row) => row.id === "PIPE-PHX-0018"), false);
   assert.equal(byId("NDA-008")?.folded_site_ids.includes("PIPE-LAS-0070"), true);
   assert.equal(byId("NDA-008")?.folded_site_ids.includes("PIPE-LAS-0071"), true);
 });
@@ -177,10 +173,22 @@ test("parked rows stay off the default list and off the brief, and stage is stil
   assert.deepEqual(briefSet(shown).map((row) => row.id), ["NDA-004", "NDA-002", "NDA-003"]);
 });
 
+test("closed and dropped notes are not live loops", () => {
+  for (const id of ["LAND-PHX-0043", "LAND-PHX-0049", "LAND-PHX-0054", "LAND-PHX-0055", "PIPE-PHX-0005", "PIPE-PHX-0081", "PIPE-PHX-0018"]) {
+    assert.equal(derived.loops.some((row) => row.id === id), false);
+    assert.equal(isClosedOrDropped(snapshot.sites.find((row) => row.site_id === id)?.next_step || ""), true);
+  }
+  assert.equal(derived.loops.some((row) => /none\s*[—-]\s*closed/i.test(row.next_step)), false);
+  assert.equal(derived.loops.some((row) => /^(?:dropped|closed)\b/i.test(row.next_step)), false);
+  assert.equal(derived.loops.some((row) => /\bstays dropped\b/i.test(row.next_step)), false);
+  assert.equal(byId("LAND-LAS-0008")?.label.includes("Closed"), true);
+  assert.equal(isClosedOrDropped("Not dropped. Still waiting on the broker."), false);
+});
+
 test("courts and owners follow the table", () => {
-  assert.equal(byId("LAND-PHX-0043")?.court, "Us");
-  assert.equal(byId("LAND-PHX-0043")?.detail, "We owe a reply");
-  assert.equal(byId("LAND-LAS-0008")?.court, "Us");
+  assert.equal(byId("LAND-PHX-0050")?.court, "Us — reply");
+  assert.equal(byId("LAND-PHX-0050")?.detail, "We owe a reply");
+  assert.equal(byId("LAND-LAS-0008")?.court, "Us — diligence");
   assert.equal(byId("LAND-LAS-0008")?.detail, "Our-side diligence");
   assert.equal(byId("PIPE-SNA-0002")?.court, "Them — broker");
   assert.equal(byId("PIPE-SNA-0002")?.owner, "Chase check");
@@ -190,6 +198,8 @@ test("courts and owners follow the table", () => {
   assert.equal(byId("PIPE-PHX-0084")?.owner, "Brief");
   assert.equal(byId("PIPE-PHX-0084")?.days, 5);
   assert.equal(byId("PIPE-PHX-0084")?.brief_flagged, false);
+  assert.equal(siteCourt("We owe a reply", ""), "Us — reply");
+  assert.equal(siteCourt("Our-side diligence", ""), "Us — diligence");
   assert.equal(siteCourt("NDA execution", "—"), "Them — signer");
   assert.equal(siteCourt("NDA execution", "Us — signer"), "Us — signer");
   assert.equal(siteCourt("Price/terms", ""), "—");

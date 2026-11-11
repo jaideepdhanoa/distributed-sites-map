@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   clockLine,
   counterpartyLine,
+  courtDayCount,
   coveredSites,
   dayCount,
   queueCourt,
@@ -65,7 +66,7 @@ export default function NdaQueue({
             const sites = coveredSites(row.site_ids || "");
             const open = openId === row.nda_id;
             const party = counterpartyLine(row);
-            const clocks = clockLine(dayCount(row.nda_days_open), dayCount(row.nda_days_in_court));
+            const clocks = clockLine(dayCount(row.nda_days_open), courtDayCount(row.nda_days_in_court));
             return (
               <li key={row.nda_id} className="nda-row" data-testid={`nda-${row.nda_id}`} data-court={queueCourt(row)}>
                 <h3>{row.nda_id}{party ? ` · ${party}` : ""}</h3>

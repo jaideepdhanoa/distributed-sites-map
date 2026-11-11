@@ -1,4 +1,6 @@
-import { coveredSites, daysSince, type NdaAgreement } from "./nda";
+import { courtDayCount, coveredSites, daysSince, type NdaAgreement } from "./nda";
+
+export { courtDayCount };
 
 export const PARKED_BADGE = "Parked — owner's decision";
 export const NO_COURT = "—";
@@ -89,21 +91,6 @@ function text(value: unknown): string {
   return String(value).trim();
 }
 
-/** A date-formatted zero is 0. Any other date is not a day count. */
-export function courtDayCount(value: unknown): number | null {
-  if (typeof value === "string") {
-    const raw = value.trim();
-    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(raw)) {
-      return raw === "12/30/1899" || raw === "12/30/99" ? 0 : null;
-    }
-    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.startsWith("1899-12-30") ? 0 : null;
-  }
-  if (value == null || value === "" || typeof value === "boolean") return null;
-  const number = typeof value === "number" ? value : Number(String(value).replace(/,/g, ""));
-  if (!Number.isFinite(number)) return null;
-  return Math.round(number);
-}
-
 export function liveWaiting(value: string): boolean {
   return value.startsWith("Us") || value.startsWith("Them");
 }
@@ -121,6 +108,19 @@ function blankBlocker(value: string): boolean {
   return !raw || raw === "—" || raw === "-" || raw === "–";
 }
 
+/**
+ * A next step that records the site as closed or dropped. The stage column can
+ * still say Desk screen; that note means it is not a live loop.
+ */
+export function isClosedOrDropped(nextStep: string): boolean {
+  const raw = nextStep.replace(/\s+/g, " ").trim();
+  if (!raw || /\bnot\s+dropped\b/i.test(raw)) return false;
+  if (/^none\s*[—–-]\s*closed\b/i.test(raw)) return true;
+  if (/^(?:dropped|closed)\b/i.test(raw)) return true;
+  if (/\bstays\s+dropped\b/i.test(raw)) return true;
+  return false;
+}
+
 /** Jaideep's park ruling in Next step. These rows stay off the default list and off the brief. */
 export function isParkedDecision(nextStep: string): boolean {
   const raw = nextStep.toLowerCase();
@@ -131,7 +131,8 @@ export function isParkedDecision(nextStep: string): boolean {
 }
 
 export function siteCourt(blocker: string, waiting: string): string {
-  if (blocker === "We owe a reply" || blocker === "Our-side diligence") return "Us";
+  if (blocker === "We owe a reply") return "Us — reply";
+  if (blocker === "Our-side diligence") return "Us — diligence";
   if (blocker === "Awaiting broker reply" || blocker === "Awaiting package") return "Them — broker";
   if (blocker === "NDA execution") {
     if (liveWaiting(waiting)) return waiting;
@@ -231,6 +232,7 @@ export function deriveOpenLoops(snapshot: OpenLoopsSnapshot): DerivedLoops {
       folded.set(site.nda_id, list);
       continue;
     }
+    if (isClosedOrDropped(site.next_step || "")) continue;
     const waiting = text(byNda.get(site.nda_id)?.nda_waiting_on);
     const owner = loopOwner("Site", site.stage_blocker);
     const loop = finish({

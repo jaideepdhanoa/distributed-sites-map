@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  canSeeGmailLinks,
   commsBody,
+  commsForViewer,
   compareLines,
   directionKind,
   linesForSites,
@@ -210,6 +212,42 @@ test("no mailbox or raw body is added beyond the summary and counterparty column
   const other = toCommsLine(row({ direction: "Broker", summary: "Unexpected direction" }));
   assert.equal(mergeActivity([], [other], { includeInternal: false }).length, 0);
   assert.equal(mergeActivity([], [other], { includeInternal: true }).length, 0);
+});
+
+test("the gmail link is only returned for the allowlisted account", () => {
+  const previous = process.env.GMAIL_LINK_VIEWERS;
+  delete process.env.GMAIL_LINK_VIEWERS;
+  try {
+    assert.equal(canSeeGmailLinks("jaideep"), true);
+    assert.equal(canSeeGmailLinks("cindel"), false);
+    const owner = commsForViewer("reviewer", "jaideep", snapshot, ["LAND-PHX-0059"]);
+    const teammate = commsForViewer("contributor", "cindel", snapshot, ["LAND-PHX-0059"]);
+    assert.equal("error" in owner, false);
+    assert.equal("error" in teammate, false);
+    if ("error" in owner || "error" in teammate) return;
+    const linked = owner.rows.find((line) => line.commsId === "CM-0377");
+    const hidden = teammate.rows.find((line) => line.commsId === "CM-0377");
+    assert.ok(linked);
+    assert.ok(hidden);
+    assert.equal(linked.href, "https://mail.google.com/mail/u/0/#inbox/1a1cb8944d8350a0");
+    assert.equal(hidden.summary, linked.summary);
+    assert.equal(hidden.direction, linked.direction);
+    assert.equal(hidden.firm, linked.firm);
+    assert.equal("href" in hidden, false);
+    assert.equal(JSON.stringify(teammate).includes("mail.google.com"), false);
+    process.env.GMAIL_LINK_VIEWERS = "jaideep@dhanoa.in";
+    assert.equal(canSeeGmailLinks("jaideep"), true);
+    assert.equal(commsForViewer("reviewer", "jaideep", snapshot, ["LAND-PHX-0059"]).rows.find((line) => line.commsId === "CM-0377")?.href, linked.href);
+    process.env.GMAIL_LINK_VIEWERS = "cindel";
+    const moved = commsForViewer("reviewer", "jaideep", snapshot, ["LAND-PHX-0059"]);
+    const granted = commsForViewer("reviewer", "cindel", snapshot, ["LAND-PHX-0059"]);
+    assert.equal("href" in (moved.rows.find((line) => line.commsId === "CM-0377") || {}), false);
+    assert.equal(granted.rows.find((line) => line.commsId === "CM-0377")?.href, linked.href);
+  } finally {
+    if (previous === undefined) delete process.env.GMAIL_LINK_VIEWERS;
+    else process.env.GMAIL_LINK_VIEWERS = previous;
+  }
+  assert.match(route, /commsForViewer\(session\.actionRole, session\.u/);
 });
 
 test("the activity screen keeps the heading and hides internal rows until asked", () => {

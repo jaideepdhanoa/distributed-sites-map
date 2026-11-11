@@ -1,3 +1,5 @@
+import alertDefaults from "../config/alerts.json";
+import commsConfig from "../config/comms.json";
 import { ndaQueueAllowed } from "./nda";
 
 const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
@@ -44,9 +46,9 @@ export type CommsLine = {
   firm: string;
   channel: string;
   summary: string;
-  href: string;
   citedEventIds: string[];
   messageId: string;
+  href?: string;
 };
 
 export type ActivityInput = {
@@ -223,6 +225,42 @@ export function splitLines(lines: CommsLine[]): { rows: CommsLine[]; internal: C
 export function commsBody(role: string, snapshot: CommsSnapshot, ids: string[]): CommsBody {
   if (!ndaQueueAllowed(role)) return { error: "You do not have permission for that." };
   return splitLines(linesForSites(snapshot, ids));
+}
+
+/** Usernames or mailboxes that may receive a Gmail link. GMAIL_LINK_VIEWERS replaces the config list. */
+export function gmailLinkViewers(): string[] {
+  const raw = process.env.GMAIL_LINK_VIEWERS;
+  const listed = raw && raw.trim() ? raw.split(",") : commsConfig.gmailLinkViewers;
+  return listed.map((item) => String(item).trim().toLowerCase()).filter(Boolean);
+}
+
+/**
+ * The signed-in account is session.u. That username is the avatar initial.
+ * An allowlist entry may instead be the mailbox recorded for that username.
+ */
+export function canSeeGmailLinks(username: string): boolean {
+  const id = username.trim().toLowerCase();
+  if (!id) return false;
+  const allowed = new Set(gmailLinkViewers());
+  if (allowed.has(id)) return true;
+  const mailbox = String((alertDefaults.emails as Record<string, string>)[id] || "").trim().toLowerCase();
+  return Boolean(mailbox && allowed.has(mailbox));
+}
+
+function withoutGmailLink(line: CommsLine): CommsLine {
+  const next = { ...line };
+  delete next.href;
+  return next;
+}
+
+/** Comms rows for every allowed viewer. The Gmail link is only on the allowlisted account. */
+export function commsForViewer(role: string, username: string, snapshot: CommsSnapshot, ids: string[]): CommsBody {
+  const body = commsBody(role, snapshot, ids);
+  if ("error" in body || canSeeGmailLinks(username)) return body;
+  return {
+    rows: body.rows.map(withoutGmailLink),
+    internal: body.internal.map(withoutGmailLink),
+  };
 }
 
 function messageKey(href: string, messageId: string): string {

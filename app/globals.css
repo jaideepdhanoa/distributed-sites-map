@@ -1123,7 +1123,7 @@ tr { cursor: pointer; }
   .shell.table-open { grid-template-rows: auto 1fr; }
   .shell.table-open .map-stage { display: none; }
   .dock-tabs button { min-height: 44px; }
-  .legend, .map-key { display: none; }
+  .legend { display: none; }
   .layers label.layer-row { min-height: 44px; }
   .layers:not(.open) {
     display: block;
@@ -2379,6 +2379,46 @@ span.listing-link.muted { text-decoration: none; }
 .layers .segmented, .popover .segmented { display: flex; width: 100%; }
 .layers .segmented > button, .popover .segmented > button { flex: 1; white-space: nowrap; padding: 4px 4px; font-size: 12px; }
 .layers label i { flex: none; }
+.map-corner {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(320px, calc(100% - 24px));
+  pointer-events: none;
+}
+.map-corner > * { pointer-events: auto; }
+.map-corner .location-note,
+.map-corner .map-key {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  top: auto;
+  transform: none;
+  z-index: auto;
+  max-width: 100%;
+}
+.rings-outside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  background: #faf7f1;
+  border: 1px solid #d6cebe;
+  border-radius: 14px;
+  box-shadow: var(--shadow-1);
+  color: #1c1914;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.rings-outside p { margin: 0; flex: 1 1 160px; }
 .map-key {
   position: absolute;
   z-index: 2;
@@ -2434,4 +2474,23 @@ button.paper-btn.on,
   .map-float { top: 188px; right: 8px; }
   .layers:not(.open) { top: 252px; right: 8px; }
   .measure-bar .paper-btn { min-height: 44px; }
+  .rings-outside .paper-btn { min-height: 44px; }
+  .map-corner {
+    left: 8px;
+    bottom: 112px;
+    max-width: calc(100% - 16px);
+    z-index: 4;
+  }
+  .shell.drawer-open .map-corner { bottom: calc(var(--sheet-h, 45vh) + 8px); }
+  .shell:has(.layers.open) .map-corner {
+    position: fixed;
+    z-index: 30;
+    left: 8px;
+    bottom: 8px;
+  }
+  .shell.drawer-open:has(.layers.open) .map-corner { bottom: calc(var(--sheet-h, 45vh) + 8px); }
+  .layers.open { padding-bottom: 200px; scroll-padding-bottom: 200px; }
+  .shell.sheet-full .map-corner,
+  .shell.steps-open .map-corner,
+  .shell:has(.menu-sheet) .map-corner { display: none; }
 }

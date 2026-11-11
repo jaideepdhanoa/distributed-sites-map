@@ -145,6 +145,11 @@ export default function Explorer() {
   const tableTab: "universe" | "pipeline" | "land" = tabParam === "pipeline" || tabParam === "land" ? tabParam : "universe";
   const [tip, setTip] = useState("");
   const [ringCursor, setRingCursor] = useState<{ x: number; y: number } | null>(null);
+  const [ringsOutside, setRingsOutside] = useState(false);
+  const frameRings = useRef<(() => void) | null>(null);
+  const registerFrameRings = useCallback((frame: (() => void) | null) => {
+    frameRings.current = frame;
+  }, []);
   const ringNoteRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const note = ringNoteRef.current;
@@ -1952,6 +1957,8 @@ export default function Explorer() {
           onPinLabel={setPinLabel}
           basemap={basemap}
           onBasemap={chooseBasemap}
+          onRingsOutside={setRingsOutside}
+          registerFrameRings={registerFrameRings}
           onSelect={(id) => {
             if (inReview) {
               const at = visibleFeed.findIndex((site) => site.siteId === id);
@@ -1982,12 +1989,6 @@ export default function Explorer() {
             <button type="button" onClick={() => write({ stage: "in_area", listed: "yes" })} className="menu-item">Show in service area listed</button>
           </div>
         ) : null}
-        {!listView ? (() => {
-          const missing = funnel === "pipeline"
-            ? pipelineStepRows.length - pipelineSquares.length
-            : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
-          return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
-        })() : null}
         {!listView && !selected && data ? (
           <aside className="phone-peek" data-testid="phone-peek">
             <span className="sheet-grab" aria-hidden="true" />
@@ -2106,16 +2107,30 @@ export default function Explorer() {
           )}
         </aside>
         {!listView ? (
-          <aside className="map-key" aria-label="Key">
-            <ul>
-              <li><i className="swatch cleared" /> Cleared</li>
-              <li><i className="swatch possible" /> Possible</li>
-              <li><i className="swatch unresolved" /> Unresolved</li>
-              <li><i className="swatch held" /> Held</li>
-              <li><i className="swatch l10" /> 10k+ sq ft</li>
-              <li><i className="swatch l4" /> 4k+ sq ft</li>
-            </ul>
-          </aside>
+          <div className="map-corner">
+            {ringsOutside ? (
+              <div className="rings-outside" role="status">
+                <p>5- and 10-mile rings are outside this view.</p>
+                <button type="button" className="paper-btn" onClick={() => frameRings.current?.()}>Show rings</button>
+              </div>
+            ) : null}
+            {(() => {
+              const missing = funnel === "pipeline"
+                ? pipelineStepRows.length - pipelineSquares.length
+                : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
+              return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
+            })()}
+            <aside className="map-key" aria-label="Key">
+              <ul>
+                <li><i className="swatch cleared" /> Cleared</li>
+                <li><i className="swatch possible" /> Possible</li>
+                <li><i className="swatch unresolved" /> Unresolved</li>
+                <li><i className="swatch held" /> Held</li>
+                <li><i className="swatch l10" /> 10k+ sq ft</li>
+                <li><i className="swatch l4" /> 4k+ sq ft</li>
+              </ul>
+            </aside>
+          </div>
         ) : null}
         {tip ? <p className="tip">{tip}</p> : null}
         {guideOpen ? (

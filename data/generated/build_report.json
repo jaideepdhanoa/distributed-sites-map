@@ -142,9 +142,9 @@
   "pipeline_rows": 86,
   "land_rows": 58,
   "pipeline_stage_counts": {
-    "Dropped": 24,
+    "Dropped": 23,
     "": 49,
-    "1 Desk screen": 11,
+    "1 Desk screen": 12,
     "2 Financial screen": 2
   },
   "land_stage_counts": {
@@ -199,7 +199,7 @@
         "city": "PHX",
         "kind": "pipeline",
         "label": "PHX Tire business, Apache Junction",
-        "stage": "Dropped"
+        "stage": "1 Desk screen"
       },
       {
         "deal_id": "PIPE-PHX-0067",
@@ -265,13 +265,13 @@
       "MIA": 10
     },
     "pipeline_by_stage": {
-      "Dropped": 24,
-      "1 Desk screen": 11,
+      "Dropped": 23,
+      "1 Desk screen": 12,
       "2 Financial screen": 2
     },
     "pipeline_by_group": {
-      "dropped": 24,
-      "desk": 11,
+      "dropped": 23,
+      "desk": 12,
       "financial": 2
     },
     "land_by_city": {
@@ -1071,7 +1071,7 @@
     "Census row count is 1744, workbook expectation was 1,701.",
     "Unique sites are 1700 {'LAS': 429, 'PHX': 580, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
     "In-area city split is {'LAS': 186, 'PHX': 277, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
-    "Pipeline tab has 86 rows (stages {'Dropped': 24, '': 49, '1 Desk screen': 11, '2 Financial screen': 2}). The older note of 79 is not in this export."
+    "Pipeline tab has 86 rows (stages {'Dropped': 23, '': 49, '1 Desk screen': 12, '2 Financial screen': 2}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",

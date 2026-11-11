@@ -3,6 +3,7 @@ import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
 import { acreUnit, acresText, capacitySummary, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
 import { stageDetail } from "@/lib/labels";
+import { ndaChip } from "@/lib/nda";
 
 const MISSING = "Not on file";
 
@@ -27,6 +28,7 @@ function dealRows(deal: DealProps, sites: SiteProps[]): CompareRow[] {
   return [
     { label: "Address", value: shown(displayAddress(deal.address)) },
     { label: "Stage", value: shown(stageDetail(deal.stage, deal.stage_group)) },
+    { label: "NDA", value: ndaChip(deal) },
     { label: "Asking", value: sheetMoney(deal.asking_price, deal.asking_price_display) },
     { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(workbookTrafficLine(deal)) },
@@ -52,6 +54,7 @@ function siteRows(site: SiteProps, deals: DealProps[]): CompareRow[] {
   return [
     { label: "Address", value: shown(displayAddress(site.address)) },
     { label: "Stage", value: shown(site.pipeline_stage || "Universe") },
+    { label: "NDA", value: linked ? ndaChip(linked) : "Not required" },
     { label: "Asking", value: shown(site.asking_price_display) },
     { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(universeTrafficLine(site)) },

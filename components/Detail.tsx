@@ -12,6 +12,7 @@ import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
+import { BlockerLine, NdaChip } from "./NdaChip";
 
 function acres(value: number | null | undefined, text?: string) {
   const shown = acreUnit(value, text);
@@ -249,7 +250,9 @@ export default function Detail({
               {site.land_only ? <span className="badge pending">Land site</span> : null}
               {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
               {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
+              {linkedDeal ? <NdaChip deal={linkedDeal} /> : null}
             </div>
+            {linkedDeal ? <BlockerLine deal={linkedDeal} /> : null}
             <h2>{site.name || site.address || site.site_id}</h2>
             {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
             <p className="note">{site.address || "—"}</p>
@@ -503,7 +506,9 @@ export function DealDetail({
               <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
               {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
               {deal.listed ? <span className="badge checked">Listed</span> : null}
+              <NdaChip deal={deal} />
             </div>
+            <BlockerLine deal={deal} />
             <h2>{deal.name || deal.address}</h2>
             <p className="note">{deal.address}</p>
             <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>

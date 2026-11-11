@@ -36,6 +36,9 @@ import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
+import { ndaChip } from "@/lib/nda";
+import { NdaChip } from "./NdaChip";
+import NdaQueue from "./NdaQueue";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
 
@@ -242,6 +245,7 @@ export default function Explorer() {
   const allPipes = pipeView.all;
   const pipeStage: PipeId = pipeView.stage;
   const listView = params.get("view") === "list";
+  const ndaOpen = params.get("nda") === "1";
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
@@ -358,7 +362,7 @@ export default function Explorer() {
   function stopReview(next: Record<string, string | null> = {}) {
     wantedReview.current = "";
     leaveSite.current = "";
-    write({ review: null, view: null, i: null, ...next });
+    write({ review: null, view: null, i: null, nda: null, ...next });
   }
 
   function replaceSearch(base: string, next: Record<string, string | null>, history = false) {
@@ -1293,6 +1297,8 @@ export default function Explorer() {
       traffic: linked?.aadt_count ? `${linked.aadt_count}${linked.aadt_road ? ` on ${plainRoad(linked.aadt_road)}` : ""}` : "",
       listed: price || (deal.listed ? "Yes" : "No"),
       lead: [deal.broker, deal.firm].filter(Boolean).join(" · "),
+      nda: ndaChip(deal),
+      ndaId: deal.nda_id || "",
     };
   }
 
@@ -1471,7 +1477,7 @@ export default function Explorer() {
   }) : [];
 
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView ? "list-open" : ""} ${ndaOpen ? "nda-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -1702,6 +1708,7 @@ export default function Explorer() {
               <div className="menu" role="menu">
                 <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
                 <ActionsMenuButtons close={() => setMoreOpen(false)} />
+                <button type="button" data-testid="nda-queue-open" onClick={() => { setMoreOpen(false); write(ndaOpen ? { nda: null } : { nda: "1", view: null, table: null, review: null, i: null }); }} className="menu-item">NDA queue</button>
                 <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
                 {changesNote ? <p className="menu-note">{changesNote}</p> : null}
               </div>
@@ -1817,6 +1824,7 @@ export default function Explorer() {
             <div className="menu-group" role="group" aria-label="Tools">
               <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
               <ActionsMenuButtons close={() => setMenuOpen(false)} />
+              <button type="button" data-testid="nda-queue-open" onClick={() => { setMenuOpen(false); write(ndaOpen ? { nda: null } : { nda: "1", view: null, table: null, review: null, i: null }); }} className="menu-item">NDA queue</button>
               <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }} className="menu-item">How to read this</button>
               {funnel === "pipeline" && unplacedDeals.length > 0 ? (
                 <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
@@ -1860,6 +1868,7 @@ export default function Explorer() {
                 <li key={deal.deal_id}>
                   <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
                   {" · "}{stageTitle(deal.stage_group)}
+                  {" · "}<NdaChip deal={deal} />
                 </li>
               ))}
             </ul>
@@ -2000,7 +2009,8 @@ export default function Explorer() {
             <button type="button" aria-label="Open the list" onClick={() => write({ view: "list" })} className="menu-item">List</button>
           </aside>
         ) : null}
-        {listView && funnel === "pipeline" ? (
+        {ndaOpen ? <NdaQueue onOpen={choose} onClose={() => write({ nda: null })} /> : null}
+        {listView && !ndaOpen && funnel === "pipeline" ? (
           <PipelineList
             rows={pipelineRows}
             unreadIds={openQueueIds}
@@ -2021,7 +2031,7 @@ export default function Explorer() {
             onResetColumns={() => write({ cols: null })}
             onRanges={(next) => write(rangeQuery(next))}
           />
-        ) : listView ? (
+        ) : listView && !ndaOpen ? (
           <ListView
             rows={listRows}
             selectedId={selected}

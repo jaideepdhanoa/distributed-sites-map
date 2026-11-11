@@ -13,6 +13,7 @@ import { capacitySummary, factsForDeal, factsForSite } from "@/lib/keyNumbers";
 import { spareTier } from "@/lib/filter";
 import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
+import { NdaChip } from "./NdaChip";
 
 type SortingState = { id: string; desc: boolean }[];
 
@@ -213,6 +214,12 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
     id: "stage",
     accessorFn: (row) => stageDetail(row.stage, row.stage_group),
     header: "Stage",
+    cell: ({ row }) => (
+      <span className="stage-cell">
+        <span>{stageDetail(row.original.stage, row.original.stage_group)}</span>
+        <NdaChip deal={row.original} />
+      </span>
+    ),
   },
   { id: "firm", accessorFn: (row) => shownFirm(row), header: "Firm" },
   { id: "broker", accessorFn: (row) => shownBroker(row), header: "Broker" },
@@ -308,6 +315,7 @@ export function DealTable({
             <button type="button" className={row.deal_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.deal_id)}>
               <strong>{row.name || row.address || row.deal_id}</strong>
               <span>{stageDetail(row.stage, row.stage_group)}{row.asking_price_display ? ` · ${row.asking_price_display}` : ""}</span>
+              <NdaChip deal={row} />
               <span>{row.address}</span>
               {touchOf(activity, row.deal_id)?.lastTouched || touchOf(activity, row.deal_id)?.materials ? (
                 <span>{touchOf(activity, row.deal_id)?.materials || 0} materials · {touchOf(activity, row.deal_id)?.lastTouched || "—"}</span>

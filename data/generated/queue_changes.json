@@ -1076,12 +1076,12 @@
     {
       "id": "PIPE-PHX-0018",
       "city": "PHX",
-      "stage": "Dropped",
-      "stageGroup": "dropped",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
       "verdict": "",
       "askingPrice": "$2,100,000",
       "askingSource": "WCI Business Sales",
-      "active": false
+      "active": true
     },
     {
       "id": "PIPE-PHX-0067",

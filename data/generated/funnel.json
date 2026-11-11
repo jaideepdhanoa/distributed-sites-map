@@ -318,10 +318,10 @@
       "id": "contacted",
       "name": "Deals contacted",
       "unit": "deals",
-      "total": 33,
+      "total": 34,
       "by_city": {
         "LAS": 11,
-        "PHX": 16,
+        "PHX": 17,
         "MIA": 6
       },
       "note": "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."

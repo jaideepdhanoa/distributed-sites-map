@@ -129,14 +129,25 @@ test("PIPE-PHX-0018 keeps the NDA chip and a different blocker sentence", () => 
   assert.equal(chip, "Moove form sent · Them — signer · 18d open · 16d in court");
   assert.equal(chip.includes("NDA execution"), false);
   assert.equal(chip.includes("Awaiting broker reply"), false);
+  const deals = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
+    features: { properties: { deal_id?: string; stage?: string; stage_group?: string } }[];
+  };
+  const deal = deals.features.find((feature) => feature.properties.deal_id === "PIPE-PHX-0018")?.properties;
+  assert.equal(deal?.stage, "1 Desk screen");
+  assert.equal(deal?.stage_group, "desk");
+  const sites = JSON.parse(readFileSync("data/generated/sites.geojson", "utf8")) as {
+    features: { properties: { site_id?: string; pipeline_stage?: string } }[];
+  };
+  const site = sites.features.find((feature) => feature.properties.site_id === "PIPE-PHX-0018")?.properties;
+  assert.equal(site?.pipeline_stage, "1 Desk screen");
   const sentence = blockerSentence({
-    stage: "Dropped",
-    stageGroup: "dropped",
+    stage: deal?.stage,
+    stageGroup: deal?.stage_group,
     blocker: mirror.stage_blocker,
     since: mirror.stage_blocker_since,
     today: "2026-11-11",
   });
-  assert.equal(sentence, "Dropped — blocked by Awaiting broker reply (4 days)");
+  assert.equal(sentence, "Desk screen — blocked by Awaiting broker reply (4 days)");
   assert.equal(sentence.includes("NDA execution"), false);
   assert.equal(sentence.includes("Proof of funds"), false);
 });

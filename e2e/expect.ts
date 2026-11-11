@@ -1,5 +1,4 @@
-import { defaultCategories, landLinks, siteInCategories, type Categories } from "../lib/categories";
-import { isPipelineStore } from "../lib/labels";
+import { dealInCategories, defaultCategories, landLinks, siteInCategories, type Categories } from "../lib/categories";
 
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const STEPS = ["universe", "in_area", "land", "county", "cleared"] as const;
@@ -192,13 +191,19 @@ function placed(deal: Feature<Deal>, sites: Map<string, Feature<Site>>) {
   return Boolean(deal.geometry);
 }
 
-function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean } = {}) {
+function categoryChoice(options: { cstore?: boolean; land?: boolean; auto?: boolean; wash?: boolean } = {}): Categories {
+  const categories = { ...defaultCategories(), land: Boolean(options.land), store: Boolean(options.cstore) };
+  if (options.auto !== undefined) categories.auto = options.auto;
+  if (options.wash !== undefined) categories.wash = options.wash;
+  return categories;
+}
+
+function stageDeals(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean; auto?: boolean; wash?: boolean } = {}) {
+  const categories = categoryChoice(options);
   return catalog.deals.filter((feature) => {
     const deal = feature.properties;
     if (deal.city !== city || deal.stage_group !== step) return false;
-    if (deal.kind === "land") return Boolean(options.land);
-    if (deal.kind !== "pipeline") return false;
-    if ((deal.is_c_store || isPipelineStore(deal)) && !options.cstore) return false;
+    if (!dealInCategories(deal, categories)) return false;
     if (options.types && !options.types.includes(deal.business_type || "Other")) return false;
     if (options.query) {
       const text = `${deal.deal_id} ${deal.name || ""} ${deal.address || ""} ${deal.broker || ""} ${deal.firm || ""} ${deal.universe_id || ""}`.toLowerCase();
@@ -208,14 +213,14 @@ function stageDeals(catalog: Catalog, city: string, step: string, options: { typ
   });
 }
 
-export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean } = {}) {
+export function expectedSquares(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean; auto?: boolean; wash?: boolean } = {}) {
   const sites = new Map(catalog.sites.map((feature) => [feature.properties.site_id, feature]));
   return stageDeals(catalog, city, step, options)
     .filter((feature) => placed(feature, sites))
     .map((feature) => feature.properties.deal_id);
 }
 
-export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean } = {}) {
+export function expectedStageTotal(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean; auto?: boolean; wash?: boolean } = {}) {
   return stageDeals(catalog, city, step, options).length;
 }
 

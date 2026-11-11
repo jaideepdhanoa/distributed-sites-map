@@ -436,7 +436,7 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.locator("button.tool", { hasText: "Filters" }).click();
   await page.getByTestId("cstore-category").click();
-  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)store/);
+  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)auto(?:%7C|\|)store/);
   await page.getByRole("button", { name: "List", exact: true }).click();
   const sinclair = page.getByTestId("pipeline-list").getByText("Sinclair").first();
   await expect(sinclair).toBeVisible();

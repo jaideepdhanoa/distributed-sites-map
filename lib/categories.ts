@@ -1,19 +1,20 @@
-import { isPipelineStore } from "./labels";
+import { isAutoBusinessType, isPipelineStore } from "./labels";
 
-export const CATEGORY_IDS = ["wash", "land", "store"] as const;
+export const CATEGORY_IDS = ["wash", "auto", "land", "store"] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
 
 export type Categories = Record<CategoryId, boolean>;
 
 /**
- * Car washes are the working set. Land parcels and c-stores stay off until a link
- * or the Filters panel turns them on.
+ * Car washes and auto service are the working set. Land parcels and c-stores stay
+ * off until a link or the Filters panel turns them on.
  *
- * `cats` is the shareable choice (`cats=wash|land`). A missing `cats` is car washes
- * only. Older links still opt in: `landlayer=1` turns Land on, and `cstore=1` turns
- * C-stores on. Nothing was stored locally for the old "a chosen stage includes land"
- * rule, so there is no preference to migrate the way pin labels needed.
+ * `cats` is the shareable choice (`cats=wash|auto`). A missing `cats` is car washes
+ * and auto service. Older links still opt in: `landlayer=1` turns Land on, and
+ * `cstore=1` turns C-stores on. Nothing was stored locally for the old "a chosen
+ * stage includes land" rule, so there is no preference to migrate the way pin
+ * labels needed.
  */
 export function parseCategories(input: {
   cats?: string | null;
@@ -23,27 +24,29 @@ export function parseCategories(input: {
   if (input.cats == null || input.cats === "") {
     return {
       wash: true,
+      auto: true,
       land: input.landlayer === "1",
       store: input.cstore === "1",
     };
   }
-  if (input.cats === "none") return { wash: false, land: false, store: false };
+  if (input.cats === "none") return { wash: false, auto: false, land: false, store: false };
   const on = new Set(input.cats.split("|"));
   return {
     wash: on.has("wash"),
+    auto: on.has("auto"),
     land: on.has("land"),
     store: on.has("store"),
   };
 }
 
 export function defaultCategories(): Categories {
-  return { wash: true, land: false, store: false };
+  return { wash: true, auto: true, land: false, store: false };
 }
 
 /** Null when the choice is the default, so the URL stays clean. `none` means every category is off. */
 export function categoriesParam(value: Categories): string | null {
   const base = defaultCategories();
-  if (value.wash === base.wash && value.land === base.land && value.store === base.store) return null;
+  if (CATEGORY_IDS.every((id) => value[id] === base[id])) return null;
   const on = CATEGORY_IDS.filter((id) => value[id]);
   return on.length ? on.join("|") : "none";
 }
@@ -101,12 +104,14 @@ type DealLike = {
 };
 
 /**
- * Land deals are the Land category, including a parcel whose business type says gas station.
+ * Land deals are the Land category, including a parcel whose business type says auto repair or gas station.
+ * Pipeline auto repair, tire and lube, and auto service are the Auto service category.
  * Pipeline fuel and c-stores are the C-stores category. Every other pipeline deal stays with car washes.
  */
 export function dealCategory(deal: DealLike): CategoryId | null {
   if (deal.kind === "land") return "land";
   if (deal.kind !== "pipeline") return null;
+  if (isAutoBusinessType(deal.business_type)) return "auto";
   if (deal.is_c_store || isPipelineStore(deal)) return "store";
   return "wash";
 }

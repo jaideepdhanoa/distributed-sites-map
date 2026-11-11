@@ -260,7 +260,7 @@ for (const city of CITIES) {
     }
 
     const withLand = expectedSquares(catalog, city, "desk", { land: true });
-    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|land`);
+    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|auto|land`);
     await page.waitForFunction(
       (count) => (((window as unknown as { __src?: { deals?: unknown[] } }).__src?.deals) || []).length === count,
       withLand.length,

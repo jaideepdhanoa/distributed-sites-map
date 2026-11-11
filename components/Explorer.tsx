@@ -26,7 +26,7 @@ import { displayAddress, leadSourceLine, plainRoad } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
 import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
-import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
@@ -982,7 +982,7 @@ export default function Explorer() {
       const stageShown = (view.all || search.get("pstage") === deal.stage_group) && (deal.stage_group !== "dropped" || droppedVisible);
       if (!stageShown) patch.pstage = known ? deal.stage_group : null;
       const category = dealCategory(deal);
-      if (category === "land" || category === "store") {
+      if (category === "land" || category === "store" || category === "auto") {
         const current = parseCategories({
           cats: search.get("cats"),
           landlayer: search.get("landlayer"),
@@ -1179,7 +1179,7 @@ export default function Explorer() {
     dealRows,
     (catalog ?? features).map((feature) => feature.properties),
     (site) => deepestStage(presentSite(site as SiteProps)),
-    { cStores: categories.store, land: categories.land },
+    { cStores: categories.store, land: categories.land, auto: categories.auto },
   );
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const focus = (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : (CITY_VIEW[city] ?? CITY_VIEW.PHX);
@@ -1344,13 +1344,14 @@ export default function Explorer() {
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
   if (!categories.wash) activeFilters.push({ id: "wash", label: "Car washes off", clear: () => setCategory("wash", true) });
+  if (!categories.auto) activeFilters.push({ id: "auto", label: "Auto service off", clear: () => setCategory("auto", true) });
   if (categories.land) activeFilters.push({ id: "landcat", label: "Land", clear: () => setCategory("land", false) });
   if (categories.store) activeFilters.push({ id: "store", label: "C-stores", clear: () => setCategory("store", false) });
   if (landTier !== "any") activeFilters.push({ id: "tier", label: tierLabel(landTier) || "Spare land", clear: () => write({ tier: null }) });
   if (verdict !== "any") activeFilters.push({ id: "verdict", label: plainVerdict(verdict), clear: () => write({ verdict: null }) });
   if (listed === "yes") activeFilters.push({ id: "listed", label: "Listed", clear: () => write({ listed: null }) });
   if (landSites) activeFilters.push({ id: "land", label: "Land sites", clear: () => write({ land: null }) });
-  if (showUnscreened) activeFilters.push({ id: "newlist", label: "Listed, not yet screened", clear: () => write({ newlist: null }) });
+  if (showUnscreened) activeFilters.push({ id: "newlist", label: UNSCREENED_LISTINGS_LABEL, clear: () => write({ newlist: null }) });
   if (compare) activeFilters.push({ id: "compare", label: "Reviews disagree", clear: () => write({ disagree: null }) });
   if (showDropped) activeFilters.push({ id: "ruled", label: "Ruled out", clear: () => write({ ruled: null }) });
   if (extra === "held") activeFilters.push({ id: "held", label: "Held outside the service area", clear: () => write({ extra: null }) });
@@ -1730,6 +1731,10 @@ export default function Explorer() {
                 <input className="check" type="checkbox" data-testid="wash-category" checked={categories.wash} onChange={() => setCategory("wash", !categories.wash)} />
                 <span>Car washes<span className="layer-meta">{CATEGORY_NOTES.wash}</span></span>
               </label>
+              <label title={CATEGORY_NOTES.auto}>
+                <input className="check" type="checkbox" data-testid="auto-category" checked={categories.auto} onChange={() => setCategory("auto", !categories.auto)} />
+                <span>Auto service<span className="layer-meta">{CATEGORY_NOTES.auto}</span></span>
+              </label>
               <label title={CATEGORY_NOTES.land}>
                 <input className="check" type="checkbox" data-testid="land-category" checked={categories.land} onChange={() => setCategory("land", !categories.land)} />
                 <span>Land<span className="layer-meta">{CATEGORY_NOTES.land}</span></span>
@@ -1783,15 +1788,11 @@ export default function Explorer() {
             ) : null}
             <h3>Listings</h3>
             <div className="cat-row">
-              <label title={LAYER_TITLES.unscreened}>
-                <input className="check" type="checkbox" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
+              <label title={UNSCREENED_LISTINGS_NOTE}>
+                <input className="check" type="checkbox" data-testid="unscreened-listings" checked={showUnscreened} onChange={(event) => write({ newlist: event.target.checked ? "1" : null })} />
                 <span>
-                  Listed, not yet screened
-                  <span className="layer-meta">
-                    {unscreened.filter((feature) => feature.properties.pinned).length.toLocaleString()} on the map
-                    {" · "}
-                    {unscreened.filter((feature) => !feature.properties.pinned).length.toLocaleString()} address withheld
-                  </span>
+                  {UNSCREENED_LISTINGS_LABEL}
+                  <span className="layer-meta">{UNSCREENED_LISTINGS_NOTE}</span>
                 </span>
               </label>
             </div>
@@ -2139,7 +2140,7 @@ export default function Explorer() {
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
             <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000. Spare land is leftover land on an operating wash. It is not a vacant parcel.</p>
-            <p>Filters chooses the working set. Car washes are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
+            <p>Filters chooses the working set. Car washes and auto service are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
             <p>Site capacity sits beside spare land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
             <p>Deals contacted, beside Universe, counts deals in the categories you have on, in this city, with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>

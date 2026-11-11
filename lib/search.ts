@@ -1,6 +1,6 @@
 /** Search text for the map. "&" and "and" are the same word, and punctuation does not hide a name. */
 
-import { isPipelineStore } from "./labels.ts";
+import { isAutoBusinessType, isPipelineStore } from "./labels.ts";
 
 export function foldSearch(value: string | null | undefined): string {
   return String(value || "")
@@ -76,6 +76,8 @@ export type SearchOptions = {
   cStores?: boolean;
   /** Vacant land parcels stay out of suggestions until the Land category is on. */
   land?: boolean;
+  /** Auto service deals stay in suggestions unless this is false. The category is on by default. */
+  auto?: boolean;
 };
 
 type SiteHitSource = {
@@ -110,9 +112,11 @@ export function collectSearchHits(
   if (needle.length < 2) return [];
   const cStores = options.cStores === true;
   const landOn = options.land === true;
+  const autoOn = options.auto !== false;
   const hiddenStore = (deal: DealHitSource) => deal.is_c_store === true || isPipelineStore(deal);
   const hiddenLand = (deal: DealHitSource) => deal.kind === "land";
-  const visibleDeals = deals.filter((deal) => (cStores || !hiddenStore(deal)) && (landOn || !hiddenLand(deal)));
+  const hiddenAuto = (deal: DealHitSource) => deal.kind === "pipeline" && isAutoBusinessType(deal.business_type);
+  const visibleDeals = deals.filter((deal) => (cStores || !hiddenStore(deal)) && (landOn || !hiddenLand(deal)) && (autoOn || !hiddenAuto(deal)));
   const hiddenIds = new Set<string>();
   const hide = (deal: DealHitSource) => {
     if (deal.deal_id) hiddenIds.add(deal.deal_id);
@@ -120,6 +124,13 @@ export function collectSearchHits(
   };
   if (!cStores) deals.filter(hiddenStore).forEach(hide);
   if (!landOn) deals.filter(hiddenLand).forEach(hide);
+  // The pipeline row can share the deal id. A linked census site stays a car wash.
+  const hiddenAutoIds = new Set<string>();
+  if (!autoOn) {
+    for (const deal of deals.filter(hiddenAuto)) {
+      if (deal.deal_id) hiddenAutoIds.add(deal.deal_id);
+    }
+  }
   const byDeal = new Map(visibleDeals.map((deal) => [deal.deal_id, deal]));
   const byUniverse = new Map<string, DealHitSource>();
   for (const deal of visibleDeals) {
@@ -160,7 +171,7 @@ export function collectSearchHits(
       linked?.deal_id,
       linked?.name,
     ];
-    if (hiddenIds.has(site.site_id) || (site.linked_deal_id && hiddenIds.has(site.linked_deal_id))) continue;
+    if (hiddenIds.has(site.site_id) || hiddenAutoIds.has(site.site_id) || (site.linked_deal_id && hiddenIds.has(site.linked_deal_id))) continue;
     if (!matchesQuery(query, parts)) continue;
     hits.push({
       id: site.site_id,

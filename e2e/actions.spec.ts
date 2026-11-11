@@ -608,7 +608,7 @@ test("the review queue omits gas stations and c-stores", async ({ request }) => 
   }
   expect(names.join("\n")).not.toMatch(/c-store|Sinclair|ARCO|service station/i);
   expect(ids).toContain("PIPE-LAS-0073");
-  expect(ids).toContain("PIPE-MIA-0079");
+  expect(ids).toContain("PIPE-LAS-0016");
 });
 
 function dealStage(payload: { features?: { properties?: { deal_id?: string; stage?: string } }[] }, id: string) {

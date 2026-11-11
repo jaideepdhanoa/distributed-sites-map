@@ -1,8 +1,73 @@
 [
   {
+    "id": "LAND-LAS-0004",
+    "stage": "1 Desk screen",
+    "reason": "No longer for sale"
+  },
+  {
     "id": "LAND-PHX-0003",
     "stage": "Financial screen",
     "reason": "Outside the service area"
+  },
+  {
+    "id": "LAND-PHX-0007",
+    "stage": "1 Desk screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "LAND-PHX-0043",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "LAND-PHX-0044",
+    "stage": "1 Desk screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "LAND-PHX-0049",
+    "stage": "1 Desk screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "LAND-PHX-0054",
+    "stage": "1 Desk screen",
+    "reason": "No longer for sale"
+  },
+  {
+    "id": "LAND-PHX-0055",
+    "stage": "1 Desk screen",
+    "reason": "No longer for sale"
+  },
+  {
+    "id": "PIPE-LAS-0011",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-LAS-0015",
+    "stage": "1 Desk screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "PIPE-LAS-0016",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-LAS-0017",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-LAS-0071",
+    "stage": "1 Desk screen",
+    "reason": "Business not operating"
+  },
+  {
+    "id": "PIPE-LAS-0072",
+    "stage": "1 Desk screen",
+    "reason": "No longer for sale"
   },
   {
     "id": "PIPE-LAS-0073",
@@ -10,13 +75,88 @@
     "reason": "Tenant lease ties up the site"
   },
   {
+    "id": "PIPE-MIA-0013",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-MIA-0075",
+    "stage": "1 Desk screen",
+    "reason": "Business not operating"
+  },
+  {
     "id": "PIPE-MIA-0086",
     "stage": "1 Desk screen",
     "reason": "Lot too small"
   },
   {
+    "id": "PIPE-PHX-0001",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0003",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0005",
+    "stage": "1 Desk screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "PIPE-PHX-0006",
+    "stage": "1 Desk screen",
+    "reason": "No longer for sale"
+  },
+  {
+    "id": "PIPE-PHX-0007",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0008",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0009",
+    "stage": "1 Desk screen",
+    "reason": "No longer for sale"
+  },
+  {
+    "id": "PIPE-PHX-0010",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0014",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0018",
+    "stage": "1 Desk screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "PIPE-PHX-0081",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0084",
+    "stage": "1 Desk screen",
+    "reason": "Land only"
+  },
+  {
     "id": "PIPE-PHX-0085",
     "stage": "1 Desk screen",
     "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-SNA-0002",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
   }
 ]

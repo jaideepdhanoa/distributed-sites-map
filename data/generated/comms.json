@@ -1,7 +1,7 @@
 {
-  "source": "fixture",
-  "as_of": "2026-11-11",
-  "label": "Fixture snapshot of the Comms Log, read-only on Nov 11, 2026 PT, so a preview can render the Activity timeline. scripts/comms.py replaces data/generated/comms.json when a workbook export includes the Comms Log tab. This file does not write the workbook.",
+  "source": "workbook",
+  "as_of": "",
+  "label": "Read-only snapshot of the Comms Log tab.",
   "unexpected_directions": [],
   "rows": [
     {
@@ -7261,6 +7261,101 @@
       "source": "Directed send in chat (Jaideep 'Send', Nov 11, 2026)",
       "message_id": "1a1cc5a0ce91194e",
       "subject": "Re: 8812-8828 N Black Canyon Hwy, Phoenix — inquiry from Moove"
+    },
+    {
+      "comms_id": "CM-0390",
+      "site_ids": "LAND-PHX-0036",
+      "thread_id": "1a19eecf0eed9549",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1cc5f804b2084a",
+      "at": "2026-11-11 13:00",
+      "direction": "out",
+      "person": "Gunnar Sinnett",
+      "firm": "LevRose",
+      "channel": "Gmail",
+      "summary": "Thanked him for the northern power-line detail; capacity ask closed on the broker side (not something he has); asked where the two offers he mentioned stand — seller working with one, or both still live.",
+      "asks_made": "Status of the two offers mentioned Nov 2",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Reply sent; offers status is the site's one open broker ask",
+      "source": "Directed send in chat (Jaideep 'send', Nov 11, 2026)",
+      "message_id": "1a1cc5f804b2084a",
+      "subject": "Re: LoopNet Lead for NEC 24th St & Broadway Rd"
+    },
+    {
+      "comms_id": "CM-0391",
+      "site_ids": "LAND-PHX-0061; LAND-PHX-0059",
+      "thread_id": "1a1cb8944d8350a0",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1cc6df5a12cd20",
+      "at": "2026-11-11 13:06",
+      "direction": "out",
+      "person": "Art Rullo",
+      "firm": "Marcus & Millichap",
+      "channel": "Gmail",
+      "summary": "Acknowledged 2125 E Southern Ave as under contract (keep us in mind if it returns); on Chandler Village Dr, confirmed interest at the guided level and asked the post-package questions.",
+      "asks_made": "Recorded PAD development plan / approved use list; any seller Phase I, even older; electrical service position (SRP capacity letter, stub locations); seller's hoped-for escrow length",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Reply sent; LAND-PHX-0061 blocker to Awaiting broker reply; LAND-PHX-0059 blocker cleared to none — its drop decision is Jaideep's",
+      "source": "Directed send in chat (Jaideep 'Send', Nov 11, 2026)",
+      "message_id": "1a1cc6df5a12cd20",
+      "subject": "Re: 2125 E Southern Ave, Phoenix and S Chandler Village Dr, Chandler - information request"
+    },
+    {
+      "comms_id": "CM-0392",
+      "site_ids": "LAND-PHX-0060",
+      "thread_id": "1a1cb75941cb176a",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1cc78e76307f0a",
+      "at": "2026-11-11 13:18",
+      "direction": "out",
+      "person": "Alexa Nunns",
+      "firm": "Diversified Partners",
+      "channel": "Gmail",
+      "summary": "Thanked her for the Paradise Lane flyer (site plan, approved multifamily plans) and asked the items still open from the first note.",
+      "asks_made": "Survey or title report; environmental reports; electrical service size / APS or City will-serve or capacity note; approved unit count under the entitlements",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Reply sent; blocker to Awaiting broker reply",
+      "source": "Directed send in chat (Jaideep 'Send', Nov 11, 2026)",
+      "message_id": "1a1cc78e76307f0a",
+      "subject": "Re: Jaideep Dhanoa clicked email on 3275 E Paradise Lane"
+    },
+    {
+      "comms_id": "CM-0393",
+      "site_ids": "PIPE-LAS-0070; PIPE-LAS-0071",
+      "thread_id": "1a1c219fef8bba7f",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1cc81f329509b6",
+      "at": "2026-11-11 13:28",
+      "direction": "internal",
+      "person": "Brittni Toston",
+      "firm": "Moove",
+      "channel": "Gmail",
+      "summary": "Confirmed Friday 10:00 AM MST for the NDA-hurdles call and noted the calendar invite sent for 9:00–9:30 AM PT (event e04v6imh2aslsshargap0u5gq0).",
+      "asks_made": "",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "NDA-008 call booked Fri Nov 13, 9:00–9:30 AM PT",
+      "source": "Directed in chat (Jaideep, Nov 11, 2026)",
+      "message_id": "1a1cc81f329509b6",
+      "subject": "Re: 7251 W Azure Dr, Las Vegas — follow-up"
+    },
+    {
+      "comms_id": "CM-0394",
+      "site_ids": "LAND-LAS-0008",
+      "thread_id": "1a1a74eb2f1f5a52",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1cc84a3f10f32a",
+      "at": "2026-11-11 13:32",
+      "direction": "out",
+      "person": "Farhad Navazi",
+      "firm": "FirstCap Investment",
+      "channel": "Gmail",
+      "summary": "Asked the seller for copies of Clark County permits BD21-35450 and PW22-13578 (or the approved plans) — the county portal does not release the underlying documents to us.",
+      "asks_made": "Copies of permits BD21-35450 and PW22-13578, or the approved plans",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Seller ask sent (T-066 fallback); T-066 stays open pending the reply",
+      "source": "Directed send in chat (Jaideep 'Send', Nov 11, 2026)",
+      "message_id": "1a1cc84a3f10f32a",
+      "subject": "Re: 4990 Paradise Rd, Las Vegas"
     }
   ],
   "sites": {
@@ -7657,7 +7752,8 @@
     "LAND-PHX-0036": [
       "CM-0159",
       "CM-0354",
-      "CM-0366"
+      "CM-0366",
+      "CM-0390"
     ],
     "PIPE-MIA-0080": [
       "CM-0174",
@@ -7695,7 +7791,8 @@
       "CM-0336",
       "CM-0339",
       "CM-0347",
-      "CM-0352"
+      "CM-0352",
+      "CM-0394"
     ],
     "LAND-PHX-0033": [
       "CM-0183",
@@ -7747,7 +7844,8 @@
       "CM-0288",
       "CM-0332",
       "CM-0348",
-      "CM-0358"
+      "CM-0358",
+      "CM-0393"
     ],
     "PIPE-MIA-0012": [
       "CM-0211",
@@ -7820,7 +7918,8 @@
       "CM-0332",
       "CM-0348",
       "CM-0358",
-      "CM-0365"
+      "CM-0365",
+      "CM-0393"
     ],
     "LAND-PHX-0048": [
       "CM-0285",
@@ -7858,13 +7957,16 @@
       "CM-0375"
     ],
     "LAND-PHX-0059": [
-      "CM-0377"
+      "CM-0377",
+      "CM-0391"
     ],
     "LAND-PHX-0061": [
-      "CM-0377"
+      "CM-0377",
+      "CM-0391"
     ],
     "LAND-PHX-0060": [
-      "CM-0378"
+      "CM-0378",
+      "CM-0392"
     ]
   }
 }

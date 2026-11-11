@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const panels = [
   { id: "PIPE-PHX-0067", stage: "desk", city: "", exact: "$4,990,000" },
-  { id: "PIPE-LAS-0016", stage: "dropped", city: "city=LAS&", exact: "$7,000,000" },
+  { id: "PIPE-MIA-0079", stage: "dropped", city: "city=MIA&", exact: "$3,999,000" },
 ];
 const widths = [1024, 1440, 390];
 

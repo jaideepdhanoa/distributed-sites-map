@@ -1,100 +1,99 @@
 {
-  "workbook_as_of": "2026-11-10",
+  "workbook_as_of": "2026-11-11",
   "pipeline": {
-    "Dropped": 23,
-    "1 Desk screen": 12,
-    "2 Financial screen": 2
+    "1 Desk screen": 33,
+    "Dropped": 3,
+    "2 Financial screen": 1
   },
   "land": {
-    "1 Desk screen": 33,
-    "Financial screen": 1,
-    "Dropped": 7
+    "1 Desk screen": 44,
+    "Financial screen": 1
   },
   "rows": [
     {
       "deal_id": "PIPE-PHX-0001",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-SNA-0002",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0003",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0004",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0005",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0006",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0007",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0008",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0009",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0010",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-LAS-0011",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-MIA-0012",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-MIA-0013",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0014",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-LAS-0015",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-LAS-0016",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-LAS-0017",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0018",
@@ -124,12 +123,12 @@
     {
       "deal_id": "PIPE-LAS-0071",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-LAS-0072",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-LAS-0073",
@@ -144,7 +143,7 @@
     {
       "deal_id": "PIPE-MIA-0075",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-MIA-0076",
@@ -159,7 +158,7 @@
     {
       "deal_id": "PIPE-MIA-0079",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "Dropped"
     },
     {
       "deal_id": "PIPE-MIA-0080",
@@ -169,7 +168,7 @@
     {
       "deal_id": "PIPE-PHX-0081",
       "kind": "pipeline",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-MIA-0082",
@@ -184,7 +183,7 @@
     {
       "deal_id": "PIPE-PHX-0084",
       "kind": "pipeline",
-      "stage": "2 Financial screen"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "PIPE-PHX-0085",
@@ -214,7 +213,7 @@
     {
       "deal_id": "LAND-LAS-0004",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-LAS-0005",
@@ -229,7 +228,7 @@
     {
       "deal_id": "LAND-PHX-0007",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-LAS-0008",
@@ -324,12 +323,12 @@
     {
       "deal_id": "LAND-PHX-0043",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-PHX-0044",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-PHX-0045",
@@ -354,7 +353,7 @@
     {
       "deal_id": "LAND-PHX-0049",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-LAS-0050",
@@ -384,12 +383,12 @@
     {
       "deal_id": "LAND-PHX-0054",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-PHX-0055",
       "kind": "land",
-      "stage": "Dropped"
+      "stage": "1 Desk screen"
     },
     {
       "deal_id": "LAND-PHX-0056",
@@ -398,6 +397,26 @@
     },
     {
       "deal_id": "LAND-PHX-0057",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0058",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0059",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0060",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0061",
       "kind": "land",
       "stage": "1 Desk screen"
     }

@@ -1,7 +1,7 @@
 {
-  "source": "fixture",
+  "source": "workbook",
   "as_of": "2026-11-11",
-  "label": "Fixture snapshot of open loops as of Nov 11, 2026 PT. Day counts are frozen to that date. A later sync recomputes them from the since dates.",
+  "label": "Read-only snapshot of open loops. Day counts use the sync date in America/Los_Angeles.",
   "register": [
     {
       "nda_id": "NDA-001",
@@ -57,7 +57,7 @@
       "counterparty_person": "Brad Ingarfield",
       "site_ids": "PIPE-PHX-0014",
       "nda_status": "With Moove legal",
-      "nda_waiting_on": "Them \u2014 signer",
+      "nda_waiting_on": "Us \u2014 legal",
       "nda_waiting_on_since": "2026-11-11",
       "nda_gates": "Package",
       "nda_days_open": 3,
@@ -503,7 +503,7 @@
       "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 11 \u2014 electrical: power lines run on the northern property line (broker statement), but capacity at the intersection is unknown to the broker and no utility documentation exists in the package; the broker cannot answer the capacity item, so it is no longer a broker ask. STILL OPEN: (a) status of the two offers reported Nov 2 \u2014 not addressed in the Nov 11 reply (partial reply; the item stays open, R-094; blocker stays Awaiting broker reply since 2026-11-10); (b) electrical capacity itself \u2014 unconfirmed on the record. Decision with Jaideep (ex-T\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "LAND-PHX-0037",
@@ -593,7 +593,7 @@
       "next_step": "Awaiting the seller's site/environmental reports via the broker (keep-warm note sent Nov 7 via Crexi confirming the corrected 0.86 ac / four parcels and APS + City water noted; tour held until the reports are reviewed)",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "LAND-PHX-0046",
@@ -642,8 +642,8 @@
       "stage": "1 Desk screen",
       "next_step": "Broker replied Nov 7: co-broker Jason Butler will provide more information. Awaiting that reply on availability and price, full-parcel confirmation, survey/site plan, title and environmental reports, entitlement documents, and APS / water-sewer details. Photo pack is the last our-side open item (T-048 queue).",
       "nda_id": "",
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "LAND-PHX-0052",
@@ -732,7 +732,7 @@
       "stage": "1 Desk screen",
       "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 11 \u2014 the broker sent the listing flyer (filed and analyzed in the midday pass): parcel, acreage, zoning and price confirmed; multifamily plans and entitlements stated as City-approved; site plan included in the flyer. STILL OPEN: (a) survey and title report \u2014 not provided; (b) environmental reports \u2014 not provided; (c) electrical service details / any will-serve or capacity note (flyer says only utilities are City of Phoenix); (d) how many units the approved entitlements cover (broker's note says 16 units). Draft reply held in the Nov 11 midda\u2026",
       "nda_id": "",
-      "stage_blocker": "We owe a reply",
+      "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
     },
     {
@@ -740,9 +740,9 @@
       "label": "Chandler Mall land, S Chandler Village Dr, Chandler",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Ask list (updated Nov 11, 2026): ANSWERED Nov 11 \u2014 availability (available), price ($40/sq ft; sellers would consider mid-$30s/sq ft, shorter escrow helps), parcels (single 1.34-ac parcel, APN 301-65-977), documents (broker states no current survey, site plan, title or environmental reports exist). STILL OPEN: (a) the marketing package contents \u2014 the attached Executive Summary PDF (7.1 MB) could not be downloaded via the Gmail connector in the midday pass (named failure); the held draft asks the broker to resend it or share the site plan/survey separately; (b) PAD entitlements / any recorded\u2026",
+      "next_step": "Ask list (updated Nov 11, 2026, after the package analysis): ANSWERED \u2014 availability, price guidance ($40/sq ft; mid-$30s considered, shorter escrow helps), single parcel APN 301-65-977, PAD zoning with the 2014 rezoning history (hotel + future commercial), taxes ($11,805, 2025), frontage/access, City water/sewer nearby. STILL OPEN: (a) the 2014 PAD case \u2014 any recorded development plan or approved use list we can review (broker ask; the package names retail/hotel-type uses only); (b) electrical service \u2014 the package states no size or capacity; SRP service/capacity position and any stub locati\u2026",
       "nda_id": "",
-      "stage_blocker": "We owe a reply",
+      "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
     },
     {
@@ -1593,7 +1593,7 @@
       "next_step": "Reply sent Nov 7 (Jaideep-approved): asked Fife for the current rent roll / month-to-month lease documents and the buildings' electrical service details (amps, voltage, phase, utility bills). Awaiting reply; the drop decision (no business included, 0 spare land) waits on the income picture.",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "PIPE-SNA-0002",

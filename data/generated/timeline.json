@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-10T03:38:59+00:00",
+  "generated_at": "2026-11-11T22:40:18+00:00",
   "records": {
     "LAND-LAS-0001": {
       "folder_url": "https://drive.google.com/drive/folders/1b1nRtWO5Kcm-weYghZOajqXMhEmWXU55",
@@ -25,8 +25,15 @@
     },
     "LAND-LAS-0008": {
       "folder_url": "https://drive.google.com/drive/folders/1VoIWGk8K_cEQuvOFkcYRlgjlMx0OqUVZ",
-      "materials": [],
-      "last_touched": ""
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 1,
+          "latest": "2026-11-11"
+        }
+      ],
+      "last_touched": "2026-11-11"
     },
     "LAND-LAS-0009": {
       "folder_url": "https://drive.google.com/drive/folders/1gTB9Uo5JPvWhOHyXyMW1KSkjL-BOoxWr",
@@ -128,8 +135,15 @@
     },
     "LAND-PHX-0034": {
       "folder_url": "https://drive.google.com/drive/folders/1T2Ug8EIoTnpqeVNDWPASebcyaAWW6ubs",
-      "materials": [],
-      "last_touched": "2026-10-30"
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 2,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "LAND-PHX-0035": {
       "folder_url": "https://drive.google.com/drive/folders/1o2HyR7UJ2u0RkCkaWRt-WEJQ4B1yGKdU",
@@ -176,11 +190,11 @@
         {
           "category": "property_legal",
           "label": "Property and legal",
-          "count": 2,
-          "latest": "2026-11-03"
+          "count": 3,
+          "latest": "2026-11-11"
         }
       ],
-      "last_touched": "2026-11-03"
+      "last_touched": "2026-11-11"
     },
     "LAND-PHX-0040": {
       "folder_url": "https://drive.google.com/drive/folders/1NYoPVZZMD-H_kbnPC3pwzKMcOaZYuPVV",
@@ -208,11 +222,11 @@
         {
           "category": "property_legal",
           "label": "Property and legal",
-          "count": 17,
-          "latest": "2026-11-09"
+          "count": 18,
+          "latest": "2026-11-10"
         }
       ],
-      "last_touched": "2026-11-09"
+      "last_touched": "2026-11-10"
     },
     "LAND-PHX-0045": {
       "folder_url": "https://drive.google.com/drive/folders/1NX9PGyy6xdW3B6-XChiOT9y6eBX3bPmz",
@@ -273,8 +287,15 @@
     },
     "LAND-PHX-0056": {
       "folder_url": "https://drive.google.com/drive/folders/1Cyf2mPqS6Nwx3UTzLsO7G4_O2Hxb_B7b",
-      "materials": [],
-      "last_touched": ""
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 71,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "LAND-PHX-0057": {
       "folder_url": "https://drive.google.com/drive/folders/1KXIDNxUN7iL9XAaBPAz3gWErXtV0YjJf",
@@ -287,6 +308,40 @@
         }
       ],
       "last_touched": "2026-11-09"
+    },
+    "LAND-PHX-0058": {
+      "folder_url": "https://drive.google.com/drive/folders/1ZuK1MmraisYFf-_6YQ5gtJbUL2m1E0UF",
+      "materials": [],
+      "last_touched": ""
+    },
+    "LAND-PHX-0059": {
+      "folder_url": "https://drive.google.com/drive/folders/18MRa5_3T08X3N54uhq5SF7CpD38IwbZ-",
+      "materials": [],
+      "last_touched": ""
+    },
+    "LAND-PHX-0060": {
+      "folder_url": "https://drive.google.com/drive/folders/1w7MpBUNZx2QlO065c5u7CQOCe2kJRDGu",
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 1,
+          "latest": "2026-11-11"
+        }
+      ],
+      "last_touched": "2026-11-11"
+    },
+    "LAND-PHX-0061": {
+      "folder_url": "https://drive.google.com/drive/folders/1RwqmvfYcjEZWeoZdIiIROD3wgk1HsHXd",
+      "materials": [
+        {
+          "category": "property_legal",
+          "label": "Property and legal",
+          "count": 1,
+          "latest": "2026-11-11"
+        }
+      ],
+      "last_touched": "2026-11-11"
     },
     "PIPE-LAS-0011": {
       "folder_url": "https://drive.google.com/drive/folders/1-CCIYhfPrH724_TzN-YR4f3MK2dLDqQ-",
@@ -401,6 +456,7 @@
       "last_touched": "2026-11-09"
     },
     "PIPE-MIA-0082": {
+      "folder_url": "https://drive.google.com/drive/folders/1Y2JUb_IRdzfK6aL5-vjIPUC5DWUp0NHD",
       "materials": [],
       "last_touched": "2026-11-06"
     },
@@ -536,8 +592,15 @@
     },
     "PIPE-PHX-0083": {
       "folder_url": "https://drive.google.com/drive/folders/12uKO16mHPcXYvKQOIPosMuxmsBEcqnag",
-      "materials": [],
-      "last_touched": ""
+      "materials": [
+        {
+          "category": "financials",
+          "label": "Financials",
+          "count": 5,
+          "latest": "2026-11-10"
+        }
+      ],
+      "last_touched": "2026-11-10"
     },
     "PIPE-PHX-0084": {
       "folder_url": "https://drive.google.com/drive/folders/1BtLDQGLPm7jM8mtbnLWgSl5ZpYtw9ssC",
@@ -701,7 +764,8 @@
       "event_id": "A-000225",
       "date": "2026-11-04",
       "type": "legal",
-      "summary": "Site layout on file"
+      "summary": "Site layout on file",
+      "source_link": "https://mail.google.com/mail/u/0/#inbox/FMfcgzQjggsXxhTsSSWxpkXShPKcdvjt"
     },
     {
       "record_id": "LAND-PHX-0007",
@@ -925,7 +989,8 @@
       "event_id": "A-000020",
       "date": "2026-10-21",
       "type": "financials",
-      "summary": "Financials on file"
+      "summary": "Financials on file",
+      "source_link": "https://mail.google.com/mail/?authuser=jaideep@dhanoa.in#all/thread-f:1879682233147675753"
     },
     {
       "record_id": "PIPE-PHX-0006",
@@ -960,7 +1025,8 @@
       "event_id": "A-000001",
       "date": "2026-10-21",
       "type": "financials",
-      "summary": "Financials on file"
+      "summary": "Financials on file",
+      "source_link": "https://mail.google.com/mail/?authuser=jaideep@dhanoa.in#all/thread-f:1879229393307229197"
     },
     {
       "record_id": "PIPE-PHX-0001",
@@ -974,7 +1040,8 @@
       "event_id": "A-000005",
       "date": "2026-10-21",
       "type": "doc",
-      "summary": "Document on file"
+      "summary": "Document on file",
+      "source_link": "https://mail.google.com/mail/?authuser=jaideep@dhanoa.in#all/thread-f:1879229393307229197"
     },
     {
       "record_id": "PIPE-PHX-0014",

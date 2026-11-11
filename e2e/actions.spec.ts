@@ -109,8 +109,8 @@ for (const width of [1024, 1280]) {
       reviewQueueSettled = true;
       await route.continue();
     });
-    await openAs(page, "contributor", "/?view=review&site=PIPE-PHX-0008");
-    await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+    await openAs(page, "contributor", "/?view=review&site=PIPE-MIA-0079");
+    await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0079");
     await expect(page.getByTestId("review-bar")).toHaveCount(0, { timeout: 2000 });
     expect(reviewQueueSettled).toBe(false);
     await expect(page.locator(".review-rail")).toHaveCount(0);
@@ -182,8 +182,8 @@ test("a review link highlights that site, or leaves review when it is not queued
   await expect(highlighted).toHaveCount(1);
   if (target.name) await expect(highlighted).toContainText(target.name);
 
-  await page.goto("/?view=review&site=PIPE-PHX-0008&panel=discussion");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+  await page.goto("/?view=review&site=PIPE-MIA-0079&panel=discussion");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0079");
   await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
   await expect(page.getByTestId("review-bar")).toHaveCount(0);
   await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
@@ -313,7 +313,7 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByTestId("record-actions")).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("button", { name: "Suggestions" }).click();
   await expect(page.getByTestId("suggestions-panel")).toBeVisible();
   const panel = page.getByTestId("suggestions-panel");
@@ -608,7 +608,7 @@ test("the review queue omits gas stations and c-stores", async ({ request }) => 
   }
   expect(names.join("\n")).not.toMatch(/c-store|Sinclair|ARCO|service station/i);
   expect(ids).toContain("PIPE-LAS-0073");
-  expect(ids).toContain("PIPE-MIA-0079");
+  expect(ids).toContain("PIPE-LAS-0016");
 });
 
 function dealStage(payload: { features?: { properties?: { deal_id?: string; stage?: string } }[] }, id: string) {

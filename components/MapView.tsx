@@ -1027,9 +1027,6 @@ export default function MapView(props: Props) {
     const observed = node.current;
     const preserveView = Boolean(kept);
     const recenter = () => {
-      if (preserveView) return;
-      if (!map.isStyleLoaded()) return;
-      map.resize();
       if (propsRef.current.reviewFocus) return;
       const id = propsRef.current.selectedId;
       if (!id) return;
@@ -1041,6 +1038,8 @@ export default function MapView(props: Props) {
       const pin = geometry.coordinates as [number, number];
       if (!Number.isFinite(pin[0]) || !Number.isFinite(pin[1])) return;
       markCentered(map, id, pin[0], pin[1]);
+      if (preserveView || !map.isStyleLoaded()) return;
+      map.resize();
       const center = map.getCenter();
       const pad = pointPadding(map);
       const padded = Math.abs((map.getPadding().right ?? 0) - pad.right) < 1;
@@ -1050,7 +1049,7 @@ export default function MapView(props: Props) {
     observer = new ResizeObserver(() => recenter());
     observer.observe(observed);
     resizeTimer = window.setInterval(recenter, 250);
-    resizeStop = window.setTimeout(() => window.clearInterval(resizeTimer), 4000);
+    resizeStop = window.setTimeout(() => window.clearInterval(resizeTimer), 12000);
     mapRef.current = map;
     (window as Window & { __sitesMap?: Map }).__sitesMap = map;
     if (!cancelled) setMapGeneration((value) => value + 1);
@@ -1415,6 +1414,15 @@ export default function MapView(props: Props) {
     if (!map) return;
     if (skipViewReset.current || freezeCamera.current) {
       skipViewReset.current = false;
+      const id = props.selectedId;
+      const deal = id ? propsRef.current.deals.find((feature) => feature.properties.deal_id === id) : undefined;
+      const site = id ? propsRef.current.sites.find((feature) => feature.properties.site_id === id) : undefined;
+      const off = id ? propsRef.current.offMarket.find((feature) => feature.properties.site_id === id) : undefined;
+      const geometry = deal?.geometry || site?.geometry || off?.geometry;
+      if (id && geometry?.type === "Point") {
+        const pin = geometry.coordinates as [number, number];
+        if (Number.isFinite(pin[0]) && Number.isFinite(pin[1])) markCentered(map, id, pin[0], pin[1]);
+      }
       return;
     }
     let cancel = false;

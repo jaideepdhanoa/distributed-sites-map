@@ -4,7 +4,9 @@ import { AREA_LABELS, AREA_PAINT, areaRole, miamiAreaLabels } from "../lib/areas
 import { areaTip, ringTip } from "../lib/markerTip.ts";
 import { nearbyWashPoints } from "../lib/nearbyWashes.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
+import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
+import { boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
   assert.equal(resolvePinLabel(null, { version: null, value: null }), "asking");
@@ -63,6 +65,33 @@ test("Miami layers are labeled in plain words and the mid-2027 line is its own r
   assert.notEqual(AREA_PAINT.futureLine, "#d6e4f5");
   assert.notEqual(AREA_PAINT.futureLineSatellite, "#d6e4f5");
   assert.match(ringTip({ miles: 5, depot: "Phoenix depot" }).extra || "", /5- and 10-mile rings around each depot/);
+});
+
+test("the map line calls dropped deals hidden only while they are not drawn", () => {
+  const hidden = { placed: 23, dropped: 19, droppedPlaced: 15, droppedShown: false, droppedOnly: false };
+  assert.equal(pipelineMapSummary(hidden), "23 on the map · 19 dropped, hidden");
+  assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true }), "23 on the map · 15 dropped on the map");
+  assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true, droppedOnly: true }), "15 dropped on the map");
+  assert.equal(pipelineMapSummary({ placed: 23, dropped: 19, droppedPlaced: 19, droppedShown: true, droppedOnly: false }).includes("hidden"), false);
+});
+
+test("a ring note with the site card and Layers open stays in open map space", () => {
+  const bounds = { left: 0, top: 138, right: 1280, bottom: 800 };
+  const card = { left: 900, top: 138, right: 1280, bottom: 800 };
+  const layers = { left: 662, top: 210, right: 890, bottom: 780 };
+  const placed = placeReadableTip({
+    cursor: { x: 820, y: 460 },
+    bounds,
+    obstacles: [card, layers],
+    widths: [248, 200, 168],
+    measure: (width) => ({ width, height: 96 }),
+  });
+  const note: TipBox = { left: placed.left, right: placed.left + placed.width, top: placed.top, bottom: placed.top + placed.height };
+  assert.equal(boxesOverlap(note, card), false);
+  assert.equal(boxesOverlap(note, layers), false);
+  assert.ok(note.left >= bounds.left && note.top >= bounds.top && note.right <= bounds.right && note.bottom <= bounds.bottom);
+  assert.ok(placed.width >= 168);
+  assert.match(ringTip({ miles: 10, depot: "Yale Substation" }).title, /10-mile ring/);
 });
 
 test("nearby washes use real pins and skip anything without a location", () => {

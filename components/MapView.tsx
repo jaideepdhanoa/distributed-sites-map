@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GeoJSONSource, Map, NavigationControl, Popup, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
+import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, clusterTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
 import { mutedPositronStyle } from "@/lib/mutedStyle";
+import { placeReadableTip, type TipBox } from "@/lib/tipPlace";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
@@ -597,6 +598,7 @@ export default function MapView(props: Props) {
         ],
       } as StyleSpecification;
     let active: Map | null = null;
+    let tipEl: HTMLDivElement | null = null;
     let observer: ResizeObserver | null = null;
     let resizeTimer = 0;
     let resizeStop = 0;
@@ -779,74 +781,56 @@ export default function MapView(props: Props) {
         const id = event.features?.[0]?.properties?.id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
-      const popup = new Popup({ closeButton: false, closeOnClick: false, closeOnMove: false, maxWidth: "260px", className: "map-tip-popup", offset: 14 });
+      const tip = document.createElement("div");
+      tip.className = "map-tip-fixed";
+      tip.dataset.hidden = "1";
+      document.body.appendChild(tip);
+      tipEl = tip;
       const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "nearby-washes", ...RING_LAYER_IDS, ...AREA_LAYER_IDS];
       const areaLayers = new Set([...AREA_LAYER_IDS, ...RING_LAYER_IDS]);
       let shownKey = "";
       let request = 0;
+      let tipPoint: { x: number; y: number } | undefined;
       const hideTip = () => {
         shownKey = "";
         request += 1;
-        popup.remove();
+        tip.dataset.hidden = "1";
         map.getCanvas().style.cursor = "";
       };
-      const aimTip = (point: { x: number; y: number }) => {
+      const chromeBoxes = (): TipBox[] => ["aside.drawer", "aside.layers.open", ".map-float", ".maplibregl-ctrl-top-right"].flatMap((selector) => {
+        const node = document.querySelector(selector);
+        if (!node) return [];
+        const rect = node.getBoundingClientRect();
+        if (rect.width < 8 || rect.height < 8) return [];
+        return [{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
+      });
+      const placeTip = (point?: { x: number; y: number }) => {
         const box = map.getContainer().getBoundingClientRect();
-        const obstacles = ["aside.drawer", "aside.layers.open", ".map-tools"].flatMap((selector) => {
-          const node = document.querySelector(selector);
-          if (!node) return [];
-          const rect = node.getBoundingClientRect();
-          if (rect.width < 8 || rect.height < 8) return [];
-          if (rect.bottom < box.top + 4 || rect.top > box.bottom - 4) return [];
-          return [{
-            left: rect.left - box.left,
-            right: rect.right - box.left,
-            top: rect.top - box.top,
-            bottom: rect.bottom - box.top,
-          }];
+        const cursor = point
+          ? { x: box.left + point.x, y: box.top + point.y }
+          : { x: box.left + box.width / 2, y: box.top + 72 };
+        const placed = placeReadableTip({
+          cursor,
+          bounds: { left: box.left, top: box.top, right: box.right, bottom: box.bottom },
+          obstacles: chromeBoxes(),
+          widths: [248, 200, 168],
+          measure: (width) => {
+            tip.style.width = `${width}px`;
+            return { width: tip.offsetWidth || width, height: tip.offsetHeight || 72 };
+          },
         });
-        const bounds = { left: 8, top: 8, right: box.width - 8, bottom: box.height - 8 };
-        const height = 124;
-        type TipAnchor = "bottom-right" | "top-right" | "bottom-left" | "top-left" | "right" | "left";
-        const placed = (anchor: TipAnchor, corner: { x: number; y: number }, width: number) => {
-          if (anchor === "bottom-right") return { left: corner.x - width, right: corner.x, top: corner.y - height, bottom: corner.y };
-          if (anchor === "bottom-left") return { left: corner.x, right: corner.x + width, top: corner.y - height, bottom: corner.y };
-          if (anchor === "top-right") return { left: corner.x - width, right: corner.x, top: corner.y, bottom: corner.y + height };
-          if (anchor === "top-left") return { left: corner.x, right: corner.x + width, top: corner.y, bottom: corner.y + height };
-          if (anchor === "right") return { left: corner.x - width, right: corner.x, top: corner.y - height / 2, bottom: corner.y + height / 2 };
-          return { left: corner.x, right: corner.x + width, top: corner.y - height / 2, bottom: corner.y + height / 2 };
-        };
-        const clear = (rect: { left: number; right: number; top: number; bottom: number }) => rect.left >= bounds.left
-          && rect.right <= bounds.right
-          && rect.top >= bounds.top
-          && rect.bottom <= bounds.bottom
-          && obstacles.every((item) => rect.right <= item.left + 1 || rect.left >= item.right - 1 || rect.bottom <= item.top + 1 || rect.top >= item.bottom - 1);
-        const anchors: TipAnchor[] = ["bottom-right", "top-right", "bottom-left", "top-left", "right", "left"];
-        let choice: { anchor: TipAnchor; offset: [number, number]; width: number } | null = null;
-        for (const width of [248, 200, 168]) {
-          for (const anchor of anchors) {
-            const signX = anchor.endsWith("right") ? -1 : 1;
-            const signY = anchor.startsWith("bottom") ? -1 : anchor.startsWith("top") ? 1 : 0;
-            for (let step = 0; step < 18 && !choice; step += 1) {
-              const offset: [number, number] = [signX * (14 + step * 36), signY * 14];
-              if (clear(placed(anchor, { x: point.x + offset[0], y: point.y + offset[1] }, width))) choice = { anchor, offset, width };
-            }
-          }
-          if (choice) break;
-        }
-        const picked = choice || { anchor: "bottom-right" as const, offset: [-14, -14] as [number, number], width: 220 };
-        popup.setOffset(picked.offset);
-        popup.options.anchor = picked.anchor;
-        popup.setMaxWidth(`${picked.width}px`);
+        tip.style.left = `${placed.left}px`;
+        tip.style.top = `${placed.top}px`;
+        tip.style.width = `${placed.width}px`;
+        tip.dataset.hidden = "0";
       };
-      const showTip = (key: string, lngLat: { lng: number; lat: number }, model: TipModel, point?: { x: number; y: number }) => {
+      const showTip = (key: string, _lngLat: { lng: number; lat: number }, model: TipModel, point?: { x: number; y: number }) => {
         if (shownKey !== key) {
           shownKey = key;
-          popup.setHTML(tipHtml(model));
+          tip.innerHTML = tipHtml(model);
         }
-        if (point) aimTip(point);
-        popup.setLngLat(lngLat);
-        if (!popup.isOpen()) popup.addTo(map);
+        if (point) tipPoint = point;
+        placeTip(point || tipPoint);
       };
       map.on("mousemove", (event: MapMouseEvent) => {
         if (measureRef.current) {
@@ -857,7 +841,9 @@ export default function MapView(props: Props) {
         if (pointer && pointer.pointerType === "touch") return;
         const layers = tipLayers.filter((id) => map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none");
         const hits = layers.length ? map.queryRenderedFeatures(event.point, { layers }) : [];
-        const feature = hits.find((item) => !areaLayers.has(item.layer.id)) || hits[0];
+        const pointHit = hits.find((item) => !areaLayers.has(item.layer.id));
+        const ringHit = hits.find((item) => RING_LAYER_IDS.includes(item.layer.id));
+        const feature = pointHit || ringHit || hits[0];
         if (!feature) {
           hideTip();
           return;
@@ -880,7 +866,8 @@ export default function MapView(props: Props) {
           source.getClusterLeaves(clusterId, Math.max(count, 1), 0).then((leaves) => {
             clusterLeaves.current.set(clusterId, leaves as { properties?: Record<string, unknown> }[]);
             if (ticket !== request || shownKey !== key) return;
-            popup.setHTML(tipHtml(clusterTip(leaves as { properties?: Record<string, unknown> }[])));
+            tip.innerHTML = tipHtml(clusterTip(leaves as { properties?: Record<string, unknown> }[]));
+            placeTip(tipPoint);
           }).catch(() => undefined);
           return;
         }
@@ -1057,6 +1044,7 @@ export default function MapView(props: Props) {
       window.clearInterval(resizeTimer);
       window.clearTimeout(resizeStop);
       observer?.disconnect();
+      tipEl?.remove();
       active?.remove();
       mapRef.current = null;
       if (active && (window as Window & { __sitesMap?: Map }).__sitesMap === active) delete (window as Window & { __sitesMap?: Map }).__sitesMap;

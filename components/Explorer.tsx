@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, WhatChanged, marketLabel, type FeedSite } from "./queue/QueueView";
@@ -27,6 +28,8 @@ import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange,
 import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, LAYER_TITLES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
+import { pipelineMapSummary } from "@/lib/mapSummary";
+import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView, stageLandShown } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
@@ -141,6 +144,37 @@ export default function Explorer() {
   const tabParam = params.get("tab");
   const tableTab: "universe" | "pipeline" | "land" = tabParam === "pipeline" || tabParam === "land" ? tabParam : "universe";
   const [tip, setTip] = useState("");
+  const [ringCursor, setRingCursor] = useState<{ x: number; y: number } | null>(null);
+  const ringNoteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const note = ringNoteRef.current;
+    if (!ringCursor || !note) return;
+    const map = document.querySelector(".map-stage")?.getBoundingClientRect();
+    const bounds = map
+      ? { left: map.left, top: map.top, right: map.right, bottom: map.bottom }
+      : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    const obstacles = ["aside.drawer", "aside.layers.open", ".map-float"].flatMap((selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return [];
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) return [];
+      return [{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
+    });
+    const placed = placeReadableTip({
+      cursor: ringCursor,
+      bounds,
+      obstacles,
+      widths: [248, 200],
+      measure: (width) => {
+        note.style.width = `${width}px`;
+        return { width: note.offsetWidth || width, height: note.offsetHeight || 72 };
+      },
+    });
+    note.style.left = `${placed.left}px`;
+    note.style.top = `${placed.top}px`;
+    note.style.width = `${placed.width}px`;
+    note.dataset.hidden = "0";
+  }, [ringCursor]);
   const [copied, setCopied] = useState(false);
   const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
   const [changesNote, setChangesNote] = useState("");
@@ -1309,9 +1343,14 @@ export default function Explorer() {
   function summaryText() {
     if (funnel !== "pipeline") return "";
     const rows = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !cStoreHidden(deal, false));
-    const onMap = rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length;
-    const dropped = rows.filter((deal) => deal.stage_group === "dropped").length;
-    return `${onMap.toLocaleString()} on the map · ${dropped.toLocaleString()} dropped, hidden`;
+    const droppedRows = rows.filter((deal) => deal.stage_group === "dropped");
+    return pipelineMapSummary({
+      placed: rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length,
+      dropped: droppedRows.length,
+      droppedPlaced: droppedRows.filter((deal) => Boolean(dealPoint(deal))).length,
+      droppedShown: showDroppedRows,
+      droppedOnly: showDroppedRows && !dealWide && pipeStage === "dropped",
+    });
   }
 
   function goReview(index: number) {
@@ -1995,7 +2034,7 @@ export default function Explorer() {
                 <p className="eyebrow">Context</p>
                 <label title={LAYER_TITLES.areas}><i className="swatch current-area" /><input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} /> Service areas</label>
                 <label title={LAYER_TITLES.depots}><i className="pin-sample depot" /><input className="check" type="checkbox" checked={showDepots} onChange={(event) => write({ depots: event.target.checked ? null : "0" })} /> Depots</label>
-                <label title={LAYER_TITLES.rings}><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
+                <label onMouseEnter={(event) => setRingCursor({ x: event.clientX, y: event.clientY })} onMouseLeave={() => setRingCursor(null)}><i className="pin-sample line" /><input className="check" type="checkbox" checked={showRings} onChange={(event) => write({ rings: event.target.checked ? "1" : null })} /> Depot rings</label>
                 <p className="eyebrow">Key</p>
                 <p className="layer-key"><i className="swatch cleared" /> Cleared</p>
                 <p className="layer-key"><i className="swatch possible" /> Possible</p>
@@ -2122,6 +2161,10 @@ export default function Explorer() {
           {tableTab === "pipeline" ? <DealTable rows={pipelineDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
           {tableTab === "land" ? <DealTable rows={landDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
         </section>
+      ) : null}
+      {ringCursor ? createPortal(
+        <div ref={ringNoteRef} className="map-tip-fixed" data-hidden="1">{LAYER_TITLES.rings}</div>,
+        document.body,
       ) : null}
     </div>
   );

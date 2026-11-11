@@ -70,9 +70,9 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(list).not.toContainText("Majestic Car Wash");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&cats=wash");
-  await expect(page.getByTestId("pipeline-list")).toContainText("Black Canyon");
-  await page.goto("/?funnel=pipeline&pstage=desk&view=list&cats=auto");
   await expect(page.getByTestId("pipeline-list")).not.toContainText("Black Canyon");
+  await page.goto("/?funnel=pipeline&pstage=desk&view=list&cats=auto");
+  await expect(page.getByTestId("pipeline-list")).toContainText("Black Canyon");
 
   await page.goto("/?funnel=pipeline&pstage=desk");
   const layers = page.locator("aside.layers.open");

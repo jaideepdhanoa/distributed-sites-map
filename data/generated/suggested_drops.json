@@ -1,0 +1,22 @@
+[
+  {
+    "id": "LAND-PHX-0003",
+    "stage": "Financial screen",
+    "reason": "Outside the service area"
+  },
+  {
+    "id": "PIPE-LAS-0073",
+    "stage": "1 Desk screen",
+    "reason": "Tenant lease ties up the site"
+  },
+  {
+    "id": "PIPE-MIA-0086",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  },
+  {
+    "id": "PIPE-PHX-0085",
+    "stage": "1 Desk screen",
+    "reason": "Lot too small"
+  }
+]

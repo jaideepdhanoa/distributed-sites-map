@@ -8,7 +8,7 @@ import { recordAppEvent } from "@/lib/queue/events";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
 import { audit } from "./audit";
 import type { Sql } from "./db";
-import { allowsAssignee, allowsDate, exportStage, normalizeNextStep } from "./nextStep";
+import { allowsAssignee, allowsDate, bringBackActivitySummary, dropActivitySummary, dropSuggestionSummary, exportStage, normalizeNextStep } from "./nextStep";
 import { parseDocumentRequest } from "@/lib/financials";
 import { blockersBySuggestion, clearHoldBlocker, linkWaitingBlockers, parseHold, refreshProposalReadiness, stagesDiffer, type Blocker } from "./blockers";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
@@ -270,13 +270,25 @@ export async function createSuggestion(
     await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "suggestion", sourceId: id });
   }
   if (nextStep && title) {
-    await recordAppEvent(sql, {
-      siteId,
-      type: "next_proposed",
-      summary: `Next step proposed: ${title}`,
-      actorId: input.authorId,
-      refId: id,
-    });
+    if (detail === "knock_off") {
+      const who = ownerName(input.authorId) || input.authorId;
+      await recordAppEvent(sql, {
+        siteId,
+        type: "drop_suggested",
+        summary: dropSuggestionSummary(who, reason),
+        actorId: input.authorId,
+        refId: id,
+        max: 2400,
+      });
+    } else {
+      await recordAppEvent(sql, {
+        siteId,
+        type: "next_proposed",
+        summary: `Next step proposed: ${title}`,
+        actorId: input.authorId,
+        refId: id,
+      });
+    }
   }
   await notifySuggestion(sql, {
     id,
@@ -421,15 +433,38 @@ export async function decideSuggestion(
     }
   }
   if (row.field_name === "proposed_next_step" && (input.status === "accepted" || input.status === "rejected")) {
-    const title = safeSnapshot(row.title || row.proposed_value, 120);
-    if (title) {
+    const siteId = permanentSiteId(row.target_kind, row.target_id, lookup);
+    if (input.status === "accepted" && row.detail === "bring_back") {
+      const who = ownerName(row.author_id) || row.author_id;
       await recordAppEvent(sql, {
-        siteId: permanentSiteId(row.target_kind, row.target_id, lookup),
-        type: input.status === "accepted" ? "next_accepted" : "next_rejected",
-        summary: input.status === "accepted" ? `Next step approved: ${title}` : `Next step rejected: ${title}`,
-        actorId: input.actorId,
+        siteId,
+        type: "bring_back",
+        summary: bringBackActivitySummary(who, row.proposed_value, row.reason),
+        actorId: row.author_id,
         refId: row.id,
+        max: 2400,
       });
+    } else if (input.status === "accepted" && row.detail === "knock_off") {
+      const who = ownerName(row.author_id) || row.author_id;
+      await recordAppEvent(sql, {
+        siteId,
+        type: "drop",
+        summary: dropActivitySummary(who, row.reason),
+        actorId: row.author_id,
+        refId: row.id,
+        max: 2400,
+      });
+    } else {
+      const title = safeSnapshot(row.title || row.proposed_value, 120);
+      if (title) {
+        await recordAppEvent(sql, {
+          siteId,
+          type: input.status === "accepted" ? "next_accepted" : "next_rejected",
+          summary: input.status === "accepted" ? `Next step approved: ${title}` : `Next step rejected: ${title}`,
+          actorId: input.actorId,
+          refId: row.id,
+        });
+      }
     }
   }
   await refreshProposalReadiness(sql, lookup);

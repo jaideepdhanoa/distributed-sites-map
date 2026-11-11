@@ -9,6 +9,7 @@ from build_data import (
     classify_register_row,
     match_workbook_site,
     stage_group,
+    suggested_drop_rows,
     universe_gap_lines,
     universe_gap_problems,
     universe_gap_status,
@@ -28,6 +29,27 @@ class StageBuckets(unittest.TestCase):
         self.assertEqual(stage_group("4 Offer and close"), "close")
         self.assertEqual(stage_group("Dropped"), "dropped")
         self.assertNotEqual(stage_group("2 Financial screen"), "contacted")
+
+    def test_knockout_stays_a_suggestion(self):
+        rows = suggested_drop_rows([
+            {"lead id": "PIPE-PHX-0085", "map stage": "1 Desk screen", "KO reason": "Lot too small", "workbook Stage": "1 Desk screen"},
+            {"lead id": "PIPE-PHX-0014", "map stage": "Dropped", "KO reason": "Lot too small", "workbook Stage": "Dropped"},
+            {"lead id": "LAS-U119", "map stage": "not listed", "KO reason": "off-market", "workbook Stage": ""},
+        ])
+        self.assertEqual(rows, [{"id": "PIPE-PHX-0085", "stage": "1 Desk screen", "reason": "Lot too small"}])
+        self.assertEqual(stage_group(rows[0]["stage"]), "desk")
+        with (ROOT / "data/drift_report.csv").open(newline="", encoding="utf-8") as handle:
+            shipped = suggested_drop_rows(list(csv.DictReader(handle)))
+        on_disk = json.loads((ROOT / "data/generated/suggested_drops.json").read_text())
+        self.assertEqual(on_disk, shipped)
+        deals = json.loads((ROOT / "data/generated/deals.geojson").read_text())["features"]
+        by_id = {item["properties"]["deal_id"]: item["properties"] for item in deals}
+        for row in shipped:
+            deal = by_id[row["id"]]
+            self.assertEqual(deal["stage"], row["stage"])
+            self.assertNotEqual(deal["stage_group"], "dropped")
+        self.assertEqual(by_id["PIPE-PHX-0014"]["stage"], "Dropped")
+        self.assertEqual(by_id["PIPE-PHX-0014"]["stage_group"], "dropped")
 
 
 class OneMatcher(unittest.TestCase):

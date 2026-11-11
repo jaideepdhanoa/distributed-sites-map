@@ -66,6 +66,9 @@ export function chipLabel(type: string): string {
   if (type === "note" || type === "reply") return "New note";
   if (type === "mention") return "Mentioned you";
   if (type === "document_request") return "Approval";
+  if (type === "bring_back") return "Brought back";
+  if (type === "drop_suggested") return "Suggested drop";
+  if (type === "drop") return "Dropped";
   if (type === "assignment" || type === "next_proposed" || type === "next_accepted") return "Assigned";
   if (type === "flag") return "Flagged";
   if (type === "stage") return "Stage";

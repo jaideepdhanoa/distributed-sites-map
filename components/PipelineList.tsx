@@ -22,6 +22,7 @@ import {
 import { listingCue, shownPriceSource } from "@/lib/format";
 import { stageDetail, stageTone } from "@/lib/labels";
 import { NdaChip } from "./NdaChip";
+import { SuggestedDropMark } from "./SuggestedDrop";
 
 export type PipelineRow = {
   deal: DealProps;
@@ -258,6 +259,7 @@ export default function PipelineList({
                         <span className="stage-cell">
                           <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column)}</span>
                           <NdaChip deal={row.deal} />
+                          <SuggestedDropMark reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                         </span>
                       ) : column === "capacity" ? (
                         <span className="capacity-cell" title={factsForDeal(row.deal).map((fact) => fact.basis).filter(Boolean).join(" · ")}>{cell(row, column)}</span>
@@ -292,6 +294,7 @@ export default function PipelineList({
                   Site capacity {capacitySummary(factsForDeal(row.deal))}
                 </span>
                 <NdaChip deal={row.deal} />
+                <SuggestedDropMark reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                 {row.noPin ? <span className="no-pin">No pin</span> : null}
               </button>
               <button type="button" className="text-link" onClick={() => onShowMap(row.deal.deal_id)}>{row.noPin ? "No pin" : "Show on map"}</button>

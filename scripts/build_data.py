@@ -1291,6 +1291,28 @@ def scrub_drift_reason(text: str) -> str:
     return cleaned or "Noted"
 
 
+def suggested_drop_rows(drift: list[dict]) -> list[dict]:
+    """Knock-outs that stay suggestions. Stage is not rewritten.
+
+    A row already at Dropped is a recorded stage, not a new suggestion.
+    A listing-flag note with no pipeline stage is not a suggested drop.
+    """
+    rows = []
+    for row in drift:
+        deal_id = str(row.get("lead id") or "").strip()
+        stage = str(row.get("map stage") or row.get("workbook Stage") or "").strip()
+        reason = str(row.get("KO reason") or "").strip()
+        if not re.fullmatch(r"(PIPE|LAND)-[A-Z]{2,4}-\d{4}", deal_id):
+            continue
+        if not stage or not reason:
+            continue
+        if stage.lower().startswith("dropped") or stage.lower() == "not listed":
+            continue
+        rows.append({"id": deal_id, "stage": stage, "reason": reason})
+    rows.sort(key=lambda item: item["id"])
+    return rows
+
+
 def knockout_for_report(row: dict, delist_status: str) -> tuple[str, str]:
     """Report-only. R-068: business not confirmed is never a knock-out.
 
@@ -1414,6 +1436,9 @@ def write_workbook_stage_files(extra: list[dict] | None = None) -> dict:
         writer = csv.DictWriter(handle, fieldnames=DRIFT_FIELDS)
         writer.writeheader()
         writer.writerows(drift)
+    suggested = OUT / "suggested_drops.json"
+    suggested.parent.mkdir(parents=True, exist_ok=True)
+    suggested.write_text(json.dumps(suggested_drop_rows(drift), indent=2) + "\n")
     return payload
 
 

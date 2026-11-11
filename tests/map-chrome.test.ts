@@ -7,9 +7,9 @@ import { FUNNEL_VERSION, resolveFunnelMode } from "../lib/funnelMode.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
 import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
-import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
+import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, sheetCeiling, type TipBox } from "../lib/tipPlace.ts";
 import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets } from "../lib/depotRings.ts";
-import { previewChromePlacement } from "../lib/previewChrome.ts";
+import { commentButtonCovered, previewChromePlacement } from "../lib/previewChrome.ts";
 import type { GeoFeature } from "../lib/types.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
@@ -154,6 +154,23 @@ test("depot rings are closed lines and stay outside a neighborhood view", () => 
 });
 
 test("the preview comment button hides while a phone sheet or list covers it", () => {
+  const clear = {
+    phone: true,
+    drawerOpen: false,
+    filtersOpen: false,
+    listOpen: false,
+    stepsOpen: false,
+    tableOpen: false,
+    layersOpen: false,
+    menuOpen: false,
+    popoverOpen: false,
+  };
+  assert.equal(commentButtonCovered(clear), false);
+  assert.equal(commentButtonCovered({ ...clear, drawerOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, layersOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, listOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, filtersOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, phone: false, drawerOpen: true }), false);
   const base = {
     viewportWidth: 390,
     viewportHeight: 844,
@@ -178,6 +195,30 @@ test("the preview comment button hides while a phone sheet or list covers it", (
   });
   assert.equal(desktop.display, "block");
   assert.ok(parseFloat(desktop.left) < 900);
+});
+
+test("a phone pin tip stays above the site sheet", () => {
+  const bounds = { left: 0, top: 0, right: 390, bottom: 844 };
+  const sheet = { left: 0, top: 524, right: 390, bottom: 844 };
+  assert.equal(sheetCeiling(bounds, [sheet]), 524);
+  const placed = placeReadableTip({
+    cursor: { x: 210, y: 500 },
+    bounds,
+    obstacles: [sheet],
+    widths: [248, 200, 168],
+    measure: (width) => ({ width, height: 280 }),
+  });
+  const note: TipBox = { left: placed.left, right: placed.left + placed.width, top: placed.top, bottom: placed.top + placed.height };
+  assert.equal(boxesOverlap(note, sheet), false);
+  assert.ok(note.bottom <= sheet.top);
+  const tall = placeReadableTip({
+    cursor: { x: 210, y: 500 },
+    bounds,
+    obstacles: [sheet],
+    widths: [248],
+    measure: () => ({ width: 248, height: 640 }),
+  });
+  assert.ok(tall.top + tall.height <= sheet.top + 0.5);
 });
 
 test("nearby washes use real pins and skip anything without a location", () => {

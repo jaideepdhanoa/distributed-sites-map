@@ -10,6 +10,7 @@ import { loadFinancialPanel } from "@/lib/financialsLoad";
 import { listAppEvents } from "@/lib/queue/events";
 import { dealSearchParts, matchesQuery, siteSearchParts } from "@/lib/search";
 import { presentCard } from "@/lib/timeline/filter";
+import { suggestedDropHistory, suggestedReason } from "@/lib/suggestedDrop";
 import type { DealProps } from "@/lib/types";
 import { dealCardFacts, siteCardFacts } from "./card";
 import { listedDealsByMarket } from "./counts";
@@ -136,24 +137,28 @@ function getSite(id: string) {
   const deal = findDeal(key);
   if (deal) {
     const universe = deal.universe_id ? findSite(String(deal.universe_id)) : null;
+    const suggested = suggestedReason(String(deal.deal_id || key), deal.stage, deal.stage_group);
     return {
       id: key,
       kind: "deal",
       label: deal.name || key,
       href: siteHref(key),
       ...pick(deal, ["city", "address", "stage", "stage_group", "business_type", "listed", "universe_id"]),
+      ...(suggested ? { suggested_drop: suggested } : {}),
       card: dealCardFacts(deal, universe),
     };
   }
   const site = findSite(key);
   if (!site) return { error: "not_found" };
   const linked = site.linked_deal_id ? findDeal(String(site.linked_deal_id)) : null;
+  const suggested = linked ? suggestedReason(String(linked.deal_id || site.linked_deal_id), linked.stage, linked.stage_group) : "";
   return {
     id: key,
     kind: "site",
     label: site.name || key,
     href: siteHref(key),
     ...pick(site, SITE_FIELDS),
+    ...(suggested ? { suggested_drop: suggested } : {}),
     card: siteCardFacts(site, linked),
   };
 }
@@ -272,18 +277,31 @@ function timeline(id: string) {
   };
 }
 
+function activityIds(id: string): string[] {
+  const ids = [id];
+  const site = findSite(id);
+  if (site?.linked_deal_id) ids.push(String(site.linked_deal_id));
+  const deal = findDeal(id);
+  if (deal?.universe_id) ids.push(String(deal.universe_id));
+  return ids;
+}
+
 async function activity(id: string) {
   if (isQuarantined(id)) return quarantinedRecord(id);
   const card = timeline(id) as { items?: unknown[]; href: string; label: string };
   let events: { type: string; summary: string; at: string; href: string }[] = [];
   if (actionsEnabled()) {
     const rows = await withSql((sql: Sql) => listAppEvents(sql));
-    events = rows.filter((row) => row.siteId === id).slice(-20).map((row) => ({
+    const ids = new Set(activityIds(id));
+    events = rows.filter((row) => ids.has(row.siteId)).slice(-20).map((row) => ({
       type: row.type,
       summary: row.summary,
       at: row.at,
       href: `${siteHref(id)}&panel=activity`,
     }));
+  }
+  for (const item of suggestedDropHistory(activityIds(id))) {
+    events.push({ type: item.type, summary: item.summary, at: item.date, href: `${siteHref(id)}&panel=activity` });
   }
   const timelineItems = card.items || [];
   const empty = timelineItems.length === 0 && events.length === 0;

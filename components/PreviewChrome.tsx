@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { PREVIEW_CHROME_SELECTOR, applyPreviewChrome, type ChromeBox } from "@/lib/previewChrome";
+import { PREVIEW_CHROME_SELECTOR, applyPreviewChrome, commentButtonCovered, type ChromeBox } from "@/lib/previewChrome";
 
 function readBox(): ChromeBox {
   const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -9,17 +9,17 @@ function readBox(): ChromeBox {
   const drawer = document.querySelector("aside.drawer");
   const rect = drawer?.getBoundingClientRect();
   const open = Boolean(shell?.classList.contains("drawer-open"));
-  const covered = Boolean(
-    phone && shell && (
-      shell.classList.contains("filters-open")
-      || shell.classList.contains("list-open")
-      || shell.classList.contains("steps-open")
-      || shell.classList.contains("table-open")
-      || document.querySelector("aside.layers.open")
-      || document.querySelector(".menu-sheet")
-      || document.querySelector(".popover")
-    ),
-  );
+  const covered = shell ? commentButtonCovered({
+    phone,
+    drawerOpen: open,
+    filtersOpen: shell.classList.contains("filters-open"),
+    listOpen: shell.classList.contains("list-open"),
+    stepsOpen: shell.classList.contains("steps-open"),
+    tableOpen: shell.classList.contains("table-open"),
+    layersOpen: Boolean(document.querySelector("aside.layers.open")),
+    menuOpen: Boolean(document.querySelector(".menu-sheet")),
+    popoverOpen: Boolean(document.querySelector(".popover")),
+  }) : false;
   return {
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,

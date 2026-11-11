@@ -740,6 +740,9 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   overflow-wrap: anywhere;
 }
 .map-tip-fixed[data-hidden="1"] { visibility: hidden; }
+@media (max-width: 767px) {
+  .map-tip-fixed { z-index: 3; }
+}
 .map-tip-popup { pointer-events: none; }
 .map-tip-popup .maplibregl-popup-content {
   background: #faf7f1;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { allowsAssignee, allowsDate, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { allowsAssignee, allowsDate, emptyNextStepActions, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
 import { useRecommendations } from "../agent/useRecommendations";
@@ -32,8 +32,6 @@ type Step = {
 };
 type Need = { kind: string; label: string; party: string; askedOn: string | null; followUpOn: string | null };
 type ProposalNote = { id: string; body: string; authorId: string; createdAt: string };
-
-const PRIORITIZE = NEXT_STEP_TYPES.find((item) => item.id === "stage_move")?.label || "Prioritize: push to Financials";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -69,7 +67,7 @@ function statusMark(status: string) {
   return { label: "Waiting for approval", tone: "pending" };
 }
 
-export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }) {
+export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kind: "site" | "deal"; id: string; stageGroup?: string | null; stage?: string | null }) {
   const params = useSearchParams();
   const proposal = params.get("panel") === "proposal";
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
@@ -282,7 +280,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       detail: stepType,
       title: stepType === "work_item" ? title : undefined,
       proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : stepType === "mark_duplicate" ? survivor : title,
-      reason: stepType === "knock_off" || stepType === "mark_duplicate" ? reason : "",
+      reason: stepType === "knock_off" || stepType === "mark_duplicate" || stepType === "bring_back" ? reason : "",
       ownerId: allowsAssignee(stepType) ? ownerId : "",
       targetOn: allowsDate(stepType) ? due : "",
     };
@@ -315,7 +313,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           <input className="field" aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
         </label>
       ) : null}
-      {type === "knock_off" || type === "mark_duplicate" ? (
+      {type === "knock_off" || type === "mark_duplicate" || type === "bring_back" ? (
         <label>
           Reason
           <textarea className="field" aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} required />
@@ -360,7 +358,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
         </div>
       ) : null}
       <div className="proposal-send">
-        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reason.trim())} className="propose">Submit for approval</button>
+        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || ((type === "knock_off" || type === "bring_back") && !reason.trim())} className="propose">Submit for approval</button>
         <button type="button" onClick={resetForm} className="text-link">Cancel</button>
       </div>
     </form>
@@ -387,7 +385,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           {focus.ownerName ? ` · Assignee ${focus.ownerName}` : knock ? " · No assignee" : ""}
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
-        {(knock || stepType === "mark_duplicate") && focus.reason ? (
+        {(knock || stepType === "mark_duplicate" || stepType === "bring_back") && focus.reason ? (
           <p className="proposal-reason"><span>Reason</span>{focus.reason}</p>
         ) : null}
         {focus.stale ? <p className="hint">The stage changed after this proposal{focus.currentStage ? ` (${focus.currentStage})` : ""}.</p> : null}
@@ -442,7 +440,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
             onHoldAsked={setHoldAsked}
             onHoldFollow={setHoldFollow}
             pending={pending}
-            stageMove={stepType === "stage_move"}
+            stageMove={stepType === "stage_move" || stepType === "bring_back"}
             needsCount={needs.length}
             onSend={() => {
               if (outcome === "reply") {
@@ -503,6 +501,7 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
           </div>
         ) : null}
         {stepType === "knock_off" ? <p className="hint">The workbook export asks for stage Dropped.</p> : null}
+        {stepType === "bring_back" && approved.reason ? <p className="proposal-reason"><span>Reason</span>{approved.reason}</p> : null}
       </>
     );
   } else if (!open) {
@@ -510,9 +509,21 @@ export function NextStepCard({ kind, id }: { kind: "site" | "deal"; id: string }
       <>
         <h3>Next step</h3>
         <div className="step-actions" role="group" aria-label="Next step type">
-          <button type="button" onClick={() => { setType("stage_move"); setStage("financial"); setOpen(true); }} className="paper-btn">{PRIORITIZE}</button>
-          <button type="button" onClick={() => { setType("knock_off"); setOpen(true); }} className="text-link">Drop with a reason</button>
-          <button type="button" onClick={() => { setType("mark_duplicate"); setOpen(true); }} className="text-link">Mark duplicate</button>
+          {emptyNextStepActions(stageGroup, recordStage).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              data-testid={`empty-step-${item.id}`}
+              onClick={() => {
+                setType(item.id);
+                setStage(item.id === "stage_move" ? "financial" : "");
+                setOpen(true);
+              }}
+              className={item.prominent ? "paper-btn" : "text-link"}
+            >
+              {nextStepTypeLabel(item.id)}
+            </button>
+          ))}
         </div>
         <p className="hint">Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
       </>

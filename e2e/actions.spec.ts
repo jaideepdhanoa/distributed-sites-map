@@ -313,7 +313,7 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByTestId("record-actions")).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("button", { name: "Suggestions" }).click();
   await expect(page.getByTestId("suggestions-panel")).toBeVisible();
   const panel = page.getByTestId("suggestions-panel");

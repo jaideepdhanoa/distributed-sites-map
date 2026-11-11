@@ -21,6 +21,29 @@ export type ChromePlacement = {
 const BUTTON = 44;
 const GAP = 12;
 
+/** Phone surfaces that cover the map. The comment button drops out until they close. */
+export function commentButtonCovered(input: {
+  phone: boolean;
+  drawerOpen: boolean;
+  filtersOpen: boolean;
+  listOpen: boolean;
+  stepsOpen: boolean;
+  tableOpen: boolean;
+  layersOpen: boolean;
+  menuOpen: boolean;
+  popoverOpen: boolean;
+}): boolean {
+  if (!input.phone) return false;
+  return input.drawerOpen
+    || input.filtersOpen
+    || input.listOpen
+    || input.stepsOpen
+    || input.tableOpen
+    || input.layersOpen
+    || input.menuOpen
+    || input.popoverOpen;
+}
+
 /** Place the preview comment button in the map, clear of the drawer and any open sheet. */
 export function previewChromePlacement(box: ChromeBox): ChromePlacement {
   if (box.phone && (box.abovePeek || box.covered)) {

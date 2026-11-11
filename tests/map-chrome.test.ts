@@ -9,7 +9,7 @@ import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
 import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, sheetCeiling, type TipBox } from "../lib/tipPlace.ts";
 import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets } from "../lib/depotRings.ts";
-import { previewChromePlacement } from "../lib/previewChrome.ts";
+import { commentButtonCovered, previewChromePlacement } from "../lib/previewChrome.ts";
 import type { GeoFeature } from "../lib/types.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
@@ -154,6 +154,23 @@ test("depot rings are closed lines and stay outside a neighborhood view", () => 
 });
 
 test("the preview comment button hides while a phone sheet or list covers it", () => {
+  const clear = {
+    phone: true,
+    drawerOpen: false,
+    filtersOpen: false,
+    listOpen: false,
+    stepsOpen: false,
+    tableOpen: false,
+    layersOpen: false,
+    menuOpen: false,
+    popoverOpen: false,
+  };
+  assert.equal(commentButtonCovered(clear), false);
+  assert.equal(commentButtonCovered({ ...clear, drawerOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, layersOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, listOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, filtersOpen: true }), true);
+  assert.equal(commentButtonCovered({ ...clear, phone: false, drawerOpen: true }), false);
   const base = {
     viewportWidth: 390,
     viewportHeight: 844,

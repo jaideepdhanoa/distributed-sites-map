@@ -109,8 +109,8 @@ for (const width of [1024, 1280]) {
       reviewQueueSettled = true;
       await route.continue();
     });
-    await openAs(page, "contributor", "/?view=review&site=PIPE-PHX-0008");
-    await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+    await openAs(page, "contributor", "/?view=review&site=PIPE-MIA-0079");
+    await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0079");
     await expect(page.getByTestId("review-bar")).toHaveCount(0, { timeout: 2000 });
     expect(reviewQueueSettled).toBe(false);
     await expect(page.locator(".review-rail")).toHaveCount(0);

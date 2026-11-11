@@ -182,8 +182,8 @@ test("a review link highlights that site, or leaves review when it is not queued
   await expect(highlighted).toHaveCount(1);
   if (target.name) await expect(highlighted).toContainText(target.name);
 
-  await page.goto("/?view=review&site=PIPE-PHX-0008&panel=discussion");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-PHX-0008");
+  await page.goto("/?view=review&site=PIPE-MIA-0079&panel=discussion");
+  await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0079");
   await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
   await expect(page.getByTestId("review-bar")).toHaveCount(0);
   await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();

@@ -5,6 +5,8 @@ export type ChromeBox = {
   drawerTop: number | null;
   phone: boolean;
   abovePeek: boolean;
+  /** A phone sheet or list is open, so the comment button would sit on top of it. */
+  covered: boolean;
 };
 
 export type ChromePlacement = {
@@ -19,9 +21,9 @@ export type ChromePlacement = {
 const BUTTON = 44;
 const GAP = 12;
 
-/** Place the preview comment button in the map, clear of the drawer and the sheet. */
+/** Place the preview comment button in the map, clear of the drawer and any open sheet. */
 export function previewChromePlacement(box: ChromeBox): ChromePlacement {
-  if (box.phone && box.abovePeek) {
+  if (box.phone && (box.abovePeek || box.covered)) {
     return { display: "none", position: "fixed", left: "0px", right: "auto", top: "0px", bottom: "auto" };
   }
   if (box.phone) {

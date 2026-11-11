@@ -216,8 +216,30 @@ test("preview button hides on the phone when the sheet is above peek", () => {
     drawerTop: 352,
     phone: true,
     abovePeek: true,
+    covered: false,
   });
   expect(hidden.display).toBe("none");
+  const sheet = previewChromePlacement({
+    viewportWidth: 390,
+    viewportHeight: 800,
+    drawerLeft: 0,
+    drawerTop: 520,
+    phone: true,
+    abovePeek: false,
+    covered: true,
+  });
+  expect(sheet.display).toBe("none");
+  const map = previewChromePlacement({
+    viewportWidth: 390,
+    viewportHeight: 800,
+    drawerLeft: 0,
+    drawerTop: 520,
+    phone: true,
+    abovePeek: false,
+    covered: false,
+  });
+  expect(map.display).toBe("block");
+  expect(parseFloat(map.top)).toBe(520 - 44 - 12);
   const parked = previewChromePlacement({
     viewportWidth: 1280,
     viewportHeight: 800,
@@ -225,6 +247,7 @@ test("preview button hides on the phone when the sheet is above peek", () => {
     drawerTop: 140,
     phone: false,
     abovePeek: false,
+    covered: true,
   });
   expect(parseFloat(parked.left)).toBeLessThan(900);
 });

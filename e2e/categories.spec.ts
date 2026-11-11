@@ -1,5 +1,25 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { cityPipelineCounts } from "./pipeline-counts";
+
+async function overlaps(button: Locator, target: Locator) {
+  const left = await button.boundingBox();
+  const right = await target.boundingBox();
+  if (!left || !right) return false;
+  return left.x < right.x + right.width && left.x + left.width > right.x && left.y < right.y + right.height && left.y + left.height > right.y;
+}
+
+async function plantPreviewButton(page: Page) {
+  await page.evaluate(() => {
+    const button = document.createElement("vercel-toolbar");
+    button.dataset.testid = "preview-comment";
+    button.style.width = "44px";
+    button.style.height = "44px";
+    button.style.borderRadius = "999px";
+    button.style.background = "#1c1914";
+    document.body.appendChild(button);
+  });
+  return page.getByTestId("preview-comment");
+}
 
 test("auto service is on with car washes, and unscreened listings stay a separate toggle", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop filters");
@@ -60,4 +80,47 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(layers.getByText("Unscreened market listings")).toHaveCount(0);
   await expect(layers.getByText("C-stores")).toHaveCount(0);
   await expect(layers.getByText("Land", { exact: true })).toHaveCount(0);
+});
+
+test("the preview comment button stays off phone sheets and list actions", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone preview button");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?funnel=pipeline&city=MIA&pstage=desk", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".shell");
+  const button = await plantPreviewButton(page);
+  await expect(button).toHaveCSS("display", "block");
+
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Filters", exact: true }).click();
+  const filters = page.getByRole("dialog", { name: "Filters" });
+  await expect(filters).toBeVisible();
+  await expect(button).toHaveCSS("display", "none");
+  expect(await overlaps(button, filters)).toBe(false);
+  await expect(filters.getByTestId("auto-category")).toBeChecked();
+  await expect(filters.getByText("Unscreened market listings")).toBeVisible();
+  await page.getByRole("button", { name: "Close filters" }).click();
+  await expect(button).toHaveCSS("display", "block");
+
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  const layers = page.locator("aside.layers.open");
+  await expect(layers).toBeVisible();
+  await expect(button).toHaveCSS("display", "none");
+  expect(await overlaps(button, layers)).toBe(false);
+  await page.getByRole("button", { name: "Close layers" }).click();
+
+  await page.locator(".phone-step").click();
+  await expect(page.locator(".shell")).toHaveClass(/steps-open/);
+  await expect(button).toHaveCSS("display", "none");
+  expect(await overlaps(button, page.locator("nav.funnel"))).toBe(false);
+  await page.getByRole("button", { name: "Close steps" }).click();
+
+  await page.getByRole("group", { name: "Map or list" }).getByRole("button", { name: "List", exact: true }).click();
+  await page.waitForSelector("[data-testid=pipeline-list]");
+  await expect(button).toHaveCSS("display", "none");
+  const show = page.getByRole("button", { name: "Show on map" }).first();
+  await expect(show).toBeVisible();
+  expect(await overlaps(button, show)).toBe(false);
+  const listing = page.locator(".list-cards .listing-icon").first();
+  await expect(listing).toBeVisible();
+  expect(await overlaps(button, listing)).toBe(false);
 });

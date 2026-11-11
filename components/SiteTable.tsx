@@ -14,6 +14,7 @@ import { spareTier } from "@/lib/filter";
 import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { NdaChip } from "./NdaChip";
+import { SuggestedDropMark } from "./SuggestedDrop";
 
 type SortingState = { id: string; desc: boolean }[];
 
@@ -218,6 +219,7 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
       <span className="stage-cell">
         <span>{stageDetail(row.original.stage, row.original.stage_group)}</span>
         <NdaChip deal={row.original} />
+        <SuggestedDropMark reason={row.original.suggested_drop} stageGroup={row.original.stage_group} stage={row.original.stage} />
       </span>
     ),
   },
@@ -316,6 +318,7 @@ export function DealTable({
               <strong>{row.name || row.address || row.deal_id}</strong>
               <span>{stageDetail(row.stage, row.stage_group)}{row.asking_price_display ? ` · ${row.asking_price_display}` : ""}</span>
               <NdaChip deal={row} />
+              <SuggestedDropMark reason={row.suggested_drop} stageGroup={row.stage_group} stage={row.stage} />
               <span>{row.address}</span>
               {touchOf(activity, row.deal_id)?.lastTouched || touchOf(activity, row.deal_id)?.materials ? (
                 <span>{touchOf(activity, row.deal_id)?.materials || 0} materials · {touchOf(activity, row.deal_id)?.lastTouched || "—"}</span>

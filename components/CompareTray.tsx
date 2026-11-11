@@ -29,6 +29,7 @@ function dealRows(deal: DealProps, sites: SiteProps[]): CompareRow[] {
     { label: "Address", value: shown(displayAddress(deal.address)) },
     { label: "Stage", value: shown(stageDetail(deal.stage, deal.stage_group)) },
     { label: "NDA", value: ndaChip(deal) },
+    ...(deal.suggested_drop && deal.stage_group !== "dropped" ? [{ label: "Suggested drop", value: deal.suggested_drop }] : []),
     { label: "Asking", value: sheetMoney(deal.asking_price, deal.asking_price_display) },
     { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(workbookTrafficLine(deal)) },

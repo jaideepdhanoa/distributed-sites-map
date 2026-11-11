@@ -152,6 +152,8 @@ export type DealProps = {
   city: string;
   stage: string;
   stage_group: "sourced" | "desk" | "financial" | "checks" | "close" | "contacted" | "later" | "dropped";
+  /** Knock-out rationale. Present only while Stage is not Dropped. */
+  suggested_drop?: string;
   broker_contacted?: boolean;
   last_broker_contact?: string;
   lead_source?: string;

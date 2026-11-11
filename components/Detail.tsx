@@ -13,6 +13,7 @@ import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 import { BlockerLine, NdaChip } from "./NdaChip";
+import { SuggestedDropMark } from "./SuggestedDrop";
 
 function acres(value: number | null | undefined, text?: string) {
   const shown = acreUnit(value, text);
@@ -253,6 +254,7 @@ export default function Detail({
               {linkedDeal ? <NdaChip deal={linkedDeal} /> : null}
             </div>
             {linkedDeal ? <BlockerLine deal={linkedDeal} /> : null}
+            <SuggestedDropMark reason={linkedDeal?.suggested_drop} stageGroup={linkedDeal?.stage_group} stage={linkedDeal?.stage} />
             <h2>{site.name || site.address || site.site_id}</h2>
             {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
             <p className="note">{site.address || "—"}</p>
@@ -269,7 +271,7 @@ export default function Detail({
       />
       {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
-      <NextStepCard kind="site" id={site.site_id} />
+      <NextStepCard kind="site" id={site.site_id} stageGroup={linkedDeal?.stage_group} stage={linkedDeal?.stage || site.pipeline_stage} />
       <PanelSections
         overview={
           <>
@@ -509,6 +511,7 @@ export function DealDetail({
               <NdaChip deal={deal} />
             </div>
             <BlockerLine deal={deal} />
+            <SuggestedDropMark reason={deal.suggested_drop} stageGroup={deal.stage_group} stage={deal.stage} />
             <h2>{deal.name || deal.address}</h2>
             <p className="note">{deal.address}</p>
             <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
@@ -526,7 +529,7 @@ export function DealDetail({
       />
       {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
-      <NextStepCard kind="deal" id={deal.deal_id} />
+      <NextStepCard kind="deal" id={deal.deal_id} stageGroup={deal.stage_group} stage={deal.stage} />
       <PanelSections
         overview={
           <>

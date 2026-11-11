@@ -54,6 +54,9 @@ export function dealTip(props: Record<string, unknown>): TipModel {
   const miles = typeof props.miles_to_depot === "number" ? props.miles_to_depot : null;
   const facts: TipFact[] = [
     { label: "Stage", value: stageDetail(text(props.stage), text(props.stage_group) || "desk") },
+    ...(text(props.suggested_drop) && text(props.stage_group) !== "dropped" && !/^dropped\b/i.test(text(props.stage))
+      ? [{ label: "Suggested drop", value: text(props.suggested_drop) }]
+      : []),
     { label: "Asking", value: text(props.asking_price_display) || "Not provided" },
     { label: "Acres", value: acres || "Not provided" },
     { label: "Per acre", value: text(props.price_per_acre_display) || "Not provided" },

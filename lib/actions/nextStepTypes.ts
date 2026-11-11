@@ -38,6 +38,30 @@ export function allowsDate(detail: string | null | undefined): boolean {
   return allowsAssignee(detail);
 }
 
+export function droppedStage(stageGroup?: string | null, stage?: string | null): boolean {
+  if (String(stageGroup || "").trim().toLowerCase() === "dropped") return true;
+  return /^dropped\b/i.test(String(stage || "").trim());
+}
+
+export type EmptyNextStepAction = { id: NextStepTypeId; prominent: boolean };
+
+/** On a dropped site, Bring back is the primary empty-state action. */
+export function emptyNextStepActions(stageGroup?: string | null, stage?: string | null): EmptyNextStepAction[] {
+  if (droppedStage(stageGroup, stage)) {
+    return [
+      { id: "bring_back", prominent: true },
+      { id: "mark_duplicate", prominent: false },
+      { id: "stage_move", prominent: false },
+      { id: "knock_off", prominent: false },
+    ];
+  }
+  return [
+    { id: "stage_move", prominent: true },
+    { id: "knock_off", prominent: false },
+    { id: "mark_duplicate", prominent: false },
+  ];
+}
+
 export function exportStage(detail: string | null | undefined, proposedValue: string): string {
   const type = nextStepType(detail);
   if (!detail) return "";

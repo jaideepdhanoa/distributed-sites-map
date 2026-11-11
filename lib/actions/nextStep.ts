@@ -83,11 +83,17 @@ export function normalizeNextStep(
     const label = stageTitle(stage);
     const title = type === "bring_back" ? `Bring back to ${label}` : `Prioritize: push to ${label}`;
     assertClean(title);
+    let reason = "";
+    if (type === "bring_back") {
+      if (!reasonText) throw new InputError("Add a reason.");
+      reason = parseBody(reasonText, "reason", 2000);
+      assertClean(reason);
+    }
     return {
       detail: type,
       title,
       proposedValue: stage,
-      reason: "",
+      reason,
       targetOn: type === "stage_move" ? date : null,
       ownerId: type === "stage_move" ? owner : null,
     };
@@ -104,4 +110,29 @@ export function normalizeNextStep(
     targetOn: date,
     ownerId: owner,
   };
+}
+
+export function bringBackActivitySummary(actorName: string, stage: string, reason: string): string {
+  const who = actorName.trim() || "Someone";
+  const label = stageTitle(stage);
+  const why = reason.trim();
+  const line = `${who} brought this site back to ${label}.`;
+  return why ? `${line} ${why}` : line;
+}
+
+export function dropSuggestionSummary(actorName: string, reason: string): string {
+  const who = actorName.trim() || "Someone";
+  const why = reason.trim();
+  return why ? `${who} recommended dropping this site. ${why}` : `${who} recommended dropping this site.`;
+}
+
+export function dropActivitySummary(actorName: string, reason: string): string {
+  const who = actorName.trim() || "Someone";
+  const why = reason.trim();
+  return why ? `${who} dropped this site. ${why}` : `${who} dropped this site.`;
+}
+
+export function recommendedDropSummary(reason: string): string {
+  const why = reason.trim();
+  return why ? `Recommended drop. ${why}` : "Recommended drop.";
 }

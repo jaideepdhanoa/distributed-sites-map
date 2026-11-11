@@ -23,7 +23,12 @@ const LABELS: Record<string, string> = {
   doc: "Document",
   visit: "Visit",
   stage: "Stage",
+  bring_back: "Brought back",
+  drop_suggested: "Suggested drop",
+  drop: "Dropped",
 };
+
+const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop"]);
 
 export default function Timeline({ recordId, relatedId }: { recordId: string; relatedId?: string }) {
   const [payload, setPayload] = useState<Payload | null>(null);
@@ -32,24 +37,28 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     let cancel = false;
     const query = new URLSearchParams({ id: recordId });
     if (relatedId) query.set("related", relatedId);
-    fetch(`/api/data/timeline?${query}`)
-      .then(async (response) => {
-        if (!response.ok) return {};
-        return (await response.json()) as Payload;
-      })
-      .then((next) => {
+    async function load() {
+      try {
+        const response = await fetch(`/api/data/timeline?${query}`);
+        const next = response.ok ? ((await response.json()) as Payload) : {};
         if (!cancel) setPayload(next);
-      })
-      .catch(() => {
+      } catch {
         if (!cancel) setPayload({});
-      });
+      }
+    }
+    void load();
+    const refresh = () => {
+      void load();
+    };
+    window.addEventListener("queue-refresh", refresh);
     return () => {
       cancel = true;
+      window.removeEventListener("queue-refresh", refresh);
     };
   }, [recordId, relatedId]);
 
   const materials = payload?.materials || [];
-  const items = payload?.showActivityLines === false ? [] : payload?.items || [];
+  const items = (payload?.items || []).filter((item) => KEPT_LINES.has(item.type) || payload?.showActivityLines !== false);
   const folderUrl = payload?.folderUrl || "";
   const lastTouched = payload?.lastTouched || "";
   const empty = payload !== null && !folderUrl && materials.length === 0 && !lastTouched && items.length === 0;

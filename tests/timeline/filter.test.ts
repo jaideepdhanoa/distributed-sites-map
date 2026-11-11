@@ -39,6 +39,36 @@ test("the card merges counts and drops blocked lines", () => {
   assert.equal(JSON.stringify(card).includes("/file/d/"), false);
 });
 
+test("a gmail source link is kept and a mailbox link is rebuilt without the mailbox", () => {
+  const card = presentCard(
+    {
+      items: [
+        {
+          record_id: "PIPE-PHX-0001",
+          event_id: "A-1",
+          date: "2026-10-22",
+          type: "doc",
+          summary: "Sales package on file",
+          source_link: "https://mail.google.com/mail/u/0/#inbox/abcdef0123456789",
+        },
+        {
+          record_id: "PIPE-PHX-0001",
+          event_id: "A-2",
+          date: "2026-10-21",
+          type: "legal",
+          summary: "Property file noted",
+          source_link: "https://mail.google.com/mail/u/0/#inbox/abcdef0123456789?authuser=person@example.com",
+        },
+      ],
+    },
+    ["PIPE-PHX-0001"],
+  );
+  assert.equal(card.items[0]?.sourceLink, "https://mail.google.com/mail/u/0/#inbox/abcdef0123456789");
+  assert.equal(card.items[1]?.sourceLink, "https://mail.google.com/mail/u/0/#inbox/abcdef0123456789");
+  assert.equal(JSON.stringify(card).includes("person@example.com"), false);
+  assert.equal(JSON.stringify(card).includes("authuser"), false);
+});
+
 test("activity lines stay on unless the config turns them off", () => {
   assert.equal(showActivityLines(), true);
 });

@@ -1,6 +1,24 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+function gmailMessageId(value: string): string {
+  const labeled = value.match(/#(?:inbox|all|sent|search)\/([0-9a-f]{16})\b/i);
+  if (labeled) return labeled[1].toLowerCase();
+  const tail = value.match(/([0-9a-f]{16})(?:[?#]|$)/i);
+  return tail ? tail[1].toLowerCase() : "";
+}
+
+/** Keep a Gmail URL and drop a mailbox. The timeline job loads this file without a bundler. */
+function activitySourceLink(value: unknown): string {
+  const link = String(value || "").trim();
+  if (!link.startsWith("https://mail.google.com/")) return "";
+  const id = gmailMessageId(link);
+  if (link.includes("@") || /authuser=/i.test(link)) {
+    return id ? `https://mail.google.com/mail/u/0/#inbox/${id}` : "";
+  }
+  return link;
+}
+
 const ALLOWED = new Set(["listing", "brochure", "om", "financials", "photos", "legal", "doc", "visit", "stage"]);
 const CATEGORY_ORDER = ["financials", "property_legal", "operations"] as const;
 const CATEGORY_LABELS: Record<(typeof CATEGORY_ORDER)[number], string> = {
@@ -60,6 +78,7 @@ export type TimelineItem = {
   type: string;
   summary: string;
   eventId: string;
+  sourceLink?: string;
 };
 
 export type MaterialCount = {
@@ -92,7 +111,10 @@ function presentItem(row: Record<string, unknown>): TimelineItem | null {
   if (!summary || blockedText(summary)) return null;
   const date = String(row.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return { date, type, summary, eventId: String(row.event_id || "") };
+  const item: TimelineItem = { date, type, summary, eventId: String(row.event_id || "") };
+  const sourceLink = activitySourceLink(row.source_link ?? row.sourceLink);
+  if (sourceLink) item.sourceLink = sourceLink;
+  return item;
 }
 
 function presentMaterials(value: unknown): MaterialCount[] {

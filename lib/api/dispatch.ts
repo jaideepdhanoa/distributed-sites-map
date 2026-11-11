@@ -30,6 +30,7 @@ import * as deals from "@/lib/api/handlers/data/deals";
 import * as depots from "@/lib/api/handlers/data/depots";
 import * as financialsId from "@/lib/api/handlers/data/financials-id";
 import * as nda from "@/lib/api/handlers/data/nda";
+import * as openLoops from "@/lib/api/handlers/data/open-loops";
 import * as funnel from "@/lib/api/handlers/data/funnel";
 import * as grid from "@/lib/api/handlers/data/grid";
 import * as parcels from "@/lib/api/handlers/data/parcels";
@@ -99,6 +100,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/depots", { GET: depots.GET as Handler }),
   route("/api/data/financials/:id", { GET: financialsId.GET as Handler }),
   route("/api/data/nda", { GET: nda.GET as Handler }),
+  route("/api/data/open-loops", { GET: openLoops.GET as Handler }),
   route("/api/data/funnel", { GET: funnel.GET as Handler }),
   route("/api/data/grid", { GET: grid.GET as Handler }),
   route("/api/data/parcels", { GET: parcels.GET as Handler }),

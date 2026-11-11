@@ -45,6 +45,7 @@ const expected = [
   "GET /api/data/deals",
   "GET /api/data/depots",
   "GET /api/data/financials/:id",
+  "GET /api/data/comms",
   "GET /api/data/nda",
   "GET /api/data/funnel",
   "GET /api/data/grid",

@@ -41,6 +41,7 @@ Set these in Vercel. A change applies on the next deployment.
 | `XAI_API_KEY` | for Ask | Direct xAI key. Ask stays in the "isn't set up yet" state until this is set. Not an AI Gateway key. |
 | `ASK_MODEL` | no | Ask model. Defaults to `grok-4.7`. |
 | `ASK_DAILY_LIMIT` | no | Questions per person per Pacific day. Defaults to 40. Counted in Upstash Redis. |
+| `GMAIL_LINK_VIEWERS` | no | Comma-separated usernames or mailboxes who may see an Open in Gmail link. When unset, `config/comms.json` is the list. |
 
 Planned accounts, none created here: `jaideep` (admin), `cindel`, `ming`, `ricardo`, `yuka`, `muse`, `indie`. Admin only opens the accounts page. Everyone else sees the same map.
 

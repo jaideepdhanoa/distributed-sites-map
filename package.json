@@ -9,7 +9,7 @@
     "validate-data": "python3 scripts/build_data.py --check",
     "hash-password": "node scripts/hash-password.mjs",
     "add-user": "node scripts/hash-password.mjs --user",
-    "test": "node --import tsx --test tests/actions/*.test.ts tests/alerts/*.test.ts tests/agent/*.test.ts tests/api/*.test.ts tests/cstore.test.ts tests/review.test.ts tests/photos.test.ts tests/financials.test.ts tests/login.test.ts tests/map-chrome.test.ts tests/categories.test.ts tests/nda.test.ts",
+    "test": "node --import tsx --test tests/actions/*.test.ts tests/alerts/*.test.ts tests/agent/*.test.ts tests/api/*.test.ts tests/cstore.test.ts tests/review.test.ts tests/photos.test.ts tests/financials.test.ts tests/login.test.ts tests/map-chrome.test.ts tests/categories.test.ts tests/nda.test.ts tests/comms.test.ts",
     "test:e2e": "playwright test",
     "test:actions": "E2E_ACTIONS=1 playwright test e2e/actions.spec.ts e2e/queue.spec.ts",
     "test:timeline": "python3 -m unittest tests/timeline/test_timeline.py tests/timeline/test_site_id.py && node --experimental-strip-types --test tests/timeline/filter.test.ts",

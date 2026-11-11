@@ -23,6 +23,7 @@ jobs:
       - run: python tests/test_business_type.py
       - run: python tests/test_financials.py
       - run: python tests/test_nda.py
+      - run: python tests/test_comms.py
       - run: python scripts/check_surface.py
       - run: python scripts/test_review_fixes.py
       - uses: actions/setup-node@v4

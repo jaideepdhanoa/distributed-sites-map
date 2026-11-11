@@ -15,6 +15,8 @@ export function placeReadableTip(args: {
   widths: number[];
   measure: (width: number) => { width: number; height: number };
   margin?: number;
+  /** Keep the note entirely above the pointer so the ground under the cursor stays visible. */
+  above?: boolean;
 }): { left: number; top: number; width: number; height: number } {
   const margin = args.margin ?? 8;
   const region = {
@@ -34,29 +36,48 @@ export function placeReadableTip(args: {
     const h = size.height;
     if (w < 8 || h < 8) continue;
     const gap = 12;
-    const spots: Array<[number, number]> = [
-      [args.cursor.x - w - gap, args.cursor.y - h - gap],
-      [args.cursor.x + gap, args.cursor.y - h - gap],
-      [args.cursor.x - w - gap, args.cursor.y + gap],
-      [args.cursor.x + gap, args.cursor.y + gap],
-      [args.cursor.x - w / 2, args.cursor.y - h - gap],
-      [args.cursor.x - w / 2, args.cursor.y + gap],
-    ];
+    const spots: Array<[number, number]> = args.above
+      ? [
+          [args.cursor.x - w / 2, args.cursor.y - h - gap],
+          [args.cursor.x - w - gap, args.cursor.y - h - gap],
+          [args.cursor.x + gap, args.cursor.y - h - gap],
+        ]
+      : [
+          [args.cursor.x - w - gap, args.cursor.y - h - gap],
+          [args.cursor.x + gap, args.cursor.y - h - gap],
+          [args.cursor.x - w - gap, args.cursor.y + gap],
+          [args.cursor.x + gap, args.cursor.y + gap],
+          [args.cursor.x - w / 2, args.cursor.y - h - gap],
+          [args.cursor.x - w / 2, args.cursor.y + gap],
+        ];
     const step = 24;
-    for (let top = region.top; top + h <= region.bottom + 0.5; top += step) {
-      for (let left = region.left; left + w <= region.right + 0.5; left += step) spots.push([left, top]);
+    if (!args.above) {
+      for (let top = region.top; top + h <= region.bottom + 0.5; top += step) {
+        for (let left = region.left; left + w <= region.right + 0.5; left += step) spots.push([left, top]);
+      }
     }
     let best: { left: number; top: number; score: number } | null = null;
     for (const [left, top] of spots) {
+      if (args.above && top + h > args.cursor.y - gap + 0.5) continue;
       if (!fits(left, top, w, h)) continue;
-      const score = Math.hypot(left + w / 2 - args.cursor.x, top + h / 2 - args.cursor.y);
+      const score = args.above
+        ? Math.abs(left + w / 2 - args.cursor.x) + (args.cursor.y - (top + h))
+        : Math.hypot(left + w / 2 - args.cursor.x, top + h / 2 - args.cursor.y);
       if (!best || score < best.score) best = { left, top, score };
     }
     if (best) return { left: best.left, top: best.top, width: w, height: h };
   }
   const width = args.widths[args.widths.length - 1] ?? 160;
   const size = args.measure(width);
-  const left = Math.min(Math.max(region.left, args.cursor.x + 12), Math.max(region.left, region.right - size.width));
-  const top = Math.min(Math.max(region.top, args.cursor.y + 12), Math.max(region.top, region.bottom - size.height));
+  const gap = 12;
+  const preferredTop = args.above ? args.cursor.y - size.height - gap : args.cursor.y + gap;
+  const left = Math.min(
+    Math.max(region.left, args.above ? args.cursor.x - size.width / 2 : args.cursor.x + gap),
+    Math.max(region.left, region.right - size.width),
+  );
+  const top = Math.min(Math.max(region.top, preferredTop), Math.max(region.top, region.bottom - size.height));
   return { left, top, width: Math.min(size.width, Math.max(8, region.right - region.left)), height: size.height };
 }
+
+/** Service-area notes wait until the pointer has been still. A later move starts the wait over. */
+export const AREA_TIP_DWELL_MS = 400;

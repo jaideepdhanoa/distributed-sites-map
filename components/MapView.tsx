@@ -7,7 +7,7 @@ import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, clusterTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
 import { mutedPositronStyle } from "@/lib/mutedStyle";
-import { placeReadableTip, type TipBox } from "@/lib/tipPlace";
+import { AREA_TIP_DWELL_MS, placeReadableTip, type TipBox } from "@/lib/tipPlace";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
@@ -203,6 +203,8 @@ function bboxCenter(feature: GeoFeature): [number, number] | null {
 export default function MapView(props: Props) {
   const node = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
+  const keptCamera = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const skipViewReset = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
@@ -602,6 +604,7 @@ export default function MapView(props: Props) {
     let observer: ResizeObserver | null = null;
     let resizeTimer = 0;
     let resizeStop = 0;
+    let areaDwell = 0;
     let cancelled = false;
     const boot = async () => {
     const basemap = propsRef.current.basemap || "satellite";
@@ -614,16 +617,19 @@ export default function MapView(props: Props) {
       }
     }
     if (cancelled || !node.current) return;
+    const kept = keptCamera.current;
     const map = new Map({
       container: node.current,
       style,
-      center: [props.focusLng, props.focusLat],
-      zoom: props.focusZoom,
+      center: kept?.center ?? [props.focusLng, props.focusLat],
+      zoom: kept?.zoom ?? props.focusZoom,
       attributionControl: false,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       fadeDuration: 0,
     });
     active = map;
+    keptCamera.current = null;
+    if (kept) skipViewReset.current = true;
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     const size = 36;
     const marker = (kind: "circle" | "diamond" | "depot", rgb: [number, number, number]) => {
@@ -791,7 +797,12 @@ export default function MapView(props: Props) {
       let shownKey = "";
       let request = 0;
       let tipPoint: { x: number; y: number } | undefined;
+      const clearDwell = () => {
+        window.clearTimeout(areaDwell);
+        areaDwell = 0;
+      };
       const hideTip = () => {
+        clearDwell();
         shownKey = "";
         request += 1;
         tip.dataset.hidden = "1";
@@ -804,7 +815,7 @@ export default function MapView(props: Props) {
         if (rect.width < 8 || rect.height < 8) return [];
         return [{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
       });
-      const placeTip = (point?: { x: number; y: number }) => {
+      const placeTip = (point?: { x: number; y: number }, above = false) => {
         const box = map.getContainer().getBoundingClientRect();
         const cursor = point
           ? { x: box.left + point.x, y: box.top + point.y }
@@ -814,6 +825,7 @@ export default function MapView(props: Props) {
           bounds: { left: box.left, top: box.top, right: box.right, bottom: box.bottom },
           obstacles: chromeBoxes(),
           widths: [248, 200, 168],
+          above,
           measure: (width) => {
             tip.style.width = `${width}px`;
             return { width: tip.offsetWidth || width, height: tip.offsetHeight || 72 };
@@ -824,13 +836,13 @@ export default function MapView(props: Props) {
         tip.style.width = `${placed.width}px`;
         tip.dataset.hidden = "0";
       };
-      const showTip = (key: string, _lngLat: { lng: number; lat: number }, model: TipModel, point?: { x: number; y: number }) => {
+      const showTip = (key: string, _lngLat: { lng: number; lat: number }, model: TipModel, point?: { x: number; y: number }, above = false) => {
         if (shownKey !== key) {
           shownKey = key;
           tip.innerHTML = tipHtml(model);
         }
         if (point) tipPoint = point;
-        placeTip(point || tipPoint);
+        placeTip(point || tipPoint, above);
       };
       map.on("mousemove", (event: MapMouseEvent) => {
         if (measureRef.current) {
@@ -851,6 +863,20 @@ export default function MapView(props: Props) {
         const layer = feature.layer.id;
         map.getCanvas().style.cursor = areaLayers.has(layer) ? "" : "pointer";
         const props = (feature.properties || {}) as Record<string, unknown>;
+        if (AREA_LAYER_IDS.includes(layer)) {
+          clearDwell();
+          shownKey = "";
+          request += 1;
+          tip.dataset.hidden = "1";
+          const point = { x: event.point.x, y: event.point.y };
+          const model = areaTip(props);
+          const key = `${layer}:${String(props.id || "")}`;
+          areaDwell = window.setTimeout(() => {
+            showTip(key, event.lngLat, model, point, true);
+          }, AREA_TIP_DWELL_MS);
+          return;
+        }
+        clearDwell();
         if (layer === "clusters") {
           const clusterId = Number(props.cluster_id);
           const key = `cluster:${clusterId}`;
@@ -1010,7 +1036,9 @@ export default function MapView(props: Props) {
       propsRef.current.onBounds(map.getBounds());
     });
     const observed = node.current;
+    const preserveView = Boolean(kept);
     const recenter = () => {
+      if (preserveView) return;
       if (!map.isStyleLoaded()) return;
       map.resize();
       if (propsRef.current.reviewFocus) return;
@@ -1043,7 +1071,12 @@ export default function MapView(props: Props) {
       cancelled = true;
       window.clearInterval(resizeTimer);
       window.clearTimeout(resizeStop);
+      window.clearTimeout(areaDwell);
       observer?.disconnect();
+      if (active) {
+        const center = active.getCenter();
+        keptCamera.current = { center: [center.lng, center.lat], zoom: active.getZoom() };
+      }
       tipEl?.remove();
       active?.remove();
       mapRef.current = null;
@@ -1055,7 +1088,7 @@ export default function MapView(props: Props) {
 
   const reviewFocusRef = useRef(props.reviewFocus);
   reviewFocusRef.current = props.reviewFocus;
-  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom},${props.basemap || "satellite"}`;
+  const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom}`;
   const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");
   const appliedReview = useRef("");
@@ -1319,6 +1352,10 @@ export default function MapView(props: Props) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    if (skipViewReset.current) {
+      skipViewReset.current = false;
+      return;
+    }
     let cancel = false;
     const go = () => {
       if (cancel || reviewFocusRef.current) return;

@@ -6,7 +6,7 @@ import { nearbyWashPoints } from "../lib/nearbyWashes.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
 import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
-import { boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
+import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
   assert.equal(resolvePinLabel(null, { version: null, value: null }), "asking");
@@ -91,6 +91,17 @@ test("a ring note with the site card and Layers open stays in open map space", (
   assert.ok(note.left >= bounds.left && note.top >= bounds.top && note.right <= bounds.right && note.bottom <= bounds.bottom);
   assert.ok(placed.width >= 168);
   assert.match(ringTip({ miles: 10, depot: "Yale Substation" }).title, /10-mile ring/);
+  const above = placeReadableTip({
+    cursor: { x: 400, y: 500 },
+    bounds: { left: 0, top: 0, right: 800, bottom: 800 },
+    obstacles: [],
+    widths: [200],
+    measure: () => ({ width: 200, height: 80 }),
+    above: true,
+  });
+  assert.ok(above.top + above.height <= 500 - 12);
+  assert.ok(above.left <= 400 && above.left + above.width >= 400);
+  assert.equal(AREA_TIP_DWELL_MS >= 300 && AREA_TIP_DWELL_MS <= 700, true);
 });
 
 test("nearby washes use real pins and skip anything without a location", () => {

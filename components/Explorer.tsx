@@ -27,7 +27,7 @@ import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange,
 import { BUSINESS_TYPES, CENSUS_NOTE, FUNNEL_NOTES, LAYER_TITLES, STATUS_NOTES, SUMMARY_NOTES, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
-import { parsePipeView } from "@/lib/pipeStage";
+import { droppedDealsShown, parsePipeView, stageLandShown } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
@@ -638,10 +638,17 @@ export default function Explorer() {
     : 0;
   const pipelineWide = funnel === "pipeline" && query.trim().length >= 2 && localDealMatches === 0 && !who;
   const dealWide = pipelineWide || allPipes || Boolean(who);
+  const showDroppedRows = droppedDealsShown({
+    all: allPipes,
+    stage: pipeStage,
+    droppedLayer: showDroppedDeals,
+    searchWide: pipelineWide || Boolean(who),
+  });
+  const showStageLand = stageLandShown({ all: funnel === "pipeline" ? allPipes : true, landLayer: showLandLayer });
 
   function includeDropped(group: string) {
     if (group !== "dropped") return true;
-    return showDroppedDeals || dealWide || pipeStage === "dropped";
+    return showDroppedRows;
   }
 
   const pipelineDeals = dealRows.filter((deal) => {
@@ -659,6 +666,7 @@ export default function Explorer() {
     if (deal.kind !== "land") return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
+    if (!includeDropped(deal.stage_group)) return false;
     if (!typeOn(deal.business_type || "Other")) return false;
     if (query && !dealQueryHit(deal)) return false;
     return true;
@@ -702,7 +710,7 @@ export default function Explorer() {
   const drawnDealsBase: DealFeature[] = funnel === "pipeline"
     ? [
         ...(showPipeline ? pipelineSquares : []),
-        ...(showLandLayer ? stageLandSquares : []),
+        ...(showStageLand ? stageLandSquares : []),
       ]
     : [
         ...(showPipeline ? pipelineDeals.filter((deal) => !deal.universe_id) : []),
@@ -917,9 +925,15 @@ export default function Explorer() {
         patch.funnel = "pipeline";
         patch.tab = "pipeline";
       }
-      const viewingAll = parsePipeView(search.get("pstage")).all;
+      const view = parsePipeView(search.get("pstage"));
       const known = PIPE_STEPS.some((step) => step.id === deal.stage_group) || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "sourced";
-      const stageShown = viewingAll || search.get("pstage") === deal.stage_group;
+      const droppedVisible = droppedDealsShown({
+        all: view.all,
+        stage: view.stage,
+        droppedLayer: search.get("dropped") === "1",
+        searchWide: false,
+      });
+      const stageShown = (view.all || search.get("pstage") === deal.stage_group) && (deal.stage_group !== "dropped" || droppedVisible);
       if (!stageShown) patch.pstage = known ? deal.stage_group : null;
       if (deal.kind === "land" && search.get("landlayer") !== "1") patch.landlayer = "1";
       return patch;
@@ -1247,7 +1261,7 @@ export default function Explorer() {
     return point ? inMapArea(point[0], point[1], mapArea) : false;
   })());
   const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
-  const landForList = showLandLayer
+  const landForList = showStageLand
     ? landDeals.filter((deal) => (dealWide || deal.stage_group === pipeStage) && inRange(deal, ranges) && tierOn(deal))
     : [];
   const pipelineRows: PipelineRow[] = [...rangedPipeline, ...landForList].map((deal) => ({ deal, noPin: !dealPoint(deal) }));

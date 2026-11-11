@@ -4,7 +4,7 @@ import { AREA_LABELS, AREA_PAINT, areaRole, miamiAreaLabels } from "../lib/areas
 import { areaTip, ringTip } from "../lib/markerTip.ts";
 import { nearbyWashPoints } from "../lib/nearbyWashes.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
-import { parsePipeView, pipelineStageFilter } from "../lib/pipeStage.ts";
+import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
   assert.equal(resolvePinLabel(null, { version: null, value: null }), "asking");
@@ -25,6 +25,13 @@ test("pipeline all-stages is the default and not a filter", () => {
   assert.equal(pipelineStageFilter(null), null);
   assert.equal(pipelineStageFilter("all"), null);
   assert.equal(pipelineStageFilter("desk"), "desk");
+  assert.equal(droppedDealsShown({ all: true, stage: "desk", droppedLayer: false, searchWide: false }), false);
+  assert.equal(droppedDealsShown({ all: false, stage: "dropped", droppedLayer: false, searchWide: false }), true);
+  assert.equal(droppedDealsShown({ all: false, stage: "desk", droppedLayer: false, searchWide: false }), false);
+  assert.equal(droppedDealsShown({ all: true, stage: "desk", droppedLayer: true, searchWide: false }), true);
+  assert.equal(stageLandShown({ all: true, landLayer: false }), false);
+  assert.equal(stageLandShown({ all: false, landLayer: false }), true);
+  assert.equal(stageLandShown({ all: true, landLayer: true }), true);
 });
 
 test("Miami layers are labeled in plain words and the mid-2027 line is its own role", () => {

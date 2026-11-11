@@ -713,7 +713,16 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   font-size: 13px;
   line-height: 1.35;
 }
-.map-tip-popup .maplibregl-popup-tip { border-top-color: #faf7f1; border-bottom-color: #faf7f1; }
+.map-tip-popup .maplibregl-popup-tip { border-color: transparent; }
+.map-tip-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.map-tip-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.map-tip-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #faf7f1; }
+.map-tip-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.map-tip-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.map-tip-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #faf7f1; }
+.map-tip-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #faf7f1; }
+.map-tip-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #faf7f1; }
+.map-tip-popup .maplibregl-popup-content { max-width: min(260px, calc(100vw - 24px)); overflow-wrap: anywhere; }
 .map-tip strong { display: block; font-size: 14px; }
 .map-tip-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .map-tip-extra { display: block; margin-top: 4px; color: #4e463d; }

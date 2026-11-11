@@ -45,6 +45,8 @@ type Props = {
   gridFeatures?: GeoFeature[];
 };
 
+const RING_LAYER_IDS = ["rings-10-case", "rings-10", "rings-5-case", "rings-5"];
+
 const AREA_LAYER_IDS = [
   "areas-later-case",
   "areas-later",
@@ -259,8 +261,10 @@ export default function MapView(props: Props) {
           { id: "areas-launch-line", type: "line", source: "areas", filter: ["==", ["get", "role"], "launch"], paint: { "line-color": AREA_PAINT.launchLineSatellite, "line-width": 2.6 } },
           { id: "areas-future-case", type: "line", source: "areas", filter: ["==", ["get", "role"], "future"], paint: { "line-color": AREA_PAINT.caseLine, "line-width": 6, "line-opacity": 0.55 } },
           { id: "areas-future", type: "line", source: "areas", filter: ["==", ["get", "role"], "future"], paint: { "line-color": AREA_PAINT.futureLineSatellite, "line-dasharray": [1.4, 0.9], "line-width": 3.6 } },
-          { id: "rings-case", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": AREA_PAINT.caseLine, "line-width": 3.6, "line-opacity": 0.5 } },
-          { id: "rings", type: "line", source: "rings", layout: { visibility: "none" }, paint: { "line-color": "#f4efe6", "line-dasharray": [2, 1.3], "line-width": 1.8, "line-opacity": 0.95 } },
+          { id: "rings-10-case", type: "line", source: "rings", filter: ["==", ["get", "miles"], 10], layout: { visibility: "none" }, paint: { "line-color": "#fffdf8", "line-width": 6, "line-opacity": 0.95 } },
+          { id: "rings-10", type: "line", source: "rings", filter: ["==", ["get", "miles"], 10], layout: { visibility: "none" }, paint: { "line-color": "#1d4e89", "line-width": 2.8, "line-dasharray": [2.6, 1.5], "line-opacity": 1 } },
+          { id: "rings-5-case", type: "line", source: "rings", filter: ["==", ["get", "miles"], 5], layout: { visibility: "none" }, paint: { "line-color": "#fffdf8", "line-width": 7, "line-opacity": 0.98 } },
+          { id: "rings-5", type: "line", source: "rings", filter: ["==", ["get", "miles"], 5], layout: { visibility: "none" }, paint: { "line-color": "#1e4636", "line-width": 3.4, "line-dasharray": [0.9, 0.7], "line-opacity": 1 } },
           { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 13, "text-max-width": 10, "text-offset": [0, 0.2], "text-allow-overlap": true, "text-padding": 2 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.6 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
@@ -775,9 +779,9 @@ export default function MapView(props: Props) {
         const id = event.features?.[0]?.properties?.id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
-      const popup = new Popup({ closeButton: false, closeOnClick: false, closeOnMove: false, maxWidth: "280px", className: "map-tip-popup", offset: 14 });
-      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "nearby-washes", "rings", "rings-case", ...AREA_LAYER_IDS];
-      const areaLayers = new Set([...AREA_LAYER_IDS, "rings", "rings-case"]);
+      const popup = new Popup({ closeButton: false, closeOnClick: false, closeOnMove: false, maxWidth: "260px", className: "map-tip-popup", offset: 14 });
+      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "nearby-washes", ...RING_LAYER_IDS, ...AREA_LAYER_IDS];
+      const areaLayers = new Set([...AREA_LAYER_IDS, ...RING_LAYER_IDS]);
       let shownKey = "";
       let request = 0;
       const hideTip = () => {
@@ -786,11 +790,61 @@ export default function MapView(props: Props) {
         popup.remove();
         map.getCanvas().style.cursor = "";
       };
-      const showTip = (key: string, lngLat: { lng: number; lat: number }, model: TipModel) => {
+      const aimTip = (point: { x: number; y: number }) => {
+        const box = map.getContainer().getBoundingClientRect();
+        const obstacles = ["aside.drawer", "aside.layers.open", ".map-tools"].flatMap((selector) => {
+          const node = document.querySelector(selector);
+          if (!node) return [];
+          const rect = node.getBoundingClientRect();
+          if (rect.width < 8 || rect.height < 8) return [];
+          if (rect.bottom < box.top + 4 || rect.top > box.bottom - 4) return [];
+          return [{
+            left: rect.left - box.left,
+            right: rect.right - box.left,
+            top: rect.top - box.top,
+            bottom: rect.bottom - box.top,
+          }];
+        });
+        const bounds = { left: 8, top: 8, right: box.width - 8, bottom: box.height - 8 };
+        const height = 124;
+        type TipAnchor = "bottom-right" | "top-right" | "bottom-left" | "top-left" | "right" | "left";
+        const placed = (anchor: TipAnchor, corner: { x: number; y: number }, width: number) => {
+          if (anchor === "bottom-right") return { left: corner.x - width, right: corner.x, top: corner.y - height, bottom: corner.y };
+          if (anchor === "bottom-left") return { left: corner.x, right: corner.x + width, top: corner.y - height, bottom: corner.y };
+          if (anchor === "top-right") return { left: corner.x - width, right: corner.x, top: corner.y, bottom: corner.y + height };
+          if (anchor === "top-left") return { left: corner.x, right: corner.x + width, top: corner.y, bottom: corner.y + height };
+          if (anchor === "right") return { left: corner.x - width, right: corner.x, top: corner.y - height / 2, bottom: corner.y + height / 2 };
+          return { left: corner.x, right: corner.x + width, top: corner.y - height / 2, bottom: corner.y + height / 2 };
+        };
+        const clear = (rect: { left: number; right: number; top: number; bottom: number }) => rect.left >= bounds.left
+          && rect.right <= bounds.right
+          && rect.top >= bounds.top
+          && rect.bottom <= bounds.bottom
+          && obstacles.every((item) => rect.right <= item.left + 1 || rect.left >= item.right - 1 || rect.bottom <= item.top + 1 || rect.top >= item.bottom - 1);
+        const anchors: TipAnchor[] = ["bottom-right", "top-right", "bottom-left", "top-left", "right", "left"];
+        let choice: { anchor: TipAnchor; offset: [number, number]; width: number } | null = null;
+        for (const width of [248, 200, 168]) {
+          for (const anchor of anchors) {
+            const signX = anchor.endsWith("right") ? -1 : 1;
+            const signY = anchor.startsWith("bottom") ? -1 : anchor.startsWith("top") ? 1 : 0;
+            for (let step = 0; step < 18 && !choice; step += 1) {
+              const offset: [number, number] = [signX * (14 + step * 36), signY * 14];
+              if (clear(placed(anchor, { x: point.x + offset[0], y: point.y + offset[1] }, width))) choice = { anchor, offset, width };
+            }
+          }
+          if (choice) break;
+        }
+        const picked = choice || { anchor: "bottom-right" as const, offset: [-14, -14] as [number, number], width: 220 };
+        popup.setOffset(picked.offset);
+        popup.options.anchor = picked.anchor;
+        popup.setMaxWidth(`${picked.width}px`);
+      };
+      const showTip = (key: string, lngLat: { lng: number; lat: number }, model: TipModel, point?: { x: number; y: number }) => {
         if (shownKey !== key) {
           shownKey = key;
           popup.setHTML(tipHtml(model));
         }
+        if (point) aimTip(point);
         popup.setLngLat(lngLat);
         if (!popup.isOpen()) popup.addTo(map);
       };
@@ -817,10 +871,10 @@ export default function MapView(props: Props) {
           const count = Number(props.point_count) || 0;
           const cached = clusterLeaves.current.get(clusterId);
           if (cached) {
-            showTip(key, event.lngLat, clusterTip(cached));
+            showTip(key, event.lngLat, clusterTip(cached), event.point);
             return;
           }
-          showTip(key, event.lngLat, { title: `${count.toLocaleString()} sites`, marks: [] });
+          showTip(key, event.lngLat, { title: `${count.toLocaleString()} sites`, marks: [] }, event.point);
           const ticket = ++request;
           const source = map.getSource("sites") as GeoJSONSource;
           source.getClusterLeaves(clusterId, Math.max(count, 1), 0).then((leaves) => {
@@ -842,11 +896,11 @@ export default function MapView(props: Props) {
                 ? depotTip(props)
                 : layer === "nearby-washes" || layer === "nearby-wash-labels"
                   ? washTip(props)
-                  : layer === "rings" || layer === "rings-case"
+                  : RING_LAYER_IDS.includes(layer)
                     ? ringTip(props)
                     : areaTip(props);
         const key = `${layer}:${String(props.site_id || props.deal_id || props.id || "")}`;
-        showTip(key, event.lngLat, model);
+        showTip(key, event.lngLat, model, event.point);
       });
       map.on("mouseout", hideTip);
       map.on("dragstart", hideTip);
@@ -894,8 +948,14 @@ export default function MapView(props: Props) {
         paint("area-labels", "text-halo-width", 1.8);
         paint("depot-labels", "text-color", "#1d4e89");
         paint("depot-labels", "text-halo-color", "#fffdf8");
-        paint("rings", "line-color", "#6b5428");
-        paint("rings", "line-width", 1.8);
+        paint("rings-5-case", "line-color", "#fffdf8");
+        paint("rings-5-case", "line-width", 7);
+        paint("rings-5", "line-color", "#1e4636");
+        paint("rings-5", "line-width", 3.4);
+        paint("rings-10-case", "line-color", "#fffdf8");
+        paint("rings-10-case", "line-width", 6);
+        paint("rings-10", "line-color", "#1d4e89");
+        paint("rings-10", "line-width", 2.8);
       } else {
         paint("areas-current", "fill-opacity", phoneScreen ? 0.1 : 0.18);
         paint("areas-current-line", "line-color", AREA_PAINT.currentLineSatellite);
@@ -910,6 +970,14 @@ export default function MapView(props: Props) {
         paint("areas-priority-line", "line-width", 2.2);
         paint("areas-future", "line-color", AREA_PAINT.futureLineSatellite);
         paint("areas-future", "line-width", 3.6);
+        paint("rings-5-case", "line-color", "#1c1914");
+        paint("rings-5-case", "line-width", 6.5);
+        paint("rings-5", "line-color", "#f7f3ea");
+        paint("rings-5", "line-width", 3.2);
+        paint("rings-10-case", "line-color", "#1c1914");
+        paint("rings-10-case", "line-width", 5.5);
+        paint("rings-10", "line-color", "#f7e2a8");
+        paint("rings-10", "line-width", 2.6);
         paint("area-labels", "text-color", "#f7f3ea");
         paint("area-labels", "text-halo-color", "#1c1914");
         paint("area-labels", "text-halo-width", 1.6);
@@ -1239,8 +1307,7 @@ export default function MapView(props: Props) {
       const depotsOn = props.showDepots || props.showRings;
       vis("depots", depotsOn);
       vis("depot-labels", depotsOn);
-      vis("rings", props.showRings);
-      vis("rings-case", props.showRings);
+      for (const id of RING_LAYER_IDS) vis(id, props.showRings);
       vis("sites", props.showSites);
       vis("clusters", props.showSites);
       vis("clusters-halo", props.showSites);

@@ -127,7 +127,7 @@ export const AREA_KIND_LABEL = {
 export const LAYER_TITLES = {
   universe: "Universe sites. The car-wash census for this market.",
   pipeline: "Pipeline deals.",
-  land: "Land without an operating wash. Off until you turn it on.",
+  land: "Land without an operating wash. Hidden on the all-stages map until you turn it on. A chosen stage still includes its land.",
   cstore: "Fuel and convenience stores. Off until you turn them on.",
   dropped: "Deals that are no longer being pursued.",
   unscreened: "Listings that have not been screened yet.",

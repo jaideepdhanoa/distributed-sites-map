@@ -24,3 +24,20 @@ export function parsePipeView(param: string | null | undefined): PipeView {
 export function pipelineStageFilter(param: string | null | undefined): string | null {
   return parsePipeView(param).all ? null : param || null;
 }
+
+/**
+ * Dropped deals stay out of the all-stages home view.
+ * They show for an explicit Dropped step, the dropped layer, or a search/broker widen.
+ */
+export function droppedDealsShown(view: { all: boolean; stage: PipeId; droppedLayer: boolean; searchWide: boolean }): boolean {
+  if (view.droppedLayer || view.searchWide) return true;
+  return !view.all && view.stage === "dropped";
+}
+
+/**
+ * Land on the all-stages map follows the Land sites layer.
+ * A chosen stage still includes the land at that stage.
+ */
+export function stageLandShown(view: { all: boolean; landLayer: boolean }): boolean {
+  return view.landLayer || !view.all;
+}

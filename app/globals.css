@@ -2491,5 +2491,6 @@ button.paper-btn.on,
   .shell.drawer-open:has(.layers.open) .map-corner { bottom: calc(var(--sheet-h, 45vh) + 8px); }
   .layers.open { padding-bottom: 200px; scroll-padding-bottom: 200px; }
   .shell.sheet-full .map-corner,
-  .shell.steps-open .map-corner { display: none; }
+  .shell.steps-open .map-corner,
+  .shell:has(.menu-sheet) .map-corner { display: none; }
 }

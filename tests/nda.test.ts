@@ -5,6 +5,7 @@ import {
   blockerSentence,
   blockerSentenceForDeal,
   coveredSites,
+  courtDayCount,
   ndaChip,
   ndaQueueAllowed,
   ndaQueueBody,
@@ -155,7 +156,13 @@ test("PIPE-PHX-0018 keeps the NDA chip and a different blocker sentence", () => 
 test("the queue is one open agreement per row, sorted by days in the current court", () => {
   const body = ndaQueueBody(snapshot);
   const ids = body.queue.map((row) => row.nda_id);
-  assert.deepEqual(ids, ["NDA-002", "NDA-003", "NDA-004", "NDA-005", "NDA-006", "NDA-007", "NDA-008", "NDA-001"]);
+  assert.deepEqual(ids, ["NDA-002", "NDA-003", "NDA-004", "NDA-006", "NDA-007", "NDA-008", "NDA-001", "NDA-005"]);
+  const current = body.queue.find((row) => row.nda_id === "NDA-005");
+  assert.equal(current?.nda_waiting_on, "Them — signer");
+  assert.equal(courtDayCount(current?.nda_days_in_court), 0);
+  assert.equal(courtDayCount("12/30/1899"), 0);
+  assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]), "With Moove legal · Them — signer · 3d open · 0d in court");
+  assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]).includes("1899"), false);
   assert.equal(body.queue[0]?.site_ids, "");
   assert.equal(coveredSites(body.queue[0]?.site_ids || "").ids.length, 0);
   assert.deepEqual(coveredSites("PIPE-LAS-0070; PIPE-LAS-0071").ids, ["PIPE-LAS-0070", "PIPE-LAS-0071"]);

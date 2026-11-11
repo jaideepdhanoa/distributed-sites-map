@@ -130,6 +130,29 @@ def _days(value):
     return int(match.group())
 
 
+def court_days(value):
+    """Days in the current court, as a number.
+
+    A zero stored with a date format comes back as 1899-12-30 or midnight.
+    That is 0 days, not a calendar date. Any other date is not a day count.
+    """
+    from datetime import time as time_cls
+
+    if isinstance(value, time_cls):
+        return 0 if value == time_cls(0, 0) else None
+    if isinstance(value, datetime):
+        return 0 if value.date() == date(1899, 12, 30) else None
+    if isinstance(value, date):
+        return 0 if value == date(1899, 12, 30) else None
+    if isinstance(value, str):
+        text = value.strip()
+        if re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2,4}", text):
+            return 0 if text in {"12/30/1899", "12/30/99"} else None
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[ T].*)?", text):
+            return 0 if text.startswith("1899-12-30") else None
+    return _days(value)
+
+
 def _status(value, linked: bool) -> str:
     text = _clean(value)
     if text.lower() == "not started":
@@ -151,7 +174,7 @@ def nda_mirror_fields(row: dict) -> dict:
     blocker = _clean(row.get("Stage blocker")) if "Stage blocker" in row else ""
     since = _date_text(row.get("Stage blocker since")) if "Stage blocker since" in row else ""
     days_open = _days(row.get("NDA days open")) if "NDA days open" in row else None
-    days_court = _days(row.get("NDA days in current court")) if "NDA days in current court" in row else None
+    days_court = court_days(row.get("NDA days in current court")) if "NDA days in current court" in row else None
     if not linked:
         return {
             "nda_id": "",
@@ -245,6 +268,8 @@ def _register_row(row: dict) -> dict | None:
         raw = row.get(header)
         if key in DATE_KEYS:
             item[key] = _date_text(raw)
+        elif key == "nda_days_in_court":
+            item[key] = court_days(raw)
         elif key in DAY_KEYS:
             item[key] = _days(raw)
         elif key == "nda_status":

@@ -19,6 +19,8 @@ function readBox(): ChromeBox {
     layersOpen: Boolean(document.querySelector("aside.layers.open")),
     menuOpen: Boolean(document.querySelector(".menu-sheet")),
     popoverOpen: Boolean(document.querySelector(".popover")),
+    ndaOpen: shell.classList.contains("nda-open"),
+    loopsOpen: shell.classList.contains("loops-open"),
   }) : false;
   return {
     viewportWidth: window.innerWidth,

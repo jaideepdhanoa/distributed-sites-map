@@ -1,0 +1,1609 @@
+{
+  "source": "fixture",
+  "as_of": "2026-11-11",
+  "label": "Fixture snapshot of open loops as of Nov 11, 2026 PT. Day counts are frozen to that date. A later sync recomputes them from the since dates.",
+  "register": [
+    {
+      "nda_id": "NDA-001",
+      "counterparty_firm": "Miracle Car Wash Advisors",
+      "counterparty_person": "Sharon Gibbs",
+      "site_ids": "PIPE-LAS-0016; PIPE-LAS-0017; LAND-LAS-0001 (plus broker-level coverage: Project 1459, register L-196; Donnie Rae PHX and Hart MIA projects, pre-row)",
+      "nda_status": "With counterparty legal",
+      "nda_waiting_on": "Them \u2014 legal",
+      "nda_waiting_on_since": "2026-11-10",
+      "nda_gates": "Discussion",
+      "nda_days_open": 13,
+      "nda_days_in_court": 1
+    },
+    {
+      "nda_id": "NDA-002",
+      "counterparty_firm": "Transworld Business Advisors",
+      "counterparty_person": "Carolyn Johnson",
+      "site_ids": "Confidential Las Vegas business (identity withheld pending NDA)",
+      "nda_status": "Moove form sent",
+      "nda_waiting_on": "Them \u2014 legal",
+      "nda_waiting_on_since": "2026-10-22",
+      "nda_gates": "Discussion",
+      "nda_days_open": 25,
+      "nda_days_in_court": 20
+    },
+    {
+      "nda_id": "NDA-003",
+      "counterparty_firm": "WCI Business Sales",
+      "counterparty_person": "Paul J Peterson",
+      "site_ids": "PIPE-PHX-0018; Apache Junction tire business (WCI)",
+      "nda_status": "Moove form sent",
+      "nda_waiting_on": "Them \u2014 signer",
+      "nda_waiting_on_since": "2026-10-26",
+      "nda_gates": "Proof of funds",
+      "nda_days_open": 18,
+      "nda_days_in_court": 16
+    },
+    {
+      "nda_id": "NDA-004",
+      "counterparty_firm": "NAI Horizon",
+      "counterparty_person": "Markus Hochholzer",
+      "site_ids": "LAND-PHX-0037",
+      "nda_status": "Moove form sent",
+      "nda_waiting_on": "Us \u2014 signer",
+      "nda_waiting_on_since": "2026-11-03",
+      "nda_gates": "Package",
+      "nda_days_open": 9,
+      "nda_days_in_court": 8
+    },
+    {
+      "nda_id": "NDA-005",
+      "counterparty_firm": "3 Minute Car Wash (seller-direct)",
+      "counterparty_person": "Brad Ingarfield",
+      "site_ids": "PIPE-PHX-0014",
+      "nda_status": "With Moove legal",
+      "nda_waiting_on": "Them \u2014 signer",
+      "nda_waiting_on_since": "2026-11-11",
+      "nda_gates": "Package",
+      "nda_days_open": 3,
+      "nda_days_in_court": 0
+    },
+    {
+      "nda_id": "NDA-006",
+      "counterparty_firm": "Logic Commercial Real Estate",
+      "counterparty_person": "Kilduff / Katz team",
+      "site_ids": "LAND-LAS-0011",
+      "nda_status": "Moove form sent",
+      "nda_waiting_on": "Them \u2014 signer",
+      "nda_waiting_on_since": "2026-11-09",
+      "nda_gates": "Package",
+      "nda_days_open": 10,
+      "nda_days_in_court": 2
+    },
+    {
+      "nda_id": "NDA-007",
+      "counterparty_firm": "Western Retail Advisors",
+      "counterparty_person": "Jason Fessinger",
+      "site_ids": "LAND-PHX-0046",
+      "nda_status": "Moove form sent",
+      "nda_waiting_on": "Them \u2014 signer",
+      "nda_waiting_on_since": "2026-11-09",
+      "nda_gates": "Package",
+      "nda_days_open": 3,
+      "nda_days_in_court": 2
+    },
+    {
+      "nda_id": "NDA-008",
+      "counterparty_firm": "NRC Realty & Capital Advisors",
+      "counterparty_person": "Ian Walker",
+      "site_ids": "PIPE-LAS-0070; PIPE-LAS-0071",
+      "nda_status": "Moove form sent",
+      "nda_waiting_on": "Them \u2014 signer",
+      "nda_waiting_on_since": "2026-11-09",
+      "nda_gates": "Package",
+      "nda_days_open": 2,
+      "nda_days_in_court": 2
+    },
+    {
+      "nda_id": "NDA-009",
+      "counterparty_firm": "RESF Commercial",
+      "counterparty_person": "Antonio Cristobal",
+      "site_ids": "PIPE-MIA-0077",
+      "nda_status": "Not required",
+      "nda_waiting_on": "\u2014",
+      "nda_waiting_on_since": "2026-11-09",
+      "nda_gates": "None \u2014 not gating (R-076)",
+      "nda_days_open": 5,
+      "nda_days_in_court": null
+    },
+    {
+      "nda_id": "NDA-010",
+      "counterparty_firm": "First Choice Business Brokers",
+      "counterparty_person": "Vic Coppola & Wayne Fort",
+      "site_ids": "PIPE-LAS-0015",
+      "nda_status": "Not required",
+      "nda_waiting_on": "\u2014",
+      "nda_waiting_on_since": "",
+      "nda_gates": "None \u2014 not gating (R-076)",
+      "nda_days_open": 2,
+      "nda_days_in_court": null
+    }
+  ],
+  "sites": [
+    {
+      "site_id": "LAND-LAS-0001",
+      "label": "Wash N Go Cheyenne (closed express tunnel), North Las Vegas",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 10, 2026): ANSWERED Nov 10 \u2014 utility capacity: approval for an upgrade to a 480/277V, 600-amp service (M Square / Megrath, broker statement, Claimed). STILL OPEN: (1) any utility sign-off / approval document behind that upgrade (NV Energy paper, if it exists); (2) surveys or environmental reports (asked Oct 28, still unanswered). No reply owed on the electrical item itself.",
+      "nda_id": "NDA-001",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "LAND-LAS-0004",
+      "label": "Former c-store and fuel station (closed)",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 6, 2026: emailed listing broker Emily Brun (Cushman & Wakefield) \u2014 asked (1) whether the property is sold, withdrawn, or expected back on the market, (2) whether $1.5M still holds if it returns, (3) fuel-tank cleanup case status and Phase I / environmental report availability. Awaiting reply. Land check on the aerial still outstanding (land verdict is Estimated); tank-removal scope follows from her reply.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "LAND-LAS-0005",
+      "label": "Freestanding building with a large fenced yard",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Zoning (T-058 measurement, Nov 9, 2026): RS5.2 residential-adjacency area approx. 165 ft from the parcel boundary - inside the 200-ft line, so a vehicle wash is NOT by-right in CG; if this site advances, the path is a Special Use Permit (Use Permit / UC, Sec. 30.06.05D), typically with Design Review, before any redevelopment or expansion of a wash use. Certainty step (Moove-team action; agents do not contact the county): formal written zoning determination from Clark County Current Planning. Broker thread unchanged - Northcap (Belanus/Han); electrical on file (Claimed, Nov 9). Nov 10, 2026: b\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-LAS-0008",
+      "label": "Closed gas station and c-store across from the airport",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 10, 2026, night): ANSWERED Nov 10 \u2014 (1) Environmental file resent and analyzed: Limited Phase II ESA (Converse, Oct 24, 2025) \u2014 soil at the former UST/dispenser area non-detect for target analytes; groundwater TCE 7.1 \u00b5g/L (above the 5.0 NDEP reportable level) attributed by Converse to an offsite source; no further assessment recommended. (2) Electrical: broker supplied county-record service details \u2014 1,200A, 277/480V, 3-phase (typed Layer C/D, Claimed); the two linked Clark County permit PDFs could not be downloaded this pass (county document server unreachable \u2014 named\u2026",
+      "nda_id": "",
+      "stage_blocker": "Our-side diligence",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-LAS-0009",
+      "label": "Dental office with fenced excess land",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Title commitment read Nov 9, 2026 (T-033 closed). Our-side pass Nov 9, 2026: (1) 1976 deed (Book 627, Doc 586529) \u2014 NOT available online (Recorder's online index starts 1988; microfilm only). Close via whichever lands first: the broker ask already sent to the listing broker (deed + NV Energy bills), or a Recorder copy order (email CCOROrder@ClarkCountyNV.gov for the page count, then mail order $1/page to Box 551510, Las Vegas, NV 89155-1510, or counter at 500 S Grand Central Pkwy). (2) 1982 utility easement (Book 1617, Inst. 1576712) \u2014 same microfilm route; unplottable from online records (ho\u2026",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-LAS-0010",
+      "label": "Vacant C-2 lot next door to Wash N Go Cheyenne (Cheyenne Square)",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 29 land sweep: North Las Vegas C-2 on the county layer, where a parking lot is allowed by right. Oct 29 desk checks: the ground for sale isn't a standalone parcel (see Land notes), and the listing shows two prices. Next: if Cindel approves land-only buys, ask the agents which ground is for sale (a plat or site plan), whether it's still available, any survey, title or environmental report, and what Cheyenne Square's CC&Rs allow; leave the price question until terms are on the table; look at pairing it with Wash N Go Cheyenne (Land Sites row 5)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-LAS-0011",
+      "label": "Vacant 1.88-acre C-2 lot on Las Vegas Blvd N",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 2: Cindel commented on this site on the Pipeline (10:35 AM): recommend dropping it, since Moove's Site Acq team already sources land-only sites. Second follow-up SENT Nov 9, 2026 (Jaideep approved sending despite Cindel's drop recommendation; text presses Moove's mutual NDA only, per his instruction \u2014 no broker-form route). Awaiting Logic's execution details for DocuSign. Nov 1: Blaze Katz replied that it's still available and asked us to sign Logic's NDA on their website before they share anything. Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipelin\u2026",
+      "nda_id": "NDA-006",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-LAS-0012",
+      "label": "Vacant 1.48-acre M-2 lot",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Electrical question answered Nov 9, 2026: power is accessible and stubbed at the street (broker-relayed, unverified \u2014 utility verification would be needed); water and sewer positions recorded in What we know. No survey or geological report exists (broker, Oct 30). Site stays at Desk screen on Land Sites; no reply owed \u2014 the Oct 30 asks are now all answered.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-LAS-0013",
+      "label": "Vacant 0.60-acre IP lot on Las Vegas Blvd N",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 2, 3:31 PM: Jaideep sent Moove's mutual NDA (Brittni copied); waiting for Mark Anthony's answer. Nov 2: Mark Anthony replied that it's still available, the utilities are nearby (NV Energy to confirm the nearest connection; the large industrial building next door suggests it's close) and the seller has no surveys. Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipeline. A reply sharing Moove's NDA was drafted the same day. Oct 30: Mark Anthony replied with the ERA marketing package (the same Sep 10 package already summarized in What we know; it's in Gmai\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-02"
+    },
+    {
+      "site_id": "LAND-LAS-0014",
+      "label": "Vacant 0.72-acre IP lot west of I-15, south of the Strip",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Broker's file is now complete in the folder and fully read (2016 building plans, elevations, landscape plan, and the 2017 civil improvement plans processed Nov 9, 2026). Still open: (1) electrical service at the lot \u2014 nothing in the broker's file states a service size or shows any service design for the lot (the civils cover water, sewer, gas and streetlights only); the desk position stands (no service mapped on the lot's frontage; feeder capacity about 400 ft north on W Mesa Verde Ln). Only an NV Energy/utility check or a seller-side electrical document closes this \u2014 it is not a broker ask a\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-LAS-0015",
+      "label": "Vacant 0.52-acre IP lot",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 29 desk checks: the lot is a strip about 50 ft wide behind the houses on Tunis Ave, and the feeder along Denning has no load room. Recommend dropping it unless Cindel wants it as a fallback",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-LAS-0050",
+      "label": "LAS 8355 Dean Martin Dr",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Inquiry queued Nov 5 - the same-broker 2-hour rule defers the send to after about 11:36 AM (broker contacted about 9:36 AM on another listing). Nov 5 desk: parcel identified as APN 177-17-202-006, 1.24 acres; listing price and terms still unverified.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-MIA-0006",
+      "label": "Automotive building on a paved, fenced lot",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 10, 2026): lot size and folio ANSWERED Nov 10 (county 13,366 sq ft; folio 04-3118-001-4940). Still open with the lead agent, who is checking with the seller: any site plan, survey or title work; utilities including the electrical service size (amps/phase/voltage) or a recent utility bill. The broker's C-2 zoning statement conflicts with the county CR zoning on file \u2014 resolve from a document if the site advances. Showing: Jaideep replied Nov 10, 2026 \u2014 documents first, showing to be discussed once they are reviewed (Activity A-000407). No reply owed while the broker gathe\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-MIA-0016",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (Fontainebleau priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a Miami lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0017",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (Fontainebleau priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a Miami lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0018",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (central Miami, near 868 NW 21st Terrace). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a Miami lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0019",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (central Miami, near 868 NW 21st Terrace). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a Miami lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0020",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (central Miami, near 868 NW 21st Terrace). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a Miami lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0021",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (central Miami). Next: ask Moove whether a lot next to its 3611 NW S River Dr site is useful; then desk checks (zoning, flood, FPL power)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0022",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (central Miami, near 868 NW 21st Terrace). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a Miami lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0023",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Fort Lauderdale priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0024",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Fort Lauderdale priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0025",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Fort Lauderdale priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0026",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Fort Lauderdale priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0027",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Highland Lakes priority area, Broward side). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0028",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Highland Lakes priority area, Broward side). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0029",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Fort Lauderdale priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0030",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Highland Lakes priority area, Broward side). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0031",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Highland Lakes priority area, Broward side). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0032",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Broward sweep (Fort Lauderdale priority area). Next: desk checks (zoning, flood, FPL power); if Cindel approves land-only buys, ask a South Florida lane broker to sound out the owner",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-MIA-0051",
+      "label": "MIA 19045 NW 2nd Ave",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 5, 2026: desk GIS catch-up recorded. Remaining: service size and title (broker/utility); listing lot size still conflicts with the county (12,190 vs 20,140 sf). Inquiry sent Nov 5 via Crexi (9:50 AM); awaiting availability at $1,685,000, lot-size confirmation, survey/site plan/title/environmental and utility details. Nov 10, 2026: DELIVERY DELAY flagged \u2014 the Nov 9 follow-up to the broker is in Gmail retry (45 hours from Nov 10, 3:59 PM PT); if a permanent-failure notice lands, re-send or use another channel. Do not count the Nov 9 follow-up as delivered until delivery is confirmed.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-PHX-0002",
+      "label": "Former Texaco station (closed)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Land check on the aerial; ask about tank removal and the Phase I",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0003",
+      "label": "Vacant land entitled for a car wash",
+      "market": "PHX",
+      "stage": "Financial screen",
+      "next_step": "Awaiting Pencek on the two Nov 8 follow-ups: (1) Special Use Permit status - filed? hearing or approval date? SUP documents; (2) anything showing the electrical service size (amps/phase/voltage) or a utility letter. His Nov 8 reply (found in spam) only acknowledged the Sonoran keep-warm and answered neither Ocotillo question. Site remains at Financial screen; location outside the service area is unchanged.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0007",
+      "label": "Truck and RV repair and wash center",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Chase sent Nov 7, 2026 (email, threaded reply to the Nov 4 outreach; Gmail message 1a1b5eb39b8488ae): the Nov 4 inquiry to Jazz Deol (ORION Investment Real Estate) went unanswered, so the chase re-asks (1) the asking price (none is published on the Crexi listing), (2) what exactly is included \u2014 the real estate with the operating businesses (the truck/RV repair and the wash) or the property only, and if the businesses are included, their financials (three years of P&Ls plus year-to-date), and (3) the electrical service size (amps, phase, voltage) and recent power bills. Awaiting Deol's reply.\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "LAND-PHX-0033",
+      "label": "PHX 5020 S 16th St (land)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 4, 2026: inquiry SENT by email to Linda Gerchick (linda@justsoldit.com) \u2014 availability at $950K, lot size/parcel (listing 0.31 ac vs county 0.98 ac to reconcile), survey/site plan/title, utilities incl. electrical service. No reply; chase #1 SENT Nov 9, 2026 (Jaideep-approved, R-091).",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-PHX-0034",
+      "label": "PHX 654 N Country Club Dr (land)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 10, 2026, OM analysis): (1) ANSWERED \u2014 the OM PDF has been received (saved into the site folder by Jaideep) and analyzed in full; it confirms $675,000, APNs 135-24-050A / 135-24-051A, 1.28 ac, C-2. STILL OPEN: (2) Electrical: which utility serves the lot (SRP or City of Mesa) and any service information \u2014 the OM is silent on utilities and the survey states no service size; no service on the vacant parcels. (3) Environmental report \u2014 none provided and none mentioned in the OM; ask stands. Reply to the broker (asks 2 + 3) is drafted (documents-only version A) and with Jaid\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-PHX-0035",
+      "label": "3.98-acre C-3 and R-5 lot on Buckeye Rd (for sale or lease)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 30 Phoenix land sweep (LoopNet, inside the 2026 service area). Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipeline; no outreach yet.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0036",
+      "label": "Vacant 0.43-acre C-2 corner at 24th St and Broadway Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 11 \u2014 electrical: power lines run on the northern property line (broker statement), but capacity at the intersection is unknown to the broker and no utility documentation exists in the package; the broker cannot answer the capacity item, so it is no longer a broker ask. STILL OPEN: (a) status of the two offers reported Nov 2 \u2014 not addressed in the Nov 11 reply (partial reply; the item stays open, R-094; blocker stays Awaiting broker reply since 2026-11-10); (b) electrical capacity itself \u2014 unconfirmed on the record. Decision with Jaideep (ex-T\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-PHX-0037",
+      "label": "Vacant 0.43-acre C-2 lot on McDowell Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "NDA signature due Nov 5; then request the demolition records.",
+      "nda_id": "NDA-004",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-03"
+    },
+    {
+      "site_id": "LAND-PHX-0038",
+      "label": "Vacant 0.56-acre C-2 corner on Central Ave at the light rail",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 30 Phoenix land sweep (LoopNet, inside the 2026 service area). Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipeline; no outreach yet.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0039",
+      "label": "Fenced 0.41-acre C-3 storage yard on Central Ave (price on request)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 11, 2026): STILL OPEN \u2014 (a) reliance letter for the 2020 Phase I / Phase II; (b) any seller utility documentation (service confirmation / will-serve). Nov 11: the broker replied he will dig in and see what he can find out \u2014 both items remain with the broker; no new facts. Follow up Nov 15 under R-091 if nothing lands. Our-side item unchanged: (c) verification of the stubbed-vs-adjacent utilities question in due diligence. The reports cover only the 2,661 sq ft City frontage take; the eastern parcel (former service buildings) remains unassessed.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-11"
+    },
+    {
+      "site_id": "LAND-PHX-0040",
+      "label": "0.49-acre A-1 yard at 7th Ave and Lower Buckeye Rd (three parcels)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 30 Phoenix land sweep (LoopNet, inside the 2026 service area). Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipeline; no outreach yet.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0041",
+      "label": "Vacant 0.82-acre A-1 lot on Fillmore St (flood zone AE)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 30 Phoenix land sweep (LoopNet, inside the 2026 service area). Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipeline; no outreach yet.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0042",
+      "label": "Vacant C-3 lot of 1.06 to 1.42 acres on Indian School Rd (flood zone A)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Oct 30 Phoenix land sweep (LoopNet, inside the 2026 service area). Nov 2: moved to the Land Sites tab, since Cindel ruled out land-only sites for the Pipeline; no outreach yet.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0043",
+      "label": "PHX 3926 N 19th Ave",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "None \u2014 closed. Recorded sale confirmed Nov 6, 2026 (Maricopa County): special warranty deed, sale date Apr 1, 2026, recorded Aug 14, 2026 (recording no. 20260483407), price $1,400,000 (the full asking price) \u2014 MGK Investment Group LLC (seller) to Reliance Investments LLC (buyer). Broker Aaron Gutierrez's Nov 4 'sold' report is confirmed by the county record (the transfer itself closed in April). Site stays Dropped; no further action.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "LAND-PHX-0044",
+      "label": "PHX SWC 35th Ave & Baseline Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Documents received and read Nov 9, 2026: the cross access and cross drainage agreements, the three recorded easements, the May 2023 title commitment and the Aug 2021 ALTA survey (Superior Surveying; saved into the site folder by Jaideep) contain NO restriction on a car wash use for Parcel 3 on the evidence in hand (analyses filed in the site folder). Still open: (1) recorded Doc 20211159591 - the one document neither title review characterizes beyond 'restrictions/covenants' (it postdates the survey); an our-side Maricopa Recorder pull, no broker needed. The plat notes and Doc 20040804863 are\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-PHX-0045",
+      "label": "PHX 120-140 W Osborn Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Awaiting the seller's site/environmental reports via the broker (keep-warm note sent Nov 7 via Crexi confirming the corrected 0.86 ac / four parcels and APS + City water noted; tour held until the reports are reviewed)",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "LAND-PHX-0046",
+      "label": "PHX South Mountain Pavilion, 2040/2050 W Baseline Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 9, 2026: reply SENT to Fessinger (Jaideep-approved) proposing Moove's mutual NDA (attached, Brittni cc'd) with execution details requested; proof of funds to follow once the NDA is executed; the three Outparcel items and electricals asked again in parallel. Awaiting his response.",
+      "nda_id": "NDA-007",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-08"
+    },
+    {
+      "site_id": "LAND-PHX-0047",
+      "label": "PHX 3930 E Baseline Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Restriction + listing-holder questions ANSWERED by Chad Russell Nov 10, 2026 (broker statement, no document): the restriction prevents building a car wash on the vacant parcel; listing moved to Jesse Rozio, Ignite CRE (Scottsdale). Jaideep's decision Nov 10: courtesy close to Russell (sent, A-000428) and ask Ignite first (A-000429, sent Nov 10) \u2014 awaiting from Rozio: the recorded restriction document or recording reference, current asking price and listing status, any seller-held survey / title / environmental documents, and utility / service information. Site stays at Desk screen pending the\u2026",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0048",
+      "label": "PHX 1905 W Baseline Rd",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Inquiry sent Nov 5 via Crexi (10:02 AM); awaiting asking price (none published), car-wash-use confirmation, survey/site plan/title/environmental and utility details.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-PHX-0049",
+      "label": "PHX 2725 N 35th Ave",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Dropped Nov 7, 2026 on location: the broker confirmed parcel 108-10-130E in writing, and that parcel's county point is outside phx_2026_v5. Electrical service available at the property line remains unknown (broker has no information; buyer to verify in inspection) - no longer needed. No further action unless Jaideep directs a revisit.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "LAND-PHX-0050",
+      "label": "PHX 1616 E Portland St (land)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Broker replied Nov 7: co-broker Jason Butler will provide more information. Awaiting that reply on availability and price, full-parcel confirmation, survey/site plan, title and environmental reports, entitlement documents, and APS / water-sewer details. Photo pack is the last our-side open item (T-048 queue).",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "LAND-PHX-0052",
+      "label": "PHX 849 S 17th Ave (land)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Brochure filed + analyzed Nov 9, 2026 (Jaideep saved it to Source files / 2 Property and legal; facts in What we know). Still open: (1) confirmation the offering covers both parcels from the 2016 land division \u2014 the brochure names only APN 112-14-003-A (asked the broker Nov 9, 2026); (2) APS electrical service size (asked Nov 9, 2026; nothing in the brochure); (3) HP easement \u2014 the broker directed us to the City of Phoenix (that contact runs through the Moove team, not agents); (4) zoning: brochure states R-5 72% / C-2 28% \u2014 confirm the car-wash use position on the C-2 portion. Broker replied\u2026",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "LAND-PHX-0053",
+      "label": "PHX 821 W McKinley St (land)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Broker replied Nov 8: no information yet - colleagues on the broker side will reply with more information. Awaiting availability and price, full-parcel confirmation, current zoning, survey/site plan, title and environmental reports, and utility service. Aerial measure (R-084) and photo pack (R-085) pending via the standing backfill; AADT/population via the daily sweep (T-042 master).",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-08"
+    },
+    {
+      "site_id": "LAND-PHX-0054",
+      "label": "PHX 1822 W Glendale Ave (pads)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Closed Nov 8, 2026: broker confirmed the parcels are sold (to 7-Eleven and McDonald's) \u2014 no further action.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-08"
+    },
+    {
+      "site_id": "LAND-PHX-0055",
+      "label": "PHX 7011-7013 N 19th Ave (land)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Closed Nov 8, 2026: broker confirmed the parcels are sold (to 7-Eleven and McDonald's) \u2014 no further action.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-08"
+    },
+    {
+      "site_id": "LAND-PHX-0056",
+      "label": "Palm Skyline \u2014 fully entitled 25-unit development site, 338 E Willetta St, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 10, 2026): broker items (1) acreage and (2) title report ANSWERED Nov 10 (lot is 17,370 sq ft / 0.40 ac per the county assessor \u2014 the OM 0.58 ac figure was the broker's error; no title report exists until a purchase agreement is executed and escrow opens). (3) Entitlement currency: broker states permit-ready with approved 25-unit plans; permits est. ~$50,000, which the broker indicated can come off the price. Our-side (R-093): T-060 City of Phoenix KIVA 23-1947 approval-status check remains open \u2014 that is now the gating item on entitlement currency. No reply owed.",
+      "nda_id": "",
+      "stage_blocker": "Our-side diligence",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-PHX-0057",
+      "label": "Development opportunity with building plans, 2833 E Broadway Rd, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 10 \u2014 the marketed parcel is confirmed as the front parcel, APN 122-58-035A (035B is the back parcel). STILL OPEN: (a) whether 035B is also available and at what price \u2014 not answered; (b) title report \u2014 broker has ordered it, expected early next week (week of Nov 16); (c) whether the SRP 500 kVA transformer service is installed and energized \u2014 broker getting clarity. Draft reply held in the Nov 11 morning review (keeps the channel written, re-asks (a), confirms (b) and (c) awaited). Follow up Nov 15 under R-091 if the title report / transforme\u2026",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-10"
+    },
+    {
+      "site_id": "LAND-PHX-0058",
+      "label": "Contractor yard with shop building, 9232 N 11th Ave, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Closed Nov 10, 2026: broker confirmed in writing the site is under contract and set to close within two weeks \u2014 stage moved to Dropped (R-033). No further action unless the sale falls through. Broker offered to share other properties that could fit; draft reply held for Jaideep (DRAFTS in this run's report).",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "LAND-PHX-0059",
+      "label": "Multifamily land, 2125 E Southern Ave, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "SUGGESTED DROP (Nov 11, 2026): the broker confirmed in writing the property is under contract. Stage stays at Desk screen pending Jaideep's drop decision (R-097 \u2014 a stage is never moved to Dropped except on a human decision); no chase while it is under contract. If Jaideep approves, drop the row and register L-405 with the broker's under-contract statement as evidence. Draft reply held in the Nov 11 midday review (thanks the broker and asks to be kept in mind if it returns to market).",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": "2026-11-11"
+    },
+    {
+      "site_id": "LAND-PHX-0060",
+      "label": "Land, 3275 E Paradise Lane, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 11 \u2014 the broker sent the listing flyer (filed and analyzed in the midday pass): parcel, acreage, zoning and price confirmed; multifamily plans and entitlements stated as City-approved; site plan included in the flyer. STILL OPEN: (a) survey and title report \u2014 not provided; (b) environmental reports \u2014 not provided; (c) electrical service details / any will-serve or capacity note (flyer says only utilities are City of Phoenix); (d) how many units the approved entitlements cover (broker's note says 16 units). Draft reply held in the Nov 11 midda\u2026",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-11"
+    },
+    {
+      "site_id": "LAND-PHX-0061",
+      "label": "Chandler Mall land, S Chandler Village Dr, Chandler",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Ask list (updated Nov 11, 2026): ANSWERED Nov 11 \u2014 availability (available), price ($40/sq ft; sellers would consider mid-$30s/sq ft, shorter escrow helps), parcels (single 1.34-ac parcel, APN 301-65-977), documents (broker states no current survey, site plan, title or environmental reports exist). STILL OPEN: (a) the marketing package contents \u2014 the attached Executive Summary PDF (7.1 MB) could not be downloaded via the Gmail connector in the midday pass (named failure); the held draft asks the broker to resend it or share the site plan/survey separately; (b) PAD entitlements / any recorded\u2026",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-11"
+    },
+    {
+      "site_id": "PIPE-LAS-0011",
+      "label": "Self-serve wash",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Dropped Oct 18 in the off-market screen: 0.46 acres, under half an acre, unless the land next door can be added. Land figures corrected Nov 6, 2026 per the verified R-084 re-measure (0 sq ft spare / 0 stalls fit; Land status now Verified) \u2014 the sole reopen path is adding the separate vacant parcel directly east, already asked of the broker in the Nov 6 Crexi follow-up. Nov 6, 2026: the Crexi follow-up to Marcie Hansen (Regency Realty Investments) was sent and verified in the account Sent folder (Crexi message 128466868, delivered exactly once, alongside the original Nov 5 inquiry). Awaiting H\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-LAS-0015",
+      "label": "Repair, collision and U-Haul",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Suggested drop under R-097 (knock-out: outside the service area \u2014 Mesquite NV). Jaideep decided Nov 11, 2026: KEEP parked as a suggested drop; do not drop without a new decision from him. Thread closed Oct 30 (pass communicated); NDA-010 closed as Not required Nov 11. \u2014 History: Oct 30: Vic says the shop is in Mesquite, NV, about 80 miles northeast of Las Vegas and far outside the service area, so it's knocked out; we replied passing on it and asking for anything similar in the Las Vegas valley. Earlier Oct 30: followed up with Vic and Wayne (Brittni copied) to ask whether Moove's mutual NDA\u2026",
+      "nda_id": "NDA-010",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-10-30"
+    },
+    {
+      "site_id": "PIPE-LAS-0016",
+      "label": "Wash N Go Sahara",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Suggested drop (R-097) \u2014 Jaideep decided Nov 11, 2026: PIPE-LAS-0016 is a suggested drop until he reviews/confirms it \u2014 not dropped; no pass may drop it without a new decision from him. Blocker corrected the same day (his ruling): we sent last on Nov 6 \u2014 nothing is owed to Schneider; the open asks are Miracle's. Prior next step (unchanged): Market-data follow-up sent to Stephen Schneider (Miracle) Nov 6, 2026 in his Sahara/Desert Inn thread: pair price / year-end position and whether the seller would split the pair; operating financials requested (recent P&Ls, membership numbers). Site stays\u2026",
+      "nda_id": "NDA-001",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-LAS-0017",
+      "label": "Wash N Go Desert Inn",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Suggested drop (R-097) \u2014 Jaideep decided Nov 11, 2026: PIPE-LAS-0017 is a suggested drop until he reviews/confirms it \u2014 not dropped; no pass may drop it without a new decision from him (the same ruling he gave PIPE-LAS-0016, extended to this row at his direction). Blocker already reads 'Awaiting broker reply' since Nov 6, 2026 \u2014 we sent last; nothing is owed to Schneider; the open asks are Miracle's. Prior next step (unchanged): Market-data follow-up sent to Stephen Schneider (Miracle) Nov 6, 2026 in his Sahara/Desert Inn thread: pair price / year-end position and whether the seller would spl\u2026",
+      "nda_id": "NDA-001",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-LAS-0042",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Desk screen: Clark County IP zoning rules, access to the west land and liens; then the Las Vegas auto-service lane broker Nov 2 (Torque): Jaideep designated this the #1 off-market target (4210 W Glendale Ave downgraded to Watch). Next: power check (NV Energy hosting-capacity map) map) and parcel detail before any broker-lane approach, which still needs Jaideep's off-market route approval.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0043",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Test-fit 10 stalls on the SW paving; Henderson CC zoning rules",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0044",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Check who owns the vacant land next door (possible assemblage); parking minimums",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0045",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Identify the operator (truck wash?) from the street view",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0046",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Verify the business and the owner; then the Las Vegas auto-service lane broker",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0047",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Confirm tenant leases and parking needs",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0048",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Verify it's operating",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0049",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Verify the business; City of Las Vegas zoning",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0050",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Only if the north paving test-fits around the entry lane",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0051",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Pair with 7501 Alta Dr if both owners are open",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0052",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0053",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0054",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0055",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0070",
+      "label": "Operating c-store with gas and gaming",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 9, 2026, 2:07 PM PT: Jaideep sent Ian Walker (NRC) Moove's mutual NDA on this listing (the same form already offered earlier that day on the 2014 Ann Rd thread, attached again; Brittni cc'd). Reply awaited. Nov 9, 2026: broker replied that the package sits on the NRC website behind their confidentiality agreement (Moove does not sign website CAs). Seller faces significant liquidated damages to end the ARCO/ampm agreements, so real estate separate from the brand looks costly. Nov 10, 2026: internal \u2014 Brittni proposed a 15\u201330 min call this week to work through the NRC NDA hurdles; Jaideep's\u2026",
+      "nda_id": "NDA-008",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "PIPE-LAS-0071",
+      "label": "Operating c-store with gas and gaming; car wash out of service",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 9, 2026: reply SENT to Walker/NRC (Jaideep-approved) declining their website confidentiality agreement and offering Moove's mutual NDA instead (attached, Brittni cc'd; execution details requested), with the full package + electrical + tank-report ask in parallel. Awaiting NRC's response.",
+      "nda_id": "NDA-008",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "PIPE-LAS-0072",
+      "label": "Independent station and c-store, 8 pumps",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Class 4 identification pass, Nov 7, 2026: address and lot size still not established. The BizBuySell listing (2564027) is dead (404 / File Not Found, re-confirmed Nov 7) and no project record \u2014 register L-130, category row C-030, this row, Gmail/Drive \u2014 contains an address or APN. One public candidate surfaced on price alone (an ARCO am/pm offering at $6,900,000: 4380 Spring Mountain Rd, APN 162-18-504-001, Dara Realty Group) but was NOT adopted as an identification: a single round-number price match does not identify a confidential listing, the teaser describes an independent station with a\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-LAS-0073",
+      "label": "Former car wash building, now four tenants",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Broker replied again Nov 9, 2026: the seller will not release the remaining detail (per-tenant rents, car wash lease start/expiry dates, which parcel each tenant sits on, buyout terms) until a brief live call takes place \u2014 the seller wants to confirm an actual human is in discussion. Decision for Jaideep: take the seller's call, or hold the written-only line and let the thread rest. The four open items stay on the ask list either way. Jaideep, Nov 9, 2026: HOLD for now on the seller's call request \u2014 no call and no further chase at this stage; the thread rests with the four items open.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0012",
+      "label": "Auto repair, corner lot",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 6, 2026: Outreach sent via Realmo to the listing agent, Maria Lorena L Gonzalez (Florida Realty of Miami Corp) \u2014 market-data pass on the dropped row; Stage stays Dropped and reopening is a separate decision. Listing re-verified live at send time ($1,350,000, Active, 0.41 ac, 4,040 sq ft); no prior inquiry existed. Asked: (1) whether the sale includes the real estate or is business only (row records Unknown); (2) lot size \u2014 county folio 30-2134-008-0010 now verifies 0.41 ac / 17,680 sq ft (NW17-CHECKS-2026-11-06.md), superseding the repair-census funnel's 0.22 ac figure; (3) what business\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-MIA-0013",
+      "label": "Tire and service shop",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 5, 2026: desk GIS catch-up recorded (data only; stage unchanged). Dropped Oct 18 in the off-market screen: 0.26 acres is far too small, and the asking price is 2.4 times the county's value Nov 6, 2026: Realmo listing verified OFF-MARKET in the signed-in session (no $3.3M ask, no named agent, no contact form). The approved inquiry was NOT sent \u2014 no active listing to send it to. County record pulled instead (Miami-Dade PA GIS roll, folio 30-4009-004-0020): owner of record UNIDEL CORP (mailing address = the site). The only sale on the roll is Apr 1, 1980, $106,000 (OR Bk 10875 Pg 208) \u2014 no t\u2026",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0056",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Ask Cindel whether truck-stop land is in scope and inside the target zones",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0057",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Check leases and the parking ratio",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0058",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority unless the segment widens",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0059",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0060",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority: trucks fill the yard",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0061",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Verify the operator; Florida City zoning",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0062",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0063",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0064",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0065",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0066",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0074",
+      "label": "Owner-operated repair shop on two folios",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 5, 2026: desk catch-up blocked on street address (address after NDA). Oct 28: not worth an inquiry. The listing says package only (the business, real estate and equipment together, with a certified mechanic to keep the shop registered) and shows two bays and eight parking spaces, so about 4 stalls even if the shop closed. Revisit only if the address shows more land",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0075",
+      "label": "Gas station that needs its tanks replaced",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Class 4 identification pass, Nov 7, 2026: address and lot size still not established. The BizBuySell listing (2232797, 'Gas Station For Sale With Land', North Miami, $1,800,000, 'NEEDS TANKS TO BE REPLACED. REAL ESTATE INCLUDED') is confirmed as this row's listing in the current BizBuySell category indexes, but it is a confidential listing \u2014 no address, folio or lot size is published anywhere, and the Nov 4 BizBuySell message to the broker (Roger Schaeffler) asking for the address, lot size and tank responsibility has no recorded reply. No county pull is possible without a folio. Row stays ca\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-MIA-0076",
+      "label": "Corner service station with a tenant",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 5, 2026: desk GIS catch-up recorded (county value, FPL, on-site tanks and an open release in Finder). Remaining: remediation status, tenant lease, service size and title. Land check on the aerial; the remediation status and the tenant's lease",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "PIPE-MIA-0077",
+      "label": "Auto repair business with an option on its two warehouse units",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 5, 2026: desk catch-up blocked on street address (address after NDA). Get the address and lot size; then a land check",
+      "nda_id": "NDA-009",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "PIPE-MIA-0078",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Oct 29 Miami sweep (central Miami). Next: desk checks (zoning, flood, FPL power), and find out what the businesses are and whether the west lot is free",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0079",
+      "label": "M Car Wash",
+      "market": "MIA",
+      "stage": "Dropped",
+      "next_step": "Dropped Nov 10, 2026 by Jaideep \u2014 seller unreachable. The only listed channel (carwashesforsale.com Contact Advertiser form) failed 5 times on Nov 3 with a server-side relay error; no broker is named on the listing. An owner-direct letter to Rose Point Ventures LLC (owner of record, pulled Nov 10) was prepared but Jaideep directed the drop instead \u2014 letter NOT sent. No further action; no chase. Nov 10, 2026: The seller has never been reached. The carwashesforsale.com Contact Advertiser form failed on Nov 3 (Mailbox unavailable / Relay is not allowed; Run Log rows 51 and 55; row 70 records fiv\u2026",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0080",
+      "label": "Stars & Stripes",
+      "market": "MIA",
+      "stage": "2 Financial screen",
+      "next_step": "Broker replied Nov 9, 2026: no paid labor in the P&L (owner-operated) \u2014 the payroll item is closed. Awaiting POS/car counts and water/electric bills (broker assembling), electrical service size and addbacks detail. Tax returns at LOI. Stage stays Financial screen.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0082",
+      "label": "Clean Get Away Car Wash",
+      "market": "MIA",
+      "stage": "Dropped",
+      "next_step": "Monitor only \u2014 parked Nov 6, 2026 at Jaideep's direction. Broker Roger Pardo (Realty Group of Miami) confirmed in writing Nov 6, 2026: the real estate is not for sale and the business-only listing ($550K) is on hold. Recheck with Pardo around Dec 6, 2026 \u2014 status change? real estate in play? business financials available as a comp? The draft check-in note (financials-as-comp + first-call-if-RE-comes-in) is prepared and parked with the DROPPED-SITES-REVIEW-2026-11-06.md file \u2014 NOT sent. No further action unless the real estate itself comes to market; address/APN confirmation also still owed if\u2026",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-MIA-0086",
+      "label": "Majestic Car Wash",
+      "market": "MIA",
+      "stage": "1 Desk screen",
+      "next_step": "Broker reply awaited \u2014 on reply, send the standard package ask (financials + power).",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0001",
+      "label": "Sonoran Express",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 6, 2026: Outreach sent to Pencek (market-data pass; Stage stays Dropped \u2014 reopening is a separate decision, Cindel for any offer). Asked: (1) where the seller sits today \u2014 $1.6M listing vs the $1.3M seller bottom line from Oct 22; (2) monthly P&Ls ahead of escrow (annuals on file run through mid-2026); (3) electrical service size (amps/phase/voltage) \u2014 utility letter, panel details, or any SRP correspondence on capacity or upgrades; (4) seller timing \u2014 whether a year-end close is still the aim and whether it affects price. Awaiting reply.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-PHX-0003",
+      "label": "Express wash",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Stays dropped: no spare area on the lot, and revenue and EBITDA are falling; location re-test Nov 6 confirmed Outside (parcel point 4.30 mi from the service-area boundary). Nov 6 follow-up sent to Roger Pencek in the Sonoran thread: 2026 YTD trajectory and monthly figures, price flexibility at $2.3M, membership trend, and electrical service size (amps/phase/voltage) or utility documentation. Awaiting reply; raise the package with Cindel only if she wants a second look.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-PHX-0004",
+      "label": "Express wash, Mesa",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 6, 2026: Outreach sent to Pencek (market-data pass; Stage stays Dropped \u2014 reopening is a separate decision, Cindel for any offer). Asked: (1) availability \u2014 whether $2.9M is still the asking price and whether there is flexibility; (2) the full financial package, never requested before \u2014 3 years of P&Ls + YTD, monthly car counts or POS reports for the last 24 months, membership count + recurring revenue, payroll summary, water and power bills, proposed addbacks and what is included in the sale; (3) electrical service size (amps/phase/voltage) or any utility documentation the seller can sha\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-PHX-0005",
+      "label": "Rinse My Ride",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Stays dropped: little usable spare area on the 0.77-acre lot, and about 21x 2025 EBITDA at $2.1M. Package received Oct 21. Roger answered Oct 21 (1:29pm): Rinse My Ride Glendale is a separate location, and the survey page he sent is a Rinse My Ride plat, now filed in this folder. Nothing more needed for now | Nov 7, 2026: sent the approved market-data follow-up to Roger Pencek in a NEW Gmail thread (msg 1a1b5e5d11ee8ff1) \u2014 asked: (1) whether the $2.3M flyer price (land $1M / building $800K / equipment $500K) is still the seller's position and its flexibility; (2) 2026 year-to-date monthly fig\u2026",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-PHX-0006",
+      "label": "Flex-serve wash, northeast Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Class 4 identification pass, Nov 7, 2026: address still not established \u2014 no street address or APN exists anywhere in the project records (register L-022/L-064, this row, Gmail/Drive per the Nov 6 catch-up), and the public BizBuySell index copy of Ad 2357559 carries no address (confidential teaser: 'Car wash $725K FIRM w land NE Phoenix', flex service, established 1990, absentee owner, real estate owned). The only sale evidence remains Roger Pencek's Oct 21 email that the second self-serve he mentioned had SOLD \u2014 broker-stated, with no parcel to verify against county records. Row stays cannot\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-PHX-0007",
+      "label": "Express wash",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Follow-up sent to Justin Corrales (Matthews) Nov 6, 2026 as a reply-all in the existing Assaf/Corrales Gmail thread (Simon's Nov 3 message CC'd Justin as the listing contact): (1) is the property still available; (2) which price is current \u2014 Matthews listing $699K vs the $1.3M on Roger Pencek's Rinse My Ride flyer (Jul 21, same owner) \u2014 and is there flexibility; (3) full financial package \u2014 3 years of P&Ls + YTD, 24 months of monthly car counts/POS, membership count + recurring revenue, payroll summary, water and power bills, proposed addbacks and what is included in the sale; (4) electrical\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-PHX-0008",
+      "label": "16 bays, 9,948 sq ft",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Identified Nov 7, 2026 (Class 4 pass): the BizBuySell teaser is 1325 E Main St, Mesa, AZ 85203 (APN 138-09-007A) \u2014 matched on the listing fingerprint (9,948 sq ft building; 16 bays) to the COBE Real Estate sale brochure for Main Street Auto Shop. County record shows NO real-estate sale (owner unchanged since 2006), so the vanished $2.75M business+real-estate listing was withdrawn, not sold; the real estate was separately marketed at $2,100,000 (COBE brochure, crawled Nov 5, 2026) with the business offered alongside. Nothing to chase unless it relists or a broker brings it back; the address is\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-PHX-0009",
+      "label": "Land and building",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Class 4 identification pass, Nov 7, 2026: the listing is matched to its BizQuest mirror (Listing ID 2144047) \u2014 same $1,790,000 ask and the same 'LAND, BUILDING, PARKING RIGHTS, AND BUSINESS CONVEY' copy as this row's descriptor \u2014 which adds listing facts (4,801 sq ft shop, six drive-in bays, 29,011 sq ft / 0.67 ac lot, built 2000, auto services at the location since 2000, claimed NOI $426,483) but NO street address or APN: the mirror's only location trace is its FF&E attachment filename ('FFE List Apache Blvd.pdf') \u2014 the Apache Blvd corridor, Mesa, not an address. Identification fails on the\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-PHX-0010",
+      "label": "Express wash, Peoria",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "None \u2014 closed as a market-data point. Nov 6, 2026 status check: the Crexi listing ($4.5M, 183 days on market) has been removed \u2014 the register records the Crexi page updated Oct 28, 2026 showing the listing removed, and it was recorded delisted in the Nov 3 scan. No sale has recorded: Maricopa County owner of record remains GRAND WASH LLC (APN 142-13-023), so the property delisted unsold and the wash (Grand Express Wash) continues to operate. Keep as a $4.5M price comp only. Stage stays Dropped; reopening is a separate decision.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0014",
+      "label": "3 Minute Car Wash",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 9, 2026: redline acknowledged to the seller (Gmail 1a1c12b384a85680) and the redline forwarded to Brittni with a request to submit it to CLM for legal review (Gmail 1a1c12b77622069c). Awaiting CLM/legal feedback; then DocuSign (seller Love Your Car LLC, signer Brad Ingarfield). Package + electricals follow execution. Site stays Dropped (land knock-out). Nov 10, 2026: Jaideep followed up with Brittni again on the CLM submission of the Ingarfield redline (second follow-up; the first was Nov 9) \u2014 still awaiting CLM/legal feedback.",
+      "nda_id": "NDA-005",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "PIPE-PHX-0018",
+      "label": "Tire sales and service (WCI listing)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 9, 2026: WCI confirmed the tire shop owner is not interested in selling at this time \u2014 site stays Dropped; no further chase on this business. The separate WCI NDA thread stays open only for other listings: Paul will follow up with WCI's designated broker for the entity/signer details (Brittni cc'd on his reply).",
+      "nda_id": "NDA-003",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-PHX-0019",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Nov 3, 2026, 2:40 PM (Indie): knocked out under the new tenant-lease rule (R-067, Assumptions row 143; Jaideep, chat, Nov 3, 2:35 PM): Tenant lease blocks site (CJ) set to Yes, so Knock-out reads Tenant lease ties up the site. Per R-063: \"Tenure is a first-pass screen, not a diligence item. Before any site is presented as a GO or top target, check owner-vs-operator tenure and any recorded lease (the 4210 W Glendale Ave lesson: the whole parcel was inside a 20-year tenant lease).\" Not an approach candidate; no contact. Earlier: Read the 2022 lease (20220640248) and the Raceway assignment, then\u2026",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0020",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None: no spare land (Oct 21 aerial)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0021",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None: no spare land (Oct 21 aerial)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0022",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None: no spare land (Oct 21 aerial)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0023",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Test-fit stalls on the south paving; then owner outreach once Cindel approves the wording",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0024",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Street view and the Dec 2025 deed to confirm the use; then owner outreach once Cindel approves the wording",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0025",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None: no spare land (Oct 21 aerial)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0026",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority: only about 5 stalls fit",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0027",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Test-fit 9 stalls on the north paving, keeping the entry queue",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0028",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Test-fit the two side lots",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0029",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None: no spare land (Oct 21 aerial)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0030",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority: only about 4 stalls fit",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0031",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Hold; revisit only as a land or redevelopment case",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0032",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Confirm the shared-parking and cross-access easement; test-fit the south triangle",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0033",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Nov 3, 2026: Off market (no lead) under R-064. The 2024 LoopNet listing (ID 32246526, on market Jun 25, 2024, $1.2M) now reads \"no longer advertised\", so it is not a live listing; no broker is attached. Jaideep to approve any approach route. Earlier: Ask the lane broker whether the 2024 listing is still live, and when the tenant's lease ends",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0034",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Confirm whether KJM Properties runs the shop; test-fit the east strip",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0035",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority: only the east dirt strip is free (about 7 stalls)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0036",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority: about 7 stalls fit on the south asphalt",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0037",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Check shared access and easements through the shopping center",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0038",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Low priority: collision is \"not now\" in the plan",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0039",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None while the car lot runs; check the service area first if it comes back",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0040",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "None: no spare land (Oct 21 aerial)",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0041",
+      "label": "",
+      "market": "",
+      "stage": "",
+      "next_step": "Verify the business",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0067",
+      "label": "Sinclair station and c-store (WCI listing)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Get the address and lot size from WCI (Paul) or the listing; then a land check",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0068",
+      "label": "Shell station and c-store on a signalized corner (WCI listing)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Get the address and lot size from WCI (Paul) or the listing; then a land check",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0069",
+      "label": "ARCO station and ampm c-store (WCI listing)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Get the address and lot size from WCI (Paul) or the listing; then a land check",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0081",
+      "label": "Rinse My Ride",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Closed Nov 9, 2026: broker (Car Wash Brokers) confirmed in writing the same day that the Glendale site was sold about 45 days earlier (\"Sold this one 45 days ago\"). Stage moved to Dropped on the broker's written word (R-033). The FY2023 package and the $172,040 Normalized EBITDA recast stay on file for reference; no further asks on this site.",
+      "nda_id": "",
+      "stage_blocker": "We owe a reply",
+      "stage_blocker_since": "2026-11-09"
+    },
+    {
+      "site_id": "PIPE-PHX-0083",
+      "label": "Fast Lap Xpress Wash",
+      "market": "PHX",
+      "stage": "Dropped",
+      "next_step": "Broker confirmed Nov 5: $7M is business + RE combined (Red Mountain Group); tenure knock-out lifted. Jaideep Nov 5 11:39 AM PT: keep Dropped \u2014 outside Phoenix service area (also weak vs ~$110K EBITDA). Leave off Cindel walk; no bring-back. Financial completion asks (Nov 9, 2026): FY2024 P&L and business tax returns (needed to reach Verified); reconcile P&L car wash net revenue ($445,055) against POS net wash subtotal ($418,629); confirm whether any owner compensation or non-recurring items sit inside payroll or supplies; electrical service size still outstanding.",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-PHX-0084",
+      "label": "3520 N 16th St (former DataBank building)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 10, 2026: Corrected reply SENT to Payne (A-000446): Nov 6 wash-template ask withdrawn; real-estate package requested (title, survey, environmental, utility/service incl. electrical + bills), second parcel APN, PSA status, building's actual clear height. Awaiting the broker \u2014 chase due Nov 14 under R-091 if unanswered. Site held at Desk screen until a real package exists (Jaideep, Nov 10). Nov 10, 2026: DEMOTED to Desk screen on Jaideep's direction \u2014 the Nov 5 stage advance rested on a site plan only; no financial package has ever been received, and the site is categorized as LAND (Archety\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting package",
+      "stage_blocker_since": "2026-11-06"
+    },
+    {
+      "site_id": "PIPE-PHX-0085",
+      "label": "8812-8828 N Black Canyon Hwy (auto center)",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Reply sent Nov 7 (Jaideep-approved): asked Fife for the current rent roll / month-to-month lease documents and the buildings' electrical service details (amps, voltage, phase, utility bills). Awaiting reply; the drop decision (no business included, 0 spare land) waits on the income picture.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-07"
+    },
+    {
+      "site_id": "PIPE-SNA-0002",
+      "label": "Newport Beach",
+      "market": "SNA",
+      "stage": "1 Desk screen",
+      "next_step": "Nov 5, 2026: desk GIS catch-up recorded (APN, acres, SCE, flood/tanks; no public assessed value). Stage unchanged. Out of scope for now: Cindel (Oct 19) wants to vet the model in Phoenix, Miami and Las Vegas first, so no Birch requests to Voit. Revisit if Southern California opens up",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-10-14"
+    }
+  ]
+}

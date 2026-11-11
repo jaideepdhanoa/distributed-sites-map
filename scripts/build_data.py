@@ -4823,10 +4823,12 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         from scripts.comms import write_comms_file
         from scripts.financials import write_financials_file
         from scripts.nda import write_nda_file
+        from scripts.open_loops import write_open_loops_file
 
         write_financials_file(workbook, OUT / "financials.json", reg)
         write_nda_file(workbook, OUT / "nda.json")
         write_comms_file(workbook, OUT / "comms.json")
+        write_open_loops_file(workbook, OUT / "open-loops.json")
         (OUT / "parcels.geojson").write_text(json.dumps(parcels_fc))
         for city_code in ("PHX", "LAS", "MIA"):
             city_fc = {
@@ -5059,6 +5061,7 @@ def validate_committed() -> None:
         "unscreened.geojson",
         "nda.json",
         "comms.json",
+        "open-loops.json",
     ]
     loaded = {}
     for name in required:

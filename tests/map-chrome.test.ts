@@ -8,6 +8,8 @@ import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
 import { pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
 import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, type TipBox } from "../lib/tipPlace.ts";
+import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets } from "../lib/depotRings.ts";
+import type { GeoFeature } from "../lib/types.ts";
 
 test("pin labels default to asking price and keep a later explicit choice", () => {
   assert.equal(resolvePinLabel(null, { version: null, value: null }), "asking");
@@ -114,6 +116,40 @@ test("a ring note with the site card and Layers open stays in open map space", (
   assert.ok(above.top + above.height <= 500 - 12);
   assert.ok(above.left <= 400 && above.left + above.width >= 400);
   assert.equal(AREA_TIP_DWELL_MS >= 300 && AREA_TIP_DWELL_MS <= 700, true);
+});
+
+test("depot rings are closed lines and stay outside a neighborhood view", () => {
+  const phx03: GeoFeature = {
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [-112.0704241, 33.4356713] },
+    properties: { id: "DEP-PHX-03", address: "1224 S 3rd St" },
+  };
+  const far: GeoFeature = {
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [-111.904597, 33.6203296] },
+    properties: { id: "DEP-PHX-01", address: "8175 E Butherus Dr" },
+  };
+  const features = depotRingFeatures([phx03, far]);
+  assert.equal(features.length, 4);
+  for (const feature of features) {
+    assert.equal(feature.geometry.type, "LineString");
+    const line = feature.geometry.coordinates;
+    assert.equal(line.length, 65);
+    assert.ok(Math.abs(line[0][0] - line[line.length - 1][0]) < 1e-9);
+    assert.ok(Math.abs(line[0][1] - line[line.length - 1][1]) < 1e-9);
+  }
+  const five = features.find((feature) => feature.properties.miles === 5 && feature.properties.depot === "1224 S 3rd St");
+  assert.ok(five);
+  const lats = five.geometry.coordinates.map((point) => point[1]);
+  const span = (Math.max(...lats) - Math.min(...lats)) * 69;
+  assert.ok(span > 9.5 && span < 10.5, `5-mile ring span ${span}`);
+  const neighborhood = { west: -112.11, south: 33.41, east: -112.03, north: 33.46 };
+  assert.equal(ringStrokeMeets([phx03], neighborhood), false);
+  assert.equal(ringStrokeMeets([phx03, far], { west: -112.3, south: 33.2, east: -111.7, north: 33.7 }), true);
+  const framed = ringFrameCoordinates([phx03, far], [-112.07, 33.44], neighborhood);
+  const framedLats = framed.map((point) => point[1]);
+  assert.ok(Math.max(...framedLats) > 33.5 && Math.max(...framedLats) < 33.6);
+  assert.ok(Math.min(...framedLats) < 33.4 && Math.min(...framedLats) > 33.28);
 });
 
 test("nearby washes use real pins and skip anything without a location", () => {

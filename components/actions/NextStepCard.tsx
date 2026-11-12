@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
-import { publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
+import { approvedStage, publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { formatPacific } from "@/lib/actions/time";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
 import { useRecommendations } from "../agent/useRecommendations";
@@ -35,6 +35,35 @@ type Need = { kind: string; label: string; party: string; askedOn: string | null
 type ProposalNote = { id: string; body: string; authorId: string; createdAt: string };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Survives a card remount when the map applies the new stage in the same page. */
+const rememberedStage = new Map<string, Step>();
+
+function stageKey(kind: string, id: string) {
+  return `${kind}:${id}`;
+}
+
+function rememberStage(kind: string, id: string, suggestion: Step) {
+  if (suggestion.status !== "accepted" || !approvedStage(suggestion)) return;
+  rememberedStage.set(stageKey(kind, id), suggestion);
+}
+
+function mergeSteps(kind: string, id: string, incoming: Step[]): Step[] {
+  const key = stageKey(kind, id);
+  const saved = rememberedStage.get(key);
+  if (!saved) return incoming;
+  const fromServer = incoming.find((item) => item.id === saved.id);
+  if (!fromServer) return [saved, ...incoming.filter((item) => item.id !== saved.id)];
+  if (fromServer.status === "applied" || fromServer.status === "rejected" || fromServer.doneAt) {
+    rememberedStage.delete(key);
+    return incoming;
+  }
+  if (saved.status === "accepted" && fromServer.status !== "accepted") {
+    return incoming.map((item) => (item.id === saved.id ? saved : item));
+  }
+  rememberedStage.set(key, fromServer);
+  return incoming;
+}
 
 function shortDate(iso: string | null) {
   if (!iso) return "";
@@ -74,7 +103,11 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
   const cardRef = useRef<HTMLElement>(null);
   const status = useActionStatus();
-  const [steps, setSteps] = useState<Step[]>([]);
+  const [steps, setSteps] = useState<Step[]>(() => {
+    const saved = rememberedStage.get(stageKey(kind, id));
+    return saved ? [saved] : [];
+  });
+  const loadGen = useRef(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -105,11 +138,12 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
   const stages = nextStageChoices();
 
   async function reload() {
+    const token = ++loadGen.current;
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     const response = await fetch(`/api/actions/suggestions?${query}`);
-    if (!response.ok) return;
+    if (!response.ok || token !== loadGen.current) return;
     const body = (await response.json()) as { suggestions?: Step[]; needs?: Need[] };
-    setSteps((body.suggestions || []).filter((item) => item.field === "proposed_next_step"));
+    setSteps(mergeSteps(kind, id, (body.suggestions || []).filter((item) => item.field === "proposed_next_step")));
     setNeeds(body.needs || []);
   }
 
@@ -165,11 +199,12 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
     if (!status.enabled) return undefined;
     let cancel = false;
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
+    const token = ++loadGen.current;
     Promise.all([fetch(`/api/actions/suggestions?${query}`), fetch("/api/actions/accounts")]).then(async ([stepsRes, accountsRes]) => {
-      if (cancel) return;
+      if (cancel || token !== loadGen.current) return;
       if (stepsRes.ok) {
         const body = (await stepsRes.json()) as { suggestions?: Step[]; needs?: Need[] };
-        setSteps((body.suggestions || []).filter((item) => item.field === "proposed_next_step"));
+        setSteps(mergeSteps(kind, id, (body.suggestions || []).filter((item) => item.field === "proposed_next_step")));
         setNeeds(body.needs || []);
       }
       if (accountsRes.ok) setAccounts(((await accountsRes.json()) as { accounts: Account[] }).accounts || []);
@@ -255,8 +290,12 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
       return;
     }
     const refresh = payload.suggestion ? refreshFromSuggestion(kind, id, payload.suggestion) : null;
-    if (refresh) publishStageRefresh(refresh);
+    if (payload.suggestion && refresh) {
+      rememberStage(kind, id, payload.suggestion);
+      setSteps((current) => mergeSteps(kind, id, [payload.suggestion as Step, ...current.filter((item) => item.id !== payload.suggestion?.id)]));
+    }
     resetForm();
+    if (refresh) publishStageRefresh(refresh);
     await reload();
     window.dispatchEvent(new Event("queue-refresh"));
   }
@@ -506,7 +545,10 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
             <button type="button" onClick={() => void submit(`/api/actions/suggestions/${approved.id}`, { targetOn: due }, "PATCH")} className="paper-btn">Save date</button>
           </div>
         ) : null}
-        {stepType === "knock_off" ? <p className="hint">The workbook export asks for stage Dropped.</p> : null}
+        {(() => {
+          const stageChange = approvedStage({ field: "proposed_next_step", detail: approved.detail, proposedValue: approved.proposedValue });
+          return stageChange ? <p className="hint">Moved to {stageChange.label}, waiting for workbook.</p> : null;
+        })()}
         {stepType === "bring_back" && approved.reason ? <p className="proposal-reason"><span>Reason</span>{approved.reason}</p> : null}
       </>
     );
@@ -531,7 +573,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
             </button>
           ))}
         </div>
-        <p className="hint">Approval updates the stage on the map. The workbook catches up on the next sync. Resolving a comment does not change Stage.</p>
+        <p className="hint">Approval updates the stage on the map. It stays waiting for workbook until the sync matches. Resolving a comment does not change Stage.</p>
       </>
     );
   }

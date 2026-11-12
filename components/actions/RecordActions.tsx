@@ -160,7 +160,12 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     .filter((item) => item.field === "proposed_next_step" && item.status === "accepted")
     .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""));
   const currentStep = approvedSteps[0];
-  const roots = notes.filter((item) => !item.parentId);
+  const seenNote = new Set<string>();
+  const roots = notes.filter((item) => {
+    if (item.parentId || seenNote.has(item.id)) return false;
+    seenNote.add(item.id);
+    return true;
+  });
   const pendingSteps = suggestions.filter((item) => item.field === "proposed_next_step" && item.status === "open");
 
   const threads = roots.length ? (
@@ -310,28 +315,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
 
   return (
     <section className="act" data-testid="record-actions">
-      <div className="act-threads" data-testid="note-threads">
-        {roots.map((item) => (
-          <NoteThread
-            key={item.id}
-            note={item}
-            replies={notes.filter((reply) => reply.parentId === item.id)}
-            writable={writable}
-            reviewer={reviewer}
-            pending={pending}
-            accounts={accounts}
-            onOpen={openThread}
-            recommendations={suggestionsForSite.rows}
-          onDismissRecommendation={(recommendationId) => void suggestionsForSite.dismiss(recommendationId)}
-          onReply={(parentId, body, mentions, recommendationId) => submit("/api/actions/notes", { targetKind: kind, targetId: id, parentId, body, mentions, recommendationId }, () => undefined)}
-            onEdit={(noteId, body, mentions) => submit(`/api/actions/notes/${noteId}`, { body, mentions }, () => undefined, "PATCH")}
-            onDelete={(noteId) => submit(`/api/actions/notes/${noteId}`, null, () => undefined, "DELETE")}
-            onResolve={(noteId) => submit(`/api/actions/notes/${noteId}/resolve`, {}, () => undefined)}
-            onReopen={(noteId) => submit(`/api/actions/notes/${noteId}/reopen`, {}, () => undefined)}
-            actor={status.username}
-          />
-        ))}
-      </div>
+      {roots.length ? threads : <div className="act-threads" data-testid="note-threads" />}
       {writable ? (
         <form
           onSubmit={(event) => {
@@ -428,10 +412,10 @@ function NoteThread({
         </form>
       ) : (
         <>
-          <p>
+          <div className="note-copy">
             {note.body}
             {note.updatedAt ? <span className="note"> · edited</span> : null}
-          </p>
+          </div>
           {note.mentions?.length ? <p className="note">Mentioned <MentionChips mentions={note.mentions} /></p> : null}
         </>
       )}
@@ -516,7 +500,7 @@ function ReplyLine({
         </form>
       ) : (
         <>
-          <p>{note.body}</p>
+          <div className="note-copy">{note.body}</div>
           {note.mentions?.length ? <p className="note">Mentioned <MentionChips mentions={note.mentions} /></p> : null}
         </>
       )}

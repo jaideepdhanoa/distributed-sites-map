@@ -25,8 +25,8 @@ test("a knock-out stays on the current stage and is labeled a suggested drop", (
   assert.equal(droppedDealsShown({ all: true, stage: "desk", droppedLayer: false, searchWide: false }), false);
   assert.notEqual(deal?.stage_group, "dropped");
   const restored = annotated.features?.find((feature) => feature.properties?.deal_id === "PIPE-PHX-0014")?.properties;
-  assert.equal(restored?.stage, "1 Desk screen");
-  assert.equal(restored?.stage_group, "desk");
+  assert.equal(restored?.stage, "2 Financial screen");
+  assert.equal(restored?.stage_group, "financial");
   assert.equal(restored?.suggested_drop, "Lot too small");
   assert.ok(suggestedDropHistory(["PIPE-PHX-0014"]).length > 0);
   const dropped = annotated.features?.find((feature) => feature.properties?.deal_id === "PIPE-MIA-0079")?.properties;
@@ -35,7 +35,9 @@ test("a knock-out stays on the current stage and is labeled a suggested drop", (
   assert.equal(dropped?.suggested_drop, undefined);
   const desk = annotated.features?.filter((feature) => feature.properties?.stage_group === "desk" && feature.properties.suggested_drop) || [];
   assert.ok(desk.some((feature) => feature.properties?.deal_id === "PIPE-PHX-0085"));
-  assert.ok(desk.some((feature) => feature.properties?.deal_id === "PIPE-PHX-0014"));
+  assert.equal(desk.some((feature) => feature.properties?.deal_id === "PIPE-PHX-0014"), false);
+  const financial = annotated.features?.filter((feature) => feature.properties?.stage_group === "financial" && feature.properties.suggested_drop) || [];
+  assert.ok(financial.some((feature) => feature.properties?.deal_id === "PIPE-PHX-0014"));
   const items = mergeBringBackHistory([], suggestedDropHistory(["PIPE-PHX-0085"]));
   assert.equal(items[0]?.type, "drop_suggested");
   assert.match(items[0]?.summary || "", /Recommended drop\. Lot too small/);

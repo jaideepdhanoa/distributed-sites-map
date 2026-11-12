@@ -64,7 +64,7 @@ function newestFirst(lines: MergedLine[]): boolean {
 
 test("the snapshot is keyed by site id and keeps internal rows", () => {
   assert.equal(snapshot.source, "workbook");
-  assert.equal(snapshot.rows.length, 387);
+  assert.equal(snapshot.rows.length, 423);
   assert.match(snapshot.label, /Comms Log/);
   const byId = new Map(snapshot.rows.map((item) => [item.comms_id, item]));
   assert.equal(byId.has("CM-0002"), false);
@@ -76,8 +76,9 @@ test("the snapshot is keyed by site id and keeps internal rows", () => {
   assert.equal(byId.get("CM-0387")?.direction, "internal");
   assert.equal(byId.get("CM-0385")?.at, "2026-11-11 12:30");
   assert.equal(byId.get("CM-0389")?.at, "2026-11-11 12:56");
-  assert.equal(snapshot.rows.at(-1)?.comms_id, "CM-0394");
   assert.equal(byId.get("CM-0394")?.at, "2026-11-11 13:32");
+  assert.equal(snapshot.rows.at(-1)?.comms_id, "CM-0427");
+  assert.equal(byId.get("CM-0427")?.at, "2026-11-11 22:18");
   assert.equal(byId.get("CM-0021")?.direction, "internal");
   assert.deepEqual(siteTokens(byId.get("CM-0377")?.site_ids || ""), ["LAND-PHX-0059", "LAND-PHX-0061"]);
   for (const [site, ids] of Object.entries(snapshot.sites)) {

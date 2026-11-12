@@ -229,7 +229,7 @@ test("getSite returns the card facts for 3520 N 16th St without restaging it", a
   assert.equal(result.card?.askingPrice, props.asking_price_display);
   assert.equal(result.card?.acres, props.land_acres);
   assert.equal(result.card?.baysThatFit, props.bays_that_fit);
-  assert.equal(result.card?.packageStatus, "Package asked for");
+  assert.equal(result.card?.packageStatus, "Package on file");
   assert.equal(result.card?.cashFlow, "Not provided");
   assert.match(String(result.card?.spareLand), /9,000 sq ft/);
   assert.match(String(result.card?.photoSet), /Photo set: complete/);
@@ -238,7 +238,7 @@ test("getSite returns the card facts for 3520 N 16th St without restaging it", a
   assert.equal(JSON.stringify(result).includes("timeline"), false);
   const scope = siteScopeLine("PIPE-PHX-0084");
   assert.match(scope, /\$1,750,000/);
-  assert.match(scope, /Package asked for/);
+  assert.match(scope, /Package on file/);
   assert.match(scope, /9,000 sq ft/);
   assert.match(scope, /no events were recorded/i);
   const activity = await runAskTool("activity", { id: "PIPE-PHX-0084" }, "reviewer") as { timeline?: unknown[]; events?: unknown[]; note?: string };

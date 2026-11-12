@@ -49,9 +49,9 @@ class StageBuckets(unittest.TestCase):
             self.assertEqual(deal["stage"], row["stage"])
             self.assertNotEqual(deal["stage_group"], "dropped")
         suggested = next(row for row in shipped if row["id"] == "PIPE-PHX-0014")
-        self.assertEqual(suggested["stage"], "1 Desk screen")
-        self.assertEqual(by_id["PIPE-PHX-0014"]["stage"], "1 Desk screen")
-        self.assertNotEqual(by_id["PIPE-PHX-0014"]["stage_group"], "dropped")
+        self.assertEqual(suggested["stage"], "2 Financial screen")
+        self.assertEqual(by_id["PIPE-PHX-0014"]["stage"], "2 Financial screen")
+        self.assertEqual(by_id["PIPE-PHX-0014"]["stage_group"], "financial")
 
 
 class OneMatcher(unittest.TestCase):

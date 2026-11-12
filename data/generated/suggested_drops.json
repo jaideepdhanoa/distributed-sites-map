@@ -100,11 +100,6 @@
     "reason": "Lot too small"
   },
   {
-    "id": "PIPE-PHX-0005",
-    "stage": "1 Desk screen",
-    "reason": "Outside the service area"
-  },
-  {
     "id": "PIPE-PHX-0006",
     "stage": "1 Desk screen",
     "reason": "No longer for sale"
@@ -138,11 +133,6 @@
     "id": "PIPE-PHX-0018",
     "stage": "1 Desk screen",
     "reason": "Outside the service area"
-  },
-  {
-    "id": "PIPE-PHX-0081",
-    "stage": "1 Desk screen",
-    "reason": "Lot too small"
   },
   {
     "id": "PIPE-PHX-0084",

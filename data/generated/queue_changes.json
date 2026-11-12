@@ -1091,6 +1091,55 @@
       "type": "materials",
       "at": "2026-11-12T04:49:21.981Z",
       "summary": "Financials count is now 5."
+    },
+    {
+      "id": "stage:PIPE-PHX-0005:2026-11-12T16:42:21.902Z:Dropped",
+      "siteId": "PIPE-PHX-0005",
+      "type": "stage",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-PHX-0081:2026-11-12T16:42:21.902Z:Dropped",
+      "siteId": "PIPE-PHX-0081",
+      "type": "stage",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "materials:LAND-PHX-0045:2026-11-12T16:42:21.902Z:property_legal",
+      "siteId": "LAND-PHX-0045",
+      "type": "materials",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Property and legal count is now 5."
+    },
+    {
+      "id": "materials:LAND-PHX-0050:2026-11-12T16:42:21.902Z:property_legal",
+      "siteId": "LAND-PHX-0050",
+      "type": "materials",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Property and legal count is now 2."
+    },
+    {
+      "id": "materials:LAND-PHX-0061:2026-11-12T16:42:21.902Z:property_legal",
+      "siteId": "LAND-PHX-0061",
+      "type": "materials",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Property and legal count is now 2."
+    },
+    {
+      "id": "materials:PIPE-PHX-0014:2026-11-12T16:42:21.902Z:financials",
+      "siteId": "PIPE-PHX-0014",
+      "type": "materials",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Financials count is now 5."
+    },
+    {
+      "id": "materials:PIPE-PHX-0014:2026-11-12T16:42:21.902Z:property_legal",
+      "siteId": "PIPE-PHX-0014",
+      "type": "materials",
+      "at": "2026-11-12T16:42:21.902Z",
+      "summary": "Property and legal count is now 5."
     }
   ],
   "baseline": [
@@ -1307,12 +1356,12 @@
     {
       "id": "PIPE-PHX-0005",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$2,100,000",
       "askingSource": "Car Wash Brokers Inc",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0006",
@@ -1417,12 +1466,12 @@
     {
       "id": "PIPE-PHX-0081",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "",
       "askingSource": "Car Wash Brokers Inc",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0083",
@@ -1871,6 +1920,18 @@
       "count": 18
     },
     {
+      "siteId": "LAND-PHX-0045",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 5
+    },
+    {
+      "siteId": "LAND-PHX-0050",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 2
+    },
+    {
       "siteId": "LAND-PHX-0052",
       "category": "property_legal",
       "label": "Property and legal",
@@ -1898,7 +1959,7 @@
       "siteId": "LAND-PHX-0061",
       "category": "property_legal",
       "label": "Property and legal",
-      "count": 1
+      "count": 2
     },
     {
       "siteId": "PIPE-LAS-0016",
@@ -1968,9 +2029,15 @@
     },
     {
       "siteId": "PIPE-PHX-0014",
+      "category": "financials",
+      "label": "Financials",
+      "count": 5
+    },
+    {
+      "siteId": "PIPE-PHX-0014",
       "category": "property_legal",
       "label": "Property and legal",
-      "count": 1
+      "count": 5
     },
     {
       "siteId": "PIPE-PHX-0081",

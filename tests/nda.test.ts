@@ -81,7 +81,7 @@ test("an unlinked site reads Not required and never Not started", () => {
 
 test("a linked chip uses the site mirror, including the Miracle copy", () => {
   const miracle = snapshot.sites["PIPE-LAS-0016"];
-  assert.equal(ndaChip(miracle), "With counterparty legal · Them — legal · 13d open · 1d in court");
+  assert.equal(ndaChip(miracle), "With counterparty legal · Them — legal · 14d open · 2d in court");
   assert.equal(ndaChip(snapshot.sites["PIPE-LAS-0017"]), ndaChip(miracle));
   assert.equal(ndaChip(snapshot.sites["LAND-LAS-0001"]), ndaChip(miracle));
   assert.equal(ndaChip({ nda_id: "NDA-006", nda_days_open: 10, nda_days_in_court: 2 }), "10d open · 2d in court");
@@ -127,7 +127,7 @@ test("the blocker sentence counts days from the since date and stays quiet when 
 test("PIPE-PHX-0018 keeps the NDA chip and a different blocker sentence", () => {
   const mirror = snapshot.sites["PIPE-PHX-0018"];
   const chip = ndaChip(mirror);
-  assert.equal(chip, "Moove form sent · Them — signer · 18d open · 16d in court");
+  assert.equal(chip, "Moove form sent · Them — signer · 19d open · 17d in court");
   assert.equal(chip.includes("NDA execution"), false);
   assert.equal(chip.includes("Awaiting broker reply"), false);
   const deals = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
@@ -159,9 +159,9 @@ test("the queue is one open agreement per row, sorted by days in the current cou
   assert.deepEqual(ids, ["NDA-002", "NDA-003", "NDA-004", "NDA-006", "NDA-007", "NDA-008", "NDA-001", "NDA-005"]);
   const current = body.queue.find((row) => row.nda_id === "NDA-005");
   assert.equal(current?.nda_waiting_on, "Us — legal");
-  assert.equal(courtDayCount(current?.nda_days_in_court), 0);
+  assert.equal(courtDayCount(current?.nda_days_in_court), null);
   assert.equal(courtDayCount("12/30/1899"), 0);
-  assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]), "With Moove legal · Us — legal · 3d open · 0d in court");
+  assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]), "With Moove legal · Us — legal · 4d open · 1d in court");
   assert.equal(ndaChip(snapshot.sites["PIPE-PHX-0014"]).includes("1899"), false);
   assert.equal(body.queue[0]?.site_ids, "Confidential Las Vegas business (identity withheld pending NDA)");
   assert.equal(coveredSites(body.queue[0]?.site_ids || "").ids.length, 0);

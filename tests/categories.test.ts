@@ -69,9 +69,9 @@ test("Phoenix listed and desk counts leave land parcels out until that category 
 
   const desk = (categories: typeof washes) =>
     deals.filter((deal) => deal.city === "PHX" && deal.stage_group === "desk" && dealInCategories(deal, categories));
-  assert.equal(desk(washes).length, 14);
-  assert.equal(desk(withLand).length, 44);
-  assert.equal(desk({ ...washes, store: true }).length, 17);
+  assert.equal(desk(washes).length, 10);
+  assert.equal(desk(withLand).length, 40);
+  assert.equal(desk({ ...washes, store: true }).length, 13);
   assert.ok(desk(withLand).some((deal) => deal.kind === "land" && deal.deal_id.startsWith("LAND-PHX-")));
 });
 

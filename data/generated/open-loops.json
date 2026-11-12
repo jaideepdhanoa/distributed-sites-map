@@ -1,6 +1,6 @@
 {
   "source": "workbook",
-  "as_of": "2026-11-11",
+  "as_of": "2026-11-12",
   "label": "Read-only snapshot of open loops. Day counts use the sync date in America/Los_Angeles.",
   "register": [
     {
@@ -12,8 +12,8 @@
       "nda_waiting_on": "Them \u2014 legal",
       "nda_waiting_on_since": "2026-11-10",
       "nda_gates": "Discussion",
-      "nda_days_open": 13,
-      "nda_days_in_court": 1
+      "nda_days_open": 14,
+      "nda_days_in_court": 2
     },
     {
       "nda_id": "NDA-002",
@@ -24,8 +24,8 @@
       "nda_waiting_on": "Them \u2014 legal",
       "nda_waiting_on_since": "2026-10-22",
       "nda_gates": "Discussion",
-      "nda_days_open": 25,
-      "nda_days_in_court": 20
+      "nda_days_open": 26,
+      "nda_days_in_court": 21
     },
     {
       "nda_id": "NDA-003",
@@ -36,8 +36,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-10-26",
       "nda_gates": "Proof of funds",
-      "nda_days_open": 18,
-      "nda_days_in_court": 16
+      "nda_days_open": 19,
+      "nda_days_in_court": 17
     },
     {
       "nda_id": "NDA-004",
@@ -48,8 +48,8 @@
       "nda_waiting_on": "Us \u2014 signer",
       "nda_waiting_on_since": "2026-11-03",
       "nda_gates": "Package",
-      "nda_days_open": 9,
-      "nda_days_in_court": 8
+      "nda_days_open": 10,
+      "nda_days_in_court": 9
     },
     {
       "nda_id": "NDA-005",
@@ -60,8 +60,8 @@
       "nda_waiting_on": "Us \u2014 legal",
       "nda_waiting_on_since": "2026-11-11",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 0
+      "nda_days_open": 4,
+      "nda_days_in_court": null
     },
     {
       "nda_id": "NDA-006",
@@ -72,8 +72,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-11-09",
       "nda_gates": "Package",
-      "nda_days_open": 10,
-      "nda_days_in_court": 2
+      "nda_days_open": 11,
+      "nda_days_in_court": 3
     },
     {
       "nda_id": "NDA-007",
@@ -84,8 +84,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-11-09",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 2
+      "nda_days_open": 4,
+      "nda_days_in_court": 3
     },
     {
       "nda_id": "NDA-008",
@@ -96,8 +96,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-11-09",
       "nda_gates": "Package",
-      "nda_days_open": 2,
-      "nda_days_in_court": 2
+      "nda_days_open": 3,
+      "nda_days_in_court": 3
     },
     {
       "nda_id": "NDA-009",
@@ -1219,11 +1219,11 @@
       "site_id": "PIPE-PHX-0005",
       "label": "Rinse My Ride",
       "market": "PHX",
-      "stage": "1 Desk screen",
+      "stage": "Dropped",
       "next_step": "Stays dropped: little usable spare area on the 0.77-acre lot, and about 21x 2025 EBITDA at $2.1M. Package received Oct 21. Roger answered Oct 21 (1:29pm): Rinse My Ride Glendale is a separate location, and the survey page he sent is a Rinse My Ride plat, now filed in this folder. Nothing more needed for now | Nov 7, 2026: sent the approved market-data follow-up to Roger Pencek in a NEW Gmail thread (msg 1a1b5e5d11ee8ff1) \u2014 asked: (1) whether the $2.3M flyer price (land $1M / building $800K / equipment $500K) is still the seller's position and its flexibility; (2) 2026 year-to-date monthly fig\u2026",
       "nda_id": "",
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     {
       "site_id": "PIPE-PHX-0006",
@@ -1559,11 +1559,11 @@
       "site_id": "PIPE-PHX-0081",
       "label": "Rinse My Ride",
       "market": "PHX",
-      "stage": "1 Desk screen",
+      "stage": "Dropped",
       "next_step": "Closed Nov 9, 2026: broker (Car Wash Brokers) confirmed in writing the same day that the Glendale site was sold about 45 days earlier (\"Sold this one 45 days ago\"). Stage moved to Dropped on the broker's written word (R-033). The FY2023 package and the $172,040 Normalized EBITDA recast stay on file for reference; no further asks on this site.",
       "nda_id": "",
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-09"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     {
       "site_id": "PIPE-PHX-0083",

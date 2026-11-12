@@ -1,12 +1,9 @@
 lead id,workbook Stage,KO reason,map stage,rule applied
 PIPE-PHX-0001,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
 PIPE-SNA-0002,1 Desk screen,Outside our markets,1 Desk screen,R-042
-PIPE-PHX-0003,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
 PIPE-PHX-0006,1 Desk screen,No longer for sale,1 Desk screen,R-042
 PIPE-PHX-0007,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
 PIPE-PHX-0008,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
-PIPE-PHX-0009,1 Desk screen,No longer for sale,1 Desk screen,R-042
-PIPE-PHX-0010,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
 PIPE-LAS-0011,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
 PIPE-MIA-0013,1 Desk screen,Lot too small,1 Desk screen,R-031; R-042
 PIPE-PHX-0014,2 Financial screen,Lot too small,2 Financial screen,R-031; R-042

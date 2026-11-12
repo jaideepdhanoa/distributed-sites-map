@@ -30,8 +30,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-06"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     "PIPE-PHX-0004": {
       "nda_id": "",
@@ -90,8 +90,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     "PIPE-PHX-0010": {
       "nda_id": "",
@@ -400,8 +400,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "\u2014",
-      "stage_blocker_since": ""
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-12"
     },
     "LAND-LAS-0004": {
       "nda_id": "",
@@ -740,8 +740,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-08"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-12"
     },
     "LAND-PHX-0054": {
       "nda_id": "",
@@ -822,6 +822,26 @@
       "nda_days_in_court": null,
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
+    },
+    "LAND-PHX-0062": {
+      "nda_id": "",
+      "nda_status": "Not required",
+      "nda_waiting_on": "\u2014",
+      "nda_gates": "None \u2014 not gating (R-076)",
+      "nda_days_open": null,
+      "nda_days_in_court": null,
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-12"
+    },
+    "LAND-PHX-0063": {
+      "nda_id": "",
+      "nda_status": "Not required",
+      "nda_waiting_on": "\u2014",
+      "nda_gates": "None \u2014 not gating (R-076)",
+      "nda_days_open": null,
+      "nda_days_in_court": null,
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": "2026-11-12"
     }
   },
   "register": [
@@ -896,14 +916,14 @@
       "nda_waiting_on": "Us \u2014 signer",
       "nda_opened_date": "2026-11-02",
       "nda_sent_date": "2026-11-02",
-      "nda_last_action_date": "2026-11-11",
+      "nda_last_action_date": "2026-11-12",
       "nda_waiting_on_since": "2026-11-03",
       "nda_executed_date": "",
       "nda_gates": "Package",
       "nda_days_open": 10,
       "nda_days_in_court": 9,
-      "source": "Gmail thread 1a19e48e0c9edd2b (mutual NDA attached Nov 2, 2026; accepted as-is Nov 2; Horizon entity details for DocuSign received Nov 3); Forward to Brittni Nov 11, 2026 (Gmail 1a1cdfb8e59bab14)",
-      "notes": "Form agreed as-is. Execution is stalled on OUR side: the DocuSign routing/signature (Brittni routes, Cara Dwyer signs) has been outstanding since the entity details arrived Nov 3, 2026 \u2014 was due Nov 5. Nov 11, 2026: Jaideep forwarded the broker thread to Brittni and asked her to get the DocuSign sent out for signature \u2014 the broker's side has been complete since Nov 3 (form accepted as-is; entity/signer details in). Waiting-on court unchanged (Us \u2014 signer, since Nov 3): the ball stays on our side until the envelope is routed and signed."
+      "source": "Gmail thread 1a19e48e0c9edd2b (mutual NDA attached Nov 2, 2026; accepted as-is Nov 2; Horizon entity details for DocuSign received Nov 3); Forward to Brittni Nov 11, 2026 (Gmail 1a1cdfb8e59bab14); Brittni/Jaideep exchange Nov 12, 2026 (Gmail thread 1a1cdfb8e59bab14: Brittni 1a1d05552e799576; Jaideep fields-only reply 1a1d08d0c4ad0d30; Brittni 1a1d09432e3df2b4 and 1a1d0954dcf796d9)",
+      "notes": "Form agreed as-is. Execution is stalled on OUR side: the DocuSign routing/signature (Brittni routes, Cara Dwyer signs) has been outstanding since the entity details arrived Nov 3, 2026 \u2014 was due Nov 5. Nov 11, 2026: Jaideep forwarded the broker thread to Brittni and asked her to get the DocuSign sent out for signature \u2014 the broker's side has been complete since Nov 3 (form accepted as-is; entity/signer details in). Waiting-on court unchanged (Us \u2014 signer, since Nov 3): the ball stays on our side until the envelope is routed and signed. Nov 12, 2026: Brittni asked for the latest doc to make sure it is in DocuSign, then asked for a filled-out / marked-up copy she can pass to legal with everything completed and route for signature; she added that she can help complete it later today. Jaideep sent the DocuSign fields only - no document attached - so the filled-form step is still on our side. Waiting-on court UNCHANGED (Us - signer, since Nov 3). Flagged to Jaideep: the markup request sits in tension with the recorded as-is acceptance (Nov 2) - no change to the form posture in this pass. | Nov 12, 2026: FILLED NDA document sent to Brittni as an email attachment on Jaideep's order (Gmail 1a1d110209568cf9, in thread 1a1cdfb8e59bab14) \u2014 the Moove mutual NDA with NAI Horizon's details completed (entity, Phoenix address, Markus Hochholzer VP as signer); the one field left blank is Horizon's state of incorporation, flagged in the email for Markus to complete when he signs in DocuSign. Brittni to route for signature; waiting-on unchanged."
     },
     {
       "nda_id": "NDA-005",
@@ -1024,6 +1044,26 @@
       "nda_days_in_court": null,
       "source": "Gmail thread 1a185d4177302682 \u2014 CM-0120 (broker ask, Oct 28), CM-0122 (Moove form sent, Oct 28), CM-0131 (follow-up, Oct 30); Close decision: Jaideep, Nov 11, 2026 (chat) \u2014 Not required under R-076 (on Grok's recommendation) \u2014 broker's own online-NDA ask answered with Moove's form per R-010; site passed Oct 30 (Mesquite NV, outside the service area); link kept",
       "notes": "Broker asked Oct 28, 2026 to complete First Choice's own online NDA process; per R-010/R-076 Jaideep sent Moove's mutual NDA instead the same day (Brittni cc'd) and followed up Oct 30. Later on Oct 30 the broker disclosed the property is in Mesquite, NV (outside the service area) and Jaideep passed \u2014 the NDA loop closed unexecuted with the pass; nothing is outstanding and no one holds the court. Row opened Nov 11, 2026 for register completeness on Grok's flag (CM-0120 had no register row). CLOSED Nov 11, 2026 as Not required (Grok's recommendation, confirmed by Jaideep \u2014 decider Jaideep): the site was passed on Oct 30 and the NDA loop closed unexecuted with the pass \u2014 nothing outstanding; the row's dates and history above stand as the record. Site link kept; the chip no longer reads as a live open NDA."
+    },
+    {
+      "nda_id": "NDA-011",
+      "counterparty_firm": "The Auto Repair Boss, Inc.",
+      "counterparty_person": "Halle Parker",
+      "scope": "Listing-specific (L-441)",
+      "site_ids": "L-441",
+      "nda_status": "Our form sent \u2014 awaiting execution",
+      "nda_form": "Moove mutual",
+      "nda_waiting_on": "Them",
+      "nda_opened_date": "2026-11-12",
+      "nda_sent_date": "2026-11-12",
+      "nda_last_action_date": "2026-11-12",
+      "nda_waiting_on_since": "2026-11-12",
+      "nda_executed_date": "",
+      "nda_gates": "Location + details",
+      "nda_days_open": null,
+      "nda_days_in_court": null,
+      "source": "Gmail 1a1d115e8412ef4e (Nov 12, 2026)",
+      "notes": "Broker replied Nov 12, 2026 to the L-441 inquiry with a Tupelo SMB click-to-sign NDA link \u2014 per R-010/R-076 we do not sign or click a broker's NDA; counter with Moove's mutual form (R-090 reply drafted/sent in the same thread, Brittni cc'd). Broker also requires a completed Financial and Experience Profile before releasing confidential details (teaser footer). Source: Gmail 1a1d115e8412ef4e."
     }
   ]
 }

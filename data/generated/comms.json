@@ -8040,6 +8040,158 @@
       "source": "Morning email review Nov 12, 2026",
       "message_id": "1a1ce68443a381a6",
       "subject": "Re: Distributed Sites Update"
+    },
+    {
+      "comms_id": "CM-0428",
+      "site_ids": "LAND-PHX-0062",
+      "thread_id": "1a1d0aa04dfbc2a8",
+      "link": "https://mail.google.com/mail/?authuser=jaideep@dhanoa.in#sent/1a1d0aa04dfbc2a8",
+      "at": "2026-11-12 08:49",
+      "direction": "out",
+      "person": "Chip Diamond",
+      "firm": "Diamond Properties Inc",
+      "channel": "Gmail",
+      "summary": "Initial land inquiry on 4550 E Thomas Rd, Phoenix (0.67 ac, $1,625,000, APN 127-05-010E); cc John Appelbe, Appelbe Commercial Real Estate.",
+      "asks_made": "Availability and asking price; exact parcels/acreage and building vacancy; survey/site plan; title and environmental reports; electrical service details and utility bills",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Site captured at 1 Desk screen (new Land Sites row 67); stage blocker Awaiting broker reply from 2026-11-12",
+      "source": "moove-alert-morning-check Nov 12, 2026 - send verified in Gmail Sent",
+      "message_id": "1a1d0aa04dfbc2a8",
+      "subject": "4550 E Thomas Rd, Phoenix - land inquiry from Moove"
+    },
+    {
+      "comms_id": "CM-0429",
+      "site_ids": "LAND-PHX-0063",
+      "thread_id": "1a1d0aa3045013fb",
+      "link": "https://mail.google.com/mail/?authuser=jaideep@dhanoa.in#sent/1a1d0aa3045013fb",
+      "at": "2026-11-12 08:49",
+      "direction": "out",
+      "person": "Brent Mallonee",
+      "firm": "Cushman & Wakefield - Phoenix",
+      "channel": "Gmail",
+      "summary": "Initial inquiry on the retail pads at NWC Loop 101 & 56th St, Phoenix (4.24 ac in two parcels out of APN 212-32-100U, unpriced).",
+      "asks_made": "Availability and asking price (both pads together and individually); exact parcels/acreage; survey/site plan; title and environmental reports; electrical service details and utility bills",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Site captured at 1 Desk screen (new Land Sites row 68); stage blocker Awaiting broker reply from 2026-11-12",
+      "source": "moove-alert-morning-check Nov 12, 2026 - send verified in Gmail Sent",
+      "message_id": "1a1d0aa3045013fb",
+      "subject": "NWC Loop 101 & 56th St, Phoenix - retail pads inquiry from Moove"
+    },
+    {
+      "comms_id": "CM-0430",
+      "site_ids": "LAND-PHX-0003",
+      "thread_id": "1a1a731b99a20f92",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1a731b99a20f92",
+      "at": "2026-11-12 10:18",
+      "direction": "out",
+      "person": "Roger Pencek",
+      "firm": "Car Wash Brokers Inc",
+      "channel": "Gmail",
+      "summary": "Chase 1 (R-091) sent on Jaideep's order: SUP status (filed? hearing/approval date? SUP documents) and electrical service size (amps/phase/voltage) or a utility letter still open from the Nov 8 note.",
+      "asks_made": "SUP status + documents; electrical service size or utility letter",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Stage blocker -> Awaiting broker reply since 2026-11-12",
+      "source": "Send verified in Gmail this session (Jaideep order Nov 12, 2026)",
+      "message_id": "1a1d0fb4723118dd",
+      "subject": "Re: 3141 E Ocotillo Rd, San Tan Valley — entitled car wash land"
+    },
+    {
+      "comms_id": "CM-0431",
+      "site_ids": "LAND-PHX-0053",
+      "thread_id": "1a1bb6996357d37f",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1bb6996357d37f",
+      "at": "2026-11-12 10:18",
+      "direction": "out",
+      "person": "Beth Jo Zeitzer",
+      "firm": "R.O.I. Properties",
+      "channel": "Gmail",
+      "summary": "Chase 1 (R-091/R-094 inbound-last) sent on Jaideep's order: Jake Vice / Tommy Moore's promised follow-up never arrived; full standing ask list re-asked (availability + $350,000 confirmation, full parcel, zoning, survey/site plan, title + environmental, utility service details).",
+      "asks_made": "Availability + price confirmation; full-parcel confirmation; zoning; survey/site plan; title + environmental reports; utility service details",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Stage blocker -> Awaiting broker reply since 2026-11-12",
+      "source": "Send verified in Gmail this session (Jaideep order Nov 12, 2026)",
+      "message_id": "1a1d0fb4cee44bbc",
+      "subject": "Re: 821 W McKinley St, Phoenix - information request"
+    },
+    {
+      "comms_id": "CM-0432",
+      "site_ids": "LAND-PHX-0037",
+      "thread_id": "1a1cdfb8e59bab14",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1cdfb8e59bab14",
+      "at": "2026-11-12 10:41",
+      "direction": "out",
+      "person": "Brittni Toston",
+      "firm": "Moove (internal)",
+      "channel": "Gmail",
+      "summary": "Sent the filled Moove mutual NDA document (attachment) for the NAI Horizon / McDowell Rd agreement, completed with the counterparty's entity, address and signer; state of incorporation left for the counterparty signer to complete in DocuSign.",
+      "asks_made": "",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "NDA-004: Brittni to route DocuSign; court unchanged (Us — signer since 2026-11-03)",
+      "source": "Send verified in Gmail this turn (Jaideep order Nov 12, 2026)",
+      "message_id": "1a1d110209568cf9",
+      "subject": "Re: LoopNet Lead for 3232 E McDowell Rd"
+    },
+    {
+      "comms_id": "CM-0433",
+      "site_ids": "L-441",
+      "thread_id": "",
+      "link": "https://us.businessesforsale.com/us/enquiry/confirmation?sessionGuid=b4bdf513-1d37-4ece-a702-532e34975046&sent=1",
+      "at": "2026-11-12 10:45",
+      "direction": "out",
+      "person": "Halle Parker",
+      "firm": "The Auto Repair Boss, Inc.",
+      "channel": "BusinessesForSale",
+      "summary": "First inquiry on listing 4021622 (two Brakes For Less shops, FL): location (metro/county) asked first, then real-estate availability + price or lease position, lot size per shop, 3 years of financials for both shops, electrical service size (amps/phase/voltage) or recent utility bills.",
+      "asks_made": "Location (metro/county); real estate price or lease position; lot sizes; 3-yr financials; electrical service size / utility bills",
+      "asks_answered": "",
+      "attachments": "none",
+      "state_changes": "Await broker reply; chase due 2026-11-16",
+      "source": "Send confirmed on the BusinessesForSale confirmation page (Jaideep order Nov 12, 2026)",
+      "message_id": "BFS enquiry sessionGuid b4bdf513-1d37-4ece-a702-532e34975046",
+      "subject": "BusinessesForSale listing 4021622 inquiry — 2 Auto Repair Shops"
+    },
+    {
+      "comms_id": "CM-0434",
+      "site_ids": "L-441",
+      "thread_id": "1a1d115e8412ef4e",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1d115e8412ef4e",
+      "at": "2026-11-12 10:47",
+      "direction": "in",
+      "person": "Halle Parker",
+      "firm": "The Auto Repair Boss, Inc.",
+      "channel": "Gmail",
+      "summary": "Reply to the L-441 inquiry: asked us to sign her platform NDA (Tupelo SMB click-to-sign) and provide required information before details are shared; attached the listing teaser (5110-0028). Teaser claims: TTM sales $4,081,808 / SDE $384,141; seller owns both properties; location still 'Florida' only",
+      "asks_made": "",
+      "asks_answered": "",
+      "attachments": "Broker NDA via Tupelo click-to-sign (declined per R-076 — counter with ours)",
+      "state_changes": "NDA-011 opened (Broker asked — send our form; waiting on Us since 2026-11-12)",
+      "source": "Read in full and analyzed same pass",
+      "message_id": "1a1d115e8412ef4e",
+      "subject": "Sign NDA"
+    },
+    {
+      "comms_id": "CM-0435",
+      "site_ids": "L-441",
+      "thread_id": "1a1d115e8412ef4e",
+      "link": "https://mail.google.com/mail/u/0/#inbox/1a1d115e8412ef4e",
+      "at": "2026-11-12 11:12",
+      "direction": "out",
+      "person": "Halle Parker",
+      "firm": "The Auto Repair Boss, Inc.",
+      "channel": "Gmail",
+      "summary": "Sent Moove's mutual NDA (attached) instead of signing the broker's Tupelo click-through NDA; named Cara Dwyer as Moove's signer; asked for the broker's entity and signer details for DocuSign routing and for the Financial and Experience Profile requirements; package + electricals asked in the same me",
+      "asks_made": "Location (metro/county); real-estate price both properties; lot sizes; 3-yr financials; electrical service size / utility bills; broker entity + signer details; buyer profile requirements",
+      "asks_answered": "Moove US LLC Mutual NDA.docx attached; Brittni cc'd",
+      "attachments": "none",
+      "state_changes": "NDA-011: our form sent — court Them since 2026-11-12",
+      "source": "Send verified in Gmail this turn (Jaideep order Nov 12, 2026)",
+      "message_id": "1a1d12b4181eb889",
+      "subject": "Re: Sign NDA"
     }
   ],
   "sites": {
@@ -8433,7 +8585,8 @@
       "CM-0160",
       "CM-0165",
       "CM-0171",
-      "CM-0422"
+      "CM-0422",
+      "CM-0432"
     ],
     "LAND-PHX-0039": [
       "CM-0156",
@@ -8468,7 +8621,8 @@
       "CM-0186",
       "CM-0219",
       "CM-0227",
-      "CM-0232"
+      "CM-0232",
+      "CM-0430"
     ],
     "LAND-MIA-0006": [
       "CM-0180",
@@ -8587,7 +8741,8 @@
     ],
     "LAND-PHX-0053": [
       "CM-0235",
-      "CM-0236"
+      "CM-0236",
+      "CM-0431"
     ],
     "LAND-PHX-0054": [
       "CM-0238",
@@ -8683,6 +8838,12 @@
       "CM-0392",
       "CM-0396",
       "CM-0383"
+    ],
+    "LAND-PHX-0062": [
+      "CM-0428"
+    ],
+    "LAND-PHX-0063": [
+      "CM-0429"
     ]
   }
 }

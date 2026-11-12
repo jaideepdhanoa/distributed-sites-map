@@ -1,28 +1,41 @@
 {
-  "new_sites": 0,
+  "new_sites": 2,
   "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 4,
-  "sample_new": [],
+  "stage_moves": 6,
+  "sample_new": [
+    "WB-PHX-0042",
+    "WB-PHX-0043"
+  ],
   "sample_verdicts": [],
   "sample_stages": [
     {
-      "site_id": "PHX-U326",
+      "site_id": "PHX-U309",
       "before": "1 Desk screen",
       "after": "Dropped"
     },
     {
-      "site_id": "PHX-U435",
+      "site_id": "PHX-U432",
       "before": "1 Desk screen",
       "after": "Dropped"
     },
     {
-      "deal_id": "PIPE-PHX-0005",
+      "site_id": "PIPE-PHX-0009",
       "before": "1 Desk screen",
       "after": "Dropped"
     },
     {
-      "deal_id": "PIPE-PHX-0081",
+      "deal_id": "PIPE-PHX-0003",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0009",
+      "before": "1 Desk screen",
+      "after": "Dropped"
+    },
+    {
+      "deal_id": "PIPE-PHX-0010",
       "before": "1 Desk screen",
       "after": "Dropped"
     }

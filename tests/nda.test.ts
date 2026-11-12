@@ -156,7 +156,7 @@ test("PIPE-PHX-0018 keeps the NDA chip and a different blocker sentence", () => 
 test("the queue is one open agreement per row, sorted by days in the current court", () => {
   const body = ndaQueueBody(snapshot);
   const ids = body.queue.map((row) => row.nda_id);
-  assert.deepEqual(ids, ["NDA-002", "NDA-003", "NDA-004", "NDA-006", "NDA-007", "NDA-008", "NDA-001", "NDA-005"]);
+  assert.deepEqual(ids, ["NDA-002", "NDA-003", "NDA-004", "NDA-006", "NDA-007", "NDA-008", "NDA-001", "NDA-005", "NDA-011"]);
   const current = body.queue.find((row) => row.nda_id === "NDA-005");
   assert.equal(current?.nda_waiting_on, "Us — legal");
   assert.equal(courtDayCount(current?.nda_days_in_court), null);

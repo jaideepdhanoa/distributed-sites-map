@@ -1140,6 +1140,27 @@
       "type": "materials",
       "at": "2026-11-12T16:42:21.902Z",
       "summary": "Property and legal count is now 5."
+    },
+    {
+      "id": "stage:PIPE-PHX-0003:2026-11-12T19:43:39.977Z:Dropped",
+      "siteId": "PIPE-PHX-0003",
+      "type": "stage",
+      "at": "2026-11-12T19:43:39.977Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-PHX-0009:2026-11-12T19:43:39.977Z:Dropped",
+      "siteId": "PIPE-PHX-0009",
+      "type": "stage",
+      "at": "2026-11-12T19:43:39.977Z",
+      "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "stage:PIPE-PHX-0010:2026-11-12T19:43:39.977Z:Dropped",
+      "siteId": "PIPE-PHX-0010",
+      "type": "stage",
+      "at": "2026-11-12T19:43:39.977Z",
+      "summary": "Stage is now Dropped."
     }
   ],
   "baseline": [
@@ -1336,12 +1357,12 @@
     {
       "id": "PIPE-PHX-0003",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$2,300,000",
       "askingSource": "Car Wash Brokers Inc",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0004",
@@ -1396,22 +1417,22 @@
     {
       "id": "PIPE-PHX-0009",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$1,790,000",
       "askingSource": "Not shown",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0010",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "Dropped",
+      "stageGroup": "dropped",
       "verdict": "",
       "askingPrice": "$4,500,000",
       "askingSource": "Colton Rodgers",
-      "active": true
+      "active": false
     },
     {
       "id": "PIPE-PHX-0014",

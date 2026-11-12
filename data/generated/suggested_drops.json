@@ -95,11 +95,6 @@
     "reason": "Lot too small"
   },
   {
-    "id": "PIPE-PHX-0003",
-    "stage": "1 Desk screen",
-    "reason": "Lot too small"
-  },
-  {
     "id": "PIPE-PHX-0006",
     "stage": "1 Desk screen",
     "reason": "No longer for sale"
@@ -111,16 +106,6 @@
   },
   {
     "id": "PIPE-PHX-0008",
-    "stage": "1 Desk screen",
-    "reason": "Lot too small"
-  },
-  {
-    "id": "PIPE-PHX-0009",
-    "stage": "1 Desk screen",
-    "reason": "No longer for sale"
-  },
-  {
-    "id": "PIPE-PHX-0010",
     "stage": "1 Desk screen",
     "reason": "Lot too small"
   },

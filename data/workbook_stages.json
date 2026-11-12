@@ -1,9 +1,9 @@
 {
-  "workbook_as_of": "2026-11-11",
+  "workbook_as_of": "2026-11-12",
   "pipeline": {
-    "1 Desk screen": 33,
-    "Dropped": 3,
-    "2 Financial screen": 1
+    "1 Desk screen": 31,
+    "2 Financial screen": 3,
+    "Dropped": 3
   },
   "land": {
     "1 Desk screen": 44,
@@ -78,7 +78,7 @@
     {
       "deal_id": "PIPE-PHX-0014",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "2 Financial screen"
     },
     {
       "deal_id": "PIPE-LAS-0015",
@@ -183,7 +183,7 @@
     {
       "deal_id": "PIPE-PHX-0084",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "2 Financial screen"
     },
     {
       "deal_id": "PIPE-PHX-0085",

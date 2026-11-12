@@ -1021,6 +1021,76 @@
       "type": "materials",
       "at": "2026-11-11T22:39:06.808Z",
       "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "stage:PIPE-PHX-0014:2026-11-12T04:49:21.981Z:2 Financial screen",
+      "siteId": "PIPE-PHX-0014",
+      "type": "stage",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Stage is now 2 Financial screen."
+    },
+    {
+      "id": "stage:PIPE-PHX-0084:2026-11-12T04:49:21.981Z:2 Financial screen",
+      "siteId": "PIPE-PHX-0084",
+      "type": "stage",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Stage is now 2 Financial screen."
+    },
+    {
+      "id": "materials:LAND-LAS-0008:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-LAS-0008",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:LAND-PHX-0034:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-PHX-0034",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 2."
+    },
+    {
+      "id": "materials:LAND-PHX-0039:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-PHX-0039",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 3."
+    },
+    {
+      "id": "materials:LAND-PHX-0044:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-PHX-0044",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 18."
+    },
+    {
+      "id": "materials:LAND-PHX-0056:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-PHX-0056",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 71."
+    },
+    {
+      "id": "materials:LAND-PHX-0060:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-PHX-0060",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:LAND-PHX-0061:2026-11-12T04:49:21.981Z:property_legal",
+      "siteId": "LAND-PHX-0061",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Property and legal count is now 1."
+    },
+    {
+      "id": "materials:PIPE-PHX-0083:2026-11-12T04:49:21.981Z:financials",
+      "siteId": "PIPE-PHX-0083",
+      "type": "materials",
+      "at": "2026-11-12T04:49:21.981Z",
+      "summary": "Financials count is now 5."
     }
   ],
   "baseline": [
@@ -1297,8 +1367,8 @@
     {
       "id": "PIPE-PHX-0014",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "2 Financial screen",
+      "stageGroup": "financial",
       "verdict": "",
       "askingPrice": "$2,400,000",
       "askingSource": "Brad Ingarfield, Love Your Car LLC",
@@ -1367,8 +1437,8 @@
     {
       "id": "PIPE-PHX-0084",
       "city": "PHX",
-      "stage": "1 Desk screen",
-      "stageGroup": "desk",
+      "stage": "2 Financial screen",
+      "stageGroup": "financial",
       "verdict": "",
       "askingPrice": "$1,750,000",
       "askingSource": "Incyte Realty",
@@ -1735,6 +1805,12 @@
       "count": 3
     },
     {
+      "siteId": "LAND-LAS-0008",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
+    },
+    {
       "siteId": "LAND-LAS-0009",
       "category": "property_legal",
       "label": "Property and legal",
@@ -1759,6 +1835,12 @@
       "count": 11
     },
     {
+      "siteId": "LAND-PHX-0034",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 2
+    },
+    {
       "siteId": "LAND-PHX-0036",
       "category": "financials",
       "label": "Financials",
@@ -1780,13 +1862,13 @@
       "siteId": "LAND-PHX-0039",
       "category": "property_legal",
       "label": "Property and legal",
-      "count": 2
+      "count": 3
     },
     {
       "siteId": "LAND-PHX-0044",
       "category": "property_legal",
       "label": "Property and legal",
-      "count": 17
+      "count": 18
     },
     {
       "siteId": "LAND-PHX-0052",
@@ -1795,10 +1877,28 @@
       "count": 12
     },
     {
+      "siteId": "LAND-PHX-0056",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 71
+    },
+    {
       "siteId": "LAND-PHX-0057",
       "category": "property_legal",
       "label": "Property and legal",
       "count": 31
+    },
+    {
+      "siteId": "LAND-PHX-0060",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
+    },
+    {
+      "siteId": "LAND-PHX-0061",
+      "category": "property_legal",
+      "label": "Property and legal",
+      "count": 1
     },
     {
       "siteId": "PIPE-LAS-0016",
@@ -1877,6 +1977,12 @@
       "category": "financials",
       "label": "Financials",
       "count": 1
+    },
+    {
+      "siteId": "PIPE-PHX-0083",
+      "category": "financials",
+      "label": "Financials",
+      "count": 5
     },
     {
       "siteId": "PIPE-SNA-0002",

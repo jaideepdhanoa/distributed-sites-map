@@ -152,8 +152,8 @@
       "stage": "1 Desk screen",
       "next_step": "Zoning (T-058 measurement, Nov 9, 2026): RS5.2 residential-adjacency area approx. 165 ft from the parcel boundary - inside the 200-ft line, so a vehicle wash is NOT by-right in CG; if this site advances, the path is a Special Use Permit (Use Permit / UC, Sec. 30.06.05D), typically with Design Review, before any redevelopment or expansion of a wash use. Certainty step (Moove-team action; agents do not contact the county): formal written zoning determination from Clark County Current Planning. Broker thread unchanged - Northcap (Belanus/Han); electrical on file (Claimed, Nov 9). Nov 10, 2026: b\u2026",
       "nda_id": "",
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker": "Our-side diligence",
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "LAND-LAS-0008",
@@ -162,8 +162,8 @@
       "stage": "1 Desk screen",
       "next_step": "Ask list (updated Nov 10, 2026, night): ANSWERED Nov 10 \u2014 (1) Environmental file resent and analyzed: Limited Phase II ESA (Converse, Oct 24, 2025) \u2014 soil at the former UST/dispenser area non-detect for target analytes; groundwater TCE 7.1 \u00b5g/L (above the 5.0 NDEP reportable level) attributed by Converse to an offsite source; no further assessment recommended. (2) Electrical: broker supplied county-record service details \u2014 1,200A, 277/480V, 3-phase (typed Layer C/D, Claimed); the two linked Clark County permit PDFs could not be downloaded this pass (county document server unreachable \u2014 named\u2026",
       "nda_id": "",
-      "stage_blocker": "Our-side diligence",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "LAND-LAS-0009",
@@ -430,7 +430,7 @@
       "label": "MIA 19045 NW 2nd Ave",
       "market": "MIA",
       "stage": "1 Desk screen",
-      "next_step": "Nov 5, 2026: desk GIS catch-up recorded. Remaining: service size and title (broker/utility); listing lot size still conflicts with the county (12,190 vs 20,140 sf). Inquiry sent Nov 5 via Crexi (9:50 AM); awaiting availability at $1,685,000, lot-size confirmation, survey/site plan/title/environmental and utility details. Nov 10, 2026: DELIVERY DELAY flagged \u2014 the Nov 9 follow-up to the broker is in Gmail retry (45 hours from Nov 10, 3:59 PM PT); if a permanent-failure notice lands, re-send or use another channel. Do not count the Nov 9 follow-up as delivered until delivery is confirmed.",
+      "next_step": "Nov 5, 2026: desk GIS catch-up recorded. Remaining: service size and title (broker/utility); listing lot size still conflicts with the county (12,190 vs 20,140 sf). Inquiry sent Nov 5 via Crexi (9:50 AM); awaiting availability at $1,685,000, lot-size confirmation, survey/site plan/title/environmental and utility details. Nov 10, 2026: DELIVERY DELAY flagged \u2014 the Nov 9 follow-up to the broker is in Gmail retry (45 hours from Nov 10, 3:59 PM PT); if a permanent-failure notice lands, re-send or use another channel. Do not count the Nov 9 follow-up as delivered until delivery is confirmed. Nov 1\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-09"
@@ -480,10 +480,10 @@
       "label": "PHX 654 N Country Club Dr (land)",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Ask list (updated Nov 10, 2026, OM analysis): (1) ANSWERED \u2014 the OM PDF has been received (saved into the site folder by Jaideep) and analyzed in full; it confirms $675,000, APNs 135-24-050A / 135-24-051A, 1.28 ac, C-2. STILL OPEN: (2) Electrical: which utility serves the lot (SRP or City of Mesa) and any service information \u2014 the OM is silent on utilities and the survey states no service size; no service on the vacant parcels. (3) Environmental report \u2014 none provided and none mentioned in the OM; ask stands. Reply to the broker (asks 2 + 3) is drafted (documents-only version A) and with Jaid\u2026",
+      "next_step": "Utility leg ANSWERED our-side Nov 11 (T-073): serving electric utility is the City of Mesa Electric Utility (municipal) per the City's official service-area map \u2014 no longer a broker/seller dependency. STILL OPEN: (a) environmental \u2014 no Phase I exists; any prior report asked of Leo Nov 11 (also asked the seller, via Leo, for the utility from the purchase file \u2014 now moot for electric, and for seller timing); (b) the offer-interest call stays Jaideep's once the environmental picture lands. A capacity/service-size question, if pursued, goes to the City of Mesa Electric Utility directly.",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "LAND-PHX-0035",
@@ -500,7 +500,7 @@
       "label": "Vacant 0.43-acre C-2 corner at 24th St and Broadway Rd",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 11 \u2014 electrical: power lines run on the northern property line (broker statement), but capacity at the intersection is unknown to the broker and no utility documentation exists in the package; the broker cannot answer the capacity item, so it is no longer a broker ask. STILL OPEN: (a) status of the two offers reported Nov 2 \u2014 not addressed in the Nov 11 reply (partial reply; the item stays open, R-094; blocker stays Awaiting broker reply since 2026-11-10); (b) electrical capacity itself \u2014 unconfirmed on the record. Decision with Jaideep (ex-T\u2026",
+      "next_step": "Ask list (updated Nov 11, 2026, late-afternoon review): (a) ANSWERED Nov 11 \u2014 both offers still live; NO offer deadline, seller just reviewing options (Sinnett, 5:02 PM PT). (b) STILL OPEN \u2014 terms beyond price that matter to the seller (escrow length, contingencies, proof of funds), asked Nov 11 and not answered; a partial reply counts as awaiting on the unanswered items (R-094). (c) Electrical capacity at the corner remains unconfirmed \u2014 the our-side capacity check is the route (the broker does not hold it). Blocker: Awaiting broker reply (since Nov 11).",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -590,7 +590,7 @@
       "label": "PHX 120-140 W Osborn Rd",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Awaiting the seller's site/environmental reports via the broker (keep-warm note sent Nov 7 via Crexi confirming the corrected 0.86 ac / four parcels and APS + City water noted; tour held until the reports are reviewed)",
+      "next_step": "Ask list (updated Nov 11, 2026, evening review): PART-ANSWERED \u2014 Heidi Kory (The Arrow Agency) sent the survey set (her Nov 11, 12:17 PM PT email), filed + analyzed in this pass (R-092): ALTA/NSPS survey P21-236 (Arizona Surveying and Mapping, Aug 5, 2021 \u2014 parcels 118-32-042A / 043A / 044A, \u00b10.403 ac combined, 25 parking spaces, direct access to Osborn Rd and 2nd Ave, Flood Zone X) and Lot Combination + Topographic surveys P23-340 (Nov 6, 2023 \u2014 all four parcels 041 / 042A / 043A / 044A combined as Lot 1, \u00b138,502 sq ft / \u00b10.88 ac, record owner 130 W Osborn Rd LLC, two buildings shown). Heidi\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -640,7 +640,7 @@
       "label": "PHX 1616 E Portland St (land)",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Broker replied Nov 7: co-broker Jason Butler will provide more information. Awaiting that reply on availability and price, full-parcel confirmation, survey/site plan, title and environmental reports, entitlement documents, and APS / water-sewer details. Photo pack is the last our-side open item (T-048 queue).",
+      "next_step": "Awaiting Butler (asked Nov 11): survey/site plan, seller-held title material, environmental reports, APS / water-sewer service position, and the lender's offer-approval process. Entitlement verification is DONE (T-074, Nov 11): the PHO-4-21 stipulation modification for the 17-unit scheme was approved and ratified Dec 15, 2021.",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -740,7 +740,7 @@
       "label": "Chandler Mall land, S Chandler Village Dr, Chandler",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Ask list (updated Nov 11, 2026, after the package analysis): ANSWERED \u2014 availability, price guidance ($40/sq ft; mid-$30s considered, shorter escrow helps), single parcel APN 301-65-977, PAD zoning with the 2014 rezoning history (hotel + future commercial), taxes ($11,805, 2025), frontage/access, City water/sewer nearby. STILL OPEN: (a) the 2014 PAD case \u2014 any recorded development plan or approved use list we can review (broker ask; the package names retail/hotel-type uses only); (b) electrical service \u2014 the package states no size or capacity; SRP service/capacity position and any stub locati\u2026",
+      "next_step": "Awaiting Rullo (asked Nov 11): any seller Phase I, the electrical position (SRP capacity letter or service stubs), and the seller's hoped-for escrow timeline. PAD entitlement is now documented (DVR14-0026): a vehicle-services use is not among the contemplated support-service commercial uses for the pad, and the pad needs its own PDP approval \u2014 the entitlement route is the gating question if this site advances.",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -1279,11 +1279,11 @@
       "site_id": "PIPE-PHX-0014",
       "label": "3 Minute Car Wash",
       "market": "PHX",
-      "stage": "1 Desk screen",
-      "next_step": "Nov 9, 2026: redline acknowledged to the seller (Gmail 1a1c12b384a85680) and the redline forwarded to Brittni with a request to submit it to CLM for legal review (Gmail 1a1c12b77622069c). Awaiting CLM/legal feedback; then DocuSign (seller Love Your Car LLC, signer Brad Ingarfield). Package + electricals follow execution. Site stays Dropped (land knock-out). Nov 10, 2026: Jaideep followed up with Brittni again on the CLM submission of the Ingarfield redline (second follow-up; the first was Nov 9) \u2014 still awaiting CLM/legal feedback.",
+      "stage": "2 Financial screen",
+      "next_step": "Awaiting Brad: (1) SRP written service confirmation \u2014 amperage, voltage, phase \u2014 plus any spare-capacity / upgrade-path indication (energy manager returns Nov 16); (2) the employer payroll-tax allocation once confirmed; (3) whether card-processing fees are tracked anywhere in his records. Standing: the 2016 >100,000-car records only if that volume claim is to be credited; a CURRENT title commitment comes at contracting. The financial picture is complete enough to judge: negative EBITDA \u2014 any continuation is a land/location decision, and layout fit on the net 0.46 ac is the gating land questio\u2026",
       "nda_id": "NDA-005",
-      "stage_blocker": "NDA execution",
-      "stage_blocker_since": "2026-11-09"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "PIPE-PHX-0018",
@@ -1579,11 +1579,11 @@
       "site_id": "PIPE-PHX-0084",
       "label": "3520 N 16th St (former DataBank building)",
       "market": "PHX",
-      "stage": "1 Desk screen",
-      "next_step": "Nov 10, 2026: Corrected reply SENT to Payne (A-000446): Nov 6 wash-template ask withdrawn; real-estate package requested (title, survey, environmental, utility/service incl. electrical + bills), second parcel APN, PSA status, building's actual clear height. Awaiting the broker \u2014 chase due Nov 14 under R-091 if unanswered. Site held at Desk screen until a real package exists (Jaideep, Nov 10). Nov 10, 2026: DEMOTED to Desk screen on Jaideep's direction \u2014 the Nov 5 stage advance rested on a site plan only; no financial package has ever been received, and the site is categorized as LAND (Archety\u2026",
+      "stage": "2 Financial screen",
+      "next_step": "Ask list (updated Nov 11, 2026, evening review \u2014 real-estate package RECEIVED + ANALYZED, R-092; stage to Financial screen on the package, R-074, reversing the Nov 10 demotion condition): title commitment (Commonwealth Land Title, File 942602728 \u2014 fee vested in Vim and Vigor Candle Co LLC; legal description covers BOTH parcels 118-09-106C + 118-09-106D), Phase I (EDI-R.E., Feb 25, 2021 \u2014 NO RECs / no controlled RECs; 0.87 ac total across both parcels; 7,691 sq ft building) and floor plan (2026), all filed to Source files / 2 Property and legal and analyzed in this pass. Electrical (broker ema\u2026",
       "nda_id": "",
-      "stage_blocker": "Awaiting package",
-      "stage_blocker_since": "2026-11-06"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": "2026-11-11"
     },
     {
       "site_id": "PIPE-PHX-0085",

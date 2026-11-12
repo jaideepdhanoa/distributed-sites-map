@@ -56,6 +56,8 @@ export type StageRefresh = {
   targetId: string;
   stage: string;
   stageGroup: string;
+  /** Shown immediately, before the deals refetch returns the same note. */
+  note?: string;
 };
 
 export const STAGE_REFRESH_EVENT = "sites-stage-refresh";
@@ -349,14 +351,19 @@ export function patchLiveStage<D extends { features: StageFeature[] }, S extends
   }
   const paintDeal = (properties: Record<string, unknown>) => {
     const next: Record<string, unknown> = { ...properties, stage: detail.stage, stage_group: detail.stageGroup };
+    if (detail.note) next.stage_pending = detail.note;
     if (detail.stageGroup === "dropped") delete next.suggested_drop;
     return next;
   };
-  const paintSite = (properties: Record<string, unknown>) => ({
-    ...properties,
-    pipeline_stage: detail.stage,
-    linked_deal_stage: detail.stage,
-  });
+  const paintSite = (properties: Record<string, unknown>) => {
+    const next: Record<string, unknown> = {
+      ...properties,
+      pipeline_stage: detail.stage,
+      linked_deal_stage: detail.stage,
+    };
+    if (detail.note) next.stage_pending = detail.note;
+    return next;
+  };
   return {
     deals: {
       ...input.deals,

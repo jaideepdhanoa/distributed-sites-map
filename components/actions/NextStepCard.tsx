@@ -289,13 +289,16 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
       setError(payload.error || "That could not be saved.");
       return;
     }
-    const refresh = payload.suggestion ? refreshFromSuggestion(kind, id, payload.suggestion) : null;
-    if (payload.suggestion && refresh) {
-      rememberStage(kind, id, payload.suggestion);
-      setSteps((current) => mergeSteps(kind, id, [payload.suggestion as Step, ...current.filter((item) => item.id !== payload.suggestion?.id)]));
+    const saved = payload.suggestion;
+    const refresh = saved ? refreshFromSuggestion(kind, id, saved) : null;
+    if (saved && refresh) {
+      rememberStage(kind, id, saved);
+      setSteps((current) => mergeSteps(kind, id, [saved, ...current.filter((item) => item.id !== saved.id)]));
+      const stageChange = approvedStage(saved);
+      const actor = accounts.find((account) => account.id === status.username)?.name || status.username;
+      publishStageRefresh(stageChange ? { ...refresh, note: `Moved to ${stageChange.label} by ${actor}, waiting for workbook` } : refresh);
     }
     resetForm();
-    if (refresh) publishStageRefresh(refresh);
     await reload();
     window.dispatchEvent(new Event("queue-refresh"));
   }

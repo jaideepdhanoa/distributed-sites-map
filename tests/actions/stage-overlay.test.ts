@@ -209,8 +209,10 @@ test("an optimistic patch moves the deal and the linked site", () => {
     targetId: "PIPE-PHX-0008",
     stage: "Dropped",
     stageGroup: "dropped",
+    note: "Moved to Dropped by Reviewer, waiting for workbook",
   });
   assert.equal(patched.deals.features[0].properties.stage_group, "dropped");
+  assert.equal(patched.deals.features[0].properties.stage_pending, "Moved to Dropped by Reviewer, waiting for workbook");
   assert.equal(patched.deals.features[0].properties.suggested_drop, undefined);
   assert.equal(patched.sites.features[0].properties.linked_deal_stage, "Dropped");
   assert.equal(patched.deals.features[1].properties.stage_group, "financial");

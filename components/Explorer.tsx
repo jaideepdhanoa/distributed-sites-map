@@ -406,15 +406,17 @@ export default function Explorer() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
+  const dataGen = useRef(0);
   useEffect(() => {
     let cancel = false;
+    const token = ++dataGen.current;
     Promise.all([
-      fetch(`/api/data/sites?city=${city}`),
+      fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
       fetch("/api/data/areas"),
       fetch("/api/data/depots"),
       fetch(`/api/data/parcels?city=${city}`),
       fetch("/api/data/funnel"),
-      fetch("/api/data/deals"),
+      fetch("/api/data/deals", { cache: "no-store" }),
       fetch("/api/data/unscreened"),
       fetch("/api/data/timeline/summary"),
       fetch("/api/me"),
@@ -424,11 +426,11 @@ export default function Explorer() {
         return;
       }
       if (!sitesRes.ok || !areasRes.ok || !depotsRes.ok || !parcelsRes.ok || !funnelRes.ok || !dealsRes.ok || !unscreenedRes.ok) {
-        setError("The site data could not be loaded.");
+        if (!cancel && token === dataGen.current) setError("The site data could not be loaded.");
         return;
       }
       const funnelPayload = await funnelRes.json();
-      if (!cancel) {
+      if (!cancel && token === dataGen.current) {
         setData({
           sites: await sitesRes.json(),
           areas: await areasRes.json(),
@@ -459,31 +461,33 @@ export default function Explorer() {
   catalogOn.current = Boolean(catalog);
   useEffect(() => {
     let cancel = false;
-    let generation = 0;
-    async function refresh() {
-      const token = ++generation;
-      const requests = [fetch("/api/data/deals"), fetch(`/api/data/sites?city=${city}`)];
-      if (catalogOn.current) requests.push(fetch("/api/data/sites"));
+    async function refresh(token: number) {
+      const requests = [
+        fetch("/api/data/deals", { cache: "no-store" }),
+        fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
+      ];
+      if (catalogOn.current) requests.push(fetch("/api/data/sites", { cache: "no-store" }));
       const [dealsRes, sitesRes, allSitesRes] = await Promise.all(requests);
-      if (cancel || token !== generation || !dealsRes?.ok || !sitesRes?.ok) return;
+      if (cancel || token !== dataGen.current || !dealsRes?.ok || !sitesRes?.ok) return;
       const deals = await dealsRes.json();
       const sites = await sitesRes.json();
-      if (cancel || token !== generation) return;
+      if (cancel || token !== dataGen.current) return;
       setData((current) => (current ? { ...current, deals, sites } : current));
       if (allSitesRes?.ok) {
         const payload = (await allSitesRes.json()) as { features?: SiteFeature[] };
-        if (!cancel && token === generation) setCatalog(Array.isArray(payload.features) ? payload.features : []);
+        if (!cancel && token === dataGen.current) setCatalog(Array.isArray(payload.features) ? payload.features : []);
       }
     }
     function onStage(event: Event) {
       const detail = (event as CustomEvent<StageRefresh>).detail;
       if (!detail?.targetId || !detail.stageGroup) return;
+      const token = ++dataGen.current;
       setData((current) => (current ? { ...current, ...patchLiveStage(current, detail) } : current));
       setCatalog((current) => {
         if (!current) return current;
         return patchLiveStage({ deals: { features: [] }, sites: { features: current } }, detail).sites.features;
       });
-      void refresh();
+      void refresh(token);
     }
     window.addEventListener(STAGE_REFRESH_EVENT, onStage);
     return () => {

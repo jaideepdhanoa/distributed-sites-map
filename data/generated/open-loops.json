@@ -122,6 +122,18 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": 2,
       "nda_days_in_court": null
+    },
+    {
+      "nda_id": "NDA-011",
+      "counterparty_firm": "The Auto Repair Boss, Inc.",
+      "counterparty_person": "Halle Parker",
+      "site_ids": "L-441",
+      "nda_status": "Our form sent \u2014 awaiting execution",
+      "nda_waiting_on": "Them",
+      "nda_waiting_on_since": "2026-11-12",
+      "nda_gates": "Location + details",
+      "nda_days_open": null,
+      "nda_days_in_court": null
     }
   ],
   "sites": [
@@ -450,10 +462,10 @@
       "label": "Vacant land entitled for a car wash",
       "market": "PHX",
       "stage": "Financial screen",
-      "next_step": "Awaiting Pencek on the two Nov 8 follow-ups: (1) Special Use Permit status - filed? hearing or approval date? SUP documents; (2) anything showing the electrical service size (amps/phase/voltage) or a utility letter. His Nov 8 reply (found in spam) only acknowledged the Sonoran keep-warm and answered neither Ocotillo question. Site remains at Financial screen; location outside the service area is unchanged.",
+      "next_step": "Chase 1 sent Nov 12, 2026 (Jaideep's order, Gmail 1a1d0fb4723118dd): SUP status + electrical service size still open. Awaiting Pencek on the two Nov 8 follow-ups: (1) Special Use Permit status - filed? hearing or approval date? SUP documents; (2) anything showing the electrical service size (amps/phase/voltage) or a utility letter. His Nov 8 reply (found in spam) only acknowledged the Sonoran keep-warm and answered neither Ocotillo question. Site remains at Financial screen; location outside the service area is unchanged.",
       "nda_id": "",
-      "stage_blocker": "\u2014",
-      "stage_blocker_since": ""
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-12"
     },
     {
       "site_id": "LAND-PHX-0007",
@@ -510,7 +522,7 @@
       "label": "Vacant 0.43-acre C-2 lot on McDowell Rd",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "NDA signature due Nov 5; then request the demolition records.",
+      "next_step": "NDA execution is the gate (NDA-004; gates the package/demolition records). Nov 12, 2026: Brittni asked for the latest NDA doc for DocuSign; Jaideep sent the fields only (counterparty NAI Horizon / HORIZON REAL ESTATE GROUP, INC., Phoenix Office, 2944 North 44th Street, Suite 200, Phoenix, AZ 85018; signer Markus Hochholzer, Vice President; Moove signer Cara Dwyer; Horizon's state of incorporation still missing - signer to complete it at signing). Brittni then asked for a filled-out / marked-up copy of the NDA to pass to legal and route for signature, and offered to help complete it later toda\u2026",
       "nda_id": "NDA-004",
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-03"
@@ -660,10 +672,10 @@
       "label": "PHX 821 W McKinley St (land)",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Broker replied Nov 8: no information yet - colleagues on the broker side will reply with more information. Awaiting availability and price, full-parcel confirmation, current zoning, survey/site plan, title and environmental reports, and utility service. Aerial measure (R-084) and photo pack (R-085) pending via the standing backfill; AADT/population via the daily sweep (T-042 master).",
+      "next_step": "Chase 1 sent Nov 12, 2026 (Jaideep's order, Gmail 1a1d0fb4cee44bbc): promised Jake/Tommy follow-up never arrived; standing ask list re-asked in full. Broker replied Nov 8: no information yet - colleagues on the broker side will reply with more information. Awaiting availability and price, full-parcel confirmation, current zoning, survey/site plan, title and environmental reports, and utility service. Aerial measure (R-084) and photo pack (R-085) pending via the standing backfill; AADT/population via the daily sweep (T-042 master).",
       "nda_id": "",
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-08"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-12"
     },
     {
       "site_id": "LAND-PHX-0054",
@@ -746,6 +758,26 @@
       "stage_blocker_since": "2026-11-11"
     },
     {
+      "site_id": "LAND-PHX-0062",
+      "label": "Thomas Road / Arcadia infill land, 4550 E Thomas Rd, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Email inquiry sent Nov 12 to Chip Diamond, Diamond Properties (cc John Appelbe, Appelbe Commercial) - availability and price, exact parcels included and whether the existing building is vacant, survey/site plan, title and environmental reports, electrical service details and utility bills. Gmail message 1a1d0aa04dfbc2a8. Awaiting reply. Aerial measure (R-084) pending via the standing backfill; photo pack via backfill; AADT/population via the daily sweep (T-042 master); FEMA flood and power Layer A retry in the daily sweep.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-12"
+    },
+    {
+      "site_id": "LAND-PHX-0063",
+      "label": "Retail pads, NWC Loop 101 Freeway & 56th Street, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "SUGGESTED DROP (Nov 12, 2026): the broker stated in writing that a car wash is not being done at this site and redirected Moove to SWC 35th Ave & Baseline Rd, which is already dropped as outside the service area (register L-242). Stage stays at Desk screen pending Jaideep's drop decision (R-097); no chase. If Jaideep approves, drop the row and register L-433 on the broker's statement. Draft reply held in the Nov 12 midday review (thanks the broker, notes the other site sits outside Moove's current focus area, asks to be kept in mind for in-area pads).",
+      "nda_id": "",
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": "2026-11-12"
+    },
+    {
       "site_id": "PIPE-LAS-0011",
       "label": "Self-serve wash",
       "market": "LAS",
@@ -760,7 +792,7 @@
       "label": "Repair, collision and U-Haul",
       "market": "LAS",
       "stage": "1 Desk screen",
-      "next_step": "Suggested drop under R-097 (knock-out: outside the service area \u2014 Mesquite NV). Jaideep decided Nov 11, 2026: KEEP parked as a suggested drop; do not drop without a new decision from him. Thread closed Oct 30 (pass communicated); NDA-010 closed as Not required Nov 11. \u2014 History: Oct 30: Vic says the shop is in Mesquite, NV, about 80 miles northeast of Las Vegas and far outside the service area, so it's knocked out; we replied passing on it and asking for anything similar in the Las Vegas valley. Earlier Oct 30: followed up with Vic and Wayne (Brittni copied) to ask whether Moove's mutual NDA\u2026",
+      "next_step": "SUGGESTED DROP \u2014 awaiting Jaideep's review (R-097). Reason: the property is in Mesquite, NV \u2014 outside the service area (knock-out). Suggested drop under R-097 (knock-out: outside the service area \u2014 Mesquite NV). Jaideep decided Nov 11, 2026: KEEP parked as a suggested drop; do not drop without a new decision from him. Thread closed Oct 30 (pass communicated); NDA-010 closed as Not required Nov 11. \u2014 History: Oct 30: Vic says the shop is in Mesquite, NV, about 80 miles northeast of Las Vegas and far outside the service area, so it's knocked out; we replied passing on it and asking for anything\u2026",
       "nda_id": "NDA-010",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-10-30"
@@ -770,7 +802,7 @@
       "label": "Wash N Go Sahara",
       "market": "LAS",
       "stage": "1 Desk screen",
-      "next_step": "Suggested drop (R-097) \u2014 Jaideep decided Nov 11, 2026: PIPE-LAS-0016 is a suggested drop until he reviews/confirms it \u2014 not dropped; no pass may drop it without a new decision from him. Blocker corrected the same day (his ruling): we sent last on Nov 6 \u2014 nothing is owed to Schneider; the open asks are Miracle's. Prior next step (unchanged): Market-data follow-up sent to Stephen Schneider (Miracle) Nov 6, 2026 in his Sahara/Desert Inn thread: pair price / year-end position and whether the seller would split the pair; operating financials requested (recent P&Ls, membership numbers). Site stays\u2026",
+      "next_step": "SUGGESTED DROP \u2014 awaiting Jaideep's review (R-097). Reason: layout/land knock-out \u2014 0 stalls fit on the site. Suggested drop (R-097) \u2014 Jaideep decided Nov 11, 2026: PIPE-LAS-0016 is a suggested drop until he reviews/confirms it \u2014 not dropped; no pass may drop it without a new decision from him. Blocker corrected the same day (his ruling): we sent last on Nov 6 \u2014 nothing is owed to Schneider; the open asks are Miracle's. Prior next step (unchanged): Market-data follow-up sent to Stephen Schneider (Miracle) Nov 6, 2026 in his Sahara/Desert Inn thread: pair price / year-end position and whether\u2026",
       "nda_id": "NDA-001",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-06"
@@ -780,7 +812,7 @@
       "label": "Wash N Go Desert Inn",
       "market": "LAS",
       "stage": "1 Desk screen",
-      "next_step": "Suggested drop (R-097) \u2014 Jaideep decided Nov 11, 2026: PIPE-LAS-0017 is a suggested drop until he reviews/confirms it \u2014 not dropped; no pass may drop it without a new decision from him (the same ruling he gave PIPE-LAS-0016, extended to this row at his direction). Blocker already reads 'Awaiting broker reply' since Nov 6, 2026 \u2014 we sent last; nothing is owed to Schneider; the open asks are Miracle's. Prior next step (unchanged): Market-data follow-up sent to Stephen Schneider (Miracle) Nov 6, 2026 in his Sahara/Desert Inn thread: pair price / year-end position and whether the seller would spl\u2026",
+      "next_step": "SUGGESTED DROP \u2014 awaiting Jaideep's review (R-097). Reason: only 1 stall fits on the site (land knock-out). Suggested drop (R-097) \u2014 Jaideep decided Nov 11, 2026: PIPE-LAS-0017 is a suggested drop until he reviews/confirms it \u2014 not dropped; no pass may drop it without a new decision from him (the same ruling he gave PIPE-LAS-0016, extended to this row at his direction). Blocker already reads 'Awaiting broker reply' since Nov 6, 2026 \u2014 we sent last; nothing is owed to Schneider; the open asks are Miracle's. Prior next step (unchanged): Market-data follow-up sent to Stephen Schneider (Miracle)\u2026",
       "nda_id": "NDA-001",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-06"
@@ -1199,11 +1231,11 @@
       "site_id": "PIPE-PHX-0003",
       "label": "Express wash",
       "market": "PHX",
-      "stage": "1 Desk screen",
-      "next_step": "Stays dropped: no spare area on the lot, and revenue and EBITDA are falling; location re-test Nov 6 confirmed Outside (parcel point 4.30 mi from the service-area boundary). Nov 6 follow-up sent to Roger Pencek in the Sonoran thread: 2026 YTD trajectory and monthly figures, price flexibility at $2.3M, membership trend, and electrical service size (amps/phase/voltage) or utility documentation. Awaiting reply; raise the package with Cindel only if she wants a second look.",
+      "stage": "Dropped",
+      "next_step": "Dropped Nov 12, 2026 by Jaideep \u2014 Outside service area (his reason as recorded in the distributedsites.com web app at 11:31 AM PT; Stage written to the workbook the same day on his instruction). Stays dropped: no spare area on the lot, and revenue and EBITDA are falling; location re-test Nov 6 confirmed Outside (parcel point 4.30 mi from the service-area boundary). Nov 6 follow-up sent to Roger Pencek in the Sonoran thread: 2026 YTD trajectory and monthly figures, price flexibility at $2.3M, membership trend, and electrical service size (amps/phase/voltage) or utility documentation. Awaiting\u2026",
       "nda_id": "",
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-06"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     {
       "site_id": "PIPE-PHX-0004",
@@ -1259,18 +1291,18 @@
       "site_id": "PIPE-PHX-0009",
       "label": "Land and building",
       "market": "PHX",
-      "stage": "1 Desk screen",
-      "next_step": "Class 4 identification pass, Nov 7, 2026: the listing is matched to its BizQuest mirror (Listing ID 2144047) \u2014 same $1,790,000 ask and the same 'LAND, BUILDING, PARKING RIGHTS, AND BUSINESS CONVEY' copy as this row's descriptor \u2014 which adds listing facts (4,801 sq ft shop, six drive-in bays, 29,011 sq ft / 0.67 ac lot, built 2000, auto services at the location since 2000, claimed NOI $426,483) but NO street address or APN: the mirror's only location trace is its FF&E attachment filename ('FFE List Apache Blvd.pdf') \u2014 the Apache Blvd corridor, Mesa, not an address. Identification fails on the\u2026",
+      "stage": "Dropped",
+      "next_step": "Dropped Nov 12, 2026 by Jaideep \u2014 No longer for sale (his reason as recorded in the distributedsites.com web app at 11:22 AM PT; Stage written to the workbook the same day on his instruction). Class 4 identification pass, Nov 7, 2026: the listing is matched to its BizQuest mirror (Listing ID 2144047) \u2014 same $1,790,000 ask and the same 'LAND, BUILDING, PARKING RIGHTS, AND BUSINESS CONVEY' copy as this row's descriptor \u2014 which adds listing facts (4,801 sq ft shop, six drive-in bays, 29,011 sq ft / 0.67 ac lot, built 2000, auto services at the location since 2000, claimed NOI $426,483) but NO st\u2026",
       "nda_id": "",
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     {
       "site_id": "PIPE-PHX-0010",
       "label": "Express wash, Peoria",
       "market": "PHX",
-      "stage": "1 Desk screen",
-      "next_step": "None \u2014 closed as a market-data point. Nov 6, 2026 status check: the Crexi listing ($4.5M, 183 days on market) has been removed \u2014 the register records the Crexi page updated Oct 28, 2026 showing the listing removed, and it was recorded delisted in the Nov 3 scan. No sale has recorded: Maricopa County owner of record remains GRAND WASH LLC (APN 142-13-023), so the property delisted unsold and the wash (Grand Express Wash) continues to operate. Keep as a $4.5M price comp only. Stage stays Dropped; reopening is a separate decision.",
+      "stage": "Dropped",
+      "next_step": "Dropped Nov 12, 2026 by Jaideep \u2014 Outside of service area (his reason as recorded in the distributedsites.com web app at 11:28 AM PT; Stage written to the workbook the same day on his instruction). None \u2014 closed as a market-data point. Nov 6, 2026 status check: the Crexi listing ($4.5M, 183 days on market) has been removed \u2014 the register records the Crexi page updated Oct 28, 2026 showing the listing removed, and it was recorded delisted in the Nov 3 scan. No sale has recorded: Maricopa County owner of record remains GRAND WASH LLC (APN 142-13-023), so the property delisted unsold and the was\u2026",
       "nda_id": "",
       "stage_blocker": "\u2014",
       "stage_blocker_since": ""
@@ -1280,7 +1312,7 @@
       "label": "3 Minute Car Wash",
       "market": "PHX",
       "stage": "2 Financial screen",
-      "next_step": "Awaiting Brad: (1) SRP written service confirmation \u2014 amperage, voltage, phase \u2014 plus any spare-capacity / upgrade-path indication (energy manager returns Nov 16); (2) the employer payroll-tax allocation once confirmed; (3) whether card-processing fees are tracked anywhere in his records. Standing: the 2016 >100,000-car records only if that volume claim is to be credited; a CURRENT title commitment comes at contracting. The financial picture is complete enough to judge: negative EBITDA \u2014 any continuation is a land/location decision, and layout fit on the net 0.46 ac is the gating land questio\u2026",
+      "next_step": "Awaiting Brad: SRP written service confirmation - amperage, voltage, phase - plus any spare-capacity / upgrade-path indication (his energy manager returns Nov 16; Brad has asked SRP and will pass on their response). Payroll-tax and card-fee residuals ANSWERED Nov 12, 2026 (payroll taxes about $13,500, seller approximation; card fees about 2% of card sales, about $4,757, seller estimate) and reflected in the -$32,719 recast. Standing: the 2016 >100,000-car records only if that volume claim is to be credited; a CURRENT title commitment comes at contracting. The financial picture is complete eno\u2026",
       "nda_id": "NDA-005",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -1290,7 +1322,7 @@
       "label": "Tire sales and service (WCI listing)",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Nov 9, 2026: WCI confirmed the tire shop owner is not interested in selling at this time \u2014 site stays Dropped; no further chase on this business. The separate WCI NDA thread stays open only for other listings: Paul will follow up with WCI's designated broker for the entity/signer details (Brittni cc'd on his reply).",
+      "next_step": "DROP DECISION PENDING \u2014 Jaideep's call. Reason: broker (Peterson, WCI) reported Nov 9, 2026 that the tire-shop owner is not interested in selling. Nov 9, 2026: WCI confirmed the tire shop owner is not interested in selling at this time \u2014 site stays Dropped; no further chase on this business. The separate WCI NDA thread stays open only for other listings: Paul will follow up with WCI's designated broker for the entity/signer details (Brittni cc'd on his reply).",
       "nda_id": "NDA-003",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-07"

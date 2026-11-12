@@ -1,12 +1,12 @@
 {
   "workbook_as_of": "2026-11-12",
   "pipeline": {
-    "1 Desk screen": 29,
-    "Dropped": 5,
+    "1 Desk screen": 26,
+    "Dropped": 8,
     "2 Financial screen": 3
   },
   "land": {
-    "1 Desk screen": 44,
+    "1 Desk screen": 46,
     "Financial screen": 1
   },
   "rows": [
@@ -23,7 +23,7 @@
     {
       "deal_id": "PIPE-PHX-0003",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "Dropped"
     },
     {
       "deal_id": "PIPE-PHX-0004",
@@ -53,12 +53,12 @@
     {
       "deal_id": "PIPE-PHX-0009",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "Dropped"
     },
     {
       "deal_id": "PIPE-PHX-0010",
       "kind": "pipeline",
-      "stage": "1 Desk screen"
+      "stage": "Dropped"
     },
     {
       "deal_id": "PIPE-LAS-0011",
@@ -417,6 +417,16 @@
     },
     {
       "deal_id": "LAND-PHX-0061",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0062",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0063",
       "kind": "land",
       "stage": "1 Desk screen"
     }

@@ -50,8 +50,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-07"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     "PIPE-PHX-0006": {
       "nda_id": "",
@@ -138,8 +138,8 @@
       "nda_status": "With Moove legal",
       "nda_waiting_on": "Us \u2014 legal",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 0,
+      "nda_days_open": 4,
+      "nda_days_in_court": 1,
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
     },
@@ -158,8 +158,8 @@
       "nda_status": "With counterparty legal",
       "nda_waiting_on": "Them \u2014 legal",
       "nda_gates": "Discussion",
-      "nda_days_open": 13,
-      "nda_days_in_court": 1,
+      "nda_days_open": 14,
+      "nda_days_in_court": 2,
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-06"
     },
@@ -168,8 +168,8 @@
       "nda_status": "With counterparty legal",
       "nda_waiting_on": "Them \u2014 legal",
       "nda_gates": "Discussion",
-      "nda_days_open": 13,
-      "nda_days_in_court": 1,
+      "nda_days_open": 14,
+      "nda_days_in_court": 2,
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-06"
     },
@@ -178,8 +178,8 @@
       "nda_status": "Moove form sent",
       "nda_waiting_on": "Them \u2014 signer",
       "nda_gates": "Proof of funds",
-      "nda_days_open": 18,
-      "nda_days_in_court": 16,
+      "nda_days_open": 19,
+      "nda_days_in_court": 17,
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-07"
     },
@@ -218,8 +218,8 @@
       "nda_status": "Moove form sent",
       "nda_waiting_on": "Them \u2014 signer",
       "nda_gates": "Package",
-      "nda_days_open": 2,
-      "nda_days_in_court": 2,
+      "nda_days_open": 3,
+      "nda_days_in_court": 3,
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-09"
     },
@@ -228,8 +228,8 @@
       "nda_status": "Moove form sent",
       "nda_waiting_on": "Them \u2014 signer",
       "nda_gates": "Package",
-      "nda_days_open": 2,
-      "nda_days_in_court": 2,
+      "nda_days_open": 3,
+      "nda_days_in_court": 3,
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-09"
     },
@@ -320,8 +320,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "We owe a reply",
-      "stage_blocker_since": "2026-11-09"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": ""
     },
     "PIPE-MIA-0082": {
       "nda_id": "",
@@ -378,8 +378,8 @@
       "nda_status": "With counterparty legal",
       "nda_waiting_on": "Them \u2014 legal",
       "nda_gates": "Discussion",
-      "nda_days_open": 13,
-      "nda_days_in_court": 1,
+      "nda_days_open": 14,
+      "nda_days_in_court": 2,
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-07"
     },
@@ -478,8 +478,8 @@
       "nda_status": "Moove form sent",
       "nda_waiting_on": "Them \u2014 signer",
       "nda_gates": "Package",
-      "nda_days_open": 10,
-      "nda_days_in_court": 2,
+      "nda_days_open": 11,
+      "nda_days_in_court": 3,
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-09"
     },
@@ -568,8 +568,8 @@
       "nda_status": "Moove form sent",
       "nda_waiting_on": "Us \u2014 signer",
       "nda_gates": "Package",
-      "nda_days_open": 9,
-      "nda_days_in_court": 8,
+      "nda_days_open": 10,
+      "nda_days_in_court": 9,
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-03"
     },
@@ -658,8 +658,8 @@
       "nda_status": "Moove form sent",
       "nda_waiting_on": "Them \u2014 signer",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 2,
+      "nda_days_open": 4,
+      "nda_days_in_court": 3,
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-08"
     },
@@ -840,8 +840,8 @@
       "nda_waiting_on_since": "2026-11-10",
       "nda_executed_date": "",
       "nda_gates": "Discussion",
-      "nda_days_open": 13,
-      "nda_days_in_court": 1,
+      "nda_days_open": 14,
+      "nda_days_in_court": 2,
       "source": "Gmail thread 1a182c3d38dcfde9 (Hart Oct 29 / Gibbs Oct 30, per-project NDAs agreed); Julia Prinz counter-edits Nov 9, 2026; Run Log 333 (Nov 10, 2026 send); Sharon Gibbs email Nov 11, 2026 (Gmail 1a1cb3f9b569f787)",
       "notes": "Per-project NDAs agreed Oct 29-30, 2026. Moove's mutual form, incorporating Julia Prinz's Nov 9 counter-edits from the Project 1459 negotiation, was forwarded to Miracle legal via Sharon Gibbs on Nov 10, 2026 (Brittni Toston cc'd). SFR Realty LLC is a facilitating broker only and does not sign (settled Nov 10). Nov 11, 2026: Gibbs confirmed she will send the form to Miracle counsel for review and mark-up and will be back in touch as soon as she can \u2014 court stays Them \u2014 legal (waiting-on since Nov 10 unchanged; the confirmation does not change hands)."
     },
@@ -860,8 +860,8 @@
       "nda_waiting_on_since": "2026-10-22",
       "nda_executed_date": "",
       "nda_gates": "Discussion",
-      "nda_days_open": 25,
-      "nda_days_in_court": 20,
+      "nda_days_open": 26,
+      "nda_days_in_court": 21,
       "source": "Gmail thread 1a14660aa89721c3 (Johnson Oct 17, 2026: NDA required before any discussion; Moove mutual attached Oct 19; Brittni Oct 22 asked for her redline)",
       "notes": "Broker requires an NDA before discussing the business. Her redline of Moove's mutual form (Nevada law \u2014 Moove legal confirmed OK Oct 29) has been awaited since Oct 22, 2026; her own confidentiality and buyer introduction agreements are also still to come. She said Nov 4 she would 'put something together by next week'; chased Nov 2 and Nov 9."
     },
@@ -880,8 +880,8 @@
       "nda_waiting_on_since": "2026-10-26",
       "nda_executed_date": "",
       "nda_gates": "Proof of funds",
-      "nda_days_open": 18,
-      "nda_days_in_court": 16,
+      "nda_days_open": 19,
+      "nda_days_in_court": 17,
       "source": "Gmail thread 1a146ddb22fad95f (mutual NDA sent Oct 24, 2026; Peterson query Oct 25; clarification Oct 26; chase Nov 7; Peterson reply Nov 9)",
       "notes": "Sent so Moove's proof of funds can be shared under NDA. Awaiting the WCI designated broker's legal entity name and signer name/email/title so Brittni can route it by DocuSign. Peterson (Nov 9): 'I will follow up with the broker on this.'"
     },
@@ -900,8 +900,8 @@
       "nda_waiting_on_since": "2026-11-03",
       "nda_executed_date": "",
       "nda_gates": "Package",
-      "nda_days_open": 9,
-      "nda_days_in_court": 8,
+      "nda_days_open": 10,
+      "nda_days_in_court": 9,
       "source": "Gmail thread 1a19e48e0c9edd2b (mutual NDA attached Nov 2, 2026; accepted as-is Nov 2; Horizon entity details for DocuSign received Nov 3); Forward to Brittni Nov 11, 2026 (Gmail 1a1cdfb8e59bab14)",
       "notes": "Form agreed as-is. Execution is stalled on OUR side: the DocuSign routing/signature (Brittni routes, Cara Dwyer signs) has been outstanding since the entity details arrived Nov 3, 2026 \u2014 was due Nov 5. Nov 11, 2026: Jaideep forwarded the broker thread to Brittni and asked her to get the DocuSign sent out for signature \u2014 the broker's side has been complete since Nov 3 (form accepted as-is; entity/signer details in). Waiting-on court unchanged (Us \u2014 signer, since Nov 3): the ball stays on our side until the envelope is routed and signed."
     },
@@ -920,8 +920,8 @@
       "nda_waiting_on_since": "2026-11-11",
       "nda_executed_date": "",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 0,
+      "nda_days_open": 4,
+      "nda_days_in_court": null,
       "source": "Gmail thread 1a1bbf1cb5839617; Activity A-000331 (seller reply Nov 8, 2026) and A-000438 (CLM follow-up Nov 10, 2026); Gmail 1a1cb95e37b37a09; Completed redline returned by Ingarfield Nov 11, 2026 (Gmail 1a1cc55fdf2f236e) \u2014 party/signatory fields completed (Love Your Car LLC, Delaware, signer as Member); Jaideep reviewed and confirmed complete; forwarded to Brittni Nov 11 for CLM submission (Gmail 1a1cc57fdaa30c4e) \u2014 court now Us \u2014 legal",
       "notes": "Seller replied Nov 8 open to Moove's form, then sent a redline; the redline is with Moove legal via CLM (Brittni) \u2014 Jaideep chased Nov 9 and Nov 10. Seller's package (wash-level sales/expenses) follows once both parties have signed, so this NDA gates the package. Nov 11: Brittni flagged the redline's highlighted party/signatory fields ([NAME], [ADDRESS] x2, signatory name) were never filled in, so CLM submission waits on the completed form; Jaideep asked the seller to complete the Love Your Car LLC blocks and return the updated redline (Gmail 1a1cb95e37b37a09, Brittni cc'd)."
     },
@@ -940,8 +940,8 @@
       "nda_waiting_on_since": "2026-11-09",
       "nda_executed_date": "",
       "nda_gates": "Package",
-      "nda_days_open": 10,
-      "nda_days_in_court": 2,
+      "nda_days_open": 11,
+      "nda_days_in_court": 3,
       "source": "Activity A-000423 (broker re-sent its website NDA link Nov 9-10, 2026) and A-000430 (Moove mutual resent Nov 10, 2026); Cindel drop recommendation Nov 2 superseded by Jaideep Nov 10",
       "notes": "Broker gates all property information behind its own website property NDA (link first sent Nov 1, 2026). Moove declined the website form (R-076) and sent its mutual NDA on Nov 9, resent Nov 10 with the execution-details ask and the package + electrical asks in parallel (R-090); proof of funds follows execution."
     },
@@ -960,8 +960,8 @@
       "nda_waiting_on_since": "2026-11-09",
       "nda_executed_date": "",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 2,
+      "nda_days_open": 4,
+      "nda_days_in_court": 3,
       "source": "Gmail thread 1a1b2c237a05f711 (Fessinger reply Nov 8, 2026; Moove mutual NDA attached Nov 9, 2026)",
       "notes": "Property information is gated behind an NDA. Moove's mutual form was attached Nov 9 ('let's put the NDA in place so this can move forward'); awaiting Western Retail Advisors' go-ahead and execution details (legal name/state/address, signer name/email/title)."
     },
@@ -980,8 +980,8 @@
       "nda_waiting_on_since": "2026-11-09",
       "nda_executed_date": "",
       "nda_gates": "Package",
-      "nda_days_open": 2,
-      "nda_days_in_court": 2,
+      "nda_days_open": 3,
+      "nda_days_in_court": 3,
       "source": "Gmail thread 1a1c219fef8bba7f (Walker Nov 9, 2026; Jaideep's mutual-NDA email Nov 9; Brittni call proposal Nov 10; Activity A-000425/A-000439); Call with Brittni booked for Fri Nov 13, 2026, 9:00\u20139:30 AM PT to work through the NDA hurdles (calendar event e04v6imh2aslsshargap0u5gq0; confirmed to her by email Nov 11, Gmail 1a1cc81f329509b6).",
       "notes": "NRC's website confidentiality agreement declined (R-076). Moove's mutual NDA was sent Nov 9 for the 2014 Ann Rd property and extended to the Azure Dr listing the same day; NRC can accept one executed NDA covering both listings or go property-specific with entity/signer details to Brittni. Package and proof of funds follow execution. Brittni proposed a call on the NDA hurdles Nov 10; Jaideep offered Nov 11 slots."
     },

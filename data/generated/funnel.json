@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-12T04:47:46Z",
+  "generated_at": "2026-11-12T16:40:43Z",
   "workbook_as_of": "2026-11-12",
   "stages": [
     {
@@ -318,10 +318,10 @@
       "id": "contacted",
       "name": "Deals contacted",
       "unit": "deals",
-      "total": 57,
+      "total": 55,
       "by_city": {
         "LAS": 16,
-        "PHX": 35,
+        "PHX": 33,
         "MIA": 6
       },
       "note": "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."

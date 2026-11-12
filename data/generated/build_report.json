@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-12T04:47:46Z",
+  "generated_at": "2026-11-12T16:40:43Z",
   "census_rows": {
     "total": 1749,
     "by_city": {
@@ -142,10 +142,10 @@
   "pipeline_rows": 86,
   "land_rows": 62,
   "pipeline_stage_counts": {
-    "1 Desk screen": 31,
+    "1 Desk screen": 29,
+    "Dropped": 5,
     "2 Financial screen": 3,
-    "": 49,
-    "Dropped": 3
+    "": 49
   },
   "land_stage_counts": {
     "1 Desk screen": 44,
@@ -257,14 +257,14 @@
       "MIA": 10
     },
     "pipeline_by_stage": {
-      "1 Desk screen": 31,
-      "2 Financial screen": 3,
-      "Dropped": 3
+      "1 Desk screen": 29,
+      "Dropped": 5,
+      "2 Financial screen": 3
     },
     "pipeline_by_group": {
-      "desk": 31,
-      "financial": 3,
-      "dropped": 3
+      "desk": 29,
+      "dropped": 5,
+      "financial": 3
     },
     "land_by_city": {
       "LAS": 12,
@@ -1061,7 +1061,7 @@
     "Census row count is 1749, workbook expectation was 1,701.",
     "Unique sites are 1705 {'LAS': 429, 'PHX': 585, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
     "In-area city split is {'LAS': 186, 'PHX': 281, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
-    "Pipeline tab has 86 rows (stages {'1 Desk screen': 31, '2 Financial screen': 3, '': 49, 'Dropped': 3}). The older note of 79 is not in this export."
+    "Pipeline tab has 86 rows (stages {'1 Desk screen': 29, 'Dropped': 5, '2 Financial screen': 3, '': 49}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -1083,24 +1083,24 @@
     "sample_verdicts": [],
     "sample_stages": [
       {
-        "site_id": "PHX-U229",
+        "site_id": "PHX-U326",
         "before": "1 Desk screen",
-        "after": "2 Financial screen"
+        "after": "Dropped"
       },
       {
-        "site_id": "WB-PHX-0012",
+        "site_id": "PHX-U435",
         "before": "1 Desk screen",
-        "after": "2 Financial screen"
+        "after": "Dropped"
       },
       {
-        "deal_id": "PIPE-PHX-0014",
+        "deal_id": "PIPE-PHX-0005",
         "before": "1 Desk screen",
-        "after": "2 Financial screen"
+        "after": "Dropped"
       },
       {
-        "deal_id": "PIPE-PHX-0084",
+        "deal_id": "PIPE-PHX-0081",
         "before": "1 Desk screen",
-        "after": "2 Financial screen"
+        "after": "Dropped"
       }
     ]
   },

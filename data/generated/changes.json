@@ -7,24 +7,24 @@
   "sample_verdicts": [],
   "sample_stages": [
     {
-      "site_id": "PHX-U229",
+      "site_id": "PHX-U326",
       "before": "1 Desk screen",
-      "after": "2 Financial screen"
+      "after": "Dropped"
     },
     {
-      "site_id": "WB-PHX-0012",
+      "site_id": "PHX-U435",
       "before": "1 Desk screen",
-      "after": "2 Financial screen"
+      "after": "Dropped"
     },
     {
-      "deal_id": "PIPE-PHX-0014",
+      "deal_id": "PIPE-PHX-0005",
       "before": "1 Desk screen",
-      "after": "2 Financial screen"
+      "after": "Dropped"
     },
     {
-      "deal_id": "PIPE-PHX-0084",
+      "deal_id": "PIPE-PHX-0081",
       "before": "1 Desk screen",
-      "after": "2 Financial screen"
+      "after": "Dropped"
     }
   ]
 }

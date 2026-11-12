@@ -309,6 +309,44 @@ export function refreshFromSuggestion(
   return { targetKind, targetId, stage: approved.stage, stageGroup: approved.group };
 }
 
+type PendingFile = { features?: { properties?: Record<string, unknown> }[] };
+
+/**
+ * A deals response that started before the approval can omit the overlay.
+ * Keep the stage already painted on screen until a response includes the same note.
+ */
+export function preservePendingStage<T extends PendingFile>(previous: T | null | undefined, incoming: T): T {
+  const features = incoming.features;
+  const prior = previous?.features;
+  if (!features || !prior) return incoming;
+  const pending = new Map<string, Record<string, unknown>>();
+  for (const feature of prior) {
+    const properties = feature.properties;
+    const id = String(properties?.deal_id || properties?.site_id || "");
+    if (id && properties?.stage_pending) pending.set(id, properties);
+  }
+  if (!pending.size) return incoming;
+  let changed = false;
+  const nextFeatures = features.map((feature) => {
+    const properties = feature.properties;
+    const id = String(properties?.deal_id || properties?.site_id || "");
+    const local = id ? pending.get(id) : undefined;
+    if (!properties || !local || properties.stage_pending) return feature;
+    changed = true;
+    const next: Record<string, unknown> = { ...properties, stage_pending: local.stage_pending };
+    if (local.stage_group) {
+      next.stage = local.stage;
+      next.stage_group = local.stage_group;
+      if (local.stage_group === "dropped") delete next.suggested_drop;
+    }
+    if (local.pipeline_stage) next.pipeline_stage = local.pipeline_stage;
+    if (local.linked_deal_stage) next.linked_deal_stage = local.linked_deal_stage;
+    return { ...feature, properties: next };
+  });
+  if (!changed) return incoming;
+  return { ...incoming, features: nextFeatures };
+}
+
 export function publishStageRefresh(detail: StageRefresh) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(STAGE_REFRESH_EVENT, { detail }));

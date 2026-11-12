@@ -11,6 +11,7 @@ import {
   applyStageOverlay,
   overlayVerdict,
   patchLiveStage,
+  preservePendingStage,
   type StageDecision,
 } from "../../lib/stageOverlay";
 import { memorySql } from "../helpers/sql";
@@ -216,6 +217,23 @@ test("an optimistic patch moves the deal and the linked site", () => {
   assert.equal(patched.deals.features[0].properties.suggested_drop, undefined);
   assert.equal(patched.sites.features[0].properties.linked_deal_stage, "Dropped");
   assert.equal(patched.deals.features[1].properties.stage_group, "financial");
+});
+
+test("a late workbook response does not erase a stage painted on screen", () => {
+  const painted = {
+    features: [{ properties: { deal_id: "PIPE-PHX-0003", stage: "Dropped", stage_group: "dropped", stage_pending: "Moved to Dropped by Reviewer, waiting for workbook" } }],
+  };
+  const late = {
+    features: [{ properties: { deal_id: "PIPE-PHX-0003", stage: "1 Desk screen", stage_group: "desk", suggested_drop: "Lot too small" } }],
+  };
+  const kept = preservePendingStage(painted, late);
+  assert.equal(kept.features[0].properties.stage_group, "dropped");
+  assert.equal(kept.features[0].properties.stage_pending, "Moved to Dropped by Reviewer, waiting for workbook");
+  assert.equal(kept.features[0].properties.suggested_drop, undefined);
+  const confirmed = {
+    features: [{ properties: { deal_id: "PIPE-PHX-0003", stage: "Dropped", stage_group: "dropped", stage_pending: "Moved to Dropped by Reviewer, waiting for workbook" } }],
+  };
+  assert.equal(preservePendingStage(painted, confirmed).features[0].properties.stage, "Dropped");
 });
 
 test("every approved stage change Jaideep accepts tells the workbook writer what to write", () => {

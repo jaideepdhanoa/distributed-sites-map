@@ -31,7 +31,7 @@ import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineMapSummary } from "@/lib/mapSummary";
-import { patchLiveStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
+import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
@@ -472,7 +472,7 @@ export default function Explorer() {
       const deals = await dealsRes.json();
       const sites = await sitesRes.json();
       if (cancel || token !== dataGen.current) return;
-      setData((current) => (current ? { ...current, deals, sites } : current));
+      setData((current) => (current ? { ...current, deals: preservePendingStage(current.deals, deals), sites: preservePendingStage(current.sites, sites) } : current));
       if (allSitesRes?.ok) {
         const payload = (await allSitesRes.json()) as { features?: SiteFeature[] };
         if (!cancel && token === dataGen.current) setCatalog(Array.isArray(payload.features) ? payload.features : []);

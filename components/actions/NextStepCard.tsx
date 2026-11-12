@@ -523,9 +523,6 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
           {reviewer || approved.ownerId === status.username ? (
             <button type="button" className="propose" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${approved.id}/done`, {})}>Mark done</button>
           ) : null}
-          {droppedStage(stageGroup, recordStage) && stepType !== "bring_back" ? (
-            <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
-          ) : null}
           {allowsAssignee(approved.detail) && (reviewer || approved.ownerId === status.username) ? (
             <button type="button" onClick={() => { setReassigning((value) => !value); setDating(false); setOwnerId(approved.ownerId || ""); }} className="paper-btn">Reassign</button>
           ) : null}
@@ -582,9 +579,13 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
   }
 
   const tone = open ? "compose" : focus ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved ? "approved" : "empty";
+  const bringBack = droppedStage(stageGroup, recordStage) && !(open && type === "bring_back") && nextStepType(approved?.detail) !== "bring_back";
   return (
     <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
+      {bringBack ? (
+        <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
+      ) : null}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
     </section>
   );

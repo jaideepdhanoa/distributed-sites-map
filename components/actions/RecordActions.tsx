@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatPacific } from "@/lib/actions/time";
 import type { VisibleRecommendation } from "@/lib/agent/recommend";
+import { publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
 import { useRecommendations } from "../agent/useRecommendations";
 import { MentionChips, MentionField, type MentionAccount } from "./MentionField";
@@ -130,12 +131,14 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
       headers: body == null ? undefined : { "Content-Type": "application/json" },
       body: body == null ? undefined : JSON.stringify(body),
     });
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; suggestion?: Suggestion };
     setPending(false);
     if (!response.ok) {
       setError(payload.error || "That could not be saved.");
       return;
     }
+    const refresh = payload.suggestion ? refreshFromSuggestion(kind, id, payload.suggestion) : null;
+    if (refresh) publishStageRefresh(refresh);
     clear();
     await reload();
     window.dispatchEvent(new Event("queue-refresh"));

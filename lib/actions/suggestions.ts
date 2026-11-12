@@ -11,6 +11,7 @@ import type { Sql } from "./db";
 import { allowsAssignee, allowsDate, bringBackActivitySummary, dropActivitySummary, dropSuggestionSummary, exportStage, normalizeNextStep } from "./nextStep";
 import { parseDocumentRequest } from "@/lib/financials";
 import { blockersBySuggestion, clearHoldBlocker, linkWaitingBlockers, parseHold, refreshProposalReadiness, stagesDiffer, type Blocker } from "./blockers";
+import { stageDecisionMatchesWorkbook } from "@/lib/stageOverlay";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
 import {
   csvCell,
@@ -586,7 +587,13 @@ export async function reconcileSuggestions(sql: Sql, lookup: RecordLookup = file
   let applied = 0;
   for (const row of rows.rows) {
     const record = lookup(row.target_kind, row.target_id);
-    if (!valuesMatch(row.field_name, row.detail, row.proposed_value, record)) continue;
+    const stageSettled = stageDecisionMatchesWorkbook({
+      status: row.status,
+      field: row.field_name,
+      detail: row.detail,
+      proposedValue: row.proposed_value,
+    }, record);
+    if (!stageSettled && !valuesMatch(row.field_name, row.detail, row.proposed_value, record)) continue;
     const updated = await sql.query(
       `UPDATE suggestions SET status = 'applied', applied_at = now()
        WHERE id = $1 AND status IN ('open', 'accepted') RETURNING id`,

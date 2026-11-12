@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { allowsAssignee, allowsDate, emptyNextStepActions, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { formatPacific } from "@/lib/actions/time";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
 import { useRecommendations } from "../agent/useRecommendations";
@@ -247,12 +248,14 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; suggestion?: Step };
     setPending(false);
     if (!response.ok) {
       setError(payload.error || "That could not be saved.");
       return;
     }
+    const refresh = payload.suggestion ? refreshFromSuggestion(kind, id, payload.suggestion) : null;
+    if (refresh) publishStageRefresh(refresh);
     resetForm();
     await reload();
     window.dispatchEvent(new Event("queue-refresh"));
@@ -329,7 +332,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
             <input className="check" type="checkbox" checked={sameParcel} onChange={(event) => setSameParcel(event.target.checked)} />
             These are the same parcel
           </label>
-          <p className="hint">The link waits for approval. It does not change Stage.</p>
+          <p className="hint">The link waits for approval. Marking a duplicate does not change Stage.</p>
         </>
       ) : null}
       {type === "bring_back" || type === "stage_move" ? (
@@ -478,6 +481,9 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
           {reviewer || approved.ownerId === status.username ? (
             <button type="button" className="propose" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${approved.id}/done`, {})}>Mark done</button>
           ) : null}
+          {droppedStage(stageGroup, recordStage) && stepType !== "bring_back" ? (
+            <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
+          ) : null}
           {allowsAssignee(approved.detail) && (reviewer || approved.ownerId === status.username) ? (
             <button type="button" onClick={() => { setReassigning((value) => !value); setDating(false); setOwnerId(approved.ownerId || ""); }} className="paper-btn">Reassign</button>
           ) : null}
@@ -525,7 +531,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
             </button>
           ))}
         </div>
-        <p className="hint">Approval is required before it changes the record. Resolving a comment does not change Stage.</p>
+        <p className="hint">Approval updates the stage on the map. The workbook catches up on the next sync. Resolving a comment does not change Stage.</p>
       </>
     );
   }
@@ -661,7 +667,7 @@ function OutcomeForm({
           <option value="reply">Reply only</option>
         </select>
       </label>
-      {stageMove && outcome === "accepted" ? <p className="hint">The stage is written when the workbook approver accepts.</p> : null}
+      {stageMove && outcome === "accepted" ? <p className="hint">The map updates now. The workbook Stage column is written after the workbook approver accepts.</p> : null}
       {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
       {showReply ? (
         <label>

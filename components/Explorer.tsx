@@ -31,6 +31,7 @@ import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineMapSummary } from "@/lib/mapSummary";
+import { patchLiveStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
@@ -451,6 +452,43 @@ export default function Explorer() {
     });
     return () => {
       cancel = true;
+    };
+  }, [city]);
+
+  const catalogOn = useRef(false);
+  catalogOn.current = Boolean(catalog);
+  useEffect(() => {
+    let cancel = false;
+    let generation = 0;
+    async function refresh() {
+      const token = ++generation;
+      const requests = [fetch("/api/data/deals"), fetch(`/api/data/sites?city=${city}`)];
+      if (catalogOn.current) requests.push(fetch("/api/data/sites"));
+      const [dealsRes, sitesRes, allSitesRes] = await Promise.all(requests);
+      if (cancel || token !== generation || !dealsRes?.ok || !sitesRes?.ok) return;
+      const deals = await dealsRes.json();
+      const sites = await sitesRes.json();
+      if (cancel || token !== generation) return;
+      setData((current) => (current ? { ...current, deals, sites } : current));
+      if (allSitesRes?.ok) {
+        const payload = (await allSitesRes.json()) as { features?: SiteFeature[] };
+        if (!cancel && token === generation) setCatalog(Array.isArray(payload.features) ? payload.features : []);
+      }
+    }
+    function onStage(event: Event) {
+      const detail = (event as CustomEvent<StageRefresh>).detail;
+      if (!detail?.targetId || !detail.stageGroup) return;
+      setData((current) => (current ? { ...current, ...patchLiveStage(current, detail) } : current));
+      setCatalog((current) => {
+        if (!current) return current;
+        return patchLiveStage({ deals: { features: [] }, sites: { features: current } }, detail).sites.features;
+      });
+      void refresh();
+    }
+    window.addEventListener(STAGE_REFRESH_EVENT, onStage);
+    return () => {
+      cancel = true;
+      window.removeEventListener(STAGE_REFRESH_EVENT, onStage);
     };
   }, [city]);
 

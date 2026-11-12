@@ -57,14 +57,14 @@ To add a route, register it in `lib/api/dispatch.ts` and put the handler under `
 
 ## Actions
 
-Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes a stage, and it never writes to the workbook or the Google Sheet.
+Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes to the workbook or the Google Sheet, and it never edits `data/generated`. An accepted stage change is drawn over the generated stage so the map, the funnel counts, and the site card update immediately. Pending proposals are not drawn. When a later sync's stage matches, the decision is marked `applied` and the overlay stops. If that sync shows a different stage than the one the decision was made against and the one it approved, the workbook stage wins. The waiting note (`Moved to <stage> by <name>, waiting for workbook`) is on the site card for signed-in viewers, where names are already shown. Drop reasons stay on the activity line. The map pin takes the new stage color and does not add the name or the reason.
 
 ### Neon
 
 1. In the Vercel project, add the Neon integration from the Marketplace (or create a Neon database and connect it). This repo does not provision the database.
 2. Use the pooled connection string. Neon exposes it as `DATABASE_URL`. Do not commit that string.
 3. Redeploy. The first notes, suggestions, or saved-view request applies `db/migrations`. From a machine that has the URL, `npm run db:migrate` does the same thing.
-4. After a workbook sync rebuilds `data/generated`, run `npm run reconcile-suggestions`. The suggestions panel also checks on open. A suggestion becomes `applied` only when the generated data already matches the proposed value. Accepting a suggestion does not change what the map shows.
+4. After a workbook sync rebuilds `data/generated`, run `npm run reconcile-suggestions`. The suggestions panel also checks on open. A suggestion becomes `applied` only when the generated data already matches the proposed value. An accepted stage move, drop, or bring-back is shown on the map until that match. The app does not write the new stage into the workbook.
 
 ### Roles
 
@@ -89,7 +89,7 @@ Free text is checked before it is stored. Text that fails the same wording rules
 
 More → Suggestions → Download CSV. A person applies those rows in the workbook. The columns are the record, the field, the current value, the proposed value, the reason, and the status (`open`, `accepted`, `rejected`, or `applied`).
 
-Approved next steps have their own download on that panel. Columns are the site id (the permanent id when the record has one), the target date, the title, the owner, when it was approved, and when it was marked done. Approving a next step does not change the stage and does not write the workbook. A later approval leaves the earlier one in the history on the card.
+Approved next steps have their own download on that panel. Columns are the site id (the permanent id when the record has one), the target date, the title, the owner, when it was approved, and when it was marked done. Approving a work item does not change the stage and does not write the workbook. Approving a stage move, drop, or bring-back updates the stage on the map until the workbook sync catches up. It still does not write the workbook. A later approval leaves the earlier one in the history on the card.
 
 The owner of a next step, or a reviewer, can mark it Done. That is recorded in the audit log and in the done-at column. A contributor who is not the owner cannot mark it done.
 
@@ -378,7 +378,7 @@ The draft and the rationale are stored as written. A phone number is refused. A 
 
 Agreed, waiting keeps the stage and links the site's open document requests, open diligence checklist items, and any NDA or hold named with the decision. When every linked blocker closes, the proposal becomes `ready` and the feed gains one `proposal_ready` row. That surfaces the stage move. It does not write the workbook.
 
-A stage_move that Jaideep approves adds a `decision` row with `workbook_stage: true` and `stage` set to the approved stage id. That is the signal to write the workbook Stage column. The app does not ask again. Accepting while the proposal is still waiting on blockers is refused. Closing a proposal as overtaken records the reason and adds one `proposal_overtaken` row. Reject stays for a real finding.
+A stage change that Jaideep approves — a move between stages, a drop, or a bring-back — adds a `decision` row with `workbook_stage: true` and `stage` set to the approved stage. The text includes `Approved stage: <stage>. Write this stage on the workbook Stage column.` That is the signal to write the workbook Stage column. The app does not write the workbook, and it does not ask again. Accepting while the proposal is still waiting on blockers is refused. Closing a proposal as overtaken records the reason and adds one `proposal_overtaken` row. Reject stays for a real finding.
 
 Unanswered Ask questions are logged as `ask_gap`.
 

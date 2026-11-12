@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
+import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import type { SiteFeature } from "@/lib/types";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -14,6 +15,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   delete properties.serving_utility;
   delete properties.serving_utility_source;
   delete properties.site_capacity;
+  const staged = await overlayStageFile({ features: [{ properties }] }, "site");
   console.info(JSON.stringify({ event: "data", user: session.u, part: "site", id }));
-  return NextResponse.json(properties, { headers: privateHeaders });
+  return NextResponse.json(staged.features?.[0]?.properties || properties, { headers: privateHeaders });
 }

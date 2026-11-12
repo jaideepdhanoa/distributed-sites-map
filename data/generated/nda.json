@@ -140,8 +140,8 @@
       "nda_gates": "Package",
       "nda_days_open": 3,
       "nda_days_in_court": 0,
-      "stage_blocker": "NDA execution",
-      "stage_blocker_since": "2026-11-09"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-11"
     },
     "PIPE-LAS-0015": {
       "nda_id": "NDA-010",
@@ -350,8 +350,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "Awaiting package",
-      "stage_blocker_since": "2026-11-06"
+      "stage_blocker": "\u2014",
+      "stage_blocker_since": "2026-11-11"
     },
     "PIPE-PHX-0085": {
       "nda_id": "",
@@ -420,8 +420,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker": "Our-side diligence",
+      "stage_blocker_since": "2026-11-11"
     },
     "LAND-MIA-0006": {
       "nda_id": "",
@@ -450,8 +450,8 @@
       "nda_gates": "None \u2014 not gating (R-076)",
       "nda_days_open": null,
       "nda_days_in_court": null,
-      "stage_blocker": "Our-side diligence",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-11"
     },
     "LAND-LAS-0009": {
       "nda_id": "",
@@ -541,7 +541,7 @@
       "nda_days_open": null,
       "nda_days_in_court": null,
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-10"
+      "stage_blocker_since": "2026-11-11"
     },
     "LAND-PHX-0035": {
       "nda_id": "",
@@ -836,14 +836,14 @@
       "nda_waiting_on": "Them \u2014 legal",
       "nda_opened_date": "2026-10-29",
       "nda_sent_date": "2026-11-10",
-      "nda_last_action_date": "2026-11-10",
+      "nda_last_action_date": "2026-11-11",
       "nda_waiting_on_since": "2026-11-10",
       "nda_executed_date": "",
       "nda_gates": "Discussion",
       "nda_days_open": 13,
       "nda_days_in_court": 1,
-      "source": "Gmail thread 1a182c3d38dcfde9 (Hart Oct 29 / Gibbs Oct 30, per-project NDAs agreed); Julia Prinz counter-edits Nov 9, 2026; Run Log 333 (Nov 10, 2026 send)",
-      "notes": "Per-project NDAs agreed Oct 29-30, 2026. Moove's mutual form, incorporating Julia Prinz's Nov 9 counter-edits from the Project 1459 negotiation, was forwarded to Miracle legal via Sharon Gibbs on Nov 10, 2026 (Brittni Toston cc'd). SFR Realty LLC is a facilitating broker only and does not sign (settled Nov 10)."
+      "source": "Gmail thread 1a182c3d38dcfde9 (Hart Oct 29 / Gibbs Oct 30, per-project NDAs agreed); Julia Prinz counter-edits Nov 9, 2026; Run Log 333 (Nov 10, 2026 send); Sharon Gibbs email Nov 11, 2026 (Gmail 1a1cb3f9b569f787)",
+      "notes": "Per-project NDAs agreed Oct 29-30, 2026. Moove's mutual form, incorporating Julia Prinz's Nov 9 counter-edits from the Project 1459 negotiation, was forwarded to Miracle legal via Sharon Gibbs on Nov 10, 2026 (Brittni Toston cc'd). SFR Realty LLC is a facilitating broker only and does not sign (settled Nov 10). Nov 11, 2026: Gibbs confirmed she will send the form to Miracle counsel for review and mark-up and will be back in touch as soon as she can \u2014 court stays Them \u2014 legal (waiting-on since Nov 10 unchanged; the confirmation does not change hands)."
     },
     {
       "nda_id": "NDA-002",
@@ -896,14 +896,14 @@
       "nda_waiting_on": "Us \u2014 signer",
       "nda_opened_date": "2026-11-02",
       "nda_sent_date": "2026-11-02",
-      "nda_last_action_date": "2026-11-03",
+      "nda_last_action_date": "2026-11-11",
       "nda_waiting_on_since": "2026-11-03",
       "nda_executed_date": "",
       "nda_gates": "Package",
       "nda_days_open": 9,
       "nda_days_in_court": 8,
-      "source": "Gmail thread 1a19e48e0c9edd2b (mutual NDA attached Nov 2, 2026; accepted as-is Nov 2; Horizon entity details for DocuSign received Nov 3)",
-      "notes": "Form agreed as-is. Execution is stalled on OUR side: the DocuSign routing/signature (Brittni routes, Cara Dwyer signs) has been outstanding since the entity details arrived Nov 3, 2026 \u2014 was due Nov 5."
+      "source": "Gmail thread 1a19e48e0c9edd2b (mutual NDA attached Nov 2, 2026; accepted as-is Nov 2; Horizon entity details for DocuSign received Nov 3); Forward to Brittni Nov 11, 2026 (Gmail 1a1cdfb8e59bab14)",
+      "notes": "Form agreed as-is. Execution is stalled on OUR side: the DocuSign routing/signature (Brittni routes, Cara Dwyer signs) has been outstanding since the entity details arrived Nov 3, 2026 \u2014 was due Nov 5. Nov 11, 2026: Jaideep forwarded the broker thread to Brittni and asked her to get the DocuSign sent out for signature \u2014 the broker's side has been complete since Nov 3 (form accepted as-is; entity/signer details in). Waiting-on court unchanged (Us \u2014 signer, since Nov 3): the ball stays on our side until the envelope is routed and signed."
     },
     {
       "nda_id": "NDA-005",

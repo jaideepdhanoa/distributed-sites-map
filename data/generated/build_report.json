@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-11T22:37:19Z",
+  "generated_at": "2026-11-12T04:47:46Z",
   "census_rows": {
     "total": 1749,
     "by_city": {
@@ -142,10 +142,10 @@
   "pipeline_rows": 86,
   "land_rows": 62,
   "pipeline_stage_counts": {
-    "1 Desk screen": 33,
+    "1 Desk screen": 31,
+    "2 Financial screen": 3,
     "": 49,
-    "Dropped": 3,
-    "2 Financial screen": 1
+    "Dropped": 3
   },
   "land_stage_counts": {
     "1 Desk screen": 44,
@@ -257,14 +257,14 @@
       "MIA": 10
     },
     "pipeline_by_stage": {
-      "1 Desk screen": 33,
-      "Dropped": 3,
-      "2 Financial screen": 1
+      "1 Desk screen": 31,
+      "2 Financial screen": 3,
+      "Dropped": 3
     },
     "pipeline_by_group": {
-      "desk": 33,
-      "dropped": 3,
-      "financial": 1
+      "desk": 31,
+      "financial": 3,
+      "dropped": 3
     },
     "land_by_city": {
       "LAS": 12,
@@ -1043,7 +1043,7 @@
       "traffic_by_city": {
         "LAS": 41,
         "MIA": 558,
-        "PHX": 268
+        "PHX": 269
       },
       "note": "Zoning queries used official layers that answered: Maricopa County PlanNet zoning, Scottsdale Open Data zoning, Miami-Dade county zoning, and Clark County open-data zoning (including Las Vegas, Henderson, and North Las Vegas). Chandler, Gilbert, Tempe, and Mesa city GIS roots did not publish a zoning service this pass. Traffic is the nearest public count within 150 m."
     },
@@ -1061,7 +1061,7 @@
     "Census row count is 1749, workbook expectation was 1,701.",
     "Unique sites are 1705 {'LAS': 429, 'PHX': 585, 'MIA': 691}, workbook counted rows are 1,658 (LAS 417 / PHX 555 / MIA 686).",
     "In-area city split is {'LAS': 186, 'PHX': 281, 'MIA': 612}, workbook service area is LV 179 / PHX 254 / MIA 610.",
-    "Pipeline tab has 86 rows (stages {'1 Desk screen': 33, '': 49, 'Dropped': 3, '2 Financial screen': 1}). The older note of 79 is not in this export."
+    "Pipeline tab has 86 rows (stages {'1 Desk screen': 31, '2 Financial screen': 3, '': 49, 'Dropped': 3}). The older note of 79 is not in this export."
   ],
   "skipped": [
     "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -1075,78 +1075,32 @@
     "Human verdict write-back is a later version and is not in this app."
   ],
   "changes": {
-    "new_sites": 5,
-    "removed_sites": 1,
+    "new_sites": 0,
+    "removed_sites": 0,
     "verdict_changes": 0,
-    "stage_moves": 59,
-    "sample_new": [
-      "WB-PHX-0037",
-      "WB-PHX-0038",
-      "WB-PHX-0039",
-      "WB-PHX-0040",
-      "WB-PHX-0041"
-    ],
+    "stage_moves": 4,
+    "sample_new": [],
     "sample_verdicts": [],
     "sample_stages": [
       {
-        "site_id": "LAS-U53",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "LAS-U829",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "LAS-U858",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "LAS-U977",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "MIA-U1206",
-        "before": "1 Desk screen",
-        "after": "Dropped"
-      },
-      {
-        "site_id": "PHX-U193",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
         "site_id": "PHX-U229",
-        "before": "Dropped",
-        "after": "1 Desk screen"
+        "before": "1 Desk screen",
+        "after": "2 Financial screen"
       },
       {
-        "site_id": "PHX-U274",
-        "before": "Dropped",
-        "after": "1 Desk screen"
+        "site_id": "WB-PHX-0012",
+        "before": "1 Desk screen",
+        "after": "2 Financial screen"
       },
       {
-        "site_id": "PHX-U309",
-        "before": "Dropped",
-        "after": "1 Desk screen"
+        "deal_id": "PIPE-PHX-0014",
+        "before": "1 Desk screen",
+        "after": "2 Financial screen"
       },
       {
-        "site_id": "PHX-U326",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "PHX-U346",
-        "before": "Dropped",
-        "after": "1 Desk screen"
-      },
-      {
-        "site_id": "PHX-U432",
-        "before": "Dropped",
-        "after": "1 Desk screen"
+        "deal_id": "PIPE-PHX-0084",
+        "before": "1 Desk screen",
+        "after": "2 Financial screen"
       }
     ]
   },
@@ -1162,7 +1116,7 @@
     "matched_folders": 78,
     "unmatched_folders": 66,
     "sheet_links": 78,
-    "warnings": 251,
+    "warnings": 268,
     "drive": "ok"
   }
 }

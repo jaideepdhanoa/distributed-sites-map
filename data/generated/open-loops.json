@@ -1,6 +1,6 @@
 {
   "source": "workbook",
-  "as_of": "2026-11-12",
+  "as_of": "2026-11-13",
   "label": "Read-only snapshot of open loops. Day counts use the sync date in America/Los_Angeles.",
   "register": [
     {
@@ -12,8 +12,8 @@
       "nda_waiting_on": "Them \u2014 legal",
       "nda_waiting_on_since": "2026-11-10",
       "nda_gates": "Discussion",
-      "nda_days_open": 14,
-      "nda_days_in_court": 2
+      "nda_days_open": 15,
+      "nda_days_in_court": 3
     },
     {
       "nda_id": "NDA-002",
@@ -24,8 +24,8 @@
       "nda_waiting_on": "Them \u2014 legal",
       "nda_waiting_on_since": "2026-10-22",
       "nda_gates": "Discussion",
-      "nda_days_open": 26,
-      "nda_days_in_court": 21
+      "nda_days_open": 27,
+      "nda_days_in_court": 22
     },
     {
       "nda_id": "NDA-003",
@@ -36,8 +36,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-10-26",
       "nda_gates": "Proof of funds",
-      "nda_days_open": 19,
-      "nda_days_in_court": 17
+      "nda_days_open": 20,
+      "nda_days_in_court": 18
     },
     {
       "nda_id": "NDA-004",
@@ -48,8 +48,8 @@
       "nda_waiting_on": "Us \u2014 signer",
       "nda_waiting_on_since": "2026-11-03",
       "nda_gates": "Package",
-      "nda_days_open": 10,
-      "nda_days_in_court": 9
+      "nda_days_open": 11,
+      "nda_days_in_court": 10
     },
     {
       "nda_id": "NDA-005",
@@ -60,7 +60,7 @@
       "nda_waiting_on": "Us \u2014 legal",
       "nda_waiting_on_since": "2026-11-11",
       "nda_gates": "Package",
-      "nda_days_open": 4,
+      "nda_days_open": 5,
       "nda_days_in_court": null
     },
     {
@@ -72,8 +72,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-11-09",
       "nda_gates": "Package",
-      "nda_days_open": 11,
-      "nda_days_in_court": 3
+      "nda_days_open": 12,
+      "nda_days_in_court": 4
     },
     {
       "nda_id": "NDA-007",
@@ -84,8 +84,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-11-09",
       "nda_gates": "Package",
-      "nda_days_open": 4,
-      "nda_days_in_court": 3
+      "nda_days_open": 5,
+      "nda_days_in_court": 4
     },
     {
       "nda_id": "NDA-008",
@@ -96,8 +96,8 @@
       "nda_waiting_on": "Them \u2014 signer",
       "nda_waiting_on_since": "2026-11-09",
       "nda_gates": "Package",
-      "nda_days_open": 3,
-      "nda_days_in_court": 3
+      "nda_days_open": 4,
+      "nda_days_in_court": 4
     },
     {
       "nda_id": "NDA-009",
@@ -134,6 +134,18 @@
       "nda_gates": "Location + details",
       "nda_days_open": null,
       "nda_days_in_court": null
+    },
+    {
+      "nda_id": "NDA-012",
+      "counterparty_firm": "First Capital Investment Realty",
+      "counterparty_person": "Farhad Navazi",
+      "site_ids": "LAND-LAS-0008",
+      "nda_status": "Our form sent \u2014 awaiting execution",
+      "nda_waiting_on": "Them",
+      "nda_waiting_on_since": "2026-11-12",
+      "nda_gates": "Package",
+      "nda_days_open": 1,
+      "nda_days_in_court": 1
     }
   ],
   "sites": [
@@ -172,10 +184,10 @@
       "label": "Closed gas station and c-store across from the airport",
       "market": "LAS",
       "stage": "1 Desk screen",
-      "next_step": "Ask list (updated Nov 10, 2026, night): ANSWERED Nov 10 \u2014 (1) Environmental file resent and analyzed: Limited Phase II ESA (Converse, Oct 24, 2025) \u2014 soil at the former UST/dispenser area non-detect for target analytes; groundwater TCE 7.1 \u00b5g/L (above the 5.0 NDEP reportable level) attributed by Converse to an offsite source; no further assessment recommended. (2) Electrical: broker supplied county-record service details \u2014 1,200A, 277/480V, 3-phase (typed Layer C/D, Claimed); the two linked Clark County permit PDFs could not be downloaded this pass (county document server unreachable \u2014 named\u2026",
-      "nda_id": "",
-      "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-11"
+      "next_step": "NDA GATE (Nov 12, 2026): Farhad Navazi sent his own Confidentiality Agreement via DocuSign (Gmail 1a1d21bfdb371b21), apparently for the due diligence package he said on Nov 11 he is assembling. Do NOT sign or click it (R-010/R-076). NDA-012 opened (Broker asked \u2014 send our form; waiting on Us since 2026-11-12; gates Package). Counter-draft held in the Nov 12 late-afternoon review report for Jaideep: offers Moove's mutual NDA (file attached, Brittni Toston cc'd \u2014 R-090), asks for First Capital's full legal name, state and address and the signer's name, email and title so Brittni can route it (R\u2026",
+      "nda_id": "NDA-012",
+      "stage_blocker": "NDA execution",
+      "stage_blocker_since": "2026-11-12"
     },
     {
       "site_id": "LAND-LAS-0009",
@@ -442,10 +454,10 @@
       "label": "MIA 19045 NW 2nd Ave",
       "market": "MIA",
       "stage": "1 Desk screen",
-      "next_step": "Nov 5, 2026: desk GIS catch-up recorded. Remaining: service size and title (broker/utility); listing lot size still conflicts with the county (12,190 vs 20,140 sf). Inquiry sent Nov 5 via Crexi (9:50 AM); awaiting availability at $1,685,000, lot-size confirmation, survey/site plan/title/environmental and utility details. Nov 10, 2026: DELIVERY DELAY flagged \u2014 the Nov 9 follow-up to the broker is in Gmail retry (45 hours from Nov 10, 3:59 PM PT); if a permanent-failure notice lands, re-send or use another channel. Do not count the Nov 9 follow-up as delivered until delivery is confirmed. Nov 1\u2026",
+      "next_step": "Re-sent Nov 12, 2026 via a FRESH Crexi inquiry on Jaideep's order (the Nov 9 direct-email chase permanently failed delivery \u2014 broker's server refused it Nov 9\u201312, so he never saw it). Listing verified live on Crexi at send time ($1,685,000); inquiry confirmed in Crexi Sent (message 128813184, Nov 12, 7:26 PM PT). Standing asks re-asked: availability at ask; exact lot size (listing 20,140 sq ft vs county 12,190); survey/site plan/title/environmental; utilities incl. electrical service size. Next chase due Nov 16 if silent (R-091). Nov 5, 2026: desk GIS catch-up recorded. Remaining: service siz\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-09"
+      "stage_blocker_since": "2026-11-12"
     },
     {
       "site_id": "LAND-PHX-0002",
@@ -522,7 +534,7 @@
       "label": "Vacant 0.43-acre C-2 lot on McDowell Rd",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "NDA execution is the gate (NDA-004; gates the package/demolition records). Nov 12, 2026: Brittni asked for the latest NDA doc for DocuSign; Jaideep sent the fields only (counterparty NAI Horizon / HORIZON REAL ESTATE GROUP, INC., Phoenix Office, 2944 North 44th Street, Suite 200, Phoenix, AZ 85018; signer Markus Hochholzer, Vice President; Moove signer Cara Dwyer; Horizon's state of incorporation still missing - signer to complete it at signing). Brittni then asked for a filled-out / marked-up copy of the NDA to pass to legal and route for signature, and offered to help complete it later toda\u2026",
+      "next_step": "NDA execution is the gate (NDA-004; gates the package/demolition records). Nov 12, 2026: Jaideep sent Brittni the filled Moove mutual NDA for NAI Horizon (entity, address and signer Markus Hochholzer, VP completed; Horizon's state of incorporation left for Markus to complete when he signs in DocuSign; form accepted as-is Nov 2). Brittni confirmed receipt the same morning and said she will get it uploaded to DocuSign. Waiting-on unchanged: Us - signer since 2026-11-03 (Brittni routes, Cara Dwyer signs). Next: confirm the DocuSign envelope is out; once executed, ask Markus for the demolition do\u2026",
       "nda_id": "NDA-004",
       "stage_blocker": "NDA execution",
       "stage_blocker_since": "2026-11-03"
@@ -742,7 +754,7 @@
       "label": "Land, 3275 E Paradise Lane, Phoenix",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Ask list (updated Nov 11, 2026): PART-ANSWERED Nov 11 \u2014 the broker sent the listing flyer (filed and analyzed in the midday pass): parcel, acreage, zoning and price confirmed; multifamily plans and entitlements stated as City-approved; site plan included in the flyer. STILL OPEN: (a) survey and title report \u2014 not provided; (b) environmental reports \u2014 not provided; (c) electrical service details / any will-serve or capacity note (flyer says only utilities are City of Phoenix); (d) how many units the approved entitlements cover (broker's note says 16 units). Draft reply held in the Nov 11 midda\u2026",
+      "next_step": "Ask list (updated Nov 13, 2026): PART-ANSWERED Nov 13 \u2014 approved unit count ANSWERED (16 units, broker email); City water and sewer capacity confirmed by the broker. STILL OPEN: (a) survey and title report \u2014 not provided; (b) environmental reports \u2014 not provided; (c) electrical capacity \u2014 APS is on the street but no capacity figure was obtained (broker: APS was running regular service), so service/capacity remains unconfirmed; (d) the broker says the seller is at PSA with another group \u2014 ask the timeline/deadline for other interest, and what the additional documentation she mentioned is and w\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -752,7 +764,7 @@
       "label": "Chandler Mall land, S Chandler Village Dr, Chandler",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Awaiting Rullo (asked Nov 11): any seller Phase I, the electrical position (SRP capacity letter or service stubs), and the seller's hoped-for escrow timeline. PAD entitlement is now documented (DVR14-0026): a vehicle-services use is not among the contemplated support-service commercial uses for the pad, and the pad needs its own PDP approval \u2014 the entitlement route is the gating question if this site advances.",
+      "next_step": "Awaiting Rullo (asked Nov 11, re-asked in writing Nov 13, 2026 after he proposed a call): any seller Phase I / environmental report, anything on electrical service to the parcel (SRP capacity letter or stub locations), and the seller's hoped-for escrow length. PAD entitlement is documented (DVR14-0026): a vehicle-services use is not among the contemplated support-service commercial uses for the pad, and the pad needs its own PDP approval \u2014 the entitlement route is the gating question if this site advances. The combined thread's other site, 2125 E Southern Ave (LAND-PHX-0059), stays under cont\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -776,6 +788,16 @@
       "nda_id": "",
       "stage_blocker": "\u2014",
       "stage_blocker_since": "2026-11-12"
+    },
+    {
+      "site_id": "LAND-PHX-0064",
+      "label": "Land, 5020 N 21st Ave, Phoenix",
+      "market": "PHX",
+      "stage": "1 Desk screen",
+      "next_step": "Email inquiry sent Nov 13 to Gunnar Sinnett, LevRose Commercial Real Estate - availability and price, exact parcels included, survey/site plan, title and environmental reports, electrical service details and utility bills. Gmail message 1a1d5cf97afc7f47. Awaiting reply. Aerial measure (R-084) pending via the standing backfill; photo pack via backfill; AADT/population via the daily sweep (T-042 master); FEMA flood and power Layer A retry in the daily sweep.",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-13"
     },
     {
       "site_id": "PIPE-LAS-0011",
@@ -996,6 +1018,16 @@
       "nda_id": "",
       "stage_blocker": "\u2014",
       "stage_blocker_since": ""
+    },
+    {
+      "site_id": "PIPE-LAS-0074",
+      "label": "Renovated express tunnel car wash, 6451 W Charleston Blvd, Las Vegas",
+      "market": "LAS",
+      "stage": "1 Desk screen",
+      "next_step": "Brevitas inquiry sent Nov 13, 2026 to Farrell Goodman (deal room open; verified in the Brevitas Buying Dashboard, 10:02 AM PT): availability and price, business/real-estate/equipment inclusion, seller package (financials, membership numbers, site plan/survey, title and environmental reports), electrical service details and utility bills. Awaiting reply. Aerial measure (R-084) and photo pack (R-085) pending via the standing backfill; FEMA flood retry in the daily sweep (NFHL connection dropped Nov 13) and NV Energy DRP detail (point query returned no feeder record Nov 13); AADT/population via\u2026",
+      "nda_id": "",
+      "stage_blocker": "Awaiting broker reply",
+      "stage_blocker_since": "2026-11-13"
     },
     {
       "site_id": "PIPE-MIA-0012",
@@ -1312,7 +1344,7 @@
       "label": "3 Minute Car Wash",
       "market": "PHX",
       "stage": "2 Financial screen",
-      "next_step": "Awaiting Brad: SRP written service confirmation - amperage, voltage, phase - plus any spare-capacity / upgrade-path indication (his energy manager returns Nov 16; Brad has asked SRP and will pass on their response). Payroll-tax and card-fee residuals ANSWERED Nov 12, 2026 (payroll taxes about $13,500, seller approximation; card fees about 2% of card sales, about $4,757, seller estimate) and reflected in the -$32,719 recast. Standing: the 2016 >100,000-car records only if that volume claim is to be credited; a CURRENT title commitment comes at contracting. The financial picture is complete eno\u2026",
+      "next_step": "Part-answered Nov 13, 2026: SRP (via Brad) confirmed secondary voltage 277/480V, 3-phase (3ABC) and a 300 kVA transformer rating. STILL OPEN with the broker: (a) service amperage \u2014 SRP says it must be verified at the panel by an electrical contractor; (b) spare capacity today \u2014 the 300 kVA rating does not confirm any; (c) the upgrade path \u2014 SRP's route is its Construction Contact Center / a designer contact for transformer maximum capacity, service drawings and records (utility contact runs through the broker/seller side, never agent-direct). Brad asked for a preliminary equipment list or loa\u2026",
       "nda_id": "NDA-005",
       "stage_blocker": "Awaiting broker reply",
       "stage_blocker_since": "2026-11-11"
@@ -1622,10 +1654,10 @@
       "label": "8812-8828 N Black Canyon Hwy (auto center)",
       "market": "PHX",
       "stage": "1 Desk screen",
-      "next_step": "Reply sent Nov 7 (Jaideep-approved): asked Fife for the current rent roll / month-to-month lease documents and the buildings' electrical service details (amps, voltage, phase, utility bills). Awaiting reply; the drop decision (no business included, 0 spare land) waits on the income picture.",
+      "next_step": "Reply sent to Fife Nov 12, 2026 (Jaideep's order, Gmail 1a1d169df8678bd6): thanked him for the rent roll (income picture complete on our side); utility bills + actual per-suite service size (amps/voltage/phase, from the panels) still awaited. Site HELD at Desk screen (not dropped) pending those two items. Rent roll received Nov 12, 2026 - the income picture the Nov 7 reply was waiting on is now in (gross rent $165,400/yr incl. billboard; one suite vacant; all tenancies month-to-month; no business included). Still open with the broker: utility bills (broker said Nov 12 he will request them) an\u2026",
       "nda_id": "",
       "stage_blocker": "Awaiting broker reply",
-      "stage_blocker_since": "2026-11-11"
+      "stage_blocker_since": "2026-11-12"
     },
     {
       "site_id": "PIPE-SNA-0002",

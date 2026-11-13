@@ -59,8 +59,8 @@
 .act-check input { width: auto; }
 .act-layer { position: absolute; inset: 0; z-index: 8; }
 .panel-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
-.panel-tabs .chip { border: 1px solid var(--line); background: var(--cream-0); color: var(--ink); border-radius: 999px; box-shadow: var(--shadow-1); padding: 4px 10px; font-size: 12px; font-weight: 550; text-decoration: none; }
-.panel-tabs .chip.on { background: var(--ink); color: #faf7f1; border-color: var(--ink); }
+.panel-tabs button { border: 1px solid var(--line); background: var(--cream-0); color: var(--ink); border-radius: 999px; box-shadow: var(--shadow-1); padding: 4px 10px; font-size: 12px; font-weight: 550; }
+.panel-tabs button.on { background: var(--ink); color: #faf7f1; border-color: var(--ink); }
 .pin { background: #e3efe7; border-radius: 10px; padding: 8px 10px; margin: 8px 0; }
 .thread { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .thread .reply { margin: 8px 0 0 14px; border-left: 2px solid var(--paper-2, #e7e0d2); padding-left: 10px; }

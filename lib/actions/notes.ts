@@ -140,6 +140,14 @@ export async function createNote(
     const saved = await loadNote(sql, duplicateId);
     const note = saved ? present(saved) : null;
     if (!note) throw new InputError("That note could not be saved.");
+    const siteId = await queueSiteId(sql, targetKind, targetId);
+    await recordAppEvent(sql, {
+      siteId,
+      type: parentId ? "reply" : "note",
+      summary: parentId ? "New reply." : "New note.",
+      actorId: input.authorId,
+      refId: duplicateId,
+    });
     return (await withMentions(sql, [note]))[0];
   }
   const mentionIds = parseMentionIds(input.mentions);

@@ -1161,6 +1161,13 @@
       "type": "stage",
       "at": "2026-11-12T19:43:39.977Z",
       "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "new_site:PIPE-LAS-0074:2026-11-13T19:34:56.234Z:new",
+      "siteId": "PIPE-LAS-0074",
+      "type": "new_site",
+      "at": "2026-11-13T19:34:56.234Z",
+      "summary": "New pipeline site."
     }
   ],
   "baseline": [
@@ -1242,6 +1249,16 @@
       "verdict": "",
       "askingPrice": "$2,595,000",
       "askingSource": "Life Realty District",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0074",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$4,500,000",
+      "askingSource": "Farrell Goodman, Brevitas",
       "active": true
     },
     {

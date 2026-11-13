@@ -126,6 +126,22 @@ export async function createNote(
   }
   const body = parseBody(input.body, "note", 2000);
   assertClean(body);
+  const duplicate = await sql.query<{ id: string }>(
+    `SELECT id FROM notes
+     WHERE target_kind = $1 AND target_id = $2 AND author_id = $3 AND body = $4
+       AND deleted_at IS NULL
+       AND parent_id IS NOT DISTINCT FROM $5
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [targetKind, targetId, input.authorId, body, parentId],
+  );
+  const duplicateId = duplicate.rows[0]?.id;
+  if (duplicateId) {
+    const saved = await loadNote(sql, duplicateId);
+    const note = saved ? present(saved) : null;
+    if (!note) throw new InputError("That note could not be saved.");
+    return (await withMentions(sql, [note]))[0];
+  }
   const mentionIds = parseMentionIds(input.mentions);
   const attached = await attachRecommendation(sql, {
     recommendationId: input.recommendationId,

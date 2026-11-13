@@ -429,16 +429,23 @@ export default function Explorer() {
         if (!cancel && token === dataGen.current) setError("The site data could not be loaded.");
         return;
       }
-      const funnelPayload = await funnelRes.json();
+      const [sitesBody, areasBody, depotsBody, parcelsBody, funnelPayload, dealsBody] = await Promise.all([
+        sitesRes.json(),
+        areasRes.json(),
+        depotsRes.json(),
+        parcelsRes.json(),
+        funnelRes.json(),
+        dealsRes.json(),
+      ]);
       if (!cancel && token === dataGen.current) {
-        setData({
-          sites: await sitesRes.json(),
-          areas: await areasRes.json(),
-          depots: await depotsRes.json(),
-          parcels: await parcelsRes.json(),
-          deals: await dealsRes.json(),
+        setData((current) => ({
+          sites: current ? preservePendingStage(current.sites, sitesBody) : sitesBody,
+          areas: areasBody,
+          depots: depotsBody,
+          parcels: parcelsBody,
+          deals: current ? preservePendingStage(current.deals, dealsBody) : dealsBody,
           funnel: funnelPayload.funnel,
-        });
+        }));
         const unscreenedPayload = await unscreenedRes.json();
         setUnscreened(Array.isArray(unscreenedPayload.features) ? unscreenedPayload.features : []);
         setMe(meRes.ok ? await meRes.json() : null);
@@ -475,7 +482,10 @@ export default function Explorer() {
       setData((current) => (current ? { ...current, deals: preservePendingStage(current.deals, deals), sites: preservePendingStage(current.sites, sites) } : current));
       if (allSitesRes?.ok) {
         const payload = (await allSitesRes.json()) as { features?: SiteFeature[] };
-        if (!cancel && token === dataGen.current) setCatalog(Array.isArray(payload.features) ? payload.features : []);
+        if (!cancel && token === dataGen.current) {
+          const incoming = Array.isArray(payload.features) ? payload.features : [];
+          setCatalog((current) => (current ? preservePendingStage({ features: current }, { features: incoming }).features || incoming : incoming));
+        }
       }
     }
     function onStage(event: Event) {
@@ -503,7 +513,10 @@ export default function Explorer() {
     fetch("/api/data/sites").then(async (response) => {
       if (!response.ok || cancel) return;
       const payload = await response.json() as { features?: SiteFeature[] };
-      if (!cancel) setCatalog(Array.isArray(payload.features) ? payload.features : []);
+      if (!cancel) {
+        const incoming = Array.isArray(payload.features) ? payload.features : [];
+        setCatalog((current) => (current ? preservePendingStage({ features: current }, { features: incoming }).features || incoming : incoming));
+      }
     }).catch(() => undefined);
     return () => {
       cancel = true;

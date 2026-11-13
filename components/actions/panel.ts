@@ -37,24 +37,37 @@ export function usePanel(): PanelName {
   );
 }
 
+let statusAttempts = 0;
+
 function loadStatus() {
-  if (statusState !== "idle") return;
+  if (statusState === "loading") return;
+  if (statusState === "ready" && status.enabled) return;
   statusState = "loading";
-  fetch("/api/actions/status")
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 8000);
+  fetch("/api/actions/status", { cache: "no-store", signal: controller.signal })
     .then(async (response) => {
-      if (!response.ok) return { enabled: false, actionRole: "viewer" as const, username: "" };
+      if (!response.ok) throw new Error(String(response.status));
       return (await response.json()) as Status;
     })
     .then((next) => {
       status = { enabled: Boolean(next.enabled), actionRole: next.actionRole || "viewer", username: next.username || "" };
       statusState = "ready";
+      statusAttempts = 0;
       emitStatus();
     })
     .catch(() => {
+      statusAttempts += 1;
+      if (statusAttempts < 4) {
+        statusState = "idle";
+        window.setTimeout(loadStatus, 300 * statusAttempts);
+        return;
+      }
       status = { enabled: false, actionRole: "viewer", username: "" };
       statusState = "ready";
       emitStatus();
-    });
+    })
+    .finally(() => window.clearTimeout(timer));
 }
 
 export function useActionStatus(): Status {

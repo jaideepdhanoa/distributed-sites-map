@@ -404,7 +404,7 @@ test("a reviewer approval shows the next step on the card", async ({ page, reque
 });
 
 test("discussion stays a comment box, and a reviewer can accept a knock off", async ({ page, request }) => {
-  const target = "PIPE-PHX-0003";
+  const target = "PIPE-PHX-0004";
   await login(request, "contributor");
   await openAs(page, "contributor", `/?funnel=pipeline&site=${target}`);
   await page.getByTestId("panel-tab-discussion").click();

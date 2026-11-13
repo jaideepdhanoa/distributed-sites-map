@@ -55,6 +55,21 @@ test("notes store the author and team language", async () => {
   assert.equal((await listNotes(sql, "site", "PHX-U180")).length, 2);
 });
 
+test("posting the same note again returns the one already stored", async () => {
+  const sql = await ready();
+  const first = await createNote(sql, { targetKind: "site", targetId: "PHX-U180", body: TEAM_NOTE, authorId: "writer" }, lookup);
+  const again = await createNote(sql, { targetKind: "site", targetId: "PHX-U180", body: TEAM_NOTE, authorId: "writer" }, lookup);
+  assert.equal(again.id, first.id);
+  assert.equal((await listNotes(sql, "site", "PHX-U180")).length, 1);
+  const created = (await listAudit(sql)).filter((row) => row.action === "note.create");
+  assert.equal(created.length, 1);
+  const other = await createNote(sql, { targetKind: "site", targetId: "PHX-U180", body: TEAM_NOTE, authorId: "editor" }, lookup);
+  assert.notEqual(other.id, first.id);
+  await deleteNote(sql, { id: first.id, actorId: "writer" });
+  const restored = await createNote(sql, { targetKind: "site", targetId: "PHX-U180", body: TEAM_NOTE, authorId: "writer" }, lookup);
+  assert.notEqual(restored.id, first.id);
+});
+
 test("a suggestion never writes the record and can be marked applied when data matches", async () => {
   const sql = await ready();
   const created = await createSuggestion(sql, {

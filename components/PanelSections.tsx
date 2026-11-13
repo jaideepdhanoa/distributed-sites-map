@@ -12,6 +12,16 @@ const TABS = [
 
 type TabId = (typeof TABS)[number][0];
 
+const openTab = new Map<string, TabId>();
+
+function tabHref(current: { toString(): string }, id: TabId) {
+  const next = new URLSearchParams(current.toString());
+  if (id === "overview") next.delete("panel");
+  else next.set("panel", id);
+  const query = next.toString();
+  return query ? `/?${query}` : "/";
+}
+
 export default function PanelSections({
   overview,
   numbers,
@@ -27,10 +37,17 @@ export default function PanelSections({
   const site = params.get("site");
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<TabId>(panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview");
+  const fromUrl = panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
+  const [tab, setTab] = useState<TabId>((site && openTab.get(site)) || fromUrl);
   useEffect(() => {
-    if (panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "overview") setTab(panel);
+    const remembered = site ? openTab.get(site) : undefined;
+    if (remembered) setTab(remembered);
+    else if (panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "overview") setTab(panel);
   }, [site, panel]);
+  function choose(id: TabId) {
+    if (site) openTab.set(site, id);
+    setTab(id);
+  }
   useEffect(() => {
     if (panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
@@ -71,17 +88,20 @@ export default function PanelSections({
     <div className="panel-sections" ref={sections}>
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
         {TABS.map(([id, label]) => (
-          <button
+          <a
             key={id}
-            type="button"
+            href={tabHref(params, id)}
             role="tab"
             aria-selected={tab === id}
             className={tab === id ? "chip on" : "chip"}
             data-testid={`panel-tab-${id}`}
-            onClick={() => setTab(id)}
+            onClick={(event) => {
+              event.preventDefault();
+              choose(id);
+            }}
           >
             {label}
-          </button>
+          </a>
         ))}
       </div>
       <div role="tabpanel">{body}</div>

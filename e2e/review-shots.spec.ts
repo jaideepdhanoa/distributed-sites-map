@@ -89,5 +89,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(stars).toContainText("Financial screen");
   await expect(stars.getByTestId("workbook-step")).toContainText("POS/car counts");
   await expect(stars).toContainText("Last contact Nov 6");
+  await page.locator(".drawer-scroll").evaluate((node) => { node.scrollTop = 0; });
+  await expect(stars.locator("h2")).toBeInViewport();
   await page.screenshot({ path: `review-shots/${name}-mia-0080.png`, fullPage: false });
 });

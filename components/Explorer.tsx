@@ -191,6 +191,16 @@ export default function Explorer() {
   const [userOpen, setUserOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(params.get("alerts") === "1");
   const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    const shell = shellRef.current;
+    const bar = shell?.querySelector(".bar");
+    if (!shell || !(bar instanceof HTMLElement)) return;
+    const apply = () => shell.style.setProperty("--bar-h", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [selected, stepsOpen, menuOpen]);
   const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
   const [hitsOpen, setHitsOpen] = useState(false);
   const searchTimer = useRef<number | null>(null);

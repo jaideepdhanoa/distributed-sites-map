@@ -379,6 +379,10 @@ export default function Detail({
       </div>
       {banner}
       <div className="drawer-scroll">
+      <SitePhotos
+        card={photos}
+        between={(
+          <>
       <div className="card-top">
         <h2>{site.name || site.address || site.site_id}</h2>
         <div className="card-chips">
@@ -420,7 +424,9 @@ export default function Detail({
         blocker={linkedDeal}
       />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} /> : <FigureSkeleton />}
-      <SitePhotos card={photos} />
+          </>
+        )}
+      />
       {related}
       <PanelSections
         overview={
@@ -655,6 +661,10 @@ export function DealDetail({
       </div>
       {banner}
       <div className="drawer-scroll">
+      <SitePhotos
+        card={photos}
+        between={(
+          <>
       <div className="card-top">
         <h2>{deal.name || deal.address}</h2>
         <div className="card-chips">
@@ -684,7 +694,9 @@ export function DealDetail({
         blocker={deal}
       />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} /> : <FigureSkeleton />}
-      <SitePhotos card={photos} />
+          </>
+        )}
+      />
       {related}
       <PanelSections
         overview={

@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
 import { acreUnit, acresText, capacitySummary, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
+import { basisBadge } from "@/lib/pricing";
 import { stageDetail } from "@/lib/labels";
 import { cardNdaLabel } from "@/lib/nda";
 
@@ -24,13 +25,14 @@ function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): Compa
     deal.open_land_sqft != null ? `${openLandText(deal.open_land_sqft)} sheet` : "",
     linked && linked.spare_ac_own != null ? `${acreUnit(linked.spare_ac_own, linked.spare_ac_own_text)} census` : "",
   ].filter(Boolean).join(" · ");
-  const cashValue = cash.hidden ? "" : [cash.value, cash.note, cash.basis].filter(Boolean).join(" · ");
+  const cashBasis = basisBadge(deal.earnings_basis) || basisBadge(cash.basis);
+  const cashValue = cash.hidden ? "" : [cash.value, cash.note, cashBasis].filter(Boolean).join(" · ");
   return [
     { label: "Address", value: shown(displayAddress(deal.address)) },
     { label: "Stage", value: shown(stageDetail(deal.stage, deal.stage_group)) },
     ...(cardNdaLabel(deal, signedIn) ? [{ label: "NDA", value: cardNdaLabel(deal, signedIn) }] : []),
     ...(deal.suggested_drop && deal.stage_group !== "dropped" ? [{ label: "Suggested drop", value: deal.suggested_drop }] : []),
-    { label: "Asking", value: sheetMoney(deal.asking_price, deal.asking_price_display) },
+    { label: "Asking", value: signedIn ? sheetMoney(deal.asking_price, deal.asking_price_display) : "—" },
     { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(workbookTrafficLine(deal)) },
     { label: "Land", value: shown(acresText(deal.land_acres)) },
@@ -41,8 +43,29 @@ function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): Compa
     { label: "Depot", value: depotLine(deal.miles_to_depot, deal.miles_to_depot != null) },
     { label: "Zoning", value: shown(linked?.zoning) },
     { label: "Owner", value: shown(linked?.owner) },
-    { label: "Cash flow", value: shown(cashValue) },
-    { label: "Per acre", value: deal.price_per_acre != null ? sheetMoney(deal.price_per_acre, fullMoney(deal.price_per_acre)) : MISSING },
+    { label: "Cash flow", value: signedIn ? shown(cashValue) : "—" },
+    { label: "Per acre", value: signedIn && deal.price_per_acre != null ? sheetMoney(deal.price_per_acre, fullMoney(deal.price_per_acre)) : "—" },
+    ...pricingRows(deal, signedIn),
+  ];
+}
+
+function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
+  if (!signedIn || deal.kind === "land") return [];
+  const earnings = deal.earnings_multiple_which ? `Asking / ${deal.earnings_multiple_which}` : "Asking / cash flow";
+  const land = deal.land_estimate;
+  const asking = deal.asking_price;
+  const split = asking != null && asking > 0 && land != null
+    ? `Land ${Math.round((Math.max(0, Math.min(land, asking)) / asking) * 100)}% · Business ${Math.round((Math.max(0, asking - land) / asking) * 100)}%`
+    : "—";
+  return [
+    { label: "Pricing", value: split },
+    { label: "Revenue", value: signedIn ? [deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ") : "—" },
+    { label: "Land estimate", value: [deal.land_estimate_display || "—", land != null ? "Estimate" : ""].filter(Boolean).join(" · ") },
+    { label: "Business value", value: deal.business_value_display || "—" },
+    { label: "County value (land + buildings)", value: [deal.county_value_display || "—", deal.county_value_basis].filter(Boolean).join(" · ") },
+    { label: "Asking / revenue", value: [deal.revenue_multiple_display || "—", deal.revenue_multiple_basis].filter(Boolean).join(" · ") },
+    { label: earnings, value: [deal.earnings_multiple_display || "—", deal.earnings_multiple_basis].filter(Boolean).join(" · ") },
+    { label: "Business-only multiple", value: [deal.business_multiple_display || "—", deal.business_multiple_basis].filter(Boolean).join(" · ") },
   ];
 }
 
@@ -51,12 +74,13 @@ function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): Compa
   const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
   const spare = site.spare_ac_own != null ? `${acreUnit(site.spare_ac_own, site.spare_ac_own_text)} census` : "";
   const cash = linked ? cashTile(linked) : null;
-  const cashValue = cash && !cash.hidden ? [cash.value, cash.note, cash.basis].filter(Boolean).join(" · ") : "";
+  const cashBasis = linked ? (basisBadge(linked.earnings_basis) || basisBadge(cash?.basis)) : "";
+  const cashValue = cash && !cash.hidden ? [cash.value, cash.note, cashBasis].filter(Boolean).join(" · ") : "";
   return [
     { label: "Address", value: shown(displayAddress(site.address)) },
     { label: "Stage", value: shown(site.pipeline_stage || "Universe") },
     ...(linked && cardNdaLabel(linked, signedIn) ? [{ label: "NDA", value: cardNdaLabel(linked, signedIn) }] : []),
-    { label: "Asking", value: shown(site.asking_price_display) },
+    { label: "Asking", value: signedIn ? shown(site.asking_price_display) : "—" },
     { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(universeTrafficLine(site)) },
     { label: "Land", value: shown(acres) },
@@ -67,8 +91,9 @@ function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): Compa
     { label: "Depot", value: depotLine(site.miles_to_depot, site.miles_to_depot != null) },
     { label: "Zoning", value: shown(site.zoning) },
     { label: "Owner", value: shown(site.owner) },
-    { label: "Cash flow", value: shown(cashValue) },
-    { label: "Per acre", value: linked?.price_per_acre != null ? sheetMoney(linked.price_per_acre, fullMoney(linked.price_per_acre)) : MISSING },
+    { label: "Cash flow", value: signedIn ? shown(cashValue) : "—" },
+    { label: "Per acre", value: signedIn && linked?.price_per_acre != null ? sheetMoney(linked.price_per_acre, fullMoney(linked.price_per_acre)) : "—" },
+    ...(linked ? pricingRows(linked, signedIn) : []),
   ];
 }
 

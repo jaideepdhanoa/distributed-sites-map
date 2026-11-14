@@ -1625,6 +1625,16 @@ tr { cursor: pointer; }
 .saved-list { list-style: none; margin: 8px 0; padding: 0; }
 .saved-search input, .shortlist-save input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .shortlist-save { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px; }
+.split-bar {
+  display: flex;
+  height: 8px;
+  margin: 4px 0 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #efe8dc;
+}
+.split-bar .split-land { background: #1e4636; height: 100%; }
+.split-bar .split-business { background: #c4b49a; height: 100%; }
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

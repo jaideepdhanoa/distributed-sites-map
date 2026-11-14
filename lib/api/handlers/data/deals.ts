@@ -5,6 +5,7 @@ import { packageHrefMap } from "@/lib/financialsLoad";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import { overlayDeals } from "@/lib/nda";
 import { loadNdaSnapshot } from "@/lib/ndaLoad";
+import { withPricing } from "@/lib/pricingLoad";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { withSuggestedDrops } from "@/lib/suggestedDrop";
 
@@ -15,6 +16,6 @@ export async function GET() {
   const deals = readGenerated("deals.geojson") as { features?: { properties?: Record<string, unknown> }[] };
   const staged = await overlayStageFile(overlayDeals(deals, loadNdaSnapshot()), "deal");
   const dropped = withSuggestedDrops(staged);
-  const features = attachPackageHrefs(dropped.features || [], packageHrefMap(), canReadFinancials(session.actionRole));
+  const features = attachPackageHrefs(dropped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature));
   return NextResponse.json({ ...dropped, features }, { headers: privateHeaders });
 }

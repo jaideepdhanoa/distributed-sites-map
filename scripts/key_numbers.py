@@ -1,7 +1,8 @@
 """Land measures and seller-stated figures for pipeline and land rows.
 
 Columns are chosen by header name. Shipped keys stay neutral: a capacity
-rating is site_capacity, and package figures are omitted rather than copied.
+rating is site_capacity. Package file names stay off the card. The revenue
+and cash-flow figures themselves ship for every signed-in reader.
 """
 
 from __future__ import annotations
@@ -428,31 +429,23 @@ def key_figures(row: dict, kind: str) -> dict:
     packaged = package_source(source_text)
     recorded_basis = financials_basis(row.get("Financials status"))
     package_state = package_status_label(row.get("Package status"))
-    if cash is not None:
-        status = "shown"
-        revenue_out = None if packaged else (round(revenue, 2) if revenue is not None else None)
-        cash_out = round(cash, 2)
-        figures_basis = recorded_basis or ("" if packaged else "Claimed")
-        figures_source = "" if packaged else public_source(source_text)
-    elif revenue is None:
+    revenue_out = round(revenue, 2) if revenue is not None else None
+    cash_out = round(cash, 2) if cash is not None else None
+    if cash_out is None and revenue_out is None:
         status = "vacant" if vacant else "absent"
-        revenue_out = cash_out = None
-        figures_basis = recorded_basis
-        figures_source = ""
-    elif packaged:
-        # A package can name revenue without a cash-flow figure. Do not ship the revenue or a file name.
-        status = "absent"
-        revenue_out = cash_out = None
         figures_basis = recorded_basis
         figures_source = ""
     else:
         status = "shown"
-        revenue_out = round(revenue, 2)
-        cash_out = None
-        figures_basis = recorded_basis or "Claimed"
-        figures_source = public_source(source_text)
+        if packaged:
+            # The figure ships. The package file name does not.
+            figures_basis = recorded_basis
+            figures_source = ""
+        else:
+            figures_basis = recorded_basis or "Claimed"
+            figures_source = public_source(source_text)
     per_acre = round(asking / acres, 2) if asking and acres else None
-    multiple = round(asking / cash_out, 1) if asking and cash_out and cash_out > 0 and not packaged else None
+    multiple = round(asking / cash_out, 1) if asking and cash_out and cash_out > 0 else None
     multiple_text = None
     if multiple is not None:
         text = f"{multiple:.1f}"

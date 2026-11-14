@@ -71,7 +71,7 @@ test("agreed waiting keeps the stage, links blockers, and replies once", async (
       reason: "",
       authorId: "cindel",
     }, lookup);
-    assert.equal(proposal.title, "Prioritize: push to Financial screen");
+    assert.equal(proposal.title, "Move to Financial screen");
     assert.equal(proposal.stageAt, "1 Desk screen");
     const waiting = await decideSuggestion(sql, {
       id: proposal.id,

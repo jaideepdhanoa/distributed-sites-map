@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { stageMoveLabel } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
+import { reviewSentence } from "@/lib/queue/since";
 import "./queue.css";
 
 export type QueueReason = { at: string; summary: string; type: string };
@@ -19,6 +21,8 @@ export type FeedSite = {
   reasons: QueueReason[];
   status: "open" | "reviewed" | "snoozed";
   previous: string | null;
+  firstVisit?: boolean;
+  reviewedAt?: string;
 };
 
 function reviewGroups(sites: FeedSite[]) {
@@ -99,20 +103,6 @@ function chips(reasons: QueueReason[]) {
   return out.slice(0, 3);
 }
 
-export function WhatChanged({ reasons }: { reasons: QueueReason[] }) {
-  if (!reasons.length) return null;
-  return (
-    <ul className="queue-changes">
-      {reasons.map((reason) => (
-        <li key={`${reason.type}-${reason.at}-${reason.summary}`}>
-          {chipLabel(reason.type) === "Update" ? reason.summary.replace(/\.$/, "") : chipLabel(reason.type)}
-          <time dateTime={reason.at}>{reasonWhen(reason.at)}</time>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export function ReviewBar({
   index,
   total,
@@ -127,6 +117,11 @@ export function ReviewBar({
   siteId,
   followed,
   filters,
+  reasons,
+  firstVisit,
+  reviewedAt,
+  stageGroup,
+  stage,
 }: {
   index: number;
   total: number;
@@ -141,8 +136,17 @@ export function ReviewBar({
   siteId: string;
   followed: boolean;
   filters: ReactNode;
+  reasons: QueueReason[];
+  firstVisit: boolean;
+  reviewedAt: string;
+  stageGroup?: string;
+  stage?: string;
 }) {
   const [menu, setMenu] = useState<null | "snooze" | "more">(null);
+  const [sinceOpen, setSinceOpen] = useState(false);
+  const since = reviewSentence({ firstVisit, reviewedAt, reasons });
+  useEffect(() => { setSinceOpen(false); }, [siteId]);
+  const moveLabel = stageMoveLabel(stageGroup, stage);
   const width = total ? Math.min(100, (reviewed / total) * 100) : 0;
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -175,6 +179,23 @@ export function ReviewBar({
         <button type="button" className="review-step" aria-label="Previous" onClick={onPrev}>Previous</button>
         <button type="button" className="review-step" aria-label="Next" onClick={onNext}>Next</button>
       </div>
+      {siteId && since.lines.length ? (
+        <span className="review-since-wrap">
+          <button type="button" className="review-step" data-testid="review-since" aria-expanded={sinceOpen} onClick={() => setSinceOpen((value) => !value)}>{since.sentence}</button>
+          {sinceOpen ? (
+            <ul className="review-since-list" data-testid="review-since-list">
+              {since.lines.map((line) => (
+                <li key={`${line.at}-${line.text}`}>
+                  <span>{line.text}</span>
+                  <time dateTime={line.at}>{line.when}</time>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </span>
+      ) : (
+        siteId ? <span className="review-since-text" data-testid="review-since">{since.sentence}</span> : null
+      )}
       <button type="button" className="primary" data-testid="queue-reviewed" onClick={onReviewed}>
         <span className="review-long">Mark reviewed</span>
         <span className="review-short">Mark reviewed</span>
@@ -187,12 +208,12 @@ export function ReviewBar({
         <span className="review-long">Exit review</span>
         <span className="review-short">Exit</span>
       </button>
-      {menu ? <ReviewMenu mode={menu} siteId={siteId} followed={followed} onClose={() => setMenu(null)} onShowSnooze={() => setMenu("snooze")} onSnooze={onSnooze} /> : null}
+      {menu ? <ReviewMenu mode={menu} siteId={siteId} followed={followed} moveLabel={moveLabel} onClose={() => setMenu(null)} onShowSnooze={() => setMenu("snooze")} onSnooze={onSnooze} /> : null}
     </div>
   );
 }
 
-function ReviewMenu({ mode, siteId, followed, onClose, onShowSnooze, onSnooze }: { mode: "snooze" | "more"; siteId: string; followed: boolean; onClose: () => void; onShowSnooze: () => void; onSnooze: () => void }) {
+function ReviewMenu({ mode, siteId, followed, moveLabel, onClose, onShowSnooze, onSnooze }: { mode: "snooze" | "more"; siteId: string; followed: boolean; moveLabel: string; onClose: () => void; onShowSnooze: () => void; onSnooze: () => void }) {
   const [snooze, setSnooze] = useState("");
   const [packageReason, setPackageReason] = useState("");
   const [flagUser, setFlagUser] = useState("");
@@ -239,7 +260,7 @@ function ReviewMenu({ mode, siteId, followed, onClose, onShowSnooze, onSnooze }:
       ) : null}
       {mode === "more" ? (
         <div className="review-menu-actions" role="group" aria-label="Review actions">
-          <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "stage_move" })); }} className="menu-item">Prioritize: push to Financials</button>
+          <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "stage_move" })); }} className="menu-item">{moveLabel}</button>
           <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "knock_off" })); }} className="menu-item">Drop with a reason</button>
           <button type="button" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("sites-open-next-step", { detail: "mark_duplicate" })); }} className="menu-item">Mark duplicate</button>
           <button type="button" onClick={onShowSnooze} className="menu-item">Snooze until a package arrives</button>

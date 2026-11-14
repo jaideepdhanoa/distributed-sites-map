@@ -776,6 +776,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 }
 .badge.checked { background: #e3efe7; color: #12312a; box-shadow: inset 0 0 0 1px #8fbfa8; }
 .badge.pending { background: #f7ead2; color: #5c4310; box-shadow: inset 0 0 0 1px #d7b56a; }
+.badge.quiet { background: #f4f0e6; color: #3f3a33; box-shadow: inset 0 0 0 1px #d6cebe; }
 .badge.held { background: #e4eef8; color: var(--held); }
 .badge.tier { background: #eef2f6; color: #2c3a48; display: inline-flex; align-items: center; gap: 6px; }
 .badge.tier.l10, .badge.tier.l4 { background: #eef2f6; color: #2c3a48; }
@@ -2088,12 +2089,18 @@ span.listing-link.muted { text-decoration: none; }
 .photo-rest .photo-grid figure { width: 96px; flex: none; margin: 0; }
 .headline {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.72fr) minmax(0, 1.25fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border: 1px solid var(--line);
   border-radius: 14px;
   margin: var(--space-4) 0;
   background: #fffefb;
 }
+.card-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.card-links { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin: 8px 0 4px; }
+.card-links .text-link, .card-link.missing { min-height: 44px; display: inline-flex; align-items: center; }
+.card-link.missing { color: var(--ink-3); }
+.card-footer { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 18px 0 8px; }
+.stage-wait { margin-left: 6px; font-size: 11px; font-weight: 650; letter-spacing: 0.02em; color: var(--ink-3); }
 .headline > div { padding: 10px 12px; min-width: 0; }
 .headline > div + div { border-left: 1px solid var(--line); }
 .headline span, .headline small { display: block; font-size: var(--type-cap); line-height: 16px; color: var(--ink-3); overflow-wrap: anywhere; }
@@ -2291,8 +2298,10 @@ span.listing-link.muted { text-decoration: none; }
   .hero-slot { margin-bottom: 8px; }
   .hero-frame { min-height: 88px; }
   .hero-frame iframe, .hero-still, .hero-still img { height: 88px; }
+  .headline { grid-template-columns: 1fr 1fr; }
   .headline strong { font-size: 16px; line-height: 22px; }
   .headline > div { padding: 8px; }
+  .headline > div:nth-child(odd) { border-left: 0; }
   .layers.open { max-height: calc(100dvh - 168px); }
   .shell.drawer-open .layers.open {
     position: fixed;

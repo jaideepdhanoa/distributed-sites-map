@@ -5,7 +5,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
-import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, WhatChanged, marketLabel, type FeedSite } from "./queue/QueueView";
+import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, type FeedSite } from "./queue/QueueView";
 import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
@@ -20,7 +20,6 @@ import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMark
 import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
 import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
-import { clearHidden, hideSite, readHidden } from "@/lib/hide";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
 import { displayAddress, leadSourceLine, plainRoad } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
@@ -122,8 +121,6 @@ export default function Explorer() {
   const [askOpen, setAskOpen] = useState(false);
   const [askSite, setAskSite] = useState<{ id: string; name: string } | null>(null);
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
-  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
-  const [showHidden, setShowHidden] = useState(false);
   const [handoff, setHandoff] = useState("");
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -264,7 +261,7 @@ export default function Explorer() {
   const queueApproval = params.get("qapprove") === "1";
   const queueMentions = params.get("qmention") === "1";
   const queueAssigned = params.get("qassign") === "1";
-  const visibleFeed = feed.filter((site) => site.status !== "snoozed" && (showHidden || !hiddenIds.includes(site.siteId)));
+  const visibleFeed = feed.filter((site) => site.status !== "snoozed");
   // /?view=review&site=ID opens that site. After the link lands, review=1 follows the queue cursor.
   const reviewDeepSite = params.get("view") === "review" ? params.get("site") : null;
   const reviewDeepIndex = reviewDeepSite ? visibleFeed.findIndex((site) => site.siteId === reviewDeepSite) : -1;
@@ -282,9 +279,6 @@ export default function Explorer() {
   const pipelineSortId = (PIPELINE_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as PipelineColumnId;
 
   const mapArea = parseMapArea(params);
-  useEffect(() => {
-    setHiddenIds(readHidden());
-  }, []);
   useEffect(() => {
     if (!me?.u) return;
     const searches = readSearches();
@@ -544,7 +538,7 @@ export default function Explorer() {
         setFeedLoaded(true);
         return;
       }
-      const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
+      const payload = (await response.json()) as { items?: { siteId: string; followed?: boolean; needsApproval?: boolean; mentioned?: boolean; assigned?: boolean; city?: string; firstVisit?: boolean; reviewedAt?: string; reasons?: FeedSite["reasons"]; snapshot?: { name?: string; city?: string; lng?: number | null; lat?: number | null } | null }[] };
       if (cancel) return;
       const next = (payload.items || []).filter((item) => !isPipelineStore({
         kind: "pipeline",
@@ -564,6 +558,8 @@ export default function Explorer() {
         reasons: item.reasons || [],
         status: "open" as const,
         previous: null,
+        firstVisit: Boolean(item.firstVisit),
+        reviewedAt: item.reviewedAt || "",
       }));
       setQueueCount(next.length);
       setFeed(next);
@@ -858,13 +854,7 @@ export default function Explorer() {
     const coords = feature.geometry?.coordinates;
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
   });
-  function personallyHidden(id: string) {
-    if (showHidden || !hiddenIds.includes(id)) return false;
-    if (selected === id) return false;
-    if (query.trim().length >= 2 && matchesQuery(query, [id])) return false;
-    return true;
-  }
-  const drawnDeals = areaDeals.filter((feature) => !personallyHidden(feature.properties.deal_id));
+  const drawnDeals = areaDeals;
   const overlaysOn = parseOverlays(params.get("overlay"));
   function toggleOverlay(id: OverlayId) {
     const next = overlaysOn.includes(id) ? overlaysOn.filter((item) => item !== id) : [...overlaysOn, id];
@@ -1324,7 +1314,7 @@ export default function Explorer() {
     if (!(allStages || universeWide || stage === "universe") && !inStage(feature.properties, stage)) return false;
     return passesChips(feature.properties, false, universeWide);
   });
-  const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry && !personallyHidden(feature.properties.site_id)) : [];
+  const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry) : [];
   const unscreenedPins = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : [];
   const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
@@ -1944,7 +1934,7 @@ export default function Explorer() {
                 <li key={deal.deal_id}>
                   <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
                   {" · "}{stageTitle(deal.stage_group)}
-                  {" · "}<NdaChip deal={deal} />
+                  {" · "}<NdaChip deal={deal} signedIn={Boolean(me)} />
                 </li>
               ))}
             </ul>
@@ -1965,6 +1955,11 @@ export default function Explorer() {
           onExit={() => stopReview()}
           onOpenFeed={() => setFeedSheet(true)}
           onSnooze={snoozeCurrent}
+          reasons={reviewCurrent?.reasons || []}
+          firstVisit={Boolean(reviewCurrent?.firstVisit)}
+          reviewedAt={reviewCurrent?.reviewedAt || ""}
+          stageGroup={dealRows.find((deal) => deal.deal_id === reviewCurrent?.siteId)?.stage_group}
+          stage={dealRows.find((deal) => deal.deal_id === reviewCurrent?.siteId)?.stage}
           filters={(
             <FilterPopover
               summary={filterSummary}
@@ -2058,11 +2053,6 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
-        {hiddenIds.length ? (
-          <button type="button" onClick={() => { setHiddenIds(clearHidden()); setShowHidden(false); }} className="menu-item clear-hidden">
-            Clear {hiddenIds.length} hidden
-          </button>
-        ) : null}
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
@@ -2250,10 +2240,8 @@ export default function Explorer() {
             onClose={() => choose(null)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
-            onNotFit={() => { setHiddenIds(hideSite(selectedDeal.deal_id)); choose(null); }}
             compared={compareIds.includes(selectedDeal.deal_id)}
             sheet={sheet}
-            banner={inReview && reviewCurrent?.siteId === selectedDeal.deal_id ? <WhatChanged reasons={reviewCurrent.reasons} /> : null}
             onSwipe={inReview ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
             signedIn={Boolean(me)}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
@@ -2285,7 +2273,6 @@ export default function Explorer() {
             onAddCompare={() => setCompared(selectedSite.site_id, !compareIds.includes(selectedSite.site_id))}
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
-            onNotFit={() => { setHiddenIds(hideSite(selectedSite.site_id)); choose(null); }}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
             onClose={() => choose(null)}
             sheet={sheet}
@@ -2307,6 +2294,7 @@ export default function Explorer() {
               return site ? [site] : [];
             })}
             contextSites={sites}
+            signedIn={Boolean(me)}
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}
           >

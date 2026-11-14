@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canReadFinancials } from "@/lib/agent/access";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { loadFinancialPanel } from "@/lib/financialsLoad";
+import { loadWorkbookStep } from "@/lib/workbookStepLoad";
 import { fileLookup } from "@/lib/actions/records";
 import type { DealProps } from "@/lib/types";
 
@@ -15,6 +16,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const deal = fileLookup()("deal", id) as DealProps | null;
   if (!deal) return NextResponse.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
   const panel = loadFinancialPanel(deal, true);
+  const workbookStep = loadWorkbookStep(id);
   console.info(JSON.stringify({ event: "data", user: session.u, part: "financials", id }));
-  return NextResponse.json(panel, { headers: privateHeaders });
+  return NextResponse.json({ ...panel, workbookStep }, { headers: privateHeaders });
 }

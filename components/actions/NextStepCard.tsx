@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { stageTitle } from "@/lib/labels";
+import { contactDate } from "@/lib/cardStatus";
+import type { WorkbookStep } from "@/lib/workbookStep";
+import type { DealProps } from "@/lib/types";
+import { blockerSentenceForDeal } from "@/lib/nda";
+import { pacificToday } from "@/lib/queue/today";
+import { BlockerLine } from "../NdaChip";
+import { SuggestedDropMark } from "../SuggestedDrop";
 import { approvedStage, publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { formatPacific } from "@/lib/actions/time";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
@@ -97,7 +105,25 @@ function statusMark(status: string) {
   return { label: "Waiting for approval", tone: "pending" };
 }
 
-export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kind: "site" | "deal"; id: string; stageGroup?: string | null; stage?: string | null }) {
+export function NextStepCard({
+  kind,
+  id,
+  stageGroup,
+  stage: recordStage,
+  signedIn = false,
+  workbookId = "",
+  suggestedDrop,
+  blocker,
+}: {
+  kind: "site" | "deal";
+  id: string;
+  stageGroup?: string | null;
+  stage?: string | null;
+  signedIn?: boolean;
+  workbookId?: string;
+  suggestedDrop?: string | null;
+  blocker?: (Pick<DealProps, "stage" | "stage_group"> & Partial<Pick<DealProps, "stage_blocker" | "stage_blocker_since">>) | null;
+}) {
   const params = useSearchParams();
   const proposal = params.get("panel") === "proposal";
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
@@ -136,6 +162,12 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
   const writable = canWrite(status.actionRole);
   const reviewer = canReview(status.actionRole);
   const stages = nextStageChoices();
+  const forward = forwardStageId(stageGroup, recordStage);
+  const moveLabel = stageMoveLabel(stageGroup, recordStage);
+  const forwardRef = useRef(forward);
+  forwardRef.current = forward;
+  const [workbook, setWorkbook] = useState<WorkbookStep | null>(null);
+  const lookup = workbookId || (kind === "deal" ? id : "");
 
   async function reload() {
     const token = ++loadGen.current;
@@ -152,6 +184,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
       const detail = (event as CustomEvent<NextStepTypeId>).detail;
       if (!detail) return;
       setType(detail);
+      if (detail === "stage_move") setStage(forwardRef.current);
       setOpen(true);
     }
     function onPrefill(event: Event) {
@@ -194,6 +227,25 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
       sizes.disconnect();
     };
   }, [proposal, reviewing, status.enabled, id]);
+
+  useEffect(() => {
+    if (!signedIn || !lookup) {
+      setWorkbook(null);
+      return undefined;
+    }
+    let cancel = false;
+    fetch(`/api/data/financials/${encodeURIComponent(lookup)}`)
+      .then(async (response) => (response.ok ? await response.json() as { workbookStep?: WorkbookStep | null } : null))
+      .then((body) => {
+        if (cancel) return;
+        const step = body?.workbookStep;
+        setWorkbook(step && (step.text || step.owner || step.due) ? step : null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [signedIn, lookup]);
 
   useEffect(() => {
     if (!status.enabled) return undefined;
@@ -254,7 +306,29 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
     window.dispatchEvent(new CustomEvent("sites-sheet-snap", { detail: "full" }));
   }, [status.enabled, reviewer, open, focus, proposal, reviewing]);
 
-  if (!status.enabled) return null;
+  const workbookDue = workbook?.due ? contactDate(workbook.due) : "";
+  const workbookBlock = signedIn && workbook ? (
+    <div data-testid="workbook-step">
+      {workbook.text ? <p className="proposal-title">{workbook.text}</p> : null}
+      {workbook.owner || workbookDue ? (
+        <p className="proposal-meta">
+          {[workbook.owner ? `Owner ${workbook.owner}` : "", workbookDue ? `Due ${workbookDue}` : ""].filter(Boolean).join(" · ")}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
+  const context = (
+    <>
+      <SuggestedDropMark reason={suggestedDrop} stageGroup={stageGroup} stage={recordStage} />
+      {blocker ? <BlockerLine deal={blocker} /> : null}
+      {workbookBlock}
+    </>
+  );
+  if (!status.enabled) {
+    const blocked = blocker ? blockerSentenceForDeal(blocker, pacificToday()) : "";
+    if (!workbookBlock && !String(suggestedDrop || "").trim() && !blocked) return null;
+    return <section className="next-card" data-testid="next-step">{context}</section>;
+  }
 
   const approved = steps
     .filter((item) => item.status === "accepted" && !item.doneAt)
@@ -349,7 +423,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
       <h3>Propose next step</h3>
       <div className="type-chips" role="group" aria-label="Next step type">
         {NEXT_STEP_TYPES.map((item) => (
-          <button key={item.id} type="button" className={type === item.id ? "chip on" : "chip"} onClick={() => { setType(item.id); if (item.id === "stage_move" && !stage) setStage("financial"); }}>{item.label}</button>
+          <button key={item.id} type="button" className={type === item.id ? "chip on" : "chip"} onClick={() => { setType(item.id); if (item.id === "stage_move" && !stage) setStage(forward); }}>{item.id === "stage_move" ? moveLabel : item.label}</button>
         ))}
       </div>
       {type === "work_item" ? (
@@ -415,7 +489,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
     const knock = stepType === "knock_off";
     const mark = statusMark(focus.status);
     const headline = focus.title || focus.proposedValue;
-    const kindLabel = nextStepTypeLabel(focus.detail);
+    const kindLabel = stepType === "stage_move" ? `Move to ${stageTitle(focus.proposedValue)}` : nextStepTypeLabel(focus.detail);
     const canEdit = focus.status === "open" && (reviewer || (writable && focus.authorId === status.username));
     body = (
       <>
@@ -507,7 +581,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
   } else if (!open && approved) {
     const stepType = nextStepType(approved.detail);
     const headline = `Next: ${approved.title || approved.proposedValue}`;
-    const kindLabel = nextStepTypeLabel(approved.detail);
+    const kindLabel = stepType === "stage_move" ? `Move to ${stageTitle(approved.proposedValue)}` : nextStepTypeLabel(approved.detail);
     body = (
       <>
         <span className="badge checked">Approved</span>
@@ -564,12 +638,12 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
               data-testid={`empty-step-${item.id}`}
               onClick={() => {
                 setType(item.id);
-                setStage(item.id === "stage_move" ? "financial" : "");
+                setStage(item.id === "stage_move" ? forward : "");
                 setOpen(true);
               }}
               className={item.prominent ? "paper-btn" : "text-link"}
             >
-              {nextStepTypeLabel(item.id)}
+              {item.id === "stage_move" ? moveLabel : nextStepTypeLabel(item.id)}
             </button>
           ))}
         </div>
@@ -582,6 +656,7 @@ export function NextStepCard({ kind, id, stageGroup, stage: recordStage }: { kin
   const bringBack = droppedStage(stageGroup, recordStage) && !(open && type === "bring_back") && nextStepType(approved?.detail) !== "bring_back";
   return (
     <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
+      {context}
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
       {bringBack ? (
         <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>

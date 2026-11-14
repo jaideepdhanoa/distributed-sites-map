@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
-import { panelFromDeal, safePackageHref, type FinancialPanel } from "@/lib/financials";
+import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
 
@@ -139,7 +139,6 @@ export default function KeyStrip({
       cancel = true;
     };
   }, [signedIn, showFinancials, deal.deal_id]);
-  const packageHref = safePackageHref(financials?.packageHref, signedIn);
   const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
   const shownPanel = showFinancials ? (financials ?? fallbackPanel) : null;
   const population = trade.find((line) => line.startsWith("3-mile population"));
@@ -179,7 +178,6 @@ export default function KeyStrip({
               {cashNote ? <small>{cashNote}</small> : null}
               {cash.basis ? <em>{cash.basis}</em> : null}
             </button>
-            {packageHref ? <a href={packageHref} target="_blank" rel="noopener noreferrer">Open package</a> : null}
           </article>
         ) : (
           <Metric icon={Banknote} label={cashLabel} value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />

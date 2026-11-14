@@ -6,6 +6,7 @@ import {
   blockerSentenceForDeal,
   coveredSites,
   courtDayCount,
+  cardNdaLabel,
   ndaChip,
   ndaQueueAllowed,
   ndaQueueBody,
@@ -186,4 +187,12 @@ test("the NDA queue is signed in the same way as financials", () => {
   assert.match(route, /ndaQueueAllowed\(session\.actionRole\)/);
   assert.equal(snapshot.source, "workbook");
   assert.equal(JSON.stringify(snapshot).includes("Not started"), false);
+});
+
+test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {
+  assert.equal(cardNdaLabel({}, true), "");
+  assert.equal(cardNdaLabel({ nda_status: "Not required" }, true), "");
+  assert.equal(cardNdaLabel({ nda_id: "NDA-001", nda_status: "Executed" }, true), "");
+  assert.equal(cardNdaLabel({ nda_id: "NDA-006", nda_status: "With counterparty legal", nda_days_open: 10, nda_days_in_court: 2 }, false), "");
+  assert.equal(cardNdaLabel({ nda_id: "NDA-006", nda_status: "With counterparty legal", nda_days_open: 10, nda_days_in_court: 2 }, true), "NDA: With counterparty legal · 10d open · 2d in court");
 });

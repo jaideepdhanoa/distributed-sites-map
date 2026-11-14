@@ -1,12 +1,22 @@
-import { blockerSentenceForDeal, ndaChip, type NdaMirror } from "@/lib/nda";
+import { blockerSentenceForDeal, cardNdaLabel, type NdaMirror } from "@/lib/nda";
 import { pacificToday } from "@/lib/queue/today";
 import type { DealProps } from "@/lib/types";
 
-export function NdaChip({ deal, text }: { deal?: Partial<NdaMirror>; text?: string }) {
-  const label = text ?? ndaChip(deal || {});
+export function NdaChip({
+  deal,
+  text,
+  signedIn = true,
+}: {
+  deal?: Partial<NdaMirror>;
+  text?: string;
+  signedIn?: boolean;
+}) {
+  if (!signedIn) return null;
+  const label = text ? (text === "Not required" || text.startsWith("NDA:") ? (text === "Not required" ? "" : text) : `NDA: ${text}`) : cardNdaLabel(deal || {}, true);
+  if (!label) return null;
   const id = deal?.nda_id || "";
   return (
-    <span className="badge pending nda-chip" data-testid="nda-chip" data-nda-id={id} title={id || undefined}>
+    <span className="badge quiet nda-chip" data-testid="nda-chip" data-nda-id={id} title={id || undefined}>
       {label}
     </span>
   );

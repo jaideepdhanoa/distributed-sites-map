@@ -79,4 +79,15 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   const layers = page.locator("aside.layers.open");
   await expect(layers).toBeVisible();
   await layers.screenshot({ path: `review-shots/${name}-layers.png` });
+  const closeLayers = page.getByRole("button", { name: "Close layers" });
+  if (await closeLayers.isVisible()) await closeLayers.click();
+  await page.goto(`/?funnel=pipeline&site=PIPE-MIA-0080${name === "mobile" ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("aside.drawer");
+  await waitForBasemap(page);
+  const stars = page.locator("aside.drawer");
+  await expect(stars).toContainText("Stars & Stripes");
+  await expect(stars).toContainText("Financial screen");
+  await expect(stars.getByTestId("workbook-step")).toContainText("POS/car counts");
+  await expect(stars).toContainText("Last contact Nov 6");
+  await page.screenshot({ path: `review-shots/${name}-mia-0080.png`, fullPage: false });
 });

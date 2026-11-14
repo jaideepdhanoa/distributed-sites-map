@@ -21,6 +21,7 @@ from scripts.nda import (  # noqa: E402
     column_index,
     nda_mirror_fields,
     write_nda_file,
+    _row_dict,
     _with_letter_fallback,
 )
 
@@ -41,18 +42,48 @@ def _stamp(ws, row: int, values: dict[str, object]) -> None:
 
 class NdaReadTest(unittest.TestCase):
     def test_letter_fallback_reads_the_court_clock(self) -> None:
-        header = [""] * 160
-        values: list[object] = [None] * 160
-        values[column_index("EW")] = "NDA-009"
-        values[column_index("EX")] = "With Moove legal"
-        values[column_index("FD")] = 4
-        values[column_index("FC")] = 9
-        row = _with_letter_fallback(header, values, {"Site ID": "PIPE-PHX-0014"})
+        width = column_index("FF") + 1
+        header = [""] * width
+        values: list[object] = [None] * width
+        values[column_index("EY")] = "NDA-009"
+        values[column_index("EZ")] = "With Moove legal"
+        values[column_index("FF")] = 4
+        values[column_index("FE")] = 9
+        with self.assertLogs("scripts.nda", level="WARNING") as caught:
+            row = _with_letter_fallback(header, values, {"Site ID": "PIPE-PHX-0014"})
+        self.assertTrue(any("NDA ID" in line and "EY" in line for line in caught.output))
         mirror = nda_mirror_fields(row)
         self.assertEqual(mirror["nda_id"], "NDA-009")
         self.assertEqual(mirror["nda_status"], "With Moove legal")
         self.assertEqual(mirror["nda_days_open"], 9)
         self.assertEqual(mirror["nda_days_in_court"], 4)
+
+    def test_shifted_headers_ignore_stale_letters_and_a_blank_cell(self) -> None:
+        width = column_index("FF") + 4
+        header = [""] * width
+        values: list[object] = [None] * width
+        for letter, name, _key in NDA_COLUMNS:
+            header[column_index(letter)] = name
+        values[column_index("EY")] = "NDA-009"
+        values[column_index("EZ")] = "With Moove legal"
+        values[column_index("FE")] = 9
+        court = next(letter for letter, name, _key in NDA_COLUMNS if name == "NDA days in current court")
+        letter_at = column_index(court)
+        dest = letter_at + 2
+        header[dest] = header[letter_at]
+        values[dest] = None
+        header[letter_at] = ""
+        values[letter_at] = 99
+        values[column_index("EW")] = "NDA-OLD"
+        values[column_index("EX")] = "OLD STATUS"
+        with self.assertNoLogs("scripts.nda", level="WARNING"):
+            row = _row_dict(header, values, letter_fallback=True)
+        mirror = nda_mirror_fields(row)
+        self.assertEqual(mirror["nda_id"], "NDA-009")
+        self.assertEqual(mirror["nda_status"], "With Moove legal")
+        self.assertEqual(mirror["nda_days_open"], 9)
+        self.assertIsNone(mirror["nda_days_in_court"])
+        self.assertNotEqual(mirror["nda_id"], "NDA-OLD")
 
     def test_reader_uses_the_mirrors_and_does_not_write_the_workbook(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

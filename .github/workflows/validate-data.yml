@@ -24,6 +24,7 @@ jobs:
       - run: python tests/test_cstore.py
       - run: python tests/test_business_type.py
       - run: python tests/test_financials.py
+      - run: python tests/test_pricing_sources.py
       - run: python tests/test_nda.py
       - run: python tests/test_comms.py
       - run: python tests/test_open_loops.py

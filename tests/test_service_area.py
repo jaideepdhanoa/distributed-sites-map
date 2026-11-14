@@ -10,13 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.key_numbers import key_figures
-from scripts.sync_workbook import service_area_comment_lines
+from scripts.sync_workbook import service_area_comment_lines, service_area_distance_comment_lines
 from scripts.service_area import (
     EDGE_LABEL,
     classify_service_area,
     passes_service_area,
     service_area_breakdown,
+    service_area_distance_warning,
     service_area_fields,
+    service_area_record_problems,
 )
 
 
@@ -211,6 +213,66 @@ class FunnelTest(unittest.TestCase):
         self.assertIn("Beside", lines[1])
         self.assertEqual(service_area_comment_lines({})[0], "Unrecognized service-area classes: 0.")
         self.assertEqual(service_area_comment_lines(None)[0], "Unrecognized service-area classes: 0.")
+
+
+class DistanceBandTest(unittest.TestCase):
+    def _warn(self, raw, distance, where=""):
+        row = {"Service area": raw}
+        if distance is not None:
+            row["Distance to service area (mi)"] = distance
+        fields, class_warning = service_area_fields(row, where=where)
+        self.assertIsNone(class_warning, raw)
+        return service_area_distance_warning(fields, where=where), fields
+
+    def test_bands_and_a_near_zero_do_not_fail_the_row(self) -> None:
+        quiet = (
+            ("Inside", None),
+            ("Inside", 0),
+            ("Near 0-5", 0.1),
+            ("Near 0-5", 5),
+            ("Near 5-10", 5.1),
+            ("Near 5-10", 10),
+            ("Outside", 10.1),
+            ("Out", 12),
+            ("Edge", 0),
+            ("Edge", 4),
+            ("Unknown", 3),
+        )
+        for raw, distance in quiet:
+            warning, _fields = self._warn(raw, distance)
+            self.assertIsNone(warning, (raw, distance))
+
+        flagged = (
+            ("Inside", 1.2, "Inside"),
+            ("Near 0-5", 5.1, "Near 0-5"),
+            ("Near 5-10", 5, "Near 5-10"),
+            ("Near 0-5", None, "blank"),
+            ("Outside", 10, "10"),
+            ("Outside", None, "blank"),
+            ("Out", 4, "Outside"),
+            ("Out", 10, "10"),
+        )
+        for raw, distance, needle in flagged:
+            warning, fields = self._warn(raw, distance, where="PIPE-PHX-0001")
+            self.assertIsNotNone(warning, (raw, distance))
+            self.assertIn(needle, warning)
+            self.assertIn("PIPE-PHX-0001", warning)
+            self.assertEqual(service_area_record_problems("PIPE-PHX-0001", fields), [])
+
+        near_zero, fields = self._warn("Near 0-5", 0, where="LAND-LAS-0001")
+        self.assertEqual(near_zero, "LAND-LAS-0001 service area Near 0-5 has distance 0")
+        self.assertEqual(service_area_record_problems("LAND-LAS-0001", fields), [])
+        near_far_zero, _fields = self._warn("Near 5-10", 0)
+        self.assertEqual(near_far_zero, "service area Near 5-10 has distance 0")
+
+    def test_sync_comment_lists_the_disagreement_and_still_counts_zero(self) -> None:
+        lines = service_area_distance_comment_lines({
+            "service_area_distance": ["LAND-LAS-0001 service area Near 0-5 has distance 0"],
+        })
+        self.assertEqual(lines[0], "Service-area class and distance disagree: 1.")
+        self.assertIn("distance 0", lines[1])
+        self.assertEqual(service_area_distance_comment_lines({})[0], "Service-area class and distance disagree: 0.")
+        self.assertEqual(service_area_distance_comment_lines(None)[0], "Service-area class and distance disagree: 0.")
 
 
 if __name__ == "__main__":

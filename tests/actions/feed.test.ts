@@ -158,7 +158,9 @@ test("an unreviewed active site stays queued, and a dropped site stays out of th
     filters: { viable: true, market: "all" },
   });
   assert.deepEqual(rows.map((item) => item.siteId), ["open"]);
-  assert.equal(rows[0]?.reasons[0]?.summary, "New pipeline site.");
+  assert.equal(rows[0]?.reasons.length, 0);
+  assert.equal(rows[0]?.firstVisit, true);
+  assert.equal(rows[0]?.isNew, true);
 });
 
 test("assigned and mention filters keep the matching sites only", () => {

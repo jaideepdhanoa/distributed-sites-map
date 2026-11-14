@@ -53,6 +53,28 @@
 .review-meter { width: 72px; height: 4px; border-radius: 99px; background: rgba(250, 247, 241, 0.25); overflow: hidden; flex: none; }
 .review-meter span { display: block; height: 100%; background: #f3d48a; }
 .review-nav { display: inline-flex; flex: none; gap: 4px; align-items: center; }
+.review-since-wrap { position: relative; min-width: 0; max-width: 28rem; }
+.review-since-wrap .review-step { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-since-text { font-size: 13px; min-width: 0; }
+.review-since-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 9;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(280px, 40vh);
+  overflow: auto;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: #faf7f1;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.review-since-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; font-size: 13px; }
+.review-since-list time { color: var(--muted); flex: none; }
 .review-step { min-width: 0; }
 .review-summary { min-width: 0; }
 .review-summary button { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -173,6 +195,7 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "count summary exit"
+      "since since since"
       "nav reviewed more";
     gap: 6px 8px;
     align-items: center;
@@ -184,6 +207,8 @@
   .review-summary button { max-width: 100%; }
   .review-exit { grid-area: exit; margin-left: 0; justify-self: end; }
   .review-nav { grid-area: nav; }
+  .review-since-wrap, .review-since-text { grid-area: since; max-width: none; }
+  .review-since-wrap .review-step { white-space: normal; text-align: left; }
   .review-bar .primary { grid-area: reviewed; justify-self: start; }
   .review-more { grid-area: more; justify-self: end; }
   .review-bar button.review-step { min-width: 36px; width: 36px; padding: 0; font-size: 0; }

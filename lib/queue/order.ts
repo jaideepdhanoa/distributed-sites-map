@@ -16,6 +16,8 @@ export type QueueRow = {
   assigned: boolean;
   needsApproval: boolean;
   isNew: boolean;
+  firstVisit: boolean;
+  reviewedAt: string;
   newestAt: string;
 };
 
@@ -94,12 +96,9 @@ export function buildQueue(input: {
     const reasons = (input.reasons[site.id] || []).filter((reason) => !reviewedAt || reason.at > reviewedAt);
     const flagged = input.flagged.has(site.id);
     if (site.hidden) continue;
-    const neverReviewed = !reviewedAt;
-    const baseline = !site.hidden && neverReviewed && site.active && !reasons.some((reason) => reason.type === "new_site")
-      ? [{ at: input.today, summary: "New pipeline site.", type: "new_site" }]
-      : [];
-    const visible = [...baseline, ...reasons];
-    const isNew = visible.some((reason) => reason.type === "new_site");
+    const firstVisit = !reviewedAt;
+    const visible = reasons;
+    const isNew = visible.some((reason) => reason.type === "new_site") || (firstVisit && site.active);
     if (input.filters.freshOnly && !isNew) continue;
     if (input.filters.flaggedOnly && !flagged) continue;
     if (input.filters.approvalOnly && !needsApproval) continue;
@@ -115,7 +114,8 @@ export function buildQueue(input: {
       reasons: visible,
     });
     if (!queued) continue;
-    const shown = visible.length ? visible : [placeholder({ flagged, mentioned, assigned, needsApproval, at: input.today })];
+    const prompted = needsApproval || mentioned || assigned || flagged;
+    const shown = visible.length ? visible : prompted ? [placeholder({ flagged, mentioned, assigned, needsApproval, at: input.today })] : [];
     const newestAt = shown.reduce((latest, reason) => (reason.at > latest ? reason.at : latest), reviewedAt || input.today);
     rows.push({
       siteId: site.id,
@@ -129,6 +129,8 @@ export function buildQueue(input: {
       assigned,
       needsApproval,
       isNew,
+      firstVisit,
+      reviewedAt,
       newestAt,
     });
   }

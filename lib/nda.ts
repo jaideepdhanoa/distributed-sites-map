@@ -144,6 +144,22 @@ export function ndaChip(value: Partial<NdaMirror> | Record<string, unknown> | nu
   return parts.length ? parts.join(" · ") : mirror.nda_id;
 }
 
+/**
+ * Card chip. Hidden when no NDA is open, and hidden for a signed-out reader.
+ * An open NDA is prefixed so it is not mistaken for a site status.
+ */
+export function cardNdaLabel(
+  value: Partial<NdaMirror> | Record<string, unknown> | null | undefined,
+  signedIn: boolean,
+): string {
+  if (!signedIn) return "";
+  const mirror = normalizeMirror(value);
+  if (!mirror.nda_id || !isOpenAgreement(mirror)) return "";
+  const body = ndaChip(value);
+  if (!body || body === NOT_REQUIRED) return "";
+  return body.startsWith("NDA:") ? body : `NDA: ${body}`;
+}
+
 export function clockLine(open: number | null, court: number | null): string {
   return clockParts(open, court).join(" · ");
 }

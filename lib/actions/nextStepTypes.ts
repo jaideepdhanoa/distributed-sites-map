@@ -1,7 +1,8 @@
 import { stageTitle } from "@/lib/labels";
+import { stageKey } from "@/lib/stageOverlay";
 
 export const NEXT_STEP_TYPES = [
-  { id: "stage_move", label: "Prioritize: push to Financials" },
+  { id: "stage_move", label: "Move stage" },
   { id: "knock_off", label: "Drop with a reason" },
   { id: "mark_duplicate", label: "Mark duplicate" },
   { id: "bring_back", label: "Bring back" },
@@ -10,7 +11,7 @@ export const NEXT_STEP_TYPES = [
 
 export type NextStepTypeId = (typeof NEXT_STEP_TYPES)[number]["id"];
 
-export const NEXT_STAGE_IDS = ["desk", "financial", "checks"] as const;
+export const NEXT_STAGE_IDS = ["desk", "financial", "checks", "close"] as const;
 
 export type NextStageId = (typeof NEXT_STAGE_IDS)[number];
 
@@ -27,6 +28,23 @@ export function nextStepTypeLabel(detail: string | null | undefined): string {
 
 export function nextStageChoices(): { id: NextStageId; label: string }[] {
   return NEXT_STAGE_IDS.map((id) => ({ id, label: stageTitle(id) }));
+}
+
+/** The stage after the one on the card. Empty when the row is already at Offer and close. */
+export function forwardStageId(stageGroup?: string | null, stage?: string | null): NextStageId | "" {
+  const group = String(stageGroup || "").trim().toLowerCase();
+  const key = group || stageKey(stage || "");
+  if (key === "financial" || key === "contacted") return "checks";
+  if (key === "checks") return "close";
+  if (key === "close" || key === "later" || key === "dropped") return "";
+  return "financial";
+}
+
+/** Names the next stage. A deal already in Financial screen says "Move to Site checks". */
+export function stageMoveLabel(stageGroup?: string | null, stage?: string | null): string {
+  const id = forwardStageId(stageGroup, stage);
+  if (!id) return "Move stage";
+  return `Move to ${stageTitle(id)}`;
 }
 
 export function allowsAssignee(detail: string | null | undefined): boolean {

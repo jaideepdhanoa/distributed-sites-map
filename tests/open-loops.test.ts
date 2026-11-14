@@ -15,6 +15,7 @@ import {
   type OpenLoopsSnapshot,
   type OpenLoopSite,
 } from "../lib/openLoops.ts";
+import { workbookStepFor } from "../lib/workbookStep.ts";
 
 const snapshot = JSON.parse(readFileSync("data/fixtures/open-loops.json", "utf8")) as OpenLoopsSnapshot;
 const derived = deriveOpenLoops(snapshot);
@@ -279,4 +280,29 @@ test("the open-loops API is signed in the same way as the NDA queue", () => {
   assert.equal(/\bcharging\b/i.test(raw), false);
   assert.equal(/\bautonomous\b/i.test(raw), false);
   assert.equal(/\bAVs?\b/.test(raw), false);
+});
+
+test("the signed-in workbook step keeps the text the public card drops", () => {
+  const site = {
+    site_id: "PIPE-MIA-0080",
+    label: "Stars & Stripes",
+    market: "MIA",
+    stage: "2 Financial screen",
+    next_step: "Awaiting POS/car counts and water bills.",
+    nda_id: "",
+    stage_blocker: "—",
+    stage_blocker_since: "",
+    next_step_owner: "Broker",
+    next_step_due: "2026-11-20",
+  };
+  const step = workbookStepFor({ sites: [site] }, "PIPE-MIA-0080");
+  assert.equal(step?.text, "Awaiting POS/car counts and water bills.");
+  assert.equal(step?.owner, "Broker");
+  assert.equal(step?.due, "2026-11-20");
+  assert.equal(workbookStepFor({ sites: [site] }, "PIPE-PHX-0001"), null);
+  const deals = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as { features: { properties: { deal_id?: string; next_step?: string } }[] };
+  const stars = deals.features.find((feature) => feature.properties.deal_id === "PIPE-MIA-0080")?.properties;
+  assert.equal(stars?.next_step || "", "");
+  const loops = JSON.parse(readFileSync("data/generated/open-loops.json", "utf8")) as OpenLoopsSnapshot;
+  assert.match(workbookStepFor(loops, "PIPE-MIA-0080")?.text || "", /POS\/car counts/);
 });

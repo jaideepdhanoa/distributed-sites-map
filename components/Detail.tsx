@@ -1,20 +1,19 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { contactDate, serviceAreaChip } from "@/lib/cardStatus";
+import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
-import { spareTier } from "@/lib/filter";
-import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf, tierLabel } from "@/lib/labels";
+import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
-import { BlockerLine, NdaChip } from "./NdaChip";
-import { StagePending } from "./StagePending";
-import { SuggestedDropMark } from "./SuggestedDrop";
+import { NdaChip } from "./NdaChip";
 
 function acres(value: number | null | undefined, text?: string) {
   const shown = acreUnit(value, text);
@@ -101,12 +100,20 @@ function FigureSkeleton() {
 function DealHeadline({ deal, censusAcres }: { deal: DealProps; censusAcres?: number | null }) {
   const cash = cashTile(deal);
   const spare = spareLandSqft(deal.open_land_sqft, censusAcres);
-  const bays = deal.bays_that_fit == null ? "Not provided" : String(Math.round(deal.bays_that_fit));
+  const bays = deal.bays_that_fit == null ? "Not on file" : String(Math.round(deal.bays_that_fit));
   const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
   const cashLabel = deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow";
   const negative = deal.stated_cash_flow != null && deal.stated_cash_flow < 0;
+  const traffic = deal.trade_aadt != null ? Math.round(deal.trade_aadt).toLocaleString() : "Not on file";
   return (
-    <div className="headline" data-testid="headline">
+    <div className="headline" data-testid="card-numbers">
+      {cash.hidden ? null : (
+        <div>
+          <span>{cashLabel}</span>
+          <strong className={negative ? "neg" : ""}>{cash.value}</strong>
+          {[cash.note, cash.basis].filter(Boolean).length ? <small>{[cash.note, cash.basis].filter(Boolean).join(" · ")}</small> : null}
+        </div>
+      )}
       <div>
         <span>Spare land</span>
         <strong>{spare.value}</strong>
@@ -117,15 +124,147 @@ function DealHeadline({ deal, censusAcres }: { deal: DealProps; censusAcres?: nu
         <strong>{bays}</strong>
         {land ? <small>{land}</small> : null}
       </div>
-      {cash.hidden ? null : (
-        <div>
-          <span>{cashLabel}</span>
-          <strong className={negative ? "neg" : ""}>{cash.value}</strong>
-          {[cash.note, cash.basis].filter(Boolean).length ? <small>{[cash.note, cash.basis].filter(Boolean).join(" · ")}</small> : null}
-        </div>
-      )}
+      <div>
+        <span>Traffic</span>
+        <strong>{traffic}</strong>
+        {deal.trade_aadt != null ? <small>vehicles/day</small> : null}
+      </div>
     </div>
   );
+}
+
+function SiteNumbers({ site, deal }: { site: SiteProps; deal?: DealProps | null }) {
+  if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} />;
+  const spare = spareLandSqft(null, site.spare_ac_own);
+  const traffic = site.aadt_count ? site.aadt_count : "Not on file";
+  return (
+    <div className="headline" data-testid="card-numbers">
+      <div>
+        <span>Cash flow</span>
+        <strong>Not on file</strong>
+      </div>
+      <div>
+        <span>Spare land</span>
+        <strong>{spare.value}</strong>
+        {spare.note ? <small>{spare.note}</small> : null}
+      </div>
+      <div>
+        <span>Bays that fit</span>
+        <strong>Not on file</strong>
+      </div>
+      <div>
+        <span>Traffic</span>
+        <strong>{traffic}</strong>
+        {site.aadt_count ? <small>vehicles/day</small> : null}
+      </div>
+    </div>
+  );
+}
+
+function StageChip({ deal }: { deal: DealProps }) {
+  const pending = String(deal.stage_pending || "").trim();
+  return (
+    <span className={`stage-pill tone-${stageTone(deal)}`}>
+      {stageDetail(deal.stage, deal.stage_group)}
+      {pending ? (
+        <span className="stage-wait" data-testid="stage-pending" title={pending}>
+          waiting
+          <span className="sr">{pending}</span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function AreaChip({ record }: { record: { service_area_class?: DealProps["service_area_class"]; service_area_distance_mi?: number | null } }) {
+  const label = serviceAreaChip(record);
+  if (!label) return null;
+  return <span className={record.service_area_class === "outside" ? "badge gone" : "badge quiet"} data-testid="service-area-chip">{label}</span>;
+}
+
+function CardLink({ href, label, testId, title }: { href?: string; label: string; testId: string; title?: string }) {
+  if (!href) return <span className="card-link missing" data-testid={testId}>{label}</span>;
+  return (
+    <a className="text-link" data-testid={testId} href={href} target="_blank" rel="noopener noreferrer" title={title}>
+      {label} ↗
+    </a>
+  );
+}
+
+function CardLinks({
+  listing,
+  folder,
+  packageHref,
+  map,
+  street,
+  signedIn,
+  listingTitle,
+}: {
+  listing?: string;
+  folder?: string;
+  packageHref?: string;
+  map?: string;
+  street?: string;
+  signedIn: boolean;
+  listingTitle?: string;
+}) {
+  return (
+    <p className="card-links">
+      <CardLink href={listing} label="Listing" testId="listing-link" title={listingTitle} />
+      <CardLink href={folder} label="Folder" testId="site-folder-link" />
+      {signedIn ? <CardLink href={packageHref} label="Package" testId="package-link" /> : null}
+      <CardLink href={map} label="Map" testId="map-link" />
+      <CardLink href={street} label="Street View" testId="street-view-link" />
+    </p>
+  );
+}
+
+function CardFooter({ onOpenReview, onCompare, compared }: { onOpenReview?: () => void; onCompare?: () => void; compared?: boolean }) {
+  if (!onOpenReview && !onCompare) return null;
+  return (
+    <div className="card-footer">
+      {onOpenReview ? <button className="text-link" type="button" onClick={onOpenReview}>Open in Review</button> : null}
+      {onCompare ? (
+        <button className="text-link" type="button" aria-pressed={Boolean(compared)} onClick={onCompare}>{compared ? "In compare" : "Add to compare"}</button>
+      ) : null}
+    </div>
+  );
+}
+
+function usePackageHref(id: string, signedIn: boolean) {
+  const [href, setHref] = useState("");
+  useEffect(() => {
+    if (!signedIn || !id) {
+      setHref("");
+      return undefined;
+    }
+    let cancel = false;
+    fetch(`/api/data/financials/${encodeURIComponent(id)}`)
+      .then(async (response) => (response.ok ? await response.json() as { packageHref?: string } : null))
+      .then((body) => {
+        if (!cancel) setHref(safePackageHref(body?.packageHref, true));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [id, signedIn]);
+  return href;
+}
+
+function mapHref(lat?: number | null, lng?: number | null) {
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+}
+
+function streetHref(lat?: number | null, lng?: number | null, streetViewUrl?: string | null) {
+  if (streetViewUrl && isPanoUrl(streetViewUrl)) return streetViewUrl;
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return "";
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+}
+
+function folderHref(value?: string | null) {
+  return value && FOLDER_URL.test(value) ? value : "";
 }
 
 function mapsLinks(
@@ -177,7 +316,6 @@ export default function Detail({
   onAddCompare,
   compared = false,
   onOpenReview,
-  onNotFit,
   sameOwner,
   onClose,
   sheet,
@@ -198,7 +336,6 @@ export default function Detail({
   onAddCompare?: () => void;
   compared?: boolean;
   onOpenReview?: () => void;
-  onNotFit?: () => void;
   sameOwner?: { site_id: string; name: string }[];
   onClose?: () => void;
   sheet?: SheetControl;
@@ -209,6 +346,7 @@ export default function Detail({
   related?: ReactNode;
   signedIn?: boolean;
 }) {
+  const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
   const street = photos.frontageUrl || site.street_view_url;
@@ -245,35 +383,51 @@ export default function Detail({
         card={photos}
         between={(
           <>
-            <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {spareTier(site) ? <span className={`badge tier ${spareTier(site) === "L10" ? "l10" : "l4"}`} title={tierLabel(spareTier(site))}><i className={`swatch ${spareTier(site) === "L10" ? "l10" : "l4"}`} />{tierLabel(spareTier(site))}</span> : null}
-              {site.tier_from_adjoining ? <span className="badge tier l4"><i className="swatch l4" />Tier from same-owner adjoining land</span> : null}
-              <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
-              {site.land_only ? <span className="badge pending">Land site</span> : null}
-              {site.origin === "off-market" ? <span className="badge pending">Other off-market</span> : null}
-              {site.linked_deal_id ? <span className="badge checked">Listed</span> : null}
-              {linkedDeal ? <NdaChip deal={linkedDeal} /> : null}
-            </div>
-            {linkedDeal ? <BlockerLine deal={linkedDeal} /> : null}
-            <SuggestedDropMark reason={linkedDeal?.suggested_drop} stageGroup={linkedDeal?.stage_group} stage={linkedDeal?.stage} />
-            <StagePending note={linkedDeal?.stage_pending} />
-            <h2>{site.name || site.address || site.site_id}</h2>
-            {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
-            <p className="note">{site.address || "—"}</p>
-            <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
-            {linkedDeal ? <DealHeadline deal={linkedDeal} censusAcres={site.spare_ac_own} /> : null}
-            <div className="card-actions">
-              {mapsLinks(lat, lng, linkedDeal?.listing_url ? linkedDeal : null, false, site.folder_url || linkedDeal?.folder_url, photos.frontageUrl)}
-              {onOpenReview ? <button className="action primary" type="button" onClick={onOpenReview}>Open in Review</button> : null}
-              {onAddCompare ? <button className={`paper-btn${compared ? " on" : ""}`} type="button" aria-pressed={compared} onClick={onAddCompare}>{compared ? "In compare" : "Add to compare"}</button> : null}
-              {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
-            </div>
+      <div className="card-top">
+        <h2>{site.name || site.address || site.site_id}</h2>
+        <div className="card-chips">
+          {linkedDeal ? <StageChip deal={linkedDeal} /> : null}
+          <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
+          <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
+          {linkedDeal ? <NdaChip deal={linkedDeal} signedIn={signedIn} /> : null}
+        </div>
+        {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
+        <p className="note">{site.address || "—"}</p>
+        <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
+        {site.land_only ? <p className="note">Land site</p> : null}
+        {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
+        {site.linked_deal_id ? (
+          <p>
+            <button className="text-link" type="button" data-testid="pipeline-deal-link" onClick={onOpenDeal}>
+              Pipeline deal {site.linked_deal_id}
+            </button>
+          </p>
+        ) : null}
+        <CardLinks
+          listing={linkedDeal?.listing_url || site.listing_url || ""}
+          folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
+          packageHref={packageHref}
+          map={mapHref(lat, lng)}
+          street={streetHref(lat, lng, photos.frontageUrl || site.street_view_url)}
+          signedIn={signedIn}
+          listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
+        />
+      </div>
+      <NextStepCard
+        kind="site"
+        id={site.site_id}
+        stageGroup={linkedDeal?.stage_group}
+        stage={linkedDeal?.stage || site.pipeline_stage}
+        signedIn={signedIn}
+        workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
+        suggestedDrop={linkedDeal?.suggested_drop}
+        blocker={linkedDeal}
+      />
+      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} /> : <FigureSkeleton />}
           </>
         )}
       />
-      {figuresReady ? <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
-      <NextStepCard kind="site" id={site.site_id} stageGroup={linkedDeal?.stage_group} stage={linkedDeal?.stage || site.pipeline_stage} />
       <PanelSections
         overview={
           <>
@@ -288,12 +442,15 @@ export default function Detail({
             )}
             <h3>Lead source</h3>
             <p>{leadSourceLine(site, linkedDeal)}</p>
-            {linkedDeal && (shownBroker(linkedDeal) || shownFirm(linkedDeal)) ? (
+            {linkedDeal && (shownBroker(linkedDeal) || shownFirm(linkedDeal) || linkedDeal.last_broker_contact) ? (
               <>
                 <h3>Broker</h3>
                 <div className="kv">
                   <span>Broker</span>
-                  <div>{shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : "Not provided"}</div>
+                  <div>
+                    {shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : "Not provided"}
+                    {linkedDeal.last_broker_contact ? ` · Last contact ${contactDate(linkedDeal.last_broker_contact)}` : ""}
+                  </div>
                   <span>Firm</span>
                   <div>{shownFirm(linkedDeal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(linkedDeal))}>{shownFirm(linkedDeal)}</button> : "Not provided"}</div>
                 </div>
@@ -388,6 +545,7 @@ export default function Detail({
         }
         numbers={figuresReady ? (
           <>
+            <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} />
             <div className="kv">
               <span>Asking price</span>
               <div>
@@ -424,6 +582,7 @@ export default function Detail({
         activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} />}
         discussion={extras}
       />
+      <CardFooter onOpenReview={onOpenReview} onCompare={onAddCompare} compared={compared} />
       </div>
     </aside>
   );
@@ -442,7 +601,6 @@ export function DealDetail({
   onClose,
   onCompare,
   onOpenReview,
-  onNotFit,
   compared,
   sheet,
   extras,
@@ -464,7 +622,6 @@ export function DealDetail({
   onClose?: () => void;
   onCompare?: (on: boolean) => void;
   onOpenReview?: () => void;
-  onNotFit?: () => void;
   compared?: boolean;
   sheet?: SheetControl;
   extras?: ReactNode;
@@ -474,9 +631,11 @@ export function DealDetail({
   figuresReady?: boolean;
   related?: ReactNode;
 }) {
+  const packageHref = usePackageHref(deal.deal_id, signedIn);
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
   const cash = cashTile(deal);
+  const cue = listingCue(deal);
   return (
     <aside
       className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
@@ -506,45 +665,53 @@ export function DealDetail({
         card={photos}
         between={(
           <>
-            <div className="card-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <span className={`stage-pill tone-${stageTone(deal)}`}>{stageDetail(deal.stage, deal.stage_group)}</span>
-              {deal.broker_contacted ? <span className="badge pending" title={deal.last_broker_contact ? `Last contact ${deal.last_broker_contact}` : "An outbound email or call is on file"}>Broker contacted</span> : null}
-              {deal.listed ? <span className="badge checked">Listed</span> : null}
-              <NdaChip deal={deal} />
-            </div>
-            <BlockerLine deal={deal} />
-            <SuggestedDropMark reason={deal.suggested_drop} stageGroup={deal.stage_group} stage={deal.stage} />
-            <StagePending note={deal.stage_pending} />
-            <h2>{deal.name || deal.address}</h2>
-            <p className="note">{deal.address}</p>
-            <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
-            <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} />
-            <div className="card-actions">
-              {mapsLinks(lat, lng, deal, true, deal.folder_url, photos.frontageUrl)}
-              {onOpenReview ? <button className="action primary" type="button" onClick={onOpenReview}>Open in Review</button> : null}
-              {onCompare ? (
-                <button className={`paper-btn${compared ? " on" : ""}`} type="button" aria-pressed={Boolean(compared)} onClick={() => onCompare?.(!compared)}>{compared ? "In compare" : "Add to compare"}</button>
-              ) : null}
-              {onNotFit ? <button className="action" type="button" onClick={onNotFit}>Not a fit</button> : null}
-            </div>
+      <div className="card-top">
+        <h2>{deal.name || deal.address}</h2>
+        <div className="card-chips">
+          <StageChip deal={deal} />
+          <AreaChip record={deal} />
+          <NdaChip deal={deal} signedIn={signedIn} />
+        </div>
+        <p className="note">{deal.address}</p>
+        <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>
+        <CardLinks
+          listing={cue.url}
+          folder={folderHref(deal.folder_url)}
+          packageHref={packageHref}
+          map={mapHref(lat, lng)}
+          street={streetHref(lat, lng, photos.frontageUrl || deal.street_view_url)}
+          signedIn={signedIn}
+          listingTitle={deal.listing_removed ? "May be removed" : undefined}
+        />
+      </div>
+      <NextStepCard
+        kind="deal"
+        id={deal.deal_id}
+        stageGroup={deal.stage_group}
+        stage={deal.stage}
+        signedIn={signedIn}
+        suggestedDrop={deal.suggested_drop}
+        blocker={deal}
+      />
+      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} /> : <FigureSkeleton />}
           </>
         )}
       />
-      {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : <FigureSkeleton />}
       {related}
-      <NextStepCard kind="deal" id={deal.deal_id} stageGroup={deal.stage_group} stage={deal.stage} />
       <PanelSections
         overview={
           <>
             <h3>Broker</h3>
             <div className="kv">
               <span>Broker</span>
-              <div>{shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : "Not provided"}</div>
+              <div>
+                {shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : "Not provided"}
+                {deal.last_broker_contact ? ` · Last contact ${contactDate(deal.last_broker_contact)}` : ""}
+              </div>
               <span>Firm</span>
               <div>{shownFirm(deal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(deal))}>{shownFirm(deal)}</button> : "Not provided"}</div>
               <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
               <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
-              <span>Last broker contact</span><div>{deal.last_broker_contact || "—"}</div>
               <span>Parcel</span><div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "Not matched"}</div>
               <span>Nearest depot</span><div>{depotMiles == null ? (hasPin ? "Not provided" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
               <span>Listing</span>
@@ -552,10 +719,9 @@ export function DealDetail({
                 {deal.listing_url ? (
                   <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">{listingCue(deal).label}</a>
                 ) : (
-                  listingCue(deal).label
+                  cue.label
                 )}
               </div>
-              <span>Next step</span><div>{deal.next_step || "Not provided"}</div>
             </div>
             {deal.universe_id ? (
               <div data-testid="universe-preview">
@@ -573,6 +739,7 @@ export function DealDetail({
         }
         numbers={
           <>
+            {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : null}
             <div className="kv">
               <span>Asking price</span>
               <div>
@@ -593,6 +760,7 @@ export function DealDetail({
         activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />}
         discussion={extras}
       />
+      <CardFooter onOpenReview={onOpenReview} onCompare={onCompare ? () => onCompare(!compared) : undefined} compared={compared} />
       </div>
     </aside>
   );
@@ -619,10 +787,10 @@ export function UnscreenedDetail({
       </div>
       <div className="drawer-scroll">
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <span className="badge pending">Listed, not yet screened</span>
-        <span className="badge checked">{row.kind}</span>
-        {row.approximate ? <span className="badge pending">Approximate location</span> : null}
-        {!row.pinned ? <span className="badge pending">Address withheld</span> : null}
+        <span className="badge quiet">Listed, not yet screened</span>
+        <span className="badge quiet">{row.kind}</span>
+        {row.approximate ? <span className="badge quiet">Approximate location</span> : null}
+        {!row.pinned ? <span className="badge quiet">Address withheld</span> : null}
       </div>
       <h2>{row.name}</h2>
       <p className="note">{row.address}</p>

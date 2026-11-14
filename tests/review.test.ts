@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { contactDate, serviceAreaChip } from "../lib/cardStatus";
 import { leadSourceLine } from "../lib/format";
 import { plainVerdict, stageDetail, stageTitle, statusOf, uncheckedNote } from "../lib/labels";
+import { reviewSentence } from "../lib/queue/since";
 import type { DealProps, SiteProps } from "../lib/types";
 
 function site(partial: Partial<SiteProps>): SiteProps {
@@ -127,4 +129,33 @@ test("stage 3 is shown as Site checks", () => {
   assert.equal(stageDetail("3 Site checks", "checks"), "Site checks");
   assert.equal(stageTitle("financial"), "Financial screen");
   assert.equal(stageTitle("close"), "Offer and close");
+});
+
+test("the service-area chip stays quiet inside and names near and outside", () => {
+  assert.equal(serviceAreaChip({ service_area_class: "inside", service_area_distance_mi: 0 }), "");
+  assert.equal(serviceAreaChip({ service_area_class: "edge_legacy" }), "");
+  assert.equal(serviceAreaChip({ service_area_class: "unknown" }), "");
+  assert.equal(serviceAreaChip({ service_area_class: "near_5_10", service_area_distance_mi: 3.24 }), "Near · 3.2 mi");
+  assert.equal(serviceAreaChip({ service_area_class: "near_0_5" }), "Near");
+  assert.equal(serviceAreaChip({ service_area_class: "outside", service_area_distance_mi: 12 }), "Outside · knock-out");
+  assert.equal(contactDate("2026-11-06"), "Nov 6");
+});
+
+test("review changes collapse to one sentence", () => {
+  const first = reviewSentence({ firstVisit: true, reasons: [] });
+  assert.equal(first.sentence, "First time in your review");
+  assert.equal(first.lines.length, 0);
+  const since = reviewSentence({
+    firstVisit: false,
+    reviewedAt: "2026-11-10",
+    reasons: [
+      { at: "2026-11-11", summary: "Stage is now 2 Financial screen.", type: "stage" },
+      { at: "2026-11-11", summary: "New note.", type: "note" },
+      { at: "2026-11-12", summary: "New note.", type: "reply" },
+      { at: "2026-11-12", summary: "Asking price is $1.", type: "price" },
+    ],
+  });
+  assert.equal(since.sentence, "Since Nov 10: stage moved to Financial screen · 2 new notes · +1 more");
+  assert.equal(since.lines.length, 4);
+  assert.equal(since.lines[3]?.when, "Nov 12");
 });

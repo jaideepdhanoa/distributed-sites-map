@@ -4,7 +4,7 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import type { RecordLookup } from "../../lib/actions/records";
 import { createSuggestion, decideSuggestion, nextStepsCsv, reviseSuggestion } from "../../lib/actions/suggestions";
-import { emptyNextStepActions } from "../../lib/actions/nextStepTypes";
+import { emptyNextStepActions, forwardStageId, stageMoveLabel } from "../../lib/actions/nextStepTypes";
 import { InputError } from "../../lib/actions/text";
 import { listBringBackHistory, listRecordedHistory } from "../../lib/queue/events";
 import { presentCard } from "../../lib/timeline/filter";
@@ -217,6 +217,13 @@ test("a dropped site leads with bring back, and an active site does not", () => 
   assert.equal(active[0]?.prominent, true);
   assert.equal(active.some((item) => item.id === "bring_back"), false);
   assert.equal(active.some((item) => item.id === "knock_off"), true);
+  assert.equal(forwardStageId("desk", "1 Desk screen"), "financial");
+  assert.equal(stageMoveLabel("desk", "1 Desk screen"), "Move to Financial screen");
+  assert.equal(forwardStageId("financial", "2 Financial screen"), "checks");
+  assert.equal(stageMoveLabel("financial", "2 Financial screen"), "Move to Site checks");
+  assert.equal(stageMoveLabel("checks", "3 Site checks"), "Move to Offer and close");
+  assert.equal(forwardStageId("close", "4 Offer and close"), "");
+  assert.equal(stageMoveLabel("close", "4 Offer and close"), "Move stage");
 });
 
 test("bring-back history stays on the activity card beside workbook lines", () => {

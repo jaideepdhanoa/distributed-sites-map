@@ -3,7 +3,7 @@ import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
 import { acreUnit, acresText, capacitySummary, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
 import { stageDetail } from "@/lib/labels";
-import { ndaChip } from "@/lib/nda";
+import { cardNdaLabel } from "@/lib/nda";
 
 const MISSING = "Not on file";
 
@@ -14,7 +14,7 @@ function shown(value?: string | null) {
   return text || MISSING;
 }
 
-function dealRows(deal: DealProps, sites: SiteProps[]): CompareRow[] {
+function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): CompareRow[] {
   const linked = sites.find((site) => site.site_id === deal.universe_id);
   const cash = cashTile(deal);
   const trade = tradeAreaLines(deal);
@@ -28,7 +28,7 @@ function dealRows(deal: DealProps, sites: SiteProps[]): CompareRow[] {
   return [
     { label: "Address", value: shown(displayAddress(deal.address)) },
     { label: "Stage", value: shown(stageDetail(deal.stage, deal.stage_group)) },
-    { label: "NDA", value: ndaChip(deal) },
+    ...(cardNdaLabel(deal, signedIn) ? [{ label: "NDA", value: cardNdaLabel(deal, signedIn) }] : []),
     ...(deal.suggested_drop && deal.stage_group !== "dropped" ? [{ label: "Suggested drop", value: deal.suggested_drop }] : []),
     { label: "Asking", value: sheetMoney(deal.asking_price, deal.asking_price_display) },
     { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
@@ -46,7 +46,7 @@ function dealRows(deal: DealProps, sites: SiteProps[]): CompareRow[] {
   ];
 }
 
-function siteRows(site: SiteProps, deals: DealProps[]): CompareRow[] {
+function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): CompareRow[] {
   const linked = deals.find((deal) => deal.universe_id === site.site_id || deal.deal_id === site.linked_deal_id);
   const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
   const spare = site.spare_ac_own != null ? `${acreUnit(site.spare_ac_own, site.spare_ac_own_text)} census` : "";
@@ -55,7 +55,7 @@ function siteRows(site: SiteProps, deals: DealProps[]): CompareRow[] {
   return [
     { label: "Address", value: shown(displayAddress(site.address)) },
     { label: "Stage", value: shown(site.pipeline_stage || "Universe") },
-    { label: "NDA", value: linked ? ndaChip(linked) : "Not required" },
+    ...(linked && cardNdaLabel(linked, signedIn) ? [{ label: "NDA", value: cardNdaLabel(linked, signedIn) }] : []),
     { label: "Asking", value: shown(site.asking_price_display) },
     { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(universeTrafficLine(site)) },
@@ -93,6 +93,7 @@ export default function CompareTray({
   onRemove,
   onClose,
   children,
+  signedIn = false,
 }: {
   deals: DealProps[];
   sites: SiteProps[];
@@ -100,6 +101,7 @@ export default function CompareTray({
   onRemove: (id: string) => void;
   onClose: () => void;
   children?: ReactNode;
+  signedIn?: boolean;
 }) {
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
@@ -129,10 +131,10 @@ export default function CompareTray({
       {count >= 2 ? (
         <div className="compare-grid" style={{ "--compare-cols": String(count) } as CSSProperties}>
           {deals.map((deal) => (
-            <CompareCard key={deal.deal_id} title={deal.name || displayAddress(deal.address) || deal.deal_id} rows={dealRows(deal, lookup)} />
+            <CompareCard key={deal.deal_id} title={deal.name || displayAddress(deal.address) || deal.deal_id} rows={dealRows(deal, lookup, signedIn)} />
           ))}
           {sites.map((site) => (
-            <CompareCard key={site.site_id} title={site.name || displayAddress(site.address) || site.site_id} rows={siteRows(site, deals)} />
+            <CompareCard key={site.site_id} title={site.name || displayAddress(site.address) || site.site_id} rows={siteRows(site, deals, signedIn)} />
           ))}
         </div>
       ) : null}

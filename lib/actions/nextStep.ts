@@ -10,7 +10,7 @@ import {
 } from "./nextStepTypes";
 
 export type { NextStepTypeId } from "./nextStepTypes";
-export { exportStage, nextStepType, nextStepTypeLabel, nextStageChoices, allowsAssignee, allowsDate, NEXT_STEP_TYPES, NEXT_STAGE_IDS } from "./nextStepTypes";
+export { exportStage, nextStepType, nextStepTypeLabel, nextStageChoices, forwardStageId, stageMoveLabel, allowsAssignee, allowsDate, NEXT_STEP_TYPES, NEXT_STAGE_IDS } from "./nextStepTypes";
 
 export type NextStepDraft = {
   detail: string | null;
@@ -81,7 +81,7 @@ export function normalizeNextStep(
     const stage = String(input.proposedValue || "").trim();
     if (!(NEXT_STAGE_IDS as readonly string[]).includes(stage)) throw new InputError("Choose a stage.");
     const label = stageTitle(stage);
-    const title = type === "bring_back" ? `Bring back to ${label}` : `Prioritize: push to ${label}`;
+    const title = type === "bring_back" ? `Bring back to ${label}` : `Move to ${label}`;
     assertClean(title);
     let reason = "";
     if (type === "bring_back") {

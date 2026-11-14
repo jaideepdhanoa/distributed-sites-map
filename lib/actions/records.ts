@@ -62,6 +62,23 @@ export function recordField(record: Record<string, unknown> | null, field: strin
   return value == null ? "" : String(value).trim();
 }
 
+export function recordLinks(): { dealId: string; siteId: string }[] {
+  fileLookup();
+  if (!cache) return [];
+  const links: { dealId: string; siteId: string }[] = [];
+  const seen = new Set<string>();
+  const add = (dealId: string, siteId: string) => {
+    if (!dealId || !siteId) return;
+    const key = `${dealId}\0${siteId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    links.push({ dealId, siteId });
+  };
+  for (const [id, props] of cache.deals) add(id, String(props.universe_id || "").trim());
+  for (const [id, props] of cache.sites) add(String(props.linked_deal_id || "").trim(), id);
+  return links;
+}
+
 export function valuesMatch(field: string, detail: string | null, proposed: string, record: Record<string, unknown> | null): boolean {
   if (field === "proposed_next_step" || field === "document_request") return false;
   if (!record) return false;

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
@@ -276,7 +277,7 @@ test("a comment with team language is stored", async ({ page, request }) => {
   await expect(page.getByTestId("action-error")).toHaveCount(0);
 });
 
-test("a contributor can suggest a change and a reviewer can accept it without changing the deal", async ({ page, request }) => {
+test("a reviewer accepting a stage change overlays the map and leaves the workbook file alone", async ({ page, request }) => {
   await login(request, "contributor");
   const before = await request.get("/api/data/deals");
   expect(before.ok()).toBeTruthy();
@@ -306,8 +307,14 @@ test("a contributor can suggest a change and a reviewer can accept it without ch
   expect(accepted.ok()).toBeTruthy();
   const decision = (await accepted.json()) as { suggestion: { status: string } };
   expect(decision.suggestion.status).toBe("accepted");
+  const stored = generatedDeal(targetId);
+  expect(stored?.stage).toBe(beforeStage);
   const after = await request.get("/api/data/deals");
-  expect(dealStage(await after.json(), targetId)).toBe(beforeStage);
+  const live = dealProps(await after.json(), targetId);
+  expect(live?.stage).toBe("Dropped");
+  expect(live?.stage_group).toBe("dropped");
+  expect(live?.stage_pending).toMatch(/Moved to Dropped by Reviewer, waiting for workbook/);
+  expect(generatedDeal(targetId)?.stage).toBe(beforeStage);
 
   await openAs(page, "reviewer", `/?site=${targetId}`);
   await page.getByTestId("panel-tab-discussion").click();
@@ -397,10 +404,8 @@ test("a reviewer approval shows the next step on the card", async ({ page, reque
 });
 
 test("discussion stays a comment box, and a reviewer can accept a knock off", async ({ page, request }) => {
-  const target = "PIPE-PHX-0067";
+  const target = "PIPE-PHX-0004";
   await login(request, "contributor");
-  const before = await request.get("/api/data/deals");
-  const beforeBody = await before.text();
   await openAs(page, "contributor", `/?funnel=pipeline&site=${target}`);
   await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByRole("checkbox", { name: "Propose next step" })).toHaveCount(0);
@@ -413,11 +418,49 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   await openAs(page, "reviewer", `/?funnel=pipeline&site=${target}`);
   const card = page.getByTestId("proposed-next-step");
   await expect(card.getByRole("button", { name: "Send" })).toBeVisible();
+  const storedStage = generatedDeal(target)?.stage;
   await card.getByRole("button", { name: "Send" }).click();
   await expect(page.getByTestId("next-step")).toContainText("Drop from pipeline");
   await expect(page.getByTestId("next-step")).toContainText("Dropped");
+  await expect(page.locator("aside.drawer").getByTestId("stage-pending")).toContainText("Moved to Dropped by Reviewer, waiting for workbook");
+  const bringBack = page.getByTestId("bring-back-dropped");
+  await bringBack.scrollIntoViewIfNeeded();
+  await expect(bringBack).toBeVisible();
   const after = await request.get("/api/data/deals");
-  expect(await after.text()).toBe(beforeBody);
+  const live = dealProps(await after.json(), target);
+  expect(live?.stage_group).toBe("dropped");
+  expect(live?.stage).toBe("Dropped");
+  expect(generatedDeal(target)?.stage).toBe(storedStage);
+  expect(storedStage).not.toBe("Dropped");
+});
+
+test("an approved stage move shows on the open card without a reload", async ({ page, request }) => {
+  await login(request, "reviewer");
+  const catalog = await request.get("/api/data/deals");
+  expect(catalog.ok()).toBeTruthy();
+  const rows = ((await catalog.json()) as { features?: { properties?: { deal_id?: string; kind?: string; stage_group?: string; is_c_store?: boolean; stage?: string } }[] }).features || [];
+  const target = rows.map((item) => item.properties).find((row) => row?.kind === "pipeline" && row.deal_id && row.stage_group === "desk" && row.is_c_store !== true);
+  expect(target?.deal_id, "a desk deal that is not a c-store").toBeTruthy();
+  const id = target!.deal_id!;
+  const stored = generatedDeal(id)?.stage;
+
+  await openAs(page, "reviewer", `/?funnel=pipeline&site=${id}`);
+  await page.getByTestId("panel-tab-discussion").click();
+  await page.getByTestId("empty-step-stage_move").click();
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await expect(page.getByTestId("proposed-next-step")).toBeVisible();
+  await page.getByLabel("Outcome").selectOption("accepted");
+  await page.getByRole("button", { name: "Send" }).click();
+  const drawer = page.locator("aside.drawer");
+  await expect(drawer.getByTestId("stage-pending")).toContainText("Moved to Financial screen by Reviewer, waiting for workbook");
+  await expect(drawer.locator(".stage-pill").first()).toContainText("Financial screen");
+  await expect(page).toHaveURL(new RegExp(`site=${id}`));
+
+  const after = await request.get("/api/data/deals");
+  const live = dealProps(await after.json(), id);
+  expect(live?.stage_group).toBe("financial");
+  expect(live?.stage).toBe("2 Financial screen");
+  expect(generatedDeal(id)?.stage).toBe(stored);
 });
 
 test("c-stores stay hidden until the filter is on, and review leads with approvals", async ({ page, request }) => {
@@ -611,7 +654,13 @@ test("the review queue omits gas stations and c-stores", async ({ request }) => 
   expect(ids).toContain("PIPE-LAS-0016");
 });
 
-function dealStage(payload: { features?: { properties?: { deal_id?: string; stage?: string } }[] }, id: string) {
-  const feature = payload.features?.find((item) => item.properties?.deal_id === id);
-  return feature?.properties?.stage ?? null;
+function dealProps(payload: { features?: { properties?: { deal_id?: string; stage?: string; stage_group?: string; stage_pending?: string } }[] }, id: string) {
+  return payload.features?.find((item) => item.properties?.deal_id === id)?.properties;
+}
+
+function generatedDeal(id: string) {
+  const file = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
+    features: { properties: { deal_id?: string; stage?: string; stage_group?: string } }[];
+  };
+  return file.features.find((feature) => feature.properties.deal_id === id)?.properties;
 }

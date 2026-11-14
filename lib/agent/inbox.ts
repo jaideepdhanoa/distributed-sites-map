@@ -5,6 +5,7 @@ import type { Sql } from "@/lib/actions/db";
 import { fileLookup, recordField, type RecordLookup } from "@/lib/actions/records";
 import { stamp, type TargetKind } from "@/lib/actions/text";
 import { stageTitle } from "@/lib/labels";
+import { workbookInstruction } from "@/lib/stageOverlay";
 
 export type InboxKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap" | "proposal_ready" | "proposal_overtaken";
 
@@ -438,19 +439,17 @@ export function decisionFeed(input: {
   reason: string;
   createdAt?: string | null;
 }): FeedInsert {
-  const stageMove = input.detail === "stage_move" && input.status === "accepted" && approvesWorkbookStage(input.actorId);
-  const stage = stageMove ? input.proposedValue : null;
-  const stageLabel = stage ? stageTitle(stage) : "";
+  const approved = workbookInstruction(input, approvesWorkbookStage(input.actorId));
   const verb = input.status === "accepted" ? "Approved" : input.status === "agreed_waiting" ? "Agreed, waiting" : "Rejected";
   const lines = [
     `${verb}: ${input.title || input.proposedValue}`,
-    stageLabel ? `Approved stage: ${stageLabel} (${stage}). Write this stage on the workbook Stage column.` : "",
+    approved?.line || "",
     input.status === "agreed_waiting" ? "The stage is unchanged." : "",
     input.note ? `Note: ${input.note}` : "",
   ].filter(Boolean);
   return {
     kind: "decision",
-    subtype: stageMove ? "stage_move" : input.detail || input.field,
+    subtype: input.detail || input.field,
     refId: input.refId || input.id,
     siteId: input.siteId,
     recordId: input.recordId,
@@ -460,8 +459,8 @@ export function decisionFeed(input: {
     threadContext: [input.title, input.proposedValue, input.reason].filter(Boolean).join("\n"),
     proposalId: input.id,
     proposalStatus: input.status,
-    stage,
-    workbookStage: stageMove,
+    stage: approved?.stage ?? null,
+    workbookStage: Boolean(approved),
     createdAt: input.createdAt,
   };
 }

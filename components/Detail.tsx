@@ -13,6 +13,7 @@ import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 import { BlockerLine, NdaChip } from "./NdaChip";
+import { StagePending } from "./StagePending";
 import { SuggestedDropMark } from "./SuggestedDrop";
 
 function acres(value: number | null | undefined, text?: string) {
@@ -255,6 +256,7 @@ export default function Detail({
             </div>
             {linkedDeal ? <BlockerLine deal={linkedDeal} /> : null}
             <SuggestedDropMark reason={linkedDeal?.suggested_drop} stageGroup={linkedDeal?.stage_group} stage={linkedDeal?.stage} />
+            <StagePending note={linkedDeal?.stage_pending} />
             <h2>{site.name || site.address || site.site_id}</h2>
             {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
             <p className="note">{site.address || "—"}</p>
@@ -512,6 +514,7 @@ export function DealDetail({
             </div>
             <BlockerLine deal={deal} />
             <SuggestedDropMark reason={deal.suggested_drop} stageGroup={deal.stage_group} stage={deal.stage} />
+            <StagePending note={deal.stage_pending} />
             <h2>{deal.name || deal.address}</h2>
             <p className="note">{deal.address}</p>
             <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""} · Asking {deal.asking_price_display || "not on file"}</p>

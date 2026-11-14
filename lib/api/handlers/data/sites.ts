@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
+import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import type { SiteFeature } from "@/lib/types";
 
 const KEEP = [
@@ -95,6 +96,7 @@ const KEEP = [
   "photo_listing_count",
   "photos_checked",
   "photo_notes",
+  "stage_pending",
   "owner_mail",
   "assessed_value_display",
   "full_cash_value_display",
@@ -115,6 +117,7 @@ export async function GET(request: NextRequest) {
     for (const key of KEEP) properties[key] = feature.properties[key];
     return { type: "Feature", geometry: feature.geometry, properties };
   });
+  const staged = await overlayStageFile({ type: "FeatureCollection", features }, "site");
   console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
-  return NextResponse.json({ type: "FeatureCollection", features }, { headers: privateHeaders });
+  return NextResponse.json(staged, { headers: privateHeaders });
 }

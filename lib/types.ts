@@ -86,6 +86,8 @@ export type SiteProps = {
   asking_price_date: string;
   asking_price_status: string | null;
   pipeline_stage: string | null;
+  /** Accepted stage that is not in the workbook yet. Names stay on the signed-in card. */
+  stage_pending?: string;
   pipeline_id: string | null;
   land_only: boolean;
   on_land_tab: boolean;
@@ -152,6 +154,8 @@ export type DealProps = {
   city: string;
   stage: string;
   stage_group: "sourced" | "desk" | "financial" | "checks" | "close" | "contacted" | "later" | "dropped";
+  /** Accepted stage that is not in the workbook yet. Names stay on the signed-in card. */
+  stage_pending?: string;
   /** Knock-out rationale. Present only while Stage is not Dropped. */
   suggested_drop?: string;
   broker_contacted?: boolean;

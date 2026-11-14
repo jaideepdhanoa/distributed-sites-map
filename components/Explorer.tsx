@@ -31,6 +31,7 @@ import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineMapSummary } from "@/lib/mapSummary";
+import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
@@ -405,15 +406,17 @@ export default function Explorer() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
+  const dataGen = useRef(0);
   useEffect(() => {
     let cancel = false;
+    const token = ++dataGen.current;
     Promise.all([
-      fetch(`/api/data/sites?city=${city}`),
+      fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
       fetch("/api/data/areas"),
       fetch("/api/data/depots"),
       fetch(`/api/data/parcels?city=${city}`),
       fetch("/api/data/funnel"),
-      fetch("/api/data/deals"),
+      fetch("/api/data/deals", { cache: "no-store" }),
       fetch("/api/data/unscreened"),
       fetch("/api/data/timeline/summary"),
       fetch("/api/me"),
@@ -423,19 +426,26 @@ export default function Explorer() {
         return;
       }
       if (!sitesRes.ok || !areasRes.ok || !depotsRes.ok || !parcelsRes.ok || !funnelRes.ok || !dealsRes.ok || !unscreenedRes.ok) {
-        setError("The site data could not be loaded.");
+        if (!cancel && token === dataGen.current) setError("The site data could not be loaded.");
         return;
       }
-      const funnelPayload = await funnelRes.json();
-      if (!cancel) {
-        setData({
-          sites: await sitesRes.json(),
-          areas: await areasRes.json(),
-          depots: await depotsRes.json(),
-          parcels: await parcelsRes.json(),
-          deals: await dealsRes.json(),
+      const [sitesBody, areasBody, depotsBody, parcelsBody, funnelPayload, dealsBody] = await Promise.all([
+        sitesRes.json(),
+        areasRes.json(),
+        depotsRes.json(),
+        parcelsRes.json(),
+        funnelRes.json(),
+        dealsRes.json(),
+      ]);
+      if (!cancel && token === dataGen.current) {
+        setData((current) => ({
+          sites: current ? preservePendingStage(current.sites, sitesBody) : sitesBody,
+          areas: areasBody,
+          depots: depotsBody,
+          parcels: parcelsBody,
+          deals: current ? preservePendingStage(current.deals, dealsBody) : dealsBody,
           funnel: funnelPayload.funnel,
-        });
+        }));
         const unscreenedPayload = await unscreenedRes.json();
         setUnscreened(Array.isArray(unscreenedPayload.features) ? unscreenedPayload.features : []);
         setMe(meRes.ok ? await meRes.json() : null);
@@ -454,6 +464,48 @@ export default function Explorer() {
     };
   }, [city]);
 
+  const catalogOn = useRef(false);
+  catalogOn.current = Boolean(catalog);
+  useEffect(() => {
+    let cancel = false;
+    async function refresh(token: number) {
+      const requests = [
+        fetch("/api/data/deals", { cache: "no-store" }),
+        fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
+      ];
+      if (catalogOn.current) requests.push(fetch("/api/data/sites", { cache: "no-store" }));
+      const [dealsRes, sitesRes, allSitesRes] = await Promise.all(requests);
+      if (cancel || token !== dataGen.current || !dealsRes?.ok || !sitesRes?.ok) return;
+      const deals = await dealsRes.json();
+      const sites = await sitesRes.json();
+      if (cancel || token !== dataGen.current) return;
+      setData((current) => (current ? { ...current, deals: preservePendingStage(current.deals, deals), sites: preservePendingStage(current.sites, sites) } : current));
+      if (allSitesRes?.ok) {
+        const payload = (await allSitesRes.json()) as { features?: SiteFeature[] };
+        if (!cancel && token === dataGen.current) {
+          const incoming = Array.isArray(payload.features) ? payload.features : [];
+          setCatalog((current) => (current ? preservePendingStage({ features: current }, { features: incoming }).features || incoming : incoming));
+        }
+      }
+    }
+    function onStage(event: Event) {
+      const detail = (event as CustomEvent<StageRefresh>).detail;
+      if (!detail?.targetId || !detail.stageGroup) return;
+      const token = ++dataGen.current;
+      setData((current) => (current ? { ...current, ...patchLiveStage(current, detail) } : current));
+      setCatalog((current) => {
+        if (!current) return current;
+        return patchLiveStage({ deals: { features: [] }, sites: { features: current } }, detail).sites.features;
+      });
+      void refresh(token);
+    }
+    window.addEventListener(STAGE_REFRESH_EVENT, onStage);
+    return () => {
+      cancel = true;
+      window.removeEventListener(STAGE_REFRESH_EVENT, onStage);
+    };
+  }, [city]);
+
   const needCatalog = allCities || Boolean(who) || query.trim().length >= 2;
   useEffect(() => {
     if (!needCatalog || catalog) return;
@@ -461,7 +513,10 @@ export default function Explorer() {
     fetch("/api/data/sites").then(async (response) => {
       if (!response.ok || cancel) return;
       const payload = await response.json() as { features?: SiteFeature[] };
-      if (!cancel) setCatalog(Array.isArray(payload.features) ? payload.features : []);
+      if (!cancel) {
+        const incoming = Array.isArray(payload.features) ? payload.features : [];
+        setCatalog((current) => (current ? preservePendingStage({ features: current }, { features: incoming }).features || incoming : incoming));
+      }
     }).catch(() => undefined);
     return () => {
       cancel = true;

@@ -9,6 +9,7 @@ cells for PIPE-PHX-0006.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -77,6 +78,7 @@ COUNTED_ROLES = {"Reported", "Addback accepted", "Normalized result"}
 DRIVE_ID = re.compile(r"/(?:folders|file/d)/([A-Za-z0-9_-]+)")
 SENSITIVE_NAME = re.compile(r"(?i)(payroll|tax return|schedule c|\bw-?2\b|\b1099\b)")
 EMAIL_FOLDER = re.compile(r"(?i)^4\b|emails and calls")
+LOGGER = logging.getLogger("scripts.financials")
 
 
 def column_index(letter: str) -> int:
@@ -266,29 +268,32 @@ def _by_site(rows: list[dict]) -> dict[str, list[dict]]:
     return grouped
 
 
+# Last resort only: the header row has none of the names in NAMES.
+# Letters match the sheet after BA/BB (Distance to service area, Service area polygon)
+# were inserted. A blank cell is not a reason to use the letter.
 LETTERS = {
     "revenue": "I",
     "earnings": "J",
-    "label": "DU",
-    "claimed": "DV",
-    "years": "DW",
-    "members": "DX",
-    "member_revenue": "DY",
-    "package": "DZ",
-    "normalized": "EA",
-    "cars_latest": "EB",
-    "cars_prior": "EC",
-    "cars_older": "ED",
-    "revenue_prior": "EE",
-    "revenue_older": "EF",
-    "member_share": "EG",
-    "addbacks": "EH",
-    "checked": "EI",
-    "notes": "EJ",
-    "status": "BE",
+    "label": "DW",
+    "claimed": "DX",
+    "years": "DY",
+    "members": "DZ",
+    "member_revenue": "EA",
+    "package": "EB",
+    "normalized": "EC",
+    "cars_latest": "ED",
+    "cars_prior": "EE",
+    "cars_older": "EF",
+    "revenue_prior": "EG",
+    "revenue_older": "EH",
+    "member_share": "EI",
+    "addbacks": "EJ",
+    "checked": "EK",
+    "notes": "EL",
+    "status": "BG",
     "folder": "AE",
     "source": "AG",
-    "business": "CE",
+    "business": "CG",
 }
 NAMES = {
     "revenue": ("Revenue ($ a year)", "Revenue"),
@@ -296,19 +301,19 @@ NAMES = {
     "label": ("Claimed cash-flow label", "Cash-flow label"),
     "claimed": ("Claimed cash flow ($ a year)", "Claimed cash flow"),
     "years": ("Years operating",),
-    "members": ("Membership count", "Members"),
-    "member_revenue": ("Membership revenue ($ a month)", "Monthly membership revenue"),
+    "members": ("Claimed membership count", "Membership count", "Members"),
+    "member_revenue": ("Claimed membership ($ a year)", "Membership revenue ($ a month)", "Monthly membership revenue"),
     "package": ("Package status",),
     "normalized": ("Normalized EBITDA ($ a year)", "Normalized EBITDA"),
-    "cars_latest": ("Car counts (latest)", "Car counts"),
-    "cars_prior": ("Car counts (prior)",),
-    "cars_older": ("Car counts (two years prior)",),
-    "revenue_prior": ("Prior revenue ($ a year)", "Revenue prior year"),
-    "revenue_older": ("Revenue two years prior ($ a year)",),
-    "member_share": ("Membership share",),
-    "addbacks": ("Addbacks ($)", "Addbacks"),
+    "cars_latest": ("Cars (latest year)", "Cars (latest)", "Car counts (latest)", "Car counts"),
+    "cars_prior": ("Cars (prior year)", "Cars (prior)", "Car counts (prior)"),
+    "cars_older": ("Cars (two years prior)", "Car counts (two years prior)"),
+    "revenue_prior": ("Revenue (prior year)", "Prior revenue ($ a year)", "Revenue prior year"),
+    "revenue_older": ("Revenue (two years prior)", "Revenue two years prior ($ a year)"),
+    "member_share": ("Membership share of revenue", "Membership share"),
+    "addbacks": ("Addbacks ($ a year)", "Addbacks ($)", "Addbacks"),
     "checked": ("Financials checked",),
-    "notes": ("Financials notes",),
+    "notes": ("Financial notes", "Financials notes"),
     "status": ("Financials status",),
     "folder": ("Folder",),
     "source": ("Source of the numbers",),
@@ -317,12 +322,15 @@ NAMES = {
 
 
 def _named(row: dict, key: str):
+    """Header name wins, including a blank cell. The letter is only for a missing header."""
     folded = {str(name).strip().lower(): value for name, value in row.items() if not str(name).startswith("_")}
     for name in NAMES[key]:
-        if name.lower() in folded and not _blank(folded[name.lower()]):
+        if name.lower() in folded:
             return folded[name.lower()]
     letters = row.get("_letters") or {}
-    return letters.get(key)
+    if key in letters:
+        return letters[key]
+    return None
 
 
 def _state(present: bool, package_status: str, asked_on: str, why: str) -> dict:
@@ -796,14 +804,26 @@ def build_site(deal_id: str, kind: str, row: dict, fact_rows: list[dict] | None,
 
 def _row_from_sheet(header: list[str], values, links) -> dict:
     row = {}
-    letters = {}
-    letter_keys = {column_index(letter): key for key, letter in LETTERS.items()}
     for index, cell in enumerate(values):
         key = header[index] if index < len(header) else ""
         if key:
             row[key] = cell
-        if index in letter_keys and not _blank(cell):
-            letters[letter_keys[index]] = cell
+    folded = {str(name).strip().lower() for name in row if not str(name).startswith("_")}
+    letters = {}
+    where = str(row.get("Site ID") or row.get("Site") or "").strip()
+    suffix = f" for {where}" if where else ""
+    for key, names in NAMES.items():
+        if any(name.lower() in folded for name in names):
+            continue
+        index = column_index(LETTERS[key])
+        letters[key] = values[index] if index < len(values) else None
+        LOGGER.warning(
+            "Financials field %s has no header (%s); using column %s%s",
+            key,
+            ", ".join(names),
+            LETTERS[key],
+            suffix,
+        )
     row["_letters"] = letters
     row["_links"] = links
     return row

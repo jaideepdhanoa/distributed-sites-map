@@ -314,6 +314,18 @@ def service_area_comment_lines(report: dict | None) -> list[str]:
     return lines
 
 
+def service_area_distance_comment_lines(report: dict | None) -> list[str]:
+    """Class and distance band disagree. The sync still finishes."""
+    items = []
+    if isinstance(report, dict):
+        found = report.get("service_area_distance") or []
+        if isinstance(found, list):
+            items = [str(item) for item in found if str(item).strip()]
+    lines = [f"Service-area class and distance disagree: {len(items)}."]
+    lines.extend(f"- {item}" for item in items[:30])
+    return lines
+
+
 def write_sync_comment(path: Path) -> None:
     report = json.loads((ROOT / "data" / "generated" / "build_report.json").read_text())
     changes = report.get("changes") or {}
@@ -330,6 +342,7 @@ def write_sync_comment(path: Path) -> None:
             f"Stage moves: {changes.get('stage_moves', 0)}.",
             *_timeline_lines(),
             *service_area_comment_lines(report),
+            *service_area_distance_comment_lines(report),
             "",
             "Drift report (not served to the app):",
             "```",

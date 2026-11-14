@@ -22,6 +22,7 @@ PYTHON = [
     ["tests/test_cstore.py"],
     ["tests/test_business_type.py"],
     ["tests/test_financials.py"],
+    ["tests/test_pricing_sources.py"],
     ["tests/test_nda.py"],
     ["tests/test_comms.py"],
     ["tests/test_open_loops.py"],

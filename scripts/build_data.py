@@ -32,7 +32,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
-from scripts.service_area import SERVICE_AREA_NOTE, service_area_breakdown, service_area_fields, service_area_record_problems
+from scripts.service_area import (
+    SERVICE_AREA_NOTE,
+    service_area_breakdown,
+    service_area_distance_warning,
+    service_area_fields,
+    service_area_record_problems,
+)
 from scripts.nda import nda_mirror_fields
 from scripts.site_photos import index_photos, load_site_photos, photo_fields
 from scripts.timeline_drive import folder_id_from_row, folder_url_for
@@ -634,6 +640,7 @@ def apply_live_universe(
     fresh = 0
     matched = 0
     unrecognized: list[str] = []
+    distance_flags: list[str] = []
     geocode_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
 
     def claim(city: str, apn_value, address: str) -> tuple[str | None, str | None]:
@@ -677,6 +684,9 @@ def apply_live_universe(
         site.update(fields)
         if warning:
             unrecognized.append(warning)
+        band = service_area_distance_warning(fields, where=f"Universe {site['site_id']}")
+        if band:
+            distance_flags.append(band)
         ring = str(site.get("service_ring") or "")
         if site["in_area"]:
             site["expansion_horizon"] = False
@@ -848,6 +858,7 @@ def apply_live_universe(
         "county_verdicts": {key: county.get(key, 0) for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")},
         "missing_point": [site["site_id"] for site in counted if site.get("lat") is None or site.get("lon") is None],
         "service_area_unrecognized": unrecognized,
+        "service_area_distance": distance_flags,
     }
 
 
@@ -2478,6 +2489,7 @@ def build_deal_layer(
     failed = []
     matched = 0
     unrecognized: list[str] = []
+    distance_flags: list[str] = []
     expected_folders: list[tuple[str, str, str]] = []
     for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
         for index, row in enumerate(rows, start=1):
@@ -2527,6 +2539,9 @@ def build_deal_layer(
             area_fields, area_warning = service_area_fields(row, where=deal_id)
             if area_warning:
                 unrecognized.append(area_warning)
+            band = service_area_distance_warning(area_fields, where=deal_id)
+            if band:
+                distance_flags.append(band)
             if folder:
                 expected_folders.append((deal_id, folder, universe_id or ""))
             props = {
@@ -2606,6 +2621,7 @@ def build_deal_layer(
         ),
         "geocode_failed": failed,
         "service_area_unrecognized": unrecognized,
+        "service_area_distance": distance_flags,
         "pipeline_by_city": dict(Counter(item["properties"]["city"] for item in pipeline)),
         "pipeline_by_stage": dict(Counter(item["properties"]["stage"] for item in pipeline)),
         "pipeline_by_group": dict(Counter(item["properties"]["stage_group"] for item in pipeline)),
@@ -4679,6 +4695,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
 
     warnings = site_id_warnings(pipeline_rows, land_rows)
     warnings.extend(live_universe.get("service_area_unrecognized") or [])
+    warnings.extend(live_universe.get("service_area_distance") or [])
     if census["total"] != 1701:
         warnings.append(f"Census row count is {census['total']}, workbook expectation was 1,701.")
     if len(countable) != 1658 or by_city(countable) != {"LAS": 417, "PHX": 555, "MIA": 686}:
@@ -4723,6 +4740,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     )
     apply_contacted_deal_stage(funnel, deals_fc["features"])
     warnings.extend(deal_report.get("service_area_unrecognized") or [])
+    warnings.extend(deal_report.get("service_area_distance") or [])
     listed_drift = listed_flag_drift(sites)
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     public_records = {"note": "Public-record fields are added when the build writes files."}
@@ -4781,6 +4799,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             note
             for note in (live_universe.get("service_area_unrecognized") or [])
             + (deal_report.get("service_area_unrecognized") or [])
+        ],
+        "service_area_distance": [
+            note
+            for note in (live_universe.get("service_area_distance") or [])
+            + (deal_report.get("service_area_distance") or [])
         ],
         "land_tiers": {
             "L10": len(l10),

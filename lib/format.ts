@@ -24,6 +24,20 @@ export function listingHost(url: string) {
   }
 }
 
+const FOLDER_URL = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/;
+
+/** A Drive folder link, or blank when the cell is not one. */
+export function folderHref(value?: string | null) {
+  const url = (value || "").trim().split("?")[0];
+  return FOLDER_URL.test(url) ? url : "";
+}
+
+/** An http listing page, or blank. */
+export function listingHref(value?: string | null) {
+  const url = (value || "").trim();
+  return /^https?:\/\//i.test(url) ? url : "";
+}
+
 /** Host label for the original listing, or a muted note when none is on file. */
 export function listingCue(record: { listing_url?: string | null; listing_removed?: boolean | null }) {
   const url = (record.listing_url || "").trim();

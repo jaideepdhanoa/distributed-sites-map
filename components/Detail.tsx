@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
-import { cleanNote, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
+import { cleanNote, folderHref, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { contactDate, serviceAreaChip } from "@/lib/cardStatus";
 import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
@@ -28,8 +28,6 @@ function websiteLabel(url: string) {
     return url.replace(/^https?:\/\//i, "");
   }
 }
-
-const FOLDER_URL = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/;
 
 type SheetControl = {
   expanded: boolean;
@@ -136,7 +134,8 @@ function DealHeadline({ deal, censusAcres }: { deal: DealProps; censusAcres?: nu
 function SiteNumbers({ site, deal }: { site: SiteProps; deal?: DealProps | null }) {
   if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} />;
   const spare = spareLandSqft(null, site.spare_ac_own);
-  const traffic = site.aadt_count ? site.aadt_count : "Not on file";
+  const traffic = site.aadt_count ? site.aadt_count : "—";
+  const year = countYear(site.aadt_year);
   return (
     <div className="headline" data-testid="card-numbers">
       <div>
@@ -155,7 +154,7 @@ function SiteNumbers({ site, deal }: { site: SiteProps; deal?: DealProps | null 
       <div>
         <span>Traffic</span>
         <strong>{traffic}</strong>
-        {site.aadt_count ? <small>vehicles/day</small> : null}
+        {site.aadt_count ? <small>{year ? `vehicles/day · ${year}` : "vehicles/day"}</small> : null}
       </div>
     </div>
   );
@@ -263,10 +262,6 @@ function streetHref(lat?: number | null, lng?: number | null, streetViewUrl?: st
   return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
 }
 
-function folderHref(value?: string | null) {
-  return value && FOLDER_URL.test(value) ? value : "";
-}
-
 function mapsLinks(
   lat?: number | null,
   lng?: number | null,
@@ -278,7 +273,7 @@ function mapsLinks(
   const hasMap = lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
   const cue = listing ? listingCue(listing) : null;
   const showListing = Boolean(cue && (required || cue.url));
-  const folder = folderUrl && FOLDER_URL.test(folderUrl) ? folderUrl : "";
+  const folder = folderHref(folderUrl);
   const point = hasMap ? `${lat},${lng}` : "";
   const generated = hasMap ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point}` : "";
   const street = streetViewUrl && isPanoUrl(streetViewUrl) ? streetViewUrl : generated;
@@ -730,7 +725,7 @@ export function DealDetail({
                   <button className="text-link" type="button" onClick={onOpenSite}>{universeName || deal.universe_id}</button>
                   {` · ${deal.universe_id}`}
                 </p>
-                <p>{universeTrafficLine(universeSite) || "Traffic count not on this universe row"}</p>
+                <p>{universeTrafficLine(universeSite) || "—"}</p>
               </div>
             ) : hasPin ? (
               <p className="note" data-testid="universe-gap">This listing has a location and is not linked to a universe site yet.</p>

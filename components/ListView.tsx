@@ -1,6 +1,7 @@
 "use client";
 
 import { NdaChip } from "./NdaChip";
+import { RowLinks } from "./RowLinks";
 
 export type ListRow = {
   id: string;
@@ -17,6 +18,10 @@ export type ListRow = {
   lead: string;
   nda?: string;
   ndaId?: string;
+  near?: string;
+  listingUrl?: string;
+  folderUrl?: string;
+  packageUrl?: string;
 };
 
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id">; label: string }[] = [
@@ -108,8 +113,16 @@ export default function ListView({
             {rows.map((row) => (
               <tr key={row.id} className={row.id === selectedId ? "list-row on" : "list-row"} onClick={() => onOpen(row.id)}>
                 {LIST_COLUMNS.map((column) => (
-                  <td key={column.id} title={row[column.id] || ""}>
-                    {row[column.id] || "—"}
+                  <td key={column.id} title={column.id === "site" ? row.site : (row[column.id] || "")}>
+                    {column.id === "site" ? (
+                      <span className="site-name">
+                        <span className="site-name-text">{row.site || "—"}</span>
+                        {row.near ? <span className="badge quiet near-chip" data-testid="near-chip">{row.near}</span> : null}
+                        <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
+                      </span>
+                    ) : (
+                      row[column.id] || "—"
+                    )}
                     {column.id === "stage" && row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
                   </td>
                 ))}
@@ -125,10 +138,14 @@ export default function ListView({
             <li key={row.id}>
               <button type="button" className={`list-row ${row.id === selectedId ? "on" : ""}`} onClick={() => onOpen(row.id)}>
                 <strong>{row.site}</strong>
+                {row.near ? <span className="badge quiet near-chip" data-testid="near-chip">{row.near}</span> : null}
                 <span>{[row.city, row.stage, row.tier, row.grade ? `Site capacity ${row.grade}` : ""].filter(Boolean).join(" · ")}</span>
-                {row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
+                <span>{row.traffic || "—"}</span>
               </button>
-              <button type="button" className="text-link" onClick={() => onShowMap(row.id)}>Show on map</button>
+              <span className="list-card-actions">
+                <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
+                <button type="button" className="text-link" onClick={() => onShowMap(row.id)}>Show on map</button>
+              </span>
             </li>
           ))}
         </ul>

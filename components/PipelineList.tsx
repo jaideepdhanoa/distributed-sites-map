@@ -15,11 +15,13 @@ import {
   capacitySummary,
   factsForDeal,
   openLandText,
-  workbookTrafficLine,
+  vehiclesPerDay,
   summaryOf,
   acresTotal,
 } from "@/lib/keyNumbers";
-import { listingCue, shownPriceSource } from "@/lib/format";
+import { folderHref, listingHref, shownPriceSource } from "@/lib/format";
+import { serviceAreaChip } from "@/lib/cardStatus";
+import { RowLinks } from "./RowLinks";
 import { stageDetail, stageTone } from "@/lib/labels";
 import { NdaChip } from "./NdaChip";
 import { StagePending } from "./StagePending";
@@ -43,7 +45,7 @@ function cell(row: PipelineRow, id: PipelineColumnId) {
   if (id === "perAcre") return deal.price_per_acre_display || "Not provided";
   if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
   if (id === "capacity") return capacitySummary(factsForDeal(deal));
-  if (id === "traffic") return workbookTrafficLine(deal) || "Not provided";
+  if (id === "traffic") return vehiclesPerDay(deal.trade_aadt) || "—";
   if (id === "cashFlow") {
     const cash = cashTile(deal);
     if (cash.hidden) return "";
@@ -80,13 +82,11 @@ export default function PipelineList({
   rows,
   columns,
   selectedId,
-  compareIds,
   sort,
   ranges,
   onSort,
   onOpen,
   onShowMap,
-  onCompare,
   onColumns,
   onResetColumns,
   onRanges,
@@ -95,13 +95,11 @@ export default function PipelineList({
   rows: PipelineRow[];
   columns: PipelineColumnId[];
   selectedId: string | null;
-  compareIds: string[];
   sort: { id: PipelineColumnId; desc: boolean };
   ranges: RangeFilter;
   onSort: (id: PipelineColumnId, desc?: boolean) => void;
   onOpen: (id: string) => void;
   onShowMap: (id: string) => void;
-  onCompare: (id: string, on: boolean) => void;
   onColumns: (next: PipelineColumnId[]) => void;
   onResetColumns: () => void;
   onRanges: (next: RangeFilter) => void;
@@ -213,7 +211,6 @@ export default function PipelineList({
         <table className="list-table">
           <thead>
             <tr>
-              <th aria-sort="none"><span className="sr">Compare</span></th>
               {columns.map((id) => {
                 const column = PIPELINE_COLUMNS.find((item) => item.id === id);
                 const active = sort.id === id;
@@ -237,16 +234,6 @@ export default function PipelineList({
                   if ((event.target as HTMLElement).closest("input, button, a")) return;
                   onOpen(id);
                 }}>
-                  <td>
-                    <input
-                      className="check"
-                      type="checkbox"
-                      aria-label={`Compare ${row.deal.name || id}`}
-                      checked={compareIds.includes(id)}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={(event) => onCompare(id, event.currentTarget.checked)}
-                    />
-                  </td>
                   {columns.map((column) => (
                     <td key={column} className={column === "capacity" ? "capacity" : undefined}>
                       {column === "openLand" && row.deal.open_land_sqft != null ? (
@@ -269,7 +256,8 @@ export default function PipelineList({
                         <span className="site-name">
                           {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                           <span className="site-name-text">{cell(row, column)}</span>
-                          <ListingIcon deal={row.deal} />
+                          <NearMark deal={row.deal} />
+                          <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />
                         </span>
                       ) : (
                         cell(row, column)
@@ -289,7 +277,9 @@ export default function PipelineList({
             <li key={row.deal.deal_id}>
               <button type="button" className={row.deal.deal_id === selectedId ? "list-row on" : "list-row"} onClick={() => onOpen(row.deal.deal_id)}>
                 <strong>{unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}{row.deal.name || row.deal.address}</strong>
+                <NearMark deal={row.deal} />
                 <span>{dealAsking(row)} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
+                <span>{vehiclesPerDay(row.deal.trade_aadt) || "—"}</span>
                 <span>
                   {row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"}
                   {" · "}
@@ -300,8 +290,10 @@ export default function PipelineList({
                 <StagePending note={row.deal.stage_pending} />
                 {row.noPin ? <span className="no-pin">No pin</span> : null}
               </button>
-              <button type="button" className="text-link" onClick={() => onShowMap(row.deal.deal_id)}>{row.noPin ? "No pin" : "Show on map"}</button>
-              <ListingIcon deal={row.deal} />
+              <span className="list-card-actions">
+                <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />
+                <button type="button" className="text-link" onClick={() => onShowMap(row.deal.deal_id)}>{row.noPin ? "No pin" : "Show on map"}</button>
+              </span>
             </li>
           ))}
         </ul>
@@ -314,21 +306,9 @@ function dealAsking(row: PipelineRow) {
   return row.deal.asking_price_display || "Asking not provided";
 }
 
-function ListingIcon({ deal }: { deal: DealProps }) {
-  const cue = listingCue(deal);
-  const icon = (
-    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-  );
-  if (!cue.url) {
-    return <span className="listing-icon muted" title={cue.label} aria-label={cue.label}>{icon}</span>;
-  }
-  return (
-    <a className={`listing-icon${deal.listing_removed ? " removed" : ""}`} href={cue.url} target="_blank" rel="noopener noreferrer" title={cue.label} aria-label={cue.label} onClick={(event) => event.stopPropagation()}>
-      {icon}
-    </a>
-  );
+function NearMark({ deal }: { deal: DealProps }) {
+  const label = serviceAreaChip(deal);
+  if (!label || deal.service_area_class === "outside") return null;
+  if (deal.service_area_class !== "near_0_5" && deal.service_area_class !== "near_5_10") return null;
+  return <span className="badge quiet near-chip" data-testid="near-chip">{label}</span>;
 }

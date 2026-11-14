@@ -1,4 +1,5 @@
 import type { GeoFeature, SiteProps } from "./types";
+import { inReach, type Reach } from "./reach.ts";
 
 export type PipeId = "sourced" | "desk" | "financial" | "checks" | "close" | "contacted" | "later" | "dropped";
 
@@ -124,10 +125,10 @@ export function inSelectedMarket(
 // excluded from Service area and every later step, and are offered only as a separate note
 // on L10/L4. Listed is a count on each step, not a step of its own.
 // Live broker outreach is a deal count on the Universe step, not a census-site flag.
-export function inStage(site: SiteProps, stage: StageId): boolean {
+export function inStage(site: SiteProps, stage: StageId, reach: Reach = "within10"): boolean {
   if (site.land_only || site.origin !== "universe") return false;
   const unique = Boolean(site.counts_as_site) && !site.duplicate_of;
-  const inArea = unique && Boolean(site.in_area);
+  const inArea = unique && inReach(site, reach);
   const land = inArea && landFit(site) && !eliminated(site);
   const county = land && site.verification === "county-checked";
   const cleared = county && site.verdict === "PASS" && site.network_status === "cleared" && !REVIEW_HOLDS.has(site.site_id);

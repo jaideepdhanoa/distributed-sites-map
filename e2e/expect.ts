@@ -1,4 +1,5 @@
 import { dealInCategories, defaultCategories, landLinks, siteInCategories, type Categories } from "../lib/categories";
+import { inReach } from "../lib/reach";
 
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const STEPS = ["universe", "in_area", "land", "county", "cleared"] as const;
@@ -43,6 +44,7 @@ export type Site = {
   counts_as_site?: boolean;
   duplicate_of?: string | null;
   in_area?: boolean;
+  service_area_class?: string;
   verification?: string;
   tenure_fail?: boolean;
   network_status?: string | null;
@@ -100,7 +102,7 @@ function eliminated(site: Site) {
 export function inStage(site: Site, stage: string) {
   if (site.land_only || site.origin !== "universe") return false;
   const unique = Boolean(site.counts_as_site) && !site.duplicate_of;
-  const inArea = unique && Boolean(site.in_area);
+  const inArea = unique && inReach(site);
   const land = inArea && (site.land_tier === "L10" || site.land_tier === "L4") && !eliminated(site);
   const county = land && site.verification === "county-checked";
   const cleared = county && site.verdict === "PASS" && site.network_status === "cleared" && !HOLD_SET.has(site.site_id);

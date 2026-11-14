@@ -21,6 +21,8 @@ type DealProps = {
   is_c_store?: boolean;
   business_type?: string;
   description?: string;
+  service_area_class?: string;
+  in_area?: boolean;
 };
 
 type SiteProps = {
@@ -49,6 +51,8 @@ export type CatalogSite = {
   isCStore: boolean;
   businessType: string;
   description: string;
+  serviceAreaClass: string;
+  inArea: boolean | null;
 };
 
 function readJson(name: string): unknown {
@@ -132,6 +136,8 @@ export function loadCatalog(): CatalogSite[] {
       }),
       businessType: String(props.business_type || ""),
       description: String(props.description || props.source_line || ""),
+      serviceAreaClass: String(props.service_area_class || ""),
+      inArea: typeof props.in_area === "boolean" ? props.in_area : null,
     });
   }
   return out;

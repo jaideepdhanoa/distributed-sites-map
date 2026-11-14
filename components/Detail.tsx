@@ -383,6 +383,7 @@ export default function Detail({
         <h2>{site.name || site.address || site.site_id}</h2>
         <div className="card-chips">
           {linkedDeal ? <StageChip deal={linkedDeal} /> : null}
+          <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
           <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
           {linkedDeal ? <NdaChip deal={linkedDeal} signedIn={signedIn} /> : null}
         </div>
@@ -391,7 +392,6 @@ export default function Detail({
         <p className="note">{site.site_id}{figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
-        <p className="note">{statusOf(site).label}</p>
         {site.linked_deal_id ? (
           <p>
             <button className="text-link" type="button" data-testid="pipeline-deal-link" onClick={onOpenDeal}>

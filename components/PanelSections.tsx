@@ -85,7 +85,7 @@ export default function PanelSections({
           </button>
         ))}
       </div>
-      {TABS.map(([id]) => (
+      {TABS.filter(([id]) => id === tab || id === "numbers").map(([id]) => (
         <div key={id} id={`panel-${id}`} role="tabpanel" hidden={tab !== id}>
           {panels[id]}
         </div>

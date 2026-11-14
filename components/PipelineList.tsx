@@ -19,6 +19,7 @@ import {
   acresTotal,
 } from "@/lib/keyNumbers";
 import { basisBadge, compMedianOf } from "@/lib/pricing";
+import { stripPlace, stripStats, stripTip, type StripDirection, type StripStats } from "@/lib/rangeStrip";
 import { displayAddress, folderHref, listingHref, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaShort } from "@/lib/cardStatus";
 import { dealCategory } from "@/lib/categories";
@@ -108,16 +109,6 @@ function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   return null;
 }
 
-function maxOf(rows: PipelineRow[], read: (row: PipelineRow) => number | null | undefined) {
-  let max = 0;
-  for (const row of rows) {
-    const value = read(row);
-    if (value == null || !Number.isFinite(value)) continue;
-    max = Math.max(max, Math.abs(value));
-  }
-  return max || 1;
-}
-
 export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], signedIn = true) {
   const header = columns.map((id) => PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id);
   const lines = [
@@ -180,7 +171,6 @@ export default function PipelineList({
   const holdTimer = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const maxOpen = Math.max(1, ...rows.map((row) => row.deal.open_land_sqft || 0));
   const summary = useMemo(() => summaryOf(rows.map((row) => row.deal)), [rows]);
   const compMedian = useMemo(() => compMedianOf(rows.map((row) => row.deal)), [rows]);
   const ordered = useMemo(() => {
@@ -199,20 +189,21 @@ export default function PipelineList({
     });
     return copy;
   }, [rows, sort, signedIn]);
-  const scales = useMemo(() => ({
-    asking: maxOf(ordered, (row) => row.deal.asking_price),
-    acres: maxOf(ordered, (row) => row.deal.land_acres),
-    perAcre: maxOf(ordered, (row) => row.deal.price_per_acre),
-    traffic: maxOf(ordered, (row) => row.deal.trade_aadt),
-    depot: maxOf(ordered, (row) => (row.noPin ? null : row.deal.miles_to_depot)),
-    cash: maxOf(ordered, (row) => (signedIn ? row.deal.stated_cash_flow : null)),
-    revenue: maxOf(ordered, (row) => (signedIn ? row.deal.stated_revenue : null)),
-    askingRevenue: maxOf(ordered, (row) => (signedIn ? row.deal.revenue_multiple : null)),
-    askingCash: maxOf(ordered, (row) => (signedIn ? row.deal.earnings_multiple : null)),
-    businessMultiple: maxOf(ordered, (row) => (signedIn ? row.deal.business_multiple : null)),
-    landEstimate: maxOf(ordered, (row) => (signedIn ? row.deal.land_estimate : null)),
-    county: maxOf(ordered, (row) => (signedIn ? row.deal.county_value : null)),
-    capacity: maxOf(ordered, (row) => row.deal.cap_a_substation_mi),
+  const strips = useMemo(() => ({
+    asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
+    acres: stripStats(ordered.map((row) => row.deal.land_acres)),
+    perAcre: stripStats(ordered.map((row) => (signedIn ? row.deal.price_per_acre : null))),
+    openLand: stripStats(ordered.map((row) => row.deal.open_land_sqft)),
+    traffic: stripStats(ordered.map((row) => row.deal.trade_aadt)),
+    depot: stripStats(ordered.map((row) => (row.noPin ? null : row.deal.miles_to_depot))),
+    cash: stripStats(ordered.map((row) => (signedIn ? row.deal.stated_cash_flow : null)), true),
+    revenue: stripStats(ordered.map((row) => (signedIn ? row.deal.stated_revenue : null))),
+    askingRevenue: stripStats(ordered.map((row) => (signedIn ? row.deal.revenue_multiple : null))),
+    askingCash: stripStats(ordered.map((row) => (signedIn ? row.deal.earnings_multiple : null))),
+    businessMultiple: stripStats(ordered.map((row) => (signedIn ? row.deal.business_multiple : null))),
+    landEstimate: stripStats(ordered.map((row) => (signedIn ? row.deal.land_estimate : null))),
+    county: stripStats(ordered.map((row) => (signedIn ? row.deal.county_value : null))),
+    capacity: stripStats(ordered.map((row) => row.deal.cap_a_substation_mi)),
   }), [ordered, signedIn]);
   const visibleIds = ordered.map((row) => row.deal.deal_id);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
@@ -329,6 +320,7 @@ export default function PipelineList({
           {columnsOpen ? (
             <div className="menu" role="group" aria-label="Columns">
               <button type="button" className="text-link" onClick={onResetColumns}>Pipeline default</button>
+              <p className="menu-note">The strip runs from the lowest to the highest in this filter. The tick is the median. Green is the better third and amber the worse third.</p>
               {PIPELINE_COLUMNS.map((column) => (
                 <label key={column.id}>
                   <input className="check" type="checkbox" checked={columns.includes(column.id)} disabled={column.id === "site"} onChange={() => toggleColumn(column.id)} />
@@ -401,34 +393,34 @@ export default function PipelineList({
                 }}>
                   {columns.map((column) => (
                     <td key={column} className={column === "capacity" ? "capacity" : undefined}>
-                      {column === "openLand" && row.deal.open_land_sqft != null ? (
-                        <Meter text={cell(row, column, signedIn)} value={row.deal.open_land_sqft} max={maxOpen} />
+                      {column === "openLand" ? (
+                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.open_land_sqft} stats={strips.openLand} direction="higher" format={openLandText} />
                       ) : column === "asking" ? (
-                        <AskingCell deal={row.deal} max={scales.asking} onBroker={onBroker} signedIn={signedIn} />
+                        <AskingCell deal={row.deal} stats={strips.asking} onBroker={onBroker} signedIn={signedIn} />
                       ) : column === "acres" ? (
-                        <Meter text={cell(row, column, signedIn)} value={row.deal.land_acres} max={scales.acres} />
+                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.land_acres} stats={strips.acres} format={(value) => acresText(value) || String(value)} />
                       ) : column === "perAcre" ? (
-                        <Meter text={cell(row, column, signedIn)} value={row.deal.price_per_acre} max={scales.perAcre} />
+                        <NumberCell label={cell(row, column, signedIn)} value={signedIn ? row.deal.price_per_acre : null} stats={strips.perAcre} direction="lower" format={fullMoney} />
                       ) : column === "traffic" ? (
-                        <Meter text={cell(row, column, signedIn)} value={row.deal.trade_aadt} max={scales.traffic} />
+                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.trade_aadt} stats={strips.traffic} direction="higher" format={countText} />
                       ) : column === "depot" ? (
-                        row.noPin ? <span className="no-pin">No pin</span> : <Meter text={cell(row, column, signedIn)} value={row.deal.miles_to_depot} max={scales.depot} invert title="Closer to the depot is a shorter bar" />
+                        row.noPin ? <span className="no-pin">No pin</span> : <NumberCell label={cell(row, column, signedIn)} value={row.deal.miles_to_depot} stats={strips.depot} direction="lower" format={mileText} />
                       ) : column === "cashFlow" ? (
-                        !signedIn || cashTile(row.deal).hidden ? <span>{signedIn ? "" : "—"}</span> : <Meter text={cell(row, column, signedIn)} value={row.deal.stated_cash_flow} max={scales.cash} negative={row.deal.stated_cash_flow != null && row.deal.stated_cash_flow < 0} />
+                        !signedIn || cashTile(row.deal).hidden ? <span>{signedIn ? "" : "—"}</span> : <NumberCell label={cell(row, column, signedIn)} value={row.deal.stated_cash_flow} stats={strips.cash} direction="higher" markNegative format={fullMoney} />
                       ) : column === "revenue" ? (
-                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.stated_revenue != null ? basisBadge(row.deal.revenue_basis) : ""} value={signedIn ? row.deal.stated_revenue : null} max={scales.revenue} title={row.deal.revenue_period || undefined} />
+                        <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.stated_revenue != null ? basisBadge(row.deal.revenue_basis) : ""} value={signedIn ? row.deal.stated_revenue : null} stats={strips.revenue} direction="higher" format={fullMoney} labelTitle={row.deal.revenue_period || undefined} />
                       ) : column === "askingRevenue" ? (
-                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.revenue_multiple != null ? basisBadge(row.deal.revenue_multiple_basis) : ""} value={signedIn ? row.deal.revenue_multiple : null} max={scales.askingRevenue} title={row.deal.revenue_multiple_basis || undefined} />
+                        <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.revenue_multiple != null ? basisBadge(row.deal.revenue_multiple_basis) : ""} value={signedIn ? row.deal.revenue_multiple : null} stats={strips.askingRevenue} direction="lower" format={multipleText} labelTitle={row.deal.revenue_multiple_basis || undefined} />
                       ) : column === "askingCash" ? (
-                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && (row.deal.earnings_multiple != null || (row.deal.earnings_multiple_display && row.deal.earnings_multiple_display !== "—")) ? basisBadge(row.deal.earnings_multiple_basis) : ""} value={signedIn ? row.deal.earnings_multiple : null} max={scales.askingCash} negative={row.deal.stated_cash_flow != null && row.deal.stated_cash_flow < 0} title={[row.deal.earnings_multiple_which ? `Asking / ${row.deal.earnings_multiple_which}` : "", row.deal.earnings_multiple_basis].filter(Boolean).join(" · ") || undefined} />
+                        <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.earnings_multiple != null ? basisBadge(row.deal.earnings_multiple_basis) : ""} value={signedIn ? row.deal.earnings_multiple : null} stats={strips.askingCash} direction="lower" format={multipleText} labelTitle={[row.deal.earnings_multiple_which ? `Asking / ${row.deal.earnings_multiple_which}` : "", row.deal.earnings_multiple_basis].filter(Boolean).join(" · ") || undefined} />
                       ) : column === "businessMultiple" ? (
-                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.business_multiple != null ? basisBadge(row.deal.business_multiple_basis) : ""} value={signedIn ? row.deal.business_multiple : null} max={scales.businessMultiple} title={row.deal.business_multiple != null ? "Estimate. Asking minus the land estimate, divided by cash flow or EBITDA." : (row.deal.business_multiple_reason || undefined)} />
+                        <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.business_multiple != null ? basisBadge(row.deal.business_multiple_basis) : ""} value={signedIn ? row.deal.business_multiple : null} stats={strips.businessMultiple} direction="lower" format={multipleText} labelTitle={row.deal.business_multiple != null ? "Asking minus the land estimate, divided by cash flow or EBITDA." : (row.deal.business_multiple_reason || undefined)} />
                       ) : column === "landEstimate" ? (
-                        <CompactFigure text={cell(row, column, signedIn)} value={signedIn ? row.deal.land_estimate : null} max={scales.landEstimate} title={row.deal.land_estimate_tip || row.deal.land_estimate_reason || undefined} />
+                        <NumberCell label={cell(row, column, signedIn)} value={signedIn ? row.deal.land_estimate : null} stats={strips.landEstimate} format={fullMoney} labelTitle={row.deal.land_estimate_tip || row.deal.land_estimate_reason || undefined} />
                       ) : column === "countyValue" ? (
-                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.county_value != null ? "County" : ""} value={signedIn ? row.deal.county_value : null} max={scales.county} title={row.deal.county_value_basis || undefined} />
+                        <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.county_value != null ? "County" : ""} value={signedIn ? row.deal.county_value : null} stats={strips.county} format={fullMoney} labelTitle={row.deal.county_value_basis || undefined} />
                       ) : column === "capacity" ? (
-                        <Meter text={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} max={scales.capacity} invert title="Closer to a substation is a shorter bar" />
+                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle="Substation distance. Closer is better." />
                       ) : column === "stage" ? (
                         <span className="stage-cell">
                           <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column, signedIn)}</span>
@@ -502,12 +494,13 @@ export default function PipelineList({
                 {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? <span className="site-address">{displayAddress(row.deal.address)}</span> : null}
                 <NearMark deal={row.deal} />
                 <span>{signedIn ? dealAsking(row) : "—"} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
+                {signedIn ? <Strip value={row.deal.asking_price} stats={strips.asking} format={fullMoney} /> : null}
                 <span>{vehiclesPerDay(row.deal.trade_aadt) || "—"}</span>
-                <span>
-                  {row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"}
-                  {" · "}
-                  Site capacity {capacitySummary(factsForDeal(row.deal))}
-                </span>
+                <Strip value={row.deal.trade_aadt} stats={strips.traffic} direction="higher" format={countText} />
+                <span>{row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"}</span>
+                <Strip value={row.deal.open_land_sqft} stats={strips.openLand} direction="higher" format={openLandText} />
+                <span>Site capacity {capacitySummary(factsForDeal(row.deal))}</span>
+                <Strip value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} />
                 <NdaChip deal={row.deal} signedIn={signedIn} />
                 <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                 <StagePending note={row.deal.stage_pending} />
@@ -582,61 +575,75 @@ function NearMark({ deal }: { deal: DealProps }) {
   return <span className="badge quiet near-chip" data-testid="near-chip" data-short={serviceAreaShort(deal)} title={NEAR_TIP}>{label}</span>;
 }
 
-function CompactFigure({
-  text,
-  badge,
-  title,
+function countText(value: number) {
+  return Math.round(value).toLocaleString("en-US");
+}
+
+function mileText(value: number) {
+  const text = value.toFixed(2).replace(/\.?0+$/, "");
+  return `${text} mi`;
+}
+
+function multipleText(value: number) {
+  return `${value.toFixed(1)}x`;
+}
+
+function Strip({
   value,
-  max,
-  negative = false,
+  stats,
+  direction = "neutral",
+  markNegative = false,
+  format,
 }: {
-  text: string;
-  badge?: string;
-  title?: string;
   value?: number | null;
-  max: number;
-  negative?: boolean;
+  stats: StripStats | null;
+  direction?: StripDirection;
+  markNegative?: boolean;
+  format: (value: number) => string;
 }) {
-  const bar = value != null && Number.isFinite(value);
-  const width = bar ? Math.max(6, Math.min(100, (Math.abs(value) / max) * 100)) : 0;
+  if (value == null || !Number.isFinite(value) || !stats) return null;
+  const place = stripPlace(value, stats, direction, markNegative);
   return (
-    <span className="metric" title={title}>
-      <span className="metric-label">
-        {text || "—"}
-        {badge ? <em className="list-basis">{badge}</em> : null}
-      </span>
-      {bar ? <i className={negative ? "neg" : undefined}><b style={{ width: `${width}%` }} /></i> : null}
+    <span className="range-strip" title={stripTip(format(value), format(stats.median), place.rank, place.count)}>
+      <i className="range-track" />
+      {place.zeroLeft != null ? <i className="range-zero" style={{ left: `${place.zeroLeft}%` }} /> : null}
+      <i className="range-median" style={{ left: `${place.medianLeft}%` }} />
+      <i className={`range-dot tone-${place.tone}`} style={{ left: `${place.left}%` }} />
     </span>
   );
 }
 
-function Meter({
-  text,
+function NumberCell({
+  label,
+  badge,
   value,
-  max,
-  invert = false,
-  negative = false,
-  title,
+  stats,
+  direction = "neutral",
+  markNegative = false,
+  format,
+  labelTitle,
 }: {
-  text: string;
+  label: string;
+  badge?: string;
   value?: number | null;
-  max: number;
-  invert?: boolean;
-  negative?: boolean;
-  title?: string;
+  stats: StripStats | null;
+  direction?: StripDirection;
+  markNegative?: boolean;
+  format: (value: number) => string;
+  labelTitle?: string;
 }) {
-  if (value == null || !Number.isFinite(value) || !text) return <span>{text || "—"}</span>;
-  const width = Math.max(6, Math.min(100, (Math.abs(value) / max) * 100));
-  const tone = negative ? "neg" : invert ? "invert" : "";
   return (
     <span className="metric">
-      <span className="metric-label">{text}</span>
-      <i className={tone} title={title}><b style={{ width: `${width}%` }} /></i>
+      <span className="metric-label" title={labelTitle}>
+        {label || "—"}
+        {badge ? <em className="list-basis">{badge}</em> : null}
+      </span>
+      <Strip value={value} stats={stats} direction={direction} markNegative={markNegative} format={format} />
     </span>
   );
 }
 
-function AskingCell({ deal, max, onBroker, signedIn }: { deal: DealProps; max: number; onBroker?: (name: string) => void; signedIn: boolean }) {
+function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stats: StripStats | null; onBroker?: (name: string) => void; signedIn: boolean }) {
   if (!signedIn) return <span>—</span>;
   const price = deal.asking_price_display;
   if (!price) return <span>Not provided</span>;
@@ -650,11 +657,10 @@ function AskingCell({ deal, max, onBroker, signedIn }: { deal: DealProps; max: n
   ) : (
     source
   );
-  const width = deal.asking_price == null ? 0 : Math.max(6, Math.min(100, (Math.abs(deal.asking_price) / max) * 100));
   return (
     <span className="metric">
       <span className="metric-label">{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
-      {deal.asking_price != null ? <i title="Bar length follows the asking price in this list"><b style={{ width: `${width}%` }} /></i> : null}
+      <Strip value={deal.asking_price} stats={stats} format={fullMoney} />
     </span>
   );
 }

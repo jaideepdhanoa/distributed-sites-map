@@ -1721,6 +1721,40 @@ tr { cursor: pointer; }
 .open-land b { display: block; height: 100%; border-radius: 99px; background: #2f6a4e; }
 .metric { display: grid; gap: 3px; min-width: 7.5rem; }
 .metric-label { line-height: 1.35; }
+.range-strip {
+  position: relative;
+  display: block;
+  height: 10px;
+  margin-top: 2px;
+}
+.range-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5px;
+  height: 1px;
+  background: #c8c0b2;
+}
+.range-median, .range-zero {
+  position: absolute;
+  top: 2px;
+  width: 1px;
+  height: 7px;
+  background: #8a8273;
+}
+.range-zero { background: #9b4336; top: 1px; height: 9px; }
+.range-dot {
+  position: absolute;
+  top: 2px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 99px;
+  background: #5c564c;
+}
+.range-dot.tone-better { background: #1e4636; }
+.range-dot.tone-worse { background: #a15c12; }
+.range-dot.tone-negative { background: #9b4336; }
 .list-basis {
   display: inline-flex;
   margin-left: 6px;
@@ -1735,16 +1769,6 @@ tr { cursor: pointer; }
   box-shadow: inset 0 0 0 1px #d7b56a;
   vertical-align: 1px;
 }
-.metric i {
-  display: block;
-  height: 4px;
-  border-radius: 99px;
-  background: #e7e0d2;
-  overflow: hidden;
-}
-.metric b { display: block; height: 100%; border-radius: 99px; background: #2f6a4e; }
-.metric i.invert b { background: #3d5a73; }
-.metric i.neg b { background: #9b4336; }
 .selection-bar {
   display: flex;
   flex-wrap: wrap;

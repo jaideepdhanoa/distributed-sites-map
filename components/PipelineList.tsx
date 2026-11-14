@@ -161,6 +161,7 @@ export default function PipelineList({
   const skipClick = useRef(false);
   const holdTimer = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const maxOpen = Math.max(1, ...rows.map((row) => row.deal.open_land_sqft || 0));
   const summary = useMemo(() => summaryOf(rows.map((row) => row.deal)), [rows]);
   const ordered = useMemo(() => {
@@ -210,6 +211,26 @@ export default function PipelineList({
     node.addEventListener("scroll", onScroll, { passive: true });
     return () => node.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    const bar = barRef.current;
+    if (!scroll) return undefined;
+    if (!bar) {
+      scroll.style.paddingBottom = "";
+      return undefined;
+    }
+    const apply = () => {
+      scroll.style.paddingBottom = `${Math.ceil(bar.getBoundingClientRect().height)}px`;
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      scroll.style.paddingBottom = "";
+    };
+  }, [pickedRows.length, phone]);
 
   function toggleColumn(id: PipelineColumnId) {
     if (id === "site") return;
@@ -393,8 +414,8 @@ export default function PipelineList({
                             {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? (
                               <span className="site-address">{displayAddress(row.deal.address)}</span>
                             ) : null}
+                            <NearMark deal={row.deal} />
                           </span>
-                          <NearMark deal={row.deal} />
                           <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />
                         </span>
                       ) : (
@@ -464,7 +485,7 @@ export default function PipelineList({
         </ul>
       </div>
       {pickedRows.length ? (
-        <div className="selection-bar" data-testid="selection-bar">
+        <div className="selection-bar" data-testid="selection-bar" ref={barRef}>
           <p>{pickedRows.length.toLocaleString()} selected</p>
           <button type="button" className="paper-btn" disabled={pickedRows.length < 2 || pickedRows.length > 4} title="Opens the compare view for 2 to 4 sites" onClick={() => onCompare?.(pickedRows.map((row) => row.deal.deal_id))}>Compare</button>
           <button type="button" className="paper-btn" onClick={() => download(pickedRows)}>Export CSV</button>

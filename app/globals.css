@@ -1752,6 +1752,19 @@ tr { cursor: pointer; }
   border-radius: 99px;
   background: #5c564c;
 }
+.rank-chip {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
+  vertical-align: 1px;
+}
+.rank-chip.tone-better { background: #e7f0ea; color: #1e4636; }
+.rank-chip.tone-worse { background: #f7ead2; color: #a15c12; }
 .range-dot.tone-better { background: #1e4636; }
 .range-dot.tone-worse { background: #a15c12; }
 .range-dot.tone-negative { background: #9b4336; }

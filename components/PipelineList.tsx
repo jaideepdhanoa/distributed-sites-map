@@ -19,7 +19,7 @@ import {
   acresTotal,
 } from "@/lib/keyNumbers";
 import { basisBadge, compMedianOf } from "@/lib/pricing";
-import { stripPlace, stripStats, stripTip, type StripDirection, type StripStats } from "@/lib/rangeStrip";
+import { stripPlace, stripStats, stripTip, stripTone, type StripDirection, type StripStats } from "@/lib/rangeStrip";
 import { displayAddress, folderHref, listingHref, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaShort } from "@/lib/cardStatus";
 import { dealCategory } from "@/lib/categories";
@@ -493,14 +493,12 @@ export default function PipelineList({
                 <strong>{unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}{row.deal.name || row.deal.address}</strong>
                 {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? <span className="site-address">{displayAddress(row.deal.address)}</span> : null}
                 <NearMark deal={row.deal} />
-                <span>{signedIn ? dealAsking(row) : "—"} · {acresText(row.deal.land_acres) || "Acres not provided"}</span>
-                {signedIn ? <Strip value={row.deal.asking_price} stats={strips.asking} format={fullMoney} /> : null}
+                <span>
+                  {signedIn ? dealAsking(row) : "—"} · {acresText(row.deal.land_acres) || "Acres not provided"}
+                  {phoneRank(row, strips, signedIn)}
+                </span>
                 <span>{vehiclesPerDay(row.deal.trade_aadt) || "—"}</span>
-                <Strip value={row.deal.trade_aadt} stats={strips.traffic} direction="higher" format={countText} />
-                <span>{row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"}</span>
-                <Strip value={row.deal.open_land_sqft} stats={strips.openLand} direction="higher" format={openLandText} />
-                <span>Site capacity {capacitySummary(factsForDeal(row.deal))}</span>
-                <Strip value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} />
+                <span>{row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"} · Site capacity {capacitySummary(factsForDeal(row.deal))}</span>
                 <NdaChip deal={row.deal} signedIn={signedIn} />
                 <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                 <StagePending note={row.deal.stage_pending} />
@@ -573,6 +571,23 @@ function NearMark({ deal }: { deal: DealProps }) {
   if (!label || deal.service_area_class === "outside") return null;
   if (deal.service_area_class !== "near_0_5" && deal.service_area_class !== "near_5_10") return null;
   return <span className="badge quiet near-chip" data-testid="near-chip" data-short={serviceAreaShort(deal)} title={NEAR_TIP}>{label}</span>;
+}
+
+function phoneRank(row: PipelineRow, strips: { askingRevenue: StripStats | null; perAcre: StripStats | null }, signedIn: boolean) {
+  if (!signedIn) return null;
+  const place = (row.deal.city || "").trim();
+  if (!place) return null;
+  const choices: Array<{ value: number | null | undefined; stats: StripStats | null }> = [
+    { value: row.deal.revenue_multiple, stats: strips.askingRevenue },
+    { value: row.deal.price_per_acre, stats: strips.perAcre },
+  ];
+  for (const choice of choices) {
+    if (choice.value == null || !choice.stats) continue;
+    const tone = stripTone(choice.value, choice.stats, "lower");
+    if (tone !== "better" && tone !== "worse") continue;
+    return <em className={`rank-chip tone-${tone}`}>{tone === "better" ? "Low" : "High"} for {place}</em>;
+  }
+  return null;
 }
 
 function countText(value: number) {

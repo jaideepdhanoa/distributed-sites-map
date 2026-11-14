@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
 import { matchesLandTier, spareTier } from "../lib/filter.ts";
-import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, dealLabelFeatures, displayScore, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, sheetMoney, summaryOf, tileAmount, workbookTrafficLine } from "../lib/keyNumbers.ts";
+import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, countYear, dealLabelFeatures, defaultColumnIds, displayScore, growthText, pillText, inRange, openLandText, parseColumns, peerNote, publicDeal, rangesFromSearch, sheetMoney, summaryOf, tileAmount, universeTrafficLine, vehiclesPerDay, workbookTrafficLine } from "../lib/keyNumbers.ts";
 import { overlayFeatures } from "../lib/overlays.ts";
 import { inSelectedMarket, matchesOpenLandTier } from "../lib/filter.ts";
 import { inMapArea, parseMapArea } from "../lib/geoFilter.ts";
@@ -130,6 +130,22 @@ assert.equal(matchesLandTier({ spare_ac_own: 0 }, "L4"), false);
 assert.equal(matchesLandTier({ spare_ac_own: 0.2 }, "L4"), true);
 assert.equal(matchesLandTier({ spare_ac_own: null }, "L4"), false);
 assert.equal(growthText(-0.0557), "-5.57%");
+assert.equal(countYear("2025"), "2025");
+assert.equal(countYear(""), "");
+assert.equal(vehiclesPerDay("32,500", "2024"), "32,500 vehicles/day · 2024");
+assert.equal(vehiclesPerDay(840), "840 vehicles/day");
+assert.equal(vehiclesPerDay(""), "");
+assert.equal(vehiclesPerDay(null), "");
+const miami = universeTrafficLine({
+  aadt_count: "14,300",
+  aadt_road: "US 1",
+  aadt_year: "2025",
+  aadt_source: "FDOT annual average daily traffic, retrieved 2026-11-04. Nearest counted road within 150 m.",
+});
+assert.match(miami, /14,300 vehicles\/day · 2025/);
+assert.equal(miami.includes("2026"), false);
+assert.equal(universeTrafficLine({ aadt_count: "81000", aadt_year: "2024", aadt_source: "" }), "81,000 vehicles/day · 2024");
+assert.equal(universeTrafficLine({ aadt_count: "" }), "");
 assert.match(workbookTrafficLine(deal({ trade_aadt: 840, trade_aadt_road: "07  SOUTHERN AVE", trade_aadt_m: 58, trade_aadt_max: 27012 })), /840 vehicles\/day/);
 assert.match(workbookTrafficLine(deal({ trade_aadt: 840, trade_aadt_road: "07  SOUTHERN AVE", trade_aadt_m: 58, trade_aadt_max: 27012 })), /Workbook trade area/);
 const load = capacityFacts({ cap_d_peak: 108, cap_d_year: 192720 }, "deal")[0].lines.join(" ");
@@ -155,4 +171,8 @@ assert.equal(pin.name, "A");
 assert.equal(openLandText(0), "0 sq ft");
 assert.equal(openLandText(null), "");
 assert.equal(openLandText(undefined), "");
+assert.equal(defaultColumnIds().includes("address"), false);
+assert.equal(defaultColumnIds().includes("site"), true);
+assert.deepEqual(parseColumns(null).includes("nda"), false);
+assert.equal(parseColumns("site,nda").includes("nda"), true);
 console.log("key numbers ok");

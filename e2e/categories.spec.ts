@@ -120,7 +120,7 @@ test("the preview comment button stays off phone sheets and list actions", async
   const show = page.getByRole("button", { name: "Show on map" }).first();
   await expect(show).toBeVisible();
   expect(await overlaps(button, show)).toBe(false);
-  const listing = page.locator(".list-cards .listing-icon").first();
+  const listing = page.locator(".list-cards a.row-link").first();
   await expect(listing).toBeVisible();
   expect(await overlaps(button, listing)).toBe(false);
 });

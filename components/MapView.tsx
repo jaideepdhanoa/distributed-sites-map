@@ -253,7 +253,6 @@ export default function MapView(props: Props) {
           { id: "rings-10", type: "line", source: "rings", filter: ["==", ["get", "miles"], 10], layout: { visibility: "none", "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#1d4e89", "line-width": 2.8, "line-dasharray": [2.6, 1.5], "line-opacity": 1 } },
           { id: "rings-5-case", type: "line", source: "rings", filter: ["==", ["get", "miles"], 5], layout: { visibility: "none", "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fffdf8", "line-width": 7, "line-opacity": 0.98 } },
           { id: "rings-5", type: "line", source: "rings", filter: ["==", ["get", "miles"], 5], layout: { visibility: "none", "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#1e4636", "line-width": 3.4, "line-dasharray": [0.9, 0.7], "line-opacity": 1 } },
-          { id: "area-labels", type: "symbol", source: "area-labels", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 13, "text-max-width": 10, "text-offset": [0, 0.2], "text-allow-overlap": true, "text-padding": 2 }, paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.6 } },
           { id: "parcels-line", type: "line", source: "parcels", minzoom: 14, filter: ["!=", ["get", "role"], "adjoining"], paint: { "line-color": "#f7f3ea", "line-width": 1.1 } },
           { id: "parcels-adjoining", type: "line", source: "parcels", minzoom: 14, filter: ["==", ["get", "role"], "adjoining"], paint: { "line-color": "#8eb7ff", "line-width": 1.4 } },
           { id: "parcels-selected", type: "line", source: "parcels", minzoom: 14, filter: ["all", ["==", ["get", "site_id"], ""], ["!=", ["get", "role"], "adjoining"]], paint: { "line-color": "#9e4b3e", "line-width": 1.6, "line-dasharray": [1.5, 1.2] } },
@@ -529,6 +528,23 @@ export default function MapView(props: Props) {
               "text-allow-overlap": false,
             },
             paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 1.2 },
+          },
+          {
+            id: "area-labels",
+            type: "symbol",
+            source: "area-labels",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 13,
+              "text-max-width": 12,
+              "text-anchor": "left",
+              "text-offset": [0.2, 0],
+              "text-justify": "left",
+              "text-allow-overlap": true,
+              "text-padding": 6,
+            },
+            paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 2 },
           },
           {
             id: "nearby-washes",
@@ -1297,7 +1313,7 @@ export default function MapView(props: Props) {
         fitMap(
           map,
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: { top: 176, bottom: 168, left: 28, right: 36 }, maxZoom: 12.4, duration: 0 },
+          { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
       } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;

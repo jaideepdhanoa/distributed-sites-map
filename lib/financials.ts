@@ -101,6 +101,21 @@ const CLOSED: FinancialPanel = {
   listed: [],
 };
 
+/** Copy a package link onto a deal the reader is allowed to see. Other financials stay off the list. */
+export function attachPackageHrefs<T extends { properties?: Record<string, unknown> | null }>(
+  features: T[],
+  hrefs: Record<string, string>,
+  allowed: boolean,
+): T[] {
+  if (!allowed) return features;
+  return features.map((feature) => {
+    const id = String(feature.properties?.deal_id || "");
+    const href = safePackageHref(hrefs[id], true);
+    if (!href || !feature.properties) return feature;
+    return { ...feature, properties: { ...feature.properties, package_href: href } };
+  });
+}
+
 export function safePackageHref(value: string | null | undefined, signedIn: boolean): string {
   if (!signedIn) return "";
   const text = (value || "").trim();

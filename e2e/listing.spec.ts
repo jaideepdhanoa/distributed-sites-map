@@ -4,15 +4,15 @@ test("original listing sits under the title, including when none is on file", as
   await page.goto("/?funnel=pipeline&view=list&site=PIPE-PHX-0001");
   const link = page.getByTestId("listing-link");
   await expect(link).toBeVisible();
-  await expect(link).toHaveText("Listing ↗");
+  await expect(link).toHaveAttribute("aria-label", "Open the listing");
   await expect(link).toHaveAttribute("target", "_blank");
 
   await page.goto("/?funnel=pipeline&view=list&site=PIPE-LAS-0011");
-  await expect(page.getByTestId("listing-link")).toHaveText("Listing");
+  await expect(page.getByTestId("listing-link")).toHaveAttribute("aria-label", "No listing on file");
   await expect(page.getByTestId("listing-link")).not.toHaveAttribute("href", /.+/);
 
   await page.goto("/?funnel=pipeline&view=list&site=PIPE-LAS-0072");
-  await expect(page.getByTestId("listing-link")).toHaveText("Listing ↗");
+  await expect(page.getByTestId("listing-link")).toHaveAttribute("aria-label", "May be removed");
   await expect(page.getByTestId("listing-link")).toHaveAttribute("title", "May be removed");
 });
 
@@ -20,12 +20,12 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await page.goto("/?funnel=pipeline&view=list&site=PIPE-MIA-0080");
   const folder = page.getByTestId("site-folder-link");
   await expect(folder).toBeVisible();
-  await expect(folder).toHaveText("Folder ↗");
+  await expect(folder).toHaveAttribute("aria-label", "Open the site folder");
   await expect(folder).toHaveAttribute("href", "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ");
   await expect(folder).toHaveAttribute("target", "_blank");
   await expect(page.getByTestId("map-link")).toHaveText("Map ↗");
   await expect(page.getByTestId("street-view-link")).toHaveText("Street View ↗");
-  await expect(page.getByTestId("listing-link")).toHaveText("Listing ↗");
+  await expect(page.getByTestId("listing-link")).toHaveAttribute("aria-label", "Open the listing");
   await expect(page.getByTestId("card-numbers")).toContainText("Cash flow");
   await expect(page.getByTestId("card-numbers")).toContainText("Spare land");
   await expect(page.getByTestId("card-numbers")).toContainText("Bays that fit");

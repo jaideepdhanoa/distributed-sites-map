@@ -170,6 +170,8 @@ export type DealProps = {
   listing_url: string;
   /** Workbook Folder column. Empty when the row has no site folder. */
   folder_url?: string;
+  /** Signed-in package link. Absent unless the reader can see financials. */
+  package_href?: string;
   street_view_url?: string;
   photos?: SitePhoto[];
   photo_status?: string;

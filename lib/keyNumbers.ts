@@ -39,6 +39,15 @@ export const PIPELINE_COLUMNS = [
   { id: "cashFlow", label: "Cash flow" },
   { id: "depot", label: "Depot mi" },
   { id: "checked", label: "Checked" },
+  { id: "address", label: "Address", optional: true },
+  { id: "apn", label: "APN", optional: true },
+  { id: "zoning", label: "Zoning", optional: true },
+  { id: "broker", label: "Broker / firm", optional: true },
+  { id: "area", label: "Service area", optional: true },
+  { id: "nda", label: "NDA status", optional: true },
+  { id: "lastContact", label: "Last contact", optional: true },
+  { id: "nextStep", label: "Next step", optional: true },
+  { id: "type", label: "Type", optional: true },
 ] as const;
 
 export type PipelineColumnId = (typeof PIPELINE_COLUMNS)[number]["id"];
@@ -524,20 +533,27 @@ export function baysLine(deal: DealProps) {
   return `Bays that fit ${Math.round(deal.bays_that_fit).toLocaleString()}`;
 }
 
+/** The count's own year. A retrieval date in the source sentence is not the count year. */
+export function countYear(value?: string | null): string {
+  const match = String(value ?? "").match(/\b(20\d{2})\b/);
+  return match?.[1] || "";
+}
+
+/** Vehicles per day, with thousands separators and the count year when we have one. Blank when there is no count. */
+export function vehiclesPerDay(count: number | string | null | undefined, year?: string | null): string {
+  if (count == null || count === "") return "";
+  const numeric = typeof count === "number" ? count : Number(String(count).replace(/,/g, "").trim());
+  if (!Number.isFinite(numeric)) return "";
+  const shown = Math.round(numeric).toLocaleString("en-US");
+  const clean = countYear(year);
+  return clean ? `${shown} vehicles/day · ${clean}` : `${shown} vehicles/day`;
+}
+
 export function universeTrafficLine(site?: Pick<SiteProps, "aadt_count" | "aadt_road" | "aadt_year" | "aadt_source"> | null) {
   if (!site?.aadt_count) return "";
   const road = shortRoad(site.aadt_road);
-  const source = site.aadt_source || "";
-  const year = (source.match(/\b(20\d{2})\b/) || [site.aadt_year || ""])[0] || site.aadt_year || "";
-  let method = "";
-  if (/150\s*m/i.test(source)) {
-    const agency = /adot/i.test(source) ? "ADOT" : (source.split(",")[0] || "").replace(/average annual daily traffic/i, "").trim();
-    method = [agency, year].filter(Boolean).join(" ");
-    method = method ? `${method}, nearest within 150 m` : "Nearest within 150 m";
-  } else if (source) {
-    method = source.split(".")[0].trim();
-  }
-  return [`${site.aadt_count}${road ? ` on ${road}` : ""}`, method].filter(Boolean).join(" · ");
+  const base = vehiclesPerDay(site.aadt_count, site.aadt_year);
+  return road ? `${base} on ${road}` : base;
 }
 
 export function acreUnit(value?: number | null, text?: string | null) {
@@ -549,9 +565,14 @@ export function acreUnit(value?: number | null, text?: string | null) {
   return `${shown} ac`;
 }
 
+/** Optional columns stay off until someone turns them on. */
+export function defaultColumnIds(): PipelineColumnId[] {
+  return PIPELINE_COLUMNS.filter((column) => !("optional" in column && column.optional)).map((column) => column.id);
+}
+
 export function parseColumns(value: string | null): PipelineColumnId[] {
   const known = new Set(PIPELINE_COLUMNS.map((column) => column.id));
   const picked = (value || "").split(",").filter((id): id is PipelineColumnId => known.has(id as PipelineColumnId));
-  if (!picked.length || !picked.includes("site")) return PIPELINE_COLUMNS.map((column) => column.id);
+  if (!picked.length || !picked.includes("site")) return defaultColumnIds();
   return picked;
 }

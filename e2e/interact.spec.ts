@@ -92,7 +92,7 @@ test("export matches the rows and columns on screen", async ({ page }) => {
   await page.goto("/?funnel=universe&stage=cleared&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".list-pane tbody tr", { state: "attached" });
   const headers = await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter((text) => text && text !== "Map"));
-  const rowIds = await page.locator(".list-pane tbody tr td:first-child").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").trim()));
+  const rowIds = await page.locator(".list-pane tbody .site-name-text").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/\s+/g, " ").trim()));
   expect(rowIds.length).toBeGreaterThan(0);
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export CSV" }).click();

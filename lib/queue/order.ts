@@ -1,3 +1,5 @@
+import { inReach, type Reach } from "@/lib/reach";
+
 export type QueueReason = {
   at: string;
   summary: string;
@@ -30,6 +32,8 @@ export type QueueFilters = {
   approvalOnly?: boolean;
   mentionsOnly?: boolean;
   assignedOnly?: boolean;
+  /** View-only. Omitted means Within 10 mi. Does not drop a site. */
+  reach?: Reach;
 };
 
 function rank(row: QueueRow): number {
@@ -72,7 +76,16 @@ function placeholder(input: { flagged: boolean; mentioned: boolean; assigned: bo
 }
 
 export function buildQueue(input: {
-  sites: { id: string; city: string; stage: string; stageGroup: string; active: boolean; hidden?: boolean }[];
+  sites: {
+    id: string;
+    city: string;
+    stage: string;
+    stageGroup: string;
+    active: boolean;
+    hidden?: boolean;
+    service_area_class?: string | null;
+    in_area?: boolean | null;
+  }[];
   reasons: Record<string, QueueReason[]>;
   reviewedAt: Record<string, string>;
   snoozeUntil: Record<string, string>;
@@ -84,7 +97,9 @@ export function buildQueue(input: {
   filters: QueueFilters;
 }): QueueRow[] {
   const rows: QueueRow[] = [];
+  const reach = input.filters.reach || "within10";
   for (const site of input.sites) {
+    if (!inReach(site, reach)) continue;
     const needsApproval = input.needsApproval.has(site.id);
     const mentioned = input.mentioned.has(site.id);
     const assigned = input.assigned.has(site.id);

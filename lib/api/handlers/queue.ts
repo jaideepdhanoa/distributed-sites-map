@@ -3,6 +3,7 @@ import { canDecide } from "@/lib/actions/roles";
 import { InputError } from "@/lib/actions/text";
 import { loadQueue, markAllReviewed, markReviewed, undoReview } from "@/lib/queue/load";
 import type { QueueFilters } from "@/lib/queue/order";
+import { parseReach, type Reach } from "@/lib/reach";
 
 function filtersFrom(url: URL): QueueFilters {
   return {
@@ -14,6 +15,7 @@ function filtersFrom(url: URL): QueueFilters {
     approvalOnly: url.searchParams.get("approve") === "1",
     mentionsOnly: url.searchParams.get("mentions") === "1",
     assignedOnly: url.searchParams.get("assigned") === "1",
+    reach: parseReach(url.searchParams.get("reach")),
   };
 }
 
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await openActions("viewer");
   if (isResponse(session)) return session;
-  let body: { all?: boolean; undo?: boolean; previous?: string | null; siteId?: string; market?: string; stage?: string; viable?: boolean; fresh?: boolean; flagged?: boolean; approve?: boolean; mentions?: boolean; assigned?: boolean };
+  let body: { all?: boolean; undo?: boolean; previous?: string | null; siteId?: string; market?: string; stage?: string; viable?: boolean; fresh?: boolean; flagged?: boolean; approve?: boolean; mentions?: boolean; assigned?: boolean; reach?: Reach };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
         approvalOnly: Boolean(body.approve),
         mentionsOnly: Boolean(body.mentions),
         assignedOnly: Boolean(body.assigned),
+        reach: parseReach(body.reach),
       }, canDecide(session.actionRole));
       const count = await markAllReviewed(sql, session.u, queue.items.map((item) => item.siteId));
       return { count };

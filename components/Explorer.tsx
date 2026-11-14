@@ -1485,6 +1485,10 @@ export default function Explorer() {
     setUnplacedOpen(false);
   }
 
+  const stageUnmapped = funnel === "pipeline" && !allPipes && !pipelineWide
+    ? [...pipelineDeals, ...stageLandRows].filter((deal) => deal.stage_group === pipeStage && !dealPoint(deal)).length
+    : 0;
+
   function summaryText() {
     if (funnel !== "pipeline") return "";
     const stageView = !allPipes && !pipelineWide && !who;
@@ -1725,8 +1729,8 @@ export default function Explorer() {
                     <button className={!allStages && !universeWide && stage === step.id && extra !== "listed" && extra !== "contacted" ? "chip on" : "chip"} type="button" aria-current={!allStages && !universeWide && stage === step.id && !extra ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: null, ruled: null }, true)}>
                       <span>{step.label}</span>
                       <strong data-count={!allStages && step.id === stage && extra == null ? visibleSites.length : filteredAt(step.id)}>{stepBadge(step.id)}</strong>
-                      {step.id === "in_area" ? <span className="split" data-testid="service-area-split">{serviceAreaSplit(sitePool.filter((site) => (allCities || site.city === city) && atStage(site, "in_area") && siteInCategories(site, links, categories)), reach)}</span> : null}
                     </button>
+                    {step.id === "in_area" ? <span className="split area-split" data-testid="service-area-split">{serviceAreaSplit(sitePool.filter((site) => (allCities || site.city === city) && atStage(site, "in_area") && siteInCategories(site, links, categories)), reach)}</span> : null}
                     {listedHere > 0 ? (
                       <button className={`sub ${extra === "listed" && stage === step.id ? "on" : ""}`} type="button" title={FUNNEL_NOTES.listed} onMouseEnter={() => setTip(FUNNEL_NOTES.listed)} onMouseLeave={() => setTip("")} onClick={() => write({ stage: step.id === "land" ? null : step.id, extra: extra === "listed" ? null : "listed" })}>
                         {listedHere.toLocaleString()} listed
@@ -1758,7 +1762,6 @@ export default function Explorer() {
                 return dealQueryHit(deal);
               });
               const total = rows.length + landHere.length;
-              const unmapped = [...rows, ...landHere].filter((deal) => !dealPoint(deal)).length;
               const brokerHere = [...rows, ...landHere].filter((deal) => deal.broker_contacted).length;
               const split = rows.length > 0 && landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
               return (
@@ -1770,7 +1773,6 @@ export default function Explorer() {
                       <strong>{total.toLocaleString()}</strong>
                       {split ? <span className="split">{split}</span> : null}
                     </button>
-                    {!allPipes && pipeStage === step.id && unmapped > 0 ? <span className="sub">{unmapped.toLocaleString()} without a location</span> : null}
                   </span>
                 </Fragment>
               );
@@ -1800,6 +1802,7 @@ export default function Explorer() {
               {summaryText()}
             </span>
           ) : null}
+          {stageUnmapped > 0 ? <span className="summary-chip" data-testid="unmapped-note">{stageUnmapped.toLocaleString()} without a location</span> : null}
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
           <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
             Filters

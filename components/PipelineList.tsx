@@ -247,7 +247,7 @@ export default function PipelineList({
                         <span className="stage-cell">
                           <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column)}</span>
                           <NdaChip deal={row.deal} />
-                          <SuggestedDropMark reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
+                          <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                           <StagePending note={row.deal.stage_pending} />
                         </span>
                       ) : column === "capacity" ? (
@@ -286,7 +286,7 @@ export default function PipelineList({
                   Site capacity {capacitySummary(factsForDeal(row.deal))}
                 </span>
                 <NdaChip deal={row.deal} />
-                <SuggestedDropMark reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
+                <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                 <StagePending note={row.deal.stage_pending} />
                 {row.noPin ? <span className="no-pin">No pin</span> : null}
               </button>

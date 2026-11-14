@@ -10,7 +10,7 @@ export type AreaLabel = {
 export const AREA_LABELS: readonly AreaLabel[] = [
   { id: "las-100", name: "Core and ring 100 (current)" },
   { id: "las-300", name: "Rings 200 and 300 (later)", nudge: [0.04, -0.16] },
-  { id: "phx-service", name: "Phoenix service area (current)" },
+  { id: "phx-service", name: "Phoenix service area (current)", nudge: [-0.1, 0.04] },
   { id: "mia-current", name: "Miami service area (current)", nudge: [0, 0.08] },
   { id: "mia-launch", name: "Miami launch area", nudge: [0, -0.03] },
   { id: "mia-extended", name: "Miami extended area (later)", nudge: [-0.08, 0.04] },

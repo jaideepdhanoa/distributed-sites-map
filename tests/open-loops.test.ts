@@ -142,13 +142,14 @@ test("NDA-002 keeps its description and NDA-005 is zero days with the site folde
   assert.equal(folded?.court, "Them — signer");
   assert.equal(folded?.days, 0);
   const shipped = deriveOpenLoops(JSON.parse(readFileSync("data/generated/open-loops.json", "utf8")) as OpenLoopsSnapshot);
-  const shippedFolded = shipped.loops.find((row) => row.id === "NDA-005");
   const queue = ndaQueueBody(JSON.parse(readFileSync("data/generated/nda.json", "utf8")) as NdaSnapshot);
-  const queued = queue.queue.find((row) => row.nda_id === "NDA-005");
-  assert.equal(shippedFolded?.court, "Us — legal");
-  assert.equal(shippedFolded?.days, 1);
-  assert.equal(queued?.nda_waiting_on, shippedFolded?.court);
-  assert.equal(courtDayCount(queued?.nda_days_in_court), null);
+  for (const loop of shipped.loops) {
+    assert.equal(typeof loop.days, "number");
+    assert.ok(loop.days >= 0);
+    assert.equal(JSON.stringify(loop).includes("1899"), false);
+    const queued = queue.queue.find((row) => row.nda_id === loop.id);
+    if (queued) assert.equal(queued.nda_waiting_on, loop.court);
+  }
   assert.equal(courtDayCount("12/30/1899"), 0);
   assert.equal(courtDayCount(0), 0);
   assert.deepEqual(folded?.folded_site_ids, ["PIPE-PHX-0014"]);

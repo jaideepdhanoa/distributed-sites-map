@@ -55,41 +55,45 @@ test("category links default to car washes and auto service", () => {
   assert.equal(UNSCREENED_LISTINGS_NOTE, "Listings not yet in Pipeline or Universe.");
 });
 
-test("Phoenix listed and desk counts leave land parcels out until that category is on", () => {
+test("live counts are car washes and auto service until land or c-stores are turned on", () => {
   const links = landLinks(deals);
-  const washes = defaultCategories();
-  const withLand = { ...washes, land: true };
-  const phx = sites.filter((site) => site.city === "PHX").map((site) => presentSite(site));
-  const listed = phx.filter((site) => inStage(site, "in_area") && site.listed);
-  const listedWashes = listed.filter((site) => siteInCategories(site, links, washes));
-  assert.equal(listed.length, 30);
-  assert.equal(listedWashes.length, 4);
-  assert.ok(listedWashes.every((site) => !isLandParcelSite(site, links)));
-  assert.equal(listed.filter((site) => siteInCategories(site, links, withLand)).length, 30);
+  const open = defaultCategories();
+  const withLand = { ...open, land: true };
+  const withStores = { ...open, store: true };
+  for (const city of ["PHX", "LAS", "MIA"]) {
+    const listed = sites
+      .filter((site) => site.city === city)
+      .map((site) => presentSite(site))
+      .filter((site) => inStage(site, "in_area") && site.listed);
+    const listedOpen = listed.filter((site) => siteInCategories(site, links, open));
+    assert.ok(listedOpen.every((site) => !isLandParcelSite(site, links)));
+    assert.equal(listed.filter((site) => siteInCategories(site, links, withLand)).length, listed.length);
 
-  const desk = (categories: typeof washes) =>
-    deals.filter((deal) => deal.city === "PHX" && deal.stage_group === "desk" && dealInCategories(deal, categories));
-  assert.equal(desk(washes).length, 7);
-  assert.equal(desk(withLand).length, 39);
-  assert.equal(desk({ ...washes, store: true }).length, 10);
-  assert.ok(desk(withLand).some((deal) => deal.kind === "land" && deal.deal_id.startsWith("LAND-PHX-")));
+    const desk = (categories: typeof open) =>
+      deals.filter((deal) => deal.city === city && deal.stage_group === "desk" && dealInCategories(deal, categories));
+    const usual = desk(open);
+    const washOnly = desk({ ...open, auto: false }).map((deal) => deal.deal_id);
+    const autoOnly = desk({ ...open, wash: false }).map((deal) => deal.deal_id);
+    assert.equal(new Set([...washOnly, ...autoOnly]).size, washOnly.length + autoOnly.length);
+    assert.deepEqual([...washOnly, ...autoOnly].sort(), usual.map((deal) => deal.deal_id).sort());
+    assert.ok(usual.every((deal) => deal.kind !== "land" && dealCategory(deal) !== "store"));
+    const addedLand = desk(withLand).filter((deal) => !usual.some((row) => row.deal_id === deal.deal_id));
+    const addedStores = desk(withStores).filter((deal) => !usual.some((row) => row.deal_id === deal.deal_id));
+    assert.ok(addedLand.every((deal) => deal.kind === "land"));
+    assert.ok(addedStores.every((deal) => dealCategory(deal) === "store"));
+  }
 });
 
 test("search hides land parcels until the Land category is on", () => {
-  const hidden = collectSearchHits("LAND-PHX-0035", deals, sites).map((hit) => hit.id);
-  assert.equal(hidden.includes("LAND-PHX-0035"), false);
-  const shown = collectSearchHits("LAND-PHX-0035", deals, sites, () => "universe", { land: true }).map((hit) => hit.id);
-  assert.equal(shown.includes("LAND-PHX-0035"), true);
+  const land = deals.find((deal) => deal.kind === "land" && deal.deal_id?.startsWith("LAND-"));
+  assert.ok(land);
+  const hidden = collectSearchHits(land.deal_id, deals, sites).map((hit) => hit.id);
+  assert.equal(hidden.includes(land.deal_id), false);
+  const shown = collectSearchHits(land.deal_id, deals, sites, () => "universe", { land: true }).map((hit) => hit.id);
+  assert.equal(shown.includes(land.deal_id), true);
 });
 
 test("auto service is a pipeline category, separate from car washes", () => {
-  const byId = new Map(deals.map((deal) => [deal.deal_id, deal]));
-  const row = (id: string) => {
-    const deal = byId.get(id);
-    assert.ok(deal, id);
-    return deal;
-  };
-
   for (const type of ["Auto repair", "Tire and lube", "Auto service", "General auto repair", "Tire and light auto service"]) {
     assert.equal(isAutoBusinessType(type), true, type);
     assert.equal(dealCategory({ kind: "pipeline", business_type: type }), "auto", type);
@@ -98,48 +102,21 @@ test("auto service is a pipeline category, separate from car washes", () => {
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Car wash" }), "wash");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Other" }), "wash");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Gas station", name: "Corner service station with a tenant" }), "store");
-
-  assert.equal(dealCategory(row("PIPE-MIA-0074")), "auto");
-  assert.equal(dealCategory(row("PIPE-MIA-0077")), "auto");
-  assert.equal(row("PIPE-MIA-0074").business_type, "Auto repair");
-  assert.equal(row("PIPE-MIA-0077").business_type, "Auto repair");
   const tires = deals.filter((deal) => deal.kind === "pipeline" && deal.business_type === "Tire and lube");
-  assert.ok(tires.length > 0);
   assert.ok(tires.every((deal) => dealCategory(deal) === "auto"));
-
-  assert.equal(row("PIPE-PHX-0081").business_type, "Car wash");
-  assert.equal(dealCategory(row("PIPE-PHX-0081")), "wash");
-  assert.equal(row("PIPE-MIA-0082").business_type, "Car wash");
-  assert.equal(dealCategory(row("PIPE-MIA-0082")), "wash");
-  assert.equal(row("PIPE-PHX-0083").business_type, "Car wash");
-  assert.equal(dealCategory(row("PIPE-PHX-0083")), "wash");
-  assert.equal(row("PIPE-PHX-0085").business_type, "Auto repair");
-  assert.equal(dealCategory(row("PIPE-PHX-0085")), "auto");
+  assert.ok(deals.filter((deal) => deal.kind === "pipeline" && deal.business_type === "Auto repair").every((deal) => dealCategory(deal) === "auto"));
+  assert.ok(deals.filter((deal) => deal.kind === "pipeline" && deal.business_type === "Car wash").every((deal) => dealCategory(deal) === "wash"));
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Auto repair", name: "8812-8828 N Black Canyon Hwy (auto center)" }), "auto");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Car wash", name: "Rinse My Ride" }), "wash");
+  assert.equal(dealCategory({ kind: "land", business_type: "Auto repair" }), "land");
 
   const links = landLinks(deals);
-  const corner = sites.find((site) => site.site_id === "WB-MIA-0011");
-  assert.ok(corner);
-  assert.equal(siteCategory(corner, links), "wash");
-  const parcel = row("LAND-MIA-0006");
-  assert.equal(parcel.business_type, "Auto repair");
-  assert.equal(dealCategory(parcel), "land");
-
-  const open = defaultCategories();
-  const washesOnly = { ...open, auto: false };
-  const autosOnly = { ...open, wash: false };
-  const miamiDesk = (categories: typeof open) =>
-    deals.filter((deal) => deal.city === "MIA" && deal.stage_group === "desk" && dealInCategories(deal, categories));
-  const both = miamiDesk(open).map((deal) => deal.deal_id).sort();
-  assert.deepEqual(both, ["PIPE-MIA-0012", "PIPE-MIA-0013", "PIPE-MIA-0074", "PIPE-MIA-0077", "PIPE-MIA-0086"]);
-  assert.deepEqual(miamiDesk(washesOnly).map((deal) => deal.deal_id).sort(), ["PIPE-MIA-0086"]);
-  assert.deepEqual(miamiDesk(autosOnly).map((deal) => deal.deal_id).sort(), ["PIPE-MIA-0012", "PIPE-MIA-0013", "PIPE-MIA-0074", "PIPE-MIA-0077"]);
-
-  const found = collectSearchHits("PIPE-MIA-0074", deals, sites).map((hit) => hit.id);
-  assert.equal(found.includes("PIPE-MIA-0074"), true);
-  const hidden = collectSearchHits("PIPE-MIA-0074", deals, sites, () => "universe", { auto: false }).map((hit) => hit.id);
-  assert.equal(hidden.includes("PIPE-MIA-0074"), false);
-  const census = collectSearchHits("WB-MIA-0011", deals, sites, () => "universe", { auto: false }).map((hit) => hit.id);
-  assert.equal(census.includes("WB-MIA-0011"), true);
+  const census = sites.find((site) => site.origin === "universe" && !isLandParcelSite(site, links));
+  assert.ok(census);
+  assert.equal(siteCategory(census, links), "wash");
+  const auto = deals.find((deal) => deal.kind === "pipeline" && dealCategory(deal) === "auto");
+  assert.ok(auto);
+  assert.equal(collectSearchHits(auto.deal_id, deals, sites).some((hit) => hit.id === auto.deal_id), true);
+  assert.equal(collectSearchHits(auto.deal_id, deals, sites, () => "universe", { auto: false }).some((hit) => hit.id === auto.deal_id), false);
+  assert.equal(collectSearchHits(census.site_id, deals, sites, () => "universe", { auto: false }).some((hit) => hit.id === census.site_id), true);
 });

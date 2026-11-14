@@ -1,5 +1,8 @@
 name: Workbook sync
 
+# Every four hours. This schedule stays. The job does not deploy to Vercel.
+# Preview deploys still come from the Vercel GitHub app. Hobby function limits
+# are enforced by the Validate data workflow, not by a second production build.
 on:
   schedule:
     - cron: "0 */4 * * *"
@@ -8,15 +11,24 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The publish script compares the remote branch with main. A
+          # one-commit checkout cannot see that history.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
       - run: pip install -r requirements.txt cryptography
       - name: Export the Sheet and rebuild
         id: rebuild
@@ -31,17 +43,43 @@ jobs:
           fi
           python scripts/sync_workbook.py
           python scripts/build_data.py
-      - name: Open or update the sync pull request
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: See whether generated data changed
+        id: diff
         run: |
-          # data/generated includes timeline.json when that build writes it.
-          # git diff ignores a brand-new file, so also look for untracked generated files.
           if git diff --quiet -- data/generated data/drift_report.csv data/workbook_stages.json \
             && [ -z "$(git ls-files --others --exclude-standard -- data/generated data/drift_report.csv data/workbook_stages.json)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No data change."
-            exit 0
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Install test dependencies
+        if: steps.diff.outputs.changed == 'true'
+        run: npm ci
+      - name: Data checks
+        id: checks
+        if: steps.diff.outputs.changed == 'true'
+        continue-on-error: true
+        run: python scripts/run_sync_checks.py /tmp/sync-test-results.md
+      - name: Open or update the sync pull request
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          # Pull requests opened with github.token are authored by
+          # github-actions[bot]. On this public repository those pull_request
+          # workflows are created and then left at action_required until a
+          # maintainer approves them. GITHUB_TOKEN is not allowed to approve
+          # its own runs. Set the repository secret SYNC_GITHUB_TOKEN to a
+          # fine-grained personal access token owned by a collaborator with
+          # write access (Jaideep). Repository: jaideepdhanoa/distributed-sites-map
+          # only. Permissions: Contents read and write, Pull requests read and
+          # write. The pull request is then opened as that user and Validate
+          # data, Actions, Timeline, and Review screenshots start on their own.
+          # Do not print the token. A GitHub App installed on this repository
+          # with the same two permissions is the same fix if a token that
+          # expires is a problem; mint an installation token in this step and
+          # pass it as GH_TOKEN.
+          GH_TOKEN: ${{ secrets.SYNC_GITHUB_TOKEN || github.token }}
+        run: |
           DATE=$(date -u +%Y-%m-%d)
           BRANCH="workbook-sync-$DATE"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -54,11 +92,41 @@ jobs:
           git commit -m "Workbook sync $DATE"
           TITLE="Workbook sync $DATE"
           python scripts/sync_workbook.py --pr-body /tmp/sync-pr-body.md
+          if [ -f /tmp/sync-test-results.md ]; then
+            printf '\n%s\n' "$(cat /tmp/sync-test-results.md)" >> /tmp/sync-pr-body.md
+          fi
           export SYNC_PR_TITLE="$TITLE"
           export SYNC_PR_BODY="$(cat /tmp/sync-pr-body.md)"
           bash scripts/open_sync_pr.sh "$BRANCH"
+          BRANCH="$(cat /tmp/sync-branch)"
+          echo "branch=$BRANCH" >> "$GITHUB_ENV"
           python scripts/sync_workbook.py --comment
           gh pr comment "$(cat /tmp/sync-pr-number)" --body-file /tmp/drift-comment.md
+      - name: Start the checks the bot pull request cannot start itself
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SYNC_TOKEN_IS_DEFAULT: ${{ secrets.SYNC_GITHUB_TOKEN == '' && 'true' || 'false' }}
+        run: |
+          if [ "$SYNC_TOKEN_IS_DEFAULT" != "true" ]; then
+            echo "SYNC_GITHUB_TOKEN is set. pull_request workflows start on their own."
+            exit 0
+          fi
+          # workflow_dispatch is the one event GITHUB_TOKEN is allowed to
+          # create. The runs use the sync branch and show on its head commit.
+          # The pull_request copies stay at action_required until the secret
+          # above is set. A dispatch failure does not hide the data pull request.
+          BRANCH="$(cat /tmp/sync-branch)"
+          for workflow in validate-data.yml actions.yml timeline.yml review-screenshots.yml; do
+            if gh workflow run "$workflow" --ref "$BRANCH"; then
+              echo "Dispatched $workflow on $BRANCH."
+            else
+              echo "Could not dispatch $workflow on $BRANCH."
+            fi
+          done
+      - name: Fail when the data checks failed
+        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'failure'
+        run: exit 1
       - name: Located deals without a universe row
         if: steps.rebuild.outcome == 'success'
         run: python scripts/build_data.py --gap-gate

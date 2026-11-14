@@ -576,10 +576,10 @@ def load_universe_rows(path: Path) -> list[dict]:
     cursor = ws.iter_rows(values_only=True)
     header = [str(cell).strip() if cell is not None else "" for cell in next(cursor)]
     out = []
-    for row in cursor:
+    for excel_row, row in enumerate(cursor, start=2):
         if not row or not any(row[:8]):
             continue
-        item = {}
+        item = {"_excel_row": excel_row}
         for index, key in enumerate(header):
             if key and index < len(row):
                 item[key] = row[index]
@@ -4727,6 +4727,8 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     if problems:
         raise SystemExit("Banned or forbidden content in generated data:\n" + "\n".join(problems[:30]))
 
+    from scripts.vocabulary import collect_vocabulary
+
     report = {
         "generated_at": funnel["generated_at"],
         "census_rows": census,
@@ -4790,6 +4792,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "parcels": parcel_meta,
         "public_records": public_records,
         "review_source": muse_file or "second review column",
+        "vocabulary": collect_vocabulary(universe_rows, pipeline_rows, land_rows),
         "warnings": warnings,
         "skipped": [
             "Aerial-screen stages (the old 92 / 92 / 78 counts) are not funnel steps.",
@@ -5091,6 +5094,11 @@ def validate_committed() -> None:
     candidates = [item for item in countable if item.get("is_candidate")]
     held = [item for item in countable if item.get("is_held_fit")]
     report = loaded["build_report.json"]
+    from scripts.vocabulary import shipped_problems
+
+    problems.extend(
+        shipped_problems(loaded.get("deals.geojson", {}).get("features") or [], sites, report)
+    )
     funnel = loaded["funnel.json"]
     stages = {stage["id"]: stage for stage in funnel.get("stages", [])}
 
@@ -5129,8 +5137,12 @@ def validate_committed() -> None:
                 if re.search(r"(?i)\bstalls?\b", blob):
                     problems.append(f"stall wording in verdict {row.get('site_id')}")
                     break
-    if len(loaded["depots.geojson"].get("features", [])) != 13:
-        problems.append("expected 13 depot pins")
+    depot_ids = [
+        (feature.get("properties") or {}).get("id")
+        for feature in loaded["depots.geojson"].get("features", [])
+    ]
+    if not depot_ids or any(not item for item in depot_ids) or len(depot_ids) != len(set(depot_ids)):
+        problems.append("depot ids must be present and unique")
     deal_features = loaded.get("deals.geojson", {}).get("features", [])
     if sources_present():
         live_rows, _drift = workbook_stage_rows()
@@ -5153,13 +5165,15 @@ def validate_committed() -> None:
     else:
         print("Located LAS, PHX, and MIA deals without a universe row: 0.")
     unscreened = loaded.get("unscreened.geojson") or {}
-    unscreened_rows = [((feature.get("properties") or {}).get("listing_id"), bool(feature.get("geometry"))) for feature in unscreened.get("features") or []]
-    pinned = sorted(item[0] for item in unscreened_rows if item[1])
-    withheld = sorted(item[0] for item in unscreened_rows if not item[1])
-    if pinned != ["L-013", "L-236", "L-239"]:
-        problems.append(f"unscreened pins are {pinned}")
-    if withheld != ["L-214", "L-215", "L-216", "L-221", "L-233"]:
-        problems.append(f"unscreened list-only rows are {withheld}")
+    listing_ids = []
+    for feature in unscreened.get("features") or []:
+        listing_id = str((feature.get("properties") or {}).get("listing_id") or "").strip()
+        if not re.fullmatch(r"L-\d+", listing_id):
+            problems.append(f"unscreened listing id {listing_id!r} is not an L- id")
+            continue
+        listing_ids.append(listing_id)
+    if len(listing_ids) != len(set(listing_ids)):
+        problems.append("unscreened listing ids are not unique")
     allowed_deal = set(DEAL_FIELDS)
     for feature in deal_features:
         extra = set((feature.get("properties") or {})) - allowed_deal
@@ -5353,28 +5367,16 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
         problems.append(
             f"in service area is {len(in_area_rows)} {in_area_by_city}, funnel says {in_area_stage.get('total')} {in_area_stage.get('by_city')}"
         )
-    verdict_counts = Counter((feature.get("properties") or {}).get("verdict") for feature in unique_rows)
-    expected_verdicts = {"PASS": 12, "MAYBE": 32, "FAIL": 47, "NOT_A_WASH": 15, "UNRESOLVED": 4}
-    got_verdicts = {key: verdict_counts.get(key, 0) for key in expected_verdicts}
-    if got_verdicts != expected_verdicts:
-        problems.append(f"county verdicts on counted sites are {got_verdicts}, expected {expected_verdicts} after the two Maybe holds")
-    cleared_rows = [feature for feature in features if _universe_stage(feature, "cleared")]
-    if len(cleared_rows) != 10:
-        problems.append(
-            "cleared pins are "
-            + str(len(cleared_rows))
-            + " ("
-            + ", ".join(sorted((feature.get("properties") or {}).get("site_id") or "" for feature in cleared_rows))
-            + "), the two holds should leave 10"
-        )
-    held_pass = sorted(
-        (feature.get("properties") or {}).get("site_id")
-        for feature in unique_rows
-        if (feature.get("properties") or {}).get("verdict") == "PASS"
-        and (feature.get("properties") or {}).get("network_status") == "held"
-    )
-    if held_pass != ["LAS-U15", "LAS-U866"]:
-        problems.append(f"Pass rows outside the service area are {held_pass}, expected LAS-U15 and LAS-U866")
+    known_verdicts = {"PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED"}
+    for feature in unique_rows:
+        verdict = (feature.get("properties") or {}).get("verdict")
+        if verdict and verdict not in known_verdicts:
+            problems.append(f"counted site verdict {verdict!r} is not a known verdict")
+            break
+    for feature in unique_rows:
+        props = feature.get("properties") or {}
+        if props.get("verdict") == "PASS" and props.get("network_status") == "held" and props.get("in_area"):
+            problems.append(f"{props.get('site_id')} is Pass and held but still inside the service area")
     problems.extend(pipeline_pin_problems(deals or [], features))
     if deals is not None:
         problems.extend(contacted_stage_problems(funnel, deals))

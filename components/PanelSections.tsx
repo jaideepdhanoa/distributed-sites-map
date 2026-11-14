@@ -66,7 +66,7 @@ export default function PanelSections({
       added.disconnect();
     };
   }, [site, panel, tab]);
-  const body = tab === "overview" ? overview : tab === "numbers" ? numbers : tab === "activity" ? activity : discussion;
+  const panels = { overview, numbers, activity, discussion };
   return (
     <div className="panel-sections" ref={sections}>
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
@@ -76,6 +76,7 @@ export default function PanelSections({
             type="button"
             role="tab"
             aria-selected={tab === id}
+            aria-controls={`panel-${id}`}
             className={tab === id ? "chip on" : "chip"}
             data-testid={`panel-tab-${id}`}
             onClick={() => setTab(id)}
@@ -84,7 +85,11 @@ export default function PanelSections({
           </button>
         ))}
       </div>
-      <div role="tabpanel">{body}</div>
+      {TABS.map(([id]) => (
+        <div key={id} id={`panel-${id}`} role="tabpanel" hidden={tab !== id}>
+          {panels[id]}
+        </div>
+      ))}
     </div>
   );
 }

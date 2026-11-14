@@ -2100,6 +2100,7 @@ span.listing-link.muted { text-decoration: none; }
 .card-links .text-link, .card-link.missing { min-height: 44px; display: inline-flex; align-items: center; }
 .card-link.missing { color: var(--ink-3); }
 .card-footer { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 18px 0 8px; }
+.panel-sections > [hidden] { display: none; }
 .stage-wait { margin-left: 6px; font-size: 11px; font-weight: 650; letter-spacing: 0.02em; color: var(--ink-3); }
 .headline > div { padding: 10px 12px; min-width: 0; }
 .headline > div + div { border-left: 1px solid var(--line); }

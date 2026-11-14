@@ -117,6 +117,7 @@ const market = {
   medianPerAcre: 1_145_129,
   stale: 0,
   tip: "Estimate. Based on 22 land listings within the service area.",
+  enough: true,
 };
 const site: SiteInput = {
   id: "PIPE-PHX-0003",
@@ -174,6 +175,8 @@ const gas = priceSite({ ...site, id: "GAS", segment: "Gas station and c-store", 
 assert.equal(gas.pricing_eligible, true);
 assert.equal(gas.revenue_multiple_display.endsWith("x"), true);
 assert.equal(gas.land_estimate, null);
+assert.equal(gas.land_estimate_reason, "Needs acres");
+assert.equal(gas.business_multiple_reason, "Needs a land estimate");
 
 const workbook = JSON.parse(readFileSync(new URL("../data/pricing/sources.json", import.meta.url), "utf8")) as {
   land: CompSource[];
@@ -191,10 +194,14 @@ assert.equal(Math.round(phx?.medianPerAcre || 0), 1145129);
 assert.equal(las?.reach, "plus5");
 assert.equal(las?.count, 11);
 assert.equal(Math.round(las?.medianPerAcre || 0), 804598);
-assert.equal(mia, undefined);
+assert.equal(mia?.enough, false);
+assert.equal(mia?.count, 1);
 const miaSite = priceWorkbook(workbook.sites, workbook.facts, built.markets)["PIPE-MIA-0080"];
 assert.equal(miaSite.land_estimate, null);
 assert.equal(miaSite.land_estimate_display, null);
+assert.equal(miaSite.land_estimate_reason, "Too few land comps (1 in Miami, need 5)");
+assert.equal(miaSite.business_value_reason, "Needs a land estimate");
+assert.equal(miaSite.business_multiple_reason, "Needs a land estimate");
 assert.equal(miaSite.county_value, 728180);
 assert.equal(miaSite.business_multiple_display, "—");
 

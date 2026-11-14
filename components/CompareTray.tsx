@@ -60,12 +60,12 @@ function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
   return [
     { label: "Pricing", value: split },
     { label: "Revenue", value: signedIn ? [deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ") : "—" },
-    { label: "Land estimate", value: [deal.land_estimate_display || "—", land != null ? "Estimate" : ""].filter(Boolean).join(" · ") },
-    { label: "Business value", value: deal.business_value_display || "—" },
-    { label: "County value (land + buildings)", value: [deal.county_value_display || "—", deal.county_value_basis].filter(Boolean).join(" · ") },
-    { label: "Asking / revenue", value: [deal.revenue_multiple_display || "—", deal.revenue_multiple_basis].filter(Boolean).join(" · ") },
-    { label: earnings, value: [deal.earnings_multiple_display || "—", deal.earnings_multiple_basis].filter(Boolean).join(" · ") },
-    { label: "Business-only multiple", value: [deal.business_multiple_display || "—", deal.business_multiple_basis].filter(Boolean).join(" · ") },
+    { label: "Land estimate", value: deal.land_estimate_display ? `${deal.land_estimate_display} · Estimate` : (deal.land_estimate_reason || "—") },
+    { label: "Business value", value: deal.business_value_display || deal.business_value_reason || "—" },
+    { label: "County value (land + buildings)", value: deal.county_value_display || "—" },
+    { label: "Asking / revenue", value: deal.revenue_multiple_display && deal.revenue_multiple_display !== "—" ? [deal.revenue_multiple_display, deal.revenue_multiple_basis].filter(Boolean).join(" · ") : (deal.revenue_multiple_reason || "—") },
+    { label: earnings, value: deal.earnings_multiple_display && deal.earnings_multiple_display !== "—" ? [deal.earnings_multiple_display, deal.earnings_multiple_basis].filter(Boolean).join(" · ") : (deal.earnings_multiple_reason || "—") },
+    { label: "Business-only multiple", value: deal.business_multiple_display && deal.business_multiple_display !== "—" ? [deal.business_multiple_display, deal.business_multiple_basis].filter(Boolean).join(" · ") : (deal.business_multiple_reason || "—") },
   ];
 }
 

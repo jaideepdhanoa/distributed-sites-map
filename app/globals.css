@@ -1721,6 +1721,20 @@ tr { cursor: pointer; }
 .open-land b { display: block; height: 100%; border-radius: 99px; background: #2f6a4e; }
 .metric { display: grid; gap: 3px; min-width: 7.5rem; }
 .metric-label { line-height: 1.35; }
+.list-basis {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f7ead2;
+  color: #5c4310;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
+  box-shadow: inset 0 0 0 1px #d7b56a;
+  vertical-align: 1px;
+}
 .metric i {
   display: block;
   height: 4px;

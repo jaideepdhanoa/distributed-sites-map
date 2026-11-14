@@ -34,12 +34,14 @@ export type QualifiedComp = {
 
 export type MarketCompSet = {
   metro: "PHX" | "LAS" | "MIA";
-  reach: "service" | "plus5" | "plus10" | "metro";
+  reach: "service" | "plus5" | "plus10" | "metro" | "";
   within: string;
   count: number;
-  medianPerAcre: number;
+  medianPerAcre: number | null;
   stale: number;
   tip: string;
+  /** False when the metro has fewer than 5 qualifying comps. */
+  enough: boolean;
 };
 
 export type FactRow = {
@@ -84,6 +86,11 @@ export type PricedSite = {
   land_estimate_display: string | null;
   land_estimate_basis: string;
   land_estimate_tip: string;
+  land_estimate_reason: string;
+  business_value_reason: string;
+  revenue_multiple_reason: string;
+  earnings_multiple_reason: string;
+  business_multiple_reason: string;
   comp_median_per_acre: number | null;
   comp_median_tip: string;
   comp_count: number | null;
@@ -298,11 +305,24 @@ export function landCompSets(land: CompSource[], register: CompSource[]): { comp
   }
   const markets: MarketCompSet[] = [];
   for (const metro of ["PHX", "LAS", "MIA"] as const) {
+    const widest = comps.filter((row) => row.metro === metro);
     const chosen = BANDS.map((band) => {
       const pool = comps.filter((row) => row.metro === metro && row.rank <= band.max);
       return { band, pool, median: median(pool.map((row) => row.perAcre)) };
     }).find((item) => item.pool.length >= 5);
-    if (!chosen || chosen.median == null) continue;
+    if (!chosen || chosen.median == null) {
+      markets.push({
+        metro,
+        reach: "",
+        within: "",
+        count: widest.length,
+        medianPerAcre: null,
+        stale: 0,
+        tip: "",
+        enough: false,
+      });
+      continue;
+    }
     const stale = chosen.pool.filter((row) => row.stale).length;
     const staleNote = stale ? ` ${stale} on the market more than a year.` : "";
     markets.push({
@@ -313,9 +333,25 @@ export function landCompSets(land: CompSource[], register: CompSource[]): { comp
       medianPerAcre: chosen.median,
       stale,
       tip: `Estimate. Based on ${chosen.pool.length} land listings within ${chosen.band.within}.${staleNote}`,
+      enough: true,
     });
   }
   return { comps, markets };
+}
+
+function placeName(metro: "PHX" | "LAS" | "MIA" | ""): string {
+  if (metro === "PHX") return "Phoenix";
+  if (metro === "LAS") return "Las Vegas";
+  if (metro === "MIA") return "Miami";
+  return "";
+}
+
+function landGap(metro: "PHX" | "LAS" | "MIA" | "", acres: number | null, market: MarketCompSet | null, land: number | null): string {
+  if (land != null) return "";
+  if (acres == null) return "Needs acres";
+  const count = market?.count ?? 0;
+  const place = placeName(metro);
+  return place ? `Too few land comps (${count} in ${place}, need 5)` : "Too few land comps (need 5)";
 }
 
 export function basisBadge(value: string | null | undefined): string {
@@ -402,8 +438,12 @@ export function priceSite(site: SiteInput, facts: FactRow[], market: MarketCompS
   const revenueBasis = basisBadge(revenueFact?.claim || site.financialsStatus || "");
   const earningsBasis = basisBadge(earningsFact?.claim || site.financialsStatus || "");
   const eligible = pricingEligible(site.segment);
-  const land = market && acres != null ? Math.round(acres * market.medianPerAcre) : null;
+  const rate = market?.enough ? market.medianPerAcre : null;
+  const usable = rate != null && market?.enough ? market : null;
+  const metro = metroOf(site.market, site.id);
+  const land = rate != null && acres != null ? Math.round(acres * rate) : null;
   const business = asking != null && land != null ? asking - land : null;
+  const landReason = landGap(metro, acres, market, land);
   const revenueMultiple = eligible ? multipleOf(asking, revenue) : null;
   const earningsMultiple = eligible && earnings.amount != null && earnings.amount > 0 ? multipleOf(asking, earnings.amount) : null;
   const earningsWords = eligible && earnings.amount != null && earnings.amount <= 0 ? "Loss-making" : "";
@@ -414,6 +454,41 @@ export function priceSite(site: SiteInput, facts: FactRow[], market: MarketCompS
       : "";
   const businessMultiple = businessWords || !eligible ? null : multipleOf(business, earnings.amount);
   const askingBasis = asking != null ? "Broker-stated" : "";
+  const ineligible = "Not a car wash, auto service, or gas station";
+  const needsEarnings = earnings.amount == null;
+  const needsLand = land == null;
+  const businessMultipleReason = businessWords || businessMultiple != null
+    ? ""
+    : !eligible
+      ? ineligible
+      : needsLand && needsEarnings
+        ? "Needs a land estimate and cash flow or EBITDA"
+        : needsLand
+          ? "Needs a land estimate"
+          : needsEarnings
+            ? "Needs cash flow or EBITDA"
+            : asking == null
+              ? "Needs an asking price"
+              : "";
+  const businessValueReason = business != null
+    ? ""
+    : asking == null
+      ? "Needs an asking price"
+      : "Needs a land estimate";
+  const revenueReason = revenueMultiple != null
+    ? ""
+    : !eligible
+      ? ineligible
+      : revenue == null
+        ? "Needs revenue"
+        : "Needs an asking price";
+  const earningsReason = earningsMultiple != null || earningsWords
+    ? ""
+    : !eligible
+      ? ineligible
+      : needsEarnings
+        ? "Needs cash flow or EBITDA"
+        : "Needs an asking price";
   return {
     stated_revenue: revenue,
     stated_revenue_display: moneyText(revenue),
@@ -430,9 +505,14 @@ export function priceSite(site: SiteInput, facts: FactRow[], market: MarketCompS
     land_estimate: land,
     land_estimate_display: moneyText(land),
     land_estimate_basis: land != null ? "Estimate" : "",
-    land_estimate_tip: land != null && market ? `Based on ${market.count} land listings within ${market.within}` : "",
-    comp_median_per_acre: market?.medianPerAcre ?? null,
-    comp_median_tip: market?.tip || "",
+    land_estimate_tip: land != null && usable ? `Based on ${usable.count} land listings within ${usable.within}` : "",
+    land_estimate_reason: landReason,
+    business_value_reason: businessValueReason,
+    revenue_multiple_reason: revenueReason,
+    earnings_multiple_reason: earningsReason,
+    business_multiple_reason: businessMultipleReason,
+    comp_median_per_acre: usable?.medianPerAcre ?? null,
+    comp_median_tip: usable?.tip || "",
     comp_count: market?.count ?? null,
     business_value: business != null && business > 0 ? business : null,
     business_value_display: business == null ? null : business > 0 ? moneyText(business) : "Land covers asking",

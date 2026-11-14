@@ -116,7 +116,7 @@ export default function KeyStrip({
     ? { text: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display), title: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) }
     : { text: cash.value || "—", title: cash.value || "—" };
   const revenueText = deal.stated_revenue_display || (deal.stated_revenue != null ? sheetMoney(deal.stated_revenue, null) : "—");
-  const revenueBasis = deal.stated_revenue != null ? (basisBadge(deal.revenue_basis) || "—") : "—";
+  const revenueBasis = deal.stated_revenue != null ? basisBadge(deal.revenue_basis) : "";
   const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
@@ -177,7 +177,7 @@ export default function KeyStrip({
             <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
             <strong title={revenueText}>{revenueText}</strong>
             {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-            <em>{revenueBasis}</em>
+            {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small>Not on file</small> : null}
           </article>
         ) : null}
         {signedIn && !cash.hidden && showFinancials ? (

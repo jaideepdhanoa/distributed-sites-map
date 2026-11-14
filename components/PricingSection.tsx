@@ -1,9 +1,11 @@
 import type { DealProps } from "@/lib/types";
 import { basisBadge } from "@/lib/pricing";
 
-function badge(value: string | null | undefined, shown: boolean) {
-  if (!shown) return "—";
-  return basisBadge(value) || "—";
+function Mark({ badge, reason }: { badge?: string; reason?: string }) {
+  const word = basisBadge(badge);
+  if (reason) return <small>{reason}</small>;
+  if (word) return <em>{word}</em>;
+  return null;
 }
 
 function AskingSplit({ deal }: { deal: DealProps }) {
@@ -19,9 +21,18 @@ function AskingSplit({ deal }: { deal: DealProps }) {
   );
 }
 
+function shown(value?: string | null) {
+  const text = (value || "").trim();
+  return text && text !== "—" ? text : "";
+}
+
 export default function PricingSection({ deal }: { deal: DealProps }) {
   const landShown = deal.land_estimate != null;
   const earningsName = deal.earnings_multiple_which ? `Asking / ${deal.earnings_multiple_which}` : "Asking / cash flow";
+  const revenueShown = shown(deal.revenue_multiple_display);
+  const earningsShown = shown(deal.earnings_multiple_display);
+  const businessShown = shown(deal.business_multiple_display);
+  const businessValue = shown(deal.business_value_display);
   return (
     <section data-testid="pricing">
       <h3 className="job">Pricing</h3>
@@ -30,31 +41,32 @@ export default function PricingSection({ deal }: { deal: DealProps }) {
         <article>
           <span>Land estimate</span>
           <strong title={landShown ? deal.land_estimate_tip || undefined : undefined}>{deal.land_estimate_display || "—"}</strong>
-          <em>{landShown ? "Estimate" : "—"}</em>
+          <Mark badge={landShown ? "Estimate" : ""} reason={landShown ? "" : deal.land_estimate_reason} />
         </article>
         <article>
           <span>Business value</span>
-          <strong>{deal.business_value_display || "—"}</strong>
+          <strong>{businessValue || "—"}</strong>
+          <Mark reason={businessValue ? "" : deal.business_value_reason} />
         </article>
         <article className="wide">
           <span>County value (land + buildings)</span>
-          <strong>{deal.county_value_display || "—"}</strong>
-          <small>{deal.county_value != null ? (deal.county_value_basis || "—") : "—"}</small>
+          <strong title={deal.county_value_basis || undefined}>{deal.county_value_display || "—"}</strong>
+          {deal.county_value != null && deal.county_value_basis ? <small>{deal.county_value_basis}</small> : null}
         </article>
         <article>
           <span>Asking / revenue</span>
-          <strong>{deal.revenue_multiple_display || "—"}</strong>
-          <em>{badge(deal.revenue_multiple_basis, Boolean(deal.revenue_multiple_display && deal.revenue_multiple_display !== "—"))}</em>
+          <strong>{revenueShown || "—"}</strong>
+          <Mark badge={deal.revenue_multiple_basis} reason={revenueShown ? "" : deal.revenue_multiple_reason} />
         </article>
         <article>
           <span>{earningsName}</span>
-          <strong>{deal.earnings_multiple_display || "—"}</strong>
-          <em>{badge(deal.earnings_multiple_basis, Boolean(deal.earnings_multiple_display && deal.earnings_multiple_display !== "—"))}</em>
+          <strong>{earningsShown || "—"}</strong>
+          <Mark badge={deal.earnings_multiple_basis} reason={earningsShown ? "" : deal.earnings_multiple_reason} />
         </article>
         <article className="wide">
           <span>Business-only multiple</span>
-          <strong>{deal.business_multiple_display || "—"}</strong>
-          <em>{badge(deal.business_multiple_basis, Boolean(deal.business_multiple_display && deal.business_multiple_display !== "—"))}</em>
+          <strong>{businessShown || "—"}</strong>
+          <Mark badge={deal.business_multiple_basis} reason={businessShown ? "" : deal.business_multiple_reason} />
         </article>
       </div>
     </section>

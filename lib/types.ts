@@ -271,6 +271,11 @@ export type DealProps = {
   land_estimate_display?: string | null;
   land_estimate_basis?: string;
   land_estimate_tip?: string;
+  land_estimate_reason?: string;
+  business_value_reason?: string;
+  revenue_multiple_reason?: string;
+  earnings_multiple_reason?: string;
+  business_multiple_reason?: string;
   comp_median_per_acre?: number | null;
   comp_median_tip?: string;
   comp_count?: number | null;

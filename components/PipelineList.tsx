@@ -69,15 +69,12 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   }
   if (id === "revenue" || id === "askingRevenue" || id === "askingCash" || id === "businessMultiple" || id === "landEstimate" || id === "countyValue") {
     if (!signedIn) return "—";
-    if (id === "revenue") return [deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ");
-    if (id === "askingRevenue") return [deal.revenue_multiple_display || "—", deal.revenue_multiple_basis].filter(Boolean).join(" · ");
-    if (id === "askingCash") {
-      const which = deal.earnings_multiple_which ? `Asking / ${deal.earnings_multiple_which}` : "";
-      return [deal.earnings_multiple_display || "—", which, deal.earnings_multiple_basis].filter(Boolean).join(" · ");
-    }
-    if (id === "businessMultiple") return [deal.business_multiple_display || "—", deal.business_multiple_basis].filter(Boolean).join(" · ");
-    if (id === "landEstimate") return deal.land_estimate_display || "—";
-    return [deal.county_value_display || "—", deal.county_value_basis].filter(Boolean).join(" · ");
+    if (id === "revenue") return deal.stated_revenue_display || "—";
+    if (id === "askingRevenue") return deal.revenue_multiple_display && deal.revenue_multiple_display !== "—" ? deal.revenue_multiple_display : (deal.revenue_multiple_reason || "—");
+    if (id === "askingCash") return deal.earnings_multiple_display && deal.earnings_multiple_display !== "—" ? deal.earnings_multiple_display : (deal.earnings_multiple_reason || "—");
+    if (id === "businessMultiple") return deal.business_multiple_display && deal.business_multiple_display !== "—" ? deal.business_multiple_display : (deal.business_multiple_reason || "—");
+    if (id === "landEstimate") return deal.land_estimate_display || deal.land_estimate_reason || "—";
+    return deal.county_value_display || "—";
   }
   if (id === "depot") return depotLine(deal.miles_to_depot, !row.noPin);
   if (id === "address") return displayAddress(deal.address) || "—";
@@ -419,17 +416,17 @@ export default function PipelineList({
                       ) : column === "cashFlow" ? (
                         !signedIn || cashTile(row.deal).hidden ? <span>{signedIn ? "" : "—"}</span> : <Meter text={cell(row, column, signedIn)} value={row.deal.stated_cash_flow} max={scales.cash} negative={row.deal.stated_cash_flow != null && row.deal.stated_cash_flow < 0} />
                       ) : column === "revenue" ? (
-                        <Meter text={cell(row, column, signedIn)} value={signedIn ? row.deal.stated_revenue : null} max={scales.revenue} />
+                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.stated_revenue != null ? basisBadge(row.deal.revenue_basis) : ""} value={signedIn ? row.deal.stated_revenue : null} max={scales.revenue} title={row.deal.revenue_period || undefined} />
                       ) : column === "askingRevenue" ? (
-                        <Meter text={cell(row, column, signedIn)} value={signedIn ? row.deal.revenue_multiple : null} max={scales.askingRevenue} />
+                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.revenue_multiple != null ? basisBadge(row.deal.revenue_multiple_basis) : ""} value={signedIn ? row.deal.revenue_multiple : null} max={scales.askingRevenue} title={row.deal.revenue_multiple_basis || undefined} />
                       ) : column === "askingCash" ? (
-                        <Meter text={cell(row, column, signedIn)} value={signedIn ? row.deal.earnings_multiple : null} max={scales.askingCash} negative={row.deal.stated_cash_flow != null && row.deal.stated_cash_flow < 0} />
+                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && (row.deal.earnings_multiple != null || (row.deal.earnings_multiple_display && row.deal.earnings_multiple_display !== "—")) ? basisBadge(row.deal.earnings_multiple_basis) : ""} value={signedIn ? row.deal.earnings_multiple : null} max={scales.askingCash} negative={row.deal.stated_cash_flow != null && row.deal.stated_cash_flow < 0} title={[row.deal.earnings_multiple_which ? `Asking / ${row.deal.earnings_multiple_which}` : "", row.deal.earnings_multiple_basis].filter(Boolean).join(" · ") || undefined} />
                       ) : column === "businessMultiple" ? (
-                        <Meter text={cell(row, column, signedIn)} value={signedIn ? row.deal.business_multiple : null} max={scales.businessMultiple} />
+                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.business_multiple != null ? basisBadge(row.deal.business_multiple_basis) : ""} value={signedIn ? row.deal.business_multiple : null} max={scales.businessMultiple} title={row.deal.business_multiple != null ? "Estimate. Asking minus the land estimate, divided by cash flow or EBITDA." : (row.deal.business_multiple_reason || undefined)} />
                       ) : column === "landEstimate" ? (
-                        <Meter text={cell(row, column, signedIn)} value={signedIn ? row.deal.land_estimate : null} max={scales.landEstimate} title={row.deal.land_estimate_tip || undefined} />
+                        <CompactFigure text={cell(row, column, signedIn)} value={signedIn ? row.deal.land_estimate : null} max={scales.landEstimate} title={row.deal.land_estimate_tip || row.deal.land_estimate_reason || undefined} />
                       ) : column === "countyValue" ? (
-                        <Meter text={cell(row, column, signedIn)} value={signedIn ? row.deal.county_value : null} max={scales.county} title={row.deal.county_value_basis || undefined} />
+                        <CompactFigure text={cell(row, column, signedIn)} badge={signedIn && row.deal.county_value != null ? "County" : ""} value={signedIn ? row.deal.county_value : null} max={scales.county} title={row.deal.county_value_basis || undefined} />
                       ) : column === "capacity" ? (
                         <Meter text={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} max={scales.capacity} invert title="Closer to a substation is a shorter bar" />
                       ) : column === "stage" ? (
@@ -583,6 +580,34 @@ function NearMark({ deal }: { deal: DealProps }) {
   if (!label || deal.service_area_class === "outside") return null;
   if (deal.service_area_class !== "near_0_5" && deal.service_area_class !== "near_5_10") return null;
   return <span className="badge quiet near-chip" data-testid="near-chip" data-short={serviceAreaShort(deal)} title={NEAR_TIP}>{label}</span>;
+}
+
+function CompactFigure({
+  text,
+  badge,
+  title,
+  value,
+  max,
+  negative = false,
+}: {
+  text: string;
+  badge?: string;
+  title?: string;
+  value?: number | null;
+  max: number;
+  negative?: boolean;
+}) {
+  const bar = value != null && Number.isFinite(value);
+  const width = bar ? Math.max(6, Math.min(100, (Math.abs(value) / max) * 100)) : 0;
+  return (
+    <span className="metric" title={title}>
+      <span className="metric-label">
+        {text || "—"}
+        {badge ? <em className="list-basis">{badge}</em> : null}
+      </span>
+      {bar ? <i className={negative ? "neg" : undefined}><b style={{ width: `${width}%` }} /></i> : null}
+    </span>
+  );
 }
 
 function Meter({

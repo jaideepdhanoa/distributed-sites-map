@@ -5,6 +5,16 @@
     "reason": "No longer for sale"
   },
   {
+    "id": "LAND-LAS-0051",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-LAS-0052",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
     "id": "LAND-PHX-0003",
     "stage": "Financial screen",
     "reason": "Outside the service area"
@@ -20,16 +30,6 @@
     "reason": "Lot too small"
   },
   {
-    "id": "LAND-PHX-0044",
-    "stage": "1 Desk screen",
-    "reason": "Outside the service area"
-  },
-  {
-    "id": "LAND-PHX-0049",
-    "stage": "1 Desk screen",
-    "reason": "Outside the service area"
-  },
-  {
     "id": "LAND-PHX-0054",
     "stage": "1 Desk screen",
     "reason": "No longer for sale"
@@ -38,6 +38,66 @@
     "id": "LAND-PHX-0055",
     "stage": "1 Desk screen",
     "reason": "No longer for sale"
+  },
+  {
+    "id": "LAND-PHX-0065",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0066",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0067",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0068",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0069",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0070",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0071",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0072",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0073",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0074",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0075",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
+  },
+  {
+    "id": "LAND-PHX-0076",
+    "stage": "1 Desk screen",
+    "reason": "Outside our markets"
   },
   {
     "id": "PIPE-LAS-0011",

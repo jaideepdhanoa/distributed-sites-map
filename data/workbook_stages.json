@@ -1,12 +1,12 @@
 {
-  "workbook_as_of": "2026-11-12",
+  "workbook_as_of": "2026-11-13",
   "pipeline": {
-    "1 Desk screen": 26,
+    "1 Desk screen": 27,
     "Dropped": 8,
     "2 Financial screen": 3
   },
   "land": {
-    "1 Desk screen": 46,
+    "1 Desk screen": 61,
     "Financial screen": 1
   },
   "rows": [
@@ -192,6 +192,11 @@
     },
     {
       "deal_id": "PIPE-MIA-0086",
+      "kind": "pipeline",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "PIPE-LAS-0074",
       "kind": "pipeline",
       "stage": "1 Desk screen"
     },
@@ -427,6 +432,81 @@
     },
     {
       "deal_id": "LAND-PHX-0063",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0064",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0065",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0066",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0067",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0068",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0069",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0070",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0071",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0072",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0073",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0074",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0075",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-PHX-0076",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0051",
+      "kind": "land",
+      "stage": "1 Desk screen"
+    },
+    {
+      "deal_id": "LAND-LAS-0052",
       "kind": "land",
       "stage": "1 Desk screen"
     }

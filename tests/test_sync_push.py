@@ -16,11 +16,17 @@ def git(args, cwd, env=None):
     subprocess.run(["git", *args], cwd=cwd, env=merged, check=True, capture_output=True, text=True)
 
 
-def commit(cwd, message, path="note.txt", text="one"):
+def commit(cwd, message, path="note.txt", text="one", name=None, email=None):
     file = Path(cwd) / path
     file.write_text(text)
     git(["add", path], cwd)
-    git(["commit", "-m", message], cwd)
+    args = ["commit", "-m", message]
+    if name:
+        args = ["-c", f"user.name={name}", "-c", f"user.email={email}", *args]
+    git(args, cwd)
+
+
+BOT = ("github-actions[bot]", "github-actions[bot]@users.noreply.github.com")
 
 
 class SyncPushTest(unittest.TestCase):
@@ -40,7 +46,7 @@ class SyncPushTest(unittest.TestCase):
         git(["push", "-u", "origin", "main"], self.seed)
         self.branch = "workbook-sync-2026-11-05"
         git(["checkout", "-B", self.branch], self.seed)
-        commit(self.seed, "first sync", text="first")
+        commit(self.seed, "first sync", text="first", name=BOT[0], email=BOT[1])
         git(["push", "-u", "origin", self.branch], self.seed)
         subprocess.run(
             ["git", "clone", "--single-branch", "--branch", "main", self.remote.as_uri(), self.worker],
@@ -125,6 +131,58 @@ class SyncPushTest(unittest.TestCase):
             text=True,
         ).stdout.strip()
         self.assertTrue(remote)
+
+    def test_non_bot_commits_open_a_fresh_branch(self):
+        commit(self.seed, "keep the fix", path="fix.txt", text="human")
+        git(["push", "origin", self.branch], self.seed)
+        kept = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        git(["checkout", "-B", self.branch], self.worker)
+        commit(self.worker, "second sync", text="second")
+        fresh = f"{self.branch}-2"
+        dry = subprocess.run(
+            ["bash", str(SCRIPT), self.branch],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_PUSH_DRY_RUN": "1"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(dry.stdout.strip(), f"fresh {fresh}")
+        subprocess.run(
+            ["bash", str(SCRIPT), self.branch],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_SKIP_PR": "1"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        still = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        opened = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", fresh],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        local = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.worker,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assertEqual(still, kept)
+        self.assertEqual(opened, local)
+        self.assertNotEqual(opened, kept)
 
 
 if __name__ == "__main__":

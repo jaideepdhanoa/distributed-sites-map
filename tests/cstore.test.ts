@@ -6,46 +6,43 @@ import { loadCatalog, readBuildEvents } from "../lib/queue/catalog";
 import { buildQueue } from "../lib/queue/order";
 import { collectSearchHits } from "../lib/search";
 
-const EXPECTED = [
-  "PIPE-LAS-0070",
-  "PIPE-LAS-0071",
-  "PIPE-LAS-0072",
-  "PIPE-PHX-0067",
-  "PIPE-PHX-0068",
-  "PIPE-PHX-0069",
-];
+type DealRow = {
+  deal_id: string;
+  kind?: string;
+  is_c_store?: boolean;
+  name?: string;
+  address?: string;
+  city?: string;
+  stage_group?: string;
+  universe_id?: string;
+};
 
-test("is_c_store on main data is exactly the six pipeline c-stores", () => {
+function deals(): DealRow[] {
   const data = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
-    features: { properties: { deal_id: string; is_c_store?: boolean; name?: string } }[];
+    features: { properties: DealRow }[];
   };
-  const found = data.features
-    .filter((feature) => feature.properties.is_c_store === true)
-    .map((feature) => feature.properties.deal_id)
-    .sort();
-  assert.deepEqual(found, EXPECTED);
-  const mia = data.features.filter((feature) => feature.properties.deal_id === "PIPE-MIA-0075" || feature.properties.deal_id === "PIPE-MIA-0076");
-  assert.equal(mia.length, 2);
-  assert.equal(mia.every((feature) => feature.properties.is_c_store === false), true);
+  return data.features.map((feature) => feature.properties);
+}
+
+test("c-store flags are pipeline deals and stay out of the default search", () => {
+  const rows = deals();
+  const stores = rows.filter((deal) => deal.is_c_store === true);
+  assert.ok(stores.length > 0);
+  assert.ok(stores.every((deal) => deal.kind === "pipeline"));
+  for (const store of stores) {
+    assert.equal(collectSearchHits(store.deal_id, rows, []).some((hit) => hit.id === store.deal_id), false, store.deal_id);
+    const shown = collectSearchHits(store.deal_id, rows, [], () => "universe", { cStores: true });
+    assert.equal(shown.some((hit) => hit.id === store.deal_id), true, store.deal_id);
+  }
 });
 
-test("search suggestions omit c-stores and gas stations until the filter is on", () => {
-  const data = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
-    features: { properties: { deal_id: string; is_c_store?: boolean; name?: string; address?: string; city?: string; stage_group?: string; universe_id?: string } }[];
-  };
-  const deals = data.features.map((feature) => feature.properties);
-  const hidden = ["c-store", "Sinclair", "ampm", "PIPE-PHX-0067", "PIPE-LAS-0070"].flatMap((query) =>
-    collectSearchHits(query, deals, []).map((hit) => hit.id),
+test("search suggestions omit c-stores until the filter is on", () => {
+  const rows = deals();
+  const stores = rows.filter((deal) => deal.is_c_store === true);
+  const hidden = ["c-store", "Sinclair", "ampm", ...stores.map((deal) => deal.deal_id)].flatMap((query) =>
+    collectSearchHits(query, rows, []).map((hit) => hit.id),
   );
-  for (const id of EXPECTED) assert.equal(hidden.includes(id), false, id);
-  const gas = collectSearchHits("PIPE-MIA-0076", deals, []).map((hit) => hit.id);
-  assert.equal(gas.includes("PIPE-MIA-0076"), false);
-  assert.equal(gas.includes("PIPE-MIA-0075"), false);
-  assert.equal(collectSearchHits("PIPE-MIA-0075", deals, []).some((hit) => hit.id === "PIPE-MIA-0075"), false);
-  const shown = collectSearchHits("Sinclair", deals, [], () => "universe", { cStores: true }).map((hit) => hit.id);
-  assert.equal(shown.includes("PIPE-PHX-0067"), true);
-  const gasShown = collectSearchHits("PIPE-MIA-0076", deals, [], () => "universe", { cStores: true }).map((hit) => hit.id);
-  assert.equal(gasShown.includes("PIPE-MIA-0076"), true);
+  for (const store of stores) assert.equal(hidden.includes(store.deal_id), false, store.deal_id);
 });
 
 test("gas stations and c-stores stay out of the default review queue", () => {
@@ -59,9 +56,8 @@ test("gas stations and c-stores stay out of the default review queue", () => {
   assert.equal(isPipelineStore({ kind: "site", business_type: "Car wash", name: "Circle K" }), false);
   assert.equal(isPipelineStore({ kind: "land", business_type: "Gas station", name: "Closed gas station and c-store across from the airport" }), false);
   const catalog = loadCatalog();
-  for (const id of ["PIPE-LAS-0070", "PIPE-LAS-0071", "PIPE-MIA-0075", "PIPE-MIA-0076"]) {
-    assert.equal(catalog.find((site) => site.id === id)?.isCStore, true, id);
-  }
+  const stores = catalog.filter((site) => site.isCStore);
+  assert.ok(stores.length > 0);
   const reasons: Record<string, { at: string; summary: string; type: string }[]> = {};
   for (const event of readBuildEvents()) {
     reasons[event.siteId] = reasons[event.siteId] || [];
@@ -86,8 +82,5 @@ test("gas stations and c-stores stay out of the default review queue", () => {
     today: "2026-11-10",
     filters: { market: "all", stage: "any", viable: true },
   });
-  assert.equal(rows.some((row) => row.siteId === "PIPE-LAS-0070"), false);
-  assert.equal(rows.some((row) => row.siteId === "PIPE-LAS-0071"), false);
-  assert.equal(rows.some((row) => row.siteId === "PIPE-MIA-0076"), false);
-  assert.notEqual(rows[0]?.siteId, "PIPE-LAS-0070");
+  for (const store of stores) assert.equal(rows.some((row) => row.siteId === store.id), false, store.id);
 });

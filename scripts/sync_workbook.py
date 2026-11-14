@@ -276,6 +276,14 @@ def _gap_lines() -> list[str]:
     return build_data.universe_gap_lines()
 
 
+def _vocabulary_lines() -> list[str]:
+    from scripts.vocabulary import vocabulary_lines
+
+    report_path = ROOT / "data" / "generated" / "build_report.json"
+    report = json.loads(report_path.read_text()) if report_path.exists() else {}
+    return vocabulary_lines(report)
+
+
 def sync_pr_body() -> str:
     """Pull request text. Lists every located deal that still has no Universe row."""
     return "\n".join(
@@ -285,6 +293,8 @@ def sync_pr_body() -> str:
             "Nothing was written back to the Sheet. The map does not invent a Universe row, a coordinate, or a parcel number.",
             "",
             *_gap_lines(),
+            "",
+            *_vocabulary_lines(),
             "",
             "The comment has the knock-out drift report.",
             "",
@@ -325,6 +335,8 @@ def write_sync_comment(path: Path) -> None:
             "```",
             drift.strip() or "No drift rows.",
             "```",
+            "",
+            *_vocabulary_lines(),
         ]
     )
     path.write_text(text)

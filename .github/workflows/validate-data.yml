@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   validate:
@@ -26,6 +27,8 @@ jobs:
       - run: python tests/test_nda.py
       - run: python tests/test_comms.py
       - run: python tests/test_open_loops.py
+      - run: python tests/test_vocabulary.py
+      - run: python tests/test_invariants.py
       - run: python scripts/check_surface.py
       - run: python scripts/test_review_fixes.py
       - uses: actions/setup-node@v4

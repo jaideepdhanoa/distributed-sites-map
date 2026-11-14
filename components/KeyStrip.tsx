@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { basisBadge } from "@/lib/pricing";
+import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
@@ -112,9 +114,9 @@ export default function KeyStrip({
   const askingText = sheetMoney(deal.asking_price, deal.asking_price_display);
   const cashView = deal.stated_cash_flow != null || deal.stated_cash_flow_display
     ? { text: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display), title: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) }
-    : deal.stated_revenue != null && !deal.stated_cash_flow_display
-      ? { text: sheetMoney(deal.stated_revenue, deal.stated_revenue_display), title: sheetMoney(deal.stated_revenue, deal.stated_revenue_display) }
-      : { text: cash.value, title: cash.value };
+    : { text: cash.value || "—", title: cash.value || "—" };
+  const revenueText = deal.stated_revenue_display || (deal.stated_revenue != null ? sheetMoney(deal.stated_revenue, null) : "—");
+  const revenueBasis = deal.stated_revenue != null ? basisBadge(deal.revenue_basis) : "";
   const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
@@ -152,8 +154,8 @@ export default function KeyStrip({
     .replace(/^[\d,]+ vehicles\/day · /, "")
     .replace(/ · max [\d,]+/, "")
     .replace(/ · Workbook trade area$/, "");
-  const cashLabel = deal.stated_revenue_display && !deal.stated_cash_flow_display ? "Revenue" : "Cash flow";
   const cashNote = `${cash.note}${cash.extra ? ` · ${cash.extra}` : ""}`;
+  const cashBasis = basisBadge(deal.earnings_basis) || cash.basis;
   return (
     <section className="key-strip packet" data-testid="key-strip">
       <h3 className="job">Space</h3>
@@ -170,19 +172,25 @@ export default function KeyStrip({
       ) : <p className="note">Not on file</p>}
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
-        {cash.hidden ? null : signedIn && showFinancials ? (
+        {signedIn && showFinancials ? (
+          <article className="wide">
+            <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
+            <strong title={revenueText}>{revenueText}</strong>
+            {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
+            {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small>Not on file</small> : null}
+          </article>
+        ) : null}
+        {signedIn && !cash.hidden && showFinancials ? (
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
-              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {cashLabel}</span>
+              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
               <strong title={cashView.title}>{cashView.text}</strong>
               {cashNote ? <small>{cashNote}</small> : null}
-              {cash.basis ? <em>{cash.basis}</em> : null}
+              {cashBasis ? <em>{cashBasis}</em> : null}
             </button>
           </article>
-        ) : (
-          <Metric icon={Banknote} label={cashLabel} value={cashView.text} title={cashView.title} note={cash.note} basis={cash.basis} />
-        )}
-        <Metric icon={Wallet} label="Asking" value={askingText} title={askingText} note={shownPriceSource(deal) || ""} basis={deal.asking_price_display ? "Broker-stated" : ""} />
+        ) : null}
+        <Metric icon={Wallet} label="Asking" value={signedIn ? askingText : "—"} title={signedIn ? askingText : "—"} note={signedIn ? (shownPriceSource(deal) || "") : ""} basis={signedIn && deal.asking_price_display ? "Broker-stated" : ""} />
         {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
         {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
@@ -191,10 +199,11 @@ export default function KeyStrip({
       {signedIn && showFinancials && financialsOpen && shownPanel?.open ? (
         <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
       ) : null}
+      {signedIn && deal.kind !== "land" ? <PricingSection deal={deal} /> : null}
       <div className="supporting">
         {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
         {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}
-        {deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
+        {signedIn && deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
         <span>Depot</span><strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
         {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{deal.access_notes}</strong></> : null}
         {listing.label ? <><span>Listing</span><strong>{listing.label}</strong></> : null}

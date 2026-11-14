@@ -37,6 +37,12 @@ export const PIPELINE_COLUMNS = [
   { id: "capacity", label: "Site capacity" },
   { id: "traffic", label: "Traffic count" },
   { id: "cashFlow", label: "Cash flow" },
+  { id: "revenue", label: "Revenue", optional: true },
+  { id: "askingRevenue", label: "Asking/revenue", optional: true },
+  { id: "askingCash", label: "Asking/cash flow", optional: true },
+  { id: "businessMultiple", label: "Business-only multiple", optional: true },
+  { id: "landEstimate", label: "Land estimate", optional: true },
+  { id: "countyValue", label: "County value", optional: true },
   { id: "depot", label: "Depot mi" },
   { id: "checked", label: "Checked" },
   { id: "address", label: "Address", optional: true },
@@ -71,6 +77,9 @@ export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
     if (key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
+    if (key === "stated_revenue" || key === "stated_revenue_display" || key === "stated_cash_flow" || key === "stated_cash_flow_display") delete copy[key];
+    if (key === "county_value" || key === "county_value_display" || key === "land_estimate" || key === "land_estimate_display") delete copy[key];
+    if (key === "business_value" || key === "business_value_display" || key.endsWith("_multiple") || key.endsWith("_multiple_display")) delete copy[key];
   }
   return copy;
 }
@@ -471,15 +480,6 @@ export function cashTile(deal: DealProps) {
   }
   if (deal.figures_status === "withheld") {
     return { value: "Package figures not shown", note: "Seller package", basis: "", extra: "", hidden: false };
-  }
-  if (deal.stated_revenue_display) {
-    return {
-      value: deal.stated_revenue_display,
-      note: [deal.figures_source || "Seller-stated", packageLine(deal)].filter(Boolean).join(" · "),
-      basis: claimWord(deal) || "Broker-stated",
-      extra: "",
-      hidden: false,
-    };
   }
   const line = packageLine(deal);
   return { value: "Not provided", note: line, basis: claimWord(deal), extra: "", hidden: false };

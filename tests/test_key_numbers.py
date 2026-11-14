@@ -112,7 +112,8 @@ class KeyFiguresTest(unittest.TestCase):
             "pipeline",
         )
         self.assertEqual(figures["figures_status"], "shown")
-        self.assertIsNone(figures["stated_revenue"])
+        self.assertEqual(figures["stated_revenue"], 900000)
+        self.assertEqual(figures["stated_revenue_display"], "$900,000")
         self.assertEqual(figures["stated_cash_flow"], -121000)
         self.assertEqual(figures["stated_cash_flow_display"], "-$121,000")
         self.assertEqual(figures["cash_flow_label"], "EBITDA")
@@ -130,7 +131,7 @@ class KeyFiguresTest(unittest.TestCase):
         blob = json.dumps(figures).lower()
         self.assertNotIn("matthews", blob)
         self.assertNotIn("folder", blob)
-        self.assertNotIn("900000", blob)
+        self.assertIn("900000", blob)
         problems = scan_obj(figures, "figures")
         self.assertEqual(problems, [])
 

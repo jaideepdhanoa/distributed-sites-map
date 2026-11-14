@@ -135,8 +135,8 @@ test("the service-area chip stays quiet inside and names near and outside", () =
   assert.equal(serviceAreaChip({ service_area_class: "inside", service_area_distance_mi: 0 }), "");
   assert.equal(serviceAreaChip({ service_area_class: "edge_legacy" }), "");
   assert.equal(serviceAreaChip({ service_area_class: "unknown" }), "");
-  assert.equal(serviceAreaChip({ service_area_class: "near_5_10", service_area_distance_mi: 3.24 }), "Near · 3.2 mi");
-  assert.equal(serviceAreaChip({ service_area_class: "near_0_5" }), "Near");
+  assert.equal(serviceAreaChip({ service_area_class: "near_5_10", service_area_distance_mi: 3.24 }), "3.2 mi outside service area");
+  assert.equal(serviceAreaChip({ service_area_class: "near_0_5" }), "Outside service area");
   assert.equal(serviceAreaChip({ service_area_class: "outside", service_area_distance_mi: 12 }), "Outside · knock-out");
   assert.equal(contactDate("2026-11-06"), "Nov 6");
 });

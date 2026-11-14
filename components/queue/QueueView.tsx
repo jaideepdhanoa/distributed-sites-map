@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { RowLinks } from "../RowLinks";
 import { stageMoveLabel } from "@/lib/actions/nextStepTypes";
 import { formatPacific } from "@/lib/actions/time";
 import { reviewSentence } from "@/lib/queue/since";
@@ -334,30 +335,36 @@ export function FilterPopover({
   );
 }
 
+export type ReviewLinks = Record<string, { listing?: string; folder?: string; packageHref?: string }>;
+
 export function ReviewRail({
   sites,
   currentId,
   onPick,
+  links,
 }: {
   sites: FeedSite[];
   currentId: string;
   onPick: (index: number) => void;
+  links?: ReviewLinks;
 }) {
   const { groups, rest } = reviewGroups(sites);
   const row = (site: FeedSite, index: number) => (
-    <button
-      key={site.siteId}
-      type="button"
-      className={`review-row ${site.siteId === currentId ? "on" : ""} ${site.status === "reviewed" ? "done" : ""}`}
-      onClick={() => onPick(index)}
-    >
-      <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
-      <span>{marketLabel(site.city)}</span>
-      <span className="review-row-chips">
-        {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
-        {site.reasons[0] ? <time>{reasonWhen(site.reasons[0].at)}</time> : null}
-      </span>
-    </button>
+    <div key={site.siteId} className="review-line">
+      <button
+        type="button"
+        className={`review-row ${site.siteId === currentId ? "on" : ""} ${site.status === "reviewed" ? "done" : ""}`}
+        onClick={() => onPick(index)}
+      >
+        <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
+        <span>{marketLabel(site.city)}</span>
+        <span className="review-row-chips">
+          {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
+          {site.reasons[0] ? <time>{reasonWhen(site.reasons[0].at)}</time> : null}
+        </span>
+      </button>
+      <RowLinks listing={links?.[site.siteId]?.listing} folder={links?.[site.siteId]?.folder} packageHref={links?.[site.siteId]?.packageHref} />
+    </div>
   );
   return (
     <aside className="review-rail" data-testid="review-rail" aria-label="Review inbox">
@@ -382,11 +389,13 @@ export function ReviewFeedSheet({
   currentId,
   onPick,
   onClose,
+  links,
 }: {
   sites: FeedSite[];
   currentId: string;
   onPick: (index: number) => void;
   onClose: () => void;
+  links?: ReviewLinks;
 }) {
   return (
     <div className="review-sheet" data-testid="review-feed" role="dialog" aria-label="Review list">
@@ -397,15 +406,17 @@ export function ReviewFeedSheet({
       {(() => {
         const { groups, rest } = reviewGroups(sites);
         const row = (site: FeedSite, index: number) => (
-          <button
-            key={site.siteId}
-            type="button"
-            className={`review-row ${site.siteId === currentId ? "on" : ""}`}
-            onClick={() => { onPick(index); onClose(); }}
-          >
-            <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{index + 1}. {site.name}</strong>
-            <span>{marketLabel(site.city)} · {chips(site.reasons).map((chip) => chip.label).join(", ")}</span>
-          </button>
+          <div key={site.siteId} className="review-line">
+            <button
+              type="button"
+              className={`review-row ${site.siteId === currentId ? "on" : ""}`}
+              onClick={() => { onPick(index); onClose(); }}
+            >
+              <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{index + 1}. {site.name}</strong>
+              <span>{marketLabel(site.city)} · {chips(site.reasons).map((chip) => chip.label).join(", ")}</span>
+            </button>
+            <RowLinks listing={links?.[site.siteId]?.listing} folder={links?.[site.siteId]?.folder} packageHref={links?.[site.siteId]?.packageHref} />
+          </div>
         );
         return (
           <>

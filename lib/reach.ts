@@ -30,9 +30,9 @@ export function reachParam(value: Reach): string | null {
 }
 
 export function reachLabel(value: Reach): string {
-  if (value === "inside") return "Inside only";
-  if (value === "within5") return "Within 5 mi";
-  return "Within 10 mi";
+  if (value === "inside") return "Service area only";
+  if (value === "within5") return "Service area + 5 mi";
+  return "Service area + 10 mi";
 }
 
 export function explicitClass(record: AreaInput | null | undefined): ServiceClass | null {
@@ -83,8 +83,8 @@ export function areaCounts(records: AreaInput[], reach: Reach = REACH_DEFAULT): 
 export function serviceAreaSplit(records: AreaInput[], reach: Reach = REACH_DEFAULT): string {
   const counts = areaCounts(records, reach);
   const parts = [`Inside ${counts.inside.toLocaleString("en-US")}`];
-  if (reach !== "inside") parts.push(`Near 0-5 ${counts.near_0_5.toLocaleString("en-US")}`);
-  if (reach === "within10") parts.push(`Near 5-10 ${counts.near_5_10.toLocaleString("en-US")}`);
+  if (reach !== "inside") parts.push(`Within 5 mi outside ${counts.near_0_5.toLocaleString("en-US")}`);
+  if (reach === "within10") parts.push(`Within 10 mi outside ${counts.near_5_10.toLocaleString("en-US")}`);
   if (counts.edge_legacy) parts.push(`Edge ${counts.edge_legacy.toLocaleString("en-US")}`);
   return parts.join(" · ");
 }

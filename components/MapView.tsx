@@ -537,11 +537,12 @@ export default function MapView(props: Props) {
               "text-field": ["get", "name"],
               "text-font": ["Noto Sans Regular"],
               "text-size": 13,
-              "text-max-width": 10,
-              "text-variable-anchor": ["bottom", "top", "left", "right"],
-              "text-radial-offset": 2.4,
+              "text-max-width": 12,
+              "text-anchor": "left",
+              "text-offset": [0.2, 0],
+              "text-justify": "left",
               "text-allow-overlap": true,
-              "text-padding": 4,
+              "text-padding": 6,
             },
             paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 2 },
           },
@@ -1312,7 +1313,7 @@ export default function MapView(props: Props) {
         fitMap(
           map,
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: { top: 176, bottom: 168, left: 28, right: 36 }, maxZoom: 12.4, duration: 0 },
+          { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
       } else if (appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;

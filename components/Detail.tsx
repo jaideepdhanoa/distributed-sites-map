@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, folderHref, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
-import { contactDate, serviceAreaChip } from "@/lib/cardStatus";
+import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
+import { RowLinks } from "./RowLinks";
 import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
@@ -178,7 +179,8 @@ function StageChip({ deal }: { deal: DealProps }) {
 function AreaChip({ record }: { record: { service_area_class?: DealProps["service_area_class"]; service_area_distance_mi?: number | null } }) {
   const label = serviceAreaChip(record);
   if (!label) return null;
-  return <span className={record.service_area_class === "outside" ? "badge gone" : "badge quiet"} data-testid="service-area-chip">{label}</span>;
+  const near = record.service_area_class === "near_0_5" || record.service_area_class === "near_5_10";
+  return <span className={record.service_area_class === "outside" ? "badge gone" : "badge quiet near-chip"} data-testid={near ? "near-chip" : "service-area-chip"} data-short={near ? serviceAreaShort(record) : undefined} title={near ? NEAR_TIP : undefined}>{label}</span>;
 }
 
 function CardLink({ href, label, testId, title }: { href?: string; label: string; testId: string; title?: string }) {
@@ -209,9 +211,7 @@ function CardLinks({
 }) {
   return (
     <p className="card-links">
-      <CardLink href={listing} label="Listing" testId="listing-link" title={listingTitle} />
-      <CardLink href={folder} label="Folder" testId="site-folder-link" />
-      {signedIn ? <CardLink href={packageHref} label="Package" testId="package-link" /> : null}
+      <RowLinks listing={listing} folder={folder} packageHref={signedIn ? packageHref : ""} listingTitle={listingTitle} showMissing testIds="card" />
       <CardLink href={map} label="Map" testId="map-link" />
       <CardLink href={street} label="Street View" testId="street-view-link" />
     </p>

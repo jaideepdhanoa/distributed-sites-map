@@ -39,6 +39,15 @@ export const PIPELINE_COLUMNS = [
   { id: "cashFlow", label: "Cash flow" },
   { id: "depot", label: "Depot mi" },
   { id: "checked", label: "Checked" },
+  { id: "address", label: "Address", optional: true },
+  { id: "apn", label: "APN", optional: true },
+  { id: "zoning", label: "Zoning", optional: true },
+  { id: "broker", label: "Broker / firm", optional: true },
+  { id: "area", label: "Service area", optional: true },
+  { id: "nda", label: "NDA status", optional: true },
+  { id: "lastContact", label: "Last contact", optional: true },
+  { id: "nextStep", label: "Next step", optional: true },
+  { id: "type", label: "Type", optional: true },
 ] as const;
 
 export type PipelineColumnId = (typeof PIPELINE_COLUMNS)[number]["id"];
@@ -556,9 +565,14 @@ export function acreUnit(value?: number | null, text?: string | null) {
   return `${shown} ac`;
 }
 
+/** Optional columns stay off until someone turns them on. */
+export function defaultColumnIds(): PipelineColumnId[] {
+  return PIPELINE_COLUMNS.filter((column) => !("optional" in column && column.optional)).map((column) => column.id);
+}
+
 export function parseColumns(value: string | null): PipelineColumnId[] {
   const known = new Set(PIPELINE_COLUMNS.map((column) => column.id));
   const picked = (value || "").split(",").filter((id): id is PipelineColumnId => known.has(id as PipelineColumnId));
-  if (!picked.length || !picked.includes("site")) return PIPELINE_COLUMNS.map((column) => column.id);
+  if (!picked.length || !picked.includes("site")) return defaultColumnIds();
   return picked;
 }

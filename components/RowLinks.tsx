@@ -25,38 +25,62 @@ function Icon({ kind }: { kind: "listing" | "folder" | "package" }) {
   );
 }
 
+const COPY = {
+  listing: { label: "Open the listing", missing: "No listing on file", testId: "listing-link" },
+  folder: { label: "Open the site folder", missing: "No site folder on file", testId: "site-folder-link" },
+  package: { label: "Open the package", missing: "No package on file", testId: "package-link" },
+} as const;
+
 export function RowLinks({
   listing,
   folder,
   packageHref,
+  listingTitle,
+  showMissing = false,
+  testIds = "row",
 }: {
   listing?: string;
   folder?: string;
   packageHref?: string;
+  listingTitle?: string;
+  showMissing?: boolean;
+  testIds?: "row" | "card";
 }) {
   const items = [
-    listing ? { href: listing, label: "Listing", kind: "listing" as const } : null,
-    folder ? { href: folder, label: "Folder", kind: "folder" as const } : null,
-    packageHref ? { href: packageHref, label: "Package", kind: "package" as const } : null,
-  ].filter((item): item is { href: string; label: string; kind: "listing" | "folder" | "package" } => Boolean(item));
+    { kind: "listing" as const, href: listing || "" },
+    { kind: "folder" as const, href: folder || "" },
+    { kind: "package" as const, href: packageHref || "" },
+  ].filter((item) => item.href || (showMissing && item.kind !== "package"));
   if (!items.length) return null;
   return (
     <span className="row-links">
-      {items.map((item) => (
-        <a
-          key={item.kind}
-          className="row-link"
-          data-testid={`row-link-${item.kind}`}
-          href={item.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={item.label}
-          title={item.label}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <Icon kind={item.kind} />
-        </a>
-      ))}
+      {items.map((item) => {
+        const copy = COPY[item.kind];
+        const title = item.kind === "listing" && item.href ? (listingTitle || copy.label) : item.href ? copy.label : copy.missing;
+        const testId = testIds === "card" ? copy.testId : `row-link-${item.kind}`;
+        if (!item.href) {
+          return (
+            <span key={item.kind} className="row-link muted" data-testid={testId} title={title} aria-label={title}>
+              <Icon kind={item.kind} />
+            </span>
+          );
+        }
+        return (
+          <a
+            key={item.kind}
+            className="row-link"
+            data-testid={testId}
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={title}
+            title={title}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Icon kind={item.kind} />
+          </a>
+        );
+      })}
     </span>
   );
 }

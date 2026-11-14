@@ -40,13 +40,15 @@ test("service-area counts follow the reach and split by class", () => {
   assert.equal(within5.total, 4);
   assert.equal(within5.near_0_5, 1);
   assert.equal(within5.near_5_10, 0);
-  assert.equal(serviceAreaSplit(universe, "within5"), "Inside 2 · Near 0-5 1 · Edge 1");
+  assert.equal(serviceAreaSplit(universe, "within5"), "Inside 2 · Within 5 mi outside 1 · Edge 1");
   const within10 = areaCounts(universe, "within10");
   assert.equal(within10.total, 5);
   assert.equal(within10.near_5_10, 1);
   assert.equal(within10.inside + within10.near_0_5 + within10.near_5_10 + within10.edge_legacy, within10.total);
-  assert.equal(serviceAreaSplit(universe, "within10"), "Inside 2 · Near 0-5 1 · Near 5-10 1 · Edge 1");
-  assert.equal(reachLabel("within5"), "Within 5 mi");
+  assert.equal(serviceAreaSplit(universe, "within10"), "Inside 2 · Within 5 mi outside 1 · Within 10 mi outside 1 · Edge 1");
+  assert.equal(reachLabel("inside"), "Service area only");
+  assert.equal(reachLabel("within5"), "Service area + 5 mi");
+  assert.equal(reachLabel("within10"), "Service area + 10 mi");
 });
 
 function queue(reach: Reach) {

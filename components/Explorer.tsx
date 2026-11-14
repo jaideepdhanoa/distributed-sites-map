@@ -23,7 +23,7 @@ import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/l
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
 import { displayAddress, folderHref, leadSourceLine, listingHref } from "@/lib/format";
 import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
-import { PIPELINE_COLUMNS, capacitySummary, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
+import { PIPELINE_COLUMNS, capacitySummary, defaultColumnIds, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
 import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
@@ -37,7 +37,9 @@ import AlertSettings from "./alerts/AlertSettings";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
-import { serviceAreaChip } from "@/lib/cardStatus";
+import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
+import { canWrite } from "./actions/panel";
+import type { ActionRole } from "@/lib/actions/roles";
 import { inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "@/lib/reach";
 import { NdaChip } from "./NdaChip";
 import NdaQueue from "./NdaQueue";
@@ -232,6 +234,13 @@ export default function Explorer() {
     landlayer: params.get("landlayer"),
     cstore: params.get("cstore"),
   });
+  const categoriesRef = useRef(categories);
+  const categoryKey = `${params.get("cats") || ""}|${params.get("landlayer") || ""}|${params.get("cstore") || ""}`;
+  const categoryKeyRef = useRef(categoryKey);
+  if (categoryKeyRef.current !== categoryKey) {
+    categoryKeyRef.current = categoryKey;
+    categoriesRef.current = categories;
+  }
   const query = params.get("q") || "";
   useEffect(() => {
     if (!searchFocused.current) setQueryDraft(query);
@@ -411,6 +420,22 @@ export default function Explorer() {
     await navigator.clipboard.writeText(window.location.href);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function postSelection(ids: string[], bodyFor: (id: string) => Record<string, string>, path = "/api/actions/notes") {
+    const errors: string[] = [];
+    for (const id of ids) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(bodyFor(id)),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { error?: string };
+        errors.push(payload.error || "That could not be saved.");
+      }
+    }
+    if (errors.length) throw new Error(errors[0]);
   }
 
   const dataGen = useRef(0);
@@ -689,7 +714,9 @@ export default function Explorer() {
   }
 
   function setCategory(id: CategoryId, on: boolean) {
-    write(categorySearch({ ...categories, [id]: on }));
+    const next = { ...categoriesRef.current, [id]: on };
+    categoriesRef.current = next;
+    write(categorySearch(next));
   }
 
   useEffect(() => {
@@ -1356,6 +1383,11 @@ export default function Explorer() {
     return serviceAreaChip(record);
   }
 
+  function nearShort(record?: { service_area_class?: DealProps["service_area_class"]; service_area_distance_mi?: number | null } | null) {
+    if (!nearText(record)) return "";
+    return serviceAreaShort(record);
+  }
+
   function siteRow(site: SiteProps): ListRow {
     const price = site.listed && site.asking_price_display ? `${site.asking_price_display}${site.asking_price_source ? ` · ${site.asking_price_source}` : ""}` : "";
     return {
@@ -1372,6 +1404,8 @@ export default function Explorer() {
       listed: site.listed ? `Yes${price ? ` · ${price}` : ""}` : "No",
       lead: leadSourceLine(site, dealRows.find((deal) => deal.deal_id === site.linked_deal_id || deal.universe_id === site.site_id)),
       near: nearText(dealForSite(site)?.service_area_class ? dealForSite(site) : site),
+      nearShort: nearShort(dealForSite(site)?.service_area_class ? dealForSite(site) : site),
+      address: displayAddress(site.address),
       listingUrl: listingHref(dealForSite(site)?.listing_url || site.listing_url),
       folderUrl: folderHref(site.folder_url || dealForSite(site)?.folder_url),
       packageUrl: dealForSite(site)?.package_href || "",
@@ -1397,6 +1431,8 @@ export default function Explorer() {
       nda: ndaChip(deal),
       ndaId: deal.nda_id || "",
       near: nearText(deal.service_area_class ? deal : linked),
+      nearShort: nearShort(deal.service_area_class ? deal : linked),
+      address: displayAddress(deal.address || linked?.address),
       listingUrl: listingHref(deal.listing_url || linked?.listing_url),
       folderUrl: folderHref(deal.folder_url || linked?.folder_url),
       packageUrl: deal.package_href || "",
@@ -1439,7 +1475,22 @@ export default function Explorer() {
   })());
   const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
   const landForList = stageLandRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
-  const pipelineRows: PipelineRow[] = [...rangedPipeline, ...landForList].map((deal) => ({ deal, noPin: !dealPoint(deal) }));
+  const pickedIds = (params.get("pick") || "").split("|").filter(Boolean);
+  const pickedSet = new Set(pickedIds);
+  const listDeals = pickedSet.size
+    ? dealRows.filter((deal) => pickedSet.has(deal.deal_id) && viewDeal(deal) && dealAllowed(deal))
+    : [...rangedPipeline, ...landForList];
+  const reviewLinks: Record<string, { listing?: string; folder?: string; packageHref?: string }> = {};
+  for (const deal of dealRows) {
+    const listing = listingHref(deal.listing_url);
+    const folder = folderHref(deal.folder_url);
+    const packageHref = deal.package_href || "";
+    if (listing || folder || packageHref) reviewLinks[deal.deal_id] = { listing, folder, packageHref };
+  }
+  const pipelineRows: PipelineRow[] = listDeals.map((deal) => {
+    const linked = deal.universe_id ? siteById.get(deal.universe_id) : undefined;
+    return { deal, noPin: !dealPoint(deal), zoning: linked?.zoning || "", apn: deal.apn || linked?.apn || "" };
+  });
 
   function exportList() {
     const blob = new Blob([listCsv(listRows)], { type: "text/csv" });
@@ -1455,6 +1506,7 @@ export default function Explorer() {
   if (categories.land) activeFilters.push({ id: "landcat", label: "Land", clear: () => setCategory("land", false) });
   if (categories.store) activeFilters.push({ id: "store", label: "C-stores", clear: () => setCategory("store", false) });
   if (reach !== "within10") activeFilters.push({ id: "reach", label: reachLabel(reach), clear: () => write({ reach: null }) });
+  if (pickedIds.length) activeFilters.push({ id: "pick", label: `${pickedIds.length.toLocaleString()} selected`, clear: () => write({ pick: null }) });
   if (landTier !== "any") activeFilters.push({ id: "tier", label: tierLabel(landTier) || "Spare land", clear: () => write({ tier: null }) });
   if (verdict !== "any") activeFilters.push({ id: "verdict", label: plainVerdict(verdict), clear: () => write({ verdict: null }) });
   if (listed === "yes") activeFilters.push({ id: "listed", label: "Listed", clear: () => write({ listed: null }) });
@@ -1666,9 +1718,20 @@ export default function Explorer() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
-        <div className="funnel-switch map-switch only-mobile" role="group" aria-label="Map or list">
-          <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
-          <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
+        <div className="phone-view-row only-mobile">
+          <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
+            <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
+            <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
+          </div>
+          <label className="reach-pick">
+            <span className="sr">Reach</span>
+            <select className="secondary" aria-label="Reach" data-testid="reach-chip" value={reach} onChange={(event) => write({ reach: event.target.value === "within10" ? null : event.target.value })}>
+              <option value="inside">Service area only</option>
+              <option value="within5">Service area + 5 mi</option>
+              <option value="within10">Service area + 10 mi</option>
+            </select>
+          </label>
+          <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
@@ -1696,7 +1759,10 @@ export default function Explorer() {
           </div>
         ) : null}
         <div className="funnel-row">
-          <button className="close only-mobile" type="button" aria-label="Close steps" onClick={() => setStepsOpen(false)}><span aria-hidden="true">×</span></button>
+          <div className="funnel-sheet-head only-mobile">
+            <p className="eyebrow">Steps</p>
+            <button className="close" type="button" aria-label="Close steps" onClick={() => setStepsOpen(false)}><span aria-hidden="true">×</span></button>
+          </div>
           <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? null : (
               <>
@@ -1825,7 +1891,7 @@ export default function Explorer() {
         {activeFilters.length ? (
           <div className="active-row" aria-label="Active filters">
             {activeFilters.map((item) => (
-              <button key={item.id} className="removable" type="button" onClick={item.clear}>
+              <button key={item.id} className={item.id === "reach" ? "removable only-desktop" : "removable"} type="button" onClick={item.clear}>
                 {item.label}
                 <span aria-hidden="true">×</span>
                 <span className="sr">Remove</span>
@@ -1873,16 +1939,18 @@ export default function Explorer() {
                 write({ who: next, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list" });
               }}
             />
-            <h3>Reach</h3>
-            <p className="filter-note">Inside only, within 5 miles, or within 10 miles. Outside stays off this view. Nothing is dropped.</p>
-            <div className="segmented" role="group" aria-label="Reach" data-testid="reach-filter">
-              {([
-                ["inside", "Inside only"],
-                ["within5", "Within 5 mi"],
-                ["within10", "Within 10 mi"],
-              ] as const).map(([item, label]) => (
-                <button key={item} type="button" className={`segmented ${reach === item ? "on" : ""}`} onClick={() => write({ reach: item === "within10" ? null : item })}>{label}</button>
-              ))}
+            <div className="only-desktop">
+              <h3>Reach</h3>
+              <p className="filter-note">Service area only, plus 5 miles outside, or plus 10 miles outside. Farther than 10 miles stays off this view. Nothing is dropped.</p>
+              <div className="segmented" role="group" aria-label="Reach" data-testid="reach-filter">
+                {([
+                  ["inside", "Service area only"],
+                  ["within5", "Service area + 5 mi"],
+                  ["within10", "Service area + 10 mi"],
+                ] as const).map(([item, label]) => (
+                  <button key={item} type="button" className={`segmented ${reach === item ? "on" : ""}`} onClick={() => write({ reach: item === "within10" ? null : item })}>{label}</button>
+                ))}
+              </div>
             </div>
             <h3>Spare land</h3>
             <p className="filter-note">{SPARE_LAND_NOTE}</p>
@@ -1921,6 +1989,36 @@ export default function Explorer() {
                 </span>
               </label>
             </div>
+            {listView && funnel === "pipeline" ? (
+              <>
+                <h3>Column ranges</h3>
+                <p className="filter-note">Minimum and maximum for the pipeline list. These do not change the map.</p>
+                <div className="range-filters">
+                  {(
+                    [
+                      ["Asking", "$", "askMin", "askMax"],
+                      ["Acres", "ac", "acMin", "acMax"],
+                      ["Per acre", "$/ac", "paMin", "paMax"],
+                      ["Open land", "sq ft", "olMin", "olMax"],
+                    ] as const
+                  ).map(([label, unit, minKey, maxKey]) => (
+                    <label key={label}>
+                      {label} ({unit})
+                      <input className="field" aria-label={`${label} minimum`} placeholder="Min" inputMode="decimal" value={ranges[minKey] ?? ""} onChange={(event) => {
+                        const raw = event.target.value.trim();
+                        const value = raw === "" ? null : Number(raw);
+                        write(rangeQuery({ ...ranges, [minKey]: value != null && Number.isFinite(value) ? value : null }));
+                      }} />
+                      <input className="field" aria-label={`${label} maximum`} placeholder="Max" inputMode="decimal" value={ranges[maxKey] ?? ""} onChange={(event) => {
+                        const raw = event.target.value.trim();
+                        const value = raw === "" ? null : Number(raw);
+                        write(rangeQuery({ ...ranges, [maxKey]: value != null && Number.isFinite(value) ? value : null }));
+                      }} />
+                    </label>
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
         ) : null}
         {menuOpen ? (
@@ -2037,7 +2135,7 @@ export default function Explorer() {
       <div className="map-stage">
         <ActionsDialogs />
         {inReview && !caughtUp ? (
-          <ReviewRail sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} />
+          <ReviewRail sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
         ) : null}
         {inReview && caughtUp ? (
           <div className="review-done" data-testid="queue-empty">
@@ -2053,7 +2151,7 @@ export default function Explorer() {
           </div>
         ) : null}
         {feedSheet ? (
-          <ReviewFeedSheet sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} />
+          <ReviewFeedSheet sites={visibleFeed} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? shownFeatures : [])}
@@ -2137,17 +2235,36 @@ export default function Explorer() {
             columns={pipelineColumns}
             selectedId={selected}
             sort={{ id: pipelineSortId, desc: sortDesc }}
-            ranges={ranges}
+            signedIn={Boolean(me?.u)}
+            canAct={Boolean(me?.actionRole && canWrite(me.actionRole as ActionRole))}
             onSort={(id, desc) => write({ sort: `${id}:${(desc ?? (pipelineSortId === id ? !sortDesc : false)) ? "desc" : "asc"}` })}
             onOpen={choose}
             onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
             onColumns={(next) => {
-              const all = PIPELINE_COLUMNS.map((column) => column.id).join(",");
+              const defaults = defaultColumnIds().join(",");
               const value = next.join(",");
-              write({ cols: value === all ? null : value });
+              write({ cols: value === defaults ? null : value });
             }}
             onResetColumns={() => write({ cols: null })}
-            onRanges={(next) => write(rangeQuery(next))}
+            onBroker={(name) => write({ who: name, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list" })}
+            onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: "list" })}
+            onCopyLink={async (ids) => {
+              const next = new URL(window.location.href);
+              next.searchParams.set("view", "list");
+              next.searchParams.set("funnel", "pipeline");
+              next.searchParams.set("pick", ids.join("|"));
+              next.searchParams.delete("pstage");
+              await navigator.clipboard.writeText(next.toString());
+            }}
+            onComment={(ids, body) => postSelection(ids, (id) => ({ targetKind: "deal", targetId: id, body }))}
+            onDrop={(ids, reason) => postSelection(ids, (id) => ({
+              targetKind: "deal",
+              targetId: id,
+              field: "proposed_next_step",
+              detail: "knock_off",
+              proposedValue: "Dropped",
+              reason,
+            }), "/api/actions/suggestions")}
           />
         ) : listView && !ndaVisible && !loopsVisible ? (
           <ListView
@@ -2257,7 +2374,7 @@ export default function Explorer() {
                 <li><i className="swatch held" /> Held</li>
                 <li><i className="swatch l10" /> 10k+ sq ft</li>
                 <li><i className="swatch l4" /> 4k+ sq ft</li>
-                <li><i className="swatch near" /> Near</li>
+                <li title={NEAR_TIP}><i className="swatch near" /> Outside, nearby</li>
               </ul>
             </aside>
           </div>

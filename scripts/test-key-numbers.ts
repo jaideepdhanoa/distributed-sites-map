@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
 import { matchesLandTier, spareTier } from "../lib/filter.ts";
-import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, countYear, dealLabelFeatures, displayScore, growthText, pillText, inRange, openLandText, peerNote, publicDeal, rangesFromSearch, sheetMoney, summaryOf, tileAmount, universeTrafficLine, vehiclesPerDay, workbookTrafficLine } from "../lib/keyNumbers.ts";
+import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, countYear, dealLabelFeatures, defaultColumnIds, displayScore, growthText, pillText, inRange, openLandText, parseColumns, peerNote, publicDeal, rangesFromSearch, sheetMoney, summaryOf, tileAmount, universeTrafficLine, vehiclesPerDay, workbookTrafficLine } from "../lib/keyNumbers.ts";
 import { overlayFeatures } from "../lib/overlays.ts";
 import { inSelectedMarket, matchesOpenLandTier } from "../lib/filter.ts";
 import { inMapArea, parseMapArea } from "../lib/geoFilter.ts";
@@ -171,4 +171,8 @@ assert.equal(pin.name, "A");
 assert.equal(openLandText(0), "0 sq ft");
 assert.equal(openLandText(null), "");
 assert.equal(openLandText(undefined), "");
+assert.equal(defaultColumnIds().includes("address"), false);
+assert.equal(defaultColumnIds().includes("site"), true);
+assert.deepEqual(parseColumns(null).includes("nda"), false);
+assert.equal(parseColumns("site,nda").includes("nda"), true);
 console.log("key numbers ok");

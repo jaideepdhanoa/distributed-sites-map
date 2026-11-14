@@ -63,7 +63,7 @@ const PIPE_STEPS: { id: PipeId; label: string }[] = [
 
 const STEPS: { id: StageId; label: string }[] = [
   { id: "universe", label: "Universe" },
-  { id: "in_area", label: "In service area" },
+  { id: "in_area", label: "Service area" },
   { id: "land", label: "Spare land" },
   { id: "county", label: "County-checked" },
   { id: "cleared", label: "Cleared" },
@@ -850,7 +850,7 @@ export default function Explorer() {
     : null;
   const shownFeatures = handoffStep ? listedFeatures(handoffStep) : visibleFeatures;
   const handoffCopy = handoffStep
-    ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "In service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
+    ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "Service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
     : handoff;
   const areaDeals = (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
     if (funnel === "pipeline" && dealCategory(feature.properties) === "wash" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
@@ -898,7 +898,7 @@ export default function Explorer() {
     }
     if (stage !== "in_area" && areaListed > 0) {
       handedOff.current = key;
-      setHandoff(`${from} has no listed sites. Showing In service area, which has ${areaListed.toLocaleString()} listed.`);
+      setHandoff(`${from} has no listed sites. Showing Service area, which has ${areaListed.toLocaleString()} listed.`);
       write({ stage: "in_area", listed: "yes" });
     }
   }, [data, listedStepEmpty, stage, listed, funnel, listView]);
@@ -2066,13 +2066,13 @@ export default function Explorer() {
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
-            ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Universe has ${subcount("universe", "listed").toLocaleString()} listed. In service area has ${subcount("in_area", "listed").toLocaleString()} listed.`
+            ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Universe has ${subcount("universe", "listed").toLocaleString()} listed. Service area has ${subcount("in_area", "listed").toLocaleString()} listed.`
             : compare ? `No disagreements in ${city === "PHX" ? "Phoenix" : city === "LAS" ? "Las Vegas" : "Miami"}.` : query ? "No matches." : "Nothing to show for this step."}</p>
         ) : null}
         {listedStepEmpty && !handoffStep && !listView ? (
           <div className="empty-actions">
             <button type="button" onClick={() => write({ stage: "universe", listed: "yes" })} className="menu-item">Show Universe listed</button>
-            <button type="button" onClick={() => write({ stage: "in_area", listed: "yes" })} className="menu-item">Show in service area listed</button>
+            <button type="button" onClick={() => write({ stage: "in_area", listed: "yes" })} className="menu-item">Show Service area listed</button>
           </div>
         ) : null}
         {!listView && !selected && data ? (

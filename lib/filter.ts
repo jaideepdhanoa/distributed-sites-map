@@ -119,9 +119,9 @@ export function inSelectedMarket(
 
 // Universe funnel. The first step is one pin per place after census records are merged.
 // Each later step is a subset of the one before it:
-// Universe > In service area > L10/L4 > County-checked > Cleared.
+// Universe > Service area > L10/L4 > County-checked > Cleared.
 // Held fits sit outside the operative service area (the Las Vegas 200/300 rings). They are
-// excluded from In service area and every later step, and are offered only as a separate note
+// excluded from Service area and every later step, and are offered only as a separate note
 // on L10/L4. Listed is a count on each step, not a step of its own.
 // Live broker outreach is a deal count on the Universe step, not a census-site flag.
 export function inStage(site: SiteProps, stage: StageId): boolean {

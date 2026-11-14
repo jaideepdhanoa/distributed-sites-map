@@ -87,6 +87,7 @@ FIGURE_FIELDS = (
     "financials_open",
     "access_notes",
     "score",
+    "location_points",
 )
 
 
@@ -493,7 +494,9 @@ def key_figures(row: dict, kind: str) -> dict:
         "cash_multiple": multiple,
         "cash_multiple_display": multiple_text,
         "access_notes": _access_note(row.get("Access and visibility notes")),
+        # Copied from the workbook. The service-area class does not recompute either number.
         "score": _score(row.get("Score (of 100)")),
+        "location_points": _score(row.get("Location points")),
     }
 
 

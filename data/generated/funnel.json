@@ -41,7 +41,7 @@
     },
     {
       "id": "in_area",
-      "name": "In service area",
+      "name": "Service area",
       "unit": "sites",
       "total": 1081,
       "by_city": {
@@ -83,7 +83,41 @@
           "Unknown": 2
         }
       },
-      "note": "Service area comes from the Universe tab. In is inside the current area. Out and unknown stay outside. Las Vegas rings 200 and 300 stay on the expansion horizon."
+      "note": "Service area comes from the Universe tab. Inside, Near 0-5, and Near 5-10 pass. Outside, more than 10.0 miles from the polygon, is a knock-out. Legacy In and Yes count as Inside. Legacy No and Out count as Outside. Legacy Edge stays its own class, edge (not re-measured), and passes, because those rows were not measured again under the four-class rule. Unknown stays out. The step is split by class so Near is not counted as Inside. Las Vegas rings 200 and 300 stay on the expansion horizon when they do not pass.",
+      "by_service_area": {
+        "inside": {
+          "total": 1081,
+          "by_city": {
+            "LAS": 186,
+            "PHX": 283,
+            "MIA": 612
+          }
+        },
+        "near_0_5": {
+          "total": 0,
+          "by_city": {
+            "LAS": 0,
+            "PHX": 0,
+            "MIA": 0
+          }
+        },
+        "near_5_10": {
+          "total": 0,
+          "by_city": {
+            "LAS": 0,
+            "PHX": 0,
+            "MIA": 0
+          }
+        },
+        "edge_legacy": {
+          "total": 0,
+          "by_city": {
+            "LAS": 0,
+            "PHX": 0,
+            "MIA": 0
+          }
+        }
+      }
     },
     {
       "id": "land_tier",

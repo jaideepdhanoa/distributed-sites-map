@@ -36,7 +36,8 @@ export type AskToolName = (typeof ASK_TOOLS)[number];
 const QUARANTINE_ID = "PIPE-PHX-0006";
 
 const SITE_FIELDS = [
-  "site_id", "city", "name", "address", "apn", "site_class", "in_area", "verdict",
+  "site_id", "city", "name", "address", "apn", "site_class", "in_area",
+  "service_area_class", "service_area_distance_mi", "service_area_polygon", "verdict",
   "lot_ac", "owner", "listed", "contacted", "pipeline_stage", "business_type",
   "zoning", "stage", "linked_deal_id", "linked_deal_name", "linked_deal_stage",
 ] as const;
@@ -143,7 +144,7 @@ function getSite(id: string) {
       kind: "deal",
       label: deal.name || key,
       href: siteHref(key),
-      ...pick(deal, ["city", "address", "stage", "stage_group", "business_type", "listed", "universe_id"]),
+      ...pick(deal, ["city", "address", "stage", "stage_group", "business_type", "listed", "universe_id", "in_area", "service_area_class", "service_area_distance_mi", "service_area_polygon"]),
       ...(suggested ? { suggested_drop: suggested } : {}),
       card: dealCardFacts(deal, universe),
     };

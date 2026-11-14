@@ -35,6 +35,10 @@ export type SiteProps = {
   coord_status: string;
   site_class: string;
   in_area: boolean;
+  /** R-099 class. edge_legacy is "edge (not re-measured)" and still passes. */
+  service_area_class?: "inside" | "near_0_5" | "near_5_10" | "outside" | "edge_legacy" | "unknown";
+  service_area_distance_mi?: number | null;
+  service_area_polygon?: string;
   service_ring: string;
   expansion_horizon: boolean;
   duplicate_of: string | null;
@@ -177,6 +181,11 @@ export type DealProps = {
   universe_id: string;
   coord_status: string;
   miles_to_depot: number | null;
+  /** Passes the location gate: inside, either Near band, or legacy edge. */
+  in_area?: boolean;
+  service_area_class?: "inside" | "near_0_5" | "near_5_10" | "outside" | "edge_legacy" | "unknown";
+  service_area_distance_mi?: number | null;
+  service_area_polygon?: string;
   listed: boolean;
   parcel_match?: string;
   parcel_acres?: number | null;
@@ -247,6 +256,8 @@ export type DealProps = {
   cash_multiple_display?: string | null;
   access_notes?: string;
   score?: number | null;
+  /** Workbook Location points cell. Not recomputed from the service-area class. */
+  location_points?: number | null;
   apn?: string;
   /** Site mirror of NDA Register. Blank ID means Not required. */
   nda_id?: string;

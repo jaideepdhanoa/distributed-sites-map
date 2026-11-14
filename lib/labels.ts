@@ -16,7 +16,7 @@ export const STATUS_NOTES: { id: string; label: string; note: string }[] = [
 export const FUNNEL_NOTES: Record<string, string> = {
   universe: "One site for each place after duplicate census records are merged.",
   unique: "One site for each place after duplicate census records are merged.",
-  in_area: "Inside the current operating area for that city.",
+  in_area: "Inside, within 10 miles, and legacy edge pass. Outside does not.",
   land: "Enough spare land for a larger layout, about 10,000 sq ft, or a smaller one, about 4,000 sq ft.",
   county: "In-area sites with enough spare land that also have a county verdict. The workbook checked 110 sites in all: 14 cleared, 30 possible, 47 ruled out, 15 not a car wash, and 4 unresolved. That full set includes sites outside the service area and sites without enough spare land.",
   cleared: "County records confirm an operating wash with enough spare land on its own parcel. The workbook clears 12. Charleston Car Wash and the Chandler Quick Quack stay Possible until review, so the map shows 10.",

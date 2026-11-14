@@ -292,6 +292,18 @@ def sync_pr_body() -> str:
     )
 
 
+def service_area_comment_lines(report: dict | None) -> list[str]:
+    """Flag workbook class values the sync did not recognize. A clean run says zero."""
+    items = []
+    if isinstance(report, dict):
+        found = report.get("service_area_unrecognized") or []
+        if isinstance(found, list):
+            items = [str(item) for item in found if str(item).strip()]
+    lines = [f"Unrecognized service-area classes: {len(items)}."]
+    lines.extend(f"- {item}" for item in items[:30])
+    return lines
+
+
 def write_sync_comment(path: Path) -> None:
     report = json.loads((ROOT / "data" / "generated" / "build_report.json").read_text())
     changes = report.get("changes") or {}
@@ -307,6 +319,7 @@ def write_sync_comment(path: Path) -> None:
             f"Verdict changes: {changes.get('verdict_changes', 0)}.",
             f"Stage moves: {changes.get('stage_moves', 0)}.",
             *_timeline_lines(),
+            *service_area_comment_lines(report),
             "",
             "Drift report (not served to the app):",
             "```",

@@ -9,7 +9,7 @@ const ELIMINATED = new Set(["FAIL", "NOT_A_WASH"]);
 
 export const STEP_LABEL: Record<(typeof STEPS)[number], string> = {
   universe: "Universe",
-  in_area: "In service area",
+  in_area: "Service area",
   land: "Spare land",
   county: "County-checked",
   cleared: "Cleared",

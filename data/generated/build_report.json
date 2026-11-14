@@ -54,6 +54,40 @@
       "Licence-only": 15,
       "Quarantined": 2,
       "Unknown": 38
+    },
+    "by_service_area": {
+      "inside": {
+        "total": 1081,
+        "by_city": {
+          "LAS": 186,
+          "PHX": 283,
+          "MIA": 612
+        }
+      },
+      "near_0_5": {
+        "total": 0,
+        "by_city": {
+          "LAS": 0,
+          "PHX": 0,
+          "MIA": 0
+        }
+      },
+      "near_5_10": {
+        "total": 0,
+        "by_city": {
+          "LAS": 0,
+          "PHX": 0,
+          "MIA": 0
+        }
+      },
+      "edge_legacy": {
+        "total": 0,
+        "by_city": {
+          "LAS": 0,
+          "PHX": 0,
+          "MIA": 0
+        }
+      }
     }
   },
   "land_tiers": {

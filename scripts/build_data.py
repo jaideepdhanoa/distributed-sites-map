@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.key_numbers import FIGURE_FIELDS, key_figures, listing_gone
+from scripts.service_area import SERVICE_AREA_NOTE, service_area_breakdown, service_area_fields, service_area_record_problems
 from scripts.nda import nda_mirror_fields
 from scripts.site_photos import index_photos, load_site_photos, photo_fields
 from scripts.timeline_drive import folder_id_from_row, folder_url_for
@@ -632,6 +633,7 @@ def apply_live_universe(
     seq: Counter = Counter()
     fresh = 0
     matched = 0
+    unrecognized: list[str] = []
     geocode_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
 
     def claim(city: str, apn_value, address: str) -> tuple[str | None, str | None]:
@@ -671,8 +673,10 @@ def apply_live_universe(
         owner = scrub(row.get("Owner of record") or row.get("Owner"))
         if owner:
             site["owner"] = owner
-        service = str(row.get("Service area") or "").strip()
-        site["in_area"] = service == "In"
+        fields, warning = service_area_fields(row, where=f"Universe {site['site_id']}")
+        site.update(fields)
+        if warning:
+            unrecognized.append(warning)
         ring = str(site.get("service_ring") or "")
         if site["in_area"]:
             site["expansion_horizon"] = False
@@ -843,6 +847,7 @@ def apply_live_universe(
         },
         "county_verdicts": {key: county.get(key, 0) for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")},
         "missing_point": [site["site_id"] for site in counted if site.get("lat") is None or site.get("lon") is None],
+        "service_area_unrecognized": unrecognized,
     }
 
 
@@ -1688,6 +1693,10 @@ DEAL_FIELDS = (
     "universe_id",
     "coord_status",
     "miles_to_depot",
+    "in_area",
+    "service_area_class",
+    "service_area_distance_mi",
+    "service_area_polygon",
     "listed",
     "listing_removed",
     "parcel_match",
@@ -2468,6 +2477,7 @@ def build_deal_layer(
     features = []
     failed = []
     matched = 0
+    unrecognized: list[str] = []
     expected_folders: list[tuple[str, str, str]] = []
     for kind, rows in (("pipeline", pipeline_rows), ("land", land_rows)):
         for index, row in enumerate(rows, start=1):
@@ -2514,6 +2524,9 @@ def build_deal_layer(
             address = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I)
             source = firm or broker or ("Listing" if url else "")
             folder = folder_url_from_row(row)
+            area_fields, area_warning = service_area_fields(row, where=deal_id)
+            if area_warning:
+                unrecognized.append(area_warning)
             if folder:
                 expected_folders.append((deal_id, folder, universe_id or ""))
             props = {
@@ -2535,6 +2548,7 @@ def build_deal_layer(
                 "universe_id": universe_id or "",
                 "coord_status": status,
                 "miles_to_depot": miles,
+                **area_fields,
                 "listed": str(row.get("Listing status") or "").strip() == "Listed",
                 "listing_removed": listing_gone(row.get("Listing status")),
                 "parcel_match": "",
@@ -2591,6 +2605,7 @@ def build_deal_layer(
             "The map links by parcel or a unique street and does not invent a row, a coordinate, or a parcel number."
         ),
         "geocode_failed": failed,
+        "service_area_unrecognized": unrecognized,
         "pipeline_by_city": dict(Counter(item["properties"]["city"] for item in pipeline)),
         "pipeline_by_stage": dict(Counter(item["properties"]["stage"] for item in pipeline)),
         "pipeline_by_group": dict(Counter(item["properties"]["stage_group"] for item in pipeline)),
@@ -3940,6 +3955,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             "coord_status": "unknown",
             "site_class": "Unknown",
             "in_area": False,
+            "service_area_class": "unknown",
+            "service_area_distance_mi": None,
+            "service_area_polygon": "",
             "service_ring": "",
             "expansion_horizon": False,
             "duplicate_of": duplicate_of.get(sid),
@@ -4369,6 +4387,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         attach_price(site, price, source or "Pipeline workbook", url, row.get("Last checked live"), status)
         if str(row.get("Listing status") or "").strip() == "Listed":
             site["listed"] = True
+        if site.get("origin") != "universe":
+            # The deal layer reports an unrecognized class. The site keeps the same reading.
+            site.update(service_area_fields(row, where=site["site_id"])[0])
         crosswalk.append({"site_id": site["site_id"], "source": "Pipeline" if kind == "pipeline" else "Land Sites", "source_key": label})
 
     off_market_cache = json.loads(GEOCODE_CACHE.read_text()) if GEOCODE_CACHE.exists() else {}
@@ -4542,6 +4563,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     checked_fits = [site for site in land_fits if site["verification"] == "county-checked"]
     pending_fits = [site for site in land_fits if site["verification"] != "county-checked"]
     eliminated = [site for site in in_area if site.get("verdict") == "NOT_A_WASH"]
+    service_area = service_area_breakdown(sites)
 
     funnel = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -4575,13 +4597,15 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
             },
             {
                 "id": "in_area",
-                "name": "In service area",
+                "name": "Service area",
                 "unit": "sites",
                 "total": len(in_area),
                 "by_city": by_city(in_area),
                 "by_class": class_breakdown(in_area),
                 "by_city_class": city_class(in_area),
-                "note": "Service area comes from the Universe tab. In is inside the current area. Out and unknown stay outside. Las Vegas rings 200 and 300 stay on the expansion horizon.",
+                "by_service_area": service_area["by_service_area"],
+                "service_area_excluded": service_area["service_area_excluded"],
+                "note": SERVICE_AREA_NOTE,
             },
             {
                 "id": "land_tier",
@@ -4654,6 +4678,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     }
 
     warnings = site_id_warnings(pipeline_rows, land_rows)
+    warnings.extend(live_universe.get("service_area_unrecognized") or [])
     if census["total"] != 1701:
         warnings.append(f"Census row count is {census['total']}, workbook expectation was 1,701.")
     if len(countable) != 1658 or by_city(countable) != {"LAS": 417, "PHX": 555, "MIA": 686}:
@@ -4697,6 +4722,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         load_site_photos(workbook),
     )
     apply_contacted_deal_stage(funnel, deals_fc["features"])
+    warnings.extend(deal_report.get("service_area_unrecognized") or [])
     listed_drift = listed_flag_drift(sites)
     parcels, parcel_meta = ([], {"counts": {}, "note": "Parcel fetch skipped."})
     public_records = {"note": "Public-record fields are added when the build writes files."}
@@ -4743,7 +4769,17 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         "unique_site_records": len([s for s in sites if s["origin"] == "universe"]),
         "unique_sites_counted": len(countable),
         "same_parcel_collapsed": duplicate_of,
-        "in_area": {"total": len(in_area), "by_city": by_city(in_area), "by_class": class_breakdown(in_area)},
+        "in_area": {
+            "total": len(in_area),
+            "by_city": by_city(in_area),
+            "by_class": class_breakdown(in_area),
+            "by_service_area": service_area["by_service_area"],
+        },
+        "service_area_unrecognized": [
+            note
+            for note in (live_universe.get("service_area_unrecognized") or [])
+            + (deal_report.get("service_area_unrecognized") or [])
+        ],
         "land_tiers": {
             "L10": len(l10),
             "L4": len(l4),
@@ -5174,6 +5210,10 @@ def validate_committed() -> None:
         problems.append("geocode_failed must be a list")
     for item in props:
         problems.extend(site_note_problems(item))
+        problems.extend(service_area_record_problems(str(item.get("site_id") or "?"), item))
+    for feature in deal_features:
+        deal_props = feature.get("properties") or {}
+        problems.extend(service_area_record_problems(str(deal_props.get("deal_id") or "?"), deal_props))
     problems.extend(funnel_subset_problems(sites, loaded["funnel.json"], loaded.get("deals.geojson", {}).get("features", [])))
     problems.extend(gap_fill_problems(props))
     if problems:
@@ -5349,6 +5389,19 @@ def funnel_subset_problems(features: list[dict], funnel: dict, deals: list[dict]
     in_area_rows = [feature for feature in features if _universe_stage(feature, "in_area")]
     in_area_by_city = dict(Counter((feature.get("properties") or {}).get("city") for feature in in_area_rows))
     in_area_stage = stages.get("in_area") or {}
+    if in_area_stage.get("name") != "Service area":
+        problems.append(f"service area step is named {in_area_stage.get('name')!r}")
+    split = in_area_stage.get("by_service_area") or {}
+    if split:
+        split_total = 0
+        for key, value in split.items():
+            if key not in {"inside", "near_0_5", "near_5_10", "edge_legacy"}:
+                problems.append(f"service area split has {key}")
+            split_total += int((value or {}).get("total") or 0)
+        if split_total != in_area_stage.get("total"):
+            problems.append(
+                f"service area split sums to {split_total}, step total is {in_area_stage.get('total')}"
+            )
     if len(in_area_rows) != in_area_stage.get("total") or in_area_by_city != (in_area_stage.get("by_city") or {}):
         problems.append(
             f"in service area is {len(in_area_rows)} {in_area_by_city}, funnel says {in_area_stage.get('total')} {in_area_stage.get('by_city')}"

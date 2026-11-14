@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-11-12T19:41:57Z",
-  "workbook_as_of": "2026-11-12",
+  "generated_at": "2026-11-14T00:47:59Z",
+  "workbook_as_of": "2026-11-13",
   "stages": [
     {
       "id": "census",
       "name": "Census rows",
       "unit": "rows",
-      "total": 1751,
+      "total": 1752,
       "by_city": {
         "LAS": 440,
-        "PHX": 593,
+        "PHX": 594,
         "MIA": 717,
         "SNA": 1
       },
@@ -19,10 +19,10 @@
       "id": "unique",
       "name": "Unique sites",
       "unit": "sites",
-      "total": 1707,
+      "total": 1708,
       "by_city": {
         "LAS": 429,
-        "PHX": 587,
+        "PHX": 588,
         "MIA": 691
       },
       "by_class": {
@@ -35,18 +35,18 @@
         "Licence-only": 18,
         "Closed": 1,
         "Quarantined": 3,
-        "Unknown": 49
+        "Unknown": 50
       },
-      "note": "Counted rows on the Universe tab: 1707. The tab has 1751 rows in all. Census file records not on a counted row are left out (24)."
+      "note": "Counted rows on the Universe tab: 1708. The tab has 1752 rows in all. Census file records not on a counted row are left out (24)."
     },
     {
       "id": "in_area",
       "name": "In service area",
       "unit": "sites",
-      "total": 1081,
+      "total": 1082,
       "by_city": {
         "LAS": 186,
-        "PHX": 283,
+        "PHX": 284,
         "MIA": 612
       },
       "by_class": {
@@ -56,7 +56,7 @@
         "Not a wash": 45,
         "Licence-only": 15,
         "Quarantined": 2,
-        "Unknown": 38
+        "Unknown": 39
       },
       "by_city_class": {
         "LAS": {
@@ -72,7 +72,7 @@
           "Embedded": 63,
           "Gas-attached": 63,
           "Core": 128,
-          "Unknown": 29
+          "Unknown": 30
         },
         "MIA": {
           "Gas-attached": 291,
@@ -318,10 +318,10 @@
       "id": "contacted",
       "name": "Deals contacted",
       "unit": "deals",
-      "total": 56,
+      "total": 58,
       "by_city": {
-        "LAS": 16,
-        "PHX": 34,
+        "LAS": 17,
+        "PHX": 35,
         "MIA": 6
       },
       "note": "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."

@@ -1,43 +1,28 @@
 {
-  "new_sites": 2,
+  "new_sites": 15,
   "removed_sites": 0,
   "verdict_changes": 0,
-  "stage_moves": 6,
+  "stage_moves": 1,
   "sample_new": [
-    "WB-PHX-0042",
-    "WB-PHX-0043"
+    "LAND-LAS-0051",
+    "LAND-LAS-0052",
+    "LAND-PHX-0065",
+    "LAND-PHX-0066",
+    "LAND-PHX-0067",
+    "LAND-PHX-0068",
+    "LAND-PHX-0069",
+    "LAND-PHX-0070",
+    "LAND-PHX-0071",
+    "LAND-PHX-0072",
+    "LAND-PHX-0073",
+    "LAND-PHX-0074"
   ],
   "sample_verdicts": [],
   "sample_stages": [
     {
-      "site_id": "PHX-U309",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "PHX-U432",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "site_id": "PIPE-PHX-0009",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "deal_id": "PIPE-PHX-0003",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "deal_id": "PIPE-PHX-0009",
-      "before": "1 Desk screen",
-      "after": "Dropped"
-    },
-    {
-      "deal_id": "PIPE-PHX-0010",
-      "before": "1 Desk screen",
-      "after": "Dropped"
+      "site_id": "LAS-U119",
+      "before": "",
+      "after": "1 Desk screen"
     }
   ]
 }

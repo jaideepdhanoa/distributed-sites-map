@@ -1,6 +1,6 @@
 import type { Sql } from "@/lib/actions/db";
 import { importEntityFromWorkbook, type ShadowEntity } from "./flags";
-import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, parseSheet, photoCanonical, photosFromCanonical, sheetCanonical, siteComparable, type SiteRow } from "./site";
+import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, parseSheet, photoCanonical, photosFromCanonical, sheetCanonical, shortHash, siteComparable, type SiteRow } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 import { issueIds, legacyStageIds, workbookIssues, type ActivityRow, type CommsRow, type RowIssue, type StageRow, type WorkbookSlice } from "./workbook";
 
@@ -257,15 +257,41 @@ export async function diffDatabase(sql: Sql, workbook: WorkbookSlice, workbookSo
   return buildReport(workbook, await readDatabaseSlice(sql), workbookSource);
 }
 
-function sample(ids: string[], changes: DiffChange[]): string[] {
+function sample(ids: string[], changes: DiffChange[], redact: boolean): string[] {
   const lines: string[] = [];
   for (const id of ids.slice(0, 20)) lines.push(`- missing ${id}`);
   if (ids.length > 20) lines.push(`- and ${ids.length - 20} more missing in the artifact`);
   for (const change of changes.slice(0, 20)) {
-    lines.push(`- ${change.id} ${change.field}: workbook ${JSON.stringify(change.workbook)}, database ${JSON.stringify(change.database)}`);
+    lines.push(
+      redact
+        ? `- ${change.id} ${change.field} #${shortHash(change.workbook)} #${shortHash(change.database)}`
+        : `- ${change.id} ${change.field}: workbook ${JSON.stringify(change.workbook)}, database ${JSON.stringify(change.database)}`,
+    );
   }
   if (changes.length > 20) lines.push(`- and ${changes.length - 20} more changes in the artifact`);
   return lines;
+}
+
+/** Site text stays out of logs and artifacts. The hash is enough to see that two copies differ. */
+export function publicDiffReport(report: DiffReport): DiffReport {
+  return {
+    ...report,
+    invalid: {
+      ...report.invalid,
+      site: report.invalid.site.map((issue) => ({ ...issue, value: shortHash(issue.value) })),
+    },
+    entities: {
+      ...report.entities,
+      site: {
+        ...report.entities.site,
+        changed: report.entities.site.changed.map((change) => ({
+          ...change,
+          workbook: shortHash(change.workbook),
+          database: shortHash(change.database),
+        })),
+      },
+    },
+  };
 }
 
 export function renderReport(report: DiffReport): string {
@@ -302,7 +328,9 @@ export function renderReport(report: DiffReport): string {
     const issues = report.invalid[name];
     if (!issues.length) continue;
     lines.push(`### ${name} invalid`, "");
-    for (const issue of issues.slice(0, 20)) lines.push(`- ${issue.id} ${issue.field}: ${JSON.stringify(issue.value)}`);
+    for (const issue of issues.slice(0, 20)) {
+      lines.push(name === "site" ? `- ${issue.id} ${issue.field} #${shortHash(issue.value)}` : `- ${issue.id} ${issue.field}: ${JSON.stringify(issue.value)}`);
+    }
     if (issues.length > 20) lines.push(`- and ${issues.length - 20} more in the artifact`);
     lines.push("");
   }
@@ -310,7 +338,7 @@ export function renderReport(report: DiffReport): string {
     const row = report.entities[name];
     if (!row.missing.length && !row.extra.length && !row.changed.length) continue;
     lines.push(`### ${name}`, "");
-    lines.push(...sample(row.missing, row.changed));
+    lines.push(...sample(row.missing, row.changed, name === "site"));
     for (const id of row.extra.slice(0, 20)) lines.push(`- extra ${id}`);
     if (row.extra.length > 20) lines.push(`- and ${row.extra.length - 20} more extra in the artifact`);
     lines.push("");

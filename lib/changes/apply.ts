@@ -381,7 +381,11 @@ async function writeSite(
     }
     if (incoming.asking_price === "") delete facts.asking_price_source;
     if (incoming.acreage === "") delete facts.land_acres_basis;
-    const edited = mirrorWrites(incoming, payload.facts || {});
+    const edited = mirrorWrites(incoming, payload.facts || {}, {
+      broker: stored.broker,
+      firm: stored.firm,
+      cell: priorSheet.Broker || priorSheet.broker || "",
+    });
     for (const [header, value] of Object.entries(edited)) {
       if (!value) delete sheet[header];
       else sheet[header] = value;

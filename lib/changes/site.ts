@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BUSINESS_TYPES, MARKETS, SERVICE_AREA_CLASSES, SITE_ID } from "./vocab";
@@ -339,9 +340,10 @@ const CLASS_LABEL: Record<string, string> = {
  * Headers an API change may write back. Column order is not assumed.
  * Score, Location points, Stalls that fit, and Segment group are formulas and are absent.
  * Site, Segment, Stage, and Folder are absent.
+ * Broker is written as "Name (Firm)" and anything after that prefix in the current cell is kept.
  *
  * Database-only. These have no Pipeline or Land Sites column of their own:
- * firm is the other half of the Broker cell, which also holds email addresses, so it is not written separately.
+ * firm is not its own column. It is written only as the parenthetical in the Broker cell.
  * photo_refs is a list, not a cell.
  * miles_to_depot is computed from the depot pins. The universe file's depot_mi column is not a site column.
  * asking_price_source is derived from the firm or the listing.
@@ -453,13 +455,49 @@ export function mirrorHeaderAllowed(header: string): boolean {
   return MIRROR_FIELD_HEADERS.some((row) => row.headers.some((name) => name.toLowerCase() === norm));
 }
 
-/** Cell text for one API edit. Service-area tokens become the workbook labels. */
-export function mirrorWrites(fields: Record<string, string | undefined>, facts: Record<string, string | undefined>): Record<string, string> {
+export function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+type BrokerParts = { name: string; firm: string; tail: string };
+
+function brokerParts(current: string): BrokerParts {
+  const text = current.trim();
+  const match = /^(.*?)\s*\(([^)]*)\)(.*)$/.exec(text);
+  if (!match) return { name: "", firm: "", tail: "" };
+  return { name: match[1].trim(), firm: match[2].trim(), tail: match[3] || "" };
+}
+
+/** "Name (Firm)" plus any suffix that followed that prefix in the current cell. */
+export function composeBrokerCell(name: string, firm: string, current = ""): string {
+  const person = name.trim();
+  const company = firm.trim();
+  const head = person && company ? `${person} (${company})` : person || (company ? `(${company})` : "");
+  const tail = brokerParts(current).tail;
+  if (!head) return tail.replace(/^[\s,;:—–-]+/, "").trim();
+  return tail ? `${head}${tail}` : head;
+}
+
+export type BrokerWrite = { broker?: string; firm?: string; cell?: string };
+
+/** Cell text for one API edit. Service-area tokens become the workbook labels. A broker edit keeps the firm and the rest of the cell. */
+export function mirrorWrites(
+  fields: Record<string, string | undefined>,
+  facts: Record<string, string | undefined>,
+  broker: BrokerWrite = {},
+): Record<string, string> {
   const out: Record<string, string> = {};
   for (const row of MIRROR_FIELD_HEADERS) {
+    if (row.field === "broker" || row.field === "firm") continue;
     const value = fields[row.field] !== undefined ? fields[row.field] : facts[row.field];
     if (value === undefined) continue;
     out[row.headers[0]] = row.field === "service_area_class" ? CLASS_LABEL[value] || value : value;
+  }
+  if (fields.broker !== undefined || fields.firm !== undefined) {
+    const parsed = brokerParts(broker.cell || "");
+    const person = fields.broker !== undefined ? fields.broker : broker.broker || parsed.name;
+    const company = fields.firm !== undefined ? fields.firm : broker.firm || parsed.firm;
+    out.Broker = composeBrokerCell(person, company, broker.cell || "");
   }
   return out;
 }

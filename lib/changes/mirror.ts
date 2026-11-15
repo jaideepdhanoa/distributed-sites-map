@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
-import { MIRROR_FIELD_HEADERS, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameWorkbookCell } from "./site";
+import { MIRROR_FIELD_HEADERS, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameWorkbookCell, shortHash } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -407,10 +407,17 @@ export function entitiesToMirror(): ShadowEntity[] {
   return (["stage", "activity", "comms", "site"] as const).filter((entity) => readEntityFromDb(entity));
 }
 
+const PRIVATE_PLAN_HEADERS = new Set(["next step", "broker", "notes", "photo notes", "sheet"]);
+
+function planValue(header: string, value: string): string {
+  const privateCell = PRIVATE_PLAN_HEADERS.has(header.trim().toLowerCase()) || value.trim().startsWith("{");
+  return privateCell ? `#${shortHash(value)}` : JSON.stringify(value);
+}
+
 export function formatPlan(changes: CellChange[]): string {
   if (!changes.length) return "No cell changes.";
   return changes
-    .map((change) => `${a1(change.sheet, change.row, change.column)} ${change.header} ${change.id}: ${JSON.stringify(change.before)} -> ${JSON.stringify(change.after)}`)
+    .map((change) => `${a1(change.sheet, change.row, change.column)} ${change.header} ${change.id}: ${planValue(change.header, change.before)} -> ${planValue(change.header, change.after)}`)
     .join("\n");
 }
 

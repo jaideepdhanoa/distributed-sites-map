@@ -1,7 +1,7 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
-import { diffDatabase, renderReport } from "../lib/changes/diff";
+import { diffDatabase, publicDiffReport, renderReport } from "../lib/changes/diff";
 import { assertProductionDiff } from "../lib/changes/guard";
 import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
 import { unpackFile } from "../lib/snapshot/pack";
@@ -76,7 +76,8 @@ async function main(): Promise<void> {
     const loaded = await loadWorkbook(sql);
     if (!ready.rows[0]?.sites && loaded.slice.sites) loaded.slice.sites = [];
     const report = await diffDatabase(sql, loaded.slice, loaded.label);
-    writeFileSync(join(process.cwd(), "shadow-diff.json"), `${JSON.stringify({ ...report, generated_at: new Date().toISOString() }, null, 2)}\n`);
+    const published = publicDiffReport(report);
+    writeFileSync(join(process.cwd(), "shadow-diff.json"), `${JSON.stringify({ ...published, generated_at: new Date().toISOString() }, null, 2)}\n`);
     const rendered = renderReport(report);
     if (!ready.rows[0]?.sites) {
       summary("Site rows were not compared. The sites table is not on production. Run the Production migrations workflow.\n");

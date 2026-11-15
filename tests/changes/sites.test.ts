@@ -5,9 +5,9 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { importChanged } from "../../lib/changes/backfill";
-import { buildReport, diffDatabase } from "../../lib/changes/diff";
+import { buildReport, diffDatabase, publicDiffReport, renderReport } from "../../lib/changes/diff";
 import { importEntityFromWorkbook, readEntityFromDb } from "../../lib/changes/flags";
-import { PROTECTED_ROW, PROTECTED_SITE_ID, planSiteMirror, sheetValueRender, type SheetTable } from "../../lib/changes/mirror";
+import { PROTECTED_ROW, PROTECTED_SITE_ID, formatPlan, planSiteMirror, sheetValueRender, type SheetTable } from "../../lib/changes/mirror";
 import { applySiteRows } from "../../lib/changes/read";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { loadScorecard, recordedLocationPoints, recordedScore, scorecardTotal } from "../../lib/changes/scorecard";
@@ -413,6 +413,47 @@ test("a site diff without the private sheet ignores raw-cell fields", () => {
   const raw: SiteRow = { ...published, sheet: JSON.stringify({ "Next step": "Confirm the zoning." }) };
   const seen = buildReport({ ...empty, sites: [raw] }, { ...empty, sites: [stored] }, "private sheet");
   assert.equal(seen.entities.site.changed.some((change) => change.field === "notes"), true);
+});
+
+test("a broker edit keeps the firm and the rest of the Broker cell", () => {
+  const cell = "Jane Smith (Acme Realty) — jane@acme.example";
+  const writes = mirrorWrites({ broker: "Jane Doe" }, {}, { firm: "Acme Realty", cell });
+  assert.equal(writes.Broker, "Jane Doe (Acme Realty) — jane@acme.example");
+  const fromCell = mirrorWrites({ broker: "Jane Doe" }, {}, { cell });
+  assert.equal(fromCell.Broker, "Jane Doe (Acme Realty) — jane@acme.example");
+  const headers = ["Site ID", "Broker"];
+  const table = sheet(headers, [["PIPE-PHX-0001", cell]]);
+  const plan = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { Broker: writes.Broker || "" } }]);
+  assert.equal(plan.changes.length, 1);
+  assert.equal(plan.changes[0]?.after, "Jane Doe (Acme Realty) — jane@acme.example");
+  assert.equal(plan.changes.some((change) => change.after === "Jane Doe"), false);
+  const unchanged = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { Broker: cell } }]);
+  assert.equal(unchanged.changes.length, 0);
+});
+
+test("site reports and mirror plans omit raw site text", () => {
+  const secret = "Jane Smith (Acme Realty) — jane@acme.example";
+  const note = "On hold - broker Nov 6: the package is in the folder.";
+  const base = { ...emptySiteFields(), coord_status: "", facts: {}, photo_refs: "[]", market: "MIA", name: "Stars", listing_status: secret };
+  const workbook: SiteRow = { ...base, site_id: "PIPE-MIA-0082", sheet: JSON.stringify({ "Next step": "Confirm the zoning.", Broker: secret }), notes: "Confirm the zoning.", broker: "Jane Smith", firm: "Acme Realty" };
+  const database: SiteRow = { ...workbook, notes: note, broker: "Jane Doe", sheet: JSON.stringify({ "Next step": note, Broker: secret }) };
+  const empty = { stages: [], activities: [], comms: [] };
+  const report = buildReport({ ...empty, sites: [workbook] }, { ...empty, sites: [database] }, "private sheet");
+  const published = publicDiffReport(report);
+  const rendered = `${renderReport(report)}\n${JSON.stringify(published)}`;
+  assert.equal(rendered.includes(secret), false);
+  assert.equal(rendered.includes(note), false);
+  assert.match(rendered, /PIPE-MIA-0082 notes #[0-9a-f]{12} #[0-9a-f]{12}/);
+  const plan = formatPlan([
+    { sheet: "Pipeline", row: 5, column: 3, header: "Next step", id: "PIPE-MIA-0082", before: "Confirm the zoning.", after: note, valueInput: "RAW" },
+    { sheet: "Pipeline", row: 5, column: 4, header: "Broker", id: "PIPE-MIA-0082", before: secret, after: "Jane Doe (Acme Realty) — jane@acme.example", valueInput: "RAW" },
+    { sheet: "Pipeline", row: 5, column: 5, header: "Asking price ($)", id: "PIPE-MIA-0082", before: "1600000", after: "1700000", valueInput: "USER_ENTERED" },
+  ]);
+  assert.equal(plan.includes(note), false);
+  assert.equal(plan.includes(secret), false);
+  assert.equal(plan.includes("jane@acme.example"), false);
+  assert.match(plan, /Next step PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /1700000/);
 });
 
 test("agents write only their fields, and a new site needs a Phoenix, Las Vegas, or Miami market", () => {

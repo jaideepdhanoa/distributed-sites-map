@@ -10,7 +10,8 @@ for (const panel of panels) {
   for (const width of widths) {
     test(`key tiles fit ${panel.id} at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
-      await page.goto(`/?${panel.city}funnel=pipeline&pstage=${panel.stage}&site=${panel.id}`);
+      const sheet = width < 500 ? "&sheet=full" : "";
+      await page.goto(`/?${panel.city}funnel=pipeline&pstage=${panel.stage}&site=${panel.id}${sheet}`);
       await page.getByTestId("panel-tab-numbers").click();
       await page.waitForSelector("[data-testid=key-strip] strong");
       const strip = page.getByTestId("key-strip");

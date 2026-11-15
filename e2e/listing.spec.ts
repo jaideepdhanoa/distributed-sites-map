@@ -39,6 +39,11 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(page.locator("aside.drawer")).not.toContainText("Broker contacted");
   await expect(page.locator("aside.drawer")).not.toContainText("Not a fit");
   await expect(page.locator("aside.drawer")).not.toContainText("Not required");
+  if ((page.viewportSize()?.width ?? 1440) < 768 && !page.url().includes("sheet=")) {
+    const opened = new URL(page.url());
+    opened.searchParams.set("sheet", "full");
+    await page.goto(opened.toString());
+  }
   await page.getByTestId("panel-tab-numbers").click();
   const figures = page.getByTestId("key-strip");
   await expect(figures).toBeVisible();

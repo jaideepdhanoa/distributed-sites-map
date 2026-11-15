@@ -59,14 +59,20 @@ def _summary(value, *, clip: bool = True) -> str:
 
 def _when(value) -> str:
     """Date, or date and minute, as written. Naive clocks stay America/Los_Angeles."""
+    parsed, _raw = _when_parts(value)
+    return parsed
+
+
+def _when_parts(value) -> tuple[str, str]:
+    """Parsed clock, and the original cell when that clock would drop wording."""
     if value is None or value == "":
-        return ""
+        return "", ""
     if isinstance(value, datetime):
         if value.hour or value.minute or value.second:
-            return value.strftime("%Y-%m-%d %H:%M")
-        return value.date().isoformat()
+            return value.strftime("%Y-%m-%d %H:%M"), ""
+        return value.date().isoformat(), ""
     if isinstance(value, date):
-        return value.isoformat()
+        return value.isoformat(), ""
     if isinstance(value, (int, float)) and not isinstance(value, bool) and 20000 < float(value) < 80000:
         number = float(value)
         whole = int(number)
@@ -74,16 +80,20 @@ def _when(value) -> str:
         day = datetime(1899, 12, 30) + timedelta(days=whole)
         minutes = int(round(frac * 24 * 60))
         if minutes <= 0 or minutes >= 24 * 60:
-            return day.date().isoformat()
+            return day.date().isoformat(), ""
         hour, minute = divmod(minutes, 60)
-        return f"{day.date().isoformat()} {hour:02d}:{minute:02d}"
-    text = re.sub(r"\s+PT$", "", _text(value), flags=re.IGNORECASE)
+        return f"{day.date().isoformat()} {hour:02d}:{minute:02d}", ""
+    original = _text(value)
+    if not original:
+        return "", ""
+    text = re.sub(r"\s+PT$", "", original, flags=re.IGNORECASE)
     match = re.match(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?$", text)
     if not match:
-        return ""
-    if match.group(2):
-        return f"{match.group(1)} {match.group(2)}"
-    return match.group(1)
+        return "", original
+    parsed = f"{match.group(1)} {match.group(2)}" if match.group(2) else match.group(1)
+    if text == parsed:
+        return parsed, ""
+    return parsed, original
 
 
 def site_tokens(value) -> list[str]:
@@ -102,12 +112,14 @@ def normalize_row(row: dict, *, clip: bool = True) -> dict | None:
     comms_id = _text(row.get("Comms ID"))
     if not comms_id:
         return None
+    parsed_at, at_text = _when_parts(row.get("Date/time"))
     return {
         "comms_id": comms_id,
         "site_ids": _text(row.get("Site IDs")),
         "thread_id": _text(row.get("Thread ID")),
         "link": _text(row.get("Link")),
-        "at": _when(row.get("Date/time")),
+        "at": parsed_at,
+        "at_text": at_text,
         "direction": _text(row.get("Direction")),
         "person": _text(row.get("Counterparty person")),
         "firm": _text(row.get("Counterparty firm")),

@@ -164,6 +164,8 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
       if (prior && (isTruncatedCell(incoming.summary, prior.summary) || isTruncatedCell(prior.summary, incoming.summary))) {
         incoming.summary = prior.summary;
       }
+      if (prior && prior.at_text && !incoming.at_text) incoming.at_text = prior.at_text;
+      if (prior && !prior.at && !prior.at_text && !incoming.at && incoming.at_text) incoming.at_text = "";
       if (prior && sameFields(commsFields(prior), incoming, fields)) {
         counts.unchanged.comms += 1;
         continue;
@@ -177,7 +179,8 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
         source,
         payload: {
           direction: row.direction as "in" | "internal",
-          at: row.at,
+          at: incoming.at,
+          at_text: incoming.at_text,
           person: row.person,
           firm: row.firm,
           channel: row.channel,

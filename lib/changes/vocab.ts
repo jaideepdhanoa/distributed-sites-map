@@ -94,6 +94,7 @@ export const COMMS_FIELDS = [
   "site_ids",
   "direction",
   "at",
+  "at_text",
   "person",
   "firm",
   "channel",

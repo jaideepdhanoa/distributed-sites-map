@@ -16,7 +16,7 @@ function activity() {
     site_id: "PIPE-PHX-0001",
     expected_version: 0,
     source: "listing note",
-    payload: { date: "2026-11-01", type: "listing", summary: "Listing noted" },
+    payload: { date: "2026-11-01T12:00:00-08:00", type: "listing", summary: "Listing noted" },
   };
 }
 
@@ -73,7 +73,7 @@ test("validation rejects a bad market, class, source, agent drop, and a caller-c
             entity_id: "A-000099",
             expected_version: 0,
             source: "listing",
-            payload: { date: "2026-11-01", type: "listing", summary: "Listing noted" },
+            payload: { date: "2026-11-01T12:00:00-08:00", type: "listing", summary: "Listing noted" },
           },
         ],
       }),
@@ -144,7 +144,7 @@ test("version conflict rolls the batch back, replay is idempotent, and ids are s
         site_id: "PIPE-PHX-0001",
         expected_version: 0,
         source: "listing note",
-        payload: { date: "2026-11-01", type: "listing", summary: "Listing noted" },
+        payload: { date: "2026-11-01T12:00:00-08:00", type: "listing", summary: "Listing noted" },
       },
       {
         entity_type: "comms",

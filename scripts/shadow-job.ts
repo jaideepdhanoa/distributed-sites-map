@@ -4,7 +4,8 @@ import { withConnectionString } from "../lib/actions/db";
 import { diffDatabase, publicDiffReport, renderReport } from "../lib/changes/diff";
 import { MIRROR_SHEETS_SCOPE } from "../lib/changes/mirror";
 import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
-import { overlaySummaryMap, readCommsSummaries } from "../lib/changes/summaries";
+import { losesSheetDate, sameSheetDate } from "../lib/changes/site";
+import { overlaySummaryMap, readCommsDates, readCommsSummaries } from "../lib/changes/summaries";
 import { assertProductionDiff } from "../lib/changes/guard";
 import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
 import { unpackFile } from "../lib/snapshot/pack";
@@ -60,8 +61,19 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
   });
   const google = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
   if (!google) return { label, slice, sheetSummaries: false };
-  const full = await readCommsSummaries(await sheetsAccessToken(google, MIRROR_SHEETS_SCOPE));
-  return { label, slice: overlaySummaryMap(slice, full), sheetSummaries: full.size > 0 };
+  const token = await sheetsAccessToken(google, MIRROR_SHEETS_SCOPE);
+  const full = await readCommsSummaries(token);
+  const dates = await readCommsDates(token);
+  const withDates = {
+    ...slice,
+    comms: slice.comms.map((row) => {
+      const cell = dates.get(row.entity_id) || "";
+      if (!cell || sameSheetDate(cell, row.at) || sameSheetDate(cell, row.at_text || "")) return row;
+      if (!losesSheetDate(cell, row.at_text || row.at)) return row;
+      return { ...row, at_text: cell };
+    }),
+  };
+  return { label, slice: overlaySummaryMap(withDates, full), sheetSummaries: full.size > 0 };
 }
 
 async function main(): Promise<void> {

@@ -48,7 +48,10 @@ export type StagePayload = {
 };
 
 export type ActivityPayload = {
+  /** Calendar date. The API derives this from a zoned timestamp. */
   date: string;
+  /** The ISO-8601 timestamp the API accepted, with its zone offset. */
+  date_iso?: string;
   type: ActivityType;
   summary: string;
   source_link?: string;
@@ -56,7 +59,12 @@ export type ActivityPayload = {
 
 export type CommsPayload = {
   direction: CommsDirection | "internal";
+  /** Parsed clock, or the ISO-8601 timestamp the API accepted. */
   at?: string;
+  /** Sheet wording that did not parse. The mirror keeps this text. */
+  at_text?: string;
+  /** The time is approximate. The sheet gains " (approx.)" only when its cell can take that mark. */
+  at_approximate?: boolean;
   person?: string;
   firm?: string;
   channel?: string;
@@ -104,7 +112,7 @@ const stagePayload = z
 
 const activityPayload = z
   .object({
-    date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+    date: z.string().trim().min(1),
     type: z.enum(ACTIVITY_TYPES),
     summary: z.string().trim().min(1).max(300),
     source_link: z.string().trim().max(500).optional(),
@@ -115,6 +123,7 @@ const commsPayload = z
   .object({
     direction: z.enum(COMMS_DIRECTIONS),
     at: z.string().trim().max(40).optional(),
+    at_approximate: z.boolean().optional(),
     person: z.string().trim().max(200).optional(),
     firm: z.string().trim().max(200).optional(),
     channel: z.string().trim().max(80).optional(),
@@ -240,7 +249,7 @@ function issueMessage(path: string, code: string): string {
   if (path.endsWith("site_id")) return "That site id is not valid.";
   if (path.endsWith("expected_version")) return "Version must be a whole number.";
   if (path === "changes" || path.endsWith("changes")) return "Add at least one change.";
-  if (path.endsWith("date")) return "Use a calendar date.";
+  if (path.endsWith("date") || path.endsWith("at")) return "Use an ISO-8601 time with a zone offset.";
   if (path.endsWith("summary")) return "Add a summary.";
   return "That change is not valid.";
 }
@@ -248,6 +257,31 @@ function issueMessage(path: string, code: string): string {
 function fail(index: number | null, path: string, code: string): never {
   const label = issueMessage(path, code);
   throw new InputError(index == null ? label : `Change ${index + 1}: ${label}`);
+}
+
+const ZONED_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+/** An ISO-8601 timestamp that names a real calendar day and a numeric zone offset. */
+export function parseZonedTimestamp(value: string): { iso: string; date: string } | null {
+  const text = value.trim();
+  const match = ZONED_TIMESTAMP.exec(text);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] || "0");
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null;
+  const zone = match[7];
+  if (zone !== "Z") {
+    const hours = Number(zone.slice(1, 3));
+    const minutes = Number(zone.slice(4, 6));
+    if (hours > 14 || minutes > 59) return null;
+  }
+  return { iso: text, date: `${match[1]}-${match[2]}-${match[3]}` };
 }
 
 function realDate(value: string): boolean {
@@ -316,11 +350,12 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
         fail(index, issue.path.map(String).join("."), issue.code);
       }
       const data = parsedPayload.data;
-      if (!realDate(data.date)) throw new InputError(`Change ${index + 1}: Use a calendar date.`);
-    cleanText(data.summary);
-    cleanText(data.source_link);
-    assertContentActor(actor, index);
-    return { ...row, payload: data };
+      const zoned = parseZonedTimestamp(data.date);
+      if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+      cleanText(data.summary);
+      cleanText(data.source_link);
+      assertContentActor(actor, index);
+      return { ...row, payload: { ...data, date: zoned.date, date_iso: zoned.iso } };
     }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
@@ -332,6 +367,11 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     cleanText(data.firm);
     cleanText(data.channel);
     cleanText(data.subject);
+    if (data.at) {
+      const zoned = parseZonedTimestamp(data.at);
+      if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+      data.at = zoned.iso;
+    }
     cleanText(data.at);
     cleanText(data.summary);
     assertContentActor(actor, index);

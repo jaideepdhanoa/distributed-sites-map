@@ -233,6 +233,7 @@ export async function overlayComms(snapshot: CommsSnapshot): Promise<CommsSnapsh
         thread_id: text(payload.thread_id),
         link: text(payload.link),
         at: text(payload.at),
+        at_approximate: payload.at_approximate === true || payload.at_approximate === "1",
         direction: text(payload.direction),
         person: text(payload.person),
         firm: text(payload.firm),

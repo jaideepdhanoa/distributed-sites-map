@@ -5,8 +5,8 @@ import {
   counterparty,
   mergeActivity,
   summaryText,
-  whenParts,
   type ActivityInput,
+  commsWhenText,
   type CommsLine,
   type MergedLine,
 } from "@/lib/comms";
@@ -48,6 +48,7 @@ function activityLine(item: MergedLine, index: number) {
       <p>
         <strong>{LABELS[item.type] || "Document"}</strong>
         {item.at ? ` · ${item.at}` : ""}
+        {item.approximate ? " (approximate)" : ""}
       </p>
       <p>{item.summary}</p>
     </li>
@@ -55,7 +56,7 @@ function activityLine(item: MergedLine, index: number) {
 }
 
 function commsLine(item: MergedLine, index: number) {
-  const when = whenParts(item.at);
+  const when = commsWhenText(item.at, item.approximate);
   const party = counterparty(item);
   const internal = item.direction.trim().toLowerCase() === "internal";
   return (
@@ -67,8 +68,7 @@ function commsLine(item: MergedLine, index: number) {
     >
       <p>
         <strong>{item.direction}</strong>
-        {when.date ? ` · ${when.date}` : ""}
-        {when.time ? ` ${when.time} PT` : ""}
+        {when ? ` · ${when}` : ""}
         {item.channel ? ` · ${item.channel}` : ""}
       </p>
       {party ? <p>{party}</p> : null}

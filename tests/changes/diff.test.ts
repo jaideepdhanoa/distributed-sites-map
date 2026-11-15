@@ -70,7 +70,7 @@ test("a backfill is idempotent and the diff is clean until a write drifts", { ti
         site_id: "PIPE-PHX-0001",
         expected_version: 0,
         source: "listing note",
-        payload: { date: "2026-11-15", type: "listing", summary: "Listing noted" },
+        payload: { date: "2026-11-15T12:00:00-08:00", type: "listing", summary: "Listing noted" },
       },
     ],
   });

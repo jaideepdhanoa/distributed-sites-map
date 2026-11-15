@@ -498,15 +498,27 @@ test("site reports and mirror plans omit raw site text", () => {
     { sheet: "Pipeline", row: 5, column: 5, header: "Asking price ($)", id: "PIPE-MIA-0082", before: "1600000", after: "1700000", valueInput: "USER_ENTERED" },
     { sheet: "Pipeline", row: 5, column: 6, header: "Listing status", id: "PIPE-MIA-0082", before: "On hold - broker Nov 6", after: "On hold", valueInput: "RAW" },
     { sheet: "Pipeline", row: 5, column: 7, header: "Listing link", id: "PIPE-MIA-0082", before: "https://example.test/old", after: "https://example.test/new", valueInput: "RAW" },
+    { sheet: "Pipeline", row: 5, column: 8, header: "Last checked live", id: "PIPE-MIA-0082", before: "2026-10-28", after: "2026-11-06", valueInput: "USER_ENTERED" },
+    { sheet: "Pipeline", row: 5, column: 9, header: "Photos checked", id: "PIPE-MIA-0082", before: note, after: "2026-11-15", valueInput: "USER_ENTERED" },
+    { sheet: "Land Sites", row: 12, column: 2, header: "Population within 3 miles", id: "LAND-PHX-0064", before: "12000", after: "13000", valueInput: "USER_ENTERED" },
+    { sheet: "Pipeline", row: 6, column: 2, header: "Stage", id: "PIPE-MIA-0082", before: "1 Desk screen", after: "2 Financial screen" },
   ]);
   assert.equal(plan.includes(note), false);
   assert.equal(plan.includes(secret), false);
   assert.equal(plan.includes("jane@acme.example"), false);
   assert.equal(plan.includes("https://example.test/old"), false);
   assert.equal(plan.includes("On hold - broker Nov 6"), false);
+  assert.equal(plan.includes("1700000"), false);
+  assert.equal(plan.includes("1600000"), false);
+  assert.equal(plan.includes("2026-10-28"), false);
+  assert.equal(plan.includes("2026-11-06"), false);
+  assert.equal(plan.includes("12000"), false);
   assert.match(plan, /Next step PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
   assert.match(plan, /Listing status PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
-  assert.match(plan, /1700000/);
+  assert.match(plan, /Asking price \(\$\) PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /Last checked live PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /Population within 3 miles LAND-PHX-0064: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /Stage PIPE-MIA-0082: "1 Desk screen" -> "2 Financial screen"/);
 });
 
 test("agents write only their fields, and a new site needs a Phoenix, Las Vegas, or Miami market", () => {

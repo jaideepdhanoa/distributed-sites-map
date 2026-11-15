@@ -25,12 +25,12 @@ import {
   planSiteMirror,
   planStageMirror,
   recordMirrorRun,
-  sheetValueRender,
-  type SheetRender,
   stageTabs,
   type CellChange,
+  type SheetRender,
   type SheetTable,
 } from "../lib/changes/mirror";
+import { loadSheetTable, readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
 
 function summary(text: string): void {
   const file = process.env.GITHUB_STEP_SUMMARY;
@@ -92,66 +92,13 @@ async function sheetsToken(raw: string): Promise<string> {
 }
 
 async function sheetsValues(token: string, range: string, kind: SheetRender = "formatted"): Promise<string[][]> {
-  const render = sheetValueRender(kind);
-  const query = render ? `?valueRenderOption=${render}` : "";
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}${query}`;
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error(`Sheets read failed (${response.status}) for a workbook range.`);
-  const payload = (await response.json()) as { values?: unknown[][] };
-  return (payload.values || []).map((row) => row.map((cell) => String(cell ?? "")));
+  const [grid] = await readSheetRanges(token, SPREADSHEET_ID, [range], kind);
+  return grid || [];
 }
 
 async function loadTable(token: string, title: string, headerRow: number, fieldHeaders: string[][], siteCells = false): Promise<SheetTable> {
-  const header = await sheetsValues(token, `${quote(title)}!${headerRow}:${headerRow}`);
-  const headers = header[0] || [];
-  const wanted = new Set(fieldHeaders.flat().map((name) => name.trim().toLowerCase()));
-  const indexes = headers
-    .map((name, index) => ({ name, index }))
-    .filter((column) => wanted.has(column.name.trim().toLowerCase()))
-    .map((column) => column.index);
-  const rows = new Map<number, { cells: string[]; formulas: string[] }>();
-  for (const index of indexes) {
-    const column = columnLetter(index + 1);
-    const range = `${quote(title)}!${column}${headerRow + 1}:${column}`;
-    const values = await sheetsValues(token, range, siteCells ? "unformatted" : "formatted");
-    const formulas = siteCells ? await sheetsValues(token, range, "formulas") : [];
-    values.forEach((line, offset) => {
-      const rowNumber = headerRow + 1 + offset;
-      const row = rows.get(rowNumber) || { cells: [], formulas: [] };
-      row.cells[index] = line[0] || "";
-      rows.set(rowNumber, row);
-    });
-    formulas.forEach((line, offset) => {
-      const rowNumber = headerRow + 1 + offset;
-      const row = rows.get(rowNumber) || { cells: [], formulas: [] };
-      const formula = line[0] || "";
-      if (formula.startsWith("=")) row.formulas[index] = formula;
-      rows.set(rowNumber, row);
-    });
-  }
-  return {
-    title,
-    headerRow,
-    headers,
-    rows: [...rows.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([row, stored]) => ({ row, cells: stored.cells, formulas: stored.formulas })),
-  };
-}
-
-function quote(title: string): string {
-  return `'${title.replaceAll("'", "''")}'`;
-}
-
-function columnLetter(column: number): string {
-  let n = column;
-  let out = "";
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    out = String.fromCharCode(65 + rem) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
+  const read = (ranges: string[], kind: SheetRender) => readSheetRanges(token, SPREADSHEET_ID, ranges, kind);
+  return loadSheetTable(read, title, headerRow, fieldHeaders, siteCells);
 }
 
 async function writeCells(token: string, changes: CellChange[]): Promise<void> {
@@ -165,7 +112,7 @@ async function writeCells(token: string, changes: CellChange[]): Promise<void> {
   for (const [valueInputOption, group] of groups) {
     for (let start = 0; start < group.length; start += 400) {
       const chunk = group.slice(start, start + 400);
-      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
+      const response = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({

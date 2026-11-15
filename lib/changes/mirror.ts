@@ -118,6 +118,7 @@ export function assertWorkbookMirrorAllowed(): void {
   if (process.env.GITHUB_ACTIONS === "true" && ref !== "refs/heads/main") {
     throw new Error("The workbook mirror runs only on main.");
   }
+  if (mirrorDryRun()) return;
   if (process.env.WORKBOOK_MIRROR_ENABLED !== "1") {
     throw new Error(
       "WORKBOOK_MIRROR_ENABLED is not 1. Set the repository variable WORKBOOK_MIRROR_ENABLED to 1 to copy database rows into the workbook.",

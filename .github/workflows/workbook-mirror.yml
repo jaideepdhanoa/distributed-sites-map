@@ -1,8 +1,10 @@
 name: Workbook mirror
 
-# Manual run of the database-to-sheet copy. The 15-minute Workbook sync
-# also runs it on main when WORKBOOK_MIRROR_ENABLED is 1. This workflow
-# refuses any ref other than main. Dry run is the default and writes nothing.
+# Manual run of the database-to-sheet copy. Dry run is the default, writes
+# nothing, and does not need WORKBOOK_MIRROR_ENABLED. A real write needs
+# that repository variable set to 1. The 15-minute Workbook sync also runs
+# a real write on main when the variable is 1. This workflow refuses any
+# ref other than main.
 on:
   workflow_dispatch:
     inputs:

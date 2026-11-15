@@ -1,0 +1,59 @@
+name: Shadow diff
+
+# Daily workbook-versus-database report for stage, activity, and comms.
+# Connects only to the Neon branch named preview. Writes nothing to the
+# Google Sheet and does not change what the site displays. Three consecutive
+# daily reports with Clean: yes are required before a later cutover.
+on:
+  schedule:
+    - cron: "15 14 * * *"
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: "Load the latest snapshot into the events tables (one-time, idempotent, preview only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Shadow backfill and diff
+        env:
+          DATABASE_URL: ${{ secrets.NEON_PREVIEW_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          NEON_BRANCH: preview
+          SHADOW_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill && '1' || '' }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            {
+              echo "## Shadow diff skipped"
+              echo
+              echo "NEON_PREVIEW_DATABASE_URL is not set."
+              echo "Add the GitHub secret: the pooled connection string for the Neon branch named preview."
+              echo "Also set the repository variable NEON_PRODUCTION_HOST to the production endpoint hostname (no user, no password) so this job can refuse production."
+              echo "Create that Neon branch and point the Vercel Preview environment at it. Leave production on its own branch."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "NEON_PREVIEW_DATABASE_URL is not set. Skipping."
+            exit 0
+          fi
+          if [ "$SHADOW_BACKFILL" = "1" ]; then
+            npx tsx scripts/shadow-job.ts backfill
+          else
+            npx tsx scripts/shadow-job.ts diff
+          fi
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('shadow-diff.json') != ''
+        with:
+          name: shadow-diff
+          path: shadow-diff.json
+          retention-days: 14

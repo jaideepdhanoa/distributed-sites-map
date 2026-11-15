@@ -33,7 +33,11 @@ async function main(): Promise<void> {
   const files = collectGenerated(join(process.cwd(), "data", "generated"));
   const funnel = files.find((file) => file.name === "funnel.json")?.body;
   const published = await withConnectionString(url, async (sql) => {
-    await migrate(sql);
+    await migrate(sql, { connectionString: url, onProduction: "skip" });
+    const ready = await sql.query<{ name: string | null }>(`SELECT to_regclass('public.snapshots') AS name`);
+    if (!ready.rows[0]?.name) {
+      throw new Error("The snapshots table is missing. Run the Production migrations workflow. This job does not migrate production.");
+    }
     return publishSnapshot(sql, {
       sourceRunId: process.env.GITHUB_RUN_ID || "",
       workbookModifiedAt: workbookModifiedAt(funnel),

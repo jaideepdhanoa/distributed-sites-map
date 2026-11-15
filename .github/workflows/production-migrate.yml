@@ -1,0 +1,32 @@
+name: Production migrations
+
+# The only path that applies db/migrations to the production database.
+# Jaideep or Indie runs this by hand. Pull-request jobs and preview
+# deployments cannot. Type migrate-production to confirm.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type migrate-production to apply pending db/migrations to production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Migrate production
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          ALLOW_PRODUCTION_MIGRATE: "1"
+          CONFIRM: ${{ inputs.confirm }}
+        run: npx tsx scripts/production-migrate.ts

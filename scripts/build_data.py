@@ -1674,17 +1674,20 @@ _STREET_DIRS = {
     "west": "w",
 }
 _DEAL_LEAK = re.compile(r"(?i)\b(ebitda|revenue|playbook)\b")
-_DEAL_PRIVATE = re.compile(
-    r"(?i)("
-    r"\b(?:cindel|ming|ricardo|yuka|jaideep|jesse)\b"
-    r"|\b(?:outreach|approv\w*|wording|docusign|redline)\b"
+# The name list stays on notes and next steps. Asking-price source exempts the
+# broker and firm strings from this part only.
+_DEAL_NAME_LIST = r"cindel|ming|ricardo|yuka|jaideep|jesse"
+_DEAL_OTHER_RE = (
+    r"\b(?:outreach|approv\w*|wording|docusign|redline)\b"
     r"|\b(?:replied|reply|copied|email|nudged|folder|memo)\b"
     r"|\b(?:ruled out|downgraded|task board|our side|no contact|no price|no reply)\b"
     r"|\b(?:lane broker|passed on|pass on|waiting for|followed up)\b"
     r"|\b(?:sweep|priority area)\b"
     r"|moved to the land"
-    r")"
 )
+_DEAL_NAMES = re.compile(rf"(?i)\b(?:{_DEAL_NAME_LIST})\b")
+_DEAL_PRIVATE_OTHER = re.compile(rf"(?i)({_DEAL_OTHER_RE})")
+_DEAL_PRIVATE = re.compile(rf"(?i)(\b(?:{_DEAL_NAME_LIST})\b|{_DEAL_OTHER_RE})")
 DEAL_FIELDS = (
     "deal_id",
     "kind",
@@ -2029,17 +2032,17 @@ def _source_records(value) -> list[str]:
 
 
 def _broker_channel(broker: str) -> str:
-    """Brokerage or agent, without the person's name in parentheses."""
+    """Brokerage, without the person's name."""
     text = re.sub(r"\s+", " ", str(broker or "")).strip()
     if not text or re.match(r"(?i)^none yet\b", text):
         return ""
     shown = re.match(r"(?i)^not shown\s*\(([^)]+)\)", text)
     if shown:
         return shown.group(1).strip()
-    firm = re.split(r"\s+\(", text, maxsplit=1)[0]
+    _person, firm = split_broker(text)
     firm = re.split(r",\s*(?:exclusive|also|bizbuysell|loopnet|crexi)\b", firm, maxsplit=1, flags=re.I)[0]
     firm = firm.strip(" ,;")
-    if _DEAL_PRIVATE.search(firm) or _DEAL_LEAK.search(firm) or _NOTE_INTERNAL.search(firm):
+    if not firm or _DEAL_PRIVATE.search(firm) or _DEAL_LEAK.search(firm) or _NOTE_INTERNAL.search(firm):
         return ""
     return firm[:120]
 
@@ -2265,18 +2268,99 @@ def folder_link_problems(expected: list[tuple[str, str, str]], features: list[di
     return problems
 
 
+_COMPANY_MARK = re.compile(
+    r"(?i)(?:"
+    r"\breal estate\b|\brealtors?\b|\brealty\b|\bcommercial\b|\bgroup\b|\bpartners\b"
+    r"|\badvis[eo]rs\b|\bbrokerage\b|\bbrokers\b|\bllc\b|\binc\b\.?|\bincorporated\b"
+    r"|\bcorp\b\.?|\bcorporation\b|\bltd\b\.?|\bllp\b|\bpllc\b|\bco\b\.?|\bcompany\b"
+    r"|\bcre\b|\bproperties\b|\bcapital\b|\bassociates\b"
+    r"|\bmarcus\b|\bcbre\b|\bjll\b|\bcolliers\b|\bcushman\b|\bkidder\b|\bnai\b"
+    r"|\bsunbelt\b|\btransworld\b"
+    r")"
+)
+_EMAIL = re.compile(r"(?i)\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b")
+_PHONE = re.compile(
+    r"(?<!\w)(?:\+?1[\s.-]*)?(?:\(\s*\d{3}\s*\)|\d{3})[\s.-]+\d{3}[\s.-]+\d{4}\b"
+)
+_NAME_WORD = re.compile(r"^[A-Z][a-zA-Z'.-]*$")
+_EMPTY_FIRM = {"", "none", "none yet", "n/a", "na"}
+_EMPTY_BROKER = {"", "none", "none yet", "n/a", "na", "off-market"}
+
+
+def _strip_contacts(value: str) -> str:
+    """Drop emails and phone numbers. Empty parentheses left behind go too."""
+    text = _EMAIL.sub(" ", value or "")
+    text = _PHONE.sub(" ", text)
+    text = re.sub(r"\(\s*\)", " ", text)
+    text = re.sub(r"\(\s*,", "(", text)
+    text = re.sub(r",\s*\)", ")", text)
+    # A dash that only introduced the address we just removed: "Firm — person@x.com; Other".
+    text = re.sub(r"\s*[—–-]+\s*(?=;)", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+([,.;:])", r"\1", text)
+    return text.strip(" ,;:-—–")
+
+
+def _looks_like_company(value: str) -> bool:
+    return bool(_COMPANY_MARK.search(value or ""))
+
+
+def _looks_like_person(value: str) -> bool:
+    """2 to 4 capitalised words, no company keyword, optionally joined by & or and."""
+    text = re.sub(r"\s+", " ", value or "").strip()
+    if not text or _looks_like_company(text):
+        return False
+    words = text.split(" ")
+    if words[0].lower() in {"&", "and"} or words[-1].lower() in {"&", "and"}:
+        return False
+    names = [word for word in words if word.lower() not in {"&", "and"}]
+    if not 2 <= len(names) <= 4 or not all(_NAME_WORD.match(word) for word in names):
+        return False
+    return True
+
+
 def split_broker(value) -> tuple[str, str]:
-    text = scrub(value)
+    """Person and firm from a Broker cell.
+
+    Firm (Person) is the usual cell. Person, Firm is read when the left side
+    is a person and the right side is not. Person (Firm) is read when the
+    parenthesised part looks like a company. A bare person has no firm.
+    """
+    text = _strip_contacts(scrub(value))
+    broker, firm = "", ""
     match = re.match(r"^(.*?)\s*\(([^)]+)\)", text)
-    if not match:
-        broker, firm = "", text
+    left = match.group(1).strip(" ,;") if match else ""
+    inner = match.group(2).strip(" ,;") if match else ""
+    if left and inner and _looks_like_company(inner):
+        broker, firm = left, inner
+    elif left and inner:
+        broker, firm = inner, left
+    elif "," in text:
+        person, company = [part.strip(" ,;") for part in text.split(",", 1)]
+        if _looks_like_person(person) and company and not _looks_like_person(company):
+            broker, firm = person, company
+        else:
+            broker, firm = "", text
+    elif _looks_like_person(text):
+        broker, firm = text, ""
     else:
-        broker, firm = match.group(2).strip(" ,;"), match.group(1).strip(" ,;")
-    if firm.lower() in {"", "none", "none yet", "n/a"}:
+        broker, firm = "", text
+    broker = _strip_contacts(broker)
+    firm = _strip_contacts(firm)
+    if firm.lower() in _EMPTY_FIRM:
         firm = ""
-    if broker.lower() in {"", "none", "none yet", "n/a", "off-market"}:
+    if broker.lower() in _EMPTY_BROKER:
         broker = ""
     return broker, firm
+
+
+def asking_price_source_for(firm: str, listing_url: str) -> str:
+    """The firm when there is one. Never a person's name."""
+    if (firm or "").strip():
+        return str(firm).strip()
+    if (listing_url or "").strip():
+        return "Listing"
+    return "Broker"
 
 
 _DEAL_KEEP = re.compile(
@@ -2322,19 +2406,64 @@ def clean_deal_note(value) -> str:
     return cleaned[:400]
 
 
+def _without_parties(text: str, broker: str, firm: str) -> str:
+    """Drop the broker and firm strings before the internal-name check."""
+    cleaned = text or ""
+    for piece in (broker, firm):
+        piece = (piece or "").strip()
+        if len(piece) < 2:
+            continue
+        cleaned = re.sub(rf"(?i)(?<!\w){re.escape(piece)}(?!\w)", " ", cleaned)
+    return cleaned
+
+
+def _asking_source_trips(text: str, broker: str, firm: str) -> bool:
+    """Private wording on the asking source. The broker's or firm's own name does not count."""
+    if not text:
+        return False
+    if _DEAL_LEAK.search(text) or _NOTE_INTERNAL.search(text) or _DEAL_PRIVATE_OTHER.search(text):
+        return True
+    return bool(_DEAL_NAMES.search(_without_parties(text, broker, firm)))
+
+
 def deal_text_problems(deal_id: str, props: dict) -> list[str]:
     problems = []
+    broker = str(props.get("broker") or "")
+    firm = str(props.get("firm") or "")
     for key in ("next_step", "asking_price_source", "name", "address", "source_line", "figures_source"):
         text = props.get(key) or ""
         if not isinstance(text, str) or not text:
             continue
-        if key in {"next_step", "asking_price_source", "source_line"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
+        if key == "asking_price_source":
+            if _asking_source_trips(text, broker, firm):
+                problems.append(f"{deal_id} {key}: {text[:140]!r}")
+            continue
+        if key in {"next_step", "source_line"} and (_DEAL_PRIVATE.search(text) or _DEAL_LEAK.search(text)):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
         if _NOTE_INTERNAL.search(text):
             problems.append(f"{deal_id} {key}: {text[:140]!r}")
     if not str(props.get("source_line") or "").strip():
         problems.append(f"{deal_id} source_line is blank")
     return problems
+
+
+def guard_deal_text(deal_id: str, props: dict) -> None:
+    """Blank a private next step. A source that still fails after the fallback is a warning."""
+    if not deal_text_problems(deal_id, props):
+        return
+    props["next_step"] = ""
+    source = str(props.get("asking_price_source") or "")
+    broker = str(props.get("broker") or "")
+    firm = str(props.get("firm") or "")
+    if _asking_source_trips(source, broker, firm):
+        props["asking_price_source"] = firm or ""
+    problems = deal_text_problems(deal_id, props)
+    source_problems = [item for item in problems if f"{deal_id} asking_price_source:" in item]
+    other = [item for item in problems if item not in source_problems]
+    for item in source_problems:
+        print(f"Warning: asking price source still has internal wording: {item}", file=sys.stderr)
+    if other:
+        raise SystemExit("Deal text still has internal wording: " + "; ".join(other[:3]))
 
 
 def _geocode_query(row: dict) -> str:
@@ -2534,7 +2663,7 @@ def build_deal_layer(
                 else:
                     failed.append({"deal_id": deal_id, "city": city, "kind": kind, "label": label, "stage": str(row.get("Stage") or "")})
             address = re.sub(r"^(PHX|LAS|MIA|SNA)\s+", "", label, flags=re.I)
-            source = firm or broker or ("Listing" if url else "")
+            source = asking_price_source_for(firm, url)
             folder = folder_url_from_row(row)
             area_fields, area_warning = service_area_fields(row, where=deal_id)
             if area_warning:
@@ -2588,12 +2717,7 @@ def build_deal_layer(
             extra = set(props) - set(DEAL_FIELDS)
             if extra:
                 raise SystemExit("Deal fields outside the whitelist: " + ", ".join(sorted(extra)))
-            if deal_text_problems(deal_id, props):
-                props["next_step"] = ""
-                if _DEAL_PRIVATE.search(props["asking_price_source"] or "") or _DEAL_LEAK.search(props["asking_price_source"] or ""):
-                    props["asking_price_source"] = firm or ""
-            if deal_text_problems(deal_id, props):
-                raise SystemExit("Deal text still has internal wording: " + "; ".join(deal_text_problems(deal_id, props)[:3]))
+            guard_deal_text(deal_id, props)
             features.append(
                 {
                     "type": "Feature",
@@ -4396,9 +4520,9 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
                 site["land_only"] = True
             site["site_class"] = site["site_class"] if site["origin"] == "universe" else "Land"
         price = parse_price(row.get("Asking price ($)"))
-        person, firm_name = split_broker(row.get("Broker"))
-        source = firm_name or person or "Listing"
+        _person, firm_name = split_broker(row.get("Broker"))
         url = str(row.get("Listing link") or "").strip()
+        source = asking_price_source_for(firm_name, url)
         status = "verified" if url else ("inferred" if price else None)
         attach_price(site, price, source or "Pipeline workbook", url, row.get("Last checked live"), status)
         if str(row.get("Listing status") or "").strip() == "Listed":

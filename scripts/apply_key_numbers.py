@@ -17,11 +17,12 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.build_data import (  # noqa: E402
     GEOCODE_CACHE,
+    asking_price_source_for,
     business_type_from_row,
     clean_deal_note,
     deal_source,
-    deal_text_problems,
     geocode_address,
+    guard_deal_text,
     listing_url_from_row,
     money,
     nearest_depot_miles,
@@ -77,7 +78,7 @@ def _new_deal(row: dict, kind: str, depots: list[dict], cache: dict) -> dict:
         "listing_url": url[:400],
         "asking_price": price,
         "asking_price_display": money(price) if price else None,
-        "asking_price_source": scrub(firm or broker or ("Listing" if url else ""))[:160],
+        "asking_price_source": scrub(asking_price_source_for(firm, url))[:160],
         "next_step": clean_deal_note(row.get("Next step"))[:400],
         "universe_id": "",
         "coord_status": "geocoded" if coords else "failed",
@@ -91,9 +92,7 @@ def _new_deal(row: dict, kind: str, depots: list[dict], cache: dict) -> dict:
         "business_type": business_type_from_row(row),
         **key_figures(row, kind),
     }
-    problems = deal_text_problems(deal_id, props)
-    if problems:
-        raise SystemExit("Deal text still has internal wording: " + "; ".join(problems[:3]))
+    guard_deal_text(deal_id, props)
     return {
         "type": "Feature",
         "geometry": {"type": "Point", "coordinates": [coords[0], coords[1]]} if coords else None,

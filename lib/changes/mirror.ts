@@ -434,7 +434,7 @@ export function entityChangeCounts(changes: CellChange[]): { site: number; stage
   return counts;
 }
 
-/** Counts only. Cell text stays in the hashed plan. */
+/** Counts only. Site cell text stays in the hashed plan. */
 export function formatPlanSummary(changes: CellChange[]): string {
   const counts = entityChangeCounts(changes);
   return `site ${counts.site}\nstage ${counts.stage}\nactivity ${counts.activity}\ncomms ${counts.comms}`;
@@ -445,15 +445,18 @@ function siteTextHeader(header: string): boolean {
   return MIRROR_FIELD_HEADERS.some((row) => row.headers.some((name) => name.toLowerCase() === norm));
 }
 
-function planValue(header: string, value: string): string {
-  const fingerprint = mirrorCellInput(header) !== "USER_ENTERED" && (siteTextHeader(header) || value.trim().startsWith("{"));
-  return fingerprint ? `#${shortHash(value)}` : JSON.stringify(value);
+function planValue(change: CellChange, value: string): string {
+  const header = change.header.trim().toLowerCase();
+  const siteTab = change.sheet === "Pipeline" || change.sheet === "Land Sites";
+  const siteCell = siteTextHeader(change.header) || (siteTab && header !== "stage");
+  if (siteCell || value.trim().startsWith("{")) return `#${shortHash(value)}`;
+  return JSON.stringify(value);
 }
 
 export function formatPlan(changes: CellChange[]): string {
   if (!changes.length) return "No cell changes.";
   return changes
-    .map((change) => `${a1(change.sheet, change.row, change.column)} ${change.header} ${change.id}: ${planValue(change.header, change.before)} -> ${planValue(change.header, change.after)}`)
+    .map((change) => `${a1(change.sheet, change.row, change.column)} ${change.header} ${change.id}: ${planValue(change, change.before)} -> ${planValue(change, change.after)}`)
     .join("\n");
 }
 

@@ -282,6 +282,9 @@ test("the open-loops API is signed in the same way as the NDA queue", () => {
   assert.equal(/\bAVs?\b/.test(raw), false);
 });
 
+// Tax returns, P&L, insurance, addbacks, and package status stay off every public next step.
+const PUBLIC_PACKAGE = /tax returns?|p\s*&\s*l\b|\binsurance\b|\badd-?backs?\b|package status/i;
+
 test("the signed-in workbook step keeps the text the public card drops", () => {
   const site = {
     site_id: "PIPE-MIA-0080",
@@ -300,9 +303,30 @@ test("the signed-in workbook step keeps the text the public card drops", () => {
   assert.equal(step?.owner, "Broker");
   assert.equal(step?.due, "2026-11-20");
   assert.equal(workbookStepFor({ sites: [site] }, "PIPE-PHX-0001"), null);
-  const deals = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as { features: { properties: { deal_id?: string; next_step?: string } }[] };
-  const stars = deals.features.find((feature) => feature.properties.deal_id === "PIPE-MIA-0080")?.properties;
-  assert.equal(stars?.next_step || "", "");
-  const loops = JSON.parse(readFileSync("data/generated/open-loops.json", "utf8")) as OpenLoopsSnapshot;
-  assert.match(workbookStepFor(loops, "PIPE-MIA-0080")?.text || "", /POS\/car counts/);
+
+  const card = JSON.parse(readFileSync("data/fixtures/public-next-step.json", "utf8")) as {
+    source: string;
+    deal_id: string;
+    signed_in_next_step: string;
+    public_next_step: string;
+    dropped_fragments: string[];
+  };
+  assert.equal(card.source, "fixture");
+  assert.equal(card.deal_id, "PIPE-MIA-0080");
+  const signed = workbookStepFor({ sites: [{ ...site, next_step: card.signed_in_next_step }] }, card.deal_id);
+  assert.match(signed?.text || "", /POS\/car counts/);
+  assert.equal(card.public_next_step, "");
+  for (const fragment of card.dropped_fragments) {
+    assert.equal(card.signed_in_next_step.toLowerCase().includes(fragment.toLowerCase()), true, fragment);
+    assert.equal(card.public_next_step.toLowerCase().includes(fragment.toLowerCase()), false, fragment);
+  }
+  assert.equal(PUBLIC_PACKAGE.test(card.public_next_step), false);
+
+  const deals = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
+    features: { properties: { deal_id?: string; next_step?: string } }[];
+  };
+  for (const feature of deals.features) {
+    const nextStep = feature.properties.next_step || "";
+    assert.equal(PUBLIC_PACKAGE.test(nextStep), false, `${feature.properties.deal_id}: ${nextStep.slice(0, 140)}`);
+  }
 });

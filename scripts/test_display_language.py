@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -41,6 +42,34 @@ class DisplayLanguage(unittest.TestCase):
         self.assertIn("utility", kept)
         self.assertIn("stalls", kept)
         self.assertIn("offer", kept)
+
+    def test_package_document_notes_stay_off_the_public_card(self) -> None:
+        fixture = json.loads((ROOT / "data" / "fixtures" / "public-next-step.json").read_text())
+        signed_in = fixture["signed_in_next_step"]
+        public = clean_deal_note(signed_in)
+        self.assertEqual(public, fixture["public_next_step"])
+        self.assertEqual(public, "")
+        for fragment in fixture["dropped_fragments"]:
+            self.assertIn(fragment.lower(), signed_in.lower(), fragment)
+            self.assertNotIn(fragment.lower(), public.lower(), fragment)
+        self.assertEqual(
+            clean_deal_note(
+                "NOT an environmental assessment — no environmental sampling or contamination findings, "
+                "so it does not speak to environmental condition."
+            ),
+            "",
+        )
+        self.assertEqual(clean_deal_note("Confirm the title report."), "")
+        self.assertEqual(clean_deal_note("Confirm the survey."), "")
+        self.assertEqual(clean_deal_note("NOT the land check."), "")
+        self.assertEqual(clean_deal_note("(2) NOT an environmental assessment."), "")
+        self.assertEqual(clean_deal_note("Confirm the land under R-092."), "")
+        kept = clean_deal_note("Confirm the zoning. Package status stays Received. The land check is not finished.")
+        self.assertIn("Confirm the zoning", kept)
+        self.assertIn("The land check is not finished", kept)
+        self.assertNotIn("Package", kept)
+        self.assertNotIn("Received", kept)
+        self.assertNotRegex(kept, r"(?i)^not\b")
 
     def test_removed_proximity_fields_still_fail(self) -> None:
         problems = display_language_problems({"sample": {"utility_proximity": "Strong"}})

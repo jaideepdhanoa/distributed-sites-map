@@ -1,0 +1,23 @@
+{
+  "source": "fixture",
+  "as_of": "2026-11-15",
+  "deal_id": "PIPE-MIA-0080",
+  "label": "Stars & Stripes signed-in next step from the Nov 14 package review, and the public card text. The ask list is the workbook text through item (4). The environmental sentence is the later fragment the public card was keeping.",
+  "signed_in_next_step": "Broker replied Nov 9, 2026: no paid labor in the P&L (owner-operated) — the payroll item is closed. Awaiting POS/car counts and water/electric bills (broker assembling), electrical service size and addbacks detail. Tax returns at LOI. Stage stays Financial screen. Nov 14, 2026 (afternoon review): package documents received and analyzed in-pass (tax, insurance, survey) — Package status stays Received (partial package). Standing ask list (R-092) after this delivery: (1) POS / car counts; (2) water and electric bills; (3) electrical service size; (4) detail behind the addbacks. NOT an environmental assessment — no environmental sampling or contamination findings, so it does not speak to environmental condition.",
+  "public_next_step": "",
+  "dropped_fragments": [
+    "P&L",
+    "payroll",
+    "addbacks",
+    "Tax returns",
+    "insurance",
+    "survey",
+    "Package status",
+    "Received",
+    "R-092",
+    "environmental assessment",
+    "environmental sampling",
+    "contamination",
+    "NOT an environmental"
+  ]
+}

@@ -2424,10 +2424,37 @@ _DEAL_KEEP = re.compile(
 _DEAL_DROP = re.compile(
     r"(?i)(?:\$|\bpackage\b|\breceipt\b|\broger\b|\bpencek\b|\bcrexi\b|\bbizbuysell\b|\bcomp\b|\brevisit\b|\bsold\b|\bwithdrawn\b|\bfolder\b|\bcall\b|\bemail\b|\bknocked out\b|\bdesk checks?\b|\bpipeline\b|\bask\b)"
 )
+# Package and financial-document analysis stays on the signed-in workbook step.
+_DEAL_PACKAGE = re.compile(
+    r"(?i)("
+    r"environmental\s+assessments?"
+    r"|environmental\s+sampling"
+    r"|\bcontamination\b"
+    r"|\bsurveys?\b"
+    r"|\btitles?\b"
+    r"|tax\s+returns?"
+    r"|\binsurance\b"
+    r"|p\s*&\s*l\b"
+    r"|\bpayroll\b"
+    r"|\badd-?backs?\b"
+    r"|package\s+status"
+    r"|\breceived\b"
+    r"|\bR-0\d+\b"
+    r")"
+)
+
+
+def _package_sentence(piece: str) -> bool:
+    """A package-document sentence, or a fragment that starts with NOT and has no subject."""
+    text = re.sub(r"^[\s\"'“”‘’—–-]+", "", (piece or "").strip())
+    text = re.sub(r"^\(\d+\)\s*", "", text)
+    if re.match(r"(?i)^not\b", text):
+        return True
+    return bool(_DEAL_PACKAGE.search(piece or ""))
 
 
 def clean_deal_note(value) -> str:
-    """Keep a neutral next step. Drop names, approvals, outreach, and legal chatter."""
+    """Keep a neutral next step. Drop names, approvals, outreach, package documents, and legal chatter."""
     text = plain_note(value)
     if not text:
         return ""
@@ -2443,6 +2470,8 @@ def clean_deal_note(value) -> str:
         if re.search(r"(?i)\bno spare\b", piece):
             kept.append("No spare land")
             continue
+        if _package_sentence(piece):
+            continue
         if re.match(r"(?i)^(dropped|stays|oct|nov|low priority|out of scope|gone from|knocked out)\b", piece):
             continue
         if re.search(r"(?i)land sites row|pairing it with", piece):
@@ -2450,13 +2479,19 @@ def clean_deal_note(value) -> str:
         if _DEAL_DROP.search(piece) or not _DEAL_KEEP.search(piece):
             continue
         piece = re.sub(r"(?i)^(?:then|next|our side)\s*[:,]?\s*", "", piece).strip()
-        if not piece or not _DEAL_KEEP.search(piece):
+        if not piece or not _DEAL_KEEP.search(piece) or _package_sentence(piece):
             continue
         kept.append(piece[0].upper() + piece[1:] if piece[:1].islower() else piece)
     cleaned = ". ".join(part.rstrip(".") for part in kept).strip()
     if cleaned and not cleaned.endswith("."):
         cleaned += "."
-    if not cleaned or _DEAL_PRIVATE.search(cleaned) or _DEAL_LEAK.search(cleaned) or _DEAL_DROP.search(cleaned):
+    if (
+        not cleaned
+        or _DEAL_PRIVATE.search(cleaned)
+        or _DEAL_LEAK.search(cleaned)
+        or _DEAL_DROP.search(cleaned)
+        or _package_sentence(cleaned)
+    ):
         return ""
     return cleaned[:400]
 

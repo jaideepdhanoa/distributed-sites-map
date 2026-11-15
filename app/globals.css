@@ -2471,8 +2471,23 @@ span.listing-link.muted { text-decoration: none; }
   .shell.drawer-open.sheet-full:not(.list-open):not(.table-open):not(.nda-open):not(.loops-open):not(.reviewing) {
     --sheet-h: calc(100dvh - var(--bar-h, 156px) - 8px);
   }
-.drawer.snap-peek .hero-frame,
-.drawer.snap-peek .photo-rest { display: none; }
+  .drawer {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+  .drawer-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 16px 24px; }
+  .drawer:has(.card-hero) .drawer-head {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    z-index: 2;
+    pointer-events: auto;
+    padding: 4px 8px 0;
+    background: #faf7f1;
+  }
   .shell:not(.list-open):not(.table-open):not(.nda-open):not(.loops-open):not(.reviewing) .bar {
     position: absolute;
     top: 0; left: 0; right: 0;
@@ -2591,7 +2606,8 @@ span.listing-link.muted { text-decoration: none; }
   .sheet-handle .sheet-grab {
     position: static;
     width: 72px;
-    height: 22px;
+    height: 44px;
+    min-height: 44px;
     margin: 0;
     display: grid;
     place-items: center;

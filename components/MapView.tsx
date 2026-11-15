@@ -706,6 +706,27 @@ export default function MapView(props: Props) {
     };
     const image = marker("depot", [29, 78, 137]);
     const square = (rgb: [number, number, number]) => marker("circle", rgb);
+    const icons = new Map<string, Uint8Array>();
+    icons.set("depot", image);
+    const pinColors: Record<string, [number, number, number]> = {
+      stone: [138, 129, 115],
+      amber: [168, 113, 27],
+      moss: [56, 113, 86],
+      clay: [158, 75, 62],
+      held: [29, 78, 137],
+    };
+    for (const [name, rgb] of Object.entries(pinColors)) icons.set(`dia-${name}`, marker("diamond", rgb));
+    const squares: Record<string, [number, number, number]> = {
+      sourced: pinColors.stone,
+      desk: pinColors.amber,
+      financial: pinColors.moss,
+      checks: pinColors.moss,
+      close: pinColors.moss,
+      contacted: pinColors.moss,
+      later: pinColors.moss,
+      dropped: pinColors.clay,
+    };
+    for (const [name, rgb] of Object.entries(squares)) icons.set(`sq-${name}`, square(rgb));
     const triangle = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
@@ -721,33 +742,14 @@ export default function MapView(props: Props) {
         }
       }
     }
+    const addIcon = (id: string) => {
+      const data = icons.get(id);
+      if (!data || map.hasImage(id)) return;
+      map.addImage(id, { width: size, height: size, data });
+    };
+    map.on("styleimagemissing", (event) => addIcon(event.id));
     map.on("load", () => {
-      if (!map.hasImage("depot")) map.addImage("depot", { width: size, height: size, data: image });
-      const pinColors: Record<string, [number, number, number]> = {
-        stone: [138, 129, 115],
-        amber: [168, 113, 27],
-        moss: [56, 113, 86],
-        clay: [158, 75, 62],
-        held: [29, 78, 137],
-      };
-      for (const [name, rgb] of Object.entries(pinColors)) {
-        const id = `dia-${name}`;
-        if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: marker("diamond", rgb) });
-      }
-      const squares: Record<string, [number, number, number]> = {
-        sourced: pinColors.stone,
-        desk: pinColors.amber,
-        financial: pinColors.moss,
-        checks: pinColors.moss,
-        close: pinColors.moss,
-        contacted: pinColors.moss,
-        later: pinColors.moss,
-        dropped: pinColors.clay,
-      };
-      for (const [name, rgb] of Object.entries(squares)) {
-        const id = `sq-${name}`;
-        if (!map.hasImage(id)) map.addImage(id, { width: size, height: size, data: square(rgb) });
-      }
+      for (const id of icons.keys()) addIcon(id);
       node.current?.setAttribute("data-deal-markers", "square");
       map.resize();
       requestAnimationFrame(() => map.resize());

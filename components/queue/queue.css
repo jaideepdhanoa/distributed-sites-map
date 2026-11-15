@@ -189,7 +189,9 @@
 .review-sheet-head h2 { margin: 0; font-size: var(--type-lead); color: var(--ink); }
 .review-sheet-head button:not(.close) { color: var(--ink); border-color: #8d8376; background: white; }
 @media (max-width: 767px) {
-  .review-kicker, .review-rail, .review-meter, .review-long { display: none; }
+  .review-rail, .review-meter, .review-long { display: none; }
+  .review-kicker { display: block; }
+  .review-count { min-height: 44px; padding: 4px 12px; justify-items: start; }
   .review-short { display: inline; }
   .review-bar {
     display: grid;
@@ -238,6 +240,8 @@
   .review-noloc, .review-done { left: 50%; transform: translateX(-50%); }
   .shell.reviewing .map-stage { display: flex; flex-direction: column; }
   .shell.reviewing .stage-map { position: relative; height: auto; flex: 1 1 46%; min-height: 180px; width: 100%; }
+  .shell.reviewing .maplibregl-ctrl-top-right { top: 8px !important; right: 8px; }
+  .shell.reviewing .map-float { top: auto; bottom: 12px; right: 8px; }
   .shell.reviewing .drawer {
     position: relative;
     flex: 1 1 46%;

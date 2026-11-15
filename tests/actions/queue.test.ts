@@ -43,6 +43,7 @@ async function ready() {
     "008_snapshots.sql",
     "009_events.sql",
     "010_sites.sql",
+    "011_alert_categories.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

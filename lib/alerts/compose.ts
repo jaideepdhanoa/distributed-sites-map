@@ -4,7 +4,7 @@ import { renderAlert } from "./template";
 import type { AlertCategory } from "./preferences";
 
 export type MailItem = {
-  category: AlertCategory | "followed" | "queue";
+  category: AlertCategory | "followed" | "queue" | "activity" | "comms" | "brief";
   siteId: string;
   siteLabel: string;
   summary: string;
@@ -20,8 +20,15 @@ const LABELS: Record<MailItem["category"], string> = {
   replies: "Reply",
   flags: "Flag",
   assignments: "Assignment",
+  recommendations: "Recommendation",
+  proposals: "Proposal",
+  decisions: "Decision",
+  stages: "Stage",
   followed: "Note",
   queue: "Review",
+  activity: "Activity",
+  comms: "Comms",
+  brief: "Summary",
 };
 
 export function categoryLabel(category: MailItem["category"]): string {
@@ -52,6 +59,9 @@ export function screenEmail(subject: string, body: string): { subject: string; b
   return { subject: nextSubject, body: nextBody };
 }
 
-export function renderBatch(items: MailItem[], options?: { now?: Date; kind?: "instant" | "digest" | "updates" | "catchup" }): { subject: string; body: string; html: string } | null {
+export function renderBatch(
+  items: MailItem[],
+  options?: { now?: Date; kind?: "instant" | "digest" | "updates" | "catchup" },
+): { subject: string; body: string; html: string } | null {
   return renderAlert(items, options);
 }

@@ -128,6 +128,12 @@ export async function addRecommendation(sql: Sql, inboxId: string, draft: Recomm
     ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
     [id, inboxId, draft.kind, draft.draftText, draft.decision, draft.rationale, JSON.stringify(draft.sources), draft.confidence, draft.model],
   );
+  try {
+    const { notifyNewRecommendation } = await import("@/lib/alerts/agentWrite");
+    await notifyNewRecommendation(sql, id, draft.model);
+  } catch (error) {
+    console.error(JSON.stringify({ event: "agent_alert_error", name: error instanceof Error ? error.name : "error" }));
+  }
   return id;
 }
 

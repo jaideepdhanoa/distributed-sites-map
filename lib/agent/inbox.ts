@@ -505,6 +505,12 @@ export async function ingestAskGap(
     threadKey: `ask:${refId}`,
     threadContext: input.siteId ? `Site ${input.siteId}` : "Portfolio and markets",
   });
+  try {
+    const { notifyAskGap } = await import("@/lib/alerts/agentWrite");
+    await notifyAskGap(sql, { refId, actorId: input.userId, siteId, question: input.question });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "agent_alert_error", name: error instanceof Error ? error.name : "error" }));
+  }
   return refId;
 }
 

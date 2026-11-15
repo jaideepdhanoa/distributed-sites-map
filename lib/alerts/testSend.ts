@@ -24,8 +24,15 @@ const SAMPLE_NOTES: Record<MailItem["category"], string> = {
   replies: "Adding a sample reply on the thread.",
   flags: "Flagging this sample site for a closer look.",
   assignments: "This sample site is assigned to you.",
+  recommendations: "A sample recommendation is waiting.",
+  proposals: "A sample proposal is waiting.",
+  decisions: "A sample decision is waiting.",
+  stages: "A sample stage change.",
   followed: "This is a sample note for the daily digest.",
   queue: "A sample item is waiting in Review.",
+  activity: "One new activity record.",
+  comms: "One new comms record.",
+  brief: "Nothing new is waiting.",
 };
 
 function sampleHref(category: MailItem["category"]): string {

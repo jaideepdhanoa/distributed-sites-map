@@ -119,13 +119,29 @@ test("a read-back mismatch fails", () => {
   assert.throws(() => assertPlannedWrites([{ ...change, id: PROTECTED_SITE_ID }]), /PIPE-PHX-0006/);
 });
 
-test("the mirror refuses a preview, a pull request, and a disabled flag", () => {
+test("a dry run does not need WORKBOOK_MIRROR_ENABLED", () => {
   const saved = {
     vercel: process.env.VERCEL_ENV,
     event: process.env.GITHUB_EVENT_NAME,
     ref: process.env.GITHUB_REF,
     actions: process.env.GITHUB_ACTIONS,
     enabled: process.env.WORKBOOK_MIRROR_ENABLED,
+    dry: process.env.WORKBOOK_MIRROR_DRY_RUN,
+  };
+  const restore = () => {
+    const names = {
+      vercel: "VERCEL_ENV",
+      event: "GITHUB_EVENT_NAME",
+      ref: "GITHUB_REF",
+      actions: "GITHUB_ACTIONS",
+      enabled: "WORKBOOK_MIRROR_ENABLED",
+      dry: "WORKBOOK_MIRROR_DRY_RUN",
+    } as const;
+    for (const [key, name] of Object.entries(names)) {
+      const value = saved[key as keyof typeof saved];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   };
   try {
     delete process.env.VERCEL_ENV;
@@ -133,6 +149,38 @@ test("the mirror refuses a preview, a pull request, and a disabled flag", () => 
     delete process.env.GITHUB_REF;
     delete process.env.GITHUB_ACTIONS;
     delete process.env.WORKBOOK_MIRROR_ENABLED;
+    process.env.WORKBOOK_MIRROR_DRY_RUN = "1";
+    assert.doesNotThrow(() => assertWorkbookMirrorAllowed());
+    process.env.GITHUB_ACTIONS = "true";
+    process.env.GITHUB_REF = "refs/heads/feature";
+    assert.throws(() => assertWorkbookMirrorAllowed(), /only on main/);
+    process.env.GITHUB_REF = "refs/heads/main";
+    process.env.GITHUB_EVENT_NAME = "pull_request";
+    assert.throws(() => assertWorkbookMirrorAllowed(), /pull request/);
+    delete process.env.GITHUB_EVENT_NAME;
+    process.env.VERCEL_ENV = "preview";
+    assert.throws(() => assertWorkbookMirrorAllowed(), /from Vercel/);
+  } finally {
+    restore();
+  }
+});
+
+test("the mirror refuses a preview, a pull request, and a disabled flag", () => {
+  const saved = {
+    vercel: process.env.VERCEL_ENV,
+    event: process.env.GITHUB_EVENT_NAME,
+    ref: process.env.GITHUB_REF,
+    actions: process.env.GITHUB_ACTIONS,
+    enabled: process.env.WORKBOOK_MIRROR_ENABLED,
+    dry: process.env.WORKBOOK_MIRROR_DRY_RUN,
+  };
+  try {
+    delete process.env.VERCEL_ENV;
+    delete process.env.GITHUB_EVENT_NAME;
+    delete process.env.GITHUB_REF;
+    delete process.env.GITHUB_ACTIONS;
+    delete process.env.WORKBOOK_MIRROR_ENABLED;
+    delete process.env.WORKBOOK_MIRROR_DRY_RUN;
     assert.throws(() => assertWorkbookMirrorAllowed(), /WORKBOOK_MIRROR_ENABLED/);
     process.env.WORKBOOK_MIRROR_ENABLED = "1";
     process.env.GITHUB_ACTIONS = "true";
@@ -147,8 +195,16 @@ test("the mirror refuses a preview, a pull request, and a disabled flag", () => 
     delete process.env.VERCEL_ENV;
     assert.doesNotThrow(() => assertWorkbookMirrorAllowed());
   } finally {
-    for (const [key, value] of Object.entries(saved)) {
-      const name = key === "vercel" ? "VERCEL_ENV" : key === "event" ? "GITHUB_EVENT_NAME" : key === "ref" ? "GITHUB_REF" : key === "actions" ? "GITHUB_ACTIONS" : "WORKBOOK_MIRROR_ENABLED";
+    const names = {
+      vercel: "VERCEL_ENV",
+      event: "GITHUB_EVENT_NAME",
+      ref: "GITHUB_REF",
+      actions: "GITHUB_ACTIONS",
+      enabled: "WORKBOOK_MIRROR_ENABLED",
+      dry: "WORKBOOK_MIRROR_DRY_RUN",
+    } as const;
+    for (const [key, name] of Object.entries(names)) {
+      const value = saved[key as keyof typeof saved];
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }

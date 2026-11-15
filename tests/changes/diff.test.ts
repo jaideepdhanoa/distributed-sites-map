@@ -36,8 +36,8 @@ test("a backfill is idempotent and the diff is clean until a write drifts", { ti
   const first = await importChanged(sql, slice, "snap-1");
   assert.equal(first.inserted.stage, slice.stages.length);
   assert.equal(first.inserted.activity, slice.activities.length);
-  assert.ok(first.inserted.comms > 0);
-  assert.ok(first.invalid.comms > 0);
+  assert.equal(first.inserted.comms, slice.comms.length);
+  assert.equal(first.invalid.comms, 0);
   const second = await importChanged(sql, slice, "snap-1");
   assert.equal(second.inserted.stage, 0);
   assert.equal(second.inserted.activity, 0);
@@ -45,11 +45,14 @@ test("a backfill is idempotent and the diff is clean until a write drifts", { ti
   assert.equal(second.unchanged.stage, first.inserted.stage);
 
   const report = await diffDatabase(sql, slice, "files");
+  assert.equal(report.clean, true);
+  assert.deepEqual(report.clean_by_entity, { stage: true, activity: true, comms: true });
   assert.equal(report.entities.stage.changed.length, 0);
   assert.equal(report.entities.stage.missing.length, 0);
-  assert.ok(report.legacy_stages.length > 0);
-  assert.ok(report.invalid.comms.some((issue) => issue.value === "L-441"));
+  assert.deepEqual(report.legacy_stages, ["LAND-PHX-0003"]);
+  assert.equal(report.invalid.comms.some((issue) => issue.value === "L-441"), false);
   assert.match(renderReport(report), /one clean on-demand diff/);
+  assert.match(renderReport(report), /clean_by_entity: stage yes, activity yes, comms yes/);
   const legacy = slice.stages.find((row) => row.stage === "Financial screen");
   assert.ok(legacy);
   const stored = await readDatabaseSlice(sql);
@@ -85,6 +88,9 @@ test("a backfill is idempotent and the diff is clean until a write drifts", { ti
   });
   const drifted = await diffDatabase(sql, slice, "files");
   assert.equal(drifted.clean, false);
+  assert.equal(drifted.clean_by_entity.stage, false);
+  assert.equal(drifted.clean_by_entity.comms, true);
   assert.ok(drifted.entities.stage.changed.some((row) => row.id === "PIPE-PHX-0001" && row.field === "stage"));
   assert.match(renderReport(drifted), /Clean: no/);
+  assert.match(renderReport(drifted), /clean_by_entity: stage no/);
 });

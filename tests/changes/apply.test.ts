@@ -40,7 +40,7 @@ test("validation rejects a bad market, class, source, agent drop, and a caller-c
   assert.throws(() => validateBatch(human, "k1", { changes: [stage("1 Desk screen", { market: "Phoenix" })] }), /Market must be one of PHX/);
   assert.throws(
     () => validateBatch(human, "k1", { changes: [stage("1 Desk screen", { service_area_class: "Beside" })] }),
-    /Service area class must be one of Inside/,
+    /Service area class must be one of inside/,
   );
   assert.throws(() => validateBatch(human, "k1", { changes: [{ ...stage("1 Desk screen"), source: "  " }] }), /Every change needs a source/);
   assert.throws(

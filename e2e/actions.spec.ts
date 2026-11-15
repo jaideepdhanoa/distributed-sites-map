@@ -35,9 +35,7 @@ async function openAs(page: import("@playwright/test").Page, username: string, p
 
 async function discussionInView(page: import("@playwright/test").Page, id: string) {
   const drawer = page.locator("aside.drawer");
-  const record = drawer.locator("summary.disclosure", { hasText: "Record" });
-  if (await record.count()) await record.first().click();
-  await expect(drawer).toContainText(id);
+  await expect(drawer).toHaveAttribute("data-record", id);
   await expect(page.getByTestId("key-strip")).toHaveCount(1);
   await page.waitForTimeout(1200);
   const discussion = page.getByRole("tab", { name: "Discussion" });
@@ -114,7 +112,7 @@ for (const width of [1024, 1280]) {
       await route.continue();
     });
     await openAs(page, "contributor", "/?view=review&site=PIPE-MIA-0079");
-    await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0079");
+    await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", "PIPE-MIA-0079");
     await expect(page.getByTestId("review-bar")).toHaveCount(0, { timeout: 2000 });
     expect(reviewQueueSettled).toBe(false);
     await expect(page.locator(".review-rail")).toHaveCount(0);
@@ -133,7 +131,7 @@ for (const width of [1024, 1280]) {
 test("a cold in-queue review link highlights that row", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openAs(page, "contributor", "/?view=review&site=PIPE-LAS-0073");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-LAS-0073");
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", "PIPE-LAS-0073");
   await expect(page.locator(".shell")).toHaveClass(/reviewing/);
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
   await expect(page.getByTestId("review-position")).toContainText(/\d+ of \d+/);
@@ -180,14 +178,14 @@ test("a review link highlights that site, or leaves review when it is not queued
   expect(items.length).toBeGreaterThan(1);
   const target = items[items.length - 1];
   await page.goto(`/?view=review&site=${target.siteId}`);
-  await expect(page.locator("aside.drawer")).toContainText(target.siteId);
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", target.siteId);
   await expect(page.locator(".shell")).toHaveClass(/reviewing/);
   const highlighted = page.locator(".review-row.on");
   await expect(highlighted).toHaveCount(1);
   if (target.name) await expect(highlighted).toContainText(target.name);
 
   await page.goto("/?view=review&site=PIPE-MIA-0079&panel=discussion");
-  await expect(page.locator("aside.drawer")).toContainText("PIPE-MIA-0079");
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", "PIPE-MIA-0079");
   await expect(page.locator(".shell")).not.toHaveClass(/reviewing/);
   await expect(page.getByTestId("review-bar")).toHaveCount(0);
   await expect(page.getByTestId("panel-tab-discussion")).toBeInViewport();
@@ -225,7 +223,7 @@ test("a suggested draft links to that site", async ({ page, request }) => {
   await expect(link).toBeVisible();
   await expect(link).toHaveAttribute("href", `/?site=${deal}&panel=discussion`);
   await link.click();
-  await expect(page.locator("aside.drawer")).toContainText(deal);
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", deal);
   await expect(page.getByTestId("panel-tab-discussion")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("record-actions")).toBeVisible();
 });

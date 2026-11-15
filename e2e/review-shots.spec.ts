@@ -42,8 +42,13 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(drawer).toContainText("Census site");
   await expect(drawer).toContainText("County record not reviewed");
   await page.screenshot({ path: `review-shots/${name}-site-panel.png`, fullPage: false });
-  await drawer.locator("summary.disclosure", { hasText: "Record" }).click();
-  await expect(drawer).toContainText("PHX-U189");
+  if (name === "mobile") {
+    await page.goto("/?funnel=universe&stage=in_area&site=PHX-U189&sheet=full", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("aside.drawer");
+  }
+  const record = page.locator("aside.drawer");
+  await record.locator("summary.disclosure", { hasText: "Record" }).click();
+  await expect(record).toContainText("PHX-U189");
   await page.goto("/?funnel=universe&stage=in_area", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   await showFunnel(page, name);

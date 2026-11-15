@@ -35,7 +35,7 @@ test("changes note uses the published-build counts", async ({ page }, info) => {
 test("a site card does not show utility rows", async ({ page }) => {
   await signIn(page);
   await page.goto("/?site=PHX-U180");
-  await expect(page.locator("aside.drawer")).toContainText("PHX-U180");
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", "PHX-U180");
   await expect(page.locator("aside.drawer")).not.toContainText("Utility proximity");
   await expect(page.locator("aside.drawer")).not.toContainText("Serving utility");
 });

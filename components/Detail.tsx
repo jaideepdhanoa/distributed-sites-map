@@ -371,6 +371,7 @@ export default function Detail({
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   return (
     <aside
+      data-record={site.site_id}
       className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
       onTouchStart={(event) => {
         if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
@@ -657,6 +658,7 @@ export function DealDetail({
   const cue = listingCue(deal);
   return (
     <aside
+      data-record={deal.deal_id}
       className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
       onTouchStart={(event) => {
         if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;

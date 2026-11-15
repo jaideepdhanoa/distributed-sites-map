@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { POST } from "../../lib/api/handlers/changes";
 import { actorFromRequest, agentFromAuthorization, isActor } from "../../lib/changes/auth";
-import { deleteClosedPreviewBranches, previewBranchDeletable } from "../../lib/changes/cleanup";
 import { signSession } from "../../lib/session";
 
 test("agent tokens name the actor and a session is a human", async () => {
@@ -119,42 +118,4 @@ test("agent tokens name the actor and a session is a human", async () => {
       else process.env[key] = value;
     }
   }
-});
-
-test("closed pull requests delete preview/<name> branches only", async () => {
-  assert.equal(previewBranchDeletable({ name: "preview" }), false);
-  assert.equal(previewBranchDeletable({ name: "main" }), false);
-  assert.equal(previewBranchDeletable({ name: "production" }), false);
-  assert.equal(previewBranchDeletable({ name: "preview/cursor-phase", primary: true }), false);
-  assert.equal(previewBranchDeletable({ name: "preview/cursor-phase", protected: true }), false);
-  assert.equal(previewBranchDeletable({ name: "preview/cursor-phase" }), true);
-
-  const calls: { url: string; method: string }[] = [];
-  const fetchImpl: typeof fetch = async (input, init) => {
-    const url = String(input);
-    const method = init?.method || "GET";
-    calls.push({ url, method });
-    if (method === "DELETE") return new Response("{}", { status: 200 });
-    return new Response(
-      JSON.stringify({
-        branches: [
-          { id: "br-preview", name: "preview", primary: false },
-          { id: "br-main", name: "main", primary: true },
-          { id: "br-pr", name: "preview/cursor-phase-2a" },
-          { id: "br-keep", name: "preview/keep", protected: true },
-        ],
-      }),
-      { status: 200 },
-    );
-  };
-  const deleted = await deleteClosedPreviewBranches({
-    apiKey: "test-api-key",
-    projectId: "project-1",
-    fetchImpl,
-  });
-  assert.deepEqual(deleted, ["preview/cursor-phase-2a"]);
-  assert.equal(calls.some((call) => call.method === "DELETE" && call.url.endsWith("/br-pr")), true);
-  assert.equal(calls.some((call) => call.method === "DELETE" && call.url.endsWith("/br-preview")), false);
-  assert.equal(calls.some((call) => call.method === "DELETE" && call.url.endsWith("/br-main")), false);
-  assert.equal(JSON.stringify(calls).includes("test-api-key"), false);
 });

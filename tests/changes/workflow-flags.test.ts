@@ -48,4 +48,13 @@ test("import and mirror steps receive the four cutover flags", () => {
   }
   assert.ok(hits.some((hit) => hit.script === "scripts/import-shadow.ts"), "no step runs the shadow import");
   assert.ok(hits.some((hit) => hit.script === "scripts/workbook-mirror.ts"), "no step runs the workbook mirror");
+
+  const manual = readFileSync(join(root, "shadow-import.yml"), "utf8");
+  assert.match(manual, /^name: Shadow import/m);
+  assert.match(manual, /^on:\n {2}workflow_dispatch:\n/m);
+  assert.doesNotMatch(manual, /schedule:|pull_request:/);
+  assert.match(manual, /if: github\.ref == 'refs\/heads\/main'/);
+  assert.match(manual, /NEON_DATABASE_URL: \$\{\{ secrets\.NEON_DATABASE_URL \}\}/);
+  assert.match(manual, /NEON_PRODUCTION_HOST: \$\{\{ vars\.NEON_PRODUCTION_HOST \}\}/);
+  assert.ok(hits.some((hit) => hit.file === "shadow-import.yml" && hit.script === "scripts/import-shadow.ts"));
 });

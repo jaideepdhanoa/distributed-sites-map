@@ -69,12 +69,14 @@ export function assertEventsWritable(): void {
   }
 }
 
-/** Workbook sync on main is the only writer of shadow rows in production. */
+/** Workbook sync and the manual Shadow import, both on main, write shadow rows. */
 export function assertWorkbookImportAllowed(url: string): void {
   if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
     throw new ProductionWriteRefused("Refusing to import workbook rows from Vercel.");
   }
-  if (process.env.GITHUB_REF !== "refs/heads/main" || process.env.GITHUB_WORKFLOW !== "Workbook sync") {
+  const workflow = process.env.GITHUB_WORKFLOW;
+  const allowed = workflow === "Workbook sync" || workflow === "Shadow import";
+  if (process.env.GITHUB_REF !== "refs/heads/main" || !allowed) {
     throw new ProductionWriteRefused("Workbook import runs only from the Workbook sync job on main.");
   }
   if (!isProductionDatabase(url)) {

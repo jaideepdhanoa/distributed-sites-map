@@ -233,10 +233,13 @@ class DistanceBandTest(unittest.TestCase):
             ("Near 5-10", 5.1),
             ("Near 5-10", 10),
             ("Outside", 10.1),
+            ("Outside", None),
             ("Out", 12),
+            ("Out", None),
             ("Edge", 0),
             ("Edge", 4),
             ("Unknown", 3),
+            ("Unknown", None),
         )
         for raw, distance in quiet:
             warning, _fields = self._warn(raw, distance)
@@ -248,7 +251,6 @@ class DistanceBandTest(unittest.TestCase):
             ("Near 5-10", 5, "Near 5-10"),
             ("Near 0-5", None, "blank"),
             ("Outside", 10, "10"),
-            ("Outside", None, "blank"),
             ("Out", 4, "Outside"),
             ("Out", 10, "10"),
         )
@@ -264,6 +266,20 @@ class DistanceBandTest(unittest.TestCase):
         self.assertEqual(service_area_record_problems("LAND-LAS-0001", fields), [])
         near_far_zero, _fields = self._warn("Near 5-10", 0)
         self.assertEqual(near_far_zero, "service area Near 5-10 has distance 0")
+
+    def test_outside_with_a_blank_distance_is_quiet(self) -> None:
+        for raw in ("Outside", "Out"):
+            warning, fields = self._warn(raw, None, where="LAND-PHX-0001")
+            self.assertIsNone(warning, raw)
+            self.assertEqual(fields["service_area_class"], "outside")
+            self.assertIsNone(fields["service_area_distance_mi"])
+        unknown, _fields = self._warn("Unknown", None, where="LAND-PHX-0002")
+        self.assertIsNone(unknown)
+        fields, class_warning = service_area_fields({}, where="blank")
+        self.assertIsNone(class_warning)
+        self.assertEqual(fields["service_area_class"], "unknown")
+        self.assertIsNone(fields["service_area_distance_mi"])
+        self.assertIsNone(service_area_distance_warning(fields, where="blank"))
 
     def test_sync_comment_lists_the_disagreement_and_still_counts_zero(self) -> None:
         lines = service_area_distance_comment_lines({

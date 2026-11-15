@@ -249,16 +249,22 @@ def _distance_number(distance):
 
 
 def service_area_distance_agrees(class_id: str, distance) -> bool:
-    """Inside is 0 or blank. Near bands are open on the left. Outside is past 10."""
+    """Inside is 0 or blank. Near bands are open on the left.
+
+    A blank distance agrees for every class except Near. Outside is past 10
+    when a distance is filled in.
+    """
     number = _distance_number(distance)
+    if number is None:
+        return class_id not in {"near_0_5", "near_5_10"}
     if class_id == "inside":
-        return number is None or number == 0
+        return number == 0
     if class_id == "near_0_5":
-        return number is not None and 0 < number <= 5
+        return 0 < number <= 5
     if class_id == "near_5_10":
-        return number is not None and 5 < number <= 10
+        return 5 < number <= 10
     if class_id == "outside":
-        return number is not None and number > 10
+        return number > 10
     return True
 
 
@@ -274,16 +280,19 @@ def _distance_text(distance) -> str:
 def service_area_distance_warning(fields: dict, *, where: str = "") -> str | None:
     """Warn when the class and the distance band disagree. Does not fail the sync.
 
-    Inside agrees with 0 or a blank distance. Near 0-5 is more than 0 and up to 5.
-    Near 5-10 is more than 5 and up to 10. Outside is more than 10, so an Out row
-    at 10 or less disagrees. A Near row at distance 0 is called out on its own.
-    Edge and unknown have no band.
+    A blank distance is normal for Outside, and for any class that is not Near.
+    Inside with a distance above 0 disagrees. Near 0-5 is more than 0 and up to 5.
+    Near 5-10 is more than 5 and up to 10. A Near row at 0 or blank is called out.
+    Outside with a filled distance of 10 or less disagrees. Edge and unknown have no band.
     """
     class_id = str((fields or {}).get("service_area_class") or "")
     if class_id not in _DISTANCE_LABEL:
         return None
     distance = (fields or {}).get("service_area_distance_mi")
     number = _distance_number(distance)
+    # Outside, Inside, and any non-Near class may leave the distance blank.
+    if number is None and class_id not in {"near_0_5", "near_5_10"}:
+        return None
     place = f"{where} " if where else ""
     label = _DISTANCE_LABEL[class_id]
     if class_id in {"near_0_5", "near_5_10"} and number == 0:

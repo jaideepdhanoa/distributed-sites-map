@@ -57,6 +57,57 @@ test("agent tokens name the actor and a session is a human", async () => {
       body: "{}",
     }));
     assert.equal(sameOrigin.status, 503);
+
+    const wrongBearer = await POST(new Request("http://localhost/api/changes", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer wrong-token",
+        cookie: `sites_session=${token}`,
+        "sec-fetch-site": "cross-site",
+        "content-type": "application/json",
+        "idempotency-key": "wrong-bearer",
+      },
+      body: JSON.stringify({ changes: [] }),
+    }));
+    assert.equal(wrongBearer.status, 401);
+    assert.equal(((await wrongBearer.json()) as { error: string }).error, "Unauthorized");
+
+    const around = {
+      database: process.env.DATABASE_URL,
+      vercel: process.env.VERCEL_ENV,
+      enabled: process.env.CHANGES_API_ENABLED,
+    };
+    delete process.env.DATABASE_URL;
+    delete process.env.VERCEL_ENV;
+    delete process.env.CHANGES_API_ENABLED;
+    let rightBearer: Response;
+    try {
+      rightBearer = await POST(new Request("http://localhost/api/changes", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer indie-test-token",
+          "sec-fetch-site": "cross-site",
+          "content-type": "application/json",
+          "idempotency-key": "empty-batch",
+        },
+        body: JSON.stringify({ changes: [] }),
+      }));
+    } finally {
+      if (around.database === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = around.database;
+      if (around.vercel === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = around.vercel;
+      if (around.enabled === undefined) delete process.env.CHANGES_API_ENABLED;
+      else process.env.CHANGES_API_ENABLED = around.enabled;
+    }
+    const rightBody = (await rightBearer.json()) as { error: string };
+    assert.notEqual(rightBearer.status, 401);
+    assert.doesNotMatch(rightBody.error, /refused/);
+    if (rightBearer.status === 400) assert.match(rightBody.error, /at least one change/);
+    else {
+      assert.equal(rightBearer.status, 503);
+      assert.match(rightBody.error, /database is configured/);
+    }
   } finally {
     for (const [key, value] of [
       ["AGENT_WRITE_TOKEN_INDIE", saved.indie],

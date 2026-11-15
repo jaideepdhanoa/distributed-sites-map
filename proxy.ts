@@ -13,6 +13,14 @@ const OPEN = new Set([
   "/icon-512.png",
 ]);
 
+/** Handlers that call actorFromRequest. The bearer is checked there. */
+const AGENT_BEARER_PATHS = new Set(["/api/changes"]);
+
+function hasAgentBearer(request: NextRequest): boolean {
+  const header = request.headers.get("authorization");
+  return Boolean(header && /^bearer /i.test(header.trim()));
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (OPEN.has(pathname) || pathname === "/maplibre-gl-worker.js") return NextResponse.next();
@@ -22,6 +30,9 @@ export async function proxy(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;
+  }
+  if (AGENT_BEARER_PATHS.has(pathname) && hasAgentBearer(request)) {
+    return NextResponse.next({ headers: privateHeaders() });
   }
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders() });

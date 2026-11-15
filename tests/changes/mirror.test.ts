@@ -10,6 +10,7 @@ import {
   assertReadBack,
   assertWorkbookMirrorAllowed,
   entitiesToMirror,
+  formatPlanSummary,
   planActivityMirror,
   planCommsMirror,
   planStageMirror,
@@ -250,5 +251,42 @@ test("import skips an entity while its read flag is on", async () => {
     else process.env.CHANGES_API_ENABLED = previousApi;
     if (previousEnv === undefined) delete process.env.VERCEL_ENV;
     else process.env.VERCEL_ENV = previousEnv;
+  }
+});
+
+test("a site-flag simulation is a dry run and the plan summary counts entities", () => {
+  const names = ["SIMULATE_SITE_FLAG", "WORKBOOK_MIRROR_DRY_RUN", "WORKBOOK_MIRROR_ENABLED", "READ_STAGES_FROM_DB", "READ_ACTIVITY_FROM_DB", "READ_COMMS_FROM_DB", "READ_SITES_FROM_DB", "CHANGES_API_ENABLED", "VERCEL_ENV", "GITHUB_EVENT_NAME", "GITHUB_ACTIONS", "GITHUB_REF"] as const;
+  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  const restore = () => {
+    for (const name of names) {
+      const value = saved[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.SIMULATE_SITE_FLAG = "1";
+    process.env.CHANGES_API_ENABLED = "0";
+    assert.throws(() => assertWorkbookMirrorAllowed(), /simulate_site_flag is only allowed when dry_run is true/);
+    process.env.WORKBOOK_MIRROR_DRY_RUN = "1";
+    assert.doesNotThrow(() => assertWorkbookMirrorAllowed());
+    assert.deepEqual(entitiesToMirror(), ["site"]);
+    delete process.env.SIMULATE_SITE_FLAG;
+    assert.deepEqual(entitiesToMirror(), []);
+
+    const note = "On hold - broker Nov 6: the package is in the folder.";
+    const summary = formatPlanSummary([
+      { sheet: "Pipeline", row: 5, column: 4, header: "Stage", id: "PIPE-PHX-0001", before: "1 Desk screen", after: "2 Financial screen" },
+      { sheet: "Land Sites", row: 11, column: 6, header: "Next step", id: "LAND-PHX-0064", before: "Confirm the zoning.", after: note },
+      { sheet: "Activity", row: 2, column: 5, header: "Summary", id: "A-000001", before: "Called", after: note },
+      { sheet: "Comms Log", row: 3, column: 10, header: "Summary", id: "CM-0001", before: "Called", after: note },
+      { sheet: "Comms Log", row: 4, column: 10, header: "Summary", id: "CM-0002", before: "Wrote", after: "Sent the note." },
+    ]);
+    assert.equal(summary, "site 1\nstage 1\nactivity 1\ncomms 2");
+    assert.equal(summary.includes(note), false);
+    assert.equal(summary.includes("Confirm the zoning."), false);
+  } finally {
+    restore();
   }
 });

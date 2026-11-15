@@ -39,6 +39,11 @@ test("import and mirror steps receive the cutover flags", () => {
       if (!script) continue;
       hits.push({ file, script });
       for (const [key, ref] of FLAGS) {
+        if (key === "READ_SITES_FROM_DB") {
+          assert.match(block, new RegExp(`^\\s+${key}:\\s*\\$\\{\\{`, "m"), `${file} runs ${script} without ${key}`);
+          assert.match(block, /vars\.READ_SITES_FROM_DB\b/, `${file} runs ${script} without ${ref}`);
+          continue;
+        }
         assert.match(
           block,
           new RegExp(`^\\s+${key}:\\s*\\$\\{\\{\\s*${ref}\\b`, "m"),
@@ -58,4 +63,13 @@ test("import and mirror steps receive the cutover flags", () => {
   assert.match(manual, /NEON_DATABASE_URL: \$\{\{ secrets\.NEON_DATABASE_URL \}\}/);
   assert.match(manual, /NEON_PRODUCTION_HOST: \$\{\{ vars\.NEON_PRODUCTION_HOST \}\}/);
   assert.ok(hits.some((hit) => hit.file === "shadow-import.yml" && hit.script === "scripts/import-shadow.ts"));
+
+  const mirror = readFileSync(join(root, "workbook-mirror.yml"), "utf8");
+  assert.match(mirror, /simulate_site_flag:\n\s+description: Dry run only\. Set READ_SITES_FROM_DB to 1 for this run\n\s+type: boolean\n\s+default: false/);
+  assert.match(mirror, /simulate_site_flag is only allowed when dry_run is true/);
+  assert.match(mirror, /SIMULATE_SITE_FLAG: \$\{\{ \(inputs\.simulate_site_flag == true \|\| inputs\.simulate_site_flag == 'true'\) && '1' \|\| '0' \}\}/);
+  assert.match(
+    mirror,
+    /READ_SITES_FROM_DB: \$\{\{ \(inputs\.simulate_site_flag == true \|\| inputs\.simulate_site_flag == 'true'\) && \(inputs\.dry_run == true \|\| inputs\.dry_run == 'true'\) && '1' \|\| vars\.READ_SITES_FROM_DB \}\}/,
+  );
 });

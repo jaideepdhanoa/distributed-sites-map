@@ -11,7 +11,7 @@ import { PROTECTED_ROW, PROTECTED_SITE_ID, formatPlan, planSiteMirror, sheetValu
 import { applySiteRows } from "../../lib/changes/read";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { loadScorecard, recordedLocationPoints, recordedScore, scorecardTotal } from "../../lib/changes/scorecard";
-import { brokerMirrorCell, displayNote, emptySiteFields, listingFlags, listingKnown, mirrorCellInput, mirrorHeaderAllowed, mirrorWrites, siteIssues, splitBroker, type SiteRow } from "../../lib/changes/site";
+import { brokerMirrorCell, displayNote, emptySiteFields, listingFlags, listingKnown, mirrorCellInput, mirrorHeaderAllowed, mirrorWrites, pricePerAcre, shortHash, siteIssues, splitBroker, type SiteRow } from "../../lib/changes/site";
 import { isSnapshotFile } from "../../lib/snapshot/hash";
 import { readGenerated } from "../../lib/snapshot/read";
 import { workbookFromFiles } from "../../lib/changes/workbook";
@@ -543,6 +543,101 @@ test("agents write only their fields, and a new site needs a Phoenix, Las Vegas,
       changes: [siteChange({ service_area_class: "inside", miles_to_depot: 3.2, sources: { miles_to_depot: "depot file" } }, 1)],
     }),
   );
+});
+
+/** Shadow diff 43760617475: these three per-acre strings differed. The second hash is the database value. */
+const PER_ACRE_CASES = [
+  { id: "LAND-PHX-0064", asking: "395000", acres: "0.562", rounded: "0.56", perAcre: "702846.98", workbookHash: "d6795b6b7631", databaseHash: "4abcea3de329" },
+  { id: "LAND-PHX-0084", asking: "1300000", acres: "1.347", rounded: "1.35", perAcre: "965107.65", workbookHash: "be7fdc486132", databaseHash: "313591b55cac" },
+  { id: "PIPE-PHX-0086", asking: "850000", acres: "0.974", rounded: "0.97", perAcre: "872689.94", workbookHash: "a30d562f255a", databaseHash: "5dbc66b421a0" },
+] as const;
+
+test("per-acre copies the snapshot figure from the unrounded acres", async () => {
+  const sources = JSON.parse(readFileSync("data/pricing/sources.json", "utf8")) as {
+    land: { id: string; acres?: string; price?: string }[];
+    sites: { id: string; acres?: string; asking?: string; price?: string }[];
+  };
+  const drifted: string[] = [];
+  const priced = [
+    ...sources.land.map((row) => ({ id: row.id, price: row.price || "", acres: row.acres || "" })),
+    ...sources.sites.map((row) => ({ id: row.id, price: row.asking || row.price || "", acres: row.acres || "" })),
+  ];
+  for (const row of priced) {
+    if (!row.id.startsWith("PIPE-") && !row.id.startsWith("LAND-")) continue;
+    const acres = Number(row.acres.replace(/,/g, ""));
+    if (!row.price || !Number.isFinite(acres)) continue;
+    const rounded = String(Math.round(acres * 100) / 100);
+    if (pricePerAcre(row.price, row.acres) !== pricePerAcre(row.price, rounded)) drifted.push(row.id);
+  }
+  assert.deepEqual(drifted.sort(), PER_ACRE_CASES.map((row) => row.id).sort());
+
+  const features = PER_ACRE_CASES.map((row) => ({
+    geometry: { type: "Point", coordinates: [-112.07, 33.45] },
+    properties: {
+      deal_id: row.id,
+      name: row.id,
+      city: "PHX",
+      business_type: "Land",
+      asking_price: Number(row.asking),
+      land_acres: Number(row.rounded),
+      price_per_acre: Number(row.perAcre),
+    },
+  }));
+  const sheet = JSON.stringify({
+    rows: PER_ACRE_CASES.map((row) => ({
+      site_id: row.id,
+      cells: { Name: row.id, Market: "PHX", "Asking price ($)": row.asking, "Land (acres)": row.acres },
+    })),
+  });
+  const slice = workbookFromFiles({
+    deals: JSON.stringify({ features }),
+    timeline: "{\"items\":[]}",
+    comms: "{\"rows\":[]}",
+    pricing: "{}",
+    sheet,
+  });
+  for (const row of PER_ACRE_CASES) {
+    assert.equal(shortHash(pricePerAcre(row.asking, row.rounded)), row.workbookHash, row.id);
+    assert.equal(shortHash(row.perAcre), row.databaseHash, row.id);
+    const site = slice.sites?.find((item) => item.site_id === row.id);
+    assert.equal(site?.acreage, row.acres, row.id);
+    assert.equal(site?.facts.price_per_acre, row.perAcre, row.id);
+    assert.equal(shortHash(site?.facts.price_per_acre || ""), row.databaseHash, row.id);
+  }
+
+  const sql = await memorySql();
+  await migrate(sql);
+  const imported = await importChanged(sql, slice, "snap-per-acre");
+  assert.equal(imported.inserted.site, PER_ACRE_CASES.length);
+  const report = await diffDatabase(sql, slice, "snapshot 53763ee8-4cc9-4f3c-8c93-cf5db3bf4b9b");
+  assert.equal(report.clean_by_entity.site, true);
+  assert.deepEqual(report.entities.site.changed, []);
+  assert.equal(report.entities.site.missing.length, 0);
+  assert.equal(report.entities.site.extra.length, 0);
+
+  const stored = await sql.query<{ site_id: string; asking_price: string; acreage: string; sheet: unknown; facts: { price_per_acre?: string } }>(
+    "SELECT site_id, asking_price, acreage, sheet, facts FROM sites ORDER BY site_id",
+  );
+  const painted = applySiteRows(
+    { features },
+    stored.rows.map((row) => ({
+      ...emptySiteFields(),
+      site_id: row.site_id,
+      market: "PHX",
+      category: "Land",
+      asking_price: row.asking_price,
+      acreage: row.acreage,
+      sheet: typeof row.sheet === "string" ? row.sheet : JSON.stringify(row.sheet ?? {}),
+      facts: row.facts || {},
+      coord_status: "",
+      photo_refs: "[]",
+    })),
+  );
+  for (const row of PER_ACRE_CASES) {
+    const props = painted.features?.find((feature) => feature.properties?.deal_id === row.id)?.properties;
+    assert.equal(props?.price_per_acre, Number(row.perAcre), row.id);
+    assert.notEqual(props?.price_per_acre, Number(pricePerAcre(row.asking, row.rounded)), row.id);
+  }
 });
 
 type ScorePoints = { Inside: number; "Near 0-5": number; "Near 5-10": number; Outside: number };

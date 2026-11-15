@@ -11,7 +11,7 @@ import { PROTECTED_ROW, PROTECTED_SITE_ID, formatPlan, planSiteMirror, sheetValu
 import { applySiteRows } from "../../lib/changes/read";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { loadScorecard, recordedLocationPoints, recordedScore, scorecardTotal } from "../../lib/changes/scorecard";
-import { displayNote, emptySiteFields, listingFlags, listingKnown, mirrorCellInput, mirrorHeaderAllowed, mirrorWrites, siteIssues, type SiteRow } from "../../lib/changes/site";
+import { brokerMirrorCell, displayNote, emptySiteFields, listingFlags, listingKnown, mirrorCellInput, mirrorHeaderAllowed, mirrorWrites, siteIssues, splitBroker, type SiteRow } from "../../lib/changes/site";
 import { isSnapshotFile } from "../../lib/snapshot/hash";
 import { readGenerated } from "../../lib/snapshot/read";
 import { workbookFromFiles } from "../../lib/changes/workbook";
@@ -385,7 +385,7 @@ test("the raw site sheet is not a snapshot file and is not served", () => {
   assert.equal(writes["Inside the service area"], "Inside");
   assert.equal(writes["pwr_a_substation_mi"], "1.5");
   assert.equal(writes["Land basis"], "Estimated");
-  assert.equal(writes.Broker, "Ada Broker");
+  assert.equal(writes.Broker, undefined);
   assert.equal(writes.Firm, undefined);
   assert.equal("miles_to_depot" in writes, false);
   const hold = "On hold - broker Nov 6: waiting on the survey";
@@ -415,20 +415,68 @@ test("a site diff without the private sheet ignores raw-cell fields", () => {
   assert.equal(seen.entities.site.changed.some((change) => change.field === "notes"), true);
 });
 
-test("a broker edit keeps the firm and the rest of the Broker cell", () => {
-  const cell = "Jane Smith (Acme Realty) — jane@acme.example";
-  const writes = mirrorWrites({ broker: "Jane Doe" }, {}, { firm: "Acme Realty", cell });
-  assert.equal(writes.Broker, "Jane Doe (Acme Realty) — jane@acme.example");
-  const fromCell = mirrorWrites({ broker: "Jane Doe" }, {}, { cell });
-  assert.equal(fromCell.Broker, "Jane Doe (Acme Realty) — jane@acme.example");
-  const headers = ["Site ID", "Broker"];
-  const table = sheet(headers, [["PIPE-PHX-0001", cell]]);
-  const plan = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { Broker: writes.Broker || "" } }]);
+test("splitBroker matches the workbook parser", () => {
+  const cases: [string, string, string][] = [
+    ["Ignite Commercial Real Estate (Jesse Rozio)", "Jesse Rozio", "Ignite Commercial Real Estate"],
+    ["Jesse Rozio, Ignite Commercial Real Estate", "Jesse Rozio", "Ignite Commercial Real Estate"],
+    ["Jesse Rozio, Ignite Commercial Real Estate (jesse@ignite-cre.com)", "Jesse Rozio", "Ignite Commercial Real Estate"],
+    ["Jesse Rozio (Ignite Commercial Real Estate)", "Jesse Rozio", "Ignite Commercial Real Estate"],
+    ["Roger Pardo", "Roger Pardo", ""],
+    ["Alan Grobman", "Alan Grobman", ""],
+    ["Ivy Seto & Xavier Seto", "Ivy Seto & Xavier Seto", ""],
+    ["Ivy Seto and Xavier Seto", "Ivy Seto and Xavier Seto", ""],
+    ["Marcus & Millichap (John Smith)", "John Smith", "Marcus & Millichap"],
+    ["Car Wash Brokers Inc (Pencek)", "Pencek", "Car Wash Brokers Inc"],
+    ["Ignite Commercial Real Estate (Jesse Rozio) 602-555-0199", "Jesse Rozio", "Ignite Commercial Real Estate"],
+    ["None yet", "", ""],
+    ["", "", ""],
+    ["Emily Brun, Cushman & Wakefield — emily.brun@cushwake.com; Marlene Fujita Winkel (LoopNet listing)", "LoopNet listing", "Emily Brun, Cushman & Wakefield; Marlene Fujita Winkel"],
+    ["Matthews, exclusive (John Smith)", "John Smith", "Matthews, exclusive"],
+    ["None yet (off-market)", "", ""],
+    ["Not shown (BizBuySell)", "BizBuySell", "Not shown"],
+  ];
+  for (const [raw, broker, firm] of cases) {
+    assert.deepEqual(splitBroker(raw), { broker, firm }, raw);
+  }
+  assert.deepEqual(splitBroker(null), { broker: "", firm: "" });
+});
+
+test("a broker edit keeps the cell's own layout", () => {
+  const formats = [
+    "Ignite Commercial Real Estate (Jesse Rozio)",
+    "Jesse Rozio, Ignite Commercial Real Estate",
+    "Jesse Rozio (Ignite Commercial Real Estate)",
+    "Marcus & Millichap (John Smith)",
+    "Car Wash Brokers Inc (Pencek)",
+    "Roger Pardo",
+    "Ignite Commercial Real Estate (Jesse Rozio) 602-555-0199",
+  ];
+  for (const cell of formats) {
+    const parsed = splitBroker(cell);
+    const again = mirrorWrites({ broker: parsed.broker }, {}, { cell });
+    assert.equal(again.Broker, undefined, cell);
+    if (parsed.firm) {
+      const firmAgain = mirrorWrites({ firm: parsed.firm }, {}, { cell });
+      assert.equal(firmAgain.Broker, undefined, cell);
+    }
+    const table = sheet(["Site ID", "Broker"], [["PIPE-PHX-0001", cell]]);
+    assert.equal(planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { Broker: cell } }]).changes.length, 0, cell);
+  }
+
+  const usual = "Ignite Commercial Real Estate (Jesse Rozio)";
+  const edited = mirrorWrites({ broker: "Jane Doe" }, {}, { cell: usual });
+  assert.equal(edited.Broker, "Ignite Commercial Real Estate (Jane Doe)");
+  const table = sheet(["Site ID", "Broker"], [["PIPE-PHX-0001", usual]]);
+  const plan = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { Broker: edited.Broker || "" } }]);
   assert.equal(plan.changes.length, 1);
-  assert.equal(plan.changes[0]?.after, "Jane Doe (Acme Realty) — jane@acme.example");
-  assert.equal(plan.changes.some((change) => change.after === "Jane Doe"), false);
-  const unchanged = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { Broker: cell } }]);
-  assert.equal(unchanged.changes.length, 0);
+  assert.equal(plan.changes[0]?.after, "Ignite Commercial Real Estate (Jane Doe)");
+
+  const placeholder = "None yet (off-market)";
+  const skipped = mirrorWrites({ firm: "NewFirm" }, {}, { cell: placeholder });
+  assert.equal(skipped.Broker, undefined);
+  assert.equal(brokerMirrorCell(placeholder, { firm: "NewFirm" }).action, "skip");
+  const held = sheet(["Site ID", "Broker"], [["PIPE-PHX-0001", placeholder]]);
+  assert.equal(planSiteMirror([held], [{ site_id: "PIPE-PHX-0001", writes: {} }]).changes.length, 0);
 });
 
 test("site reports and mirror plans omit raw site text", () => {
@@ -448,11 +496,16 @@ test("site reports and mirror plans omit raw site text", () => {
     { sheet: "Pipeline", row: 5, column: 3, header: "Next step", id: "PIPE-MIA-0082", before: "Confirm the zoning.", after: note, valueInput: "RAW" },
     { sheet: "Pipeline", row: 5, column: 4, header: "Broker", id: "PIPE-MIA-0082", before: secret, after: "Jane Doe (Acme Realty) — jane@acme.example", valueInput: "RAW" },
     { sheet: "Pipeline", row: 5, column: 5, header: "Asking price ($)", id: "PIPE-MIA-0082", before: "1600000", after: "1700000", valueInput: "USER_ENTERED" },
+    { sheet: "Pipeline", row: 5, column: 6, header: "Listing status", id: "PIPE-MIA-0082", before: "On hold - broker Nov 6", after: "On hold", valueInput: "RAW" },
+    { sheet: "Pipeline", row: 5, column: 7, header: "Listing link", id: "PIPE-MIA-0082", before: "https://example.test/old", after: "https://example.test/new", valueInput: "RAW" },
   ]);
   assert.equal(plan.includes(note), false);
   assert.equal(plan.includes(secret), false);
   assert.equal(plan.includes("jane@acme.example"), false);
+  assert.equal(plan.includes("https://example.test/old"), false);
+  assert.equal(plan.includes("On hold - broker Nov 6"), false);
   assert.match(plan, /Next step PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /Listing status PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
   assert.match(plan, /1700000/);
 });
 

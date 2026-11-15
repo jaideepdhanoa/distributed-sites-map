@@ -407,11 +407,14 @@ export function entitiesToMirror(): ShadowEntity[] {
   return (["stage", "activity", "comms", "site"] as const).filter((entity) => readEntityFromDb(entity));
 }
 
-const PRIVATE_PLAN_HEADERS = new Set(["next step", "broker", "notes", "photo notes", "sheet"]);
+function siteTextHeader(header: string): boolean {
+  const norm = header.trim().toLowerCase();
+  return MIRROR_FIELD_HEADERS.some((row) => row.headers.some((name) => name.toLowerCase() === norm));
+}
 
 function planValue(header: string, value: string): string {
-  const privateCell = PRIVATE_PLAN_HEADERS.has(header.trim().toLowerCase()) || value.trim().startsWith("{");
-  return privateCell ? `#${shortHash(value)}` : JSON.stringify(value);
+  const fingerprint = mirrorCellInput(header) !== "USER_ENTERED" && (siteTextHeader(header) || value.trim().startsWith("{"));
+  return fingerprint ? `#${shortHash(value)}` : JSON.stringify(value);
 }
 
 export function formatPlan(changes: CellChange[]): string {

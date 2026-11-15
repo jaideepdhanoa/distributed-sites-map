@@ -340,7 +340,7 @@ const CLASS_LABEL: Record<string, string> = {
  * Headers an API change may write back. Column order is not assumed.
  * Score, Location points, Stalls that fit, and Segment group are formulas and are absent.
  * Site, Segment, Stage, and Folder are absent.
- * Broker is written as "Name (Firm)" and anything after that prefix in the current cell is kept.
+ * Broker edits replace the person or the firm inside the current cell. The cell's own order stays. A cell that does not split is left unchanged.
  *
  * Database-only. These have no Pipeline or Land Sites column of their own:
  * firm is not its own column. It is written only as the parenthetical in the Broker cell.
@@ -459,28 +459,121 @@ export function shortHash(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
-type BrokerParts = { name: string; firm: string; tail: string };
+const COMPANY_MARK = /\breal estate\b|\brealtors?\b|\brealty\b|\bcommercial\b|\bgroup\b|\bpartners\b|\badvis[eo]rs\b|\bbrokerage\b|\bbrokers\b|\bllc\b|\binc\b\.?|\bincorporated\b|\bcorp\b\.?|\bcorporation\b|\bltd\b\.?|\bllp\b|\bpllc\b|\bco\b\.?|\bcompany\b|\bcre\b|\bproperties\b|\bcapital\b|\bassociates\b|\bmarcus\b|\bcbre\b|\bjll\b|\bcolliers\b|\bcushman\b|\bkidder\b|\bnai\b|\bsunbelt\b|\btransworld\b/i;
+const EMAIL = /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i;
+const PHONE = /(?<!\w)(?:\+?1[\s.-]*)?(?:\(\s*\d{3}\s*\)|\d{3})[\s.-]+\d{3}[\s.-]+\d{4}\b/;
+const NAME_WORD = /^[A-Z][a-zA-Z'.-]*$/;
+const EMPTY_FIRM = new Set(["", "none", "none yet", "n/a", "na"]);
+const EMPTY_BROKER = new Set(["", "none", "none yet", "n/a", "na", "off-market"]);
 
-function brokerParts(current: string): BrokerParts {
-  const text = current.trim();
-  const match = /^(.*?)\s*\(([^)]*)\)(.*)$/.exec(text);
-  if (!match) return { name: "", firm: "", tail: "" };
-  return { name: match[1].trim(), firm: match[2].trim(), tail: match[3] || "" };
+function scrubBroker(value: string): string {
+  return value
+    .replace(/\bodd\b/gi, "service area")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .replace(/^[\s,;:-]+|[\s,;:-]+$/g, "");
 }
 
-/** "Name (Firm)" plus any suffix that followed that prefix in the current cell. */
-export function composeBrokerCell(name: string, firm: string, current = ""): string {
-  const person = name.trim();
-  const company = firm.trim();
-  const head = person && company ? `${person} (${company})` : person || (company ? `(${company})` : "");
-  const tail = brokerParts(current).tail;
-  if (!head) return tail.replace(/^[\s,;:—–-]+/, "").trim();
-  return tail ? `${head}${tail}` : head;
+function stripContacts(value: string): string {
+  const text = value
+    .replace(new RegExp(EMAIL.source, "gi"), " ")
+    .replace(new RegExp(PHONE.source, "g"), " ")
+    .replace(/\(\s*\)/g, " ")
+    .replace(/\(\s*,/g, "(")
+    .replace(/,\s*\)/g, ")")
+    .replace(/\s*[—–-]+\s*(?=;)/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:])/g, "$1");
+  return text.replace(/^[\s,;:—–-]+|[\s,;:—–-]+$/g, "");
+}
+
+function looksLikeCompany(value: string): boolean {
+  return COMPANY_MARK.test(value || "");
+}
+
+function looksLikePerson(value: string): boolean {
+  const text = (value || "").replace(/\s+/g, " ").trim();
+  if (!text || looksLikeCompany(text)) return false;
+  const words = text.split(" ");
+  if (words[0].toLowerCase() === "&" || words[0].toLowerCase() === "and" || words[words.length - 1].toLowerCase() === "&" || words[words.length - 1].toLowerCase() === "and") return false;
+  const names = words.filter((word) => word.toLowerCase() !== "&" && word.toLowerCase() !== "and");
+  return names.length >= 2 && names.length <= 4 && names.every((word) => NAME_WORD.test(word));
+}
+
+/** Person and firm, using the same rules as split_broker. Firm (Person) is the usual cell. */
+export function splitBroker(value: string | null | undefined): { broker: string; firm: string } {
+  const text = stripContacts(scrubBroker(value == null ? "" : String(value)));
+  let broker = "";
+  let firm = "";
+  const match = /^(.*?)\s*\(([^)]+)\)/.exec(text);
+  const left = match ? match[1].replace(/^[\s,;]+|[\s,;]+$/g, "") : "";
+  const inner = match ? match[2].replace(/^[\s,;]+|[\s,;]+$/g, "") : "";
+  if (left && inner && looksLikeCompany(inner)) {
+    broker = left;
+    firm = inner;
+  } else if (left && inner) {
+    broker = inner;
+    firm = left;
+  } else if (text.includes(",")) {
+    const pieces = text.split(/,(.+)/);
+    const person = (pieces[0] || "").replace(/^[\s,;]+|[\s,;]+$/g, "");
+    const company = (pieces[1] || "").replace(/^[\s,;]+|[\s,;]+$/g, "");
+    if (looksLikePerson(person) && company && !looksLikePerson(company)) {
+      broker = person;
+      firm = company;
+    } else {
+      firm = text;
+    }
+  } else if (looksLikePerson(text)) {
+    broker = text;
+  } else {
+    firm = text;
+  }
+  broker = stripContacts(broker);
+  firm = stripContacts(firm);
+  if (EMPTY_FIRM.has(firm.toLowerCase())) firm = "";
+  if (EMPTY_BROKER.has(broker.toLowerCase())) broker = "";
+  return { broker, firm };
+}
+
+function locateOnce(haystack: string, needle: string): { start: number; end: number } | null {
+  if (!needle) return null;
+  const start = haystack.indexOf(needle);
+  if (start < 0 || haystack.indexOf(needle, start + needle.length) >= 0) return null;
+  return { start, end: start + needle.length };
+}
+
+export type BrokerEdit = { action: "write"; cell: string } | { action: "skip" } | { action: "unchanged" };
+
+/**
+ * Replace the person or the firm inside the current cell, leaving its order and the rest of the text alone.
+ * A placeholder or a cell that does not split is not rewritten.
+ */
+export function brokerMirrorCell(current: string, edit: { broker?: string; firm?: string }): BrokerEdit {
+  const cell = current ?? "";
+  const parsed = splitBroker(cell);
+  const nextBroker = edit.broker !== undefined ? edit.broker.trim() : undefined;
+  const nextFirm = edit.firm !== undefined ? edit.firm.trim() : undefined;
+  if ((nextBroker !== undefined && !nextBroker) || (nextFirm !== undefined && !nextFirm)) return { action: "skip" };
+  if (nextBroker !== undefined && !parsed.broker) return { action: "skip" };
+  if (nextFirm !== undefined && !parsed.firm) return { action: "skip" };
+  const personAt = nextBroker !== undefined && nextBroker !== parsed.broker ? locateOnce(cell, parsed.broker) : null;
+  const firmAt = nextFirm !== undefined && nextFirm !== parsed.firm ? locateOnce(cell, parsed.firm) : null;
+  if (nextBroker !== undefined && nextBroker !== parsed.broker && !personAt) return { action: "skip" };
+  if (nextFirm !== undefined && nextFirm !== parsed.firm && !firmAt) return { action: "skip" };
+  if (personAt && firmAt && personAt.start < firmAt.end && firmAt.start < personAt.end) return { action: "skip" };
+  const pieces = [personAt && nextBroker ? { ...personAt, value: nextBroker } : null, firmAt && nextFirm ? { ...firmAt, value: nextFirm } : null]
+    .filter((piece): piece is { start: number; end: number; value: string } => piece != null)
+    .sort((a, b) => b.start - a.start);
+  let next = cell;
+  for (const piece of pieces) next = `${next.slice(0, piece.start)}${piece.value}${next.slice(piece.end)}`;
+  if (next === cell) return { action: "unchanged" };
+  return { action: "write", cell: next };
 }
 
 export type BrokerWrite = { broker?: string; firm?: string; cell?: string };
 
-/** Cell text for one API edit. Service-area tokens become the workbook labels. A broker edit keeps the firm and the rest of the cell. */
+/** Cell text for one API edit. Service-area tokens become the workbook labels. A broker edit keeps the cell's own layout. */
 export function mirrorWrites(
   fields: Record<string, string | undefined>,
   facts: Record<string, string | undefined>,
@@ -494,10 +587,8 @@ export function mirrorWrites(
     out[row.headers[0]] = row.field === "service_area_class" ? CLASS_LABEL[value] || value : value;
   }
   if (fields.broker !== undefined || fields.firm !== undefined) {
-    const parsed = brokerParts(broker.cell || "");
-    const person = fields.broker !== undefined ? fields.broker : broker.broker || parsed.name;
-    const company = fields.firm !== undefined ? fields.firm : broker.firm || parsed.firm;
-    out.Broker = composeBrokerCell(person, company, broker.cell || "");
+    const edit = brokerMirrorCell(broker.cell || "", { broker: fields.broker, firm: fields.firm });
+    if (edit.action === "write") out.Broker = edit.cell;
   }
   return out;
 }

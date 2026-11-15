@@ -5,6 +5,7 @@ import {
   SITE_FIELDS,
   SITE_NUMERIC_FIELDS,
   emptySiteFields,
+  brokerMirrorCell,
   mirrorWrites,
   parseSheet,
   photoCanonical,
@@ -381,11 +382,15 @@ async function writeSite(
     }
     if (incoming.asking_price === "") delete facts.asking_price_source;
     if (incoming.acreage === "") delete facts.land_acres_basis;
-    const edited = mirrorWrites(incoming, payload.facts || {}, {
-      broker: stored.broker,
-      firm: stored.firm,
-      cell: priorSheet.Broker || priorSheet.broker || "",
-    });
+    const brokerCell = priorSheet.Broker || priorSheet.broker || "";
+    const edited = mirrorWrites(incoming, payload.facts || {}, { cell: brokerCell });
+    if (incoming.broker !== undefined || incoming.firm !== undefined) {
+      const decision = brokerMirrorCell(brokerCell, { broker: incoming.broker, firm: incoming.firm });
+      if (decision.action === "skip") {
+        if (incoming.broker !== undefined) console.log(JSON.stringify({ event: "broker_mirror_skipped", site_id: change.site_id, field: "broker" }));
+        if (incoming.firm !== undefined) console.log(JSON.stringify({ event: "broker_mirror_skipped", site_id: change.site_id, field: "firm" }));
+      }
+    }
     for (const [header, value] of Object.entries(edited)) {
       if (!value) delete sheet[header];
       else sheet[header] = value;

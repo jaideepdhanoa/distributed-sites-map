@@ -19,12 +19,14 @@ name: Workbook sync
 # Neon: after the rebuild, hash the generated json, geojson, and csv files.
 # The last published hash is kept in the Actions cache (prefix
 # workbook-sync-published-), not in Neon and not in a commit. Restoring
-# that cache does not open a database connection. A match skips the publish
-# and the cache refresh. GitHub drops a cache that is not restored for 7
-# days. An unchanged sheet restores it every run, so the entry stays. If
-# the cache is missing, one read of the live snapshot's file hashes runs.
-# A match still skips the write and the refresh, and the hash is then saved.
-# The cache is otherwise saved only after a successful publish.
+# that cache does not open a database connection. A match skips the publish,
+# the shadow import, and the cache refresh. GitHub drops a cache that is
+# not restored for 7 days. An unchanged sheet restores it every run, so the
+# entry stays. If the cache is missing, one read of the live snapshot's
+# file hashes runs. A match still skips the write and the refresh, and the
+# hash is then saved. The cache is otherwise saved only after a successful
+# publish. When WORKBOOK_MIRROR_ENABLED is 1, that same run still reads
+# Neon and can write the cut-over cells. The mirror does not publish a snapshot.
 #
 # Pull requests: when the data checks fail, or the publish did not happen,
 # update the open bot sync pull request if every commit on it since main is
@@ -111,11 +113,12 @@ jobs:
           if [ -n "$previous" ] && [ "$previous" = "$current" ]; then
             echo "unchanged=true" >> "$GITHUB_OUTPUT"
             echo "cached=true" >> "$GITHUB_OUTPUT"
-            echo "Generated data matches the last published snapshot. Not connecting to Neon."
+            echo "Generated data matches the last published snapshot. Skipping publish and the shadow import."
             {
               echo "## Snapshot unchanged"
               echo
-              echo "The generated data matches the last published snapshot. The database was not contacted, and the cache was not refreshed."
+              echo "The generated data matches the last published snapshot. The snapshot was not published, and the cache was not refreshed."
+              echo "The workbook mirror still runs on main when WORKBOOK_MIRROR_ENABLED is 1."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -210,6 +213,10 @@ jobs:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
           SNAPSHOT_ID: ${{ steps.publish.outputs.snapshot_id }}
+          READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
+          READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
+          READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
         run: npx tsx scripts/import-shadow.ts
       - name: Refresh the production cache
         if: steps.publish.outputs.published == 'true'
@@ -217,6 +224,22 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SNAPSHOT_REVALIDATE_URL: ${{ vars.SNAPSHOT_REVALIDATE_URL }}
         run: npx tsx scripts/revalidate-snapshot.ts
+      - name: Mirror database rows into the workbook
+        if: github.ref == 'refs/heads/main' && vars.WORKBOOK_MIRROR_ENABLED == '1'
+        env:
+          WORKBOOK_MIRROR_ENABLED: "1"
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
+          READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
+          READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
+        run: |
+          if [ ! -d node_modules/pg ]; then
+            npm ci
+          fi
+          npx tsx scripts/workbook-mirror.ts
       - name: Record the published hash
         id: record-hash
         if: steps.publish.outputs.published == 'true' || steps.live.outputs.unchanged == 'true'

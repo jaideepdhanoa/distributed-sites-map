@@ -99,7 +99,7 @@ Preview deployments get their own Neon branch from the Vercel Neon integration, 
 
 ### Shadow events
 
-Stage, activity, and comms can be stored in Neon while the site still reads the workbook snapshot. The Google Sheet is not written. Production schema changes still go through the Production migrations workflow. Pull-request jobs and preview deployments do not migrate production.
+Stage, activity, and comms can be stored in Neon while the site still reads the workbook snapshot. The API and the workbook import do not write the Google Sheet. Production schema changes still go through the Production migrations workflow. Pull-request jobs and preview deployments do not migrate production.
 
 `POST /api/changes` accepts one batch. Send `Idempotency-Key`. Each change has `entity_type` (`stage`, `activity`, or `comms`), `site_id`, `expected_version`, `source`, and `payload`. A new row uses `expected_version: 0` and omits `entity_id`. The server assigns `A-` activity ids, `CM-` comms ids, and `EV-` event ids. An update sends the id the server already assigned and the `version` from the previous response. A mismatch is `409` with `conflicts`, and the whole batch is rolled back. The same key and the same body returns the original ids and does not write again.
 
@@ -118,13 +118,17 @@ New API writes accept the canonical stages `1 Desk screen`, `2 Financial screen`
 
 Each read flag is a cutover for that entity, and turning it off is the rollback. The flag takes effect only when `CHANGES_API_ENABLED` is on. While a read flag is active, Workbook sync stops importing that entity. If Neon is down, that read falls back to the snapshot.
 
-Workbook sync copies changed stage, activity, and comms rows into `events` only after a snapshot is published, and only on `main`. A hash match skips the publish, so it skips the import and does not open Neon for that copy. The actor is `workbook-sync` and the source is `workbook snapshot <id>`. A repeat of the same rows writes nothing. Legacy stage names (`Financial screen`, `Off-market target`, `Off market (no lead)`, `Sourced`) and `internal` comms are stored as written. Unknown values are listed in the diff and are not rewritten into a known value.
+Workbook sync copies changed stage, activity, and comms rows into `events` only after a snapshot is published, and only on `main`. A hash match skips the publish and the import, and that copy does not open Neon. The actor is `workbook-sync` and the source is `workbook snapshot <id>`. A repeat of the same rows writes nothing. Legacy stage names (`Financial screen`, `Off-market target`, `Off market (no lead)`, `Sourced`) and `internal` comms are stored as written. Unknown values are listed in the diff and are not rewritten into a known value.
 
 **Shadow diff** is started by hand (`workflow_dispatch`). It reads production, compares the whole workbook with the shadow tables, and writes neither events nor the sheet. The summary and the `shadow-diff` artifact say `Clean: yes` or `Clean: no`, and `clean_by_entity` for stage, activity, and comms. The gate before a cutover is one clean run after a fresh import.
 
-The workbook mirror, which would copy database rows back to the Sheet, is not in this change. It needs a later job that, for an entity whose read flag is on, writes that entity's rows to the Sheet under an explicit confirmation, and refuses to run from a preview or a pull request.
-
 Current rows live in `site_stages`, `activities`, and `comms_entries`, each with a `version`. History is append-only in `events`.
+
+Workbook mirror copies database rows back to the Sheet for each entity whose read flag is on. It writes only that entity's cells: the Stage column on Pipeline and Land Sites, the Activity tab fields, and the Comms Log fields. Rows match on Site ID, Event ID, or Comms ID. New `A-` and `CM-` rows use the headers on the tab. It does not write other columns. It does not write `PIPE-PHX-0006`, and it does not write row 10 on Pipeline or Land Sites. Activity and Comms Log can still use row 10. After a write it reads those cells back and fails if they differ. A `runs` row stores the counts. The import already skips an entity while its read flag is on, so the two jobs do not chase each other.
+
+The 15-minute Workbook sync runs the mirror on `main` when the repository variable `WORKBOOK_MIRROR_ENABLED` is `1`, including a run whose snapshot hash did not change. **Workbook mirror** can also be started by hand. Its dry run is the default: it prints the planned cells and does not write. A pull request, a preview deployment, and any ref other than `main` are refused. Set the GitHub variables `READ_STAGES_FROM_DB`, `READ_ACTIVITY_FROM_DB`, `READ_COMMS_FROM_DB`, and `CHANGES_API_ENABLED` to the same values as Vercel production. The Actions job cannot see the Vercel values. An unset `CHANGES_API_ENABLED` is passed as `0`, which is the production default, so a read flag left on by itself does not start the mirror or stop the import.
+
+The sync secret is `GOOGLE_SERVICE_ACCOUNT_JSON`. The sync asks Google only for `https://www.googleapis.com/auth/drive.readonly`, so that token cannot edit cells. The mirror asks the same secret for `https://www.googleapis.com/auth/spreadsheets`. Writes work when the Pipeline workbook is shared with that service account as Editor. A Viewer share fails with a Sheets write error and no new secret name. There is no second credential.
 
 Create a Neon branch named `preview` and point the Vercel Preview `DATABASE_URL` at it. If a preview fails with `Resource provisioning failed`, that is the Neon branch limit. The Neon preview branch cleanup workflow deletes branches named `preview/<name>` when a pull request closes. It never deletes the branch named `preview`. It needs the secret `NEON_API_KEY` and the variable `NEON_PROJECT_ID`. Until those are set, the job skips and says so. Repository variable `NEON_PRODUCTION_HOST` is the production endpoint hostname only.
 

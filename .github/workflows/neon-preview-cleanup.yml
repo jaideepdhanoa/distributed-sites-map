@@ -1,0 +1,39 @@
+name: Neon preview branch cleanup
+
+# Deletes Neon branches named preview/<name> when a pull request closes.
+# The shared branch named preview, and any primary, default, or protected
+# branch, are left alone. Per-deployment preview branches are what hit the
+# Neon branch limit ("Resource provisioning failed").
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Delete closed preview branches
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            {
+              echo "## Neon preview branch cleanup skipped"
+              echo
+              echo "Set the secret NEON_API_KEY and the variable NEON_PROJECT_ID."
+              echo "This job deletes branches named preview/<name> after a pull request closes."
+              echo "It never deletes the branch named preview, or a primary, default, or protected branch."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "NEON_API_KEY or NEON_PROJECT_ID is not set. Skipping."
+            exit 0
+          fi
+          npm ci
+          npx tsx scripts/neon-preview-cleanup.ts

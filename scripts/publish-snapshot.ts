@@ -33,7 +33,11 @@ async function main(): Promise<void> {
   const files = collectGenerated(join(process.cwd(), "data", "generated"));
   const funnel = files.find((file) => file.name === "funnel.json")?.body;
   const published = await withConnectionString(url, async (sql) => {
-    await migrate(sql);
+    await migrate(sql, { connectionString: url, onProduction: "skip" });
+    const ready = await sql.query<{ name: string | null }>(`SELECT to_regclass('public.snapshots') AS name`);
+    if (!ready.rows[0]?.name) {
+      throw new Error("The snapshots table is missing. Run the Production migrations workflow. This job does not migrate production.");
+    }
     return publishSnapshot(sql, {
       sourceRunId: process.env.GITHUB_RUN_ID || "",
       workbookModifiedAt: workbookModifiedAt(funnel),
@@ -44,6 +48,11 @@ async function main(): Promise<void> {
   const line = `Published snapshot ${published.id} at ${published.createdAt}. Files: ${published.rowCounts.files ?? files.length}.`;
   console.log(line);
   summary(`## Snapshot live\n\n${line}\n`);
+  // The shadow import is a later step in workbook-sync.yml. It runs only
+  // after this publish succeeds, and a hash match never reaches this script.
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `snapshot_id=${published.id}\n`);
+  }
 }
 
 main().catch((error: unknown) => {

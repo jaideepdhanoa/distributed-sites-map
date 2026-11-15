@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { overlayComms } from "@/lib/changes/read";
 import { commsForViewer } from "@/lib/comms";
 import { loadCommsSnapshot } from "@/lib/commsLoad";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
@@ -13,5 +14,6 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const ids = [url.searchParams.get("id") || "", url.searchParams.get("related") || ""];
   console.info(JSON.stringify({ event: "data", user: session.u, part: "comms" }));
-  return NextResponse.json(commsForViewer(session.actionRole, session.u, loadCommsSnapshot(), ids), { headers: privateHeaders });
+  const snapshot = await overlayComms(loadCommsSnapshot());
+  return NextResponse.json(commsForViewer(session.actionRole, session.u, snapshot, ids), { headers: privateHeaders });
 }

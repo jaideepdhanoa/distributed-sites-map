@@ -39,6 +39,12 @@ Set these in Vercel. A change applies on the next deployment.
 | `CRON_SECRET` | for the digest | Bearer token Vercel Cron sends to the alert routes. It does not authenticate the agent feed. The workbook sync uses the same value, stored as a GitHub secret, to refresh the snapshot cache. |
 | `SNAPSHOT_READ` | no | Set to `off` to ignore Neon and serve `data/generated`. The default reads a live snapshot when one exists. |
 | `AGENT_INBOX_SECRET` | for the agent feed | Bearer token for `GET /api/agent/inbox`, the ack route, and recommendation writes. Separate from `CRON_SECRET`. |
+| `AGENT_WRITE_TOKEN_INDIE` | for Indie writes | Bearer token for `POST /api/changes`. The actor stored on the event is `indie`. |
+| `AGENT_WRITE_TOKEN_MUSE` | for Muse writes | Bearer token for `POST /api/changes`. The actor stored on the event is `muse`. |
+| `CHANGES_API_ENABLED` | off on production | Set to `1` to allow `POST /api/changes` in production. Preview allows writes when this is unset. |
+| `READ_STAGES_FROM_DB` | off | When `1`, and writes are on, deal stages are read from `site_stages`. |
+| `READ_ACTIVITY_FROM_DB` | off | When `1`, and writes are on, activity lines are read from `activities`. |
+| `READ_COMMS_FROM_DB` | off | When `1`, and writes are on, the comms log is read from `comms_entries`. |
 | `XAI_API_KEY` | for Ask | Direct xAI key. Ask stays in the "isn't set up yet" state until this is set. Not an AI Gateway key. |
 | `ASK_MODEL` | no | Ask model. Defaults to `grok-4.7`. |
 | `ASK_DAILY_LIMIT` | no | Questions per person per Pacific day. Defaults to 40. Counted in Upstash Redis. |
@@ -64,7 +70,7 @@ Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the ma
 
 1. In the Vercel project, add the Neon integration from the Marketplace (or create a Neon database and connect it). This repo does not provision the database.
 2. Use the pooled connection string. Neon exposes it as `DATABASE_URL`. Do not commit that string.
-3. Redeploy. The first notes, suggestions, or saved-view request applies `db/migrations`. From a machine that has the URL, `npm run db:migrate` does the same thing.
+3. Redeploy. On a preview or local database, the first notes, suggestions, or saved-view request applies `db/migrations`. Production does not. Run the **Production migrations** workflow and type `migrate-production`. `npm run db:migrate` applies pending files only when `DATABASE_URL` is not the production database.
 4. After a workbook sync rebuilds `data/generated`, run `npm run reconcile-suggestions`. The suggestions panel also checks on open. A suggestion becomes `applied` only when the generated data already matches the proposed value. An accepted stage move, drop, or bring-back is shown on the map until that match. The app does not write the new stage into the workbook.
 
 ### Workbook snapshots
@@ -89,7 +95,38 @@ To roll back to files:
 
 To see which snapshot is live, sign in and request `GET /api/actions/status`. The JSON includes `snapshot_id`, `snapshot_created_at`, and `snapshot_source` (`database` or `files`). `GET /api/data/funnel` repeats the id and time under `meta`. The Actions job summary prints them after a publish.
 
-Preview deployments get their own Neon branch from the Vercel Neon integration, and they read that branch's `DATABASE_URL`. The sync job is the only writer. It refuses to run inside Vercel, and it refuses to refresh any host other than the production site. A preview cannot publish a production snapshot. The job keeps every snapshot from the last 24 hours, and it always keeps at least the last 14. Fourteen snapshots at a publish every 15 minutes would be about three and a half hours. Unchanged runs no longer publish, so a quiet sheet's 14 rows can span days. A snapshot is about 1 MiB after compression. The generated files are about 8 MiB before that. A change on every run for a full day is about 100 MiB, and Neon Free allows 1 GB per project, so that day of history is cheap. A failed check or a failed write leaves the previous live snapshot in place.
+Preview deployments get their own Neon branch from the Vercel Neon integration, and they read that branch's `DATABASE_URL`. The sync job is the only writer of snapshots. It refuses to run inside Vercel, and it refuses to refresh any host other than the production site. A preview cannot publish a production snapshot. The job keeps every snapshot from the last 24 hours, and it always keeps at least the last 14. Fourteen snapshots at a publish every 15 minutes would be about three and a half hours. Unchanged runs no longer publish, so a quiet sheet's 14 rows can span days. A snapshot is about 1 MiB after compression. The generated files are about 8 MiB before that. A change on every run for a full day is about 100 MiB, and Neon Free allows 1 GB per project, so that day of history is cheap. A failed check or a failed write leaves the previous live snapshot in place. The sync does not apply migrations that are still pending on production. If `snapshots` is missing, the job stops and says to run the Production migrations workflow.
+
+### Shadow events
+
+Stage, activity, and comms can be stored in Neon while the site still reads the workbook snapshot. The Google Sheet is not written. Production schema changes still go through the Production migrations workflow. Pull-request jobs and preview deployments do not migrate production.
+
+`POST /api/changes` accepts one batch. Send `Idempotency-Key`. Each change has `entity_type` (`stage`, `activity`, or `comms`), `site_id`, `expected_version`, `source`, and `payload`. A new row uses `expected_version: 0` and omits `entity_id`. The server assigns `A-` activity ids, `CM-` comms ids, and `EV-` event ids. An update sends the id the server already assigned and the `version` from the previous response. A mismatch is `409` with `conflicts`, and the whole batch is rolled back. The same key and the same body returns the original ids and does not write again.
+
+A session cookie is a person. Activity and comms need contributor access. Stage changes need a reviewer. A viewer gets 403. `Dropped` needs a reviewer and a `reason`; the event records who dropped it and why. Moving a row off `Dropped` also needs a reason. Cookie writes must be same-origin (`Sec-Fetch-Site: same-origin`, or an `Origin` on the same host). Indie and Muse send `Authorization: Bearer` with `AGENT_WRITE_TOKEN_INDIE` or `AGENT_WRITE_TOKEN_MUSE`. An agent can write activity and comms. An agent cannot change a stage. Do not invent token values and do not print them.
+
+New API writes accept the canonical stages `1 Desk screen`, `2 Financial screen`, `3 Site checks`, `4 Offer and close`, and `Dropped`. Market is `PHX`, `LAS`, `MIA`, or `SNA`. Service area is `Inside`, `Near 0-5`, `Near 5-10`, `Outside`, or `Unknown`. Comms direction is `in` or `out`.
+
+`CHANGES_API_ENABLED` controls writes. On production it is off until you set it to `1`. Preview turns writes on by itself. A read flag does not cut the site over while writes are off.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CHANGES_API_ENABLED` | off on production, on in preview | `POST /api/changes` |
+| `READ_STAGES_FROM_DB` | off | Deal stages come from `site_stages`. |
+| `READ_ACTIVITY_FROM_DB` | off | Timeline activity lines come from `activities`. |
+| `READ_COMMS_FROM_DB` | off | The comms log comes from `comms_entries`. |
+
+Each read flag is a cutover for that entity, and turning it off is the rollback. The flag takes effect only when `CHANGES_API_ENABLED` is on. While a read flag is active, Workbook sync stops importing that entity. If Neon is down, that read falls back to the snapshot.
+
+Workbook sync copies changed stage, activity, and comms rows into `events` only after a snapshot is published, and only on `main`. A hash match skips the publish, so it skips the import and does not open Neon for that copy. The actor is `workbook-sync` and the source is `workbook snapshot <id>`. A repeat of the same rows writes nothing. Legacy stage names (`Financial screen`, `Off-market target`, `Off market (no lead)`, `Sourced`) and `internal` comms are stored as written. Unknown values are listed in the diff and are not rewritten into a known value.
+
+**Shadow diff** is started by hand (`workflow_dispatch`). It reads production, compares the whole workbook with the shadow tables, and writes neither events nor the sheet. The summary and the `shadow-diff` artifact say `Clean: yes` or `Clean: no`. The gate before a cutover is one clean run after a fresh import.
+
+The workbook mirror, which would copy database rows back to the Sheet, is not in this change. It needs a later job that, for an entity whose read flag is on, writes that entity's rows to the Sheet under an explicit confirmation, and refuses to run from a preview or a pull request.
+
+Current rows live in `site_stages`, `activities`, and `comms_entries`, each with a `version`. History is append-only in `events`.
+
+Create a Neon branch named `preview` and point the Vercel Preview `DATABASE_URL` at it. If a preview fails with `Resource provisioning failed`, that is the Neon branch limit. The Neon preview branch cleanup workflow deletes branches named `preview/<name>` when a pull request closes. It never deletes the branch named `preview`. It needs the secret `NEON_API_KEY` and the variable `NEON_PROJECT_ID`. Until those are set, the job skips and says so. Repository variable `NEON_PRODUCTION_HOST` is the production endpoint hostname only.
 
 ### Roles
 

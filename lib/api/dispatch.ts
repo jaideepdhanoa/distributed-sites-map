@@ -19,6 +19,7 @@ import * as agentInboxAck from "@/lib/api/handlers/agent/inbox-ack";
 import * as agentInboxRecommendation from "@/lib/api/handlers/agent/inbox-recommendation";
 import * as ask from "@/lib/api/handlers/ask";
 import * as askStatus from "@/lib/api/handlers/ask-status";
+import * as changes from "@/lib/api/handlers/changes";
 import * as views from "@/lib/api/handlers/actions/views";
 import * as viewsId from "@/lib/api/handlers/actions/views-id";
 import * as digest from "@/lib/api/handlers/alerts/digest";
@@ -116,6 +117,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/unscreened", { GET: unscreened.GET as Handler }),
   route("/api/ask/status", { GET: askStatus.GET as Handler }),
   route("/api/ask", { POST: ask.POST as Handler }),
+  route("/api/changes", { POST: changes.POST as Handler }),
   route("/api/login", { POST: login.POST as Handler }),
   route("/api/logout", { POST: logout.POST as Handler }),
   route("/api/me", { GET: me.GET as Handler }),

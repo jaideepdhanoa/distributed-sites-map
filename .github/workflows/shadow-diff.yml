@@ -1,0 +1,45 @@
+name: Shadow diff
+
+# On-demand, read-only comparison of the whole workbook with the production
+# shadow tables. It does not migrate, import, or write the sheet. One clean
+# run after a fresh Workbook sync import is the gate before a read flag is
+# turned on.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Diff production
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            {
+              echo "## Shadow diff skipped"
+              echo
+              echo "NEON_DATABASE_URL is not set."
+              echo "Add the GitHub secret: the Neon production pooled connection string."
+              echo "Also set the repository variable NEON_PRODUCTION_HOST to the production endpoint hostname only, with no user and no password."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "NEON_DATABASE_URL is not set. Skipping."
+            exit 0
+          fi
+          npx tsx scripts/shadow-job.ts
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('shadow-diff.json') != ''
+        with:
+          name: shadow-diff
+          path: shadow-diff.json
+          retention-days: 14

@@ -1,23 +1,57 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Sql } from "./db";
+import {
+  isProductionDatabase,
+  migrationDecision,
+  migrationRefusalMessage,
+  ProductionWriteRefused,
+} from "../changes/guard";
+import { databaseUrl, type Sql } from "./db";
 
 const MIGRATION_ID = /^[0-9A-Za-z._-]+$/;
+
+export { ProductionWriteRefused };
 
 export function migrationDir(): string {
   return join(process.cwd(), "db", "migrations");
 }
 
-export async function migrate(sql: Sql): Promise<string[]> {
+function migrationFiles(): string[] {
+  return readdirSync(migrationDir())
+    .filter((name) => name.endsWith(".sql") && MIGRATION_ID.test(name))
+    .sort();
+}
+
+export async function migrate(
+  sql: Sql,
+  options?: { connectionString?: string | null; onProduction?: "skip" },
+): Promise<string[]> {
+  const url = options && "connectionString" in options ? options.connectionString : databaseUrl();
+  let decision = migrationDecision(url);
+  // The workbook sync already runs against production. It must not apply new
+  // migrations from CI, and it must not fail when those migrations are waiting
+  // for the manual workflow.
+  if (options?.onProduction === "skip" && isProductionDatabase(url)) decision = "skip";
+  if (decision === "refuse") throw new ProductionWriteRefused(migrationRefusalMessage());
+  if (decision === "skip") {
+    try {
+      const have = new Set(
+        (await sql.query<{ id: string }>("SELECT id FROM schema_migrations")).rows.map((row) => row.id),
+      );
+      const pending = migrationFiles().filter((file) => !have.has(file));
+      if (pending.length) console.error(JSON.stringify({ event: "production_migration_skipped", count: pending.length }));
+    } catch {
+      console.error(JSON.stringify({ event: "production_migration_skipped" }));
+    }
+    return [];
+  }
   await sql.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()
     )
   `);
-  const files = readdirSync(migrationDir())
-    .filter((name) => name.endsWith(".sql") && MIGRATION_ID.test(name))
-    .sort();
+  const files = migrationFiles();
   const applied = new Set(
     (await sql.query<{ id: string }>("SELECT id FROM schema_migrations")).rows.map((row) => row.id),
   );

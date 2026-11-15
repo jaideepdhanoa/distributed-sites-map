@@ -200,6 +200,17 @@ jobs:
           fi
           npx tsx scripts/publish-snapshot.ts
           echo "published=true" >> "$GITHUB_OUTPUT"
+          if [ -f "$GITHUB_OUTPUT" ]; then
+            id=$(grep '^snapshot_id=' "$GITHUB_OUTPUT" | tail -n 1 | cut -d= -f2-)
+            echo "snapshot_id=$id" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Import changed shadow rows
+        if: steps.publish.outputs.published == 'true' && github.ref == 'refs/heads/main'
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          SNAPSHOT_ID: ${{ steps.publish.outputs.snapshot_id }}
+        run: npx tsx scripts/import-shadow.ts
       - name: Refresh the production cache
         if: steps.publish.outputs.published == 'true'
         env:

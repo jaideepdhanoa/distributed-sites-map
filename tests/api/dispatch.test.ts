@@ -41,6 +41,7 @@ const expected = [
   "GET /api/agent/inbox",
   "GET /api/ask/status",
   "POST /api/ask",
+  "POST /api/changes",
   "GET /api/data/areas",
   "GET /api/data/deals",
   "GET /api/data/depots",
@@ -143,6 +144,31 @@ test("ask streams from the catch-all instead of its own function", () => {
   assert.match(route, /maxDuration = 300/);
   assert.match(route, /return dispatch/);
   assert.equal(route.includes("app/api/ask"), false);
+});
+
+test("changes is on the catch-all and rejects a writer with no credential", async () => {
+  const indie = process.env.AGENT_WRITE_TOKEN_INDIE;
+  const muse = process.env.AGENT_WRITE_TOKEN_MUSE;
+  delete process.env.AGENT_WRITE_TOKEN_INDIE;
+  delete process.env.AGENT_WRITE_TOKEN_MUSE;
+  try {
+    assert.equal((await call("GET", "/api/changes")).status, 405);
+    const missing = await call("POST", "/api/changes");
+    assert.equal(missing.status, 401);
+    const request = new NextRequest("http://localhost/api/changes", {
+      method: "POST",
+      headers: { authorization: "Bearer not-a-configured-token" },
+    });
+    const response = await dispatch("POST", request, ["changes"]);
+    assert.equal(response.status, 401);
+    const body = (await response.json()) as { error: string };
+    assert.match(body.error, /AGENT_WRITE_TOKEN_INDIE/);
+  } finally {
+    if (indie === undefined) delete process.env.AGENT_WRITE_TOKEN_INDIE;
+    else process.env.AGENT_WRITE_TOKEN_INDIE = indie;
+    if (muse === undefined) delete process.env.AGENT_WRITE_TOKEN_MUSE;
+    else process.env.AGENT_WRITE_TOKEN_MUSE = muse;
+  }
 });
 
 test("snapshot revalidate is on the catch-all and rejects a missing secret", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { LISTING_THUMB_CAP, esriCredit, galleryModel, imageCandidates, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
+import { LISTING_THUMB_CAP, esriCredit, galleryModel, imageCandidates, photoSetSummary, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
 import type { SitePhoto } from "@/lib/types";
 
 function altFor(photo: SitePhoto) {
@@ -75,6 +75,7 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
     const key = photoKey(photo, index);
     return hidden.has(key) ? [] : [{ photo, index, key }];
   });
+  const statusLine = photoSetSummary(card.status, slides.map((item) => item.photo));
   const diligence = slides.filter((item) => item.photo.role !== "listing");
   const listing = slides.filter((item) => item.photo.role === "listing");
   const listingThumbs = listing.slice(0, LISTING_THUMB_CAP);
@@ -225,7 +226,7 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
       ) : null}
       {between}
       <div className="photo-rest">
-      {model.statusLine ? <p className="photo-status" data-testid="photo-status" title="Photo set on file: site photos, then listing photos.">{model.statusLine}</p> : null}
+      {statusLine ? <p className="photo-status" data-testid="photo-status" title="Photo set on file: the site photos and listing photos shown below.">{statusLine}</p> : null}
       {slides.length ? (
         <>
           {diligence.length ? (

@@ -910,6 +910,16 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   vertical-align: bottom;
 }
 .nda-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.stage-cell .nda-chip, .list-cards .nda-chip {
+  display: inline-block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
 .stage-blocker { margin: 6px 0 0; }
 .shell.reviewing .map-key { display: none; }
 .shell.list-open .map-coverage,

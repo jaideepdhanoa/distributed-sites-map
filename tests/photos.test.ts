@@ -7,6 +7,7 @@ import {
   galleryModel,
   imageCandidates,
   isDirectImageUrl,
+  photoSetSummary,
   photoStatusLine,
   streetViewEmbedSrc,
 } from "../lib/photos.ts";
@@ -57,7 +58,8 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
   ];
   const card = cardPhotos({ photos, photo_status: "Partial", photo_diligence_count: 2, photo_listing_count: 4 });
   const model = galleryModel(card);
-  assert.equal(model.statusLine, "Photo set: partial · 2 site photos · 4 listing photos");
+  assert.equal(model.statusLine, "Photo set: partial · 5 site photos · 7 listing photos");
+  assert.equal(model.slides.length, 12);
   assert.deepEqual(model.slides.map((item) => item.role), [
     "spare_land_annotated",
     "lot_aerial",

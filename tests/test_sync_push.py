@@ -184,6 +184,194 @@ class SyncPushTest(unittest.TestCase):
         self.assertEqual(opened, local)
         self.assertNotEqual(opened, kept)
 
+    def test_reuses_an_older_bot_branch_instead_of_opening_today(self):
+        desired = "workbook-sync-2026-11-06"
+        git(["checkout", "-B", desired], self.worker)
+        commit(self.worker, "second sync", text="second")
+        dry = subprocess.run(
+            ["bash", str(SCRIPT), desired],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_PUSH_DRY_RUN": "1", "SYNC_REUSE_BRANCH": self.branch},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertTrue(dry.stdout.startswith(f"lease {self.branch} "))
+        subprocess.run(
+            ["bash", str(SCRIPT), desired],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_SKIP_PR": "1", "SYNC_REUSE_BRANCH": self.branch},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        remote = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        local = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.worker,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        missing = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", "--verify", desired],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(remote, local)
+        self.assertNotEqual(missing.returncode, 0)
+
+    def test_same_tree_does_not_force_push(self):
+        before = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        git(["checkout", "-B", self.branch], self.worker)
+        commit(self.worker, "second sync", text="first")
+        dry = subprocess.run(
+            ["bash", str(SCRIPT), self.branch],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_PUSH_DRY_RUN": "1"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(dry.stdout.strip(), f"unchanged {self.branch}")
+        subprocess.run(
+            ["bash", str(SCRIPT), self.branch],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_SKIP_PR": "1"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        after = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assertEqual(after, before)
+
+    def test_update_only_does_not_open_a_pull_request(self):
+        desired = "workbook-sync-2026-11-06"
+        git(["checkout", "-B", desired], self.worker)
+        commit(self.worker, "failed checks", text="failed")
+        dry = subprocess.run(
+            ["bash", str(SCRIPT), desired],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_PUSH_DRY_RUN": "1", "SYNC_UPDATE_ONLY": "1"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(dry.stdout.strip(), "skip")
+        subprocess.run(
+            ["bash", str(SCRIPT), desired],
+            cwd=self.worker,
+            env={**os.environ, "SYNC_SKIP_PR": "1", "SYNC_UPDATE_ONLY": "1"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        missing = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", "--verify", desired],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(missing.returncode, 0)
+
+    def test_update_only_leaves_a_non_bot_branch_alone(self):
+        commit(self.seed, "keep the fix", path="fix.txt", text="human")
+        git(["push", "origin", self.branch], self.seed)
+        kept = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        git(["checkout", "-B", self.branch], self.worker)
+        commit(self.worker, "second sync", text="second")
+        dry = subprocess.run(
+            ["bash", str(SCRIPT), self.branch],
+            cwd=self.worker,
+            env={
+                **os.environ,
+                "SYNC_PUSH_DRY_RUN": "1",
+                "SYNC_UPDATE_ONLY": "1",
+                "SYNC_REUSE_BRANCH": self.branch,
+            },
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(dry.stdout.strip(), "skip")
+        subprocess.run(
+            ["bash", str(SCRIPT), self.branch],
+            cwd=self.worker,
+            env={
+                **os.environ,
+                "SYNC_SKIP_PR": "1",
+                "SYNC_UPDATE_ONLY": "1",
+                "SYNC_REUSE_BRANCH": self.branch,
+            },
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        still = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", self.branch],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        fresh = subprocess.run(
+            ["git", "--git-dir", self.remote, "rev-parse", "--verify", f"{self.branch}-2"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(still, kept)
+        self.assertNotEqual(fresh.returncode, 0)
+
+    def test_discover_reuses_the_open_bot_pull_request(self):
+        bindir = Path(self.tmp.name) / "bin"
+        bindir.mkdir()
+        gh = bindir / "gh"
+        gh.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = \"pr\" ] && [ \"$2\" = \"list\" ]; then\n"
+            f"  printf '%s\\n' '{self.branch}'\n"
+            "  exit 0\n"
+            "fi\n"
+            "echo \"unexpected gh $*\" >&2\n"
+            "exit 1\n"
+        )
+        gh.chmod(0o755)
+        desired = "workbook-sync-2026-11-06"
+        git(["checkout", "-B", desired], self.worker)
+        commit(self.worker, "second sync", text="second")
+        dry = subprocess.run(
+            ["bash", str(SCRIPT), desired],
+            cwd=self.worker,
+            env={
+                **os.environ,
+                "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}",
+                "SYNC_PUSH_DRY_RUN": "1",
+                "SYNC_DISCOVER_PR": "1",
+            },
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertTrue(dry.stdout.startswith(f"lease {self.branch} "), dry.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

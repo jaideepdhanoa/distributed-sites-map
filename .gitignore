@@ -13,6 +13,7 @@ playwright-report/
 review-shots/
 !.env.example
 *.log
+.workbook-sync-cache/
 tsconfig.tsbuildinfo
 test-results/
 playwright-report/

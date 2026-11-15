@@ -1,8 +1,9 @@
-import { appendFileSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
 import { migrate } from "../lib/actions/migrate";
-import { SAFE_FILE_NAME, workbookModifiedAt } from "../lib/snapshot/pack";
+import { collectGenerated } from "../lib/snapshot/hash";
+import { workbookModifiedAt } from "../lib/snapshot/pack";
 import { publishSnapshot, snapshotWriteBlocked } from "../lib/snapshot/store";
 
 function summary(text: string): void {
@@ -14,15 +15,6 @@ function summary(text: string): void {
 function publicError(error: unknown): string {
   const text = error instanceof Error ? `${error.name}: ${error.message}` : "publish failed";
   return text.replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]").slice(0, 500);
-}
-
-function collect(dir: string): { name: string; body: string }[] {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((name) => SAFE_FILE_NAME.test(name) && /\.(json|geojson|csv)$/.test(name))
-    .sort()
-    .map((name) => ({ name, body: readFileSync(join(dir, name), "utf8") }));
 }
 
 async function main(): Promise<void> {
@@ -38,7 +30,7 @@ async function main(): Promise<void> {
     summary(`## Snapshot skipped\n\n${message}\n`);
     process.exit(0);
   }
-  const files = collect(join(process.cwd(), "data", "generated"));
+  const files = collectGenerated(join(process.cwd(), "data", "generated"));
   const funnel = files.find((file) => file.name === "funnel.json")?.body;
   const published = await withConnectionString(url, async (sql) => {
     await migrate(sql);

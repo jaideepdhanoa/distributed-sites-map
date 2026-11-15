@@ -443,6 +443,7 @@ export default function PipelineList({
                             <span className="site-name-text">
                               {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                               {cell(row, column, signedIn)}
+                              {row.noPin ? <span className="no-pin"> No pin</span> : null}
                             </span>
                             {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? (
                               <span className="site-address">{displayAddress(row.deal.address)}</span>

@@ -32,7 +32,7 @@ const TEAM_NOTE = "Under 4 stalls fit. Waiting on an NDA. The offer covers charg
 async function ready() {
   const sql = await memorySql();
   const applied = await migrate(sql);
-  assert.deepEqual(applied, ["001_actions.sql", "002_threads.sql", "003_queue.sql", "004_mentions.sql", "005_alerts.sql", "006_agent.sql", "007_proposal_outcomes.sql"]);
+  assert.deepEqual(applied, ["001_actions.sql", "002_threads.sql", "003_queue.sql", "004_mentions.sql", "005_alerts.sql", "006_agent.sql", "007_proposal_outcomes.sql", "008_snapshots.sql"]);
   assert.deepEqual(await migrate(sql), []);
   return sql;
 }

@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { canReadFinancials } from "@/lib/agent/access";
 import { actionsEnabled, withSql, type Sql } from "@/lib/actions/db";
 import { listNotes } from "@/lib/actions/notes";
@@ -196,7 +194,7 @@ function funnel() {
 }
 
 function portfolio() {
-  const report = JSON.parse(readFileSync(join(process.cwd(), "data", "generated", "build_report.json"), "utf8")) as {
+  const report = readGenerated("build_report.json") as {
     generated_at?: string;
     changes?: { new_sites?: number; verdict_changes?: number; stage_moves?: number };
   };
@@ -265,7 +263,7 @@ function financials(id: string) {
 
 function timeline(id: string) {
   if (isQuarantined(id)) return quarantinedRecord(id);
-  const raw = JSON.parse(readFileSync(join(process.cwd(), "data", "generated", "timeline.json"), "utf8"));
+  const raw = readGenerated("timeline.json");
   const card = presentCard(raw, [id]);
   const items = card.items.slice(0, 20).map((item) => ({ type: item.type, summary: item.summary, at: item.date, href: `${siteHref(id)}&panel=activity` }));
   return {

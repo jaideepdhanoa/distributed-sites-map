@@ -25,6 +25,7 @@ import * as digest from "@/lib/api/handlers/alerts/digest";
 import * as flush from "@/lib/api/handlers/alerts/flush";
 import * as preferences from "@/lib/api/handlers/alerts/preferences";
 import * as alertTest from "@/lib/api/handlers/alerts/test";
+import { primeSnapshot } from "@/lib/snapshot/read";
 import * as areas from "@/lib/api/handlers/data/areas";
 import * as deals from "@/lib/api/handlers/data/deals";
 import * as depots from "@/lib/api/handlers/data/depots";
@@ -35,6 +36,7 @@ import * as openLoops from "@/lib/api/handlers/data/open-loops";
 import * as funnel from "@/lib/api/handlers/data/funnel";
 import * as grid from "@/lib/api/handlers/data/grid";
 import * as parcels from "@/lib/api/handlers/data/parcels";
+import * as revalidate from "@/lib/api/handlers/data/revalidate";
 import * as sites from "@/lib/api/handlers/data/sites";
 import * as sitesId from "@/lib/api/handlers/data/sites-id";
 import * as timeline from "@/lib/api/handlers/data/timeline";
@@ -106,6 +108,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/funnel", { GET: funnel.GET as Handler }),
   route("/api/data/grid", { GET: grid.GET as Handler }),
   route("/api/data/parcels", { GET: parcels.GET as Handler }),
+  route("/api/data/revalidate", { POST: revalidate.POST as Handler }),
   route("/api/data/sites/:id", { GET: sitesId.GET as Handler }),
   route("/api/data/sites", { GET: sites.GET as Handler }),
   route("/api/data/timeline/summary", { GET: timelineSummary.GET as Handler }),
@@ -155,6 +158,9 @@ function methodNotAllowed(): Response {
 export async function dispatch(method: string, request: NextRequest, parts: string[]): Promise<Response> {
   const found = findRoute(parts);
   if (!found) notFound();
+  // Refreshing the cache must not read the snapshot it is about to drop.
+  const skipPrime = parts[0] === "data" && parts[1] === "revalidate";
+  if (method !== "OPTIONS" && !skipPrime) await primeSnapshot();
   if (method === "OPTIONS") {
     return new Response(null, { status: 204, headers: { Allow: allowHeader(Object.keys(found.route.methods)) } });
   }

@@ -1,18 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
-import { isSession, privateHeaders, requireUser } from "@/lib/guard";
+import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import { listRecordedHistory } from "@/lib/queue/events";
 import { suggestedDropHistory } from "@/lib/suggestedDrop";
 import { presentCard, showActivityLines, type TimelineItem } from "@/lib/timeline/filter";
 import { mergeBringBackHistory } from "@/lib/timeline/history";
 
 function readTimeline(): unknown {
-  const path = join(process.cwd(), "data", "generated", "timeline.json");
-  if (!existsSync(path)) return { records: {}, items: [] };
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    return readGenerated("timeline.json");
   } catch {
     return { records: {}, items: [] };
   }

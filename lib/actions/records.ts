@@ -1,5 +1,7 @@
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
+import { readGenerated } from "@/lib/guard";
+import { snapshotGeneration } from "@/lib/snapshot/read";
 import type { TargetKind } from "./text";
 
 export type RecordLookup = (kind: TargetKind, id: string) => Record<string, unknown> | null;
@@ -12,10 +14,8 @@ type Cache = {
 
 let cache: Cache | null = null;
 
-function loadCollection(name: string): { mtime: number; rows: Map<string, Record<string, unknown>>; idKey: string } {
-  const path = join(process.cwd(), "data", "generated", name);
-  const mtime = statSync(path).mtimeMs;
-  const parsed = JSON.parse(readFileSync(path, "utf8")) as { features?: { properties?: Record<string, unknown> }[] };
+function loadCollection(name: string): { rows: Map<string, Record<string, unknown>>; idKey: string } {
+  const parsed = readGenerated(name) as { features?: { properties?: Record<string, unknown> }[] };
   const idKey = name.startsWith("deals") ? "deal_id" : "site_id";
   const rows = new Map<string, Record<string, unknown>>();
   for (const feature of parsed.features || []) {
@@ -23,13 +23,13 @@ function loadCollection(name: string): { mtime: number; rows: Map<string, Record
     const id = String(props[idKey] || "");
     if (id) rows.set(id, props);
   }
-  return { mtime, rows, idKey };
+  return { rows, idKey };
 }
 
 export function fileLookup(): RecordLookup {
   const sitesPath = join(process.cwd(), "data", "generated", "sites.geojson");
   const dealsPath = join(process.cwd(), "data", "generated", "deals.geojson");
-  const key = `${statSync(sitesPath).mtimeMs}:${statSync(dealsPath).mtimeMs}`;
+  const key = `${snapshotGeneration()}:${statSync(sitesPath).mtimeMs}:${statSync(dealsPath).mtimeMs}`;
   if (!cache || cache.key !== key) {
     cache = {
       key,

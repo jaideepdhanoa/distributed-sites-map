@@ -36,7 +36,8 @@ Set these in Vercel. A change applies on the next deployment.
 | `ALERT_EMAILS` | no | JSON map of username to mailbox. Overrides the optional `email` on an account. |
 | `SMTP_USER` | fallback | Gmail address, used only when `RESEND_API_KEY` is unset. |
 | `SMTP_PASS` | fallback | Google app password for that mailbox. |
-| `CRON_SECRET` | for the digest | Bearer token Vercel Cron sends to the alert routes. It does not authenticate the agent feed. |
+| `CRON_SECRET` | for the digest | Bearer token Vercel Cron sends to the alert routes. It does not authenticate the agent feed. The workbook sync uses the same value, stored as a GitHub secret, to refresh the snapshot cache. |
+| `SNAPSHOT_READ` | no | Set to `off` to ignore Neon and serve `data/generated`. The default reads a live snapshot when one exists. |
 | `AGENT_INBOX_SECRET` | for the agent feed | Bearer token for `GET /api/agent/inbox`, the ack route, and recommendation writes. Separate from `CRON_SECRET`. |
 | `XAI_API_KEY` | for Ask | Direct xAI key. Ask stays in the "isn't set up yet" state until this is set. Not an AI Gateway key. |
 | `ASK_MODEL` | no | Ask model. Defaults to `grok-4.7`. |
@@ -57,7 +58,7 @@ To add a route, register it in `lib/api/dispatch.ts` and put the handler under `
 
 ## Actions
 
-Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes to the workbook or the Google Sheet, and it never edits `data/generated`. An accepted stage change is drawn over the generated stage so the map, the funnel counts, and the site card update immediately. Pending proposals are not drawn. When a later sync's stage matches, the decision is marked `applied` and the overlay stops. If that sync shows a different stage than the one the decision was made against and the one it approved, the workbook stage wins. The waiting note (`Moved to <stage> by <name>, waiting for workbook`) is on the site card for signed-in viewers, where names are already shown. Drop reasons stay on the activity line. The map pin takes the new stage color and does not add the name or the reason.
+Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the map stays read-only and those controls stay hidden. The app never writes to the workbook or the Google Sheet, and it never edits `data/generated`. It reads the newest live workbook snapshot when Neon has one, and otherwise reads the committed files. An accepted stage change is drawn over the generated stage so the map, the funnel counts, and the site card update immediately. Pending proposals are not drawn. When a later sync's stage matches, the decision is marked `applied` and the overlay stops. If that sync shows a different stage than the one the decision was made against and the one it approved, the workbook stage wins. The waiting note (`Moved to <stage> by <name>, waiting for workbook`) is on the site card for signed-in viewers, where names are already shown. Drop reasons stay on the activity line. The map pin takes the new stage color and does not add the name or the reason.
 
 ### Neon
 
@@ -65,6 +66,24 @@ Notes, suggestions, and saved views need Postgres. Without `DATABASE_URL` the ma
 2. Use the pooled connection string. Neon exposes it as `DATABASE_URL`. Do not commit that string.
 3. Redeploy. The first notes, suggestions, or saved-view request applies `db/migrations`. From a machine that has the URL, `npm run db:migrate` does the same thing.
 4. After a workbook sync rebuilds `data/generated`, run `npm run reconcile-suggestions`. The suggestions panel also checks on open. A suggestion becomes `applied` only when the generated data already matches the proposed value. An accepted stage move, drop, or bring-back is shown on the map until that match. The app does not write the new stage into the workbook.
+
+### Workbook snapshots
+
+Workbook sync writes `data/generated` into Neon after the same checks that used to gate the bot pull request (the data checks, the internal-wording guard inside the build, and the universe-row check). The site reads that live snapshot at request time. The read is cached for about five minutes (`unstable_cache` plus `revalidateTag`), and the job busts the cache when the write succeeds, so a page view does not query Neon on every request. If Neon is down or has no live snapshot, the site serves the committed files. The signed-in routes for financials, the NDA queue, the email timeline, open loops, and the Gmail link are unchanged.
+
+GitHub secret `NEON_DATABASE_URL` is the production pooled connection string. Put it on the repository, not in Vercel, and do not commit it. The app reads `DATABASE_URL` only. If `NEON_DATABASE_URL` is missing, the job prints a notice, skips the write, and still opens a pull request. GitHub secret `CRON_SECRET` must match the Vercel `CRON_SECRET`. The job sends `Authorization: Bearer` to `POST /api/data/revalidate` on `https://distributedsites.com`. If that secret is missing, the job continues and the cache expires on its own within about five minutes.
+
+The repository variable `WORKBOOK_SYNC_OPEN_PR` defaults to unset, which means a successful database write does not open a pull request. Set it to `true` to keep opening that pull request as well.
+
+To roll back to files:
+
+1. Set `WORKBOOK_SYNC_OPEN_PR` to `true`, or remove `NEON_DATABASE_URL`, so the next sync opens a pull request again.
+2. Set Vercel `SNAPSHOT_READ` to `off` and redeploy. The site then ignores Neon.
+3. Merge the sync pull request so `data/generated` is current.
+
+To see which snapshot is live, sign in and request `GET /api/actions/status`. The JSON includes `snapshot_id`, `snapshot_created_at`, and `snapshot_source` (`database` or `files`). `GET /api/data/funnel` repeats the id and time under `meta`. The Actions job summary prints them after a publish.
+
+Preview deployments get their own Neon branch from the Vercel Neon integration, and they read that branch's `DATABASE_URL`. The sync job is the only writer. It refuses to run inside Vercel, and it refuses to refresh any host other than the production site. A preview cannot publish a production snapshot. The job keeps the last 14 snapshots and deletes older ones in the same transaction as the publish. A failed check or a failed write leaves the previous live snapshot in place.
 
 ### Roles
 
@@ -190,7 +209,7 @@ Verdict rows are append-only in `data/verdicts/verdicts.csv`. Pull requests run 
 
 A scheduled workflow exports the Pipeline Sheet and reads the other build inputs from a Drive folder named Map sync inputs. The folder id is the repository variable `MAP_SYNC_INPUTS_FOLDER_ID`. There is no default, and the sync does not look in the program root. It lists only the top level of that folder.
 
-The service account needs Viewer on the Pipeline workbook and on Map sync inputs. That is enough for the Open site folder link: each sync copies column AE onto the deal and onto the universe site the panel opens. It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request.
+The service account needs Viewer on the Pipeline workbook and on Map sync inputs. That is enough for the Open site folder link: each sync copies column AE onto the deal and onto the universe site the panel opens. It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request. A passing sync with `NEON_DATABASE_URL` set publishes a Neon snapshot instead of opening that pull request. The details are under Workbook snapshots.
 
 Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk`) must be shared with `sites-map-sync@sites-map-sync.iam.gserviceaccount.com` as Viewer, and each site folder must inherit that access. A site folder set to limited access stays invisible. The card link still ships from column AE. The sync comment's "Matched folders" counts only folders that account listed under 2 Sites. "Sheet folder links" counts column AE. Those two numbers differ when the account cannot see a folder.
 
@@ -198,9 +217,9 @@ Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_
 
 ### Universe gap
 
-Universe stays a strict superset of every Pipeline or Land deal that already has a location in LAS, PHX, or MIA. The map links that deal to a counted Universe row by parcel or a unique street. The market is the deal's city field. Workbook sync reads the Sheet and opens a pull request. It leaves the Sheet unchanged.
+Universe stays a strict superset of every Pipeline or Land deal that already has a location in LAS, PHX, or MIA. The map links that deal to a counted Universe row by parcel or a unique street. The market is the deal's city field. Workbook sync reads the Sheet and publishes a snapshot when `NEON_DATABASE_URL` is set. It opens a pull request when that publish did not happen, or when `WORKBOOK_SYNC_OPEN_PR` is `true`. It leaves the Sheet unchanged.
 
-`python scripts/build_data.py --gap-gate` prints every located LAS, PHX, and MIA deal id that has no `universe_id`. The check fails when that count is above zero. Inside those three markets there is no exception list. A located deal in another market, including SNA, is listed in the sync pull request and does not fail the check. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync puts the LAS, PHX, and MIA ids in the pull request body and the drift comment, then runs the gate. A red gate leaves the pull request open and unmerged.
+`python scripts/build_data.py --gap-gate` prints every located LAS, PHX, and MIA deal id that has no `universe_id`. The check fails when that count is above zero. Inside those three markets there is no exception list. A located deal in another market, including SNA, is listed when a sync pull request is opened and does not fail the check. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync runs the gate before it publishes a snapshot or opens a pull request. A red gate publishes nothing and does not open a pull request. The previous live snapshot stays, and the Actions summary lists the deal ids.
 
 On 5 Nov 2026 Jaideep kept PIPE-SNA-0002 (Newport Beach) outside this check. The map does not assign that deal a LAS, PHX, or MIA market, and it does not require an SNA Universe row. The map does not mint a row, invent a coordinate, or invent a parcel number.
 

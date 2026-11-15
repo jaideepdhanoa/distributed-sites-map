@@ -62,3 +62,23 @@ export async function withSql<T>(fn: (sql: Sql) => Promise<T>): Promise<T> {
     client.release();
   }
 }
+
+export async function withConnectionString<T>(url: string, fn: (sql: Sql) => Promise<T>): Promise<T> {
+  const pool = new Pool({
+    connectionString: url,
+    max: 1,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    ssl: sslOption(url),
+  });
+  pool.on("error", () => {
+    // Idle client errors can include the connection string. Callers report a redacted message.
+  });
+  const client = await pool.connect();
+  try {
+    return await fn(wrap(client));
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}

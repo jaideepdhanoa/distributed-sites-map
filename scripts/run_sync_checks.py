@@ -86,7 +86,7 @@ def main() -> None:
     if not failed:
         lines.extend(["", "All data checks passed."])
     else:
-        lines.extend(["", "These checks failed. The pull request should not be merged.", ""])
+        lines.extend(["", "These checks failed. No snapshot was published. The previous live snapshot stays.", ""])
         for label, _code, output in failed:
             lines.append(f"### {label}")
             lines.append("")

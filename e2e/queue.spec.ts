@@ -293,6 +293,16 @@ test("the queue card shows a change, a mention, and a pending next step", async 
       return 0;
     }
   })).toBeGreaterThan(0);
+  const since = page.getByTestId("review-since");
+  if (await since.count()) {
+    await expect(since).toBeVisible();
+    const label = await since.evaluate((node) => {
+      const style = window.getComputedStyle(node);
+      return { fontSize: style.fontSize, text: (node.textContent || "").trim() };
+    });
+    expect(label.fontSize).not.toBe("0px");
+    expect(label.text.length).toBeGreaterThan(0);
+  }
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-mobile.png" });
   await page.getByTestId("review-position").click();
   await expect(page.getByTestId("review-feed")).toBeVisible();

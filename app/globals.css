@@ -917,19 +917,19 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .list-sort { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .list-sort select { max-width: 46vw; height: 36px; }
-.list-scroll { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
-.list-table { border-collapse: collapse; width: 100%; min-width: 0; table-layout: auto; font-size: 13px; }
-.pipeline-list .list-scroll { overflow-x: auto; }
-.pipeline-list .list-table td.capacity, .pipeline-list .list-table th.capacity { min-width: 11rem; white-space: normal; }
-.capacity-cell { display: block; white-space: normal; overflow-wrap: anywhere; }
-.list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: break-word; word-break: normal; min-width: 6.5rem; max-width: 18rem; }
+.list-scroll { flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.list-table { border-collapse: collapse; width: 100%; min-width: 0; table-layout: fixed; font-size: 13px; }
+.pipeline-list .list-table td.capacity, .pipeline-list .list-table th.capacity { min-width: 0; white-space: nowrap; }
+.capacity-cell { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: none; }
 .list-table th:first-child, .list-table td:first-child {
   position: sticky;
   left: 0;
   background: #faf7f1;
   z-index: 2;
-  min-width: 16rem;
-  max-width: 24rem;
+  width: 26%;
+  min-width: 0;
+  max-width: none;
   box-shadow: inset -1px 0 0 var(--line);
 }
 .list-table thead th:first-child { z-index: 4; }
@@ -938,13 +938,14 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   box-shadow: 8px 0 12px -8px rgba(28, 25, 20, 0.28), inset -1px 0 0 var(--line);
 }
 .list-table tr.on td:first-child { background: #e7f0ea; }
-.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: normal; text-align: left; overflow-wrap: break-word; word-break: normal; }
+.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: nowrap; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .list-table tr.on td { background: #e7f0ea; }
 .list-cards { display: none; list-style: none; margin: 0; padding: 0; }
 .list-cards li { display: flex; flex-direction: column; align-items: stretch; gap: 6px; border-bottom: 1px solid var(--line); padding: 10px 12px; }
 .list-cards button.list-row { flex: none; width: 100%; min-width: 0; border: 0; background: transparent; text-align: left; padding: 0; }
 .list-cards button.text-link { flex: none; align-self: center; min-height: 44px; }
 .list-cards .list-row > strong, .list-cards .list-row > span { display: block; }
+.list-card-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-cards .near-chip { display: inline-flex; margin-top: 4px; }
 .list-cards .site-address { font-size: 12px; color: var(--ink-3); font-weight: 450; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1719,8 +1720,8 @@ tr { cursor: pointer; }
 }
 .open-land { display: grid; gap: 4px; min-width: 88px; }
 .open-land b { display: block; height: 100%; border-radius: 99px; background: #2f6a4e; }
-.metric { display: grid; gap: 3px; min-width: 7.5rem; }
-.metric-label { line-height: 1.35; }
+.metric { display: grid; gap: 3px; min-width: 0; max-width: 100%; overflow: hidden; }
+.metric-label { display: block; line-height: 1.35; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .range-strip {
   position: relative;
   display: block;

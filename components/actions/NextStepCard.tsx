@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { plainNextStep } from "@/lib/nextStepLine";
 import { stageTitle } from "@/lib/labels";
 import { contactDate } from "@/lib/cardStatus";
 import type { WorkbookStep } from "@/lib/workbookStep";
@@ -307,27 +308,17 @@ export function NextStepCard({
   }, [status.enabled, reviewer, open, focus, proposal, reviewing]);
 
   const workbookDue = workbook?.due ? contactDate(workbook.due) : "";
-  const workbookBlock = signedIn && workbook ? (
-    <div data-testid="workbook-step">
-      {workbook.text ? <p className="proposal-title">{workbook.text}</p> : null}
-      {workbook.owner || workbookDue ? (
-        <p className="proposal-meta">
-          {[workbook.owner ? `Owner ${workbook.owner}` : "", workbookDue ? `Due ${workbookDue}` : ""].filter(Boolean).join(" · ")}
-        </p>
-      ) : null}
-    </div>
-  ) : null;
+  const workbookBlock = signedIn && workbook ? <WorkbookLine text={workbook.text} owner={workbook.owner} due={workbookDue} /> : null;
   const context = (
     <>
       <SuggestedDropMark reason={suggestedDrop} stageGroup={stageGroup} stage={recordStage} />
       {blocker ? <BlockerLine deal={blocker} /> : null}
-      {workbookBlock}
     </>
   );
   if (!status.enabled) {
     const blocked = blocker ? blockerSentenceForDeal(blocker, pacificToday()) : "";
     if (!workbookBlock && !String(suggestedDrop || "").trim() && !blocked) return null;
-    return <section className="next-card" data-testid="next-step">{context}</section>;
+    return <section className="next-card" data-testid="next-step">{context}{workbookBlock}</section>;
   }
 
   const approved = steps
@@ -629,23 +620,25 @@ export function NextStepCard({
   } else if (!open) {
     body = (
       <>
-        <h3>Next step</h3>
-        <div className="step-actions" role="group" aria-label="Next step type">
-          {emptyNextStepActions(stageGroup, recordStage).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-testid={`empty-step-${item.id}`}
-              onClick={() => {
-                setType(item.id);
-                setStage(item.id === "stage_move" ? forward : "");
-                setOpen(true);
-              }}
-              className={item.prominent ? "paper-btn" : "text-link"}
-            >
-              {item.id === "stage_move" ? moveLabel : nextStepTypeLabel(item.id)}
-            </button>
-          ))}
+        <div className="next-step-row">
+          {workbookBlock || <h3>Next step</h3>}
+          <div className="step-actions" role="group" aria-label="Next step type">
+            {emptyNextStepActions(stageGroup, recordStage).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                data-testid={`empty-step-${item.id}`}
+                onClick={() => {
+                  setType(item.id);
+                  setStage(item.id === "stage_move" ? forward : "");
+                  setOpen(true);
+                }}
+                className={item.prominent ? "paper-btn" : "text-link"}
+              >
+                {item.id === "stage_move" ? moveLabel : nextStepTypeLabel(item.id)}
+              </button>
+            ))}
+          </div>
         </div>
         <p className="hint">Approval updates the stage on the map. It stays waiting for workbook until the sync matches. Resolving a comment does not change Stage.</p>
       </>
@@ -657,12 +650,32 @@ export function NextStepCard({
   return (
     <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
       {context}
+      {tone === "empty" ? null : workbookBlock}
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
       {bringBack ? (
         <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
       ) : null}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
     </section>
+  );
+}
+
+function WorkbookLine({ text, owner, due }: { text: string; owner: string; due: string }) {
+  const plain = plainNextStep(text);
+  const [open, setOpen] = useState(false);
+  const meta = [owner ? `Owner ${owner}` : "", due ? `Due ${due}` : ""].filter(Boolean).join(" · ");
+  if (!plain.line && !meta) return null;
+  return (
+    <div className="workbook-step" data-testid="workbook-step">
+      {plain.line ? <p className="next-line" title={plain.full}>{plain.line}</p> : null}
+      {meta ? <p className="proposal-meta">{meta}</p> : null}
+      {plain.full && plain.full !== plain.line ? (
+        <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+          {open ? "Hide full next step" : "Full next step"}
+        </button>
+      ) : null}
+      {open && plain.full !== plain.line ? <p className="next-full">{plain.full}</p> : null}
+    </div>
   );
 }
 

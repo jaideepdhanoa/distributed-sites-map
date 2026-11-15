@@ -61,6 +61,16 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect.poll(chipText).toContain("on the map ·");
   await expect.poll(chipText).toContain("dropped, hidden");
   await page.screenshot({ path: `review-shots/${name}-pipeline.png`, fullPage: false });
+  await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".pipeline-list");
+  if (name !== "mobile") {
+    await expect(page.locator(".pipeline-list thead th")).toHaveCount(8);
+    const overflow = await page.locator(".pipeline-list .list-scroll").evaluate((node) => node.scrollWidth - node.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  } else {
+    await expect(page.locator(".pipeline-list .list-card-line").first()).toBeVisible();
+  }
+  await page.screenshot({ path: `review-shots/${name}-list.png`, fullPage: false });
   await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
   await waitForBasemap(page);
@@ -87,7 +97,11 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   const stars = page.locator("aside.drawer");
   await expect(stars).toContainText("Stars & Stripes");
   await expect(stars).toContainText("Financial screen");
-  await expect(stars.getByTestId("workbook-step")).toContainText("POS/car counts");
+  const step = stars.getByTestId("workbook-step");
+  await expect(step).toBeVisible();
+  const more = step.getByRole("button", { name: "Full next step" });
+  if (await more.count()) await more.click();
+  await expect(step).toContainText("POS/car counts");
   await expect(stars).toContainText("Last contact Nov 6");
   await page.locator(".drawer-scroll").evaluate((node) => { node.scrollTop = 0; });
   await expect(stars.locator("h2")).toBeInViewport();

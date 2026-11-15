@@ -187,6 +187,36 @@
 .next-card .proposal-needs .hint { display: block; margin-top: 2px; }
 .next-card .proposal-notes p { margin: 0; }
 .next-card .step-actions { display: grid; gap: 8px; justify-items: start; }
+.next-card .next-step-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.next-card .next-step-row .workbook-step,
+.next-card .next-step-row h3 { flex: 1 1 14rem; min-width: 0; margin: 0; }
+.next-card .next-step-row .step-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+.next-card .next-line {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 550;
+  color: var(--ink);
+}
+.next-card .next-full { margin: 8px 0 0; white-space: normal; line-height: 1.45; }
 .next-card .step-actions .paper-btn { max-width: 100%; }
 .next-card .act-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
 .next-card form label,

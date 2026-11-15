@@ -392,7 +392,7 @@ export default function PipelineList({
                   onOpen(id);
                 }}>
                   {columns.map((column) => (
-                    <td key={column} className={column === "capacity" ? "capacity" : undefined}>
+                    <td key={column} className={column === "capacity" ? "capacity" : undefined} title={cell(row, column, signedIn)}>
                       {column === "openLand" ? (
                         <NumberCell label={cell(row, column, signedIn)} value={row.deal.open_land_sqft} stats={strips.openLand} direction="higher" format={openLandText} />
                       ) : column === "asking" ? (
@@ -420,7 +420,7 @@ export default function PipelineList({
                       ) : column === "countyValue" ? (
                         <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.county_value != null ? "County" : ""} value={signedIn ? row.deal.county_value : null} stats={strips.county} format={fullMoney} labelTitle={row.deal.county_value_basis || undefined} />
                       ) : column === "capacity" ? (
-                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle="Substation distance. Closer is better." />
+                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={cell(row, column, signedIn)} />
                       ) : column === "stage" ? (
                         <span className="stage-cell">
                           <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column, signedIn)}</span>
@@ -493,12 +493,13 @@ export default function PipelineList({
                 <strong>{unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}{row.deal.name || row.deal.address}</strong>
                 {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? <span className="site-address">{displayAddress(row.deal.address)}</span> : null}
                 <NearMark deal={row.deal} />
-                <span>
-                  {signedIn ? dealAsking(row) : "—"} · {acresText(row.deal.land_acres) || "Acres not provided"}
+                <span className="list-card-line">
+                  {[stageDetail(row.deal.stage, row.deal.stage_group), signedIn ? dealAsking(row) : "—", row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"].join(" · ")}
                   {phoneRank(row, strips, signedIn)}
                 </span>
-                <span>{vehiclesPerDay(row.deal.trade_aadt) || "—"}</span>
-                <span>{row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"} · Site capacity {capacitySummary(factsForDeal(row.deal))}</span>
+                <span className="list-card-line" title={capacitySummary(factsForDeal(row.deal))}>
+                  {capacitySummary(factsForDeal(row.deal))} · {vehiclesPerDay(row.deal.trade_aadt) || "—"}
+                </span>
                 <NdaChip deal={row.deal} signedIn={signedIn} />
                 <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
                 <StagePending note={row.deal.stage_pending} />

@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGenerated } from "@/lib/guard";
+import { snapshotGeneration } from "@/lib/snapshot/read";
 import { listedCountLine } from "./counts";
 import { listedStageRows, stageTableText } from "./stages";
 import { isQuarantined } from "./tools";
@@ -22,21 +22,22 @@ export const ASK_SYSTEM = [
 
 type FunnelFile = { stages?: { id?: string; name?: string; total?: number }[] };
 
-let cachedSummary: string | null = null;
+let cachedSummary: { generation: number; text: string } | null = null;
 
 export function portfolioSummary(): string {
-  if (cachedSummary) return cachedSummary;
+  const generation = snapshotGeneration();
+  if (cachedSummary && cachedSummary.generation === generation) return cachedSummary.text;
   try {
-    const file = JSON.parse(readFileSync(join(process.cwd(), "data", "generated", "funnel.json"), "utf8")) as FunnelFile;
+    const file = readGenerated("funnel.json") as FunnelFile;
     const lines = (file.stages || [])
       .filter((stage) => stage && stage.name && typeof stage.total === "number")
       .map((stage) => `${stage.name}: ${stage.total}`);
     const counts = lines.length ? `Portfolio counts. ${lines.join(". ")}. ${listedCountLine()}` : listedCountLine();
-    cachedSummary = `${counts}\n\n${stageTableText(listedStageRows(isQuarantined))}`;
+    cachedSummary = { generation, text: `${counts}\n\n${stageTableText(listedStageRows(isQuarantined))}` };
   } catch {
-    cachedSummary = `${listedCountLine()}\n\n${stageTableText(listedStageRows(isQuarantined))}`;
+    cachedSummary = { generation, text: `${listedCountLine()}\n\n${stageTableText(listedStageRows(isQuarantined))}` };
   }
-  return cachedSummary;
+  return cachedSummary.text;
 }
 
 /** Stable prefix. Role and the question stay after it so this text can be cached. */

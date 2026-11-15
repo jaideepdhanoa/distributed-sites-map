@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { readGenerated } from "@/lib/guard";
 import { summaryRecords } from "@/lib/timeline/filter";
 
@@ -32,7 +30,7 @@ export type StageRow = {
 
 function lastActivityById(): Record<string, string> {
   try {
-    const raw = JSON.parse(readFileSync(join(process.cwd(), "data", "generated", "timeline.json"), "utf8"));
+    const raw = readGenerated("timeline.json");
     const records = summaryRecords(raw);
     const out: Record<string, string> = {};
     for (const [id, record] of Object.entries(records)) out[id] = record.lastTouched;

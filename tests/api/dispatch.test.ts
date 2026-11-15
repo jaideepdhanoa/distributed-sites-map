@@ -51,6 +51,7 @@ const expected = [
   "GET /api/data/funnel",
   "GET /api/data/grid",
   "GET /api/data/parcels",
+  "POST /api/data/revalidate",
   "GET /api/data/sites/:id",
   "GET /api/data/sites",
   "GET /api/data/timeline/summary",
@@ -110,6 +111,7 @@ test("options advertises the methods of that path", async () => {
   assert.equal((await call("OPTIONS", "/api/actions/recommendations/rec-1/dismiss")).headers.get("allow"), "OPTIONS, POST");
   assert.equal((await call("OPTIONS", "/api/ask")).headers.get("allow"), "OPTIONS, POST");
   assert.equal((await call("OPTIONS", "/api/ask/status")).headers.get("allow"), "GET, HEAD, OPTIONS");
+  assert.equal((await call("OPTIONS", "/api/data/revalidate")).headers.get("allow"), "OPTIONS, POST");
 });
 
 test("the new agent and ask routes dispatch to their handlers", async () => {
@@ -141,6 +143,19 @@ test("ask streams from the catch-all instead of its own function", () => {
   assert.match(route, /maxDuration = 300/);
   assert.match(route, /return dispatch/);
   assert.equal(route.includes("app/api/ask"), false);
+});
+
+test("snapshot revalidate is on the catch-all and rejects a missing secret", async () => {
+  const previous = process.env.CRON_SECRET;
+  delete process.env.CRON_SECRET;
+  try {
+    assert.equal((await call("GET", "/api/data/revalidate")).status, 405);
+    const response = await call("POST", "/api/data/revalidate");
+    assert.equal(response.status, 401);
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous;
+  }
 });
 
 test("an unknown path is the app not-found", async () => {

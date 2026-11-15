@@ -1,8 +1,10 @@
 name: Workbook sync
 
 # Every four hours. This schedule stays. The job does not deploy to Vercel.
-# Preview deploys still come from the Vercel GitHub app. Hobby function limits
-# are enforced by the Validate data workflow, not by a second production build.
+# When NEON_DATABASE_URL is set and the data checks pass, the job writes a
+# snapshot to the production database and refreshes the production cache.
+# It opens a pull request when that write did not happen, or when the
+# repository variable WORKBOOK_SYNC_OPEN_PR is true.
 on:
   schedule:
     - cron: "0 */4 * * *"
@@ -61,8 +63,66 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         continue-on-error: true
         run: python scripts/run_sync_checks.py /tmp/sync-test-results.md
+      - name: Report failed data checks
+        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'failure'
+        run: |
+          {
+            echo "## Workbook sync data checks failed"
+            echo
+            echo "No snapshot was published. The previous live snapshot stays."
+            echo
+            cat /tmp/sync-test-results.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Data checks failed. No snapshot was published."
+      - name: Located deals without a universe row
+        id: gap
+        if: steps.rebuild.outcome == 'success'
+        run: |
+          if ! python scripts/build_data.py --gap-gate > /tmp/gap-gate.txt 2>&1; then
+            {
+              echo "## Universe-row check failed"
+              echo
+              echo "No snapshot was published. The previous live snapshot stays."
+              echo
+              cat /tmp/gap-gate.txt
+            } >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/gap-gate.txt
+            echo "::error::Universe-row check failed. No snapshot was published."
+            exit 1
+          fi
+          cat /tmp/gap-gate.txt
+      - name: Publish the snapshot
+        id: publish
+        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success'
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$NEON_DATABASE_URL" ]; then
+            echo "NEON_DATABASE_URL is not set. Skipping the database snapshot."
+            echo "Add the repository secret NEON_DATABASE_URL: the Neon production pooled connection string."
+            echo "Until that secret is set, this job still opens a pull request."
+            {
+              echo "## Snapshot skipped"
+              echo
+              echo "NEON_DATABASE_URL is not set, so no snapshot was written."
+              echo "Add the repository secret NEON_DATABASE_URL (Neon production pooled connection string)."
+              echo "Until then, this job opens a pull request."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          npx tsx scripts/publish-snapshot.ts
+          echo "published=true" >> "$GITHUB_OUTPUT"
+      - name: Refresh the production cache
+        if: steps.publish.outputs.published == 'true'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SNAPSHOT_REVALIDATE_URL: ${{ vars.SNAPSHOT_REVALIDATE_URL }}
+        run: npx tsx scripts/revalidate-snapshot.ts
       - name: Open or update the sync pull request
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success' && (steps.publish.outputs.published != 'true' || vars.WORKBOOK_SYNC_OPEN_PR == 'true')
         env:
           # Pull requests opened with github.token are authored by
           # github-actions[bot]. On this public repository those pull_request
@@ -103,7 +163,7 @@ jobs:
           python scripts/sync_workbook.py --comment
           gh pr comment "$(cat /tmp/sync-pr-number)" --body-file /tmp/drift-comment.md
       - name: Start the checks the bot pull request cannot start itself
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success' && (steps.publish.outputs.published != 'true' || vars.WORKBOOK_SYNC_OPEN_PR == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           SYNC_TOKEN_IS_DEFAULT: ${{ secrets.SYNC_GITHUB_TOKEN == '' && 'true' || 'false' }}
@@ -127,6 +187,3 @@ jobs:
       - name: Fail when the data checks failed
         if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'failure'
         run: exit 1
-      - name: Located deals without a universe row
-        if: steps.rebuild.outcome == 'success'
-        run: python scripts/build_data.py --gap-gate

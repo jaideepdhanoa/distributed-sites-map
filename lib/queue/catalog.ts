@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGenerated } from "@/lib/guard";
 import { isPipelineStore } from "@/lib/labels";
 import { safeSnapshot } from "@/lib/policy/banned";
 import type { ChangeEvent } from "./diff";
@@ -56,10 +55,8 @@ export type CatalogSite = {
 };
 
 function readJson(name: string): unknown {
-  const path = join(process.cwd(), "data", "generated", name);
-  if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    return readGenerated(name);
   } catch {
     return null;
   }

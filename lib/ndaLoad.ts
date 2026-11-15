@@ -1,10 +1,11 @@
 import fs from "fs";
 import path from "path";
 import type { NdaSnapshot } from "./nda";
+import { readGeneratedOptional } from "./snapshot/read";
 
 export function loadNdaSnapshot(): NdaSnapshot {
-  const generated = path.join(process.cwd(), "data", "generated", "nda.json");
+  const generated = readGeneratedOptional("nda.json");
+  if (generated) return generated as NdaSnapshot;
   const fixture = path.join(process.cwd(), "data", "fixtures", "nda.json");
-  const file = fs.existsSync(generated) ? generated : fixture;
-  return JSON.parse(fs.readFileSync(file, "utf8")) as NdaSnapshot;
+  return JSON.parse(fs.readFileSync(fixture, "utf8")) as NdaSnapshot;
 }

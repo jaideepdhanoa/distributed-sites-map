@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readGenerated } from "@/lib/guard";
 import { droppedStage } from "@/lib/actions/nextStepTypes";
 import { recommendedDropSummary } from "@/lib/actions/nextStep";
 import type { TimelineItem } from "@/lib/timeline/filter";
@@ -9,10 +8,8 @@ export type SuggestedDrop = { id: string; stage: string; reason: string };
 type DealFile = { features?: { properties?: Record<string, unknown> }[] };
 
 export function loadSuggestedDrops(): SuggestedDrop[] {
-  const path = join(process.cwd(), "data", "generated", "suggested_drops.json");
-  if (!existsSync(path)) return [];
   try {
-    const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    const raw = readGenerated("suggested_drops.json") as unknown;
     if (!Array.isArray(raw)) return [];
     const rows: SuggestedDrop[] = [];
     for (const item of raw) {

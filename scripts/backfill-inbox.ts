@@ -1,6 +1,7 @@
 import { actionsEnabled, getPool, withSql } from "../lib/actions/db";
 import { migrate } from "../lib/actions/migrate";
 import { backfillInbox } from "../lib/agent/backfill";
+import { primeSnapshot } from "../lib/snapshot/read";
 
 // Reads the shared Neon database. --write inserts feed rows into that same database.
 // Preview and production use one DATABASE_URL, so --write updates production. Do not run it from CI.
@@ -25,6 +26,7 @@ async function main() {
     console.error("Refusing to write the agent feed from CI.");
     process.exit(1);
   }
+  await primeSnapshot();
   const report = await withSql(async (sql) => {
     if (write) await migrate(sql);
     return backfillInbox(sql, { dryRun: !write });

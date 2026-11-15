@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readGenerated } from "./guard";
+import { snapshotGeneration } from "./snapshot/read";
 import type { DealProps } from "./types";
 import type { PricedSite } from "./pricing";
 
@@ -7,13 +7,14 @@ type PricingFile = {
   deals?: Record<string, PricedSite>;
 };
 
-let cached: PricingFile | null = null;
+let cached: { generation: number; file: PricingFile } | null = null;
 
 function pricingFile(): PricingFile {
-  if (cached) return cached;
-  const file = path.join(process.cwd(), "data", "generated", "pricing.json");
-  cached = JSON.parse(readFileSync(file, "utf8")) as PricingFile;
-  return cached;
+  const generation = snapshotGeneration();
+  if (cached && cached.generation === generation) return cached.file;
+  const file = readGenerated("pricing.json") as PricingFile;
+  cached = { generation, file };
+  return file;
 }
 
 /** Workbook pricing for one deal. Package file names are not in this file. */

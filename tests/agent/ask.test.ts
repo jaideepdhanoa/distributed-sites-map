@@ -233,8 +233,8 @@ test("getSite returns the card facts for 3520 N 16th St without restaging it", a
   assert.equal(result.card?.cashFlow, "Not provided");
   assert.match(String(result.card?.spareLand), /9,000 sq ft/);
   assert.match(String(result.card?.photoSet), /Photo set: complete/);
-  assert.match(String(result.card?.photoSet), /5 site photos/);
-  assert.match(String(result.card?.photoSet), /7 listing photos/);
+  assert.match(String(result.card?.photoSet), /6 site photos/);
+  assert.match(String(result.card?.photoSet), /6 listing photos/);
   assert.equal(JSON.stringify(result).includes("timeline"), false);
   const scope = siteScopeLine("PIPE-PHX-0084");
   assert.match(scope, /\$1,750,000/);

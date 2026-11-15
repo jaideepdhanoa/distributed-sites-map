@@ -388,6 +388,7 @@ export default function Detail({
         onSwipe?.(dx < 0 ? "next" : "prev");
       }}
     >
+      <span className="sr">{site.site_id}</span>
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
@@ -675,6 +676,7 @@ export function DealDetail({
         onSwipe?.(dx < 0 ? "next" : "prev");
       }}
     >
+      <span className="sr">{deal.deal_id}</span>
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />

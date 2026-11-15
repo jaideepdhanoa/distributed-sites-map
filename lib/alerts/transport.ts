@@ -50,25 +50,41 @@ export function alertReplyTo(): string {
   return process.env.ALERT_REPLY_TO?.trim() || alertDefaults.replyTo;
 }
 
+/** Shorter than the three-minute stale-claim window, so a hung send is not mailed twice. */
+export const MAIL_SEND_TIMEOUT_MS = 60_000;
+
+export async function runMailSend(work: (signal: AbortSignal) => Promise<void>, timeoutMs = MAIL_SEND_TIMEOUT_MS): Promise<void> {
+  const signal = AbortSignal.timeout(timeoutMs);
+  try {
+    await work(signal);
+  } catch (error) {
+    if (signal.aborted) throw new Error("The mail send timed out.");
+    throw error;
+  }
+}
+
 async function sendResend(mail: OutboundMail): Promise<void> {
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) throw new Error("Resend is not configured.");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: mail.from,
-      to: [mail.to],
-      subject: mail.subject,
-      text: mail.text,
-      ...(mail.html ? { html: mail.html } : {}),
-      ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
-    }),
+  await runMailSend(async (signal) => {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: mail.from,
+        to: [mail.to],
+        subject: mail.subject,
+        text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
+        ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
+      }),
+      signal,
+    });
+    if (!response.ok) throw new Error("Resend rejected the message.");
   });
-  if (!response.ok) throw new Error("Resend rejected the message.");
 }
 
 export function mailTransport(): MailTransport | null {
@@ -84,17 +100,39 @@ export function mailTransport(): MailTransport | null {
     port: 465,
     secure: true,
     auth: { user, pass },
+    connectionTimeout: MAIL_SEND_TIMEOUT_MS,
+    greetingTimeout: MAIL_SEND_TIMEOUT_MS,
+    socketTimeout: MAIL_SEND_TIMEOUT_MS,
   });
   return {
     kind,
     async send(mail) {
-      await transporter.sendMail({
-        from: mail.from,
-        to: mail.to,
-        ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
-        subject: mail.subject,
-        text: mail.text,
-        ...(mail.html ? { html: mail.html } : {}),
+      await runMailSend(async (signal) => {
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => {
+            transporter.close();
+            reject(signal.reason instanceof Error ? signal.reason : new Error("The mail send timed out."));
+          };
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+          signal.addEventListener("abort", onAbort, { once: true });
+          transporter.sendMail({
+            from: mail.from,
+            to: mail.to,
+            ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
+            subject: mail.subject,
+            text: mail.text,
+            ...(mail.html ? { html: mail.html } : {}),
+          }).then(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, (error: unknown) => {
+            signal.removeEventListener("abort", onAbort);
+            reject(error);
+          });
+        });
       });
     },
   };

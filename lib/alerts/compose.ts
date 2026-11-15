@@ -52,6 +52,6 @@ export function screenEmail(subject: string, body: string): { subject: string; b
   return { subject: nextSubject, body: nextBody };
 }
 
-export function renderBatch(items: MailItem[], options?: { now?: Date; kind?: "instant" | "digest" }): { subject: string; body: string; html: string } | null {
+export function renderBatch(items: MailItem[], options?: { now?: Date; kind?: "instant" | "digest" | "updates" | "catchup" }): { subject: string; body: string; html: string } | null {
   return renderAlert(items, options);
 }

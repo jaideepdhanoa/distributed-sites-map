@@ -51,8 +51,9 @@ test("a burst inside the minute is one email, and a later item does not hold it"
   const logs = await sql.query<{ status: string; subject: string; body: string }>(`SELECT status, subject, body FROM alert_log`);
   assert.equal(logs.rows.length, 1);
   assert.equal(logs.rows[0]?.status, "would_send");
-  assert.match(logs.rows[0]?.subject || "", /daily digest/);
-  assert.match(logs.rows[0]?.subject || "", /10 items/);
+  assert.equal(logs.rows[0]?.subject, "Distributed Sites · 10 updates");
+  assert.equal((logs.rows[0]?.subject || "").includes("daily digest"), false);
+  assert.equal((logs.rows[0]?.body || "").includes("Daily digest"), false);
   for (let i = 0; i < 10; i += 1) assert.match(logs.rows[0]?.body || "", new RegExp(`Next step proposed ${i}`));
 
   const later = start + 10 * 60_000;
@@ -132,8 +133,9 @@ test("the queued backlog is one digest-style email per person", async () => {
   const jaideep = logs.rows.find((row) => row.user_id === "jaideep");
   const reviewer = logs.rows.find((row) => row.user_id === "reviewer");
   assert.equal(jaideep?.status, "sent");
-  assert.match(jaideep?.subject || "", /daily digest/);
-  assert.match(jaideep?.subject || "", /8 items/);
+  assert.equal(jaideep?.subject, "Distributed Sites catch-up · 8 updates");
+  assert.equal((jaideep?.subject || "").includes("daily digest"), false);
+  assert.equal((jaideep?.body || "").includes("Daily digest"), false);
   for (const summary of summaries) assert.match(jaideep?.body || "", new RegExp(summary.replace(".", "\\.")));
   assert.equal(reviewer?.status, "would_send");
   assert.match(reviewer?.warning || "", /not approved for live mail/);
@@ -262,6 +264,41 @@ test("overlapping flushes send a batch once", async () => {
     await pool.end();
     await server.stop();
   }
+});
+
+test("a failed batch drops its pending log when the retry has different rows", async () => {
+  delete process.env.ALERT_BATCH_MS;
+  delete process.env.SMTP_USER;
+  delete process.env.SMTP_PASS;
+  delete process.env.ALERT_FROM;
+  process.env.RESEND_API_KEY = "re_test_key";
+  process.env.RESEND_EMAIL_DOMAIN = "distributedsites.com";
+  const sql = await ready();
+  await enqueue(sql, "2026-11-14T15:00:00.000Z", randomUUID(), "jaideep", "First waiting.");
+  await enqueue(sql, "2026-11-14T16:00:00.000Z", randomUUID(), "jaideep", "Second waiting.");
+  const original = globalThis.fetch;
+  let called = 0;
+  globalThis.fetch = (async () => {
+    called += 1;
+    if (called === 1) return new Response("no", { status: 500 });
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+  try {
+    assert.equal(await flushInstant(sql, new Date("2026-11-15T18:00:00.000Z")), 0);
+    const pendingLog = await sql.query<{ status: string }>(`SELECT status FROM alert_log`);
+    assert.equal(pendingLog.rows.length, 1);
+    assert.equal(pendingLog.rows[0]?.status, "pending");
+    await enqueue(sql, "2026-11-14T17:00:00.000Z", randomUUID(), "jaideep", "Third waiting.");
+    assert.equal(await flushInstant(sql, new Date("2026-11-15T18:05:00.000Z")), 1);
+  } finally {
+    globalThis.fetch = original;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_EMAIL_DOMAIN;
+  }
+  const logs = await sql.query<{ status: string }>(`SELECT status FROM alert_log ORDER BY status`);
+  assert.deepEqual(logs.rows.map((row) => row.status), ["sent"]);
+  const outbox = await sql.query<{ status: string }>(`SELECT status FROM alert_outbox`);
+  assert.equal(outbox.rows.every((row) => row.status === "sent"), true);
 });
 
 test("the daily cap records a warning and does not send", async () => {

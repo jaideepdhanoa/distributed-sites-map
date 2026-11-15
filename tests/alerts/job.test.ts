@@ -32,6 +32,18 @@ test("flush and digest handlers reject a missing or junk bearer", async () => {
       method: "POST",
       headers: { authorization: `Bearer ${FIXTURE}` },
     })), true);
+    const sameLength = FIXTURE.replace(/^./, "x");
+    assert.equal(sameLength.length, FIXTURE.length);
+    assert.equal(await authorizeJob(new Request("http://localhost/api/alerts/flush", {
+      method: "POST",
+      headers: { authorization: `Bearer ${sameLength}` },
+    })), false);
+    assert.equal(await authorizeJob(new Request("http://localhost/api/alerts/digest", {
+      headers: { authorization: "Bearer short" },
+    })), false);
+    assert.equal(await authorizeJob(new Request("http://localhost/api/alerts/digest", {
+      headers: { authorization: `Bearer ${FIXTURE}-extra` },
+    })), false);
     assert.equal(await authorizeJob(new Request("http://localhost/api/alerts/digest")), false);
     delete process.env.CRON_SECRET;
     await expectUnauthorized(await flushPost(new Request("http://localhost/api/alerts/flush", {

@@ -196,7 +196,7 @@ Instant mail goes only to the person involved:
 - a reply on a thread they wrote or were mentioned in
 - a flag or an assignment to them
 
-A burst for one person is one email. The flush sends once the oldest unsent item is about a minute old, and it includes everything still waiting for that person. A later item does not hold an earlier one past that minute. The person who took the action is not mailed about it.
+A burst for one person is one email, titled `Distributed Sites · N updates`. Mail that has been waiting at least an hour is a catch-up, titled `Distributed Sites catch-up · N updates`. The daily digest subject is only used by the morning cron. The flush sends once the oldest unsent item is about a minute old, and it includes everything still waiting for that person. A later item does not hold an earlier one past that minute. The person who took the action is not mailed about it.
 
 The daily digest runs from a Vercel Cron at `0 15 * * *` UTC. That hour is 7:00 AM PST. On the Hobby plan the job is only promised to start sometime during that hour, and during daylight time it is 8:00 AM Pacific. The handler treats the America/Los_Angeles calendar day as the send day, and it sends at most one digest per person per day. It covers other notes and proposals on sites the person follows, plus the count waiting in their Review queue. Nothing is sent when there is nothing to report.
 

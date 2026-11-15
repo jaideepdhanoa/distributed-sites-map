@@ -88,7 +88,7 @@ async function claimLog(
 
 export async function deliverRows(
   sql: Sql,
-  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string; kind?: "instant" | "digest" },
+  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string; kind?: "instant" | "digest" | "updates" | "catchup" },
 ): Promise<string> {
   const now = input.now || new Date();
   const day = losAngelesParts(now).day;
@@ -100,6 +100,13 @@ export async function deliverRows(
     return "skipped";
   }
   const subject = input.subjectPrefix ? `${input.subjectPrefix} ${rendered.subject}`.replace(/\s+/g, " ").trim() : rendered.subject;
+  if (input.key.startsWith("batch:")) {
+    await sql.query(
+      `DELETE FROM alert_log
+       WHERE user_id = $1 AND status = 'pending' AND idempotency_key LIKE 'batch:' || $1 || ':%' AND idempotency_key <> $2`,
+      [input.userId, input.key],
+    );
+  }
   const claim = await claimLog(sql, {
     key: input.key,
     userId: input.userId,
@@ -148,6 +155,14 @@ export async function deliverRows(
 }
 
 const CLAIM_STALE_MS = 3 * 60 * 1000;
+/** Older than the five-minute backstop, so a burst is not labeled a catch-up. */
+const CATCH_UP_MS = 60 * 60 * 1000;
+
+function instantBatchKind(rows: OutboxRow[], now: Date): "instant" | "updates" | "catchup" {
+  if (now.getTime() - oldestStamp(rows) >= CATCH_UP_MS) return "catchup";
+  if (rows.length > 1) return "updates";
+  return "instant";
+}
 
 function claimToken(epochMs: number): string {
   return `claim:${String(Math.max(0, Math.floor(epochMs))).padStart(13, "0")}`;
@@ -239,7 +254,7 @@ export async function flushInstant(sql: Sql, now = new Date()): Promise<number> 
         rows,
         key: batchKey("batch", userId, ids),
         now,
-        kind: rows.length > 1 ? "digest" : "instant",
+        kind: instantBatchKind(rows, now),
       });
       if (status === "error") {
         await markRows(sql, ids, "pending", "");

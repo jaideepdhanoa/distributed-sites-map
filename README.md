@@ -41,10 +41,10 @@ Set these in Vercel. A change applies on the next deployment.
 | `AGENT_INBOX_SECRET` | for the agent feed | Bearer token for `GET /api/agent/inbox`, the ack route, and recommendation writes. Separate from `CRON_SECRET`. |
 | `AGENT_WRITE_TOKEN_INDIE` | for Indie writes | Bearer token for `POST /api/changes`. The actor stored on the event is `indie`. |
 | `AGENT_WRITE_TOKEN_MUSE` | for Muse writes | Bearer token for `POST /api/changes`. The actor stored on the event is `muse`. |
-| `CHANGES_API_ENABLED` | off on production | Set to `1` to allow `POST /api/changes` in production. Preview allows writes when this is unset. |
-| `READ_STAGES_FROM_DB` | off | When `1`, and writes are on, deal stages are read from `site_stages`. |
-| `READ_ACTIVITY_FROM_DB` | off | When `1`, and writes are on, activity lines are read from `activities`. |
-| `READ_COMMS_FROM_DB` | off | When `1`, and writes are on, the comms log is read from `comms_entries`. |
+| `CHANGES_API_ENABLED` | off on production | Set to `1` to allow `POST /api/changes` in production. Preview allows writes when this is unset. Also set the GitHub repository variable of the same name. |
+| `READ_STAGES_FROM_DB` | off | When `1`, and writes are on, deal stages are read from `site_stages`. Also set the GitHub repository variable of the same name. |
+| `READ_ACTIVITY_FROM_DB` | off | When `1`, and writes are on, activity lines are read from `activities`. Also set the GitHub repository variable of the same name. |
+| `READ_COMMS_FROM_DB` | off | When `1`, and writes are on, the comms log is read from `comms_entries`. Also set the GitHub repository variable of the same name. |
 | `XAI_API_KEY` | for Ask | Direct xAI key. Ask stays in the "isn't set up yet" state until this is set. Not an AI Gateway key. |
 | `ASK_MODEL` | no | Ask model. Defaults to `grok-4.7`. |
 | `ASK_DAILY_LIMIT` | no | Questions per person per Pacific day. Defaults to 40. Counted in Upstash Redis. |
@@ -118,6 +118,8 @@ New API writes accept the canonical stages `1 Desk screen`, `2 Financial screen`
 
 Each read flag is a cutover for that entity, and turning it off is the rollback. The flag takes effect only when `CHANGES_API_ENABLED` is on. While a read flag is active, Workbook sync stops importing that entity. If Neon is down, that read falls back to the snapshot.
 
+`CHANGES_API_ENABLED`, `READ_STAGES_FROM_DB`, `READ_ACTIVITY_FROM_DB`, and `READ_COMMS_FROM_DB` each have to be set in both places: Vercel Production, and a GitHub repository variable with the same name. The import step and the mirror step read the GitHub variables. They cannot see the Vercel values. A flag set only on Vercel leaves the import copying that entity. An unset GitHub `CHANGES_API_ENABLED` is passed as `0`, which is the production default.
+
 Workbook sync copies changed stage, activity, and comms rows into `events` only after a snapshot is published, and only on `main`. A hash match skips the publish and the import, and that copy does not open Neon. The actor is `workbook-sync` and the source is `workbook snapshot <id>`. A repeat of the same rows writes nothing. Legacy stage names (`Financial screen`, `Off-market target`, `Off market (no lead)`, `Sourced`) and `internal` comms are stored as written. Unknown values are listed in the diff and are not rewritten into a known value.
 
 **Shadow diff** is started by hand (`workflow_dispatch`). It reads production, compares the whole workbook with the shadow tables, and writes neither events nor the sheet. The summary and the `shadow-diff` artifact say `Clean: yes` or `Clean: no`, and `clean_by_entity` for stage, activity, and comms. The gate before a cutover is one clean run after a fresh import.
@@ -126,7 +128,7 @@ Current rows live in `site_stages`, `activities`, and `comms_entries`, each with
 
 Workbook mirror copies database rows back to the Sheet for each entity whose read flag is on. It writes only that entity's cells: the Stage column on Pipeline and Land Sites, the Activity tab fields, and the Comms Log fields. Rows match on Site ID, Event ID, or Comms ID. New `A-` and `CM-` rows use the headers on the tab. It does not write other columns. It does not write `PIPE-PHX-0006`, and it does not write row 10 on Pipeline or Land Sites. Activity and Comms Log can still use row 10. After a write it reads those cells back and fails if they differ. A `runs` row stores the counts. The import already skips an entity while its read flag is on, so the two jobs do not chase each other.
 
-The 15-minute Workbook sync runs the mirror on `main` when the repository variable `WORKBOOK_MIRROR_ENABLED` is `1`, including a run whose snapshot hash did not change. **Workbook mirror** can also be started by hand. Its dry run is the default: it prints the planned cells and does not write, and it does not need `WORKBOOK_MIRROR_ENABLED`. A real write still needs that variable set to `1`. A pull request, a preview deployment, and any ref other than `main` are refused. Set the GitHub variables `READ_STAGES_FROM_DB`, `READ_ACTIVITY_FROM_DB`, `READ_COMMS_FROM_DB`, and `CHANGES_API_ENABLED` to the same values as Vercel production. The Actions job cannot see the Vercel values. An unset `CHANGES_API_ENABLED` is passed as `0`, which is the production default, so a read flag left on by itself does not start the mirror or stop the import.
+The 15-minute Workbook sync runs the mirror on `main` when the repository variable `WORKBOOK_MIRROR_ENABLED` is `1`, including a run whose snapshot hash did not change. **Workbook mirror** can also be started by hand. Its dry run is the default: it prints the planned cells and does not write, and it does not need `WORKBOOK_MIRROR_ENABLED`. A real write still needs that variable set to `1`. A pull request, a preview deployment, and any ref other than `main` are refused. Those four cutover flags have to match Vercel Production, as repository variables. An unset `CHANGES_API_ENABLED` is passed as `0`, so a read flag left on by itself does not start the mirror or stop the import.
 
 The sync secret is `GOOGLE_SERVICE_ACCOUNT_JSON`. The sync asks Google only for `https://www.googleapis.com/auth/drive.readonly`, so that token cannot edit cells. The mirror asks the same secret for `https://www.googleapis.com/auth/spreadsheets`. Writes work when the Pipeline workbook is shared with that service account as Editor. A Viewer share fails with a Sheets write error and no new secret name. There is no second credential.
 

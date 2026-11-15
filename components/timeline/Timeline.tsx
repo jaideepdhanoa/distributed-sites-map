@@ -84,34 +84,45 @@ function commsLine(item: MergedLine, index: number) {
   );
 }
 
+const ACTIVITY_TIMEOUT_MS = 8000;
+
 export default function Timeline({ recordId, relatedId }: { recordId: string; relatedId?: string }) {
   const [timeline, setTimeline] = useState<TimelinePayload | null>(null);
   const [comms, setComms] = useState<CommsPayload | null>(null);
   const [showInternal, setShowInternal] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancel = false;
     setTimeline(null);
     setComms(null);
     setShowInternal(false);
+    setFailed(false);
     const query = new URLSearchParams({ id: recordId });
     if (relatedId) query.set("related", relatedId);
     async function load() {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), ACTIVITY_TIMEOUT_MS);
       try {
         const [timelineResponse, commsResponse] = await Promise.all([
-          fetch(`/api/data/timeline?${query}`),
-          fetch(`/api/data/comms?${query}`),
+          fetch(`/api/data/timeline?${query}`, { signal: controller.signal }),
+          fetch(`/api/data/comms?${query}`, { signal: controller.signal }),
         ]);
-        const nextTimeline = timelineResponse.ok ? ((await timelineResponse.json()) as TimelinePayload) : {};
-        const nextComms = commsResponse.ok ? ((await commsResponse.json()) as CommsPayload) : null;
+        if (!timelineResponse.ok || !commsResponse.ok) throw new Error("activity");
+        const nextTimeline = (await timelineResponse.json()) as TimelinePayload;
+        const nextComms = (await commsResponse.json()) as CommsPayload;
         if (cancel) return;
+        setFailed(false);
         setTimeline(nextTimeline);
         setComms(nextComms && Array.isArray(nextComms.rows) ? nextComms : null);
       } catch {
         if (!cancel) {
+          setFailed(true);
           setTimeline({});
           setComms(null);
         }
+      } finally {
+        window.clearTimeout(timer);
       }
     }
     void load();
@@ -140,7 +151,8 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     <section className="tl" data-testid="activity">
       <h3>Activity</h3>
       {timeline === null ? <p className="note">Loading activity.</p> : null}
-      {empty ? <p className="note">No activity on file yet.</p> : null}
+      {failed ? <p className="note" role="alert" data-testid="activity-error">Activity could not be loaded. Try this site again.</p> : null}
+      {empty && !failed ? <p className="note">No activity on file yet.</p> : null}
       {internalRows.length ? (
         <label className="tl-toggle">
           <input

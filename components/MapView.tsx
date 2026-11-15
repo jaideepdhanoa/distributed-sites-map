@@ -199,6 +199,7 @@ export default function MapView(props: Props) {
   measureDoneRef.current = measureDone;
   const [readout, setReadout] = useState("");
   const [mapGeneration, setMapGeneration] = useState(0);
+  const [mapFailed, setMapFailed] = useState("");
   const points = useRef<[number, number][]>([]);
   const propsRef = useRef(props);
   propsRef.current = props;
@@ -618,8 +619,21 @@ export default function MapView(props: Props) {
       }
     }
     if (cancelled || !node.current) return;
+    let canDraw = false;
+    try {
+      const canvas = document.createElement("canvas");
+      canDraw = Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    } catch {
+      canDraw = false;
+    }
+    if (!canDraw) {
+      setMapFailed("This browser cannot draw the map.");
+      return;
+    }
     const kept = keptCamera.current;
-    const map = new Map({
+    let map: Map;
+    try {
+      map = new Map({
       container: node.current,
       style,
       center: kept?.center ?? [props.focusLng, props.focusLat],
@@ -628,6 +642,11 @@ export default function MapView(props: Props) {
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       fadeDuration: 0,
     });
+    } catch {
+      setMapFailed("This browser cannot draw the map.");
+      return;
+    }
+    setMapFailed("");
     active = map;
     keptCamera.current = null;
     heldView.current = kept;
@@ -1622,6 +1641,7 @@ export default function MapView(props: Props) {
   return (
       <div className="stage-map" data-basemap={props.basemap || "satellite"}>
       <div ref={node} className="map" />
+      {mapFailed ? <p className="map-fail" role="alert" data-testid="map-error">{mapFailed}</p> : null}
       <div className="map-float">
         <div className="segmented map-basemap only-desktop" role="group" aria-label="Basemap" data-testid="basemap-desktop">
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>

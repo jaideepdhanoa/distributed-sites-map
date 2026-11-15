@@ -83,6 +83,7 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
   const [open, setOpen] = useState<number | null>(null);
   const [streetOpen, setStreetOpen] = useState(false);
   const [hero, setHero] = useState<"street" | "photos">(model.showGallery ? "photos" : embed ? "street" : "photos");
+  const [streetFailed, setStreetFailed] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const streetRef = useRef<HTMLDialogElement>(null);
@@ -98,6 +99,26 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
   useEffect(() => {
     if (!slides.length && embed) setHero("street");
   }, [slides.length, embed]);
+  useEffect(() => {
+    if (hero !== "street" || !embed) {
+      setStreetFailed(false);
+      return;
+    }
+    let opened = false;
+    const timer = window.setTimeout(() => {
+      if (!opened) setStreetFailed(true);
+    }, 8000);
+    const frame = document.querySelector<HTMLIFrameElement>("[data-testid='street-view-frame']");
+    const onLoad = () => {
+      opened = true;
+      setStreetFailed(false);
+    };
+    frame?.addEventListener("load", onLoad);
+    return () => {
+      window.clearTimeout(timer);
+      frame?.removeEventListener("load", onLoad);
+    };
+  }, [hero, embed]);
   useEffect(() => {
     const dialog = streetRef.current;
     if (!dialog) return;
@@ -164,6 +185,12 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
             />
+          ) : null}
+          {streetFailed && hero === "street" ? (
+            <p className="map-fail" role="alert" data-testid="street-view-error">
+              Street View did not open.{" "}
+              <a className="text-link" href={model.frontageUrl} target="_blank" rel="noopener noreferrer">Open Street View ↗</a>
+            </p>
           ) : null}
           {hero === "photos" && slides[0] ? (
             <button type="button" className="hero-still" onClick={() => openAt(slides[0].key)}>

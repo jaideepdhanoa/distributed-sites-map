@@ -1656,15 +1656,6 @@ export default function Explorer() {
               </button>
             ))}
           </div>
-          <label className="city-pick only-mobile">
-            <span className="sr">City</span>
-            <select aria-label="City" value={allCities ? "all" : city} onChange={(event) => jump(event.target.value)} className="secondary">
-              <option value="all">All markets</option>
-              <option value="PHX">Phoenix</option>
-              <option value="LAS">Las Vegas</option>
-              <option value="MIA">Miami</option>
-            </select>
-          </label>
           <div className="search-wrap only-desktop">
             <input className="search" aria-label="Search" placeholder="Search name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
             <kbd aria-hidden="true">/</kbd>
@@ -1722,6 +1713,15 @@ export default function Explorer() {
           </button>
         </div>
         <div className="phone-view-row only-mobile">
+          <label className="city-pick">
+            <span className="sr">City</span>
+            <select aria-label="City" value={allCities ? "all" : city} onChange={(event) => jump(event.target.value)} className="secondary">
+              <option value="all">All markets</option>
+              <option value="PHX">Phoenix</option>
+              <option value="LAS">Las Vegas</option>
+              <option value="MIA">Miami</option>
+            </select>
+          </label>
           <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>

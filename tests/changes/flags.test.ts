@@ -8,7 +8,7 @@ import { changesApiEnabled, importEntityFromWorkbook, readEntityFromDb } from ".
 import { diffDatabase } from "../../lib/changes/diff";
 import { memorySql } from "../helpers/sql";
 
-const KEYS = ["VERCEL_ENV", "CHANGES_API_ENABLED", "READ_STAGES_FROM_DB", "READ_ACTIVITY_FROM_DB", "READ_COMMS_FROM_DB", "AGENT_WRITE_TOKEN_INDIE"] as const;
+const KEYS = ["VERCEL_ENV", "CHANGES_API_ENABLED", "READ_STAGES_FROM_DB", "READ_ACTIVITY_FROM_DB", "READ_COMMS_FROM_DB", "READ_SITES_FROM_DB", "AGENT_WRITE_TOKEN_INDIE"] as const;
 
 test("read flags cut over only when writes are on, and invalid workbook values stay unchanged", async () => {
   const saved = new Map(KEYS.map((key) => [key, process.env[key]]));

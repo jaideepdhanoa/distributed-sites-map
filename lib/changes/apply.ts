@@ -1,13 +1,23 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
-import type { ActivityPayload, Actor, CommsPayload, ParsedChange, StagePayload } from "./schema";
+import {
+  SITE_FIELDS,
+  SITE_NUMERIC_FIELDS,
+  emptySiteFields,
+  photosFromCanonical,
+  photoCanonical,
+  type PhotoRef,
+  type SiteField,
+} from "./site";
+import type { ActivityPayload, Actor, CommsPayload, ParsedChange, SitePayload, StagePayload } from "./schema";
 import { validateBatch } from "./schema";
+import type { EntityType } from "./vocab";
 
 export type { Actor } from "./schema";
 
 export type ChangeResult = {
-  entity_type: "stage" | "activity" | "comms";
+  entity_type: EntityType;
   entity_id: string;
   site_id: string;
   event_id: string;
@@ -23,7 +33,7 @@ export type ApplyResult = {
 };
 
 export type VersionConflict = {
-  entity_type: "stage" | "activity" | "comms";
+  entity_type: EntityType;
   site_id: string;
   entity_id: string;
   expected_version: number;
@@ -96,9 +106,10 @@ function formatId(kind: "activity" | "comms" | "event", value: number): string {
 }
 
 async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
-  if (change.entity_type === "stage") {
+  if (change.entity_type === "stage" || change.entity_type === "site") {
+    const table = change.entity_type === "stage" ? "site_stages" : "sites";
     const result = await sql.query<{ version: number | string }>(
-      `SELECT version FROM site_stages WHERE site_id = $1`,
+      `SELECT version FROM ${table} WHERE site_id = $1`,
       [change.site_id],
     );
     return result.rows[0] ? Number(result.rows[0].version) : 0;
@@ -114,7 +125,7 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
 async function insertEvent(
   sql: Sql,
   input: {
-    entityType: "stage" | "activity" | "comms";
+    entityType: EntityType;
     entityId: string;
     siteId: string;
     payload: unknown;
@@ -265,6 +276,154 @@ async function writeComms(
   return stored;
 }
 
+type SiteDb = Record<SiteField, string> & { photo_refs: unknown; fact_sources: unknown; version: number | string };
+
+const SITE_COLUMNS = SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ");
+
+async function readSite(sql: Sql, siteId: string): Promise<SiteDb | null> {
+  const result = await sql.query<SiteDb>(
+    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, version FROM sites WHERE site_id = $1`,
+    [siteId],
+  );
+  return result.rows[0] || null;
+}
+
+function storedPhotos(value: unknown): PhotoRef[] {
+  if (typeof value === "string") return photosFromCanonical(value);
+  return photosFromCanonical(JSON.stringify(value ?? []));
+}
+
+async function writeSite(
+  sql: Sql,
+  change: ParsedChange,
+  actorId: string,
+  version: number,
+  mode: "api" | "workbook",
+): Promise<Record<string, unknown>> {
+  const payload = change.payload as SitePayload;
+  const previous = await readSite(sql, change.site_id);
+  const priorFields = emptySiteFields();
+  if (previous) {
+    for (const field of SITE_FIELDS) {
+      if (field === "photo_refs") priorFields.photo_refs = photoCanonical(storedPhotos(previous.photo_refs));
+      else priorFields[field] = textOf(previous[field]);
+    }
+  }
+  const stored = mode === "workbook" ? emptySiteFields() : { ...priorFields };
+  const incoming = payload.fields || {};
+  for (const field of SITE_FIELDS) {
+    if (field === "photo_refs") {
+      if (mode === "workbook") stored.photo_refs = incoming.photo_refs || "[]";
+      continue;
+    }
+    if (incoming[field] !== undefined) stored[field] = incoming[field] || "";
+    else if (mode === "workbook") stored[field] = "";
+  }
+  const priorSources = asObject(previous?.fact_sources);
+  const sources: Record<string, string> = {};
+  for (const [key, value] of Object.entries(priorSources)) sources[key] = textOf(value);
+  if (mode === "workbook") {
+    for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points"] as const) {
+      if (stored[field]) sources[field] = change.source;
+      else delete sources[field];
+    }
+  } else {
+    for (const field of SITE_NUMERIC_FIELDS) {
+      if (payload.sources?.[field]) sources[field] = payload.sources[field];
+    }
+  }
+  const photos = storedPhotos(stored.photo_refs);
+  await sql.query(
+    `INSERT INTO sites (
+       site_id, name, address, market, lat, lng, category, broker, firm, listing_url,
+       asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
+       service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
+       notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
+       universe_id, listing_status, score, location_points, fact_sources, version, updated_by
+     ) VALUES (
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+       $11, $12, $13, $14, $15, $16, $17,
+       $18, $19, $20, $21,
+       $22, $23::jsonb, $24, $25, $26, $27, $28,
+       $29, $30, $31, $32, $33::jsonb, $34, $35
+     )
+     ON CONFLICT (site_id) DO UPDATE SET
+       name = EXCLUDED.name,
+       address = EXCLUDED.address,
+       market = EXCLUDED.market,
+       lat = EXCLUDED.lat,
+       lng = EXCLUDED.lng,
+       category = EXCLUDED.category,
+       broker = EXCLUDED.broker,
+       firm = EXCLUDED.firm,
+       listing_url = EXCLUDED.listing_url,
+       asking_price = EXCLUDED.asking_price,
+       acreage = EXCLUDED.acreage,
+       apn = EXCLUDED.apn,
+       land_value = EXCLUDED.land_value,
+       improvement_value = EXCLUDED.improvement_value,
+       county_value = EXCLUDED.county_value,
+       county_value_basis = EXCLUDED.county_value_basis,
+       service_area_class = EXCLUDED.service_area_class,
+       service_area_distance_mi = EXCLUDED.service_area_distance_mi,
+       service_area_polygon = EXCLUDED.service_area_polygon,
+       miles_to_depot = EXCLUDED.miles_to_depot,
+       notes = EXCLUDED.notes,
+       photo_refs = EXCLUDED.photo_refs,
+       photo_status = EXCLUDED.photo_status,
+       photo_diligence_count = EXCLUDED.photo_diligence_count,
+       photo_listing_count = EXCLUDED.photo_listing_count,
+       photos_checked = EXCLUDED.photos_checked,
+       photo_notes = EXCLUDED.photo_notes,
+       universe_id = EXCLUDED.universe_id,
+       listing_status = EXCLUDED.listing_status,
+       score = EXCLUDED.score,
+       location_points = EXCLUDED.location_points,
+       fact_sources = EXCLUDED.fact_sources,
+       version = EXCLUDED.version,
+       updated_at = clock_timestamp(),
+       updated_by = EXCLUDED.updated_by`,
+    [
+      change.site_id,
+      stored.name,
+      stored.address,
+      stored.market,
+      stored.lat,
+      stored.lng,
+      stored.category,
+      stored.broker,
+      stored.firm,
+      stored.listing_url,
+      stored.asking_price,
+      stored.acreage,
+      stored.apn,
+      stored.land_value,
+      stored.improvement_value,
+      stored.county_value,
+      stored.county_value_basis,
+      stored.service_area_class,
+      stored.service_area_distance_mi,
+      stored.service_area_polygon,
+      stored.miles_to_depot,
+      stored.notes,
+      JSON.stringify(photos),
+      stored.photo_status,
+      stored.photo_diligence_count,
+      stored.photo_listing_count,
+      stored.photos_checked,
+      stored.photo_notes,
+      stored.universe_id,
+      stored.listing_status,
+      stored.score,
+      stored.location_points,
+      JSON.stringify(sources),
+      version,
+      actorId,
+    ],
+  );
+  return { ...stored, photo_refs: photoCanonical(photos), sources };
+}
+
 function conflict(change: ParsedChange, entityId: string, actual: number): VersionConflictError {
   return new VersionConflictError([
     {
@@ -285,28 +444,28 @@ async function applyOne(
   runId: string,
   mode: "api" | "workbook",
 ): Promise<ChangeResult> {
-  const lock =
-    change.entity_type === "stage"
-      ? `stage:${change.site_id}`
-      : `${change.entity_type}:${change.entity_id || "new"}`;
+  const siteKeyed = change.entity_type === "stage" || change.entity_type === "site";
+  const lock = siteKeyed ? `${change.entity_type}:${change.site_id}` : `${change.entity_type}:${change.entity_id || "new"}`;
   await lockKey(sql, lock);
-  const entityId =
-    change.entity_type === "stage"
-      ? change.site_id
-      : change.preserve_id && change.entity_id
-        ? change.entity_id
-        : change.expected_version === 0
-          ? formatId(change.entity_type, await mint(sql, change.entity_type))
-          : change.entity_id || "";
+  const mintedKind = change.entity_type === "comms" ? "comms" : "activity";
+  const entityId = siteKeyed
+    ? change.site_id
+    : change.preserve_id && change.entity_id
+      ? change.entity_id
+      : change.expected_version === 0
+        ? formatId(mintedKind, await mint(sql, mintedKind))
+        : change.entity_id || "";
   const actual = await readVersion(sql, { ...change, entity_id: entityId });
   if (actual !== change.expected_version) throw conflict(change, entityId, actual);
   const version = change.expected_version + 1;
   const payload =
     change.entity_type === "stage"
       ? await writeStage(sql, change, actor.id, version, mode)
-      : change.entity_type === "activity"
-        ? await writeActivity(sql, change, entityId, actor.id, version)
-        : await writeComms(sql, change, entityId, actor.id, version);
+      : change.entity_type === "site"
+        ? await writeSite(sql, change, actor.id, version, mode)
+        : change.entity_type === "activity"
+          ? await writeActivity(sql, change, entityId, actor.id, version)
+          : await writeComms(sql, change, entityId, actor.id, version);
   const eventId = await insertEvent(sql, {
     entityType: change.entity_type,
     entityId,

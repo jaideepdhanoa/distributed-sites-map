@@ -62,7 +62,21 @@ export const COMMS_DIRECTIONS = ["in", "out"] as const;
 
 export type CommsDirection = (typeof COMMS_DIRECTIONS)[number];
 
-export const ENTITY_TYPES = ["stage", "activity", "comms"] as const;
+export const ENTITY_TYPES = ["stage", "activity", "comms", "site"] as const;
+
+/** Categories the map already ships. The workbook Segment cell is freer text and is not this list. */
+export const BUSINESS_TYPES = [
+  "Car wash",
+  "Auto repair",
+  "Tire and lube",
+  "Gas station",
+  "Yard or lot",
+  "Storage",
+  "Land",
+  "Other",
+] as const;
+
+export type BusinessType = (typeof BUSINESS_TYPES)[number];
 
 export type EntityType = (typeof ENTITY_TYPES)[number];
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
+import { SITE_FIELDS, SITE_MIRROR_FIELDS, mirrorClassLabel } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -141,6 +142,7 @@ function planTable(input: {
   append: boolean;
   protectRow: boolean;
   idPattern?: RegExp;
+  skipBlank?: boolean;
 }): MirrorPlan {
   const idAt = headerIndex(input.table.headers, input.idHeaders);
   if (idAt < 0) {
@@ -183,6 +185,7 @@ function planTable(input: {
       for (const column of columns) {
         if (column.index < 0) continue;
         const after = cellText(record.values[column.key]);
+        if (input.skipBlank && column.key !== "id" && !after) continue;
         changes.push({
           sheet: input.table.title,
           row,
@@ -205,6 +208,7 @@ function planTable(input: {
     for (const column of columns) {
       if (column.index < 0 || column.key === "id") continue;
       const after = cellText(record.values[column.key]);
+      if (input.skipBlank && !after) continue;
       const before = cellText(existing.cells[column.index]);
       if (before === after) continue;
       changes.push({
@@ -239,6 +243,44 @@ export function planStageMirror(tables: SheetTable[], stages: { site_id: string;
         .map((row) => ({ id: row.site_id, values: { id: row.site_id, stage: row.stage } })),
       append: false,
       protectRow: true,
+    });
+    for (const row of table.rows) {
+      const idAt = headerIndex(table.headers, ["site id"]);
+      const id = cellText(row.cells[idAt]);
+      if (id) claimed.add(id);
+    }
+    combined.changes.push(...plan.changes);
+    combined.skippedProtected += plan.skippedProtected;
+    combined.unmatched.push(...plan.unmatched.filter((id) => !claimed.has(id)));
+  }
+  const seen = new Set<string>();
+  combined.unmatched = combined.unmatched.filter((id) => {
+    if (claimed.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  return combined;
+}
+
+export function planSiteMirror(
+  tables: SheetTable[],
+  sites: { site_id: string; values: Record<string, string> }[],
+): MirrorPlan {
+  const combined: MirrorPlan = { changes: [], skippedProtected: 0, unmatched: [], appended: 0 };
+  const claimed = new Set<string>();
+  const writable = sites.filter((row) => row.site_id !== PROTECTED_SITE_ID);
+  if (writable.length !== sites.length) combined.skippedProtected += 1;
+  for (const table of tables) {
+    const plan = planTable({
+      table,
+      idHeaders: ["site id"],
+      fields: SITE_MIRROR_FIELDS,
+      records: writable
+        .filter((row) => !claimed.has(row.site_id))
+        .map((row) => ({ id: row.site_id, values: { ...row.values, id: row.site_id } })),
+      append: false,
+      protectRow: true,
+      skipBlank: true,
     });
     for (const row of table.rows) {
       const idAt = headerIndex(table.headers, ["site id"]);
@@ -321,7 +363,7 @@ export function assertReadBack(changes: CellChange[], actual: { sheet: string; r
 }
 
 export function entitiesToMirror(): ShadowEntity[] {
-  return (["stage", "activity", "comms"] as const).filter((entity) => readEntityFromDb(entity));
+  return (["stage", "activity", "comms", "site"] as const).filter((entity) => readEntityFromDb(entity));
 }
 
 export function formatPlan(changes: CellChange[]): string {
@@ -355,10 +397,14 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   stages: { site_id: string; stage: string }[];
   activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string }[];
   comms: { entity_id: string; values: Record<string, string> }[];
+  sites: { site_id: string; values: Record<string, string> }[];
 }> {
   const stages = await sql.query<StageDb>(`SELECT site_id, stage FROM site_stages ORDER BY site_id`);
   const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload FROM activities ORDER BY entity_id`);
   const comms = await sql.query<CommsDb>(`SELECT entity_id, payload FROM comms_entries ORDER BY entity_id`);
+  const sites = await sql.query<Record<string, unknown>>(
+    `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")} FROM sites ORDER BY site_id`,
+  );
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
     activities: activities.rows.map((row) => {
@@ -377,6 +423,15 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       const values: Record<string, string> = {};
       for (const field of COMMS_FIELDS) values[field] = text(payload[field]);
       return { entity_id: text(row.entity_id), values };
+    }),
+    sites: sites.rows.map((row) => {
+      const values: Record<string, string> = {};
+      for (const field of SITE_FIELDS) {
+        if (field === "photo_refs") continue;
+        const raw = text(row[field]);
+        values[field] = field === "service_area_class" ? mirrorClassLabel(raw) : raw;
+      }
+      return { site_id: text(row.site_id), values };
     }),
   };
 }

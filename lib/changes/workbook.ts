@@ -1,3 +1,4 @@
+import { sitesFromFiles, siteIssues, type SiteRow } from "./site";
 import {
   ACTIVITY_TYPES,
   COMMS_FIELDS,
@@ -37,6 +38,8 @@ export type WorkbookSlice = {
   stages: StageRow[];
   activities: ActivityRow[];
   comms: CommsRow[];
+  /** Pipeline and land rows. Omitted slices are treated as none. */
+  sites?: SiteRow[];
 };
 
 function text(value: unknown): string {
@@ -59,7 +62,7 @@ function firstSite(value: string): string {
   return token;
 }
 
-export function workbookFromFiles(files: { deals: string; timeline: string; comms: string }): WorkbookSlice {
+export function workbookFromFiles(files: { deals: string; timeline: string; comms: string; pricing?: string }): WorkbookSlice {
   const deals = JSON.parse(files.deals) as { features?: { properties?: Record<string, unknown> }[] };
   const stages = dedupe(
     (deals.features || []).map((feature) => {
@@ -118,7 +121,7 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
     (row) => row.entity_id,
   );
 
-  return { stages, activities, comms };
+  return { stages, activities, comms, sites: sitesFromFiles(files.deals, files.pricing || "") };
 }
 
 export type RowIssue = { id: string; field: string; value: string };
@@ -128,10 +131,11 @@ function listed(value: string, allowed: readonly string[]): boolean {
 }
 
 /** Invalid workbook cells. The values are returned unchanged and are not rewritten. */
-export function workbookIssues(slice: WorkbookSlice): { stage: RowIssue[]; activity: RowIssue[]; comms: RowIssue[] } {
+export function workbookIssues(slice: WorkbookSlice): { stage: RowIssue[]; activity: RowIssue[]; comms: RowIssue[]; site: RowIssue[] } {
   const stage: RowIssue[] = [];
   const activity: RowIssue[] = [];
   const comms: RowIssue[] = [];
+  const site: RowIssue[] = siteIssues(slice.sites || []);
   for (const row of slice.stages) {
     if (!listed(row.stage, STAGES)) stage.push({ id: row.site_id, field: "stage", value: row.stage });
     if (!listed(row.market, MARKETS)) stage.push({ id: row.site_id, field: "market", value: row.market });
@@ -151,7 +155,7 @@ export function workbookIssues(slice: WorkbookSlice): { stage: RowIssue[]; activ
     if (!commsSiteAllowed(row.site_id)) comms.push({ id: row.entity_id, field: "site_id", value: row.site_id });
     if (!/^CM-\d{4,}$/.test(row.entity_id)) comms.push({ id: row.entity_id, field: "entity_id", value: row.entity_id });
   }
-  return { stage, activity, comms };
+  return { stage, activity, comms, site };
 }
 
 export function legacyStageIds(slice: WorkbookSlice): string[] {

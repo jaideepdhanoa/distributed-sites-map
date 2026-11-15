@@ -46,13 +46,13 @@ test("a backfill is idempotent and the diff is clean until a write drifts", { ti
 
   const report = await diffDatabase(sql, slice, "files");
   assert.equal(report.clean, true);
-  assert.deepEqual(report.clean_by_entity, { stage: true, activity: true, comms: true });
+  assert.deepEqual(report.clean_by_entity, { stage: true, activity: true, comms: true, site: true });
   assert.equal(report.entities.stage.changed.length, 0);
   assert.equal(report.entities.stage.missing.length, 0);
   assert.deepEqual(report.legacy_stages, ["LAND-PHX-0003"]);
   assert.equal(report.invalid.comms.some((issue) => issue.value === "L-441"), false);
   assert.match(renderReport(report), /one clean on-demand diff/);
-  assert.match(renderReport(report), /clean_by_entity: stage yes, activity yes, comms yes/);
+  assert.match(renderReport(report), /clean_by_entity: stage yes, activity yes, comms yes, site yes/);
   const legacy = slice.stages.find((row) => row.stage === "Financial screen");
   assert.ok(legacy);
   const stored = await readDatabaseSlice(sql);

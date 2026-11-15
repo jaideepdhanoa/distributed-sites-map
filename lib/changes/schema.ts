@@ -4,7 +4,14 @@ import { canDecide, canWriteContent } from "@/lib/actions/roles";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 import {
+  SITE_NUMERIC_FIELDS,
+  canonicalFact,
+  type SiteField,
+  type SiteNumericField,
+} from "./site";
+import {
   ACTIVITY_TYPES,
+  BUSINESS_TYPES,
   CANONICAL_STAGES,
   COMMS_DIRECTIONS,
   MARKETS,
@@ -54,6 +61,11 @@ export type CommsPayload = {
   message_id?: string;
 };
 
+export type SitePayload = {
+  fields: Partial<Record<SiteField, string>>;
+  sources?: Partial<Record<SiteNumericField, string>>;
+};
+
 export type ParsedChange = {
   entity_type: EntityType;
   site_id: string;
@@ -62,7 +74,7 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload;
 };
 
 const stagePayload = z
@@ -95,9 +107,78 @@ const commsPayload = z
   })
   .strict();
 
+const sitePayload = z
+  .object({
+    name: z.string().trim().max(160).optional(),
+    address: z.string().trim().max(180).optional(),
+    market: z.enum(MARKETS).optional(),
+    lat: z.number().finite().nullable().optional(),
+    lng: z.number().finite().nullable().optional(),
+    category: z.enum(BUSINESS_TYPES).optional(),
+    broker: z.string().trim().max(120).optional(),
+    firm: z.string().trim().max(160).optional(),
+    listing_url: z.string().trim().max(400).optional(),
+    asking_price: z.number().finite().nullable().optional(),
+    acreage: z.number().finite().nullable().optional(),
+    apn: z.string().trim().max(80).optional(),
+    land_value: z.number().finite().nullable().optional(),
+    improvement_value: z.number().finite().nullable().optional(),
+    county_value: z.number().finite().nullable().optional(),
+    county_value_basis: z.string().trim().max(300).optional(),
+    service_area_class: z.enum(SERVICE_AREA_CLASSES).optional(),
+    service_area_distance_mi: z.number().finite().nullable().optional(),
+    service_area_polygon: z.string().trim().max(80).optional(),
+    miles_to_depot: z.number().finite().nullable().optional(),
+    notes: z.string().trim().max(400).optional(),
+    universe_id: z.string().trim().max(40).optional(),
+    listing_status: z.string().trim().max(40).optional(),
+    sources: z.record(z.string(), z.string().trim().min(1).max(200)).optional(),
+  })
+  .strict();
+
+const GUARD_KEYS = new Set([
+  "folder",
+  "folder_url",
+  "photos",
+  "photo_refs",
+  "photo_notes",
+  "photo_status",
+  "photos_checked",
+  "photo_diligence_count",
+  "photo_listing_count",
+  "street_view_url",
+  "land_evidence",
+  "land_notes",
+  "evidence",
+  "site_capacity",
+  "checked_live",
+  "verification",
+  "stated_revenue",
+  "stated_cash_flow",
+  "cash_multiple",
+  "revenue_multiple",
+  "earnings_multiple",
+  "business_multiple",
+  "business_value",
+  "package_status",
+  "package_line",
+  "package_href",
+  "claim_word",
+  "figures_source",
+  "figures_basis",
+  "figures_status",
+  "financials_status",
+]);
+
+function guardKey(key: string): boolean {
+  const norm = key.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (norm.startsWith("cap_") || norm.startsWith("nda_") || norm.startsWith("stated_") || norm.startsWith("pwr_")) return true;
+  return GUARD_KEYS.has(norm);
+}
+
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site"]),
     site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -118,7 +199,9 @@ function issueMessage(path: string, code: string): string {
   if (path.endsWith("service_area_class")) {
     return `Service area class must be one of ${SERVICE_AREA_CLASSES.join(", ")}.`;
   }
+  if (path.includes("sources")) return "Every numeric fact needs a source.";
   if (path.endsWith("source")) return "Every change needs a source.";
+  if (path.endsWith("category")) return "Category must be one of the map business types.";
   if (path.endsWith("stage")) return "That stage is not a known stage.";
   if (path.endsWith("direction")) return "Comms direction must be in or out.";
   if (path.endsWith("site_id")) return "That site id is not valid.";
@@ -163,10 +246,11 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
   }
 
   const changes: ParsedChange[] = parsed.data.changes.map((row, index) => {
-    if (row.entity_id && (row.expected_version === 0 || row.entity_type === "stage")) {
+    const siteKeyed = row.entity_type === "stage" || row.entity_type === "site";
+    if (row.entity_id && (row.expected_version === 0 || siteKeyed)) {
       throw new InputError(`Change ${index + 1}: The server assigns ids.`);
     }
-    if (row.expected_version > 0 && row.entity_type !== "stage" && !row.entity_id) {
+    if (row.expected_version > 0 && !siteKeyed && !row.entity_id) {
       throw new InputError(`Change ${index + 1}: That update needs the record id.`);
     }
     if (row.entity_id && row.entity_type === "activity" && !/^A-\d{4,}$/.test(row.entity_id)) {
@@ -178,6 +262,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     const siteAllowed = row.entity_type === "comms" ? commsSiteAllowed(row.site_id) : SITE_ID.test(row.site_id);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
+    if (row.entity_type === "site") {
+      return { ...row, payload: parseSite(actor, index, row.expected_version, row.payload) };
+    }
     if (row.entity_type === "stage") {
       const parsedPayload = stagePayload.safeParse(row.payload);
       if (!parsedPayload.success) {
@@ -238,4 +325,77 @@ function assertContentActor(actor: Actor, index: number): void {
   if (!actor.role || !canWriteContent(actor.role)) {
     throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
   }
+}
+
+function parseSite(actor: Actor, index: number, expectedVersion: number, payload: unknown): SitePayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new InputError(`Change ${index + 1}: That change is not valid.`);
+  }
+  const raw = payload as Record<string, unknown>;
+  if ("stage" in raw || "Stage" in raw) {
+    throw new InputError(`Change ${index + 1}: Stage is not written on a site.`);
+  }
+  const guarded = Object.keys(raw).filter(guardKey);
+  if (guarded.length && expectedVersion === 0) {
+    throw new InputError(
+      `Change ${index + 1}: A new site does not copy Folder, photos, land evidence, typed power, check statuses, or financial claims.`,
+    );
+  }
+  if (guarded.length) throw new InputError(`Change ${index + 1}: That field is not accepted.`);
+  const parsedPayload = sitePayload.safeParse(payload);
+  if (!parsedPayload.success) {
+    const issue = parsedPayload.error.issues[0];
+    fail(index, issue.path.map(String).join("."), issue.code);
+  }
+  const data = parsedPayload.data;
+  const fields: Partial<Record<SiteField, string>> = {};
+  const put = (key: SiteField, value: string | number | null | undefined) => {
+    if (value === undefined) return;
+    fields[key] = value == null ? "" : canonicalFact(value);
+  };
+  put("name", data.name);
+  put("address", data.address);
+  put("market", data.market);
+  put("lat", data.lat);
+  put("lng", data.lng);
+  put("category", data.category);
+  put("broker", data.broker);
+  put("firm", data.firm);
+  put("listing_url", data.listing_url);
+  put("asking_price", data.asking_price);
+  put("acreage", data.acreage);
+  put("apn", data.apn);
+  put("land_value", data.land_value);
+  put("improvement_value", data.improvement_value);
+  put("county_value", data.county_value);
+  put("county_value_basis", data.county_value_basis);
+  put("service_area_class", data.service_area_class);
+  put("service_area_distance_mi", data.service_area_distance_mi);
+  put("service_area_polygon", data.service_area_polygon);
+  put("miles_to_depot", data.miles_to_depot);
+  put("notes", data.notes);
+  put("universe_id", data.universe_id);
+  put("listing_status", data.listing_status);
+  if (!Object.keys(fields).length) throw new InputError(`Change ${index + 1}: Add a field to change.`);
+  const sources: Partial<Record<SiteNumericField, string>> = {};
+  for (const field of SITE_NUMERIC_FIELDS) {
+    if (fields[field] === undefined) continue;
+    const source = data.sources?.[field]?.trim() || "";
+    if (!source) throw new InputError(`Change ${index + 1}: Every numeric fact needs a source.`);
+    cleanText(source);
+    sources[field] = source;
+  }
+  cleanText(fields.name);
+  cleanText(fields.address);
+  cleanText(fields.broker);
+  cleanText(fields.firm);
+  cleanText(fields.notes);
+  cleanText(fields.apn);
+  cleanText(fields.county_value_basis);
+  cleanText(fields.service_area_polygon);
+  cleanText(fields.listing_url);
+  cleanText(fields.universe_id);
+  cleanText(fields.listing_status);
+  assertContentActor(actor, index);
+  return { fields, sources };
 }

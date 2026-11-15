@@ -2,6 +2,7 @@ import { appendFileSync } from "node:fs";
 import { createSign } from "node:crypto";
 import { withConnectionString } from "../lib/actions/db";
 import { assertProductionDiff } from "../lib/changes/guard";
+import { SITE_MIRROR_FIELDS } from "../lib/changes/site";
 import {
   ACTIVITY_HEADER_ROW,
   ACTIVITY_SHEET,
@@ -19,6 +20,7 @@ import {
   mirrorDryRun,
   planActivityMirror,
   planCommsMirror,
+  planSiteMirror,
   planStageMirror,
   recordMirrorRun,
   stageTabs,
@@ -200,6 +202,18 @@ async function main(): Promise<void> {
     appended += plan.appended;
     unmatched += plan.unmatched.length;
   }
+  if (selected.includes("site")) {
+    const tables = [];
+    const headers = SITE_MIRROR_FIELDS.map((field) => field.headers);
+    for (const tab of stageTabs()) {
+      tables.push(await loadTable(token, tab.title, tab.headerRow, headers));
+    }
+    const plan = planSiteMirror(tables, rows.sites);
+    changes.push(...plan.changes);
+    skippedProtected += plan.skippedProtected;
+    appended += plan.appended;
+    unmatched += plan.unmatched.length;
+  }
   if (selected.includes("activity")) {
     const table = await loadTable(token, ACTIVITY_SHEET, ACTIVITY_HEADER_ROW, [
       ["event id"],
@@ -244,7 +258,8 @@ async function main(): Promise<void> {
   assertPlannedWrites(changes);
   const counts = {
     cells: changes.length,
-    stage_cells: changes.filter((change) => change.sheet === "Pipeline" || change.sheet === "Land Sites").length,
+    stage_cells: changes.filter((change) => change.header.trim().toLowerCase() === "stage").length,
+    site_cells: changes.filter((change) => change.header.trim().toLowerCase() !== "stage" && (change.sheet === "Pipeline" || change.sheet === "Land Sites")).length,
     activity_cells: changes.filter((change) => change.sheet === ACTIVITY_SHEET).length,
     comms_cells: changes.filter((change) => change.sheet === COMMS_SHEET).length,
     appended,

@@ -7,6 +7,7 @@ const FLAGS = [
   ["READ_STAGES_FROM_DB", "vars.READ_STAGES_FROM_DB"],
   ["READ_ACTIVITY_FROM_DB", "vars.READ_ACTIVITY_FROM_DB"],
   ["READ_COMMS_FROM_DB", "vars.READ_COMMS_FROM_DB"],
+  ["READ_SITES_FROM_DB", "vars.READ_SITES_FROM_DB"],
   ["CHANGES_API_ENABLED", "vars.CHANGES_API_ENABLED"],
 ] as const;
 
@@ -27,7 +28,7 @@ function stepBlocks(yaml: string): string[] {
   return blocks.map((block) => block.join("\n"));
 }
 
-test("import and mirror steps receive the four cutover flags", () => {
+test("import and mirror steps receive the cutover flags", () => {
   const root = join(process.cwd(), ".github", "workflows");
   const hits: { file: string; script: string }[] = [];
   for (const file of readdirSync(root)) {

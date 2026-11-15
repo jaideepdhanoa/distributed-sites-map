@@ -13,8 +13,9 @@ and it still passes the gate.
 
 The workbook score and the Location points cell are copied through. They are
 not recomputed from this class. On the current 100-point scale, location is
-40 points: Inside 40, Near 0-5 20, Near 5-10 10. That scale is recorded here
-so a later sync can see the rule. This module does not apply it.
+10 points (R-099(d)): Inside 10, Near 0-5 5, Near 5-10 2.5, Outside 0. That
+scale is recorded here so a later sync can see the rule. This module does not
+apply it.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ SERVICE_AREA_CLASSES = (
 PASSING_CLASSES = ("inside", "near_0_5", "near_5_10", "edge_legacy")
 EXCLUDED_CLASSES = ("outside", "unknown")
 # Documented point values. Not used to rewrite Score (of 100) or Location points.
-LOCATION_POINTS = {"inside": 40, "near_0_5": 20, "near_5_10": 10}
+LOCATION_POINTS = {"inside": 10, "near_0_5": 5, "near_5_10": 2.5, "outside": 0}
 EDGE_LABEL = "edge (not re-measured)"
 
 CLASS_HEADERS = ("Inside the service area", "Service area")

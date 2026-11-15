@@ -74,7 +74,7 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
               <button type="button" className={prefs.followed === "off" ? "chip on" : "chip"} onClick={() => void choose("followed", "off")}>Off</button>
             </span>
           </div>
-          <p className="note">Instant mail is batched for about five minutes. The digest is 7:00 AM Pacific, and it is skipped when there is nothing to report.</p>
+          <p className="note">Instant mail goes out about a minute after the first item. A burst is one email. The digest is 7:00 AM Pacific, and it is skipped when there is nothing to report.</p>
         </>
       ) : <p className="note">Loading</p>}
       {error ? <p className="err">{error}</p> : null}

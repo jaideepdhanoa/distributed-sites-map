@@ -16,7 +16,14 @@ const OPEN = new Set([
 /** Handlers that call actorFromRequest. The bearer is checked there. */
 const AGENT_BEARER_PATHS = new Set(["/api/changes"]);
 
-function hasAgentBearer(request: NextRequest): boolean {
+/** Handlers that check CRON_SECRET. The proxy only requires a Bearer header. */
+const CRON_BEARER_PATHS = new Set([
+  "/api/alerts/digest",
+  "/api/alerts/flush",
+  "/api/data/revalidate",
+]);
+
+function hasBearer(request: NextRequest): boolean {
   const header = request.headers.get("authorization");
   return Boolean(header && /^bearer /i.test(header.trim()));
 }
@@ -31,7 +38,7 @@ export async function proxy(request: NextRequest) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;
   }
-  if (AGENT_BEARER_PATHS.has(pathname) && hasAgentBearer(request)) {
+  if ((AGENT_BEARER_PATHS.has(pathname) || CRON_BEARER_PATHS.has(pathname)) && hasBearer(request)) {
     return NextResponse.next({ headers: privateHeaders() });
   }
   if (pathname.startsWith("/api/")) {

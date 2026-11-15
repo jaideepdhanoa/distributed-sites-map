@@ -1,10 +1,13 @@
 export const DAILY_CAP = 400;
 
+/** Oldest unsent instant row waits this long, then the whole batch for that person goes. */
+export const DEFAULT_BATCH_MS = 60 * 1000;
+
 export function batchWindowMs(): number {
   const raw = process.env.ALERT_BATCH_MS;
-  if (raw == null || raw.trim() === "") return 5 * 60 * 1000;
+  if (raw == null || raw.trim() === "") return DEFAULT_BATCH_MS;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) return 5 * 60 * 1000;
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_BATCH_MS;
   return parsed;
 }
 

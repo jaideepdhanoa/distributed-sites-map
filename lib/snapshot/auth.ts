@@ -2,10 +2,9 @@ import { timingSafeEqual } from "node:crypto";
 
 const PRODUCTION_HOSTS = new Set(["distributedsites.com", "www.distributedsites.com"]);
 
-export function authorizeSnapshotRevalidate(request: Request): boolean {
-  const secret = process.env.CRON_SECRET?.trim() || "";
+/** Constant-time Bearer check. A length mismatch still compares a buffer so the timing does not reveal the secret. */
+export function bearerMatchesSecret(header: string, secret: string): boolean {
   if (!secret) return false;
-  const header = request.headers.get("authorization") || "";
   const expected = Buffer.from(`Bearer ${secret}`);
   const actual = Buffer.from(header);
   if (expected.length !== actual.length) {
@@ -13,6 +12,12 @@ export function authorizeSnapshotRevalidate(request: Request): boolean {
     return false;
   }
   return timingSafeEqual(actual, expected);
+}
+
+export function authorizeSnapshotRevalidate(request: Request): boolean {
+  const secret = process.env.CRON_SECRET?.trim() || "";
+  const header = request.headers.get("authorization") || "";
+  return bearerMatchesSecret(header, secret);
 }
 
 /** The sync job may refresh only the production site. Preview hosts are rejected. */

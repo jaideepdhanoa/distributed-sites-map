@@ -88,7 +88,7 @@ async function claimLog(
 
 export async function deliverRows(
   sql: Sql,
-  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string; kind?: "instant" | "digest" },
+  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string; kind?: "instant" | "digest" | "updates" | "catchup" },
 ): Promise<string> {
   const now = input.now || new Date();
   const day = losAngelesParts(now).day;
@@ -100,6 +100,13 @@ export async function deliverRows(
     return "skipped";
   }
   const subject = input.subjectPrefix ? `${input.subjectPrefix} ${rendered.subject}`.replace(/\s+/g, " ").trim() : rendered.subject;
+  if (input.key.startsWith("batch:")) {
+    await sql.query(
+      `DELETE FROM alert_log
+       WHERE user_id = $1 AND status = 'pending' AND idempotency_key LIKE 'batch:' || $1 || ':%' AND idempotency_key <> $2`,
+      [input.userId, input.key],
+    );
+  }
   const claim = await claimLog(sql, {
     key: input.key,
     userId: input.userId,
@@ -147,35 +154,121 @@ export async function deliverRows(
   return "sent";
 }
 
-export async function flushInstant(sql: Sql, now = new Date()): Promise<number> {
-  const windowMs = batchWindowMs();
-  const pending = await sql.query<OutboxRow>(
-    `SELECT id, idempotency_key, user_id, to_email, category, channel, site_id, site_label, summary, author_id, href, ref_id, created_at, status
-     FROM alert_outbox WHERE channel = 'instant' AND status = 'pending' ORDER BY created_at ASC, id ASC`,
-  );
+const CLAIM_STALE_MS = 3 * 60 * 1000;
+/** Older than the five-minute backstop, so a burst is not labeled a catch-up. */
+const CATCH_UP_MS = 60 * 60 * 1000;
+
+function instantBatchKind(rows: OutboxRow[], now: Date): "instant" | "updates" | "catchup" {
+  if (now.getTime() - oldestStamp(rows) >= CATCH_UP_MS) return "catchup";
+  if (rows.length > 1) return "updates";
+  return "instant";
+}
+
+function claimToken(epochMs: number): string {
+  return `claim:${String(Math.max(0, Math.floor(epochMs))).padStart(13, "0")}`;
+}
+
+function groupByUser(rows: OutboxRow[]): Map<string, OutboxRow[]> {
   const byUser = new Map<string, OutboxRow[]>();
-  for (const row of pending.rows) {
+  for (const row of rows) {
     const list = byUser.get(row.user_id) || [];
     list.push(row);
     byUser.set(row.user_id, list);
   }
-  let sent = 0;
-  for (const [userId, rows] of byUser) {
-    const newest = rows.reduce((max, row) => Math.max(max, stampOf(row.created_at)), 0);
-    if (now.getTime() - newest < windowMs) continue;
-    const email = rows[0]?.to_email || accountEmail(userId) || "";
-    if (!email) {
-      await markRows(sql, rows.map((row) => row.id), "skipped", `skip:${userId}`);
-      continue;
+  return byUser;
+}
+
+function oldestStamp(rows: OutboxRow[]): number {
+  return rows.reduce((min, row) => Math.min(min, stampOf(row.created_at)), Number.POSITIVE_INFINITY);
+}
+
+async function rollback(sql: Sql): Promise<void> {
+  try {
+    await sql.exec("ROLLBACK");
+  } catch {
+    // The connection already closed the transaction.
+  }
+}
+
+/**
+ * Send instant rows whose oldest item is already due. A later row joins that
+ * batch and does not postpone it. The claim is a row lock plus a sending
+ * status, committed before the mail goes out, so a second flush cannot take
+ * the same rows.
+ */
+export async function flushInstant(sql: Sql, now = new Date()): Promise<number> {
+  const windowMs = batchWindowMs();
+  const cutoff = new Date(now.getTime() - windowMs).toISOString();
+  await sql.exec("BEGIN");
+  let claimed: OutboxRow[] = [];
+  try {
+    await sql.query(
+      `UPDATE alert_outbox
+       SET status = 'pending', batch_key = NULL
+       WHERE channel = 'instant' AND status = 'sending' AND batch_key LIKE 'claim:%' AND batch_key < $1`,
+      [claimToken(Date.now() - CLAIM_STALE_MS)],
+    );
+    const pending = await sql.query<OutboxRow>(
+      `SELECT id, idempotency_key, user_id, to_email, category, channel, site_id, site_label, summary, author_id, href, ref_id, created_at, status
+       FROM alert_outbox
+       WHERE channel = 'instant' AND status = 'pending'
+         AND user_id IN (
+           SELECT user_id FROM alert_outbox
+           WHERE channel = 'instant' AND status = 'pending'
+           GROUP BY user_id
+           HAVING MIN(created_at) <= $1::timestamptz
+         )
+       ORDER BY created_at ASC, id ASC
+       FOR UPDATE SKIP LOCKED`,
+      [cutoff],
+    );
+    const ready: OutboxRow[] = [];
+    for (const rows of groupByUser(pending.rows).values()) {
+      if (now.getTime() - oldestStamp(rows) < windowMs) continue;
+      ready.push(...rows);
     }
-    await deliverRows(sql, {
-      userId,
-      email,
-      rows,
-      key: batchKey("batch", userId, rows.map((row) => row.id)),
-      now,
-    });
-    sent += 1;
+    if (!ready.length) {
+      await sql.exec("COMMIT");
+      return 0;
+    }
+    await markRows(sql, ready.map((row) => row.id), "sending", claimToken(Date.now()));
+    await sql.exec("COMMIT");
+    claimed = ready;
+  } catch (error) {
+    await rollback(sql);
+    throw error;
+  }
+
+  let sent = 0;
+  for (const [userId, rows] of groupByUser(claimed)) {
+    const ids = rows.map((row) => row.id);
+    try {
+      const email = rows[0]?.to_email || accountEmail(userId) || "";
+      if (!email) {
+        await markRows(sql, ids, "skipped", `skip:${userId}`);
+        continue;
+      }
+      const status = await deliverRows(sql, {
+        userId,
+        email,
+        rows,
+        key: batchKey("batch", userId, ids),
+        now,
+        kind: instantBatchKind(rows, now),
+      });
+      if (status === "error") {
+        await markRows(sql, ids, "pending", "");
+        continue;
+      }
+      sent += 1;
+    } catch (error) {
+      try {
+        await markRows(sql, ids, "pending", "");
+      } catch {
+        // A later flush reclaims a stale sending claim.
+      }
+      throw error;
+    }
   }
   return sent;
 }

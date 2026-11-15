@@ -137,7 +137,7 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 });
 
 test("a mention is queued only for the mentioned account", async ({ page, request }) => {
-  await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any");
+  await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any&panel=discussion");
   await page.getByTestId("panel-tab-discussion").click();
   const body = page.getByTestId("note-body");
   await body.click();

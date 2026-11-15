@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
-import { MIRROR_FIELD_HEADERS, mirrorHeaderAllowed, parseSheet, sameWorkbookCell } from "./site";
+import { MIRROR_FIELD_HEADERS, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameWorkbookCell } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -13,11 +13,13 @@ export const SPREADSHEET_ID = "167rIKoApP3sMJ3vrp1lg3MT-h5yQGqmMhY_TbBIqByY";
 /** The sync token uses drive.readonly. Cell writes need the Sheets scope. */
 export const MIRROR_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
-/** USER_ENTERED keeps numbers as numbers. RAW would store them as text. */
-export const MIRROR_VALUE_INPUT = "USER_ENTERED";
+/** How a cell is read. Unformatted values and formulas are for the site tabs only. */
+export type SheetRender = "formatted" | "unformatted" | "formulas";
 
-export function sheetValueRender(kind: "values" | "formulas"): "UNFORMATTED_VALUE" | "FORMULA" {
-  return kind === "formulas" ? "FORMULA" : "UNFORMATTED_VALUE";
+export function sheetValueRender(kind: SheetRender): "UNFORMATTED_VALUE" | "FORMULA" | null {
+  if (kind === "formulas") return "FORMULA";
+  if (kind === "unformatted") return "UNFORMATTED_VALUE";
+  return null;
 }
 export const SYNC_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 
@@ -29,6 +31,8 @@ export type CellChange = {
   id: string;
   before: string;
   after: string;
+  /** RAW for text. USER_ENTERED for numeric and date site cells. */
+  valueInput?: "RAW" | "USER_ENTERED";
 };
 
 export type SheetTable = {
@@ -217,7 +221,7 @@ function planTable(input: {
       const after = cellText(record.values[column.key]);
       if (input.skipBlank && !after) continue;
       const before = cellText(existing.cells[column.index]);
-      if (before === after) continue;
+      if (sameWorkbookCell(before, after)) continue;
       changes.push({
         sheet: input.table.title,
         row: existing.row,
@@ -323,6 +327,7 @@ export function planSiteMirror(
           id: record.site_id,
           before,
           after,
+          valueInput: mirrorCellInput(table.headers[index] || key),
         });
       }
     }

@@ -106,6 +106,18 @@ function siteMap(rows: SiteRow[]): Map<string, Record<string, string>> {
   return new Map(rows.map((row) => [row.site_id, siteComparable(row)]));
 }
 
+/** Fields that differ between the published deals file and the private raw cells. */
+const RAW_SHEET_FIELDS = new Set(["sheet", "notes", "address", "listing_status", "listing_url"]);
+
+export function siteCompareFields(rows: SiteRow[]): readonly string[] {
+  const hasRawSheet = rows.some((row) => {
+    const sheet = row.sheet?.trim();
+    return Boolean(sheet && sheet !== "{}");
+  });
+  if (hasRawSheet) return SITE_COMPARE_FIELDS;
+  return SITE_COMPARE_FIELDS.filter((field) => !RAW_SHEET_FIELDS.has(field));
+}
+
 function withoutIds<T extends { site_id?: string; entity_id?: string }>(rows: T[], ids: Set<string>, idOf: (row: T) => string): T[] {
   return rows.filter((row) => !ids.has(idOf(row)));
 }
@@ -137,7 +149,7 @@ export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, wo
     site: compare(
       siteMap(withoutIds(workbook.sites || [], skip.site, (row) => row.site_id)),
       siteMap(withoutIds(database.sites || [], skip.site, (row) => row.site_id)),
-      SITE_COMPARE_FIELDS,
+      siteCompareFields(workbook.sites || []),
     ),
   };
   const cutOver: ShadowEntity[] = [];

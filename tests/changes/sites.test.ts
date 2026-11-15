@@ -5,13 +5,13 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { importChanged } from "../../lib/changes/backfill";
-import { diffDatabase } from "../../lib/changes/diff";
+import { buildReport, diffDatabase } from "../../lib/changes/diff";
 import { importEntityFromWorkbook, readEntityFromDb } from "../../lib/changes/flags";
-import { MIRROR_VALUE_INPUT, PROTECTED_ROW, PROTECTED_SITE_ID, planSiteMirror, sheetValueRender, type SheetTable } from "../../lib/changes/mirror";
+import { PROTECTED_ROW, PROTECTED_SITE_ID, planSiteMirror, sheetValueRender, type SheetTable } from "../../lib/changes/mirror";
 import { applySiteRows } from "../../lib/changes/read";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { loadScorecard, recordedLocationPoints, recordedScore, scorecardTotal } from "../../lib/changes/scorecard";
-import { displayNote, emptySiteFields, mirrorHeaderAllowed, mirrorWrites, type SiteRow } from "../../lib/changes/site";
+import { displayNote, emptySiteFields, listingFlags, listingKnown, mirrorCellInput, mirrorHeaderAllowed, mirrorWrites, siteIssues, type SiteRow } from "../../lib/changes/site";
 import { isSnapshotFile } from "../../lib/snapshot/hash";
 import { readGenerated } from "../../lib/snapshot/read";
 import { workbookFromFiles } from "../../lib/changes/workbook";
@@ -325,9 +325,12 @@ test("the site mirror writes raw cells by header and skips row 10 and PIPE-PHX-0
 });
 
 test("a fresh import over formatted currency, percents, dates, and formulas plans no writes", () => {
-  assert.equal(MIRROR_VALUE_INPUT, "USER_ENTERED");
-  assert.equal(sheetValueRender("values"), "UNFORMATTED_VALUE");
+  assert.equal(sheetValueRender("unformatted"), "UNFORMATTED_VALUE");
+  assert.equal(sheetValueRender("formatted"), null);
   assert.equal(sheetValueRender("formulas"), "FORMULA");
+  assert.equal(mirrorCellInput("Asking price ($)"), "USER_ENTERED");
+  assert.equal(mirrorCellInput("Next step"), "RAW");
+  assert.equal(mirrorCellInput("Stage"), "RAW");
   const headers = ["Site ID", "Asking price ($)", "Location points", "Score (of 100)", "Spare area (sq ft)", "Population growth (3-mile)", "Land (acres)", "Photos checked", "Stalls that fit"];
   const table = sheet(headers, [["PIPE-PHX-0001", "$1,600,000", "10.0", "24", "4,000", "-5.57%", "1.20", "Oct 28", "12"]]);
   table.rows[0].formulas = ["", "", "", "=SUM(A1)", "", "", "", "", "=B1"];
@@ -350,6 +353,7 @@ test("a fresh import over formatted currency, percents, dates, and formulas plan
   const changed = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { "Asking price ($)": "1700000", "Stalls that fit": "8" } }]);
   assert.deepEqual(changed.changes.map((change) => change.header), ["Asking price ($)"]);
   assert.equal(changed.changes[0]?.after, "1700000");
+  assert.equal(changed.changes[0]?.valueInput, "USER_ENTERED");
 });
 
 test("the public next step drops outreach, names, and package text", () => {
@@ -370,7 +374,7 @@ test("the raw site sheet is not a snapshot file and is not served", () => {
   assert.equal(isSnapshotFile("deals.geojson"), true);
   assert.throws(() => readGenerated("site_sheet.json"), /not a public snapshot file/);
   assert.equal(mirrorHeaderAllowed("Folder"), false);
-  assert.equal(mirrorHeaderAllowed("Broker"), false);
+  assert.equal(mirrorHeaderAllowed("Broker"), true);
   assert.equal(mirrorHeaderAllowed("Score (of 100)"), false);
   assert.equal(mirrorHeaderAllowed("Stalls that fit"), false);
   const writes = mirrorWrites(
@@ -381,8 +385,34 @@ test("the raw site sheet is not a snapshot file and is not served", () => {
   assert.equal(writes["Inside the service area"], "Inside");
   assert.equal(writes["pwr_a_substation_mi"], "1.5");
   assert.equal(writes["Land basis"], "Estimated");
-  assert.equal(writes.Broker, undefined);
+  assert.equal(writes.Broker, "Ada Broker");
+  assert.equal(writes.Firm, undefined);
   assert.equal("miles_to_depot" in writes, false);
+  const hold = "On hold - broker Nov 6: waiting on the survey";
+  assert.equal(listingKnown(hold), true);
+  assert.deepEqual(listingFlags(hold), { listed: false, removed: false });
+  const held = siteIssues([{ ...emptySiteFields(), site_id: "PIPE-MIA-0082", coord_status: "", sheet: "{}", facts: {}, market: "MIA", listing_status: hold, photo_refs: "[]" }]);
+  assert.equal(held.some((issue) => issue.field === "listing_status"), false);
+});
+
+test("a site diff without the private sheet ignores raw-cell fields", () => {
+  const base = { ...emptySiteFields(), coord_status: "listing", facts: {}, photo_refs: "[]", market: "MIA", name: "Stars" };
+  const published: SiteRow = { ...base, site_id: "PIPE-MIA-0082", sheet: "{}", notes: "Confirm the zoning.", address: "1 Main", listing_status: "", listing_url: "https://example.test/listing" };
+  const stored: SiteRow = {
+    ...published,
+    notes: "On hold - broker Nov 6: the package is in the folder.",
+    address: "MIA 1 Main St",
+    listing_status: "On hold - broker Nov 6: waiting on the survey",
+    listing_url: "https://example.test/listing?raw=1",
+    sheet: JSON.stringify({ "Next step": "On hold - broker Nov 6: the package is in the folder." }),
+  };
+  const empty = { stages: [], activities: [], comms: [] };
+  const skipped = buildReport({ ...empty, sites: [published] }, { ...empty, sites: [stored] }, "published deals");
+  assert.equal(skipped.entities.site.changed.length, 0);
+  assert.equal(skipped.entities.site.missing.length, 0);
+  const raw: SiteRow = { ...published, sheet: JSON.stringify({ "Next step": "Confirm the zoning." }) };
+  const seen = buildReport({ ...empty, sites: [raw] }, { ...empty, sites: [stored] }, "private sheet");
+  assert.equal(seen.entities.site.changed.some((change) => change.field === "notes"), true);
 });
 
 test("agents write only their fields, and a new site needs a Phoenix, Las Vegas, or Miami market", () => {

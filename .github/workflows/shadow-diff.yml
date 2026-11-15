@@ -19,7 +19,25 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: npm ci
+      - run: pip install -r requirements.txt cryptography
+      - name: Build the private site sheet
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          MAP_SYNC_INPUTS_FOLDER_ID: ${{ vars.MAP_SYNC_INPUTS_FOLDER_ID }}
+          GOOGLE_DRIVE_ROOT_FOLDER_ID: ${{ vars.TIMELINE_SITES_FOLDER_ID }}
+          SITE_SHEET_PATH: /tmp/site_sheet.json
+        run: |
+          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ] || [ -z "$MAP_SYNC_INPUTS_FOLDER_ID" ]; then
+            echo "The private sheet was not built. The diff skips raw site cells."
+            exit 0
+          fi
+          python scripts/sync_workbook.py
+          python scripts/build_data.py
+          test ! -e data/generated/site_sheet.json
       - name: Diff production
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -35,6 +53,9 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             echo "NEON_DATABASE_URL is not set. Skipping."
             exit 0
+          fi
+          if [ -s /tmp/site_sheet.json ]; then
+            export SITE_SHEET_PATH=/tmp/site_sheet.json
           fi
           npx tsx scripts/shadow-job.ts
       - uses: actions/upload-artifact@v4

@@ -65,7 +65,7 @@ export const SITE_NUMERIC_FIELDS = [
 export type SiteNumericField = (typeof SITE_NUMERIC_FIELDS)[number];
 
 /** Workbook Listing status values the read path understands. Annotated cells keep the same first token. */
-export const LISTING_STATUSES = ["Listed", "Active", "Off-market", "Under contract", "Sold or withdrawn", "Gone", "Removed"] as const;
+export const LISTING_STATUSES = ["Listed", "Active", "Off-market", "On hold", "Under contract", "Sold or withdrawn", "Gone", "Removed"] as const;
 
 export type ListingStatus = (typeof LISTING_STATUSES)[number];
 
@@ -338,12 +338,12 @@ const CLASS_LABEL: Record<string, string> = {
 /**
  * Headers an API change may write back. Column order is not assumed.
  * Score, Location points, Stalls that fit, and Segment group are formulas and are absent.
- * Site, Broker, Segment, Stage, and Folder are absent.
+ * Site, Segment, Stage, and Folder are absent.
  *
- * Database-only, with no workbook write:
- * broker and firm share one Broker cell that also holds email addresses.
+ * Database-only. These have no Pipeline or Land Sites column of their own:
+ * firm is the other half of the Broker cell, which also holds email addresses, so it is not written separately.
  * photo_refs is a list, not a cell.
- * miles_to_depot is computed from the depot pins.
+ * miles_to_depot is computed from the depot pins. The universe file's depot_mi column is not a site column.
  * asking_price_source is derived from the firm or the listing.
  * open_land_basis is derived when spare area is present.
  * parcel_acres and parcel_match come from the parcel layer.
@@ -351,6 +351,7 @@ const CLASS_LABEL: Record<string, string> = {
  * bays_that_fit is the formula column Stalls that fit, which is never overwritten.
  */
 export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
+  { field: "broker", headers: ["Broker"] },
   { field: "notes", headers: ["Next step"] },
   { field: "listing_url", headers: ["Listing link"] },
   { field: "listing_status", headers: ["Listing status"] },
@@ -406,6 +407,46 @@ export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "cap_d_as_of", headers: ["pwr_d_as_of"] },
   { field: "cap_d_confidence", headers: ["pwr_d_confidence"] },
 ];
+
+const ENTERED_HEADERS = new Set([
+  "asking price ($)",
+  "land (acres)",
+  "land value ($)",
+  "improvement value ($)",
+  "county value ($)",
+  "distance to service area (mi)",
+  "spare area (sq ft)",
+  "aadt (nearest)",
+  "aadt segment distance (m)",
+  "aadt max within 800 m",
+  "population within 3 miles",
+  "population growth (3-mile)",
+  "median household income (3-mile)",
+  "washes within 1 mile",
+  "washes within 3 miles",
+  "diligence photo count",
+  "listing photo count",
+  "photos checked",
+  "last checked live",
+  "pwr_a_substation_mi",
+  "pwr_a_hv_line_ft",
+  "pwr_a_as_of",
+  "pwr_b_hosting_mw_frontage",
+  "pwr_b_hosting_mw_nearby",
+  "pwr_b_as_of",
+  "pwr_c_service_amps",
+  "pwr_c_service_volts",
+  "pwr_c_panel_count",
+  "pwr_c_as_of",
+  "pwr_d_peak_kw",
+  "pwr_d_kwh_year",
+  "pwr_d_as_of",
+]);
+
+/** Numbers and dates stay USER_ENTERED. Text stays RAW so a leading = + - or @ is not a formula. */
+export function mirrorCellInput(header: string): "RAW" | "USER_ENTERED" {
+  return ENTERED_HEADERS.has(header.trim().toLowerCase()) ? "USER_ENTERED" : "RAW";
+}
 
 export function mirrorHeaderAllowed(header: string): boolean {
   const norm = header.trim().toLowerCase();

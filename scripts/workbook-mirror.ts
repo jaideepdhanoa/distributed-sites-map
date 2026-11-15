@@ -20,11 +20,11 @@ import {
   mirrorDryRun,
   planActivityMirror,
   planCommsMirror,
-  MIRROR_VALUE_INPUT,
   planSiteMirror,
   planStageMirror,
   recordMirrorRun,
   sheetValueRender,
+  type SheetRender,
   stageTabs,
   type CellChange,
   type SheetTable,
@@ -89,15 +89,17 @@ async function sheetsToken(raw: string): Promise<string> {
   return payload.access_token;
 }
 
-async function sheetsValues(token: string, range: string, kind: "values" | "formulas" = "values"): Promise<string[][]> {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueRenderOption=${sheetValueRender(kind)}`;
+async function sheetsValues(token: string, range: string, kind: SheetRender = "formatted"): Promise<string[][]> {
+  const render = sheetValueRender(kind);
+  const query = render ? `?valueRenderOption=${render}` : "";
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}${query}`;
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error(`Sheets read failed (${response.status}) for a workbook range.`);
   const payload = (await response.json()) as { values?: unknown[][] };
   return (payload.values || []).map((row) => row.map((cell) => String(cell ?? "")));
 }
 
-async function loadTable(token: string, title: string, headerRow: number, fieldHeaders: string[][], withFormulas = false): Promise<SheetTable> {
+async function loadTable(token: string, title: string, headerRow: number, fieldHeaders: string[][], siteCells = false): Promise<SheetTable> {
   const header = await sheetsValues(token, `${quote(title)}!${headerRow}:${headerRow}`);
   const headers = header[0] || [];
   const wanted = new Set(fieldHeaders.flat().map((name) => name.trim().toLowerCase()));
@@ -109,8 +111,8 @@ async function loadTable(token: string, title: string, headerRow: number, fieldH
   for (const index of indexes) {
     const column = columnLetter(index + 1);
     const range = `${quote(title)}!${column}${headerRow + 1}:${column}`;
-    const values = await sheetsValues(token, range, "values");
-    const formulas = withFormulas ? await sheetsValues(token, range, "formulas") : [];
+    const values = await sheetsValues(token, range, siteCells ? "unformatted" : "formatted");
+    const formulas = siteCells ? await sheetsValues(token, range, "formulas") : [];
     values.forEach((line, offset) => {
       const rowNumber = headerRow + 1 + offset;
       const row = rows.get(rowNumber) || { cells: [], formulas: [] };
@@ -151,23 +153,32 @@ function columnLetter(column: number): string {
 }
 
 async function writeCells(token: string, changes: CellChange[]): Promise<void> {
-  for (let start = 0; start < changes.length; start += 400) {
-    const chunk = changes.slice(start, start + 400);
-    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        valueInputOption: MIRROR_VALUE_INPUT,
-        data: chunk.map((change) => ({
-          range: a1(change.sheet, change.row, change.column),
-          values: [[change.after]],
-        })),
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Sheets write failed (${response.status}). GOOGLE_SERVICE_ACCOUNT_JSON is used with ${MIRROR_SHEETS_SCOPE}. If the account is only a Viewer, share the Pipeline workbook with it as Editor.`,
-      );
+  const groups = new Map<"RAW" | "USER_ENTERED", CellChange[]>();
+  for (const change of changes) {
+    const input = change.valueInput || "RAW";
+    const list = groups.get(input) || [];
+    list.push(change);
+    groups.set(input, list);
+  }
+  for (const [valueInputOption, group] of groups) {
+    for (let start = 0; start < group.length; start += 400) {
+      const chunk = group.slice(start, start + 400);
+      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          valueInputOption,
+          data: chunk.map((change) => ({
+            range: a1(change.sheet, change.row, change.column),
+            values: [[change.after]],
+          })),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Sheets write failed (${response.status}). GOOGLE_SERVICE_ACCOUNT_JSON is used with ${MIRROR_SHEETS_SCOPE}. If the account is only a Viewer, share the Pipeline workbook with it as Editor.`,
+        );
+      }
     }
   }
 }

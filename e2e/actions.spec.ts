@@ -274,7 +274,7 @@ test("a comment with team language is stored", async ({ page, request }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByTestId("note-body").fill("The power details and the hold can stay in one comment.");
   await page.getByRole("button", { name: "Comment" }).click();
-  await expect(page.getByText("The power details and the hold can stay in one comment.")).toBeVisible();
+  await expect(page.getByTestId("note-threads").getByText("The power details and the hold can stay in one comment.")).toBeVisible();
   await expect(page.getByTestId("action-error")).toHaveCount(0);
 });
 

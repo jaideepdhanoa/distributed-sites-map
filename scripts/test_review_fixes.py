@@ -8,6 +8,7 @@ from pathlib import Path
 
 from build_data import (
     classify_register_row,
+    linked_deal_groups,
     loose_street_keys,
     match_workbook_site,
     stage_group,
@@ -146,6 +147,7 @@ class ShippedCounts(unittest.TestCase):
 
         listed = [item["properties"] for item in sites if in_area_listed(item["properties"])]
         self.assertTrue(all(props.get("city") in {"LAS", "PHX", "MIA"} for props in listed))
+        groups = linked_deal_groups(deals)
         for feature in deals:
             props = feature["properties"]
             self.assertEqual(stage_group(props.get("stage")), props.get("stage_group"), props.get("deal_id"))
@@ -154,7 +156,14 @@ class ShippedCounts(unittest.TestCase):
             if folder and universe_id in by_id:
                 self.assertEqual(by_id[universe_id].get("folder_url"), folder, props.get("deal_id"))
             if universe_id and by_id.get(universe_id, {}).get("linked_deal_id"):
-                self.assertEqual(by_id[universe_id]["linked_deal_id"], props.get("deal_id"), props.get("deal_id"))
+                site = by_id[universe_id]
+                expected = groups.get(universe_id) or {"primary": "", "ids": []}
+                shipped = site.get("linked_deal_ids")
+                linked_ids = shipped if isinstance(shipped, list) else expected["ids"]
+                self.assertIn(props.get("deal_id"), linked_ids, props.get("deal_id"))
+                self.assertEqual(site.get("linked_deal_id"), expected["primary"], universe_id)
+                if isinstance(shipped, list):
+                    self.assertEqual(shipped, expected["ids"], universe_id)
         listing_ids = [str(item["properties"].get("listing_id") or "") for item in layer]
         self.assertTrue(all(re.fullmatch(r"L-\d+", item) for item in listing_ids))
         self.assertEqual(len(listing_ids), len(set(listing_ids)))
@@ -192,6 +201,28 @@ class ShippedCounts(unittest.TestCase):
                 entry["deal_id"],
             )
             self.assertTrue(row.get("address") or row.get("name"))
+
+
+class SharedUniverseLink(unittest.TestCase):
+    def test_an_assemblage_keeps_every_deal_on_one_counted_row(self):
+        features = [
+            {"properties": {"deal_id": "LAND-PHX-0121", "kind": "land", "stage_group": "dropped", "universe_id": "WB-PHX-0088", "name": "27603 N 33rd Ave", "stage": "Dropped"}},
+            {"properties": {"deal_id": "LAND-PHX-0122", "kind": "land", "stage_group": "dropped", "universe_id": "WB-PHX-0088", "name": "27601 N 33rd Ave", "stage": "Dropped"}},
+            {"properties": {"deal_id": "PIPE-PHX-0001", "kind": "pipeline", "stage_group": "desk", "universe_id": "PHX-U1", "name": "Wash", "stage": "1 Desk screen"}},
+        ]
+        groups = linked_deal_groups(features)
+        shared = groups["WB-PHX-0088"]
+        self.assertEqual(shared["primary"], "LAND-PHX-0121")
+        self.assertEqual(shared["ids"], ["LAND-PHX-0121", "LAND-PHX-0122"])
+        self.assertIn("LAND-PHX-0122", shared["ids"])
+        self.assertEqual(groups["PHX-U1"]["ids"], ["PIPE-PHX-0001"])
+        self.assertEqual(groups["PHX-U1"]["primary"], "PIPE-PHX-0001")
+        mixed = linked_deal_groups([
+            {"properties": {"deal_id": "LAND-X", "kind": "land", "stage_group": "desk", "universe_id": "U", "name": "Lot", "stage": "1 Desk screen"}},
+            {"properties": {"deal_id": "PIPE-X", "kind": "pipeline", "stage_group": "desk", "universe_id": "U", "name": "Wash", "stage": "1 Desk screen"}},
+        ])
+        self.assertEqual(mixed["U"]["primary"], "PIPE-X")
+        self.assertEqual(mixed["U"]["ids"], ["PIPE-X", "LAND-X"])
 
 
 class UniverseGapGate(unittest.TestCase):

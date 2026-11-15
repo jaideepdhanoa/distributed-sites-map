@@ -19,6 +19,7 @@ import {
 import type { DealProps } from "../lib/types.ts";
 
 const snapshot = JSON.parse(readFileSync("data/generated/nda.json", "utf8")) as NdaSnapshot;
+const fixture = JSON.parse(readFileSync("data/fixtures/nda.json", "utf8")) as NdaSnapshot;
 const route = readFileSync("lib/api/handlers/data/nda.ts", "utf8");
 
 function deal(partial: Partial<DealProps>): DealProps {
@@ -81,10 +82,19 @@ test("an unlinked site reads Not required and never Not started", () => {
 });
 
 test("a linked chip uses the site mirror, including the Miracle copy", () => {
-  const miracle = snapshot.sites["PIPE-LAS-0016"];
-  assert.equal(ndaChip(miracle), "With counterparty legal · Them — legal · 14d open · 2d in court");
-  assert.equal(ndaChip(snapshot.sites["PIPE-LAS-0017"]), ndaChip(miracle));
-  assert.equal(ndaChip(snapshot.sites["LAND-LAS-0001"]), ndaChip(miracle));
+  const miracle = fixture.sites["PIPE-LAS-0016"];
+  assert.equal(fixture.source, "fixture");
+  assert.equal(fixture.as_of, "2026-11-11");
+  assert.equal(ndaChip(miracle), "With counterparty legal · Them — legal · 13d open · 1d in court");
+  assert.equal(ndaChip(fixture.sites["PIPE-LAS-0017"]), ndaChip(miracle));
+  assert.equal(ndaChip(fixture.sites["LAND-LAS-0001"]), ndaChip(miracle));
+  const live = snapshot.sites["PIPE-LAS-0016"];
+  const liveChip = ndaChip(live);
+  assert.equal(ndaChip(snapshot.sites["PIPE-LAS-0017"]), liveChip);
+  assert.equal(ndaChip(snapshot.sites["LAND-LAS-0001"]), liveChip);
+  assert.equal(liveChip.includes(live.nda_status), true);
+  if (live.nda_days_open != null) assert.equal(liveChip.includes(`${live.nda_days_open}d open`), true);
+  if (live.nda_days_in_court != null) assert.equal(liveChip.includes(`${live.nda_days_in_court}d in court`), true);
   assert.equal(ndaChip({ nda_id: "NDA-006", nda_days_open: 10, nda_days_in_court: 2 }), "10d open · 2d in court");
   assert.equal(ndaChip({ nda_id: "NDA-010", nda_status: "Broker asked — send our form" }), "Broker asked — send our form");
 });

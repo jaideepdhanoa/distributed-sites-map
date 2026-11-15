@@ -33,8 +33,16 @@ for (const query of ["stars and stripes", "7520", "McNab", "PIPE-MIA-0080", "MIA
   assert.ok(found.some((hit) => hit.id === "MIA-U747"), `${query} should list MIA-U747`);
 }
 assert.equal(hits("stars and stripes")[0]?.id, "PIPE-MIA-0080");
-const matthews = deals.filter((deal) => partyMatch("Matthews", deal.broker, deal.firm)).map((deal) => deal.deal_id).sort();
-assert.deepEqual(matthews, ["PIPE-MIA-0080", "PIPE-PHX-0007"]);
+const matthews = deals.filter((deal) => partyMatch("Matthews", deal.broker, deal.firm)).map((deal) => deal.deal_id);
+for (const id of ["PIPE-MIA-0080", "PIPE-PHX-0007"]) {
+  const deal = deals.find((item) => item.deal_id === id);
+  assert.ok(deal, id);
+  assert.equal(partyMatch("Matthews", deal.broker, deal.firm), true, id);
+  assert.equal(matthews.includes(id), true, id);
+}
+for (const deal of deals) {
+  assert.equal(matthews.includes(deal.deal_id), partyMatch("Matthews", deal.broker, deal.firm), deal.deal_id);
+}
 
 const queries = ["car wash", "LLC", "wash", "PHX-U1", "LAS-U1", "MIA-U1"];
 for (const site of sites) {

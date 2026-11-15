@@ -120,6 +120,8 @@ export type SiteProps = {
   is_candidate: boolean;
   miles_to_depot: number | null;
   linked_deal_id?: string;
+  /** Every deal on this Universe row. The primary stays in linked_deal_id. */
+  linked_deal_ids?: string[];
   linked_deal_name?: string;
   linked_deal_stage?: string;
   parcel_match?: string;

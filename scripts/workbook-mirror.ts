@@ -15,7 +15,9 @@ import {
   assertReadBack,
   assertWorkbookMirrorAllowed,
   entitiesToMirror,
+  entityChangeCounts,
   formatPlan,
+  formatPlanSummary,
   loadMirrorRows,
   mirrorDryRun,
   planActivityMirror,
@@ -279,20 +281,23 @@ async function main(): Promise<void> {
     unmatched += plan.unmatched.length;
   }
   assertPlannedWrites(changes);
+  const byEntity = entityChangeCounts(changes);
   const counts = {
     cells: changes.length,
-    stage_cells: changes.filter((change) => change.header.trim().toLowerCase() === "stage").length,
-    site_cells: changes.filter((change) => change.header.trim().toLowerCase() !== "stage" && (change.sheet === "Pipeline" || change.sheet === "Land Sites")).length,
-    activity_cells: changes.filter((change) => change.sheet === ACTIVITY_SHEET).length,
-    comms_cells: changes.filter((change) => change.sheet === COMMS_SHEET).length,
+    stage_cells: byEntity.stage,
+    site_cells: byEntity.site,
+    activity_cells: byEntity.activity,
+    comms_cells: byEntity.comms,
     appended,
     unmatched,
     skipped_protected: skippedProtected,
   };
   const preview = formatPlan(changes);
+  const counted = formatPlanSummary(changes);
   if (dryRun) {
+    console.log(counted);
     console.log(preview);
-    summary(`## Workbook mirror dry run\n\n${counts.cells} cells would change. Nothing was written.\n\n\`\`\`\n${preview.slice(0, 8000)}\n\`\`\`\n`);
+    summary(`## Workbook mirror dry run\n\nNothing was written.\n\n${counted}\n\n\`\`\`\n${preview.slice(0, 8000)}\n\`\`\`\n`);
     return;
   }
   try {
@@ -303,8 +308,8 @@ async function main(): Promise<void> {
     throw error;
   }
   await withConnectionString(url, (sql) => recordMirrorRun(sql, counts, "wrote cells", "succeeded"));
-  console.log(`Wrote ${counts.cells} cells.`);
-  summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Protected rows skipped: ${skippedProtected}.\n`);
+  console.log(`Wrote ${counts.cells} cells.\n${counted}`);
+  summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Protected rows skipped: ${skippedProtected}.\n\n${counted}\n`);
 }
 
 main().catch((error: unknown) => {

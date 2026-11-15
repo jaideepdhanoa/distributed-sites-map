@@ -287,6 +287,18 @@ export function pricePerAcre(asking: string, acres: string): string {
   return String(Math.round((price / land) * 100) / 100);
 }
 
+/**
+ * The published per-acre figure. Import stores it from the unrounded acreage
+ * cell, the same cell key_numbers divides. A later read copies that stored
+ * figure. Dividing the rounded acreage changes the published value.
+ */
+export function recordedPerAcre(stored: string, asking: string, acres: string): number | null {
+  const kept = parseMeasure(stored);
+  if (kept != null) return kept;
+  const derived = pricePerAcre(asking, acres);
+  return derived ? Number(derived) : null;
+}
+
 export function sheetCanonical(cells: Record<string, string>): string {
   const keys = Object.keys(cells).filter((key) => cells[key]?.trim()).sort((a, b) => a.localeCompare(b));
   const out: Record<string, string> = {};
@@ -752,7 +764,7 @@ function listingStatus(props: Record<string, unknown>): string {
   return "";
 }
 
-function factRecord(props: Record<string, unknown>): Record<string, string> {
+function factRecord(props: Record<string, unknown>, measures: { asking: string; acres: string } = { asking: "", acres: "" }): Record<string, string> {
   const facts: Record<string, string> = {};
   const put = (key: FactField, value: unknown) => {
     const textValue = key.endsWith("_source") || key.endsWith("_basis") || key.endsWith("_kind") || key.endsWith("_line") || key.endsWith("_match") || key.endsWith("_road") || key.endsWith("_phase") || key.endsWith("_feeder") || key.endsWith("_horizon") || key === "folder_url" || key === "checked_live" || key === POWER_RATING || key.endsWith("_as_of") || key.endsWith("_confidence")
@@ -776,8 +788,10 @@ function factRecord(props: Record<string, unknown>): Record<string, string> {
   for (const key of FACT_FIELDS) {
     if (key.startsWith("cap_") || key.startsWith("trade_")) put(key, props[key]);
   }
-  if (!facts.price_per_acre) facts.price_per_acre = pricePerAcre(canonicalFact(props.asking_price), canonicalFact(props.land_acres));
-  if (!facts.price_per_acre) delete facts.price_per_acre;
+  // land_acres on the deal is already rounded. The acreage cell is the unrounded source.
+  const perAcre = pricePerAcre(measures.asking || canonicalFact(props.asking_price), measures.acres || canonicalFact(props.land_acres));
+  if (perAcre) facts.price_per_acre = perAcre;
+  else delete facts.price_per_acre;
   return facts;
 }
 
@@ -824,11 +838,13 @@ export function sitesFromFiles(dealsJson: string, pricingJson = "", sheetJson = 
     const picture = photosFromUnknown(props.photos);
     const cells = sheets.get(siteId) || {};
     const raw = (header: string): string => cells[header] || "";
+    const askingPrice = raw("Asking price ($)") || canonicalFact(props.asking_price);
+    const acreage = raw("Land (acres)") || canonicalFact(props.land_acres);
     const row: SiteRow = {
       site_id: siteId,
       coord_status: text(props.coord_status),
       sheet: sheetCanonical(cells),
-      facts: factRecord(props),
+      facts: factRecord(props, { asking: askingPrice, acres: acreage }),
       ...emptySiteFields(),
       name: raw("Name") || text(props.name),
       address: raw("Address") || raw("Site") || text(props.address),
@@ -839,8 +855,8 @@ export function sitesFromFiles(dealsJson: string, pricingJson = "", sheetJson = 
       broker: text(props.broker),
       firm: text(props.firm),
       listing_url: raw("Listing link") || text(props.listing_url),
-      asking_price: raw("Asking price ($)") || canonicalFact(props.asking_price),
-      acreage: raw("Land (acres)") || canonicalFact(props.land_acres),
+      asking_price: askingPrice,
+      acreage,
       apn: raw("APN or folio") || raw("APN") || text(props.apn),
       land_value: canonicalFact(props.land_value ?? county.land_value),
       improvement_value: canonicalFact(props.improvement_value ?? county.improvement_value),

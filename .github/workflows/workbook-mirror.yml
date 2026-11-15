@@ -4,7 +4,8 @@ name: Workbook mirror
 # nothing, and does not need WORKBOOK_MIRROR_ENABLED. A real write needs
 # that repository variable set to 1. The 15-minute Workbook sync also runs
 # a real write on main when the variable is 1. This workflow refuses any
-# ref other than main.
+# ref other than main. simulate_site_flag sets READ_SITES_FROM_DB=1 for
+# that dry run only and is refused when dry_run is false.
 on:
   workflow_dispatch:
     inputs:
@@ -12,6 +13,10 @@ on:
         description: Print the planned cell changes and do not write the Sheet
         type: boolean
         default: true
+      simulate_site_flag:
+        description: Dry run only. Set READ_SITES_FROM_DB to 1 for this run
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,6 +26,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Refuse a site-flag simulation that would write
+        if: ${{ (inputs.simulate_site_flag == true || inputs.simulate_site_flag == 'true') && !(inputs.dry_run == true || inputs.dry_run == 'true') }}
+        run: |
+          echo "simulate_site_flag is only allowed when dry_run is true." >&2
+          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -31,12 +41,13 @@ jobs:
         env:
           WORKBOOK_MIRROR_ENABLED: ${{ vars.WORKBOOK_MIRROR_ENABLED }}
           WORKBOOK_MIRROR_DRY_RUN: ${{ (inputs.dry_run == true || inputs.dry_run == 'true') && '1' || '0' }}
+          SIMULATE_SITE_FLAG: ${{ (inputs.simulate_site_flag == true || inputs.simulate_site_flag == 'true') && '1' || '0' }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
           READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
           READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
-          READ_SITES_FROM_DB: ${{ vars.READ_SITES_FROM_DB }}
+          READ_SITES_FROM_DB: ${{ (inputs.simulate_site_flag == true || inputs.simulate_site_flag == 'true') && (inputs.dry_run == true || inputs.dry_run == 'true') && '1' || vars.READ_SITES_FROM_DB }}
           CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
         run: npx tsx scripts/workbook-mirror.ts

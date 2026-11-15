@@ -119,7 +119,21 @@ function nextAppendRow(rows: { row: number }[], headerRow: number, protectRow: b
   return row;
 }
 
+export function siteFlagSimulation(): boolean {
+  const value = process.env.SIMULATE_SITE_FLAG?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "on";
+}
+
+/** A site-flag dry run is the only place that variable may be forced on. */
+export function assertSiteFlagSimulation(): void {
+  if (!siteFlagSimulation()) return;
+  if (!mirrorDryRun()) {
+    throw new Error("simulate_site_flag is only allowed when dry_run is true.");
+  }
+}
+
 export function assertWorkbookMirrorAllowed(): void {
+  assertSiteFlagSimulation();
   if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
     throw new Error("Refusing to mirror the workbook from Vercel.");
   }
@@ -404,7 +418,26 @@ export function assertReadBack(changes: CellChange[], actual: { sheet: string; r
 }
 
 export function entitiesToMirror(): ShadowEntity[] {
-  return (["stage", "activity", "comms", "site"] as const).filter((entity) => readEntityFromDb(entity));
+  const selected = (["stage", "activity", "comms", "site"] as const).filter((entity) => readEntityFromDb(entity));
+  if (siteFlagSimulation() && mirrorDryRun() && !selected.includes("site")) selected.push("site");
+  return selected;
+}
+
+export function entityChangeCounts(changes: CellChange[]): { site: number; stage: number; activity: number; comms: number } {
+  const counts = { site: 0, stage: 0, activity: 0, comms: 0 };
+  for (const change of changes) {
+    if (change.sheet === ACTIVITY_SHEET) counts.activity += 1;
+    else if (change.sheet === COMMS_SHEET) counts.comms += 1;
+    else if (change.header.trim().toLowerCase() === "stage") counts.stage += 1;
+    else if (change.sheet === "Pipeline" || change.sheet === "Land Sites") counts.site += 1;
+  }
+  return counts;
+}
+
+/** Counts only. Cell text stays in the hashed plan. */
+export function formatPlanSummary(changes: CellChange[]): string {
+  const counts = entityChangeCounts(changes);
+  return `site ${counts.site}\nstage ${counts.stage}\nactivity ${counts.activity}\ncomms ${counts.comms}`;
 }
 
 function siteTextHeader(header: string): boolean {

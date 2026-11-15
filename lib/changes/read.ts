@@ -4,7 +4,7 @@ import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
 import { readEntityFromDb } from "./flags";
 import { readGenerated } from "@/lib/guard";
-import { SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, scrubText, type PhotoRef, type SiteField } from "./site";
+import { SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, recordedPerAcre, scrubText, type PhotoRef, type SiteField } from "./site";
 
 type DealFile = {
   features?: {
@@ -108,8 +108,7 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
     if (row.county_value_basis) next.county_value_basis = row.county_value_basis;
     if (row.land_value) next.land_value = numberOrNull(row.land_value);
     if (row.improvement_value) next.improvement_value = numberOrNull(row.improvement_value);
-    const perAcre = asking != null && acres ? Math.round((asking / acres) * 100) / 100 : null;
-    next.price_per_acre = perAcre;
+    next.price_per_acre = recordedPerAcre(row.facts?.price_per_acre || "", cells["Asking price ($)"] || row.asking_price, cells["Land (acres)"] || row.acreage);
     if (row.facts) {
       for (const [key, value] of Object.entries(row.facts)) {
         if (!value || key === "price_per_acre") continue;

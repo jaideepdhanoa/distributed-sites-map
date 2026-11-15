@@ -1,15 +1,22 @@
 name: Neon preview branch cleanup
 
-# Deletes Neon branches named preview/<name> when a pull request closes.
-# The shared branch named preview, and any primary, default, or protected
-# branch, are left alone. Per-deployment preview branches are what hit the
-# Neon branch limit ("Resource provisioning failed").
+# When a pull request closes, delete the Neon branch named preview/<head ref>
+# and leave every other branch alone. A manual run lists stale preview/*
+# branches whose pull request is closed. Dry run is the default, so a manual
+# run deletes nothing unless dry run is turned off.
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List stale preview branches for closed pull requests and do not delete them
+        type: boolean
+        default: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   cleanup:
@@ -19,21 +26,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Delete closed preview branches
+      - name: Delete the closed preview branch
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          # The head ref stays in the environment. The shell below only
+          # reads the quoted variable. Do not move the GitHub expression
+          # into the run script.
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          CLEANUP_DRY_RUN: ${{ (github.event_name != 'workflow_dispatch' || (inputs.dry_run != false && inputs.dry_run != 'false')) && '1' || '0' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
             {
               echo "## Neon preview branch cleanup skipped"
               echo
               echo "Set the secret NEON_API_KEY and the variable NEON_PROJECT_ID."
-              echo "This job deletes branches named preview/<name> after a pull request closes."
-              echo "It never deletes the branch named preview, or a primary, default, or protected branch."
+              echo "When a pull request closes, this job deletes only the branch named preview/<head ref>."
+              echo "It never deletes the shared preview branch, or a primary, default, protected, or production branch."
+              echo "An empty head ref deletes nothing."
+              echo "A manual run lists stale preview branches and deletes nothing unless dry run is off."
             } >> "$GITHUB_STEP_SUMMARY"
             echo "NEON_API_KEY or NEON_PROJECT_ID is not set. Skipping."
             exit 0
           fi
           npm ci
-          npx tsx scripts/neon-preview-cleanup.ts
+          PR_HEAD_REF="${PR_HEAD_REF-}" npx tsx scripts/neon-preview-cleanup.ts

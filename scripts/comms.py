@@ -17,6 +17,8 @@ FIXTURE = ROOT / "data" / "fixtures" / "comms.json"
 SHEET = "Comms Log"
 SITE_ID = re.compile(r"^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$")
 KNOWN_DIRECTIONS = {"in", "out", "internal"}
+# The public snapshot and the map line stay short. The database import reads
+# the Comms Log through the Sheets client and stores the full summary.
 SUMMARY_LIMIT = 300
 
 HEADERS = (
@@ -48,9 +50,11 @@ def _text(value) -> str:
     return str(value).strip()
 
 
-def _summary(value) -> str:
+def _summary(value, *, clip: bool = True) -> str:
     text = " ".join(_text(value).split())
-    return text[:SUMMARY_LIMIT]
+    if clip and len(text) > SUMMARY_LIMIT:
+        return text[:SUMMARY_LIMIT]
+    return text
 
 
 def _when(value) -> str:
@@ -94,7 +98,7 @@ def site_tokens(value) -> list[str]:
     return found
 
 
-def normalize_row(row: dict) -> dict | None:
+def normalize_row(row: dict, *, clip: bool = True) -> dict | None:
     comms_id = _text(row.get("Comms ID"))
     if not comms_id:
         return None
@@ -108,7 +112,7 @@ def normalize_row(row: dict) -> dict | None:
         "person": _text(row.get("Counterparty person")),
         "firm": _text(row.get("Counterparty firm")),
         "channel": _text(row.get("Channel")),
-        "summary": _summary(row.get("Summary")),
+        "summary": _summary(row.get("Summary"), clip=clip),
         "asks_made": _text(row.get("Asks made")),
         "asks_answered": _text(row.get("Asks answered")),
         "attachments": _text(row.get("Attachments")),
@@ -144,7 +148,7 @@ def _header_cells(values) -> list[str]:
     return [_text(cell) for cell in values]
 
 
-def records_from_table(header: list[str], data_rows: list) -> list[dict]:
+def records_from_table(header: list[str], data_rows: list, *, clip: bool = True) -> list[dict]:
     rows: list[dict] = []
     for values in data_rows:
         if values is None:
@@ -156,7 +160,7 @@ def records_from_table(header: list[str], data_rows: list) -> list[dict]:
         for index, key in enumerate(header):
             if key and index < len(cells):
                 row[key] = cells[index]
-        item = normalize_row(row)
+        item = normalize_row(row, clip=clip)
         if item:
             rows.append(item)
     return rows
@@ -171,7 +175,7 @@ def workbook_has_comms(workbook) -> bool:
     return "Comms ID" in _header_cells(rows[0])
 
 
-def read_workbook_snapshot(path: Path) -> dict:
+def read_workbook_snapshot(path: Path, *, clip: bool = True) -> dict:
     import openpyxl
 
     book = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -187,7 +191,7 @@ def read_workbook_snapshot(path: Path) -> dict:
         header = _header_cells(table[0])
         data = table[1:]
     return build_payload(
-        records_from_table(header, data),
+        records_from_table(header, data, clip=clip),
         source="workbook",
         label="Read-only snapshot of the Comms Log tab.",
         as_of="",
@@ -226,3 +230,24 @@ def write_comms_file(workbook: Path, destination: Path) -> dict:
         "rows": len(payload["rows"]),
         "sites": len(payload["sites"]),
     }
+
+
+def write_full_comms_file(workbook: Path, destination: Path) -> dict:
+    """Full summaries for the database import and the shadow diff.
+
+    The public snapshot stays clipped. This file is not committed and is not
+    written under data/generated.
+    """
+    from scripts.build_data import scan_obj
+
+    path = destination.resolve()
+    generated = (ROOT / "data" / "generated").resolve()
+    if path == generated or generated in path.parents:
+        raise SystemExit("COMMS_FULL_PATH must not be inside data/generated.")
+    payload = read_workbook_snapshot(workbook, clip=False)
+    problems = scan_obj(payload, "comms")
+    if problems:
+        raise SystemExit("Comms payload failed the data check:\n" + "\n".join(problems[:20]))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return {"rows": len(payload["rows"])}

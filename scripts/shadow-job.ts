@@ -2,6 +2,9 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
 import { diffDatabase, publicDiffReport, renderReport } from "../lib/changes/diff";
+import { MIRROR_SHEETS_SCOPE } from "../lib/changes/mirror";
+import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
+import { overlaySummaryMap, readCommsSummaries } from "../lib/changes/summaries";
 import { assertProductionDiff } from "../lib/changes/guard";
 import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
 import { unpackFile } from "../lib/snapshot/pack";
@@ -26,7 +29,7 @@ function disk(name: string): string {
   return readFileSync(join(process.cwd(), "data", "generated", name), "utf8");
 }
 
-async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookSlice }> {
+async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookSlice; sheetSummaries: boolean }> {
   const bundle = await selectLiveBundle(sql);
   const read = (name: string): string => {
     const packed = bundle?.files[name];
@@ -48,16 +51,17 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
       sheet = "";
     }
   }
-  return {
-    label,
-    slice: workbookFromFiles({
-      deals: read("deals.geojson"),
-      timeline: read("timeline.json"),
-      comms: read("comms.json"),
-      pricing,
-      sheet,
-    }),
-  };
+  const slice = workbookFromFiles({
+    deals: read("deals.geojson"),
+    timeline: read("timeline.json"),
+    comms: read("comms.json"),
+    pricing,
+    sheet,
+  });
+  const google = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
+  if (!google) return { label, slice, sheetSummaries: false };
+  const full = await readCommsSummaries(await sheetsAccessToken(google, MIRROR_SHEETS_SCOPE));
+  return { label, slice: overlaySummaryMap(slice, full), sheetSummaries: full.size > 0 };
 }
 
 async function main(): Promise<void> {
@@ -81,6 +85,9 @@ async function main(): Promise<void> {
     const rendered = renderReport(report);
     if (!ready.rows[0]?.sites) {
       summary("Site rows were not compared. The sites table is not on production. Run the Production migrations workflow.\n");
+    }
+    if (!loaded.sheetSummaries) {
+      summary("The Comms Log was not read. A database summary that is only a clipped prefix of the sheet is not flagged. GOOGLE_SERVICE_ACCOUNT_JSON was not set.\n");
     }
     if (!process.env.SITE_SHEET_PATH?.trim()) {
       summary("The private raw sheet was not on this runner. Site rows are compared to the published deals. Set SITE_SHEET_PATH to compare raw cells. That file is not in git or the snapshot.\n");

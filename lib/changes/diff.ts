@@ -1,10 +1,10 @@
 import type { Sql } from "@/lib/actions/db";
 import { importEntityFromWorkbook, type ShadowEntity } from "./flags";
-import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, parseSheet, photoCanonical, photosFromCanonical, sheetCanonical, shortHash, siteComparable, type SiteRow } from "./site";
+import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, isTruncatedCell, parseSheet, photoCanonical, photosFromCanonical, sameCommsStamp, sheetCanonical, shortHash, siteComparable, type SiteRow } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 import { issueIds, legacyStageIds, workbookIssues, type ActivityRow, type CommsRow, type RowIssue, type StageRow, type WorkbookSlice } from "./workbook";
 
-export type DiffChange = { id: string; field: string; workbook: string; database: string };
+export type DiffChange = { id: string; field: string; workbook: string; database: string; truncated?: boolean };
 
 export type EntityDiff = {
   workbook: number;
@@ -46,10 +46,43 @@ function asObject(value: unknown): Record<string, unknown> {
   return {};
 }
 
+const SENSITIVE_FIELDS = new Set([
+  "summary",
+  "source_link",
+  "subject",
+  "person",
+  "firm",
+  "link",
+  "asks_made",
+  "asks_answered",
+  "attachments",
+  "workbook_source",
+  "message_id",
+  "state_changes",
+  "thread_id",
+]);
+
+export function hideDiffValue(entity: string, field: string): boolean {
+  if (entity === "site") return true;
+  return (entity === "activity" || entity === "comms") && SENSITIVE_FIELDS.has(field);
+}
+
+function fieldChange(entity: string, field: string, workbook: string, database: string): DiffChange | null {
+  const left = workbook || "";
+  const right = database || "";
+  if (entity === "comms" && field === "at" && sameCommsStamp(left, right)) return null;
+  if ((entity === "comms" || entity === "activity") && field === "summary" && isTruncatedCell(left, right)) {
+    return { id: "", field, workbook: left, database: right, truncated: true };
+  }
+  if (left === right) return null;
+  return { id: "", field, workbook: left, database: right };
+}
+
 function compare(
   workbook: Map<string, Record<string, string>>,
   database: Map<string, Record<string, string>>,
   fields: readonly string[],
+  entity: "stage" | "activity" | "comms" | "site",
 ): EntityDiff {
   const missing: string[] = [];
   const extra: string[] = [];
@@ -61,9 +94,8 @@ function compare(
       continue;
     }
     for (const field of fields) {
-      if ((row[field] || "") !== (other[field] || "")) {
-        changed.push({ id, field, workbook: row[field] || "", database: other[field] || "" });
-      }
+      const change = fieldChange(entity, field, row[field] || "", other[field] || "");
+      if (change) changed.push({ ...change, id });
     }
   }
   for (const id of database.keys()) {
@@ -135,21 +167,25 @@ export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, wo
       stageMap(withoutIds(workbook.stages, skip.stage, (row) => row.site_id)),
       stageMap(withoutIds(database.stages, skip.stage, (row) => row.site_id)),
       STAGE_FIELDS,
+      "stage",
     ),
     activity: compare(
       activityMap(withoutIds(workbook.activities, skip.activity, (row) => row.entity_id)),
       activityMap(withoutIds(database.activities, skip.activity, (row) => row.entity_id)),
       ACTIVITY_FIELDS,
+      "activity",
     ),
     comms: compare(
       commsMap(withoutIds(workbook.comms, skip.comms, (row) => row.entity_id)),
       commsMap(withoutIds(database.comms, skip.comms, (row) => row.entity_id)),
       ["site_id", ...COMMS_FIELDS],
+      "comms",
     ),
     site: compare(
       siteMap(withoutIds(workbook.sites || [], skip.site, (row) => row.site_id)),
       siteMap(withoutIds(database.sites || [], skip.site, (row) => row.site_id)),
       siteCompareFields(workbook.sites || []),
+      "site",
     ),
   };
   const cutOver: ShadowEntity[] = [];
@@ -257,13 +293,17 @@ export async function diffDatabase(sql: Sql, workbook: WorkbookSlice, workbookSo
   return buildReport(workbook, await readDatabaseSlice(sql), workbookSource);
 }
 
-function sample(ids: string[], changes: DiffChange[], redact: boolean): string[] {
+function sample(ids: string[], changes: DiffChange[], entity: string): string[] {
   const lines: string[] = [];
   for (const id of ids.slice(0, 20)) lines.push(`- missing ${id}`);
   if (ids.length > 20) lines.push(`- and ${ids.length - 20} more missing in the artifact`);
   for (const change of changes.slice(0, 20)) {
+    if (change.truncated) {
+      lines.push(`- ${change.id} ${change.field} truncated #${shortHash(change.workbook)} #${shortHash(change.database)}`);
+      continue;
+    }
     lines.push(
-      redact
+      hideDiffValue(entity, change.field)
         ? `- ${change.id} ${change.field} #${shortHash(change.workbook)} #${shortHash(change.database)}`
         : `- ${change.id} ${change.field}: workbook ${JSON.stringify(change.workbook)}, database ${JSON.stringify(change.database)}`,
     );
@@ -272,24 +312,32 @@ function sample(ids: string[], changes: DiffChange[], redact: boolean): string[]
   return lines;
 }
 
-/** Site text stays out of logs and artifacts. The hash is enough to see that two copies differ. */
+function hashEntity(row: EntityDiff, entity: string): EntityDiff {
+  return {
+    ...row,
+    changed: row.changed.map((change) =>
+      hideDiffValue(entity, change.field) || change.truncated
+        ? { ...change, workbook: shortHash(change.workbook), database: shortHash(change.database) }
+        : change,
+    ),
+  };
+}
+
+/** Site, activity, and comms text stays out of logs and artifacts. The hash is enough to see that two copies differ. */
 export function publicDiffReport(report: DiffReport): DiffReport {
   return {
     ...report,
     invalid: {
       ...report.invalid,
+      activity: report.invalid.activity.map((issue) => (hideDiffValue("activity", issue.field) ? { ...issue, value: shortHash(issue.value) } : issue)),
+      comms: report.invalid.comms.map((issue) => (hideDiffValue("comms", issue.field) ? { ...issue, value: shortHash(issue.value) } : issue)),
       site: report.invalid.site.map((issue) => ({ ...issue, value: shortHash(issue.value) })),
     },
     entities: {
-      ...report.entities,
-      site: {
-        ...report.entities.site,
-        changed: report.entities.site.changed.map((change) => ({
-          ...change,
-          workbook: shortHash(change.workbook),
-          database: shortHash(change.database),
-        })),
-      },
+      stage: hashEntity(report.entities.stage, "stage"),
+      activity: hashEntity(report.entities.activity, "activity"),
+      comms: hashEntity(report.entities.comms, "comms"),
+      site: hashEntity(report.entities.site, "site"),
     },
   };
 }
@@ -329,7 +377,11 @@ export function renderReport(report: DiffReport): string {
     if (!issues.length) continue;
     lines.push(`### ${name} invalid`, "");
     for (const issue of issues.slice(0, 20)) {
-      lines.push(name === "site" ? `- ${issue.id} ${issue.field} #${shortHash(issue.value)}` : `- ${issue.id} ${issue.field}: ${JSON.stringify(issue.value)}`);
+      lines.push(
+        hideDiffValue(name, issue.field)
+          ? `- ${issue.id} ${issue.field} #${shortHash(issue.value)}`
+          : `- ${issue.id} ${issue.field}: ${JSON.stringify(issue.value)}`,
+      );
     }
     if (issues.length > 20) lines.push(`- and ${issues.length - 20} more in the artifact`);
     lines.push("");
@@ -338,7 +390,7 @@ export function renderReport(report: DiffReport): string {
     const row = report.entities[name];
     if (!row.missing.length && !row.extra.length && !row.changed.length) continue;
     lines.push(`### ${name}`, "");
-    lines.push(...sample(row.missing, row.changed, name === "site"));
+    lines.push(...sample(row.missing, row.changed, name));
     for (const id of row.extra.slice(0, 20)) lines.push(`- extra ${id}`);
     if (row.extra.length > 20) lines.push(`- and ${row.extra.length - 20} more extra in the artifact`);
     lines.push("");

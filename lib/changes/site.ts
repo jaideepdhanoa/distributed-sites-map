@@ -660,6 +660,35 @@ export function sameWorkbookCell(before: string, after: string): boolean {
   return datesMatch(left, right);
 }
 
+/** The database value is only a clipped prefix of the sheet cell. */
+export function isTruncatedCell(sheet: string, database: string): boolean {
+  const full = sheet.trim();
+  const short = database.trim();
+  if (!short || short.length >= full.length) return false;
+  if (full.startsWith(short)) return true;
+  const collapsed = full.replace(/\s+/g, " ").trim();
+  return short.length < collapsed.length && collapsed.startsWith(short);
+}
+
+/** A trailing Pacific label is display formatting, not a different instant. */
+export function stripPacific(value: string): string {
+  return value.trim().replace(/ PT$/i, "");
+}
+
+export function sameCommsStamp(sheet: string, database: string): boolean {
+  const left = stripPacific(sheet);
+  const right = stripPacific(database);
+  return left === right || sameWorkbookCell(left, right);
+}
+
+/** New rows follow the sheet. An existing Date/time that ends in " PT" keeps that suffix. */
+export function withSheetStamp(samples: string[], value: string): string {
+  const text = value.trim();
+  if (!text || / PT$/i.test(text)) return text;
+  const usesPacific = samples.some((cell) => / PT$/i.test(cell.trim()));
+  return usesPacific ? `${text} PT` : text;
+}
+
 const PASSING_CLASSES = new Set(["inside", "near_0_5", "near_5_10", "edge_legacy"]);
 
 export function canonicalFact(value: unknown): string {

@@ -22,8 +22,9 @@ from scripts.comms import (  # noqa: E402
     normalize_row,
     site_tokens,
     write_comms_file,
+    write_full_comms_file,
 )
-from timeline_activity import read_activity  # noqa: E402
+from timeline_activity import read_activity, workbook_event_ids  # noqa: E402
 from timeline_config import load_config  # noqa: E402
 
 
@@ -156,6 +157,36 @@ class CommsReadTest(unittest.TestCase):
             self.assertEqual(warnings, [])
             self.assertEqual(items[0]["event_id"], "A-000088")
             self.assertEqual(items[0]["source_link"], "https://mail.google.com/mail/u/0/#inbox/abcdef0123456789")
+            sheet.cell(3, 1, "A-000272")
+            sheet.cell(3, 7, "Internal")
+            book.save(path)
+            ids = workbook_event_ids(path, load_config())
+            self.assertEqual(ids, ["A-000088", "A-000272"])
+            self.assertNotIn("Document on file", ids)
+
+    def test_a_full_summary_is_kept_outside_the_public_snapshot(self) -> None:
+        long = "x" * 340
+        full = normalize_row({"Comms ID": "CM-9002", "Summary": long}, clip=False)
+        clipped = normalize_row({"Comms ID": "CM-9002", "Summary": long})
+        assert full and clipped
+        self.assertEqual(len(full["summary"]), 340)
+        self.assertEqual(len(clipped["summary"]), 300)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "book.xlsx"
+            book = _book()
+            _put(book.active, 2, {"Comms ID": "CM-0382", "Summary": long, "Direction": "in"})
+            book.save(path)
+            public = Path(folder) / "comms.json"
+            write_comms_file(path, public)
+            public_row = json.loads(public.read_text(encoding="utf-8"))["rows"][0]
+            self.assertEqual(len(public_row["summary"]), 300)
+            private = Path(folder) / "comms_full.json"
+            write_full_comms_file(path, private)
+            private_row = json.loads(private.read_text(encoding="utf-8"))["rows"][0]
+            self.assertEqual(len(private_row["summary"]), 340)
+            generated = Path(__file__).resolve().parents[1] / "data" / "generated" / "comms_full.json"
+            with self.assertRaises(SystemExit):
+                write_full_comms_file(path, generated)
 
 
 if __name__ == "__main__":

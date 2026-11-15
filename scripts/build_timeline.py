@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "generated" / "timeline.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from timeline_activity import read_activity  # noqa: E402
+from timeline_activity import read_activity, workbook_event_ids  # noqa: E402
 from timeline_config import load_config  # noqa: E402
 from timeline_drive import GoogleDriveLister, match_materials, read_workbook_records  # noqa: E402
 from timeline_gmail import load_gmail_items  # noqa: E402
@@ -48,6 +48,7 @@ def write_timeline(workbook: Path | None = None, lister=None, drive_state: str |
         records = read_workbook_records(workbook)
     known = {row["site_id"] for row in records if row.get("site_id")}
     activity, activity_warnings = read_activity(workbook, config, known if workbook else None)
+    event_ids = workbook_event_ids(workbook, config)
     drive_error = ""
     if lister is None and drive_state is None:
         lister, drive_state, drive_error = _drive_lister(config)
@@ -99,6 +100,7 @@ def write_timeline(workbook: Path | None = None, lister=None, drive_state: str |
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "records": payload_records,
         "items": items,
+        "workbook_event_ids": event_ids,
     }
     target.write_text(json.dumps(payload, indent=2) + "\n")
     return {

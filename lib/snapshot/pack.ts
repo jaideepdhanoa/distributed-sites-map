@@ -6,13 +6,19 @@ export const MAX_FILE_BYTES = 20_000_000;
 
 export type PackedFile = { content: string; bytes: number; sha256: string };
 
+export function contentSha256(body: string): string {
+  const raw = Buffer.from(body, "utf8");
+  if (raw.length > MAX_FILE_BYTES) throw new Error("A snapshot file is too large.");
+  return createHash("sha256").update(raw).digest("hex");
+}
+
 export function packFile(body: string): PackedFile {
   const raw = Buffer.from(body, "utf8");
   if (raw.length > MAX_FILE_BYTES) throw new Error("A snapshot file is too large.");
   return {
     content: gzipSync(raw).toString("base64"),
     bytes: raw.length,
-    sha256: createHash("sha256").update(raw).digest("hex"),
+    sha256: contentSha256(body),
   };
 }
 

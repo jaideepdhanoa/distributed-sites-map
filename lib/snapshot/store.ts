@@ -1,8 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
+import { hashFileDigests } from "./hash";
 import { assertFileName, packFile, rowCounts, unpackFile, type PackedFile } from "./pack";
 
+/** Floor. Rows older than SNAPSHOT_HISTORY_HOURS are deleted once this many remain. */
 export const SNAPSHOTS_KEPT = 14;
+
+/**
+ * Also keep every snapshot newer than this, even when that is more than
+ * SNAPSHOTS_KEPT. A published snapshot is about 1 MiB, so a change on every
+ * 15-minute run for a day is about 100 MiB. Neon Free allows 1 GB per project.
+ */
+export const SNAPSHOT_HISTORY_HOURS = 24;
 
 export type SnapshotFileInput = { name: string; body: string };
 
@@ -134,13 +143,15 @@ export async function publishSnapshot(sql: Sql, input: PublishInput): Promise<Pu
     if (flipped.rows.length !== 1) throw new Error("The snapshot did not become live.");
     await sql.query(
       `DELETE FROM snapshots
-       WHERE id IN (
-         SELECT id FROM snapshots
-         WHERE status <> 'live'
-         ORDER BY created_at DESC, id DESC
-         OFFSET $1
-       )`,
-      [SNAPSHOTS_KEPT - 1],
+       WHERE status <> 'live'
+         AND created_at < clock_timestamp() - ($2::int * interval '1 hour')
+         AND id NOT IN (
+           SELECT id FROM snapshots
+           WHERE status <> 'live'
+           ORDER BY created_at DESC, id DESC
+           LIMIT $1
+         )`,
+      [SNAPSHOTS_KEPT - 1, SNAPSHOT_HISTORY_HOURS],
     );
     await sql.exec("COMMIT");
     return { id, createdAt: iso(flipped.rows[0].created_at) || "", rowCounts: storedCounts };
@@ -152,6 +163,21 @@ export async function publishSnapshot(sql: Sql, input: PublishInput): Promise<Pu
     }
     throw error;
   }
+}
+
+/** Hash of the live snapshot's file digests, or null when nothing is live. */
+export async function liveContentHash(sql: Sql): Promise<string | null> {
+  const found = await sql.query<{ id: string }>(
+    `SELECT id FROM snapshots WHERE status = 'live' ORDER BY created_at DESC, id DESC LIMIT 1`,
+  );
+  const id = found.rows[0]?.id;
+  if (!id) return null;
+  const files = await sql.query<{ name: string; sha256: string }>(
+    `SELECT name, sha256 FROM snapshot_files WHERE snapshot_id = $1`,
+    [id],
+  );
+  if (!files.rows.length) return null;
+  return hashFileDigests(files.rows);
 }
 
 export async function selectLive(sql: Sql): Promise<LiveSnapshot | null> {

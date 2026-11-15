@@ -73,6 +73,12 @@ Workbook sync writes `data/generated` into Neon after the same checks that used 
 
 GitHub secret `NEON_DATABASE_URL` is the production pooled connection string. Put it on the repository, not in Vercel, and do not commit it. The app reads `DATABASE_URL` only. If `NEON_DATABASE_URL` is missing, the job prints a notice, skips the write, and still opens a pull request. GitHub secret `CRON_SECRET` must match the Vercel `CRON_SECRET`. The job sends `Authorization: Bearer` to `POST /api/data/revalidate` on `https://distributedsites.com`. If that secret is missing, the job continues and the cache expires on its own within about five minutes.
 
+The schedule is every 15 minutes. A run takes about 7 minutes, and the concurrency group `workbook-sync` waits for the current run instead of starting a second one. After the rebuild, the job hashes the generated json, geojson, and csv files, the same files a snapshot stores. The last published digest is kept in the GitHub Actions cache under the prefix `workbook-sync-published-`. It is not stored in Neon and it is not committed. Restoring that cache does not open a database connection. When the new digest matches, the job skips the publish and the cache refresh and exits successfully. GitHub drops a cache that is not restored for 7 days. An unchanged sheet restores it on every run, so the entry stays. If the cache is missing, the job reads the live snapshot's file hashes once, still skips the write when they match, and then saves the cache.
+
+The Pipeline workbook is exported once per run. Drive `files.export` costs 200 quota units. Ninety-six runs a day is 19,200 units, against a per-user cap of 325,000 units a minute and a daily billing threshold of 400,000,000 units. The inputs folder can add one export when reconciliation is a native Sheet. That remains a small fraction of the quota. The hash does not export the Sheet again. This repository is public and the job uses `ubuntu-latest`, a standard runner. Standard runners are free on public repositories, so those minutes are not billed. A larger runner would be billed.
+
+A failed data check does not publish and does not open a new pull request. When an open sync pull request has only `github-actions[bot]` commits since main, the failed run updates that branch. It does not force-push over anyone else's commits. An unchanged hash does not open a pull request.
+
 The repository variable `WORKBOOK_SYNC_OPEN_PR` defaults to unset, which means a successful database write does not open a pull request. Set it to `true` to keep opening that pull request as well.
 
 To roll back to files:
@@ -83,7 +89,7 @@ To roll back to files:
 
 To see which snapshot is live, sign in and request `GET /api/actions/status`. The JSON includes `snapshot_id`, `snapshot_created_at`, and `snapshot_source` (`database` or `files`). `GET /api/data/funnel` repeats the id and time under `meta`. The Actions job summary prints them after a publish.
 
-Preview deployments get their own Neon branch from the Vercel Neon integration, and they read that branch's `DATABASE_URL`. The sync job is the only writer. It refuses to run inside Vercel, and it refuses to refresh any host other than the production site. A preview cannot publish a production snapshot. The job keeps the last 14 snapshots and deletes older ones in the same transaction as the publish. A failed check or a failed write leaves the previous live snapshot in place.
+Preview deployments get their own Neon branch from the Vercel Neon integration, and they read that branch's `DATABASE_URL`. The sync job is the only writer. It refuses to run inside Vercel, and it refuses to refresh any host other than the production site. A preview cannot publish a production snapshot. The job keeps every snapshot from the last 24 hours, and it always keeps at least the last 14. Fourteen snapshots at a publish every 15 minutes would be about three and a half hours. Unchanged runs no longer publish, so a quiet sheet's 14 rows can span days. A snapshot is about 1 MiB after compression. The generated files are about 8 MiB before that. A change on every run for a full day is about 100 MiB, and Neon Free allows 1 GB per project, so that day of history is cheap. A failed check or a failed write leaves the previous live snapshot in place.
 
 ### Roles
 
@@ -209,7 +215,7 @@ Verdict rows are append-only in `data/verdicts/verdicts.csv`. Pull requests run 
 
 A scheduled workflow exports the Pipeline Sheet and reads the other build inputs from a Drive folder named Map sync inputs. The folder id is the repository variable `MAP_SYNC_INPUTS_FOLDER_ID`. There is no default, and the sync does not look in the program root. It lists only the top level of that folder.
 
-The service account needs Viewer on the Pipeline workbook and on Map sync inputs. That is enough for the Open site folder link: each sync copies column AE onto the deal and onto the universe site the panel opens. It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request. A passing sync with `NEON_DATABASE_URL` set publishes a Neon snapshot instead of opening that pull request. The details are under Workbook snapshots.
+The service account needs Viewer on the Pipeline workbook and on Map sync inputs. That is enough for the Open site folder link: each sync copies column AE onto the deal and onto the universe site the panel opens. It does not need access to the program root. The workflow never writes to Drive or the Sheet, and it never merges its pull request. A passing sync with `NEON_DATABASE_URL` set publishes a Neon snapshot when the generated data changed, and does not connect to Neon when the hash matches the last publish. It opens or updates one pull request when that publish did not happen. The details are under Workbook snapshots.
 
 Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk`) must be shared with `sites-map-sync@sites-map-sync.iam.gserviceaccount.com` as Viewer, and each site folder must inherit that access. A site folder set to limited access stays invisible. The card link still ships from column AE. The sync comment's "Matched folders" counts only folders that account listed under 2 Sites. "Sheet folder links" counts column AE. Those two numbers differ when the account cannot see a folder.
 
@@ -217,9 +223,9 @@ Materials counts need one more share. `2 Sites` (`TIMELINE_SITES_FOLDER_ID`, `1_
 
 ### Universe gap
 
-Universe stays a strict superset of every Pipeline or Land deal that already has a location in LAS, PHX, or MIA. The map links that deal to a counted Universe row by parcel or a unique street. The market is the deal's city field. Workbook sync reads the Sheet and publishes a snapshot when `NEON_DATABASE_URL` is set. It opens a pull request when that publish did not happen, or when `WORKBOOK_SYNC_OPEN_PR` is `true`. It leaves the Sheet unchanged.
+Universe stays a strict superset of every Pipeline or Land deal that already has a location in LAS, PHX, or MIA. The map links that deal to a counted Universe row by parcel or a unique street. The market is the deal's city field. Workbook sync reads the Sheet and publishes a snapshot when `NEON_DATABASE_URL` is set and the generated data changed. It opens or updates one pull request when that publish did not happen, or when `WORKBOOK_SYNC_OPEN_PR` is `true`. It leaves the Sheet unchanged.
 
-`python scripts/build_data.py --gap-gate` prints every located LAS, PHX, and MIA deal id that has no `universe_id`. The check fails when that count is above zero. Inside those three markets there is no exception list. A located deal in another market, including SNA, is listed when a sync pull request is opened and does not fail the check. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync runs the gate before it publishes a snapshot or opens a pull request. A red gate publishes nothing and does not open a pull request. The previous live snapshot stays, and the Actions summary lists the deal ids.
+`python scripts/build_data.py --gap-gate` prints every located LAS, PHX, and MIA deal id that has no `universe_id`. The check fails when that count is above zero. Inside those three markets there is no exception list. A located deal in another market, including SNA, is listed when a sync pull request is opened and does not fail the check. `python scripts/build_data.py --check` runs the same gate. Pull requests run both steps. Workbook sync runs the gate before it publishes a snapshot or opens a pull request. A red gate publishes nothing and does not open a pull request. If a bot sync pull request is already open and every commit on it since main is by github-actions[bot], the failed run updates that branch instead of opening another one. It does not force-push over anyone else's commits. The previous live snapshot stays, and the Actions summary lists the deal ids.
 
 On 5 Nov 2026 Jaideep kept PIPE-SNA-0002 (Newport Beach) outside this check. The map does not assign that deal a LAS, PHX, or MIA market, and it does not require an SNA Universe row. The map does not mint a row, invent a coordinate, or invent a parcel number.
 
@@ -423,7 +429,7 @@ Without `XAI_API_KEY`, the panel says Ask isn't set up yet. Usage by user and da
 
 ## Not in this version
 
-- The workbook sync opens a pull request every four hours when the data changed. It does not merge, and it does not write back to the Sheet.
+- The workbook sync runs every 15 minutes. It publishes a snapshot when the generated data changed, and it opens or updates a pull request when that publish did not happen. It does not merge, and it does not write back to the Sheet.
 - Parcel outlines are drawn for Clark, Maricopa, Miami-Dade, and Broward. A folio or parcel number is tried first, then the pin. Broward uses the County Property Appraiser parcel layer. Same-owner adjoining outlines are drawn where the site record has adjoining spare land.
 - The 75–250 m review band was not recomputed. Two same-parcel pairs are counted once.
 - No write-back of a human call, and no PDF export. The current view exports to CSV.

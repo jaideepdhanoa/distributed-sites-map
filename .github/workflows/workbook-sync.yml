@@ -1,14 +1,52 @@
 name: Workbook sync
 
-# Every four hours. This schedule stays. The job does not deploy to Vercel.
-# When NEON_DATABASE_URL is set and the data checks pass, the job writes a
-# snapshot to the production database and refreshes the production cache.
-# It opens a pull request when that write did not happen, or when the
-# repository variable WORKBOOK_SYNC_OPEN_PR is true.
+# Every 15 minutes. A run takes about 7 minutes. The concurrency group queues
+# the next run and does not cancel the one that is already publishing.
+# The job does not deploy to Vercel.
+#
+# GitHub Actions minutes: this repository is public and the job uses
+# ubuntu-latest, a standard runner. Standard runners are free and unlimited
+# on public repositories, so 96 runs a day are not billed. Do not move this
+# job to a larger runner. Those are billed even on public repositories.
+#
+# Google Drive: the Pipeline workbook is exported once per run
+# (files.export, 200 quota units). 96 runs use 19,200 units a day. The
+# per-user cap is 325,000 units a minute, and the daily billing threshold
+# is 400,000,000 units. The inputs folder can add one export when
+# reconciliation is a native Sheet. The hash below is local and does not
+# export the Sheet again.
+#
+# Neon: after the rebuild, hash the generated json, geojson, and csv files.
+# The last published hash is kept in the Actions cache (prefix
+# workbook-sync-published-), not in Neon and not in a commit. Restoring
+# that cache does not open a database connection. A match skips the publish
+# and the cache refresh. GitHub drops a cache that is not restored for 7
+# days. An unchanged sheet restores it every run, so the entry stays. If
+# the cache is missing, one read of the live snapshot's file hashes runs.
+# A match still skips the write and the refresh, and the hash is then saved.
+# The cache is otherwise saved only after a successful publish.
+#
+# Pull requests: when the data checks fail, or the publish did not happen,
+# update the open bot sync pull request if every commit on it since main is
+# by github-actions[bot]. Do not open a second pull request, and do not
+# force-push over anyone else's commits. An unchanged hash does not open a
+# pull request. A failed universe-row check updates that same pull request
+# and does not open a new one.
+#
+# Snapshots: 14 rows at a publish every 15 minutes would be about 3.5 hours.
+# Unchanged runs no longer publish, so a quiet sheet's 14 rows can span
+# days. A snapshot is about 1 MiB. Keeping every changed snapshot from the
+# last 24 hours, and at least the last 14, is about 100 MiB if the sheet
+# changes on every run. Neon Free allows 1 GB per project, so that day of
+# history stays.
 on:
   schedule:
-    - cron: "0 */4 * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
+
+concurrency:
+  group: workbook-sync
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -45,26 +83,72 @@ jobs:
           fi
           python scripts/sync_workbook.py
           python scripts/build_data.py
-      - name: See whether generated data changed
-        id: diff
+      - name: Hash the generated data
+        id: hash
+        run: python scripts/snapshot_hash.py > /tmp/snapshot-hash
+      - name: Restore the last published hash
+        uses: actions/cache/restore@v4
+        with:
+          path: .workbook-sync-cache/published-hash
+          key: workbook-sync-published-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            workbook-sync-published-
+      - name: Compare with the last published snapshot
+        id: same
         run: |
-          if git diff --quiet -- data/generated data/drift_report.csv data/workbook_stages.json \
-            && [ -z "$(git ls-files --others --exclude-standard -- data/generated data/drift_report.csv data/workbook_stages.json)" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No data change."
+          current=$(tr -d '[:space:]' < /tmp/snapshot-hash)
+          if ! printf '%s' "$current" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "The generated hash is not a sha256." >&2
+            exit 1
+          fi
+          previous=""
+          if [ -f .workbook-sync-cache/published-hash ]; then
+            previous=$(tr -d '[:space:]' < .workbook-sync-cache/published-hash)
+          fi
+          if ! printf '%s' "$previous" | grep -Eq '^[0-9a-f]{64}$'; then
+            previous=""
+          fi
+          if [ -n "$previous" ] && [ "$previous" = "$current" ]; then
+            echo "unchanged=true" >> "$GITHUB_OUTPUT"
+            echo "cached=true" >> "$GITHUB_OUTPUT"
+            echo "Generated data matches the last published snapshot. Not connecting to Neon."
+            {
+              echo "## Snapshot unchanged"
+              echo
+              echo "The generated data matches the last published snapshot. The database was not contacted, and the cache was not refreshed."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "unchanged=false" >> "$GITHUB_OUTPUT"
+          if [ -n "$previous" ]; then
+            echo "cached=true" >> "$GITHUB_OUTPUT"
+            echo "Generated data differs from the last published snapshot."
           else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "cached=false" >> "$GITHUB_OUTPUT"
+            echo "No published hash is cached."
           fi
       - name: Install test dependencies
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.same.outputs.unchanged != 'true'
         run: npm ci
+      - name: Compare with the live snapshot when no hash is cached
+        id: live
+        if: steps.same.outputs.unchanged != 'true' && steps.same.outputs.cached != 'true'
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          if [ -z "$NEON_DATABASE_URL" ]; then
+            echo "unchanged=false" >> "$GITHUB_OUTPUT"
+            echo "No cached hash, and NEON_DATABASE_URL is not set."
+            exit 0
+          fi
+          npx tsx scripts/snapshot-match.ts
       - name: Data checks
         id: checks
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true'
         continue-on-error: true
         run: python scripts/run_sync_checks.py /tmp/sync-test-results.md
       - name: Report failed data checks
-        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'failure'
+        if: steps.checks.outcome == 'failure'
         run: |
           {
             echo "## Workbook sync data checks failed"
@@ -76,7 +160,8 @@ jobs:
           echo "::error::Data checks failed. No snapshot was published."
       - name: Located deals without a universe row
         id: gap
-        if: steps.rebuild.outcome == 'success'
+        if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true'
+        continue-on-error: true
         run: |
           if ! python scripts/build_data.py --gap-gate > /tmp/gap-gate.txt 2>&1; then
             {
@@ -93,7 +178,7 @@ jobs:
           cat /tmp/gap-gate.txt
       - name: Publish the snapshot
         id: publish
-        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success'
+        if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success'
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -121,8 +206,22 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SNAPSHOT_REVALIDATE_URL: ${{ vars.SNAPSHOT_REVALIDATE_URL }}
         run: npx tsx scripts/revalidate-snapshot.ts
+      - name: Record the published hash
+        id: record-hash
+        if: steps.publish.outputs.published == 'true' || steps.live.outputs.unchanged == 'true'
+        run: |
+          mkdir -p .workbook-sync-cache
+          tr -d '[:space:]' < /tmp/snapshot-hash > .workbook-sync-cache/published-hash
+          echo >> .workbook-sync-cache/published-hash
+      - name: Save the published hash
+        if: steps.record-hash.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: .workbook-sync-cache/published-hash
+          key: workbook-sync-published-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Open or update the sync pull request
-        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success' && (steps.publish.outputs.published != 'true' || vars.WORKBOOK_SYNC_OPEN_PR == 'true')
+        if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true' && (steps.checks.outcome == 'failure' || steps.gap.outcome == 'failure' || (steps.checks.outcome == 'success' && steps.gap.outcome == 'success' && (steps.publish.outputs.published != 'true' || vars.WORKBOOK_SYNC_OPEN_PR == 'true')))
         env:
           # Pull requests opened with github.token are authored by
           # github-actions[bot]. On this public repository those pull_request
@@ -139,6 +238,8 @@ jobs:
           # expires is a problem; mint an installation token in this step and
           # pass it as GH_TOKEN.
           GH_TOKEN: ${{ secrets.SYNC_GITHUB_TOKEN || github.token }}
+          SYNC_DISCOVER_PR: "1"
+          SYNC_UPDATE_ONLY: ${{ (steps.checks.outcome == 'failure' || steps.gap.outcome == 'failure') && '1' || '' }}
         run: |
           DATE=$(date -u +%Y-%m-%d)
           BRANCH="workbook-sync-$DATE"
@@ -149,6 +250,10 @@ jobs:
           if [ -f data/generated/timeline.json ]; then
             git add data/generated/timeline.json
           fi
+          if git diff --cached --quiet; then
+            echo "Nothing to commit. No pull request."
+            exit 0
+          fi
           git commit -m "Workbook sync $DATE"
           TITLE="Workbook sync $DATE"
           python scripts/sync_workbook.py --pr-body /tmp/sync-pr-body.md
@@ -158,18 +263,26 @@ jobs:
           export SYNC_PR_TITLE="$TITLE"
           export SYNC_PR_BODY="$(cat /tmp/sync-pr-body.md)"
           bash scripts/open_sync_pr.sh "$BRANCH"
+          if [ ! -s /tmp/sync-pr-number ]; then
+            echo "No sync pull request to comment on."
+            exit 0
+          fi
           BRANCH="$(cat /tmp/sync-branch)"
           echo "branch=$BRANCH" >> "$GITHUB_ENV"
           python scripts/sync_workbook.py --comment
           gh pr comment "$(cat /tmp/sync-pr-number)" --body-file /tmp/drift-comment.md
       - name: Start the checks the bot pull request cannot start itself
-        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success' && (steps.publish.outputs.published != 'true' || vars.WORKBOOK_SYNC_OPEN_PR == 'true')
+        if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true' && steps.checks.outcome == 'success' && steps.gap.outcome == 'success' && (steps.publish.outputs.published != 'true' || vars.WORKBOOK_SYNC_OPEN_PR == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           SYNC_TOKEN_IS_DEFAULT: ${{ secrets.SYNC_GITHUB_TOKEN == '' && 'true' || 'false' }}
         run: |
           if [ "$SYNC_TOKEN_IS_DEFAULT" != "true" ]; then
             echo "SYNC_GITHUB_TOKEN is set. pull_request workflows start on their own."
+            exit 0
+          fi
+          if [ ! -s /tmp/sync-branch ]; then
+            echo "No sync branch to dispatch."
             exit 0
           fi
           # workflow_dispatch is the one event GITHUB_TOKEN is allowed to
@@ -185,5 +298,5 @@ jobs:
             fi
           done
       - name: Fail when the data checks failed
-        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'failure'
+        if: steps.checks.outcome == 'failure' || steps.gap.outcome == 'failure'
         run: exit 1

@@ -102,13 +102,24 @@ test("only one live row is allowed", async () => {
   assert.equal(await countSnapshots(sql), 1);
 });
 
-test("older snapshots are pruned to the last 14", async () => {
+test("a busy day keeps every snapshot from the last 24 hours", async () => {
   const sql = await ready();
   let last = "";
   for (let index = 0; index < SNAPSHOTS_KEPT + 2; index += 1) {
     const published = await publishSnapshot(sql, input(JSON.stringify({ n: index }), "changes.json"));
     last = published.id;
   }
-  assert.equal(await countSnapshots(sql), SNAPSHOTS_KEPT);
+  assert.equal(await countSnapshots(sql), SNAPSHOTS_KEPT + 2);
   assert.equal((await selectLive(sql))?.id, last);
+});
+
+test("snapshots older than a day are pruned down to the last 14", async () => {
+  const sql = await ready();
+  for (let index = 0; index < SNAPSHOTS_KEPT + 3; index += 1) {
+    await publishSnapshot(sql, input(JSON.stringify({ n: index }), "changes.json"));
+  }
+  await sql.query(`UPDATE snapshots SET created_at = clock_timestamp() - interval '48 hours'`);
+  const published = await publishSnapshot(sql, input(JSON.stringify({ n: "fresh" }), "changes.json"));
+  assert.equal(await countSnapshots(sql), SNAPSHOTS_KEPT);
+  assert.equal((await selectLive(sql))?.id, published.id);
 });

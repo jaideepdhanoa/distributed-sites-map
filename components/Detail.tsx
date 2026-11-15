@@ -55,6 +55,7 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           if (!sheet?.onSnap) return;
           const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
           if (!drawer) return;
+          ignoreClick.current = false;
           drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
@@ -79,7 +80,6 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
             return;
           }
           ignoreClick.current = true;
-          queueMicrotask(() => { ignoreClick.current = false; });
           const height = drawer.getBoundingClientRect().height;
           drawer.style.height = "";
           sheet.onSnap(nearestSheetSnap(height, window.innerHeight));

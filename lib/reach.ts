@@ -83,8 +83,8 @@ export function areaCounts(records: AreaInput[], reach: Reach = REACH_DEFAULT): 
 export function serviceAreaSplit(records: AreaInput[], reach: Reach = REACH_DEFAULT): string {
   const counts = areaCounts(records, reach);
   const parts = [`Inside ${counts.inside.toLocaleString("en-US")}`];
-  if (reach !== "inside") parts.push(`Within 5 mi outside ${counts.near_0_5.toLocaleString("en-US")}`);
-  if (reach === "within10") parts.push(`Within 10 mi outside ${counts.near_5_10.toLocaleString("en-US")}`);
+  if (reach !== "inside") parts.push(`Near, under 5 mi ${counts.near_0_5.toLocaleString("en-US")}`);
+  if (reach === "within10") parts.push(`Near, 5 to 10 mi ${counts.near_5_10.toLocaleString("en-US")}`);
   if (counts.edge_legacy) parts.push(`Edge ${counts.edge_legacy.toLocaleString("en-US")}`);
   return parts.join(" · ");
 }

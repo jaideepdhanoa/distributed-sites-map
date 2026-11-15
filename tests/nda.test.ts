@@ -6,6 +6,7 @@ import {
   blockerSentenceForDeal,
   coveredSites,
   courtDayCount,
+  gateLabel,
   cardNdaLabel,
   ndaChip,
   ndaQueueAllowed,
@@ -76,6 +77,7 @@ test("an unlinked site reads Not required and never Not started", () => {
   assert.equal(ndaChip({ nda_status: "Not started" }), "Not required");
   assert.equal(ndaChip({ nda_id: "NDA-001", nda_status: "Not started" }), "Not required");
   assert.equal(ndaChip({ nda_status: "Not required", nda_waiting_on: "—", nda_gates: "None — not gating (R-076)" }), "Not required");
+  assert.equal(gateLabel("None — not gating (R-076)"), "None — not gating");
   assert.equal(ndaChip(deal({})).includes("Not started"), false);
   const overlaid = overlayDeals({ features: [{ properties: { deal_id: "PIPE-PHX-0001" } }] }, snapshot);
   assert.equal(ndaChip(overlaid.features?.[0]?.properties), "Not required");

@@ -43,7 +43,7 @@ export const PIPELINE_COLUMNS = [
   { id: "businessMultiple", label: "Business-only multiple", optional: true },
   { id: "landEstimate", label: "Land estimate", optional: true },
   { id: "countyValue", label: "County value", optional: true },
-  { id: "depot", label: "Depot mi", optional: true },
+  { id: "depot", label: "Depot", optional: true },
   { id: "checked", label: "Checked", optional: true },
   { id: "address", label: "Address", optional: true },
   { id: "apn", label: "APN", optional: true },
@@ -204,9 +204,18 @@ export function factsForSite(site: CapacityRecord | null | undefined, deal?: Cap
   return capacityFacts(deal, "site");
 }
 
+export const UNKNOWN = "—";
+export const UNKNOWN_TITLE = "Not on file";
+
 export function capacitySummary(facts: CapacityFact[]): string {
-  if (!facts.length) return "Not on file";
+  if (!facts.length) return "";
   return facts.map((fact) => fact.lines.join(", ")).join("; ");
+}
+
+/** The first measured line of each power fact. Empty when nothing is on file. */
+export function powerSummary(facts: CapacityFact[]): string {
+  if (!facts.length) return "";
+  return facts.map((fact) => fact.lines[0]).filter(Boolean).join(" · ");
 }
 
 export function basisLabel(basis?: string | null) {
@@ -240,14 +249,14 @@ export function fullMoney(value?: number | null) {
 export function sheetMoney(amount?: number | null, exact?: string | null) {
   const full = cleanFactText(exact);
   if (full) return full;
-  return fullMoney(amount) || "Not provided";
+  return fullMoney(amount) || UNKNOWN;
 }
 
 /** Short figure for a tile. The exact text stays in the tooltip and the overview. */
 export function tileAmount(amount?: number | null, exact?: string | null) {
   const full = (exact || "").trim();
   if (amount == null || !Number.isFinite(amount) || !full) {
-    return { text: full || "Not provided", title: full || "Not provided" };
+    return { text: UNKNOWN, title: UNKNOWN_TITLE };
   }
   if (Math.abs(amount) >= 10_000) {
     return { text: compactMoney(amount), title: full };
@@ -275,7 +284,7 @@ export function openLandText(value?: number | null) {
 export function spareLandSqft(sqft?: number | null, acres?: number | null) {
   if (sqft != null) return { value: openLandText(sqft), note: "Aerial check" };
   if (acres != null) return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
-  return { value: "Not measured", note: "" };
+  return { value: UNKNOWN, note: "" };
 }
 
 function daySpan(iso: string, today: Date) {
@@ -305,7 +314,7 @@ export function checkedShort(iso?: string | null, today = new Date()) {
 
 export function depotLine(miles?: number | null, hasPin = true) {
   if (!hasPin) return "No pin yet";
-  if (miles == null) return "Not provided";
+  if (miles == null || Number.isNaN(miles)) return UNKNOWN;
   return `${miles.toFixed(1)} mi`;
 }
 
@@ -482,7 +491,7 @@ export function cashTile(deal: DealProps) {
     return { value: "Package figures not shown", note: "Seller package", basis: "", extra: "", hidden: false };
   }
   const line = packageLine(deal);
-  return { value: "Not provided", note: line, basis: claimWord(deal), extra: "", hidden: false };
+  return { value: UNKNOWN, note: line || UNKNOWN_TITLE, basis: claimWord(deal), extra: "", hidden: false };
 }
 
 export function growthText(value?: number | null) {
@@ -550,7 +559,7 @@ export function vehiclesPerDay(count: number | string | null | undefined, year?:
 }
 
 export function universeTrafficLine(site?: Pick<SiteProps, "aadt_count" | "aadt_road" | "aadt_year" | "aadt_source"> | null) {
-  if (!site?.aadt_count) return "";
+  if (site?.aadt_count == null || site.aadt_count === "") return "";
   const road = shortRoad(site.aadt_road);
   const base = vehiclesPerDay(site.aadt_count, site.aadt_year);
   return road ? `${base} on ${road}` : base;

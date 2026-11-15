@@ -7,6 +7,7 @@ import {
   courtDayCount,
   coveredSites,
   dayCount,
+  gateLabel,
   queueCourt,
   type NdaAgreement,
 } from "@/lib/nda";
@@ -72,7 +73,7 @@ export default function NdaQueue({
                 <h3>{row.nda_id}{party ? ` · ${party}` : ""}</h3>
                 <p className="nda-court"><span>Court</span>{queueCourt(row)}</p>
                 {row.nda_status ? <p>{row.nda_status}</p> : null}
-                <p>Gates: {row.nda_gates || "—"}</p>
+                <p>Gates: {gateLabel(row.nda_gates) || "—"}</p>
                 <p>{clocks || "—"}</p>
                 <p>Last action: {row.nda_last_action_date || "—"}</p>
                 {sites.ids.length ? (

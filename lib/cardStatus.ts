@@ -14,41 +14,32 @@ function shownMiles(miles: number | null | undefined): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-function nearKind(record: AreaRecord | null | undefined): boolean {
+/** One name for each service-area class. Inside, edge, and unknown stay off the chip. */
+export function serviceAreaLabel(record: AreaRecord | null | undefined): string {
   const kind = record?.service_area_class || "";
-  return kind === "near_0_5" || kind === "near_5_10";
-}
-
-/** R-099 class for the card. Inside, legacy edge, and unknown stay quiet. */
-export function serviceAreaChip(record: AreaRecord | null | undefined): string {
-  if (nearKind(record)) {
-    const shown = shownMiles(record?.service_area_distance_mi);
-    return shown ? `${shown} mi outside service area` : "Outside service area";
-  }
-  if (record?.service_area_class === "outside") return "Outside · knock-out";
+  const shown = shownMiles(record?.service_area_distance_mi);
+  if (kind === "inside") return "Inside";
+  if (kind === "near_0_5") return shown ? `Near, ${shown} mi` : "Near, under 5 mi";
+  if (kind === "near_5_10") return shown ? `Near, ${shown} mi` : "Near, 5 to 10 mi";
+  if (kind === "outside") return "Outside";
+  if (kind === "edge_legacy") return "Edge";
   return "";
 }
 
-/** Shorter Near label for a phone row. */
+export function serviceAreaChip(record: AreaRecord | null | undefined): string {
+  const kind = record?.service_area_class || "";
+  if (!kind || kind === "inside" || kind === "edge_legacy" || kind === "unknown") return "";
+  return serviceAreaLabel(record);
+}
+
+/** Same words as the chip. A phone row does not invent a second phrase. */
 export function serviceAreaShort(record: AreaRecord | null | undefined): string {
-  if (!nearKind(record)) return serviceAreaChip(record);
-  const shown = shownMiles(record?.service_area_distance_mi);
-  return shown ? `${shown} mi outside area` : "Outside area";
+  return serviceAreaChip(record);
 }
 
 /** Class and distance from fields already on the row. Blank when the class is missing. */
 export function serviceAreaColumn(record: AreaRecord | null | undefined): string {
-  const kind = record?.service_area_class || "";
-  const name = kind === "inside" ? "Inside"
-    : kind === "near_0_5" ? "Within 5 mi outside"
-    : kind === "near_5_10" ? "Within 10 mi outside"
-    : kind === "outside" ? "Outside"
-    : kind === "edge_legacy" ? "Edge"
-    : kind === "unknown" ? "Unknown"
-    : "";
-  if (!name) return "";
-  const miles = shownMiles(record?.service_area_distance_mi);
-  return miles && kind !== "inside" ? `${name} · ${miles} mi` : name;
+  return serviceAreaLabel(record);
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

@@ -1,4 +1,4 @@
-import { courtDayCount, coveredSites, daysSince, type NdaAgreement } from "./nda";
+import { courtDayCount, coveredSites, daysSince, gateLabel, type NdaAgreement } from "./nda";
 
 export { courtDayCount };
 
@@ -273,7 +273,7 @@ export function deriveOpenLoops(snapshot: OpenLoopsSnapshot): DerivedLoops {
       stage: "",
       court: text(row.nda_waiting_on),
       days: ndaCourtDays(row, asOf),
-      detail: text(row.nda_gates) || NO_COURT,
+      detail: gateLabel(row.nda_gates) || NO_COURT,
       next_step: clip(steps.join(" · ")),
       owner: "Brief",
       parked: false,

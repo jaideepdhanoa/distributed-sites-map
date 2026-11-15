@@ -30,7 +30,7 @@ export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id">; label: string }[] = 
   { id: "site", label: "Site" },
   { id: "type", label: "Type" },
   { id: "stage", label: "Stage" },
-  { id: "spare", label: "Spare land" },
+  { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
   { id: "traffic", label: "Traffic" },
   { id: "listed", label: "Asking" },

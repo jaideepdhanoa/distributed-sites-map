@@ -27,7 +27,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(page.getByTestId("street-view-link")).toHaveText("Street View ↗");
   await expect(page.getByTestId("listing-link")).toHaveAttribute("aria-label", "Open the listing");
   await expect(page.getByTestId("card-numbers")).toContainText("Cash flow");
-  await expect(page.getByTestId("card-numbers")).toContainText("Spare land");
+  await expect(page.getByTestId("card-numbers")).toContainText("Open land");
   await expect(page.getByTestId("card-numbers")).toContainText("Bays that fit");
   await expect(page.getByTestId("card-numbers")).toContainText("Traffic");
   const step = page.getByTestId("workbook-step");
@@ -43,7 +43,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   const figures = page.getByTestId("key-strip");
   await expect(figures).toBeVisible();
   await expect(figures).toContainText("Space");
-  await expect(figures).toContainText("Capacity");
+  await expect(figures).toContainText("Power");
   await expect(figures).toContainText("Attractiveness");
   if ((page.viewportSize()?.width ?? 1440) < 768) {
     const next = new URL(page.url());

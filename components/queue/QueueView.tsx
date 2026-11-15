@@ -48,10 +48,10 @@ function reviewGroups(sites: FeedSite[]) {
 
 const STAGES = [
   { id: "any", label: "Any stage" },
-  { id: "sourced", label: "Sourced" },
   { id: "desk", label: "Desk screen" },
-  { id: "contacted", label: "Contacted" },
-  { id: "later", label: "Later stages" },
+  { id: "financial", label: "Financial screen" },
+  { id: "checks", label: "Site checks" },
+  { id: "close", label: "Offer and close" },
   { id: "dropped", label: "Dropped" },
 ];
 

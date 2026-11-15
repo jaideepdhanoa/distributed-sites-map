@@ -35,7 +35,7 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   {
     id: "tier",
     accessorFn: (row) => tierLabel(spareTier(row)),
-    header: "Spare land",
+    header: "Open land",
     cell: ({ row }) => {
       const code = spareTier(row.original);
       const label = tierLabel(code);
@@ -47,7 +47,7 @@ const columns: LegacyColumnDef<SiteProps>[] = [
   { accessorKey: "zoning", header: "Zoning" },
   { accessorKey: "flood_zone", header: "Flood" },
   { accessorKey: "year_built", header: "Year built" },
-  { accessorKey: "miles_to_depot", header: "Depot mi" },
+  { accessorKey: "miles_to_depot", header: "Depot" },
   { accessorKey: "spare_ac_own", header: "Own ac" },
   { accessorKey: "spare_ac_adjoining", header: "Adjoining ac" },
   { accessorKey: "tenure", header: "Tenure" },
@@ -79,7 +79,7 @@ export function siteCapacityText(row: SiteProps, deals: DealProps[] = []) {
 }
 
 export function siteExportHeaders() {
-  return ["Site", "Name", "City", "Spare land", "Site capacity", "Verdict", "Zoning", "Flood", "Year built", "Depot mi", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Why"];
+  return ["Site", "Name", "City", "Open land", "Power", "Verdict", "Zoning", "Flood", "Year built", "Depot", "Own ac", "Adjoining ac", "Tenure", "Confidence", "Listed", "Contacted", "Asking", "Why"];
 }
 
 export function siteExportRow(row: SiteProps, deals: DealProps[] = []) {
@@ -132,7 +132,7 @@ export default function SiteTable({
   const showWhy = rows.some((row) => row.summary_why);
   const capacityColumn: LegacyColumnDef<SiteProps> = {
     id: "site_capacity",
-    header: "Site capacity",
+    header: "Power",
     accessorFn: (row) => siteCapacityText(row, deals),
     cell: ({ row }) => {
       const facts = factsForSite(row.original, dealForSite(row.original, deals));
@@ -195,7 +195,7 @@ export default function SiteTable({
           <li key={row.site_id}>
             <button type="button" className={row.site_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.site_id)}>
               <strong>{row.name || row.address || row.site_id}</strong>
-              <span>{row.site_id} · {plainVerdict(row.verdict)}{spareTier(row) ? ` · ${tierLabel(spareTier(row))}` : ""} · Site capacity {siteCapacityText(row, deals)}</span>
+              <span>{plainVerdict(row.verdict)}{spareTier(row) ? ` · ${tierLabel(spareTier(row))}` : ""} · Power {siteCapacityText(row, deals)}</span>
               {row.summary_why ? <span className="why">{row.summary_why}</span> : null}
               {touchOf(activity, row.linked_deal_id)?.lastTouched || touchOf(activity, row.linked_deal_id)?.materials ? (
                 <span>{touchOf(activity, row.linked_deal_id)?.materials || 0} materials · {touchOf(activity, row.linked_deal_id)?.lastTouched || "—"}</span>
@@ -234,7 +234,7 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
   { id: "open_land", accessorFn: (row) => row.open_land_sqft, header: "Open land" },
   {
     id: "site_capacity",
-    header: "Site capacity",
+    header: "Power",
     accessorFn: (row) => capacitySummary(factsForDeal(row)),
     cell: ({ row }) => {
       const facts = factsForDeal(row.original);
@@ -246,7 +246,7 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
     accessorFn: (row) => row.figures_status === "withheld" ? "Package figures not shown" : (row.stated_cash_flow_display || ""),
     header: "Cash flow",
   },
-  { accessorKey: "miles_to_depot", header: "Depot mi" },
+  { accessorKey: "miles_to_depot", header: "Depot" },
   { accessorKey: "checked_live", header: "Checked" },
   { accessorKey: "universe_id", header: "Universe site" },
 ];

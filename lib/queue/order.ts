@@ -23,6 +23,14 @@ export type QueueRow = {
   newestAt: string;
 };
 
+/** Review filters use the pipeline names. Contacted is Financial screen. Later is Offer and close. */
+export function samePipelineStage(filter: string, group: string): boolean {
+  if (group === filter) return true;
+  if (filter === "financial" && group === "contacted") return true;
+  if (filter === "close" && group === "later") return true;
+  return false;
+}
+
 export type QueueFilters = {
   market?: string;
   stage?: string;
@@ -105,7 +113,7 @@ export function buildQueue(input: {
     const assigned = input.assigned.has(site.id);
     const personal = needsApproval || mentioned || assigned;
     if (!personal && input.filters.market && input.filters.market !== "all" && site.city !== input.filters.market) continue;
-    if (!personal && input.filters.stage && input.filters.stage !== "any" && site.stageGroup !== input.filters.stage) continue;
+    if (!personal && input.filters.stage && input.filters.stage !== "any" && !samePipelineStage(input.filters.stage, site.stageGroup)) continue;
     if (!personal && input.filters.viable && !site.active) continue;
     const reviewedAt = input.reviewedAt[site.id] || "";
     const reasons = (input.reasons[site.id] || []).filter((reason) => !reviewedAt || reason.at > reviewedAt);

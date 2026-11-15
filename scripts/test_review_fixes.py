@@ -8,6 +8,7 @@ from pathlib import Path
 
 from build_data import (
     classify_register_row,
+    loose_street_keys,
     match_workbook_site,
     stage_group,
     suggested_drop_rows,
@@ -50,6 +51,24 @@ class StageBuckets(unittest.TestCase):
             self.assertEqual(deal["stage"], row["stage"])
             self.assertNotEqual(deal["stage_group"], "dropped")
             self.assertEqual(stage_group(deal["stage"]), deal["stage_group"])
+
+
+class LooseStreetKeys(unittest.TestCase):
+    def test_a_five_digit_house_number_survives_a_market_prefix_and_a_zip(self):
+        self.assertEqual(loose_street_keys("PHX 16226 N 29th St"), ["16226 29"])
+        self.assertEqual(loose_street_keys("PHX 16816 N Cave Creek Rd"), ["16816 cave"])
+        self.assertEqual(loose_street_keys("16226 N 29th St, Phoenix, AZ 85032"), ["16226 29"])
+        self.assertEqual(loose_street_keys("#262 6111 W Sahara"), ["262 6111"])
+        self.assertEqual(loose_street_keys("4455 N 7th St, Phoenix, AZ 85032"), ["4455 7"])
+
+    def test_the_prefixed_street_still_matches_the_universe_row(self):
+        sites = [
+            {"site_id": "PHX-U068", "city": "PHX", "origin": "universe", "apn": "", "address": "16226 N 29th St", "name": ""},
+            {"site_id": "PHX-U092", "city": "PHX", "origin": "universe", "apn": "", "address": "16816 N Cave Creek Rd", "name": ""},
+        ]
+        by_apn, by_street = universe_match_index(sites)
+        self.assertEqual(match_workbook_site("PHX", "", "PHX 16226 N 29th St", by_apn, by_street), "PHX-U068")
+        self.assertEqual(match_workbook_site("PHX", "", "PHX 16816 N Cave Creek Rd", by_apn, by_street), "PHX-U092")
 
 
 class OneMatcher(unittest.TestCase):

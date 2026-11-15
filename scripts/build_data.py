@@ -524,16 +524,27 @@ _DIR_WORDS = (
 )
 
 
+_MARKET_PREFIX = re.compile(r"^(?:phx|las|mia|sna)\s+")
+# A 5-digit token is a ZIP when nothing street-like follows: end of the string,
+# or only a state or country. "PHX 16226 N 29th St" keeps 16226.
+_ZIP_TAIL = re.compile(
+    r"(?<=\s)\d{5}\b(?=(?:\s+(?:az|nv|fl|arizona|nevada|florida|usa|us|united\s+states))*\s*$)"
+)
+
+
 def loose_street_keys(value: str) -> list[str]:
     """House number plus the street token. City names stay, so Chandler Blvd still matches.
 
-    A trailing ZIP is removed. A 5-digit house number is kept. Store numbers such as
-    "#262 6111 W Sahara" yield the street, not the store number.
+    A leading PHX, LAS, MIA, or SNA is ignored. A 5-digit number is a ZIP only when
+    no street follows it. A 5-digit house number is kept. "#262 6111 W Sahara" still
+    pairs the store number with the house number.
     """
     text = (value or "").lower()
     text = re.sub(r"[^a-z0-9 ]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = _MARKET_PREFIX.sub("", text)
     text = re.sub(r"\b(az|nv|fl|arizona|nevada|florida)\b", " ", text)
-    text = re.sub(r"(?<=\s)\d{5}\b", " ", text)
+    text = _ZIP_TAIL.sub(" ", text)
     text = re.sub(r"\s+", " ", text).strip()
     for word, short in _DIR_WORDS:
         text = re.sub(rf"\b{word}\b", short, text)

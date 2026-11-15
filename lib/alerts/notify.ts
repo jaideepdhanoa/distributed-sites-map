@@ -4,7 +4,9 @@ import { resolveActionRole } from "@/lib/actions/roles";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
 import { discussionHref, proposalHref, reviewHref } from "./links";
+import { batchWindowMs } from "./clock";
 import { enqueueAlert, flushInstant } from "./deliver";
+import { scheduleInstantFlush } from "./schedule";
 import { loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
 
@@ -13,6 +15,16 @@ async function siteLabel(siteId: string): Promise<string> {
   const name = hit?.name?.trim();
   if (name && name !== siteId) return `${name} (${siteId})`;
   return siteId;
+}
+
+async function flushQueued(sql: Sql): Promise<void> {
+  // A zero window has nothing to coalesce. Send before the response so the row is logged.
+  // Any longer window waits in the background, measured from the oldest unsent item.
+  if (batchWindowMs() === 0) {
+    await flushInstant(sql);
+    return;
+  }
+  scheduleInstantFlush();
 }
 
 async function queueFor(
@@ -92,7 +104,7 @@ export async function notifyNote(
     href: discussionHref(input.siteId),
     refId: input.noteId,
   })) instant = true;
-  if (instant) await flushInstant(sql);
+  if (instant) await flushQueued(sql);
   await ingestNote(sql, input);
 }
 
@@ -131,7 +143,7 @@ export async function notifySuggestion(
     href: discussionHref(input.siteId),
     refId: input.id,
   })) instant = true;
-  if (instant) await flushInstant(sql);
+  if (instant) await flushQueued(sql);
   await ingestSuggestion(sql, input);
 }
 
@@ -148,6 +160,6 @@ export async function notifyFlag(
     href: reviewHref(input.siteId),
     refId: input.id,
   });
-  if (instant) await flushInstant(sql);
+  if (instant) await flushQueued(sql);
   await ingestFlag(sql, input);
 }

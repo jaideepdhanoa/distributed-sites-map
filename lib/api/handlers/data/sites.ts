@@ -59,6 +59,7 @@ const KEEP = [
   "origin",
   "miles_to_depot",
   "linked_deal_id",
+  "linked_deal_ids",
   "linked_deal_name",
   "linked_deal_stage",
   "parcel_match",

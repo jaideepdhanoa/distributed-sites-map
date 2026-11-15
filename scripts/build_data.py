@@ -2091,6 +2091,50 @@ def deal_is_c_store(kind: str, segment: str, name: str) -> bool:
     return kind == "pipeline" and is_c_store_text(segment, name)
 
 
+# A pipeline deal outranks a land deal in the same stage. Land deals still link.
+_LINK_RANK = {"desk": 0, "sourced": 1, "financial": 2, "checks": 3, "close": 4, "contacted": 2, "later": 4, "dropped": 5}
+
+
+def linked_deal_groups(features: list[dict]) -> dict[str, dict]:
+    """Deals that share one Universe row.
+
+    The primary is the deal the map already prefers. linked_deal_ids lists every
+    deal on that row, primary first, so an assemblage can keep one counted site.
+    """
+    best: dict[str, dict] = {}
+    grouped: dict[str, list[dict]] = {}
+    for feature in features:
+        props = feature.get("properties") if isinstance(feature, dict) else None
+        if not isinstance(props, dict):
+            props = feature if isinstance(feature, dict) else {}
+        universe_id = str(props.get("universe_id") or "")
+        if not universe_id:
+            continue
+        grouped.setdefault(universe_id, []).append(props)
+        score = _LINK_RANK.get(props.get("stage_group"), 9) + (0 if props.get("kind") == "pipeline" else 0.5)
+        current = best.get(universe_id)
+        current_score = (
+            _LINK_RANK.get(current.get("stage_group"), 9) + (0 if current and current.get("kind") == "pipeline" else 0.5)
+            if current
+            else 99
+        )
+        if current is None or score < current_score:
+            best[universe_id] = props
+    out: dict[str, dict] = {}
+    for universe_id, rows in grouped.items():
+        link = best.get(universe_id)
+        ids: list[str] = []
+        primary = str((link or {}).get("deal_id") or "")
+        if primary:
+            ids.append(primary)
+        for props in sorted(rows, key=lambda item: str(item.get("deal_id") or "")):
+            deal_id = str(props.get("deal_id") or "")
+            if deal_id and deal_id not in ids:
+                ids.append(deal_id)
+        out[universe_id] = {"primary": primary, "ids": ids, "props": link}
+    return out
+
+
 def business_type_from_text(raw: str) -> str:
     """Map a workbook label onto the small set of business types."""
     text = re.sub(r"\s+", " ", raw or "").strip().lower()
@@ -2764,19 +2808,7 @@ def build_deal_layer(
         "land_by_group": dict(Counter(item["properties"]["stage_group"] for item in land)),
     }
     # Prefer a live pipeline deal when several rows point at one universe site.
-    rank = {"desk": 0, "sourced": 1, "financial": 2, "checks": 3, "close": 4, "contacted": 2, "later": 4, "dropped": 5}
-    best: dict[str, dict] = {}
-    for feature in features:
-        props = feature["properties"]
-        universe_id = props["universe_id"]
-        if not universe_id:
-            continue
-        # A pipeline deal outranks a land deal in the same stage. Land deals still link.
-        score = rank.get(props["stage_group"], 9) + (0 if props["kind"] == "pipeline" else 0.5)
-        current = best.get(universe_id)
-        current_score = rank.get(current["stage_group"], 9) + (0 if current and current["kind"] == "pipeline" else 0.5) if current else 99
-        if current is None or score < current_score:
-            best[universe_id] = props
+    groups = linked_deal_groups(features)
     by_universe: dict[str, list[dict]] = {}
     for feature in features:
         uid = feature["properties"].get("universe_id") or ""
@@ -2787,8 +2819,10 @@ def build_deal_layer(
         return bool(props.get("photos") or props.get("photo_status") or props.get("street_view_url"))
 
     for site in sites:
-        link = best.get(site["site_id"])
-        site["linked_deal_id"] = link["deal_id"] if link else ""
+        group = groups.get(site["site_id"]) or {}
+        link = group.get("props")
+        site["linked_deal_id"] = group.get("primary") or ""
+        site["linked_deal_ids"] = list(group.get("ids") or [])
         site["linked_deal_name"] = link["name"] if link else ""
         site["linked_deal_stage"] = link["stage"] if link else ""
         site["contacted"] = bool(link and link.get("broker_contacted"))

@@ -1,0 +1,39 @@
+name: Workbook mirror
+
+# Manual run of the database-to-sheet copy. The 15-minute Workbook sync
+# also runs it on main when WORKBOOK_MIRROR_ENABLED is 1. This workflow
+# refuses any ref other than main. Dry run is the default and writes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the planned cell changes and do not write the Sheet
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Mirror or dry-run
+        env:
+          WORKBOOK_MIRROR_ENABLED: ${{ vars.WORKBOOK_MIRROR_ENABLED }}
+          WORKBOOK_MIRROR_DRY_RUN: ${{ (inputs.dry_run == true || inputs.dry_run == 'true') && '1' || '0' }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
+          READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
+          READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
+        run: npx tsx scripts/workbook-mirror.ts

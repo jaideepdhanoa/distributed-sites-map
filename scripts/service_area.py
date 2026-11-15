@@ -13,8 +13,9 @@ and it still passes the gate.
 
 The workbook score and the Location points cell are copied through. They are
 not recomputed from this class. On the current 100-point scale, location is
-40 points: Inside 40, Near 0-5 20, Near 5-10 10. That scale is recorded here
-so a later sync can see the rule. This module does not apply it.
+10 points (R-099(d)): Inside 10, Near 0-5 5, Near 5-10 2.5, Outside 0. That
+scale is recorded here so a later sync can see the rule. This module does not
+apply it.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ SERVICE_AREA_CLASSES = (
 PASSING_CLASSES = ("inside", "near_0_5", "near_5_10", "edge_legacy")
 EXCLUDED_CLASSES = ("outside", "unknown")
 # Documented point values. Not used to rewrite Score (of 100) or Location points.
-LOCATION_POINTS = {"inside": 40, "near_0_5": 20, "near_5_10": 10}
+LOCATION_POINTS = {"inside": 10, "near_0_5": 5, "near_5_10": 2.5, "outside": 0}
 EDGE_LABEL = "edge (not re-measured)"
 
 CLASS_HEADERS = ("Inside the service area", "Service area")
@@ -225,6 +226,71 @@ def service_area_fields(row: dict, *, where: str = "") -> tuple[dict, str | None
         "service_area_polygon": polygon,
         "in_area": passes_service_area(class_id),
     }, warning
+
+
+_DISTANCE_LABEL = {
+    "inside": "Inside",
+    "near_0_5": "Near 0-5",
+    "near_5_10": "Near 5-10",
+    "outside": "Outside",
+}
+
+
+def _distance_number(distance):
+    if distance is None or distance == "" or isinstance(distance, bool):
+        return None
+    try:
+        number = float(distance)
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return number
+
+
+def service_area_distance_agrees(class_id: str, distance) -> bool:
+    """Inside is 0 or blank. Near bands are open on the left. Outside is past 10."""
+    number = _distance_number(distance)
+    if class_id == "inside":
+        return number is None or number == 0
+    if class_id == "near_0_5":
+        return number is not None and 0 < number <= 5
+    if class_id == "near_5_10":
+        return number is not None and 5 < number <= 10
+    if class_id == "outside":
+        return number is not None and number > 10
+    return True
+
+
+def _distance_text(distance) -> str:
+    number = _distance_number(distance)
+    if number is None:
+        return "blank"
+    if number.is_integer():
+        return str(int(number))
+    return str(number)
+
+
+def service_area_distance_warning(fields: dict, *, where: str = "") -> str | None:
+    """Warn when the class and the distance band disagree. Does not fail the sync.
+
+    Inside agrees with 0 or a blank distance. Near 0-5 is more than 0 and up to 5.
+    Near 5-10 is more than 5 and up to 10. Outside is more than 10, so an Out row
+    at 10 or less disagrees. A Near row at distance 0 is called out on its own.
+    Edge and unknown have no band.
+    """
+    class_id = str((fields or {}).get("service_area_class") or "")
+    if class_id not in _DISTANCE_LABEL:
+        return None
+    distance = (fields or {}).get("service_area_distance_mi")
+    number = _distance_number(distance)
+    place = f"{where} " if where else ""
+    label = _DISTANCE_LABEL[class_id]
+    if class_id in {"near_0_5", "near_5_10"} and number == 0:
+        return f"{place}service area {label} has distance 0"
+    if service_area_distance_agrees(class_id, distance):
+        return None
+    return f"{place}service area {label} does not match distance {_distance_text(distance)}"
 
 
 def _by_city(rows: list[dict]) -> dict:

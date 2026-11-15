@@ -1,12 +1,13 @@
 """Read NDA Register and the Pipeline / Land site mirrors. Never writes the workbook.
 
 The app reads data/generated/nda.json. A workbook that does not yet have the
-NDA Register tab and the EW–FD columns keeps the committed fixture snapshot.
+NDA Register tab and the EY–FF columns keeps the committed fixture snapshot.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -16,17 +17,20 @@ FIXTURE = ROOT / "data" / "fixtures" / "nda.json"
 NOT_REQUIRED = "Not required"
 NO_VALUE = "—"
 NOT_GATING = "None — not gating (R-076)"
+LOGGER = logging.getLogger("scripts.nda")
 
-# Pipeline and Land Sites, header row 4. Letters are the fallback when a header is missing.
+# Pipeline and Land Sites, header row 4. A letter is used only when that
+# header name is missing entirely. Letters match the sheet after BA/BB
+# (Distance to service area, Service area polygon) shifted EW–FD to EY–FF.
 NDA_COLUMNS = (
-    ("EW", "NDA ID", "nda_id"),
-    ("EX", "NDA status", "nda_status"),
-    ("EY", "Stage blocker", "stage_blocker"),
-    ("EZ", "Stage blocker since", "stage_blocker_since"),
-    ("FA", "NDA waiting on", "nda_waiting_on"),
-    ("FB", "NDA gates", "nda_gates"),
-    ("FC", "NDA days open", "nda_days_open"),
-    ("FD", "NDA days in current court", "nda_days_in_court"),
+    ("EY", "NDA ID", "nda_id"),
+    ("EZ", "NDA status", "nda_status"),
+    ("FA", "Stage blocker", "stage_blocker"),
+    ("FB", "Stage blocker since", "stage_blocker_since"),
+    ("FC", "NDA waiting on", "nda_waiting_on"),
+    ("FD", "NDA gates", "nda_gates"),
+    ("FE", "NDA days open", "nda_days_open"),
+    ("FF", "NDA days in current court", "nda_days_in_court"),
 )
 REGISTER_HEADERS = (
     "NDA ID",
@@ -163,7 +167,7 @@ def _status(value, linked: bool) -> str:
 
 
 def nda_mirror_fields(row: dict) -> dict:
-    """Site-level EW–FD mirror. Missing columns stay at the unlinked default."""
+    """Site-level EY–FF mirror. Missing columns stay at the unlinked default."""
     present = any(name in row for _letter, name, _key in NDA_COLUMNS)
     nda_id = _clean(row.get("NDA ID")) if "NDA ID" in row else ""
     if not present and not nda_id:
@@ -203,26 +207,29 @@ def _header_cells(row) -> list[str]:
 
 
 def _with_letter_fallback(header: list[str], values: list, row: dict) -> dict:
+    """Use a column letter only when that header name is not on the row at all."""
+    present = {str(name).strip() for name in header if str(name).strip()}
     for letter, name, _key in NDA_COLUMNS:
-        if name in row:
+        if name in row or name in present:
             continue
         index = column_index(letter)
-        if index < len(header) and header[index] == name and index < len(values):
-            row[name] = values[index]
-        elif index < len(values) and values[index] not in (None, ""):
+        LOGGER.warning("NDA column %s is not in the header row; using column %s", name, letter)
+        if index < len(values):
             row[name] = values[index]
     return row
 
 
-def _row_dict(header: list[str], values: list) -> dict:
+def _row_dict(header: list[str], values: list, *, letter_fallback: bool = False) -> dict:
     row = {}
     for index, key in enumerate(header):
         if key and index < len(values):
             row[key] = values[index]
-    return _with_letter_fallback(header, values, row)
+    if letter_fallback:
+        return _with_letter_fallback(header, values, row)
+    return row
 
 
-def _sheet_table(workbook, title: str, header_row: int) -> list[dict]:
+def _sheet_table(workbook, title: str, header_row: int, *, letter_fallback: bool = False) -> list[dict]:
     if title not in workbook.sheetnames:
         return []
     rows = list(workbook[title].iter_rows())
@@ -234,7 +241,7 @@ def _sheet_table(workbook, title: str, header_row: int) -> list[dict]:
         values = [cell.value for cell in row]
         if not any(value not in (None, "") for value in values):
             continue
-        item = _row_dict(header, values)
+        item = _row_dict(header, values, letter_fallback=letter_fallback)
         item["_excel_row"] = header_row + offset + 2
         out.append(item)
     return out
@@ -249,7 +256,7 @@ def _skip_row(row: dict) -> bool:
 def site_mirrors(workbook) -> dict[str, dict]:
     sites: dict[str, dict] = {}
     for title in ("Pipeline", "Land Sites"):
-        for row in _sheet_table(workbook, title, 3):
+        for row in _sheet_table(workbook, title, 3, letter_fallback=True):
             if _skip_row(row):
                 continue
             site_id = _clean(row.get("Site ID")).upper()
@@ -306,7 +313,7 @@ def workbook_has_nda(workbook) -> bool:
         header = _header_cells(rows[0])
         if "NDA ID" in header or "NDA status" in header:
             return True
-        if column_index("EW") < len(header) and header[column_index("EW")] == "NDA ID":
+        if column_index("EY") < len(header) and header[column_index("EY")] == "NDA ID":
             return True
     return False
 

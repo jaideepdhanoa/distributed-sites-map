@@ -15,9 +15,14 @@ from openpyxl import Workbook
 
 from scripts.financials import (
     FACT_HEADERS,
+    LETTERS,
+    NAMES,
     PARENT_FOLDER_ID,
     PROTECTED_SITE_IDS,
+    _named,
+    _row_from_sheet,
     build_site,
+    column_index,
     package_folder_id,
     safe_drive_href,
     sensitive_files,
@@ -239,6 +244,166 @@ class FinancialsTest(unittest.TestCase):
         self.assertEqual(names[0]["name"], "Payroll summary.pdf")
         self.assertIn("/file/d/pay/", names[0]["href"])
         self.assertNotIn("mail", json.dumps(names))
+
+
+# Letters before BA/BB (Distance to service area, Service area polygon) were inserted.
+HISTORICAL = {
+    "revenue": "I",
+    "earnings": "J",
+    "label": "DU",
+    "claimed": "DV",
+    "years": "DW",
+    "members": "DX",
+    "member_revenue": "DY",
+    "package": "DZ",
+    "normalized": "EA",
+    "cars_latest": "EB",
+    "cars_prior": "EC",
+    "cars_older": "ED",
+    "revenue_prior": "EE",
+    "revenue_older": "EF",
+    "member_share": "EG",
+    "addbacks": "EH",
+    "checked": "EI",
+    "notes": "EJ",
+    "status": "BE",
+    "folder": "AE",
+    "source": "AG",
+    "business": "CE",
+}
+TODAY = {key: names[0] for key, names in NAMES.items()}
+SAMPLE = {
+    "revenue": 450000,
+    "earnings": -121000,
+    "label": "EBITDA",
+    "claimed": -121000,
+    "years": 12,
+    "members": 860,
+    "member_revenue": 24000,
+    "package": "Received",
+    "normalized": 88000,
+    "cars_latest": 18400,
+    "cars_prior": 17100,
+    "cars_older": 16300,
+    "revenue_prior": 410000,
+    "revenue_older": 390000,
+    "member_share": 0.22,
+    "addbacks": 15000,
+    "checked": "2026-11-01",
+    "notes": "Broker package, FY2025",
+    "status": "Documented",
+    "folder": "https://drive.google.com/drive/folders/fixtureFolderId",
+    "source": "Broker package",
+    "business": "Operating",
+}
+
+
+def _shifted_sheet(blank_key: str | None = None):
+    """Place today's headers on the old letters, then insert two columns at BA."""
+    width = column_index("EJ") + 8
+    header = [""] * width
+    values: list[object] = [None] * width
+    header[column_index("DU") - 2] = "Photos checked"
+    values[column_index("DU") - 2] = "2026-10-21"
+    header[column_index("DV") - 2] = "Photo notes"
+    values[column_index("DV") - 2] = "Photo notes text"
+    header[column_index("CE") - 2] = "Rank"
+    values[column_index("CE") - 2] = "4"
+    for key, letter in HISTORICAL.items():
+        index = column_index(letter)
+        header[index] = TODAY[key]
+        values[index] = None if key == blank_key else SAMPLE[key]
+    at = column_index("BA")
+    header = header[:at] + ["Distance to service area (mi)", "Service area polygon"] + header[at:]
+    values = values[:at] + [None, None] + values[at:]
+    return header, values
+
+
+class HeaderShiftTest(unittest.TestCase):
+    def test_two_inserted_columns_still_resolve_every_field(self) -> None:
+        header, values = _shifted_sheet()
+        with self.assertNoLogs("scripts.financials", level="WARNING"):
+            row = _row_from_sheet(header, values, [])
+        for key, expected in SAMPLE.items():
+            self.assertEqual(_named(row, key), expected, key)
+        # What the old letters hold after the insert, and what the header read returns.
+        self.assertEqual(values[column_index("EB")], "Received")
+        self.assertEqual(_named(row, "cars_latest"), 18400)
+        self.assertEqual(values[column_index("DV")], "Photo notes text")
+        self.assertEqual(_named(row, "claimed"), -121000)
+        self.assertEqual(values[column_index("DU")], "2026-10-21")
+        self.assertEqual(_named(row, "label"), "EBITDA")
+        self.assertEqual(values[column_index("DX")], -121000)
+        self.assertEqual(_named(row, "members"), 860)
+        self.assertEqual(values[column_index("DW")], "EBITDA")
+        self.assertEqual(_named(row, "years"), 12)
+        self.assertEqual(values[column_index("CE")], "4")
+        self.assertEqual(_named(row, "business"), "Operating")
+
+    def test_a_blank_cell_does_not_read_the_letter(self) -> None:
+        header, values = _shifted_sheet("cars_latest")
+        name = TODAY["cars_latest"]
+        letter_at = column_index(LETTERS["cars_latest"])
+        current = header.index(name)
+        self.assertIsNone(values[current])
+        if current == letter_at:
+            dest = letter_at + 2
+            parked_name = header[dest]
+            parked_value = values[dest]
+            header[dest] = name
+            values[dest] = None
+            header[letter_at] = ""
+            values[letter_at] = "Received"
+            if parked_name:
+                header.append(parked_name)
+                values.append(parked_value)
+        else:
+            values[letter_at] = "Received"
+        with self.assertNoLogs("scripts.financials", level="WARNING"):
+            row = _row_from_sheet(header, values, [])
+        self.assertIsNone(_named(row, "cars_latest"))
+        self.assertEqual(values[letter_at], "Received")
+        for key, expected in SAMPLE.items():
+            if key == "cars_latest":
+                continue
+            self.assertEqual(_named(row, key), expected, key)
+
+    def test_missing_header_uses_the_letter_and_warns(self) -> None:
+        width = column_index(max(LETTERS.values(), key=column_index)) + 2
+        header = [""] * width
+        values: list[object] = [None] * width
+        for key, names in NAMES.items():
+            if key == "business":
+                continue
+            index = column_index(LETTERS[key])
+            header[index] = names[0]
+            values[index] = SAMPLE[key]
+        values[column_index(LETTERS["business"])] = "Operating"
+        with self.assertLogs("scripts.financials", level="WARNING") as caught:
+            row = _row_from_sheet(header, values, [])
+        self.assertEqual(_named(row, "business"), "Operating")
+        self.assertEqual(_named(row, "cars_latest"), 18400)
+        self.assertEqual(len(caught.output), 1)
+        self.assertIn("business", caught.output[0])
+        self.assertIn(LETTERS["business"], caught.output[0])
+
+    def test_older_aliases_still_win_over_the_letter(self) -> None:
+        width = column_index(max(LETTERS.values(), key=column_index)) + 2
+        header = [""] * width
+        values: list[object] = [None] * width
+        header[4] = "Cars (latest)"
+        values[4] = 18400
+        header[6] = "Cars (prior)"
+        values[6] = 17100
+        header[8] = "Membership count"
+        values[8] = 860
+        values[column_index(LETTERS["cars_latest"])] = "Received"
+        values[column_index(LETTERS["cars_prior"])] = "DECOY"
+        values[column_index(LETTERS["members"])] = -121000
+        row = _row_from_sheet(header, values, [])
+        self.assertEqual(_named(row, "cars_latest"), 18400)
+        self.assertEqual(_named(row, "cars_prior"), 17100)
+        self.assertEqual(_named(row, "members"), 860)
 
 
 if __name__ == "__main__":

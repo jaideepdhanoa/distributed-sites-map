@@ -5,11 +5,13 @@ import {
   SITE_FIELDS,
   SITE_NUMERIC_FIELDS,
   emptySiteFields,
+  mirrorWrites,
   parseSheet,
   photoCanonical,
   photosFromCanonical,
   pricePerAcre,
   sheetCanonical,
+  writesCanonical,
   type PhotoRef,
   type SiteField,
 } from "./site";
@@ -283,6 +285,7 @@ type SiteDb = Record<SiteField, string> & {
   photo_refs: unknown;
   fact_sources: unknown;
   sheet: unknown;
+  sheet_writes: unknown;
   facts: unknown;
   coord_status: string;
   version: number | string;
@@ -292,7 +295,7 @@ const SITE_COLUMNS = SITE_FIELDS.filter((field) => field !== "photo_refs").join(
 
 async function readSite(sql: Sql, siteId: string): Promise<SiteDb | null> {
   const result = await sql.query<SiteDb>(
-    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, sheet, facts, coord_status, version FROM sites WHERE site_id = $1`,
+    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, sheet, sheet_writes, facts, coord_status, version FROM sites WHERE site_id = $1`,
     [siteId],
   );
   return result.rows[0] || null;
@@ -341,6 +344,13 @@ async function writeSite(
   for (const [key, value] of Object.entries(priorFacts)) facts[key] = textOf(value);
   for (const [key, value] of Object.entries(payload.facts || {})) facts[key] = value || "";
   const coord = payload.coord_status ?? textOf(previous?.coord_status);
+  const priorWrites =
+    mode === "workbook"
+      ? {}
+      : typeof previous?.sheet_writes === "string"
+        ? parseSheet(previous.sheet_writes)
+        : parseSheet(JSON.stringify(previous?.sheet_writes ?? {}));
+  const writes = { ...priorWrites };
   if (mode === "workbook") {
     for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points"] as const) {
       if (field === "lat" || field === "lng") continue;
@@ -371,26 +381,12 @@ async function writeSite(
     }
     if (incoming.asking_price === "") delete facts.asking_price_source;
     if (incoming.acreage === "") delete facts.land_acres_basis;
-    const headers: Partial<Record<SiteField, string>> = {
-      name: "Name",
-      notes: "Next step",
-      asking_price: "Asking price ($)",
-      acreage: "Land (acres)",
-      listing_status: "Listing status",
-      listing_url: "Listing link",
-      apn: "APN or folio",
-      market: "Market",
-      photo_status: "Photo status",
-      photo_notes: "Photo notes",
-      photos_checked: "Photos checked",
-      photo_diligence_count: "Diligence photo count",
-      photo_listing_count: "Listing photo count",
-    };
-    for (const [field, header] of Object.entries(headers) as [SiteField, string][]) {
-      if (incoming[field] === undefined) continue;
-      if (!incoming[field]) delete sheet[header];
-      else sheet[header] = incoming[field];
+    const edited = mirrorWrites(incoming, payload.facts || {});
+    for (const [header, value] of Object.entries(edited)) {
+      if (!value) delete sheet[header];
+      else sheet[header] = value;
     }
+    for (const [header, value] of Object.entries(edited)) writes[header] = value;
   }
   const perAcre = pricePerAcre(stored.asking_price, stored.acreage);
   if (perAcre) facts.price_per_acre = perAcre;
@@ -402,13 +398,13 @@ async function writeSite(
        asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
        service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
        notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
-       universe_id, listing_status, score, location_points, coord_status, sheet, facts, fact_sources, version, updated_by
+       universe_id, listing_status, score, location_points, coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11, $12, $13, $14, $15, $16, $17,
        $18, $19, $20, $21,
        $22, $23::jsonb, $24, $25, $26, $27, $28,
-       $29, $30, $31, $32, $33, $34::jsonb, $35::jsonb, $36::jsonb, $37, $38
+       $29, $30, $31, $32, $33, $34::jsonb, $35::jsonb, $36::jsonb, $37::jsonb, $38, $39
      )
      ON CONFLICT (site_id) DO UPDATE SET
        name = EXCLUDED.name,
@@ -444,6 +440,7 @@ async function writeSite(
        location_points = EXCLUDED.location_points,
        coord_status = EXCLUDED.coord_status,
        sheet = EXCLUDED.sheet,
+       sheet_writes = EXCLUDED.sheet_writes,
        facts = EXCLUDED.facts,
        fact_sources = EXCLUDED.fact_sources,
        version = EXCLUDED.version,
@@ -484,6 +481,7 @@ async function writeSite(
       stored.location_points,
       coord,
       sheetCanonical(sheet),
+      writesCanonical(writes),
       JSON.stringify(facts),
       JSON.stringify(sources),
       version,

@@ -76,6 +76,9 @@ function diskText(name: string): string {
 }
 
 export function readGeneratedText(name: string): string {
+  if (name === "site_sheet.json") {
+    throw new Error("site_sheet.json is not a public snapshot file.");
+  }
   if (!snapshotReadFlagOff() && memory && Object.prototype.hasOwnProperty.call(memory.files, name)) {
     return memory.files[name];
   }
@@ -107,6 +110,7 @@ function remember(bundle: SnapshotBundle | null): void {
   if (memory && memory.id === bundle.id) return;
   const files: Record<string, string> = {};
   for (const [name, packed] of Object.entries(bundle.files)) {
+    if (name === "site_sheet.json") continue;
     files[name] = unpackFile(packed);
   }
   memory = { id: bundle.id, createdAt: bundle.createdAt, files };

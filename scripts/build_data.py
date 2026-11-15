@@ -3033,8 +3033,21 @@ _SHEET_KEEP = {
 }
 
 
+def _write_private_sheet(document: dict) -> None:
+    """Raw cells for the importer only. Never under data/generated, git, or a served path."""
+    target = os.environ.get("SITE_SHEET_PATH", "").strip()
+    if not target:
+        return
+    path = Path(target).resolve()
+    generated = (OUT).resolve()
+    if path == generated or generated in path.parents:
+        raise SystemExit("SITE_SHEET_PATH must not be inside data/generated.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, indent=2) + "\n")
+
+
 def site_sheet_document(pipeline_rows: list[dict], land_rows: list[dict]) -> dict:
-    """Raw Pipeline and Land Sites cells, keyed by header. The mirror writes these back unchanged."""
+    """Raw Pipeline and Land Sites cells, keyed by header. Written only to SITE_SHEET_PATH."""
     rows = []
     for kind, group in (("pipeline", pipeline_rows), ("land", land_rows)):
         for row in group:
@@ -5201,7 +5214,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         (OUT / "areas.geojson").write_text(json.dumps(areas_fc))
         (OUT / "depots.geojson").write_text(json.dumps(depots))
         (OUT / "deals.geojson").write_text(json.dumps(deals_fc))
-        (OUT / "site_sheet.json").write_text(json.dumps(site_sheet_document(pipeline_rows, land_rows), indent=2) + "\n")
+        _write_private_sheet(site_sheet_document(pipeline_rows, land_rows))
         from scripts.comms import write_comms_file
         from scripts.financials import write_financials_file
         from scripts.nda import write_nda_file

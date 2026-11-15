@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BUSINESS_TYPES, MARKETS, SERVICE_AREA_CLASSES, SITE_ID } from "./vocab";
 
 export type SiteIssue = { id: string; field: string; value: string };
@@ -42,7 +44,7 @@ export type SiteField = (typeof SITE_FIELDS)[number];
 export type SiteRow = {
   site_id: string;
   coord_status: string;
-  /** Canonical JSON of raw workbook cells. The mirror writes only this map. */
+  /** Canonical JSON of raw workbook cells. The mirror does not write this map. */
   sheet: string;
   facts: Record<string, string>;
 } & Record<SiteField, string>;
@@ -163,8 +165,56 @@ export const PHOTO_SOURCES = ["esri_world_imagery", "google_street_view", "broke
 
 export const CREATE_MARKETS = ["PHX", "LAS", "MIA"] as const;
 
-const AGENT_NAME = /\b(?:muse|torque|indie|grok)\b/i;
 const GONE = /delist|listing removed|not live|sold or withdrawn|withdrawn/i;
+const DEAL_KEEP = /\b(?:confirm|check|verify|test-fit|identify|street view|deed|zoning|lease|easement|stalls?|spare|service area|lot size|parking|entitlement|survey|title report|environmental|assemblage|land)\b/i;
+const DEAL_DROP = /(?:\$|\bpackage\b|\breceipt\b|\broger\b|\bpencek\b|\bcrexi\b|\bbizbuysell\b|\bcomp\b|\brevisit\b|\bsold\b|\bwithdrawn\b|\bfolder\b|\bcall\b|\bemail\b|\bknocked out\b|\bdesk checks?\b|\bpipeline\b|\bask\b)/i;
+const DEAL_PACKAGE = /(?:environmental\s+assessments?|environmental\s+sampling|\bcontamination\b|\bsurveys?\b|\btitles?\b|tax\s+returns?|\binsurance\b|p\s*&\s*l\b|\bpayroll\b|\badd-?backs?\b|package\s+status|\breceived\b|\bR-0\d+\b)/i;
+const DEAL_LEAK = /\b(?:ebitda|revenue|playbook)\b/i;
+const DEAL_PRIVATE = /\b(?:cindel|ming|ricardo|yuka|jaideep|jesse)\b|\b(?:outreach|approv\w*|wording|docusign|redline)\b|\b(?:replied|reply|copied|email|nudged|folder|memo)\b|\b(?:ruled out|downgraded|task board|our side|no contact|no price|no reply)\b|\b(?:lane broker|passed on|pass on|waiting for|followed up)\b|\b(?:sweep|priority area)\b|moved to the land/i;
+const NOTE_INTERNAL = /\b(?:muse|torque|indie|grok)\b|\blive\b|rounding|source diff|\bscreens?\b|\bscreening\b|aerial claim|\bFIT_?\d+\b|\brender\b|\bplaybook\b|\bv\d\b|\/workspace|\b[\w.-]+\.(?:jpe?g|xlsx|csv|md)\b/i;
+const NOTE_FILE = /(?:\/[\w./-]+\.(?:jpe?g|xlsx|csv|md))|(?:\br_[\w.-]+\.jpe?g)|(?:\b[\w.-]+\.(?:jpe?g|xlsx|csv|md)\b)/i;
+
+type Rewrites = { notes: Record<string, string>; deals: Record<string, string> };
+
+let rewritesCache: Rewrites | null = null;
+
+function rewrites(): Rewrites {
+  if (rewritesCache) return rewritesCache;
+  try {
+    const payload = JSON.parse(readFileSync(join(process.cwd(), "data", "note_rewrites.json"), "utf8")) as {
+      notes?: Record<string, string>;
+      deals?: Record<string, string>;
+    };
+    rewritesCache = { notes: payload.notes || {}, deals: payload.deals || {} };
+  } catch {
+    rewritesCache = { notes: {}, deals: {} };
+  }
+  return rewritesCache;
+}
+
+function plainNote(value: string): string {
+  const text = scrubText(value);
+  if (!text) return "";
+  const notes = rewrites().notes;
+  if (notes[text]) return notes[text];
+  if (text.length >= 48) {
+    const keys = Object.keys(notes).sort((a, b) => b.length - a.length);
+    for (const src of keys) {
+      if (src.startsWith(text) || text.startsWith(src)) return notes[src];
+    }
+  }
+  let cleaned = text.replace(new RegExp(NOTE_FILE.source, "gi"), "");
+  cleaned = cleaned.replace(/\([^)]*\)/g, (chunk) => (NOTE_INTERNAL.test(chunk) || NOTE_FILE.test(chunk) ? "" : chunk));
+  cleaned = cleaned.replace(new RegExp(NOTE_INTERNAL.source, "gi"), "");
+  cleaned = cleaned.replace(/\s+/g, " ").replace(/\s+([,.;:])/g, "$1").replace(/(?:\s*[,;]\s*){2,}/g, ", ");
+  return cleaned.trim().replace(/^[\s,;:-]+|[\s,;:-]+$/g, "");
+}
+
+function packageSentence(piece: string): boolean {
+  const text = piece.trim().replace(/^[\s"'“”‘’—–-]+/, "").replace(/^\(\d+\)\s*/, "");
+  if (/^not\b/i.test(text)) return true;
+  return DEAL_PACKAGE.test(piece);
+}
 
 export function listingToken(value: string): ListingStatus | "" {
   const text = value.trim();
@@ -192,15 +242,33 @@ export function scrubText(value: string): string {
     .replace(/^[\s,;:-]+|[\s,;:-]+$/g, "");
 }
 
-/** Drop sentences that name an agent, then cap the public note. */
+/** The public next step. Same drops as the build's clean_deal_note: names, outreach, NDA, package files, and legal chatter. */
 export function displayNote(value: string): string {
-  const text = scrubText(value);
+  const text = plainNote(value);
   if (!text) return "";
-  const kept = text
-    .split(/(?<=[.!?])\s+|;\s+/)
-    .map((part) => part.trim())
-    .filter((part) => part && !AGENT_NAME.test(part));
-  return kept.join(". ").slice(0, 400);
+  const explicit = rewrites().deals[text];
+  if (explicit !== undefined) return explicit;
+  const kept: string[] = [];
+  for (const chunk of text.split(/(?<=[.!?])\s+|;\s+/)) {
+    let piece = chunk.trim().replace(/^[ ;]+|[ ;]+$/g, "");
+    if (!piece) continue;
+    if (DEAL_LEAK.test(piece) || DEAL_PRIVATE.test(piece) || NOTE_INTERNAL.test(piece)) continue;
+    if (/\bno spare\b/i.test(piece)) {
+      kept.push("No spare land");
+      continue;
+    }
+    if (packageSentence(piece)) continue;
+    if (/^(?:dropped|stays|oct|nov|low priority|out of scope|gone from|knocked out)\b/i.test(piece)) continue;
+    if (/land sites row|pairing it with/i.test(piece)) continue;
+    if (DEAL_DROP.test(piece) || !DEAL_KEEP.test(piece)) continue;
+    piece = piece.replace(/^(?:then|next|our side)\s*[:,]?\s*/i, "").trim();
+    if (!piece || !DEAL_KEEP.test(piece) || packageSentence(piece)) continue;
+    kept.push(piece[0] === piece[0].toLowerCase() ? piece[0].toUpperCase() + piece.slice(1) : piece);
+  }
+  let cleaned = kept.map((part) => part.replace(/\.$/, "")).join(". ").trim();
+  if (cleaned && !cleaned.endsWith(".")) cleaned += ".";
+  if (!cleaned || DEAL_PRIVATE.test(cleaned) || DEAL_LEAK.test(cleaned) || DEAL_DROP.test(cleaned) || packageSentence(cleaned)) return "";
+  return cleaned.slice(0, 400);
 }
 
 export function parseMeasure(value: string): number | null {
@@ -222,6 +290,13 @@ export function sheetCanonical(cells: Record<string, string>): string {
   const keys = Object.keys(cells).filter((key) => cells[key]?.trim()).sort((a, b) => a.localeCompare(b));
   const out: Record<string, string> = {};
   for (const key of keys) out[key] = cells[key].trim();
+  return JSON.stringify(out);
+}
+
+/** Keeps an empty value so a cleared field is still a mirror write. */
+export function writesCanonical(cells: Record<string, string>): string {
+  const out: Record<string, string> = {};
+  for (const key of Object.keys(cells).sort((a, b) => a.localeCompare(b))) out[key] = cells[key] ?? "";
   return JSON.stringify(out);
 }
 
@@ -261,38 +336,147 @@ const CLASS_LABEL: Record<string, string> = {
 };
 
 /**
- * Workbook headers, matched by name. Column order is not assumed.
- * Site, Broker, Segment, Stage, and Folder are intentionally absent.
+ * Headers an API change may write back. Column order is not assumed.
+ * Score, Location points, Stalls that fit, and Segment group are formulas and are absent.
+ * Site, Broker, Segment, Stage, and Folder are absent.
+ *
+ * Database-only, with no workbook write:
+ * broker and firm share one Broker cell that also holds email addresses.
+ * photo_refs is a list, not a cell.
+ * miles_to_depot is computed from the depot pins.
+ * asking_price_source is derived from the firm or the listing.
+ * open_land_basis is derived when spare area is present.
+ * parcel_acres and parcel_match come from the parcel layer.
+ * source_line and source_kind are built from the listing URL.
+ * bays_that_fit is the formula column Stalls that fit, which is never overwritten.
  */
-export const SITE_MIRROR_FIELDS: { headers: string[]; key: string }[] = [
-  { headers: ["site id"], key: "id" },
-  { headers: ["name"], key: "name" },
-  { headers: ["address"], key: "address" },
-  { headers: ["market"], key: "market" },
-  { headers: ["lat"], key: "lat" },
-  { headers: ["lng", "lon"], key: "lng" },
-  { headers: ["business type"], key: "category" },
-  { headers: ["listing link"], key: "listing_url" },
-  { headers: ["listing status"], key: "listing_status" },
-  { headers: ["asking price ($)"], key: "asking_price" },
-  { headers: ["land (acres)"], key: "acreage" },
-  { headers: ["apn or folio", "apn"], key: "apn" },
-  { headers: ["land value ($)"], key: "land_value" },
-  { headers: ["improvement value ($)"], key: "improvement_value" },
-  { headers: ["county value ($)"], key: "county_value" },
-  { headers: ["value basis"], key: "county_value_basis" },
-  { headers: ["inside the service area", "service area"], key: "service_area_class" },
-  { headers: ["distance to service area (mi)"], key: "service_area_distance_mi" },
-  { headers: ["service area polygon"], key: "service_area_polygon" },
-  { headers: ["next step"], key: "notes" },
-  { headers: ["photo status"], key: "photo_status" },
-  { headers: ["diligence photo count"], key: "photo_diligence_count" },
-  { headers: ["listing photo count"], key: "photo_listing_count" },
-  { headers: ["photos checked"], key: "photos_checked" },
-  { headers: ["photo notes"], key: "photo_notes" },
-  { headers: ["score (of 100)"], key: "score" },
-  { headers: ["location points"], key: "location_points" },
+export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
+  { field: "notes", headers: ["Next step"] },
+  { field: "listing_url", headers: ["Listing link"] },
+  { field: "listing_status", headers: ["Listing status"] },
+  { field: "asking_price", headers: ["Asking price ($)"] },
+  { field: "acreage", headers: ["Land (acres)"] },
+  { field: "land_value", headers: ["Land value ($)"] },
+  { field: "improvement_value", headers: ["Improvement value ($)"] },
+  { field: "county_value", headers: ["County value ($)"] },
+  { field: "county_value_basis", headers: ["Value basis"] },
+  { field: "service_area_class", headers: ["Inside the service area", "Service area"] },
+  { field: "service_area_distance_mi", headers: ["Distance to service area (mi)"] },
+  { field: "service_area_polygon", headers: ["Service area polygon"] },
+  { field: "land_acres_basis", headers: ["Land basis"] },
+  { field: "open_land_sqft", headers: ["Spare area (sq ft)"] },
+  { field: "trade_aadt", headers: ["AADT (nearest)"] },
+  { field: "trade_aadt_road", headers: ["AADT road"] },
+  { field: "trade_aadt_m", headers: ["AADT segment distance (m)"] },
+  { field: "trade_aadt_max", headers: ["AADT max within 800 m"] },
+  { field: "trade_population", headers: ["Population within 3 miles"] },
+  { field: "trade_growth", headers: ["Population growth (3-mile)"] },
+  { field: "trade_income", headers: ["Median household income (3-mile)"] },
+  { field: "trade_washes_1mi", headers: ["Washes within 1 mile"] },
+  { field: "trade_washes_3mi", headers: ["Washes within 3 miles"] },
+  { field: "photo_status", headers: ["Photo status"] },
+  { field: "photo_diligence_count", headers: ["Diligence photo count"] },
+  { field: "photo_listing_count", headers: ["Listing photo count"] },
+  { field: "photos_checked", headers: ["Photos checked"] },
+  { field: "photo_notes", headers: ["Photo notes"] },
+  { field: "checked_live", headers: ["Last checked live"] },
+  { field: POWER_RATING, headers: ["Power rating"] },
+  { field: "cap_a_substation_mi", headers: ["pwr_a_substation_mi"] },
+  { field: "cap_a_line_ft", headers: ["pwr_a_hv_line_ft"] },
+  { field: "cap_a_source", headers: ["pwr_a_source_type"] },
+  { field: "cap_a_as_of", headers: ["pwr_a_as_of"] },
+  { field: "cap_a_confidence", headers: ["pwr_a_confidence"] },
+  { field: "cap_b_feeder", headers: ["pwr_b_feeder_id"] },
+  { field: "cap_b_frontage", headers: ["pwr_b_hosting_mw_frontage"] },
+  { field: "cap_b_nearby", headers: ["pwr_b_hosting_mw_nearby"] },
+  { field: "cap_b_horizon", headers: ["pwr_b_hosting_horizon"] },
+  { field: "cap_b_source", headers: ["pwr_b_source_type"] },
+  { field: "cap_b_as_of", headers: ["pwr_b_as_of"] },
+  { field: "cap_b_confidence", headers: ["pwr_b_confidence"] },
+  { field: "cap_c_amps", headers: ["pwr_c_service_amps"] },
+  { field: "cap_c_volts", headers: ["pwr_c_service_volts"] },
+  { field: "cap_c_phase", headers: ["pwr_c_service_phase"] },
+  { field: "cap_c_panels", headers: ["pwr_c_panel_count"] },
+  { field: "cap_c_source", headers: ["pwr_c_source_type"] },
+  { field: "cap_c_as_of", headers: ["pwr_c_as_of"] },
+  { field: "cap_c_confidence", headers: ["pwr_c_confidence"] },
+  { field: "cap_d_peak", headers: ["pwr_d_peak_kw"] },
+  { field: "cap_d_year", headers: ["pwr_d_kwh_year"] },
+  { field: "cap_d_source", headers: ["pwr_d_source_type"] },
+  { field: "cap_d_as_of", headers: ["pwr_d_as_of"] },
+  { field: "cap_d_confidence", headers: ["pwr_d_confidence"] },
 ];
+
+export function mirrorHeaderAllowed(header: string): boolean {
+  const norm = header.trim().toLowerCase();
+  return MIRROR_FIELD_HEADERS.some((row) => row.headers.some((name) => name.toLowerCase() === norm));
+}
+
+/** Cell text for one API edit. Service-area tokens become the workbook labels. */
+export function mirrorWrites(fields: Record<string, string | undefined>, facts: Record<string, string | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const row of MIRROR_FIELD_HEADERS) {
+    const value = fields[row.field] !== undefined ? fields[row.field] : facts[row.field];
+    if (value === undefined) continue;
+    out[row.headers[0]] = row.field === "service_area_class" ? CLASS_LABEL[value] || value : value;
+  }
+  return out;
+}
+
+const MONTHS: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+function cellNumber(value: string): number | null {
+  const percent = value.trim().endsWith("%");
+  const body = value.trim().replace(/[$,\s]/g, "").replace(/%$/, "");
+  if (!/^-?\d+(?:\.\d+)?$/.test(body)) return null;
+  const number = Number(body);
+  if (!Number.isFinite(number)) return null;
+  return percent ? number / 100 : number;
+}
+
+function cellDate(value: string): string | null {
+  const text = value.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const named = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:\s*,?\s*(\d{4}))?$/i.exec(text);
+  if (named) {
+    const month = String(MONTHS[named[1].slice(0, 3).toLowerCase()]).padStart(2, "0");
+    const day = named[2].padStart(2, "0");
+    return named[3] ? `${named[3]}-${month}-${day}` : `-${month}-${day}`;
+  }
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    const serial = Number(text);
+    if (serial > 20000 && serial < 80000) {
+      const utc = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
+      return utc.toISOString().slice(0, 10);
+    }
+  }
+  return null;
+}
+
+function datesMatch(left: string, right: string): boolean {
+  const a = cellDate(left);
+  const b = cellDate(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.startsWith("-") && b.endsWith(a)) return true;
+  if (b.startsWith("-") && a.endsWith(b)) return true;
+  return false;
+}
+
+/** Formatted currency, percents, dates, and trailing zeros match the stored number. */
+export function sameWorkbookCell(before: string, after: string): boolean {
+  const left = before.trim();
+  const right = after.trim();
+  if (left === right) return true;
+  const ln = cellNumber(left);
+  const rn = cellNumber(right);
+  if (ln != null && rn != null) {
+    const scale = Math.max(1, Math.abs(ln), Math.abs(rn));
+    if (Math.abs(ln - rn) <= 1e-8 * scale) return true;
+  }
+  return datesMatch(left, right);
+}
 
 const PASSING_CLASSES = new Set(["inside", "near_0_5", "near_5_10", "edge_legacy"]);
 

@@ -58,8 +58,10 @@ CREATE TABLE sites (
   score text NOT NULL DEFAULT '',
   location_points text NOT NULL DEFAULT '',
   coord_status text NOT NULL DEFAULT '',
-  -- Raw workbook cells, keyed by header. The mirror writes only this map.
+  -- Raw workbook cells, keyed by header. Private to the database. The mirror does not write this map.
   sheet jsonb NOT NULL DEFAULT '{}'::jsonb,
+  -- Headers an API change wrote. A workbook import leaves this empty, so a fresh import plans no cell writes.
+  sheet_writes jsonb NOT NULL DEFAULT '{}'::jsonb,
   -- Sources and measures the scorecard reads. Not a second copy of the cleaned card.
   facts jsonb NOT NULL DEFAULT '{}'::jsonb,
   fact_sources jsonb NOT NULL DEFAULT '{}'::jsonb,

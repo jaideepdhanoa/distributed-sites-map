@@ -39,17 +39,15 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
       ? unpackFile(bundle.files["pricing.json"])
       : "{}"
     : disk("pricing.json");
-  const sheet = bundle
-    ? bundle.files["site_sheet.json"]
-      ? unpackFile(bundle.files["site_sheet.json"])
-      : ""
-    : (() => {
-        try {
-          return disk("site_sheet.json");
-        } catch {
-          return "";
-        }
-      })();
+  const sheetPath = process.env.SITE_SHEET_PATH?.trim() || "";
+  let sheet = "";
+  if (sheetPath) {
+    try {
+      sheet = readFileSync(sheetPath, "utf8");
+    } catch {
+      sheet = "";
+    }
+  }
   return {
     label,
     slice: workbookFromFiles({
@@ -82,6 +80,9 @@ async function main(): Promise<void> {
     const rendered = renderReport(report);
     if (!ready.rows[0]?.sites) {
       summary("Site rows were not compared. The sites table is not on production. Run the Production migrations workflow.\n");
+    }
+    if (!process.env.SITE_SHEET_PATH?.trim()) {
+      summary("The private raw sheet was not on this runner. Site rows are compared to the published deals. Set SITE_SHEET_PATH to compare raw cells. That file is not in git or the snapshot.\n");
     }
     console.log(rendered);
     summary(rendered);

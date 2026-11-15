@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -6,11 +7,13 @@ import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { importChanged } from "../../lib/changes/backfill";
 import { diffDatabase } from "../../lib/changes/diff";
 import { importEntityFromWorkbook, readEntityFromDb } from "../../lib/changes/flags";
-import { PROTECTED_ROW, PROTECTED_SITE_ID, planSiteMirror, type SheetTable } from "../../lib/changes/mirror";
+import { MIRROR_VALUE_INPUT, PROTECTED_ROW, PROTECTED_SITE_ID, planSiteMirror, sheetValueRender, type SheetTable } from "../../lib/changes/mirror";
 import { applySiteRows } from "../../lib/changes/read";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { loadScorecard, recordedLocationPoints, recordedScore, scorecardTotal } from "../../lib/changes/scorecard";
-import { emptySiteFields, type SiteRow } from "../../lib/changes/site";
+import { displayNote, emptySiteFields, mirrorHeaderAllowed, mirrorWrites, type SiteRow } from "../../lib/changes/site";
+import { isSnapshotFile } from "../../lib/snapshot/hash";
+import { readGenerated } from "../../lib/snapshot/read";
 import { workbookFromFiles } from "../../lib/changes/workbook";
 import { memorySql } from "../helpers/sql";
 
@@ -293,36 +296,93 @@ test("a missing sites table leaves the other imports running", async () => {
 });
 
 test("the site mirror writes raw cells by header and skips row 10 and PIPE-PHX-0006", () => {
-  const headers = ["Stage", "Folder", "Name", "Site ID", "Asking price ($)", "Next step"];
-  const raw = {
-    Name: "Sonoran Express",
-    "Asking price ($)": "$1,600,000",
-    "Next step": "Call the broker about the driveway. The package is in the folder.",
-  };
+  const headers = ["Stage", "Folder", "Name", "Site ID", "Asking price ($)", "Next step", "Score (of 100)"];
   const pipeline = sheet(headers, [
-    ["1 Desk screen", "https://drive.google.com/folder", raw.Name, "PIPE-PHX-0001", raw["Asking price ($)"], raw["Next step"]],
-    ["Dropped", "secret", "Quarantine", PROTECTED_SITE_ID, "$1", "secret note"],
+    ["1 Desk screen", "https://drive.google.com/folder", "Sonoran Express", "PIPE-PHX-0001", "$1,600,000", "Confirm the zoning.", "24"],
+    ["Dropped", "secret", "Quarantine", PROTECTED_SITE_ID, "$1", "secret note", "1"],
   ]);
+  pipeline.rows[0].formulas = ["", "", "", "", "", "", "=SUM(A1)"];
   pipeline.rows[1].row = PROTECTED_ROW;
   const unchanged = planSiteMirror(
     [pipeline, { title: "Land Sites", headerRow: 4, headers, rows: [] }],
     [
-      { site_id: "PIPE-PHX-0001", cells: raw },
-      { site_id: PROTECTED_SITE_ID, cells: { Name: "Do not write" } },
+      { site_id: "PIPE-PHX-0001", cells: { Name: "Sonoran Express", "Asking price ($)": "1600000", "Score (of 100)": "23.73421741" } },
+      { site_id: PROTECTED_SITE_ID, writes: { Name: "Do not write", "Next step": "secret" } },
     ],
   );
   assert.equal(unchanged.changes.length, 0);
   assert.equal(unchanged.changes.some((change) => change.row === PROTECTED_ROW || change.id === PROTECTED_SITE_ID), false);
 
   const edited = planSiteMirror([pipeline], [
-    { site_id: "PIPE-PHX-0001", cells: { ...raw, "Next step": "A new raw next step." } },
-    { site_id: "PIPE-MIA-0099", cells: { Name: "Missing" } },
+    { site_id: "PIPE-PHX-0001", writes: { "Next step": "Confirm the lot size.", "Score (of 100)": "23.73421741", Name: "Renamed" } },
+    { site_id: "PIPE-MIA-0099", writes: { Name: "Missing" } },
   ]);
   assert.deepEqual(edited.changes.map((change) => change.header), ["Next step"]);
   assert.equal(edited.changes[0]?.column, 6);
-  assert.equal(edited.changes[0]?.after, "A new raw next step.");
-  assert.equal(edited.changes.some((change) => change.header === "Stage" || change.header === "Folder"), false);
+  assert.equal(edited.changes[0]?.after, "Confirm the lot size.");
+  assert.equal(edited.changes.some((change) => change.header === "Stage" || change.header === "Folder" || change.header === "Score (of 100)" || change.header === "Name"), false);
   assert.deepEqual(edited.unmatched, ["PIPE-MIA-0099"]);
+});
+
+test("a fresh import over formatted currency, percents, dates, and formulas plans no writes", () => {
+  assert.equal(MIRROR_VALUE_INPUT, "USER_ENTERED");
+  assert.equal(sheetValueRender("values"), "UNFORMATTED_VALUE");
+  assert.equal(sheetValueRender("formulas"), "FORMULA");
+  const headers = ["Site ID", "Asking price ($)", "Location points", "Score (of 100)", "Spare area (sq ft)", "Population growth (3-mile)", "Land (acres)", "Photos checked", "Stalls that fit"];
+  const table = sheet(headers, [["PIPE-PHX-0001", "$1,600,000", "10.0", "24", "4,000", "-5.57%", "1.20", "Oct 28", "12"]]);
+  table.rows[0].formulas = ["", "", "", "=SUM(A1)", "", "", "", "", "=B1"];
+  const imported = {
+    site_id: "PIPE-PHX-0001",
+    cells: {
+      "Asking price ($)": "1600000",
+      "Location points": "10",
+      "Score (of 100)": "23.73421741",
+      "Spare area (sq ft)": "4000",
+      "Population growth (3-mile)": "-0.0557",
+      "Land (acres)": "1.2",
+      "Photos checked": "2026-10-28",
+      "Stalls that fit": "12",
+    },
+  };
+  assert.equal(planSiteMirror([table], [imported]).changes.length, 0);
+  const same = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: imported.cells }]);
+  assert.equal(same.changes.length, 0);
+  const changed = planSiteMirror([table], [{ site_id: "PIPE-PHX-0001", writes: { "Asking price ($)": "1700000", "Stalls that fit": "8" } }]);
+  assert.deepEqual(changed.changes.map((change) => change.header), ["Asking price ($)"]);
+  assert.equal(changed.changes[0]?.after, "1700000");
+});
+
+test("the public next step drops outreach, names, and package text", () => {
+  const card = JSON.parse(readFileSync("data/fixtures/public-next-step.json", "utf8")) as { signed_in_next_step: string; public_next_step: string };
+  assert.equal(displayNote(card.signed_in_next_step), card.public_next_step);
+  const kept = displayNote("Confirm the zoning. Package status stays Received. The land check is not finished.");
+  assert.match(kept, /Confirm the zoning/);
+  assert.match(kept, /The land check is not finished/);
+  assert.doesNotMatch(kept, /Package/);
+  assert.equal(displayNote("Confirm the title report."), "");
+  assert.equal(displayNote("Street view and the Dec 2025 deed to confirm the use; then owner outreach once Cindel approves the wording"), "Confirm use from street view and the deed.");
+});
+
+test("the raw site sheet is not a snapshot file and is not served", () => {
+  assert.match(execFileSync("git", ["check-ignore", "-v", "data/generated/site_sheet.json"], { encoding: "utf8" }), /site_sheet\.json/);
+  assert.equal(execFileSync("git", ["ls-files", "--", "data/generated/site_sheet.json"], { encoding: "utf8" }).trim(), "");
+  assert.equal(isSnapshotFile("site_sheet.json"), false);
+  assert.equal(isSnapshotFile("deals.geojson"), true);
+  assert.throws(() => readGenerated("site_sheet.json"), /not a public snapshot file/);
+  assert.equal(mirrorHeaderAllowed("Folder"), false);
+  assert.equal(mirrorHeaderAllowed("Broker"), false);
+  assert.equal(mirrorHeaderAllowed("Score (of 100)"), false);
+  assert.equal(mirrorHeaderAllowed("Stalls that fit"), false);
+  const writes = mirrorWrites(
+    { county_value: "2236814", service_area_class: "inside", broker: "Ada Broker", miles_to_depot: "3.2" },
+    { cap_a_substation_mi: "1.5", land_acres_basis: "Estimated" },
+  );
+  assert.equal(writes["County value ($)"], "2236814");
+  assert.equal(writes["Inside the service area"], "Inside");
+  assert.equal(writes["pwr_a_substation_mi"], "1.5");
+  assert.equal(writes["Land basis"], "Estimated");
+  assert.equal(writes.Broker, undefined);
+  assert.equal("miles_to_depot" in writes, false);
 });
 
 test("agents write only their fields, and a new site needs a Phoenix, Las Vegas, or Miami market", () => {

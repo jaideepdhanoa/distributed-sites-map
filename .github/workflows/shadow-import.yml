@@ -3,7 +3,9 @@ name: Shadow import
 # Manual import of the latest published snapshot. Workbook sync skips the
 # import when the generated hash matches, so a missed import is repeated
 # here. This workflow refuses any ref other than main. An entity whose
-# read flag is on is left unchanged.
+# read flag is on is left unchanged. Site rows need SITE_SHEET_PATH, the
+# private raw sheet from the workbook build. This job does not have that
+# file, so it leaves site rows unchanged.
 on:
   workflow_dispatch:
 

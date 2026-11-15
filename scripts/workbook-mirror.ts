@@ -2,6 +2,7 @@ import { appendFileSync } from "node:fs";
 import { createSign } from "node:crypto";
 import { withConnectionString } from "../lib/actions/db";
 import { assertProductionDiff } from "../lib/changes/guard";
+import { MIRROR_FIELD_HEADERS } from "../lib/changes/site";
 import {
   ACTIVITY_HEADER_ROW,
   ACTIVITY_SHEET,
@@ -19,9 +20,11 @@ import {
   mirrorDryRun,
   planActivityMirror,
   planCommsMirror,
+  MIRROR_VALUE_INPUT,
   planSiteMirror,
   planStageMirror,
   recordMirrorRun,
+  sheetValueRender,
   stageTabs,
   type CellChange,
   type SheetTable,
@@ -86,15 +89,15 @@ async function sheetsToken(raw: string): Promise<string> {
   return payload.access_token;
 }
 
-async function sheetsValues(token: string, range: string): Promise<string[][]> {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}`;
+async function sheetsValues(token: string, range: string, kind: "values" | "formulas" = "values"): Promise<string[][]> {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueRenderOption=${sheetValueRender(kind)}`;
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error(`Sheets read failed (${response.status}) for a workbook range.`);
   const payload = (await response.json()) as { values?: unknown[][] };
   return (payload.values || []).map((row) => row.map((cell) => String(cell ?? "")));
 }
 
-async function loadTable(token: string, title: string, headerRow: number, fieldHeaders: string[][]): Promise<SheetTable> {
+async function loadTable(token: string, title: string, headerRow: number, fieldHeaders: string[][], withFormulas = false): Promise<SheetTable> {
   const header = await sheetsValues(token, `${quote(title)}!${headerRow}:${headerRow}`);
   const headers = header[0] || [];
   const wanted = new Set(fieldHeaders.flat().map((name) => name.trim().toLowerCase()));
@@ -102,15 +105,24 @@ async function loadTable(token: string, title: string, headerRow: number, fieldH
     .map((name, index) => ({ name, index }))
     .filter((column) => wanted.has(column.name.trim().toLowerCase()))
     .map((column) => column.index);
-  const rows = new Map<number, string[]>();
+  const rows = new Map<number, { cells: string[]; formulas: string[] }>();
   for (const index of indexes) {
     const column = columnLetter(index + 1);
-    const values = await sheetsValues(token, `${quote(title)}!${column}${headerRow + 1}:${column}`);
+    const range = `${quote(title)}!${column}${headerRow + 1}:${column}`;
+    const values = await sheetsValues(token, range, "values");
+    const formulas = withFormulas ? await sheetsValues(token, range, "formulas") : [];
     values.forEach((line, offset) => {
       const rowNumber = headerRow + 1 + offset;
-      const cells = rows.get(rowNumber) || [];
-      cells[index] = line[0] || "";
-      rows.set(rowNumber, cells);
+      const row = rows.get(rowNumber) || { cells: [], formulas: [] };
+      row.cells[index] = line[0] || "";
+      rows.set(rowNumber, row);
+    });
+    formulas.forEach((line, offset) => {
+      const rowNumber = headerRow + 1 + offset;
+      const row = rows.get(rowNumber) || { cells: [], formulas: [] };
+      const formula = line[0] || "";
+      if (formula.startsWith("=")) row.formulas[index] = formula;
+      rows.set(rowNumber, row);
     });
   }
   return {
@@ -119,7 +131,7 @@ async function loadTable(token: string, title: string, headerRow: number, fieldH
     headers,
     rows: [...rows.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([row, cells]) => ({ row, cells })),
+      .map(([row, stored]) => ({ row, cells: stored.cells, formulas: stored.formulas })),
   };
 }
 
@@ -145,7 +157,7 @@ async function writeCells(token: string, changes: CellChange[]): Promise<void> {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        valueInputOption: "RAW",
+        valueInputOption: MIRROR_VALUE_INPUT,
         data: chunk.map((change) => ({
           range: a1(change.sheet, change.row, change.column),
           values: [[change.after]],
@@ -203,10 +215,10 @@ async function main(): Promise<void> {
   }
   if (selected.includes("site")) {
     const tables = [];
-    const names = [...new Set(rows.sites.flatMap((row) => Object.keys(row.cells)))];
+    const names = [...new Set(MIRROR_FIELD_HEADERS.flatMap((row) => row.headers))];
     const headers = [["site id"], ...names.map((name) => [name])];
     for (const tab of stageTabs()) {
-      tables.push(await loadTable(token, tab.title, tab.headerRow, headers));
+      tables.push(await loadTable(token, tab.title, tab.headerRow, headers, true));
     }
     const plan = planSiteMirror(tables, rows.sites);
     changes.push(...plan.changes);

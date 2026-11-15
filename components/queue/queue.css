@@ -240,7 +240,13 @@
   .review-noloc, .review-done { left: 50%; transform: translateX(-50%); }
   .shell.reviewing .map-stage { display: flex; flex-direction: column; }
   .shell.reviewing .stage-map { position: relative; height: auto; flex: 1 1 46%; min-height: 180px; width: 100%; }
-  .shell.reviewing .maplibregl-ctrl-top-right { top: 8px !important; right: 8px; }
+  .shell.reviewing .maplibregl-ctrl-top-right {
+    display: block !important;
+    visibility: visible !important;
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 5;
+  }
   .shell.reviewing .map-float { top: auto; bottom: 12px; right: 8px; }
   .shell.reviewing .drawer {
     position: relative;

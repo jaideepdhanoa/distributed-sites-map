@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import "./actions.css";
+import { quietActionsFetch } from "@/lib/actions/quiet";
 import { formatPacific } from "@/lib/actions/time";
 import { canReview, openPanel, useActionStatus, usePanel } from "./panel";
 
@@ -47,14 +48,14 @@ function SuggestionsDialog() {
   const [audit, setAudit] = useState<{ id: string; at: string; actorId: string; action: string; targetId: string | null }[]>([]);
 
   async function load() {
-    const response = await fetch("/api/actions/suggestions");
+    const response = await quietActionsFetch("/api/actions/suggestions");
     if (!response.ok) return;
     setRows(((await response.json()) as { suggestions: Suggestion[] }).suggestions || []);
   }
 
   useEffect(() => {
     let cancel = false;
-    fetch("/api/actions/suggestions").then(async (response) => {
+    quietActionsFetch("/api/actions/suggestions").then(async (response) => {
       if (!response.ok || cancel) return;
       setRows(((await response.json()) as { suggestions: Suggestion[] }).suggestions || []);
     }).catch(() => undefined);

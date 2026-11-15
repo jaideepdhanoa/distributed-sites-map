@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
@@ -14,6 +14,7 @@ import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
+import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/actions/quiet";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
@@ -83,6 +84,12 @@ function deepestStage(site: SiteProps): StageId {
   const order: StageId[] = ["cleared", "county", "land", "in_area", "universe"];
   for (const step of order) if (inStage(site, step)) return step;
   return "universe";
+}
+
+function ActionsQuietNotice() {
+  const down = useSyncExternalStore(subscribeActionsDown, actionsDown, () => false);
+  if (!down) return null;
+  return <p className="actions-quiet" role="status">Discussion is unavailable on this preview.</p>;
 }
 
 export default function Explorer() {
@@ -570,7 +577,7 @@ export default function Explorer() {
     if (!me?.actionsEnabled) return;
     const key = queueKey;
     let cancel = false;
-    fetch(`/api/queue?${key}`).then(async (response) => {
+    quietActionsFetch(`/api/queue?${key}`).then(async (response) => {
       if (cancel) return;
       if (!response.ok) {
         setLoadedQueueKey(key);
@@ -2095,6 +2102,7 @@ export default function Explorer() {
           </div>
         ) : null}
       </header>
+      <ActionsQuietNotice />
       {inReview && me?.actionsEnabled ? (
         <ReviewBar
           index={reviewIndex}

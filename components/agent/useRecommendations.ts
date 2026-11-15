@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { seesRecommendations, showSuggestedBlock } from "@/lib/agent/access";
 import type { VisibleRecommendation } from "@/lib/agent/recommend";
+import { quietActionsFetch } from "@/lib/actions/quiet";
 import { useActionStatus } from "../actions/panel";
 
 export function useRecommendations(recordId: string) {
@@ -16,7 +17,7 @@ export function useRecommendations(recordId: string) {
       return;
     }
     const query = new URLSearchParams({ recordId });
-    fetch(`/api/actions/recommendations?${query}`)
+    quietActionsFetch(`/api/actions/recommendations?${query}`)
       .then(async (response) => {
         if (!response.ok) return [];
         const body = (await response.json()) as { recommendations?: VisibleRecommendation[] };

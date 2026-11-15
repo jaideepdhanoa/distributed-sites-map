@@ -359,7 +359,7 @@ span.listing-link.muted {
 .site-name { display: flex; align-items: flex-start; flex-wrap: nowrap; gap: 8px; min-width: 0; }
 .site-title { display: grid; gap: 1px; min-width: 0; flex: 1 1 auto; }
 .list-table .site-name .row-links { margin-left: auto; align-self: flex-start; }
-.site-name-text { min-width: 0; font-weight: 650; }
+.site-name-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
 .site-address {
   color: var(--ink-3);
   font-size: var(--type-cap);
@@ -857,6 +857,29 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   border-radius: 12px;
   color: var(--ink);
 }
+.stage-map { overflow: hidden; }
+.map-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  background: #e7efe9;
+  color: var(--ink);
+  text-align: center;
+}
+.map-empty p { margin: 0; max-width: 26rem; line-height: 1.4; }
+.stage-map.map-unavailable .map,
+.stage-map.map-unavailable .map-float,
+.stage-map.map-unavailable .map-attrib,
+.stage-map.map-unavailable .maplibregl-ctrl { display: none; }
+.shell:has(.stage-map.map-unavailable) .layers,
+.shell:has(.stage-map.map-unavailable) .map-tools,
+.shell:has(.stage-map.map-unavailable) .map-corner { display: none; }
+.shell.list-open .stage-map { z-index: 0; }
+.shell.list-open .map-empty { display: none; }
 .empty-actions {
   position: absolute;
   z-index: 3;
@@ -941,10 +964,15 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .shell.list-open .empty-map,
 .shell.list-open .location-note { display: none; }
 .list-note { margin: 0; padding: 8px 12px 0; color: var(--muted); font-size: var(--type-body); }
+.actions-quiet { margin: 0; padding: 6px 12px; background: #f7ead2; color: #5c4310; font-size: var(--type-body); }
 .list-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .list-sort { display: flex; align-items: center; gap: 6px; font-size: var(--type-body); }
 .list-sort select { max-width: 46vw; height: 36px; }
 .list-scroll { flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.shell.list-open.drawer-open .list-scroll { overflow-x: auto; }
+.shell.list-open.drawer-open .list-table { width: max(100%, 960px); min-width: 960px; }
+.shell.list-open.drawer-open .list-table th:first-child,
+.shell.list-open.drawer-open .list-table td:first-child { width: 240px; min-width: 240px; }
 .list-table { border-collapse: collapse; width: 100%; min-width: 0; table-layout: fixed; font-size: var(--type-body); }
 .pipeline-list .list-table td.capacity, .pipeline-list .list-table th.capacity { min-width: 0; white-space: nowrap; }
 .capacity-cell { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2215,7 +2243,7 @@ span.listing-link.muted { text-decoration: none; }
 .drawer:has(.card-hero) .drawer-head .close,
 .drawer:has(.card-hero) .drawer-head .sheet-handle,
 .drawer:has(.card-hero) .drawer-head .sheet-grab { pointer-events: auto; }
-.drawer:has(.card-hero) .drawer-head .close { margin-left: auto; box-shadow: var(--shadow-2); }
+.drawer:has(.card-hero) .drawer-head .close { margin-left: auto; margin-right: 16px; box-shadow: var(--shadow-2); }
 .drawer:has(.card-hero) .drawer-scroll { padding-top: 0; }
 .drawer-scroll {
   flex: 1;
@@ -2281,8 +2309,8 @@ span.listing-link.muted { text-decoration: none; }
   place-items: center;
   padding: 0;
 }
-.hero-info { right: 12px; }
-.hero-expand { right: 52px; }
+.hero-info { right: 28px; }
+.hero-expand { right: 68px; }
 .hero-info svg, .hero-expand svg, .empty-hero svg, .search-note svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.75; }
 .hero-sources {
   position: absolute;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { quietActionsFetch } from "@/lib/actions/quiet";
 import { canReview, canWrite, useActionStatus } from "./actions/panel";
 import {
   PERIODS,
@@ -78,7 +79,7 @@ export default function FinancialsPanel({
     if (!status.enabled) return undefined;
     let cancel = false;
     const query = new URLSearchParams({ targetKind: "deal", targetId: dealId });
-    Promise.all([fetch(`/api/actions/suggestions?${query}`), fetch("/api/actions/accounts")]).then(async ([suggestionsRes, accountsRes]) => {
+    Promise.all([quietActionsFetch(`/api/actions/suggestions?${query}`), quietActionsFetch("/api/actions/accounts")]).then(async ([suggestionsRes, accountsRes]) => {
       if (cancel) return;
       if (accountsRes.ok) setAccounts(((await accountsRes.json()) as { accounts: Account[] }).accounts || []);
       if (!suggestionsRes.ok) return;

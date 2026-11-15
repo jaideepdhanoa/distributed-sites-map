@@ -13,6 +13,7 @@ import { pacificToday } from "@/lib/queue/today";
 import { BlockerLine } from "../NdaChip";
 import { SuggestedDropMark } from "../SuggestedDrop";
 import { approvedStage, publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
+import { quietActionsFetch } from "@/lib/actions/quiet";
 import { formatPacific } from "@/lib/actions/time";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
 import { useRecommendations } from "../agent/useRecommendations";
@@ -173,7 +174,7 @@ export function NextStepCard({
   async function reload() {
     const token = ++loadGen.current;
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
-    const response = await fetch(`/api/actions/suggestions?${query}`);
+    const response = await quietActionsFetch(`/api/actions/suggestions?${query}`);
     if (!response.ok || token !== loadGen.current) return;
     const body = (await response.json()) as { suggestions?: Step[]; needs?: Need[] };
     setSteps(mergeSteps(kind, id, (body.suggestions || []).filter((item) => item.field === "proposed_next_step")));
@@ -253,7 +254,7 @@ export function NextStepCard({
     let cancel = false;
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     const token = ++loadGen.current;
-    Promise.all([fetch(`/api/actions/suggestions?${query}`), fetch("/api/actions/accounts")]).then(async ([stepsRes, accountsRes]) => {
+    Promise.all([quietActionsFetch(`/api/actions/suggestions?${query}`), quietActionsFetch("/api/actions/accounts")]).then(async ([stepsRes, accountsRes]) => {
       if (cancel || token !== loadGen.current) return;
       if (stepsRes.ok) {
         const body = (await stepsRes.json()) as { suggestions?: Step[]; needs?: Need[] };

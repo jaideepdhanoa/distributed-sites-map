@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { quietActionsFetch } from "@/lib/actions/quiet";
 import { formatPacific } from "@/lib/actions/time";
 import type { VisibleRecommendation } from "@/lib/agent/recommend";
 import { publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
@@ -95,8 +96,8 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   async function reload() {
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     const [notesRes, suggestionsRes] = await Promise.all([
-      fetch(`/api/actions/notes?${query}`),
-      fetch(`/api/actions/suggestions?${query}`),
+      quietActionsFetch(`/api/actions/notes?${query}`),
+      quietActionsFetch(`/api/actions/suggestions?${query}`),
     ]);
     if (notesRes.ok) setNotes(((await notesRes.json()) as { notes: Note[] }).notes || []);
     if (suggestionsRes.ok) setSuggestions(((await suggestionsRes.json()) as { suggestions: Suggestion[] }).suggestions || []);
@@ -107,9 +108,9 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     let cancel = false;
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     Promise.all([
-      fetch(`/api/actions/notes?${query}`),
-      fetch(`/api/actions/suggestions?${query}`),
-      fetch("/api/actions/accounts"),
+      quietActionsFetch(`/api/actions/notes?${query}`),
+      quietActionsFetch(`/api/actions/suggestions?${query}`),
+      quietActionsFetch("/api/actions/accounts"),
     ]).then(async ([notesRes, suggestionsRes, accountsRes]) => {
       if (cancel) return;
       if (notesRes.ok) setNotes(((await notesRes.json()) as { notes: Note[] }).notes || []);

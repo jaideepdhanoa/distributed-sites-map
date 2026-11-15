@@ -1640,9 +1640,13 @@ export default function MapView(props: Props) {
   }
 
   return (
-      <div className="stage-map" data-basemap={props.basemap || "satellite"}>
+      <div className={`stage-map${mapFailed ? " map-unavailable" : ""}`} data-basemap={props.basemap || "satellite"}>
       <div ref={node} className="map" />
-      {mapFailed ? <p className="map-fail" role="alert" data-testid="map-error">{mapFailed}</p> : null}
+      {mapFailed ? (
+        <div className="map-empty" role="status" data-testid="map-error">
+          <p>{mapFailed}</p>
+        </div>
+      ) : null}
       <div className="map-float">
         <div className="segmented map-basemap only-desktop" role="group" aria-label="Basemap" data-testid="basemap-desktop">
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>

@@ -34,7 +34,10 @@ async function openAs(page: import("@playwright/test").Page, username: string, p
 }
 
 async function discussionInView(page: import("@playwright/test").Page, id: string) {
-  await expect(page.locator("aside.drawer")).toContainText(id);
+  const drawer = page.locator("aside.drawer");
+  const record = drawer.locator("summary.disclosure", { hasText: "Record" });
+  if (await record.count()) await record.first().click();
+  await expect(drawer).toContainText(id);
   await expect(page.getByTestId("key-strip")).toHaveCount(1);
   await page.waitForTimeout(1200);
   const discussion = page.getByRole("tab", { name: "Discussion" });

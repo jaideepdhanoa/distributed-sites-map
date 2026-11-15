@@ -91,6 +91,9 @@ test("migrations and the shadow job refuse production from CI and preview", asyn
     process.env.GITHUB_REF = "refs/heads/main";
     process.env.GITHUB_WORKFLOW = "Workbook sync";
     assert.doesNotThrow(() => assertWorkbookImportAllowed(prod));
+    process.env.GITHUB_WORKFLOW = "Shadow import";
+    assert.doesNotThrow(() => assertWorkbookImportAllowed(prod));
+    process.env.GITHUB_WORKFLOW = "Workbook sync";
     process.env.VERCEL_ENV = "preview";
     assert.throws(() => assertWorkbookImportAllowed(prod), /from Vercel/);
     delete process.env.VERCEL_ENV;

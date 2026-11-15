@@ -5,6 +5,8 @@ import { importChanged } from "../lib/changes/backfill";
 import { assertWorkbookImportAllowed } from "../lib/changes/guard";
 import { workbookFromFiles } from "../lib/changes/workbook";
 import { collectGenerated } from "../lib/snapshot/hash";
+import { unpackFile } from "../lib/snapshot/pack";
+import { selectLiveBundle } from "../lib/snapshot/store";
 
 function summary(text: string): void {
   const file = process.env.GITHUB_STEP_SUMMARY;
@@ -20,18 +22,40 @@ function publicError(error: unknown): string {
     .slice(0, 500);
 }
 
+async function publishedSnapshot(url: string): Promise<{ id: string; deals: string; timeline: string; comms: string }> {
+  const given = process.env.SNAPSHOT_ID?.trim() || "";
+  if (given) {
+    const files = collectGenerated(join(process.cwd(), "data", "generated"));
+    return {
+      id: given,
+      deals: files.find((file) => file.name === "deals.geojson")?.body || "",
+      timeline: files.find((file) => file.name === "timeline.json")?.body || "",
+      comms: files.find((file) => file.name === "comms.json")?.body || "",
+    };
+  }
+  return withConnectionString(url, async (sql) => {
+    const bundle = await selectLiveBundle(sql);
+    if (!bundle) throw new Error("No live snapshot is published. Run Workbook sync first.");
+    const read = (name: string): string => {
+      const packed = bundle.files[name];
+      if (!packed) throw new Error(`The live snapshot is missing ${name}.`);
+      return unpackFile(packed);
+    };
+    return {
+      id: bundle.id,
+      deals: read("deals.geojson"),
+      timeline: read("timeline.json"),
+      comms: read("comms.json"),
+    };
+  });
+}
+
 async function main(): Promise<void> {
   const url = process.env.NEON_DATABASE_URL?.trim() || "";
-  const snapshotId = process.env.SNAPSHOT_ID?.trim() || "";
-  if (!snapshotId) {
-    console.error("SNAPSHOT_ID is not set. The import runs only after a snapshot publish.");
-    process.exit(1);
-  }
   assertWorkbookImportAllowed(url);
-  const files = collectGenerated(join(process.cwd(), "data", "generated"));
-  const deals = files.find((file) => file.name === "deals.geojson")?.body || "";
-  const timeline = files.find((file) => file.name === "timeline.json")?.body || "";
-  const comms = files.find((file) => file.name === "comms.json")?.body || "";
+  const snapshot = await publishedSnapshot(url);
+  const snapshotId = snapshot.id;
+  const { deals, timeline, comms } = snapshot;
   try {
     const imported = await withConnectionString(url, (sql) =>
       importChanged(sql, workbookFromFiles({ deals, timeline, comms }), snapshotId),

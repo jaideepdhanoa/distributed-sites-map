@@ -1,0 +1,32 @@
+name: Shadow import
+
+# Manual import of the latest published snapshot. Workbook sync skips the
+# import when the generated hash matches, so a missed import is repeated
+# here. This workflow refuses any ref other than main. An entity whose
+# read flag is on is left unchanged.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Import the live snapshot
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
+          READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
+          READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
+        run: npx tsx scripts/import-shadow.ts

@@ -1,13 +1,15 @@
 import { z } from "zod";
+import type { ActionRole } from "@/lib/actions/roles";
+import { canDecide, canWriteContent } from "@/lib/actions/roles";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 import {
   ACTIVITY_TYPES,
+  CANONICAL_STAGES,
   COMMS_DIRECTIONS,
   MARKETS,
   SERVICE_AREA_CLASSES,
   SITE_ID,
-  STAGES,
   type ActivityType,
   type CommsDirection,
   type EntityType,
@@ -16,12 +18,12 @@ import {
   type StageName,
 } from "./vocab";
 
-export type Actor = { id: string; kind: "human" | "agent" };
+export type Actor = { id: string; kind: "human" | "agent"; role?: ActionRole };
 
 export type StagePayload = {
   stage: StageName;
   market: Market;
-  service_area_class?: ServiceAreaClass;
+  service_area_class?: ServiceAreaClass | "";
   reason?: string;
 };
 
@@ -33,13 +35,22 @@ export type ActivityPayload = {
 };
 
 export type CommsPayload = {
-  direction: CommsDirection;
+  direction: CommsDirection | "internal";
   at?: string;
   person?: string;
   firm?: string;
   channel?: string;
   summary?: string;
   subject?: string;
+  site_ids?: string;
+  thread_id?: string;
+  link?: string;
+  asks_made?: string;
+  asks_answered?: string;
+  attachments?: string;
+  state_changes?: string;
+  workbook_source?: string;
+  message_id?: string;
 };
 
 export type ParsedChange = {
@@ -48,12 +59,14 @@ export type ParsedChange = {
   entity_id?: string;
   expected_version: number;
   source: string;
+  /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
+  preserve_id?: boolean;
   payload: StagePayload | ActivityPayload | CommsPayload;
 };
 
 const stagePayload = z
   .object({
-    stage: z.enum(STAGES),
+    stage: z.enum(CANONICAL_STAGES),
     market: z.enum(MARKETS),
     service_area_class: z.enum(SERVICE_AREA_CLASSES).optional(),
     reason: z.string().trim().max(500).optional(),
@@ -170,11 +183,7 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       }
       const data = parsedPayload.data;
       cleanText(data.reason);
-      // R-097. A drop is a human decision with a reason. Agents cannot make it.
-      if (data.stage === "Dropped") {
-        if (actor.kind !== "human") throw new InputError(`Change ${index + 1}: An agent cannot set Stage to Dropped.`);
-        if (!data.reason?.trim()) throw new InputError(`Change ${index + 1}: Stage Dropped needs a reason.`);
-      }
+      assertStageActor(actor, index, data.stage, data.reason);
       return { ...row, payload: data };
     }
     if (row.entity_type === "activity") {
@@ -185,9 +194,10 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       }
       const data = parsedPayload.data;
       if (!realDate(data.date)) throw new InputError(`Change ${index + 1}: Use a calendar date.`);
-      cleanText(data.summary);
-      cleanText(data.source_link);
-      return { ...row, payload: data };
+    cleanText(data.summary);
+    cleanText(data.source_link);
+    assertContentActor(actor, index);
+    return { ...row, payload: data };
     }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
@@ -201,7 +211,28 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     cleanText(data.subject);
     cleanText(data.at);
     cleanText(data.summary);
+    assertContentActor(actor, index);
     return { ...row, payload: data };
   });
   return { key, changes };
+}
+
+function assertStageActor(actor: Actor, index: number, stage: string, reason: string | undefined): void {
+  // R-097. A drop is a reviewer decision with a reason. Agents cannot make it.
+  if (stage === "Dropped" && actor.kind !== "human") {
+    throw new InputError(`Change ${index + 1}: An agent cannot set Stage to Dropped.`);
+  }
+  if (actor.kind !== "human" || !actor.role || !canDecide(actor.role)) {
+    throw new InputError(`Change ${index + 1}: Stage changes need a reviewer.`, 403);
+  }
+  if (stage === "Dropped" && !reason?.trim()) {
+    throw new InputError(`Change ${index + 1}: Stage Dropped needs a reason.`);
+  }
+}
+
+function assertContentActor(actor: Actor, index: number): void {
+  if (actor.kind === "agent") return;
+  if (!actor.role || !canWriteContent(actor.role)) {
+    throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
+  }
 }

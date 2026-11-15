@@ -1,13 +1,12 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
-import { migrate } from "../lib/actions/migrate";
-import { importShadow } from "../lib/changes/backfill";
 import { diffDatabase, renderReport } from "../lib/changes/diff";
-import { assertPreviewTarget } from "../lib/changes/guard";
+import { assertProductionDiff } from "../lib/changes/guard";
+import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
 import { unpackFile } from "../lib/snapshot/pack";
 import { selectLiveBundle } from "../lib/snapshot/store";
-import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
+import type { Sql } from "../lib/actions/db";
 
 function summary(text: string): void {
   const file = process.env.GITHUB_STEP_SUMMARY;
@@ -16,7 +15,7 @@ function summary(text: string): void {
 }
 
 function redact(error: unknown): string {
-  const text = error instanceof Error ? error.message : "shadow job failed";
+  const text = error instanceof Error ? error.message : "shadow diff failed";
   return text
     .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
     .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
@@ -27,7 +26,7 @@ function disk(name: string): string {
   return readFileSync(join(process.cwd(), "data", "generated", name), "utf8");
 }
 
-async function loadWorkbook(sql: Parameters<typeof selectLiveBundle>[0]): Promise<{ label: string; slice: WorkbookSlice }> {
+async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookSlice }> {
   const bundle = await selectLiveBundle(sql);
   const read = (name: string): string => {
     const packed = bundle?.files[name];
@@ -46,22 +45,17 @@ async function loadWorkbook(sql: Parameters<typeof selectLiveBundle>[0]): Promis
 }
 
 async function main(): Promise<void> {
-  const command = process.argv[2];
-  if (command !== "diff" && command !== "backfill") {
-    console.error("Use diff or backfill.");
-    process.exit(1);
-  }
   const url = process.env.DATABASE_URL?.trim() || "";
-  assertPreviewTarget(url, command);
+  assertProductionDiff(url);
   await withConnectionString(url, async (sql) => {
-    await migrate(sql, { connectionString: url });
-    const loaded = await loadWorkbook(sql);
-    if (command === "backfill") {
-      const counts = await importShadow(sql, loaded.slice, loaded.label);
-      const line = `Shadow backfill inserted stage ${counts.inserted.stage}, activity ${counts.inserted.activity}, comms ${counts.inserted.comms}. Skipped stage ${counts.skipped.stage}, activity ${counts.skipped.activity}, comms ${counts.skipped.comms}.`;
-      console.log(line);
-      summary(`## Shadow backfill\n\n${line}\n\nSource: ${loaded.label}. A second run inserts nothing. This did not write the workbook.\n`);
+    const ready = await sql.query<{ name: string | null }>(`SELECT to_regclass('public.site_stages') AS name`);
+    if (!ready.rows[0]?.name) {
+      const message = "The shadow tables are not on production. Run the Production migrations workflow. This diff does not migrate.";
+      console.log(message);
+      summary(`## Shadow diff skipped\n\n${message}\n`);
+      return;
     }
+    const loaded = await loadWorkbook(sql);
     const report = await diffDatabase(sql, loaded.slice, loaded.label);
     writeFileSync(join(process.cwd(), "shadow-diff.json"), `${JSON.stringify({ ...report, generated_at: new Date().toISOString() }, null, 2)}\n`);
     const rendered = renderReport(report);
@@ -73,6 +67,6 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = redact(error);
   console.error(message);
-  summary(`## Shadow job failed\n\n${message}\n`);
+  summary(`## Shadow diff failed\n\n${message}\n`);
   process.exit(1);
 });

@@ -9,25 +9,36 @@ export const SERVICE_AREA_CLASSES = ["Inside", "Near 0-5", "Near 5-10", "Outside
 
 export type ServiceAreaClass = (typeof SERVICE_AREA_CLASSES)[number];
 
-/**
- * Known stage names. The numbered forms are the workbook labels in
- * stageOverlay. "Financial screen", the two off-market labels, and "Sourced"
- * are the other names vocabulary.py and the stage list already accept.
- * "3 Site checks" is the shortened stage-3 label.
- */
-export const STAGES = [
+/** Stages a person or an agent may write. */
+export const CANONICAL_STAGES = [
   "1 Desk screen",
   "2 Financial screen",
   "3 Site checks",
   "4 Offer and close",
   "Dropped",
+] as const;
+
+export type CanonicalStage = (typeof CANONICAL_STAGES)[number];
+
+/**
+ * Older workbook labels. The import stores them unchanged and the diff
+ * lists them. The write API does not accept them.
+ */
+export const LEGACY_STAGES = [
   "Financial screen",
   "Off-market target",
   "Off market (no lead)",
   "Sourced",
 ] as const;
 
+export type LegacyStage = (typeof LEGACY_STAGES)[number];
+
+export const STAGES = [...CANONICAL_STAGES, ...LEGACY_STAGES] as const;
+
 export type StageName = (typeof STAGES)[number];
+
+/** Workbook comms directions the import stores unchanged. The API accepts in and out. */
+export const WORKBOOK_DIRECTIONS = ["in", "out", "internal"] as const;
 
 /** Map-visible activity types from the Activity tab reader. */
 export const ACTIVITY_TYPES = [

@@ -7,16 +7,22 @@ import { privateHeaders } from "@/lib/guard";
 import { PolicyError } from "@/lib/policy/banned";
 import { actorFromRequest, isActor } from "@/lib/changes/auth";
 import { applyBatch, IdempotencyConflictError, VersionConflictError } from "@/lib/changes/apply";
+import { cookieWriteAllowed } from "@/lib/changes/csrf";
+import { changesApiEnabled } from "@/lib/changes/flags";
 import { assertEventsWritable, ProductionWriteRefused } from "@/lib/changes/guard";
 
 function missingRelation(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
 }
 
-/** Shadow write path. The map still reads workbook snapshots, not these rows. */
+/** Shadow write path. Production stays off until CHANGES_API_ENABLED is set. */
 export async function POST(request: Request) {
+  const bearer = request.headers.get("authorization")?.trim();
+  const cookie = request.headers.get("cookie")?.trim();
+  if (!bearer && cookie && !cookieWriteAllowed(request)) return jsonError("That request was refused.", 403);
   const actor = await actorFromRequest(request);
   if (!isActor(actor)) return actor;
+  if (!changesApiEnabled()) return jsonError("Changes are off until CHANGES_API_ENABLED is set.", 403);
   if (!actionsEnabled()) return jsonError("Changes are off until a database is configured.", 503);
   let body: unknown;
   try {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { POST } from "../../lib/api/handlers/changes";
 import { actorFromRequest, agentFromAuthorization, isActor } from "../../lib/changes/auth";
 import { deleteClosedPreviewBranches, previewBranchDeletable } from "../../lib/changes/cleanup";
 import { signSession } from "../../lib/session";
@@ -43,6 +44,19 @@ test("agent tokens name the actor and a session is a human", async () => {
       }),
     );
     assert.equal(isActor(wrong), false);
+    const crossSite = await POST(new Request("http://localhost/api/changes", {
+      method: "POST",
+      headers: { cookie: `sites_session=${token}`, "sec-fetch-site": "cross-site", "content-type": "application/json" },
+      body: "{}",
+    }));
+    assert.equal(crossSite.status, 403);
+    assert.match(((await crossSite.json()) as { error: string }).error, /refused/);
+    const sameOrigin = await POST(new Request("http://localhost/api/changes", {
+      method: "POST",
+      headers: { cookie: `sites_session=${token}`, origin: "http://localhost", "content-type": "application/json" },
+      body: "{}",
+    }));
+    assert.equal(sameOrigin.status, 503);
   } finally {
     for (const [key, value] of [
       ["AGENT_WRITE_TOKEN_INDIE", saved.indie],

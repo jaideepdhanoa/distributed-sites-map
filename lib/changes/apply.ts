@@ -147,20 +147,36 @@ function textOf(value: unknown): string {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
-async function writeStage(sql: Sql, change: ParsedChange, actorId: string, version: number): Promise<Record<string, unknown>> {
+async function writeStage(
+  sql: Sql,
+  change: ParsedChange,
+  actorId: string,
+  version: number,
+  mode: "api" | "workbook",
+): Promise<Record<string, unknown>> {
   const payload = change.payload as StagePayload;
-  const previous = await sql.query<{ service_area_class: string }>(
-    `SELECT service_area_class FROM site_stages WHERE site_id = $1`,
+  const previous = await sql.query<{ stage: string; service_area_class: string }>(
+    `SELECT stage, service_area_class FROM site_stages WHERE site_id = $1`,
     [change.site_id],
   );
+  const priorStage = previous.rows[0]?.stage || "";
+  const bringingBack = priorStage === "Dropped" && payload.stage !== "Dropped";
+  if (mode === "api" && bringingBack && !payload.reason?.trim()) {
+    throw new InputError("Bring back needs a reason.");
+  }
   const serviceArea =
-    payload.service_area_class ?? (previous.rows[0] ? previous.rows[0].service_area_class : "");
-  const stored = {
+    payload.service_area_class !== undefined
+      ? payload.service_area_class
+      : previous.rows[0]?.service_area_class || "";
+  const keepReason = payload.stage === "Dropped" || bringingBack;
+  const stored: Record<string, string> = {
     stage: payload.stage,
     market: payload.market,
     service_area_class: serviceArea,
-    reason: payload.stage === "Dropped" ? payload.reason?.trim() || "" : "",
+    reason: keepReason ? payload.reason?.trim() || "" : "",
   };
+  if (payload.stage === "Dropped") stored.dropped_by = actorId;
+  if (bringingBack) stored.brought_back_by = actorId;
   await sql.query(
     `INSERT INTO site_stages (site_id, market, stage, service_area_class, reason, version, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -218,7 +234,7 @@ async function writeComms(
   const previous = await sql.query<{ payload: unknown }>(`SELECT payload FROM comms_entries WHERE entity_id = $1`, [entityId]);
   const prior = asObject(previous.rows[0]?.payload);
   const stored = {
-    site_ids: change.site_id,
+    site_ids: payload.site_ids ?? change.site_id,
     direction: payload.direction,
     at: payload.at ?? textOf(prior.at),
     person: payload.person ?? textOf(prior.person),
@@ -226,14 +242,14 @@ async function writeComms(
     channel: payload.channel ?? textOf(prior.channel),
     summary: payload.summary ?? textOf(prior.summary),
     subject: payload.subject ?? textOf(prior.subject),
-    thread_id: textOf(prior.thread_id),
-    link: textOf(prior.link),
-    asks_made: textOf(prior.asks_made),
-    asks_answered: textOf(prior.asks_answered),
-    attachments: textOf(prior.attachments),
-    state_changes: textOf(prior.state_changes),
-    workbook_source: textOf(prior.workbook_source),
-    message_id: textOf(prior.message_id),
+    thread_id: payload.thread_id ?? textOf(prior.thread_id),
+    link: payload.link ?? textOf(prior.link),
+    asks_made: payload.asks_made ?? textOf(prior.asks_made),
+    asks_answered: payload.asks_answered ?? textOf(prior.asks_answered),
+    attachments: payload.attachments ?? textOf(prior.attachments),
+    state_changes: payload.state_changes ?? textOf(prior.state_changes),
+    workbook_source: payload.workbook_source ?? textOf(prior.workbook_source),
+    message_id: payload.message_id ?? textOf(prior.message_id),
   };
   await sql.query(
     `INSERT INTO comms_entries (entity_id, site_id, payload, version, updated_by)
@@ -267,26 +283,27 @@ async function applyOne(
   change: ParsedChange,
   idempotencyKey: string,
   runId: string,
+  mode: "api" | "workbook",
 ): Promise<ChangeResult> {
   const lock =
     change.entity_type === "stage"
       ? `stage:${change.site_id}`
       : `${change.entity_type}:${change.entity_id || "new"}`;
   await lockKey(sql, lock);
-  const creating = change.expected_version === 0;
-  const entityId = creating
-    ? change.entity_type === "stage"
+  const entityId =
+    change.entity_type === "stage"
       ? change.site_id
-      : formatId(change.entity_type, await mint(sql, change.entity_type))
-    : change.entity_type === "stage"
-      ? change.site_id
-      : change.entity_id || "";
-  const actual = creating && change.entity_type !== "stage" ? 0 : await readVersion(sql, { ...change, entity_id: entityId });
+      : change.preserve_id && change.entity_id
+        ? change.entity_id
+        : change.expected_version === 0
+          ? formatId(change.entity_type, await mint(sql, change.entity_type))
+          : change.entity_id || "";
+  const actual = await readVersion(sql, { ...change, entity_id: entityId });
   if (actual !== change.expected_version) throw conflict(change, entityId, actual);
   const version = change.expected_version + 1;
   const payload =
     change.entity_type === "stage"
-      ? await writeStage(sql, change, actor.id, version)
+      ? await writeStage(sql, change, actor.id, version, mode)
       : change.entity_type === "activity"
         ? await writeActivity(sql, change, entityId, actor.id, version)
         : await writeComms(sql, change, entityId, actor.id, version);
@@ -303,15 +320,21 @@ async function applyOne(
   return { entity_type: change.entity_type, entity_id: entityId, site_id: change.site_id, event_id: eventId, version };
 }
 
-export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string, body: unknown): Promise<ApplyResult> {
-  const { key, changes } = validateBatch(actor, idempotencyKey, body);
+export async function applyParsedChanges(
+  sql: Sql,
+  actor: Actor,
+  idempotencyKey: string,
+  changes: ParsedChange[],
+  notes: string,
+  mode: "api" | "workbook" = "api",
+): Promise<ApplyResult> {
   const hash = requestHash(actor, changes);
   await sql.exec("BEGIN");
   try {
-    await lockKey(sql, `idem:${key}`);
+    await lockKey(sql, `idem:${idempotencyKey}`);
     const existing = await sql.query<{ request_hash: string; response: unknown }>(
       `SELECT request_hash, response FROM change_receipts WHERE idempotency_key = $1 FOR UPDATE`,
-      [key],
+      [idempotencyKey],
     );
     const prior = existing.rows[0];
     if (prior) {
@@ -322,12 +345,12 @@ export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string,
     }
     const runId = `run_${randomUUID().replaceAll("-", "")}`;
     await sql.query(
-      `INSERT INTO runs (id, actor, status, counts, notes) VALUES ($1, $2, 'running', '{}'::jsonb, 'api')`,
-      [runId, actor.id],
+      `INSERT INTO runs (id, actor, status, counts, notes) VALUES ($1, $2, 'running', '{}'::jsonb, $3)`,
+      [runId, actor.id, notes.slice(0, 500)],
     );
     const results: ChangeResult[] = [];
     for (let index = 0; index < changes.length; index += 1) {
-      results.push(await applyOne(sql, actor, changes[index], `${key}#${index}`, runId));
+      results.push(await applyOne(sql, actor, changes[index], `${idempotencyKey}#${index}`, runId, mode));
     }
     const counts: Record<string, number> = { changes: results.length };
     for (const result of results) counts[result.entity_type] = (counts[result.entity_type] || 0) + 1;
@@ -335,10 +358,10 @@ export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string,
       `UPDATE runs SET status = 'succeeded', finished_at = clock_timestamp(), counts = $2::jsonb WHERE id = $1`,
       [runId, JSON.stringify(counts)],
     );
-    const response: ApplyResult = { ok: true, replayed: false, run_id: runId, idempotency_key: key, results };
+    const response: ApplyResult = { ok: true, replayed: false, run_id: runId, idempotency_key: idempotencyKey, results };
     await sql.query(
       `INSERT INTO change_receipts (idempotency_key, request_hash, response, actor) VALUES ($1, $2, $3::jsonb, $4)`,
-      [key, hash, JSON.stringify(response), actor.id],
+      [idempotencyKey, hash, JSON.stringify(response), actor.id],
     );
     await sql.exec("COMMIT");
     return response;
@@ -350,6 +373,11 @@ export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string,
     }
     throw error;
   }
+}
+
+export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string, body: unknown): Promise<ApplyResult> {
+  const { key, changes } = validateBatch(actor, idempotencyKey, body);
+  return applyParsedChanges(sql, actor, key, changes, "api", "api");
 }
 
 /** Highest numeric suffix already stored, so a later mint does not reuse a workbook id. */

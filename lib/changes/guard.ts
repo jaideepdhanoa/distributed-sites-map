@@ -69,10 +69,43 @@ export function assertEventsWritable(): void {
   }
 }
 
+/** Workbook sync on main is the only writer of shadow rows in production. */
+export function assertWorkbookImportAllowed(url: string): void {
+  if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
+    throw new ProductionWriteRefused("Refusing to import workbook rows from Vercel.");
+  }
+  if (process.env.GITHUB_REF !== "refs/heads/main" || process.env.GITHUB_WORKFLOW !== "Workbook sync") {
+    throw new ProductionWriteRefused("Workbook import runs only from the Workbook sync job on main.");
+  }
+  if (!isProductionDatabase(url)) {
+    throw new ProductionWriteRefused("Workbook import runs only against the production database.");
+  }
+}
+
+/** The on-demand diff reads production and does not migrate or import. */
+export function assertProductionDiff(url: string): void {
+  if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
+    throw new ProductionWriteRefused("Refusing to diff from Vercel. Run the Shadow diff workflow.");
+  }
+  if (!url.trim()) {
+    throw new ProductionWriteRefused(
+      "The shadow diff needs DATABASE_URL set to the production pooled connection string. Add the GitHub secret NEON_DATABASE_URL.",
+    );
+  }
+  const productionHost = process.env.NEON_PRODUCTION_HOST?.trim().toLowerCase();
+  if (!productionHost) {
+    throw new ProductionWriteRefused(
+      "NEON_PRODUCTION_HOST is not set. Add the repository variable: the production endpoint hostname only, with no user and no password.",
+    );
+  }
+  if (databaseHost(url) !== productionHost) {
+    throw new ProductionWriteRefused("Refusing to diff a database that is not production.");
+  }
+}
+
 /**
- * The shadow backfill and the daily diff connect only to the Neon branch
- * named preview. The production hostname is a variable, not a connection
- * string, and is compared without being printed by the caller.
+ * Preview checks stay off the production database. The production hostname
+ * is a variable, not a connection string, and is compared without being printed.
  */
 export function assertPreviewTarget(url: string, purpose: "backfill" | "diff"): void {
   if (process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview") {

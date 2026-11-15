@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
+import { importEntityFromWorkbook, type ShadowEntity } from "./flags";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
-import type { ActivityRow, CommsRow, StageRow, WorkbookSlice } from "./workbook";
+import { issueIds, legacyStageIds, workbookIssues, type ActivityRow, type CommsRow, type RowIssue, type StageRow, type WorkbookSlice } from "./workbook";
 
 export type DiffChange = { id: string; field: string; workbook: string; database: string };
 
@@ -16,6 +16,9 @@ export type EntityDiff = {
 export type DiffReport = {
   workbook_source: string;
   clean: boolean;
+  cut_over: ShadowEntity[];
+  legacy_stages: string[];
+  invalid: { stage: RowIssue[]; activity: RowIssue[]; comms: RowIssue[] };
   entities: { stage: EntityDiff; activity: EntityDiff; comms: EntityDiff };
 };
 
@@ -96,17 +99,53 @@ function commsMap(rows: CommsRow[]): Map<string, Record<string, string>> {
   }));
 }
 
+function withoutIds<T extends { site_id?: string; entity_id?: string }>(rows: T[], ids: Set<string>, idOf: (row: T) => string): T[] {
+  return rows.filter((row) => !ids.has(idOf(row)));
+}
+
 export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, workbookSource: string): DiffReport {
-  const entities = {
-    stage: compare(stageMap(workbook.stages), stageMap(database.stages), STAGE_FIELDS),
-    activity: compare(activityMap(workbook.activities), activityMap(database.activities), ACTIVITY_FIELDS),
-    comms: compare(commsMap(workbook.comms), commsMap(database.comms), ["site_id", ...COMMS_FIELDS]),
+  const invalid = workbookIssues(workbook);
+  const skip = {
+    stage: issueIds(invalid.stage),
+    activity: issueIds(invalid.activity),
+    comms: issueIds(invalid.comms),
   };
+  const entities = {
+    stage: compare(
+      stageMap(withoutIds(workbook.stages, skip.stage, (row) => row.site_id)),
+      stageMap(withoutIds(database.stages, skip.stage, (row) => row.site_id)),
+      STAGE_FIELDS,
+    ),
+    activity: compare(
+      activityMap(withoutIds(workbook.activities, skip.activity, (row) => row.entity_id)),
+      activityMap(withoutIds(database.activities, skip.activity, (row) => row.entity_id)),
+      ACTIVITY_FIELDS,
+    ),
+    comms: compare(
+      commsMap(withoutIds(workbook.comms, skip.comms, (row) => row.entity_id)),
+      commsMap(withoutIds(database.comms, skip.comms, (row) => row.entity_id)),
+      ["site_id", ...COMMS_FIELDS],
+    ),
+  };
+  const cutOver: ShadowEntity[] = [];
+  for (const entity of ["stage", "activity", "comms"] as const) {
+    if (importEntityFromWorkbook(entity)) continue;
+    cutOver.push(entity);
+    entities[entity] = { ...entities[entity], missing: [], extra: [], changed: [] };
+    invalid[entity] = [];
+  }
   const clean = (["stage", "activity", "comms"] as const).every((name) => {
     const row = entities[name];
-    return row.missing.length === 0 && row.extra.length === 0 && row.changed.length === 0;
+    return row.missing.length === 0 && row.extra.length === 0 && row.changed.length === 0 && invalid[name].length === 0;
   });
-  return { workbook_source: workbookSource, clean, entities };
+  return {
+    workbook_source: workbookSource,
+    clean,
+    cut_over: cutOver,
+    legacy_stages: legacyStageIds(workbook),
+    invalid,
+    entities,
+  };
 }
 
 export async function readDatabaseSlice(sql: Sql): Promise<WorkbookSlice> {
@@ -154,27 +193,9 @@ export async function readDatabaseSlice(sql: Sql): Promise<WorkbookSlice> {
   };
 }
 
+/** Read-only. The comparison does not insert events or runs. */
 export async function diffDatabase(sql: Sql, workbook: WorkbookSlice, workbookSource: string): Promise<DiffReport> {
-  const report = buildReport(workbook, await readDatabaseSlice(sql), workbookSource);
-  const runId = `run_${randomUUID().replaceAll("-", "")}`;
-  const counts = {
-    clean: report.clean ? 1 : 0,
-    stage_missing: report.entities.stage.missing.length,
-    stage_extra: report.entities.stage.extra.length,
-    stage_changed: report.entities.stage.changed.length,
-    activity_missing: report.entities.activity.missing.length,
-    activity_extra: report.entities.activity.extra.length,
-    activity_changed: report.entities.activity.changed.length,
-    comms_missing: report.entities.comms.missing.length,
-    comms_extra: report.entities.comms.extra.length,
-    comms_changed: report.entities.comms.changed.length,
-  };
-  await sql.query(
-    `INSERT INTO runs (id, actor, status, finished_at, counts, notes)
-     VALUES ($1, 'shadow-diff', 'succeeded', clock_timestamp(), $2::jsonb, $3)`,
-    [runId, JSON.stringify(counts), report.clean ? "clean" : "drift"],
-  );
-  return report;
+  return buildReport(workbook, await readDatabaseSlice(sql), workbookSource);
 }
 
 function sample(ids: string[], changes: DiffChange[]): string[] {
@@ -205,9 +226,26 @@ export function renderReport(report: DiffReport): string {
     "",
     `Clean: ${report.clean ? "yes" : "no"}`,
     "",
-    "Cutover needs three consecutive daily reports with Clean: yes. This job does not write the workbook and does not change what the site displays.",
+    "Cutover of an entity needs one clean on-demand diff after a fresh import. Then set that entity's read flag and CHANGES_API_ENABLED. This job does not write the workbook or the database.",
     "",
   );
+  if (report.cut_over.length) {
+    lines.push(`Database is the record for: ${report.cut_over.join(", ")}. Workbook import is off for those entities.`, "");
+  }
+  if (report.legacy_stages.length) {
+    lines.push(`Legacy stages: ${report.legacy_stages.length}.`, "");
+    for (const id of report.legacy_stages.slice(0, 20)) lines.push(`- legacy stage ${id}`);
+    if (report.legacy_stages.length > 20) lines.push(`- and ${report.legacy_stages.length - 20} more in the artifact`);
+    lines.push("");
+  }
+  for (const name of ["stage", "activity", "comms"] as const) {
+    const issues = report.invalid[name];
+    if (!issues.length) continue;
+    lines.push(`### ${name} invalid`, "");
+    for (const issue of issues.slice(0, 20)) lines.push(`- ${issue.id} ${issue.field}: ${JSON.stringify(issue.value)}`);
+    if (issues.length > 20) lines.push(`- and ${issues.length - 20} more in the artifact`);
+    lines.push("");
+  }
   for (const name of ["stage", "activity", "comms"] as const) {
     const row = report.entities[name];
     if (!row.missing.length && !row.extra.length && !row.changed.length) continue;

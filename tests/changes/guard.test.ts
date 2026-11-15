@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
-import { assertPreviewTarget } from "../../lib/changes/guard";
+import { assertPreviewTarget, assertProductionDiff, assertWorkbookImportAllowed } from "../../lib/changes/guard";
 import { memorySql } from "../helpers/sql";
 
 const KEYS = [
@@ -13,6 +13,8 @@ const KEYS = [
   "NEON_DATABASE_URL",
   "NEON_PRODUCTION_HOST",
   "NEON_BRANCH",
+  "GITHUB_REF",
+  "GITHUB_WORKFLOW",
 ] as const;
 
 test("migrations and the shadow job refuse production from CI and preview", async () => {
@@ -81,6 +83,19 @@ test("migrations and the shadow job refuse production from CI and preview", asyn
     const manual = await memorySql();
     const applied = await migrate(manual, { connectionString: prod });
     assert.ok(applied.includes("009_events.sql"));
+
+    delete process.env.ALLOW_PRODUCTION_MIGRATE;
+    delete process.env.GITHUB_EVENT_NAME;
+    delete process.env.VERCEL_ENV;
+    assert.throws(() => assertWorkbookImportAllowed(prod), /Workbook sync job on main/);
+    process.env.GITHUB_REF = "refs/heads/main";
+    process.env.GITHUB_WORKFLOW = "Workbook sync";
+    assert.doesNotThrow(() => assertWorkbookImportAllowed(prod));
+    process.env.VERCEL_ENV = "preview";
+    assert.throws(() => assertWorkbookImportAllowed(prod), /from Vercel/);
+    delete process.env.VERCEL_ENV;
+    assert.throws(() => assertProductionDiff(preview), /not production/);
+    assert.doesNotThrow(() => assertProductionDiff(prod));
   } finally {
     restore();
   }

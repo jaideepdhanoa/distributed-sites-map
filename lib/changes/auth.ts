@@ -66,5 +66,5 @@ export async function actorFromRequest(request: Request): Promise<Actor | NextRe
   }
   const session = await readSession(cookieValue(request, SESSION_COOKIE));
   if (!session) return jsonError("Unauthorized", 401);
-  return { id: session.u, kind: "human" };
+  return { id: session.u, kind: "human", role: session.actionRole };
 }

@@ -5,8 +5,20 @@ import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { memorySql } from "../helpers/sql";
 
-const human: Actor = { id: "jaideep", kind: "human" };
+const human: Actor = { id: "jaideep", kind: "human", role: "reviewer" };
+const contributor: Actor = { id: "cindel", kind: "human", role: "contributor" };
+const viewer: Actor = { id: "guest", kind: "human", role: "viewer" };
 const agent: Actor = { id: "indie", kind: "agent" };
+
+function activity() {
+  return {
+    entity_type: "activity",
+    site_id: "PIPE-PHX-0001",
+    expected_version: 0,
+    source: "listing note",
+    payload: { date: "2026-11-01", type: "listing", summary: "Listing noted" },
+  };
+}
 
 function stage(stageName: string, extra: Record<string, unknown> = {}) {
   return {
@@ -68,8 +80,13 @@ test("validation rejects a bad market, class, source, agent drop, and a caller-c
     /The server assigns ids/,
   );
   assert.doesNotThrow(() =>
-    validateBatch({ id: "indie", kind: "human" }, "k1", { changes: [stage("Dropped", { reason: "Lot too small" })] }),
+    validateBatch({ id: "indie", kind: "human", role: "reviewer" }, "k1", { changes: [stage("Dropped", { reason: "Lot too small" })] }),
   );
+  assert.throws(() => validateBatch(viewer, "k1", { changes: [activity()] }), /do not have permission/);
+  assert.throws(() => validateBatch(contributor, "k1", { changes: [stage("1 Desk screen")] }), /Stage changes need a reviewer/);
+  assert.doesNotThrow(() => validateBatch(contributor, "k1", { changes: [activity()] }));
+  assert.throws(() => validateBatch(human, "k1", { changes: [stage("Financial screen")] }), /not a known stage/);
+  assert.throws(() => validateBatch(agent, "k1", { changes: [stage("2 Financial screen")] }), /Stage changes need a reviewer/);
 });
 
 test("version conflict rolls the batch back, replay is idempotent, and ids are server-minted", async () => {
@@ -157,6 +174,26 @@ test("version conflict rolls the batch back, replay is idempotent, and ids are s
   assert.equal(dropped.rows[0]?.stage, "Dropped");
   assert.equal(dropped.rows[0]?.reason, "Lot too small");
   assert.equal(Number(dropped.rows[0]?.version), 2);
+  const dropEvent = await sql.query<{ payload: { dropped_by?: string; reason?: string } }>(
+    `SELECT payload FROM events WHERE entity_type = 'stage' ORDER BY created_at DESC LIMIT 1`,
+  );
+  assert.equal(dropEvent.rows[0]?.payload.dropped_by, "jaideep");
+  assert.equal(dropEvent.rows[0]?.payload.reason, "Lot too small");
+  await assert.rejects(
+    () => applyBatch(sql, human, "batch-back-bare", { changes: [{ ...stage("1 Desk screen"), expected_version: 2 }] }),
+    /Bring back needs a reason/,
+  );
+  const brought = await applyBatch(sql, human, "batch-back", {
+    changes: [{ ...stage("1 Desk screen", { reason: "The broker sent the package" }), expected_version: 2 }],
+  });
+  assert.equal(brought.results[0]?.version, 3);
+  const backEvent = await sql.query<{ payload: { brought_back_by?: string; reason?: string; stage?: string } }>(
+    `SELECT payload FROM events WHERE id = $1`,
+    [brought.results[0]?.event_id],
+  );
+  assert.equal(backEvent.rows[0]?.payload.brought_back_by, "jaideep");
+  assert.equal(backEvent.rows[0]?.payload.reason, "The broker sent the package");
+  assert.equal(backEvent.rows[0]?.payload.stage, "1 Desk screen");
 
   await assert.rejects(() => sql.query("UPDATE events SET source = 'rewritten'"), /append-only/);
   await assert.rejects(() => sql.query("DELETE FROM events"), /append-only/);

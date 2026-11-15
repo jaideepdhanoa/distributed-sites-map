@@ -1,4 +1,14 @@
-import { COMMS_FIELDS, type CommsField } from "./vocab";
+import {
+  ACTIVITY_TYPES,
+  COMMS_FIELDS,
+  LEGACY_STAGES,
+  MARKETS,
+  SERVICE_AREA_CLASSES,
+  SITE_ID,
+  STAGES,
+  WORKBOOK_DIRECTIONS,
+  type CommsField,
+} from "./vocab";
 
 export type StageRow = {
   site_id: string;
@@ -108,4 +118,45 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
   );
 
   return { stages, activities, comms };
+}
+
+export type RowIssue = { id: string; field: string; value: string };
+
+function listed(value: string, allowed: readonly string[]): boolean {
+  return allowed.includes(value);
+}
+
+/** Invalid workbook cells. The values are returned unchanged and are not rewritten. */
+export function workbookIssues(slice: WorkbookSlice): { stage: RowIssue[]; activity: RowIssue[]; comms: RowIssue[] } {
+  const stage: RowIssue[] = [];
+  const activity: RowIssue[] = [];
+  const comms: RowIssue[] = [];
+  for (const row of slice.stages) {
+    if (!listed(row.stage, STAGES)) stage.push({ id: row.site_id, field: "stage", value: row.stage });
+    if (!listed(row.market, MARKETS)) stage.push({ id: row.site_id, field: "market", value: row.market });
+    if (row.service_area_class && !listed(row.service_area_class, SERVICE_AREA_CLASSES)) {
+      stage.push({ id: row.site_id, field: "service_area_class", value: row.service_area_class });
+    }
+    if (!SITE_ID.test(row.site_id)) stage.push({ id: row.site_id, field: "site_id", value: row.site_id });
+  }
+  for (const row of slice.activities) {
+    if (!listed(row.type, ACTIVITY_TYPES)) activity.push({ id: row.entity_id, field: "type", value: row.type });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) activity.push({ id: row.entity_id, field: "date", value: row.date });
+    if (!SITE_ID.test(row.site_id)) activity.push({ id: row.entity_id, field: "site_id", value: row.site_id });
+    if (!/^A-\d{4,}$/.test(row.entity_id)) activity.push({ id: row.entity_id, field: "entity_id", value: row.entity_id });
+  }
+  for (const row of slice.comms) {
+    if (!listed(row.direction, WORKBOOK_DIRECTIONS)) comms.push({ id: row.entity_id, field: "direction", value: row.direction });
+    if (!SITE_ID.test(row.site_id)) comms.push({ id: row.entity_id, field: "site_id", value: row.site_id });
+    if (!/^CM-\d{4,}$/.test(row.entity_id)) comms.push({ id: row.entity_id, field: "entity_id", value: row.entity_id });
+  }
+  return { stage, activity, comms };
+}
+
+export function legacyStageIds(slice: WorkbookSlice): string[] {
+  return slice.stages.filter((row) => listed(row.stage, LEGACY_STAGES)).map((row) => row.site_id).sort();
+}
+
+export function issueIds(issues: RowIssue[]): Set<string> {
+  return new Set(issues.map((issue) => issue.id));
 }

@@ -48,6 +48,11 @@ async function main(): Promise<void> {
   const line = `Published snapshot ${published.id} at ${published.createdAt}. Files: ${published.rowCounts.files ?? files.length}.`;
   console.log(line);
   summary(`## Snapshot live\n\n${line}\n`);
+  // The shadow import is a later step in workbook-sync.yml. It runs only
+  // after this publish succeeds, and a hash match never reaches this script.
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `snapshot_id=${published.id}\n`);
+  }
 }
 
 main().catch((error: unknown) => {

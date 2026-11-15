@@ -1161,6 +1161,111 @@
       "type": "stage",
       "at": "2026-11-12T19:43:39.977Z",
       "summary": "Stage is now Dropped."
+    },
+    {
+      "id": "price:PIPE-LAS-0071:2026-11-15T05:38:37.011Z:$3,500,000",
+      "siteId": "PIPE-LAS-0071",
+      "type": "price",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "Asking price is $3,500,000, from NRC Realty & Capital Advisors."
+    },
+    {
+      "id": "new_site:PIPE-LAS-0074:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-LAS-0074",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-LAS-0075:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-LAS-0075",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-LAS-0076:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-LAS-0076",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "price:PIPE-MIA-0012:2026-11-15T05:38:37.011Z:$1,350,000",
+      "siteId": "PIPE-MIA-0012",
+      "type": "price",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "Asking price is $1,350,000, from Florida Realty of Miami Corp."
+    },
+    {
+      "id": "new_site:PIPE-MIA-0087:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-MIA-0087",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "stage:PIPE-PHX-0003:2026-11-15T05:38:37.011Z:2 Financial screen",
+      "siteId": "PIPE-PHX-0003",
+      "type": "stage",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "Stage is now 2 Financial screen."
+    },
+    {
+      "id": "stage:PIPE-PHX-0005:2026-11-15T05:38:37.011Z:2 Financial screen",
+      "siteId": "PIPE-PHX-0005",
+      "type": "stage",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "Stage is now 2 Financial screen."
+    },
+    {
+      "id": "price:PIPE-PHX-0014:2026-11-15T05:38:37.011Z:$2,400,000",
+      "siteId": "PIPE-PHX-0014",
+      "type": "price",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "Asking price is $2,400,000, from Love Your Car LLC."
+    },
+    {
+      "id": "stage:PIPE-PHX-0083:2026-11-15T05:38:37.011Z:1 Desk screen",
+      "siteId": "PIPE-PHX-0083",
+      "type": "stage",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "Stage is now 1 Desk screen."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0086:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-PHX-0086",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0087:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-PHX-0087",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0088:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-PHX-0088",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0089:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-PHX-0089",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
+    },
+    {
+      "id": "new_site:PIPE-PHX-0090:2026-11-15T05:38:37.011Z:new",
+      "siteId": "PIPE-PHX-0090",
+      "type": "new_site",
+      "at": "2026-11-15T05:38:37.011Z",
+      "summary": "New pipeline site."
     }
   ],
   "baseline": [
@@ -1221,7 +1326,7 @@
       "stageGroup": "desk",
       "verdict": "",
       "askingPrice": "$3,500,000",
-      "askingSource": "Ian Walker, NRC Realty & Capital Advisors",
+      "askingSource": "NRC Realty & Capital Advisors",
       "active": true
     },
     {
@@ -1245,13 +1350,43 @@
       "active": true
     },
     {
+      "id": "PIPE-LAS-0074",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$4,500,000",
+      "askingSource": "Brevitas",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0075",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$3,550,000",
+      "askingSource": "Regency Realty Investments",
+      "active": true
+    },
+    {
+      "id": "PIPE-LAS-0076",
+      "city": "LAS",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$5,000,000",
+      "askingSource": "broker not shown on the LoopNet digest",
+      "active": true
+    },
+    {
       "id": "PIPE-MIA-0012",
       "city": "MIA",
       "stage": "1 Desk screen",
       "stageGroup": "desk",
       "verdict": "",
       "askingPrice": "$1,350,000",
-      "askingSource": "Maria Lorena L Gonzalez, Florida Realty of Miami Corp",
+      "askingSource": "Florida Realty of Miami Corp",
       "active": true
     },
     {
@@ -1345,6 +1480,16 @@
       "active": true
     },
     {
+      "id": "PIPE-MIA-0087",
+      "city": "MIA",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$980,000",
+      "askingSource": "BHHS EWM Realty",
+      "active": true
+    },
+    {
       "id": "PIPE-PHX-0001",
       "city": "PHX",
       "stage": "1 Desk screen",
@@ -1357,12 +1502,12 @@
     {
       "id": "PIPE-PHX-0003",
       "city": "PHX",
-      "stage": "Dropped",
-      "stageGroup": "dropped",
+      "stage": "2 Financial screen",
+      "stageGroup": "financial",
       "verdict": "",
       "askingPrice": "$2,300,000",
       "askingSource": "Car Wash Brokers Inc",
-      "active": false
+      "active": true
     },
     {
       "id": "PIPE-PHX-0004",
@@ -1377,12 +1522,12 @@
     {
       "id": "PIPE-PHX-0005",
       "city": "PHX",
-      "stage": "Dropped",
-      "stageGroup": "dropped",
+      "stage": "2 Financial screen",
+      "stageGroup": "financial",
       "verdict": "",
       "askingPrice": "$2,100,000",
       "askingSource": "Car Wash Brokers Inc",
-      "active": false
+      "active": true
     },
     {
       "id": "PIPE-PHX-0006",
@@ -1441,7 +1586,7 @@
       "stageGroup": "financial",
       "verdict": "",
       "askingPrice": "$2,400,000",
-      "askingSource": "Brad Ingarfield, Love Your Car LLC",
+      "askingSource": "Love Your Car LLC",
       "active": true
     },
     {
@@ -1497,12 +1642,12 @@
     {
       "id": "PIPE-PHX-0083",
       "city": "PHX",
-      "stage": "Dropped",
-      "stageGroup": "dropped",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
       "verdict": "",
       "askingPrice": "$4,999,999",
       "askingSource": "Marcus & Millichap",
-      "active": false
+      "active": true
     },
     {
       "id": "PIPE-PHX-0084",
@@ -1522,6 +1667,56 @@
       "verdict": "",
       "askingPrice": "$4,000,000",
       "askingSource": "Cushman & Wakefield",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0086",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$850,000",
+      "askingSource": "LRA Real Estate Group",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0087",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,800,000",
+      "askingSource": "Daniel Cruz",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0088",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,499,000",
+      "askingSource": "LevRose Commercial Real Estate",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0089",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$2,895,000",
+      "askingSource": "Commercial Plus LLC",
+      "active": true
+    },
+    {
+      "id": "PIPE-PHX-0090",
+      "city": "PHX",
+      "stage": "1 Desk screen",
+      "stageGroup": "desk",
+      "verdict": "",
+      "askingPrice": "$1,100,000",
+      "askingSource": "Diamond Properties Inc",
       "active": true
     },
     {

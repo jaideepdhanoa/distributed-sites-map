@@ -3168,6 +3168,15 @@ PHX-U167,Pipeline,"PHX Fast Lap Xpress Wash, 3830 N 51st Ave"
 WB-PHX-0012,Pipeline,PHX 3520 N 16th St
 WB-PHX-0013,Pipeline,PHX 8812-8828 N Black Canyon Hwy
 MIA-U1274,Pipeline,2781 N Federal Hwy
+LAS-U119,Pipeline,LAS 6451 W Charleston Blvd
+WB-PHX-0093,Pipeline,PHX 5301 N 27th Ave
+WB-PHX-0054,Pipeline,PHX 9505 N Cave Creek Rd
+WB-PHX-0055,Pipeline,PHX 529 E Dunlap Ave
+WB-MIA-0016,Pipeline,MIA 12459 SW 130th St
+WB-LAS-0030,Pipeline,LAS 4640 E Lake Mead Blvd
+PIPE-PHX-0089,Pipeline,"PHX Jay's Express Car Wash, 7038 N 67th Ave"
+WB-LAS-0032,Pipeline,"LAS Green Valley Grocery & 76 Fuel, 7690 S Durango Dr"
+WB-PHX-0073,Pipeline,"PHX West Coast Tire, 4040 N 75th Ave"
 LAS-U943,Land Sites,LAS 2436 E Cheyenne Ave
 WB-PHX-0014,Land Sites,PHX 4405 N 7th Ave
 WB-PHX-0015,Land Sites,"PHX 3141 E Ocotillo Rd, San Tan Valley"
@@ -3215,3 +3224,75 @@ WB-PHX-0040,Land Sites,PHX 3275 E Paradise Lane (land)
 WB-PHX-0041,Land Sites,PHX S Chandler Village Dr (land)
 WB-PHX-0042,Land Sites,PHX 4550 E Thomas Rd (land)
 WB-PHX-0043,Land Sites,PHX NWC Loop 101 & 56th St (land)
+WB-PHX-0044,Land Sites,PHX 5020 N 21st Ave (land)
+LAND-PHX-0065,Land Sites,PHX NEC I-17 & Glendale Ave
+WB-PHX-0045,Land Sites,PHX 2720 W Grand Ave
+WB-PHX-0046,Land Sites,PHX 10004 & 10046 N 26th Dr
+LAND-PHX-0068,Land Sites,PHX 16226 N 29th St
+WB-PHX-0100,Land Sites,PHX 3140 Grand Ave
+WB-PHX-0047,Land Sites,PHX 121 E South Mountain Ave
+WB-PHX-0048,Land Sites,PHX 3214 W Glendale Ave
+WB-PHX-0049,Land Sites,PHX 1723 W Cholla St
+WB-PHX-0050,Land Sites,PHX 1800 E Bell Rd
+WB-PHX-0051,Land Sites,PHX 3328 W Sherman St
+WB-PHX-0101,Land Sites,PHX 3106 W Broadway Rd
+WB-PHX-0052,Land Sites,PHX 3777 N 99th Ave
+WB-LAS-0029,Land Sites,LAS 3887 E Lake Mead Blvd
+WB-LAS-0035,Land Sites,LAS 3535 W Craig Rd
+WB-PHX-0053,Land Sites,PHX 3201 E Baseline Rd
+LAND-PHX-0078,Land Sites,PHX NW 27th Ave & W Baseline Rd
+WB-PHX-0102,Land Sites,PHX 2825 W Dove Valley Rd
+WB-PHX-0056,Land Sites,PHX 2212 N 35th Ave
+LAND-PHX-0081,Land Sites,PHX 59th Ave & Elliot Rd
+WB-PHX-0057,Land Sites,PHX 5890 W Dobbins Rd
+LAND-PHX-0083,Land Sites,PHX NWC 51st Ave & Dobbins Rd
+WB-LAS-0031,Land Sites,LAS 7285 W Azure Dr
+WB-PHX-0058,Land Sites,PHX 3927 W Southern Ave
+WB-PHX-0059,Land Sites,PHX NEC 43rd Ave & Baseline Rd
+WB-PHX-0060,Land Sites,PHX 1810 N 67th Ave
+WB-PHX-0061,Land Sites,PHX 4409 W Indian School Rd
+WB-LAS-0033,Land Sites,LAS 2085 N Hollywood Blvd
+WB-PHX-0062,Land Sites,PHX 2229 W Sunrise Dr
+WB-PHX-0063,Land Sites,PHX 6502 W Thomas Rd
+WB-LAS-0034,Land Sites,LAS NWC Boulder Hwy & Russell Rd
+WB-PHX-0064,Land Sites,PHX 5954 W Grand Ave
+WB-PHX-0065,Land Sites,PHX 55th Ave & Baseline Rd
+LAND-PHX-0092,Land Sites,PHX 16816 N Cave Creek Rd
+WB-PHX-0066,Land Sites,PHX 6738 W Grand Ave
+WB-PHX-0067,Land Sites,PHX 5855 N 51st Ave
+WB-PHX-0068,Land Sites,PHX 5556 W Grand Ave
+WB-PHX-0104,Land Sites,PHX 32 S 67th Ave
+WB-PHX-0105,Land Sites,PHX 5307 W Missouri Ave
+WB-PHX-0069,Land Sites,PHX NWC 51st Ave & Elliott Rd
+WB-PHX-0106,Land Sites,PHX 8415 W Indian School Rd
+WB-PHX-0070,Land Sites,PHX NWC 83rd Ave & Glendale Ave
+WB-PHX-0071,Land Sites,PHX NEC 99th Ave & Van Buren St
+WB-PHX-0072,Land Sites,PHX NWC Virginia Ave & 99th Ave
+WB-PHX-0074,Land Sites,PHX 1690 N 95th Ln
+WB-PHX-0075,Land Sites,PHX 8239 W Lower Buckeye Rd
+WB-PHX-0076,Land Sites,PHX 9985 W Van Buren St
+WB-PHX-0077,Land Sites,PHX SWC 67th Ave & Baseline Rd
+WB-PHX-0078,Land Sites,PHX 28750 N North Valley Pkwy
+LAND-PHX-0108,Land Sites,PHX SEC Carefree Hwy & Central Ave
+LAND-PHX-0109,Land Sites,PHX SEC 99th Ave & Indian School Rd
+WB-PHX-0079,Land Sites,PHX 27902 N 33rd Ave
+WB-PHX-0080,Land Sites,PHX 5665 W Bell Rd
+WB-PHX-0081,Land Sites,PHX 3310 W Jomax Rd
+WB-PHX-0082,Land Sites,PHX SWC 99th Ave & Indian School Rd
+WB-PHX-0083,Land Sites,PHX S/SWC Loop 202 & Baseline Rd
+WB-PHX-0084,Land Sites,PHX 28300 N North Valley Pkwy
+WB-PHX-0085,Land Sites,PHX N Black Canyon Hwy
+WB-PHX-0086,Land Sites,PHX 4810 W Tonopah Dr
+LAND-PHX-0118,Land Sites,PHX N/NEC 99th Ave & McDowell Rd
+WB-PHX-0087,Land Sites,PHX Loop 101 & Thomas Rd
+WB-PHX-0107,Land Sites,PHX 8002 N 83rd Ave
+WB-PHX-0088,Land Sites,PHX 27603 N 33rd Ave
+WB-PHX-0088,Land Sites,PHX 27601 N 33rd Ave
+WB-PHX-0089,Land Sites,PHX NEC Meridian Rd & SR 24
+WB-PHX-0090,Land Sites,PHX SEC 99th Ave & Lower Buckeye Rd
+LAND-PHX-0125,Land Sites,PHX NWC Carefree Hwy & 7th St
+WB-PHX-0091,Land Sites,PHX 15th Ave & Lower Buckeye Rd (land)
+WB-PHX-0092,Land Sites,PHX SEC Cave Creek Rd & Tatum Blvd (land)
+WB-PHX-0095,Land Sites,PHX 3414 N 27th Ave
+WB-PHX-0096,Land Sites,PHX 2524 E Washington St
+WB-PHX-0097,Land Sites,PHX 2956 W Osborn Rd

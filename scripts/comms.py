@@ -17,6 +17,8 @@ FIXTURE = ROOT / "data" / "fixtures" / "comms.json"
 SHEET = "Comms Log"
 SITE_ID = re.compile(r"^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$")
 KNOWN_DIRECTIONS = {"in", "out", "internal"}
+# The public snapshot and the map line stay short. The database import reads
+# the Comms Log through the Sheets client and stores the full summary.
 SUMMARY_LIMIT = 300
 
 HEADERS = (

@@ -118,7 +118,7 @@ const commsPayload = z
     person: z.string().trim().max(200).optional(),
     firm: z.string().trim().max(200).optional(),
     channel: z.string().trim().max(80).optional(),
-    summary: z.string().trim().max(20000).optional(),
+    summary: z.string().trim().max(50000).optional(),
     subject: z.string().trim().max(2000).optional(),
   })
   .strict();

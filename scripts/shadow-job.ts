@@ -2,7 +2,9 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
 import { diffDatabase, publicDiffReport, renderReport } from "../lib/changes/diff";
-import { overlayFullSummaries } from "../lib/changes/summaries";
+import { MIRROR_SHEETS_SCOPE } from "../lib/changes/mirror";
+import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
+import { overlaySummaryMap, readCommsSummaries } from "../lib/changes/summaries";
 import { assertProductionDiff } from "../lib/changes/guard";
 import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
 import { unpackFile } from "../lib/snapshot/pack";
@@ -27,7 +29,7 @@ function disk(name: string): string {
   return readFileSync(join(process.cwd(), "data", "generated", name), "utf8");
 }
 
-async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookSlice; fullSummaries: boolean }> {
+async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookSlice; sheetSummaries: boolean }> {
   const bundle = await selectLiveBundle(sql);
   const read = (name: string): string => {
     const packed = bundle?.files[name];
@@ -56,16 +58,10 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
     pricing,
     sheet,
   });
-  const fullPath = process.env.COMMS_FULL_PATH?.trim() || "";
-  let full = "";
-  if (fullPath) {
-    try {
-      full = readFileSync(fullPath, "utf8");
-    } catch {
-      full = "";
-    }
-  }
-  return { label, slice: full ? overlayFullSummaries(slice, full) : slice, fullSummaries: Boolean(full) };
+  const google = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
+  if (!google) return { label, slice, sheetSummaries: false };
+  const full = await readCommsSummaries(await sheetsAccessToken(google, MIRROR_SHEETS_SCOPE));
+  return { label, slice: overlaySummaryMap(slice, full), sheetSummaries: full.size > 0 };
 }
 
 async function main(): Promise<void> {
@@ -90,8 +86,8 @@ async function main(): Promise<void> {
     if (!ready.rows[0]?.sites) {
       summary("Site rows were not compared. The sites table is not on production. Run the Production migrations workflow.\n");
     }
-    if (!loaded.fullSummaries) {
-      summary("Full comms summaries were not on this runner. A database summary that is only a clipped prefix of the sheet is not flagged. Set COMMS_FULL_PATH to the private comms file. It is not in git or the snapshot.\n");
+    if (!loaded.sheetSummaries) {
+      summary("The Comms Log was not read. A database summary that is only a clipped prefix of the sheet is not flagged. GOOGLE_SERVICE_ACCOUNT_JSON was not set.\n");
     }
     if (!process.env.SITE_SHEET_PATH?.trim()) {
       summary("The private raw sheet was not on this runner. Site rows are compared to the published deals. Set SITE_SHEET_PATH to compare raw cells. That file is not in git or the snapshot.\n");

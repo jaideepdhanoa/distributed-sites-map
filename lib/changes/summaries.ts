@@ -1,7 +1,9 @@
 import type { Sql } from "@/lib/actions/db";
 import { applyParsedChanges } from "./apply";
+import { COMMS_HEADER_ROW, COMMS_SHEET, SPREADSHEET_ID, type SheetRender, type SheetTable } from "./mirror";
 import type { Actor, CommsPayload } from "./schema";
 import { isTruncatedCell } from "./site";
+import { loadSheetTable, readSheetRanges } from "./sheetTable";
 import type { WorkbookSlice } from "./workbook";
 
 const ACTOR: Actor = { id: "workbook-sync", kind: "agent" };
@@ -33,9 +35,34 @@ function asObject(value: unknown): Record<string, unknown> {
   return {};
 }
 
-/** Replace clipped snapshot summaries with the private full text. Ids that are missing stay as they are. */
-export function overlayFullSummaries(slice: WorkbookSlice, body: string): WorkbookSlice {
-  const full = fullSummaries(body);
+/** One line, no 300-character cut. The public snapshot still clips; the sheet does not. */
+export function fullSummaryText(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+/** Comms ID to the full Summary cell. Whitespace is collapsed and nothing is clipped. */
+export function summariesFromCommsTable(table: SheetTable): Map<string, string> {
+  const idAt = table.headers.findIndex((header) => header.trim().toLowerCase() === "comms id");
+  const summaryAt = table.headers.findIndex((header) => header.trim().toLowerCase() === "summary");
+  const out = new Map<string, string>();
+  if (idAt < 0 || summaryAt < 0) return out;
+  for (const row of table.rows) {
+    const id = text(row.cells[idAt]);
+    const summary = fullSummaryText(String(row.cells[summaryAt] ?? ""));
+    if (id && summary) out.set(id, summary);
+  }
+  return out;
+}
+
+/** The Comms Log tab, one batched values read with the Sheets retry. Summary text is not logged. */
+export async function readCommsSummaries(token: string): Promise<Map<string, string>> {
+  const read = (ranges: string[], kind: SheetRender) => readSheetRanges(token, SPREADSHEET_ID, ranges, kind);
+  const table = await loadSheetTable(read, COMMS_SHEET, COMMS_HEADER_ROW, [["comms id"], ["summary"]]);
+  return summariesFromCommsTable(table);
+}
+
+/** Replace clipped snapshot summaries with the sheet text. Ids that are missing stay as they are. */
+export function overlaySummaryMap(slice: WorkbookSlice, full: Map<string, string>): WorkbookSlice {
   if (!full.size) return slice;
   return {
     ...slice,
@@ -45,6 +72,11 @@ export function overlayFullSummaries(slice: WorkbookSlice, body: string): Workbo
       return { ...row, summary };
     }),
   };
+}
+
+/** Replace clipped snapshot summaries with the private full text. Ids that are missing stay as they are. */
+export function overlayFullSummaries(slice: WorkbookSlice, body: string): WorkbookSlice {
+  return overlaySummaryMap(slice, fullSummaries(body));
 }
 
 export function fullSummaries(body: string): Map<string, string> {

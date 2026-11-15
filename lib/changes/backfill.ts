@@ -159,7 +159,11 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
       const prior = currentComms.get(row.entity_id);
       const fields = ["site_id", ...COMMS_FIELDS] as const;
       const incoming = commsFields(row);
-      if (prior && isTruncatedCell(prior.summary, incoming.summary)) incoming.summary = prior.summary;
+      // A stored clip is replaced only by the confirm-gated restore. A full
+      // stored summary is never replaced by the public snapshot's 300-character cut.
+      if (prior && (isTruncatedCell(incoming.summary, prior.summary) || isTruncatedCell(prior.summary, incoming.summary))) {
+        incoming.summary = prior.summary;
+      }
       if (prior && sameFields(commsFields(prior), incoming, fields)) {
         counts.unchanged.comms += 1;
         continue;

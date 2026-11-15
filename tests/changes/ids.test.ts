@@ -6,7 +6,8 @@ import { importChanged } from "../../lib/changes/backfill";
 import { loadMirrorRows } from "../../lib/changes/mirror";
 import { applyActivityRenumber, planActivityRenumber } from "../../lib/changes/renumber";
 import type { Actor } from "../../lib/changes/schema";
-import { applySummaryRestore, formatSummaryPlan, planSummaryRestore } from "../../lib/changes/summaries";
+import { applySummaryRestore, formatSummaryPlan, planSummaryRestore, summariesFromCommsTable } from "../../lib/changes/summaries";
+import type { SheetTable } from "../../lib/changes/mirror";
 import { memorySql } from "../helpers/sql";
 
 const human: Actor = { id: "jaideep", kind: "human", role: "reviewer" };
@@ -202,4 +203,62 @@ test("full comms summaries replace a clipped prefix and a later import does not 
   assert.equal(again.inserted.comms, 0);
   const kept = await sql.query<{ summary: string }>(`SELECT payload->>'summary' AS summary FROM comms_entries WHERE entity_id = 'CM-0382'`);
   assert.equal(kept.rows[0]?.summary, full);
+});
+
+test("the sheet summary is not clipped, and a sync does not expand a stored clip", async () => {
+  const long = `${"y".repeat(300)} more`;
+  const table: SheetTable = {
+    title: "Comms Log",
+    headerRow: 1,
+    headers: ["Comms ID", "Summary"],
+    rows: [{ row: 2, cells: ["CM-0382", long] }, { row: 3, cells: ["CM-9002", `  ${long}  `] }],
+  };
+  const sheet = summariesFromCommsTable(table);
+  assert.equal(sheet.get("CM-0382"), long);
+  assert.equal(sheet.get("CM-9002"), long);
+  assert.equal(long.length > 300, true);
+
+  const sql = await memorySql();
+  await migrate(sql);
+  const clipped = "y".repeat(300);
+  const base = {
+    entity_id: "CM-0382",
+    site_id: "PIPE-PHX-0001",
+    site_ids: "PIPE-PHX-0001",
+    direction: "in",
+    at: "2026-11-06 09:00",
+    person: "Ada",
+    firm: "",
+    channel: "",
+    summary: clipped,
+    subject: "",
+    thread_id: "",
+    link: "",
+    asks_made: "",
+    asks_answered: "",
+    attachments: "",
+    state_changes: "",
+    workbook_source: "",
+    message_id: "",
+  };
+  await importChanged(sql, { stages: [], activities: [], comms: [base] }, "snap-short");
+  const expanded = await importChanged(
+    sql,
+    {
+      stages: [],
+      activities: [],
+      comms: [
+        { ...base, summary: long },
+        { ...base, entity_id: "CM-9002", summary: long },
+      ],
+    },
+    "snap-long",
+  );
+  assert.equal(expanded.inserted.comms, 1);
+  assert.equal(expanded.unchanged.comms, 1);
+  const rows = await sql.query<{ entity_id: string; summary: string }>(
+    `SELECT entity_id, payload->>'summary' AS summary FROM comms_entries ORDER BY entity_id`,
+  );
+  assert.equal(rows.rows.find((row) => row.entity_id === "CM-0382")?.summary, clipped);
+  assert.equal(rows.rows.find((row) => row.entity_id === "CM-9002")?.summary, long);
 });

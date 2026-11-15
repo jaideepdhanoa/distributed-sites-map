@@ -4,8 +4,11 @@ export const MARKETS = ["PHX", "LAS", "MIA", "SNA"] as const;
 
 export type Market = (typeof MARKETS)[number];
 
-/** R-099 display labels. Legacy Edge is not a class a new write may set. */
-export const SERVICE_AREA_CLASSES = ["Inside", "Near 0-5", "Near 5-10", "Outside", "Unknown"] as const;
+/**
+ * Workbook service-area tokens. Import and the write API store them unchanged.
+ * unknown and edge_legacy are not rewritten into another class.
+ */
+export const SERVICE_AREA_CLASSES = ["inside", "near_0_5", "near_5_10", "outside", "unknown", "edge_legacy"] as const;
 
 export type ServiceAreaClass = (typeof SERVICE_AREA_CLASSES)[number];
 
@@ -64,6 +67,14 @@ export const ENTITY_TYPES = ["stage", "activity", "comms"] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
 export const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
+
+/** A listing id on a comms row, such as L-441. */
+export const LISTING_ID = /^L-\d+$/;
+
+/** A comms row may name a site, name a listing, or name neither. */
+export function commsSiteAllowed(value: string): boolean {
+  return value === "" || SITE_ID.test(value) || LISTING_ID.test(value);
+}
 
 export const COMMS_FIELDS = [
   "site_ids",

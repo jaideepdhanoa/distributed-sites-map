@@ -10,6 +10,7 @@ import {
   MARKETS,
   SERVICE_AREA_CLASSES,
   SITE_ID,
+  commsSiteAllowed,
   type ActivityType,
   type CommsDirection,
   type EntityType,
@@ -97,7 +98,7 @@ const commsPayload = z
 const changeSchema = z
   .object({
     entity_type: z.enum(["stage", "activity", "comms"]),
-    site_id: z.string().trim().regex(SITE_ID),
+    site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
     source: z.string().trim().min(1).max(200),
@@ -115,7 +116,7 @@ function issueMessage(path: string, code: string): string {
   if (code === "unrecognized_keys") return "That field is not accepted.";
   if (path.endsWith("market")) return "Market must be one of PHX, LAS, MIA, SNA.";
   if (path.endsWith("service_area_class")) {
-    return "Service area class must be one of Inside, Near 0-5, Near 5-10, Outside, Unknown.";
+    return `Service area class must be one of ${SERVICE_AREA_CLASSES.join(", ")}.`;
   }
   if (path.endsWith("source")) return "Every change needs a source.";
   if (path.endsWith("stage")) return "That stage is not a known stage.";
@@ -174,6 +175,8 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_id && row.entity_type === "comms" && !/^CM-\d{4,}$/.test(row.entity_id)) {
       throw new InputError(`Change ${index + 1}: That record id is not valid.`);
     }
+    const siteAllowed = row.entity_type === "comms" ? commsSiteAllowed(row.site_id) : SITE_ID.test(row.site_id);
+    if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
     if (row.entity_type === "stage") {
       const parsedPayload = stagePayload.safeParse(row.payload);

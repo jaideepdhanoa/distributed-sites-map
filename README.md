@@ -105,7 +105,7 @@ Stage, activity, and comms can be stored in Neon while the site still reads the 
 
 A session cookie is a person. Activity and comms need contributor access. Stage changes need a reviewer. A viewer gets 403. `Dropped` needs a reviewer and a `reason`; the event records who dropped it and why. Moving a row off `Dropped` also needs a reason. Cookie writes must be same-origin (`Sec-Fetch-Site: same-origin`, or an `Origin` on the same host). Indie and Muse send `Authorization: Bearer` with `AGENT_WRITE_TOKEN_INDIE` or `AGENT_WRITE_TOKEN_MUSE`. An agent can write activity and comms. An agent cannot change a stage. Do not invent token values and do not print them.
 
-New API writes accept the canonical stages `1 Desk screen`, `2 Financial screen`, `3 Site checks`, `4 Offer and close`, and `Dropped`. Market is `PHX`, `LAS`, `MIA`, or `SNA`. Service area is `Inside`, `Near 0-5`, `Near 5-10`, `Outside`, or `Unknown`. Comms direction is `in` or `out`.
+New API writes accept the canonical stages `1 Desk screen`, `2 Financial screen`, `3 Site checks`, `4 Offer and close`, and `Dropped`. Market is `PHX`, `LAS`, `MIA`, or `SNA`. Service area is `inside`, `near_0_5`, `near_5_10`, `outside`, `unknown`, or `edge_legacy`, stored as written. Comms direction is `in` or `out`. A comms row may use a blank site id or a listing id matching `L-` and digits. Any other site id is rejected.
 
 `CHANGES_API_ENABLED` controls writes. On production it is off until you set it to `1`. Preview turns writes on by itself. A read flag does not cut the site over while writes are off.
 
@@ -120,7 +120,7 @@ Each read flag is a cutover for that entity, and turning it off is the rollback.
 
 Workbook sync copies changed stage, activity, and comms rows into `events` only after a snapshot is published, and only on `main`. A hash match skips the publish, so it skips the import and does not open Neon for that copy. The actor is `workbook-sync` and the source is `workbook snapshot <id>`. A repeat of the same rows writes nothing. Legacy stage names (`Financial screen`, `Off-market target`, `Off market (no lead)`, `Sourced`) and `internal` comms are stored as written. Unknown values are listed in the diff and are not rewritten into a known value.
 
-**Shadow diff** is started by hand (`workflow_dispatch`). It reads production, compares the whole workbook with the shadow tables, and writes neither events nor the sheet. The summary and the `shadow-diff` artifact say `Clean: yes` or `Clean: no`. The gate before a cutover is one clean run after a fresh import.
+**Shadow diff** is started by hand (`workflow_dispatch`). It reads production, compares the whole workbook with the shadow tables, and writes neither events nor the sheet. The summary and the `shadow-diff` artifact say `Clean: yes` or `Clean: no`, and `clean_by_entity` for stage, activity, and comms. The gate before a cutover is one clean run after a fresh import.
 
 The workbook mirror, which would copy database rows back to the Sheet, is not in this change. It needs a later job that, for an entity whose read flag is on, writes that entity's rows to the Sheet under an explicit confirmation, and refuses to run from a preview or a pull request.
 

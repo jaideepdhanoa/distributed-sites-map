@@ -7,6 +7,7 @@ import {
   SITE_ID,
   STAGES,
   WORKBOOK_DIRECTIONS,
+  commsSiteAllowed,
   type CommsField,
 } from "./vocab";
 
@@ -147,7 +148,7 @@ export function workbookIssues(slice: WorkbookSlice): { stage: RowIssue[]; activ
   }
   for (const row of slice.comms) {
     if (!listed(row.direction, WORKBOOK_DIRECTIONS)) comms.push({ id: row.entity_id, field: "direction", value: row.direction });
-    if (!SITE_ID.test(row.site_id)) comms.push({ id: row.entity_id, field: "site_id", value: row.site_id });
+    if (!commsSiteAllowed(row.site_id)) comms.push({ id: row.entity_id, field: "site_id", value: row.site_id });
     if (!/^CM-\d{4,}$/.test(row.entity_id)) comms.push({ id: row.entity_id, field: "entity_id", value: row.entity_id });
   }
   return { stage, activity, comms };

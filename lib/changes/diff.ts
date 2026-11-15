@@ -16,6 +16,7 @@ export type EntityDiff = {
 export type DiffReport = {
   workbook_source: string;
   clean: boolean;
+  clean_by_entity: { stage: boolean; activity: boolean; comms: boolean };
   cut_over: ShadowEntity[];
   legacy_stages: string[];
   invalid: { stage: RowIssue[]; activity: RowIssue[]; comms: RowIssue[] };
@@ -134,18 +135,25 @@ export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, wo
     entities[entity] = { ...entities[entity], missing: [], extra: [], changed: [] };
     invalid[entity] = [];
   }
-  const clean = (["stage", "activity", "comms"] as const).every((name) => {
-    const row = entities[name];
-    return row.missing.length === 0 && row.extra.length === 0 && row.changed.length === 0 && invalid[name].length === 0;
-  });
+  const clean_by_entity = {
+    stage: entityClean(entities.stage, invalid.stage),
+    activity: entityClean(entities.activity, invalid.activity),
+    comms: entityClean(entities.comms, invalid.comms),
+  };
+  const clean = clean_by_entity.stage && clean_by_entity.activity && clean_by_entity.comms;
   return {
     workbook_source: workbookSource,
     clean,
+    clean_by_entity,
     cut_over: cutOver,
     legacy_stages: legacyStageIds(workbook),
     invalid,
     entities,
   };
+}
+
+function entityClean(row: EntityDiff, issues: RowIssue[]): boolean {
+  return row.missing.length === 0 && row.extra.length === 0 && row.changed.length === 0 && issues.length === 0;
 }
 
 export async function readDatabaseSlice(sql: Sql): Promise<WorkbookSlice> {
@@ -225,6 +233,7 @@ export function renderReport(report: DiffReport): string {
   lines.push(
     "",
     `Clean: ${report.clean ? "yes" : "no"}`,
+    `clean_by_entity: stage ${report.clean_by_entity.stage ? "yes" : "no"}, activity ${report.clean_by_entity.activity ? "yes" : "no"}, comms ${report.clean_by_entity.comms ? "yes" : "no"}`,
     "",
     "Cutover of an entity needs one clean on-demand diff after a fresh import. Then set that entity's read flag and CHANGES_API_ENABLED. This job does not write the workbook or the database.",
     "",

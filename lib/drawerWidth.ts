@@ -1,5 +1,5 @@
 export const DRAWER_WIDTH_KEY = "drawer-width";
-export const DRAWER_DEFAULT = 380;
+export const DRAWER_DEFAULT = 480;
 export const DRAWER_MIN = 360;
 export const DRAWER_MAX = 900;
 

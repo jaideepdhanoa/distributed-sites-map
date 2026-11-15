@@ -12,6 +12,7 @@ import {
   depotLine,
   fullMoney,
   capacitySummary,
+  displayScore,
   factsForDeal,
   powerSummary,
   openLandText,
@@ -51,6 +52,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageDetail(deal.stage, deal.stage_group);
+  if (id === "score") return displayScore(deal.score) || "—";
   if (id === "asking") {
     if (!signedIn) return "—";
     if (!deal.asking_price_display) return "—";
@@ -94,6 +96,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "asking") return signedIn ? deal.asking_price : null;
+  if (id === "score") return typeof deal.score === "number" ? deal.score : null;
   if (id === "acres") return deal.land_acres;
   if (id === "perAcre") return signedIn ? deal.price_per_acre : null;
   if (id === "openLand") return deal.open_land_sqft;

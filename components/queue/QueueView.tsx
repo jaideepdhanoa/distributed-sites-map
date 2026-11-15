@@ -13,6 +13,7 @@ export type FeedSite = {
   siteId: string;
   name: string;
   city: string;
+  score?: string;
   lng: number | null;
   lat: number | null;
   followed: boolean;
@@ -363,6 +364,7 @@ export function ReviewRail({
       >
         <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
         <span>{marketLabel(site.city)}</span>
+        <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{site.score || "—"}</span>
         <span className="review-row-chips">
           {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
           {site.reasons[0] ? <time>{reasonWhen(site.reasons[0].at)}</time> : null}
@@ -376,7 +378,7 @@ export function ReviewRail({
       {groups.map((group) => (
         <section key={group.testId} data-testid={group.testId}>
           <h2>{group.label}</h2>
-          {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">None</p>}
+          {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">Nothing in this group.</p>}
         </section>
       ))}
       {rest.length ? (
@@ -418,6 +420,7 @@ export function ReviewFeedSheet({
               onClick={() => { onPick(index); onClose(); }}
             >
               <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{index + 1}. {site.name}</strong>
+              <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{site.score || "—"}</span>
               <span>{marketLabel(site.city)} · {chips(site.reasons).map((chip) => chip.label).join(", ")}</span>
             </button>
             <RowLinks listing={links?.[site.siteId]?.listing} folder={links?.[site.siteId]?.folder} packageHref={links?.[site.siteId]?.packageHref} />
@@ -428,7 +431,7 @@ export function ReviewFeedSheet({
             {groups.map((group) => (
               <section key={group.testId} data-testid={`${group.testId}-sheet`}>
                 <h3>{group.label}</h3>
-                {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">None</p>}
+                {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">Nothing in this group.</p>}
               </section>
             ))}
             {rest.length ? (

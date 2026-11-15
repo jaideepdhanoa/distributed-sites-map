@@ -706,8 +706,7 @@ export default function MapView(props: Props) {
     };
     const image = marker("depot", [29, 78, 137]);
     const square = (rgb: [number, number, number]) => marker("circle", rgb);
-    const icons = new Map<string, Uint8Array>();
-    icons.set("depot", image);
+    const icons: Record<string, Uint8Array> = { depot: image };
     const pinColors: Record<string, [number, number, number]> = {
       stone: [138, 129, 115],
       amber: [168, 113, 27],
@@ -715,7 +714,7 @@ export default function MapView(props: Props) {
       clay: [158, 75, 62],
       held: [29, 78, 137],
     };
-    for (const [name, rgb] of Object.entries(pinColors)) icons.set(`dia-${name}`, marker("diamond", rgb));
+    for (const [name, rgb] of Object.entries(pinColors)) icons[`dia-${name}`] = marker("diamond", rgb);
     const squares: Record<string, [number, number, number]> = {
       sourced: pinColors.stone,
       desk: pinColors.amber,
@@ -726,7 +725,7 @@ export default function MapView(props: Props) {
       later: pinColors.moss,
       dropped: pinColors.clay,
     };
-    for (const [name, rgb] of Object.entries(squares)) icons.set(`sq-${name}`, square(rgb));
+    for (const [name, rgb] of Object.entries(squares)) icons[`sq-${name}`] = square(rgb);
     const triangle = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
@@ -743,13 +742,13 @@ export default function MapView(props: Props) {
       }
     }
     const addIcon = (id: string) => {
-      const data = icons.get(id);
+      const data = icons[id];
       if (!data || map.hasImage(id)) return;
       map.addImage(id, { width: size, height: size, data });
     };
     map.on("styleimagemissing", (event) => addIcon(event.id));
     map.on("load", () => {
-      for (const id of icons.keys()) addIcon(id);
+      for (const id of Object.keys(icons)) addIcon(id);
       node.current?.setAttribute("data-deal-markers", "square");
       map.resize();
       requestAnimationFrame(() => map.resize());

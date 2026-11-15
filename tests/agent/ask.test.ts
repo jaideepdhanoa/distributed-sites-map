@@ -91,8 +91,8 @@ test("the daily cap stops a user and the portfolio prefix stays stable", async (
     assert.equal(blocked.ok, false);
     if (!blocked.ok) assert.equal(blocked.reason, "limit");
     assert.equal((await consumeAskCredit("jaideep")).ok, true);
-    const first = askPrefix();
-    const second = askPrefix();
+    const first = await askPrefix();
+    const second = await askPrefix();
     assert.equal(first, second);
     assert.equal(first.includes("Question:"), false);
     assert.match(first, /Portfolio counts/);
@@ -185,13 +185,13 @@ test("portfolio context lists a stage for every in-play listed deal", async () =
   const expected = file.features
     .map((feature) => feature.properties)
     .filter((props) => props.listed === true && props.stage_group !== "dropped" && props.deal_id && !isQuarantined(props.deal_id));
-  const rows = listedStageRows(isQuarantined);
+  const rows = await listedStageRows(isQuarantined);
   const ids = new Set(rows.map((row) => row.id));
   assert.equal(ids.size, expected.length);
   assert.ok(expected.length > 8);
   for (const props of expected) assert.equal(ids.has(String(props.deal_id)), true);
   assert.equal(ids.has("PIPE-PHX-0006"), false);
-  const prefix = askPrefix();
+  const prefix = await askPrefix();
   for (const id of ids) assert.equal(prefix.includes(id), true, id);
   assert.equal(prefix.includes("PIPE-PHX-0006"), false);
   for (const row of rows) {
@@ -236,7 +236,7 @@ test("getSite returns the card facts for 3520 N 16th St without restaging it", a
   assert.match(String(result.card?.photoSet), /5 site photos/);
   assert.match(String(result.card?.photoSet), /7 listing photos/);
   assert.equal(JSON.stringify(result).includes("timeline"), false);
-  const scope = siteScopeLine("PIPE-PHX-0084");
+  const scope = await siteScopeLine("PIPE-PHX-0084");
   assert.match(scope, /\$1,750,000/);
   assert.match(scope, /Package on file/);
   assert.match(scope, /9,000 sq ft/);
@@ -247,13 +247,13 @@ test("getSite returns the card facts for 3520 N 16th St without restaging it", a
   }
 });
 
-test("portfolio context includes listed deals counted from the data", () => {
-  const rows = listedDealsByMarket();
+test("portfolio context includes listed deals counted from the data", async () => {
+  const rows = await listedDealsByMarket();
   assert.deepEqual(rows.map((row) => row.name), ["Phoenix", "Las Vegas", "Miami"]);
   assert.ok(rows.every((row) => Number.isInteger(row.listed) && row.listed >= 0));
-  const line = listedCountLine();
+  const line = await listedCountLine();
   for (const row of rows) assert.match(line, new RegExp(`${row.name} ${row.listed}`));
-  assert.match(askPrefix(), new RegExp(line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(await askPrefix(), new RegExp(line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
 test("ask markdown renders bold, lists, and in-app links as text nodes", () => {

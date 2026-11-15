@@ -7,11 +7,11 @@ import { createNote, listNotes } from "../../lib/actions/notes";
 import type { RecordLookup } from "../../lib/actions/records";
 import { completeSuggestion, createSuggestion, decideSuggestion, listSuggestions, nextStepsCsv } from "../../lib/actions/suggestions";
 import { InputError } from "../../lib/actions/text";
-import { loadCatalog } from "../../lib/queue/catalog";
+import { loadCatalogFromDisk } from "../../lib/queue/catalog";
 import { loadQueue, markAllReviewed } from "../../lib/queue/load";
 import { memorySql } from "../helpers/sql";
 
-const active = loadCatalog().find((item) => item.active && !item.isCStore);
+const active = loadCatalogFromDisk().find((item) => item.active && !item.isCStore);
 if (!active) throw new Error("expected an active pipeline deal");
 const deal = Object.freeze({ deal_id: active.id, stage: active.stage, name: "Sample deal" });
 const lookup: RecordLookup = (kind, id) => (kind === "deal" && id === deal.deal_id ? deal : null);
@@ -112,7 +112,7 @@ test("an assignment shows under Assigned to me, and Done is limited to the owner
   }, lookup);
   await completeSuggestion(sql, { id: owned.id, actorId: "contributor", reviewer: false });
   await decideSuggestion(sql, { id: owned.id, status: "accepted", actorId: "reviewer" });
-  const csv = nextStepsCsv(await listSuggestions(sql), lookup);
+  const csv = await nextStepsCsv(await listSuggestions(sql), lookup);
   assert.equal(csv.split("\n")[0], "site_id,date,title,owner,approved_at,done_at,type,stage");
   assert.match(csv, /Schedule a site visit/);
   assert.match(csv, /done_at/);

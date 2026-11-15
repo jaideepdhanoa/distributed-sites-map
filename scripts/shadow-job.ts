@@ -39,6 +39,17 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
       ? unpackFile(bundle.files["pricing.json"])
       : "{}"
     : disk("pricing.json");
+  const sheet = bundle
+    ? bundle.files["site_sheet.json"]
+      ? unpackFile(bundle.files["site_sheet.json"])
+      : ""
+    : (() => {
+        try {
+          return disk("site_sheet.json");
+        } catch {
+          return "";
+        }
+      })();
   return {
     label,
     slice: workbookFromFiles({
@@ -46,6 +57,7 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
       timeline: read("timeline.json"),
       comms: read("comms.json"),
       pricing,
+      sheet,
     }),
   };
 }

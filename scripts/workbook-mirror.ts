@@ -2,7 +2,6 @@ import { appendFileSync } from "node:fs";
 import { createSign } from "node:crypto";
 import { withConnectionString } from "../lib/actions/db";
 import { assertProductionDiff } from "../lib/changes/guard";
-import { SITE_MIRROR_FIELDS } from "../lib/changes/site";
 import {
   ACTIVITY_HEADER_ROW,
   ACTIVITY_SHEET,
@@ -204,7 +203,8 @@ async function main(): Promise<void> {
   }
   if (selected.includes("site")) {
     const tables = [];
-    const headers = SITE_MIRROR_FIELDS.map((field) => field.headers);
+    const names = [...new Set(rows.sites.flatMap((row) => Object.keys(row.cells)))];
+    const headers = [["site id"], ...names.map((name) => [name])];
     for (const tab of stageTabs()) {
       tables.push(await loadTable(token, tab.title, tab.headerRow, headers));
     }

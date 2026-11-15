@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
-import { SITE_FIELDS, SITE_MIRROR_FIELDS, mirrorClassLabel } from "./site";
+import { parseSheet } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -262,34 +262,66 @@ export function planStageMirror(tables: SheetTable[], stages: { site_id: string;
   return combined;
 }
 
+const MIRROR_DENY = new Set([
+  "stage",
+  "revenue ($ a year)",
+  "ebitda ($ a year)",
+  "claimed cash flow ($ a year)",
+  "normalized ebitda ($ a year)",
+  "claimed cash-flow label",
+  "financials status",
+  "package status",
+]);
+
+/** Write raw header cells only. A header with no stored raw value is left alone. */
 export function planSiteMirror(
   tables: SheetTable[],
-  sites: { site_id: string; values: Record<string, string> }[],
+  sites: { site_id: string; cells: Record<string, string> }[],
 ): MirrorPlan {
   const combined: MirrorPlan = { changes: [], skippedProtected: 0, unmatched: [], appended: 0 };
   const claimed = new Set<string>();
   const writable = sites.filter((row) => row.site_id !== PROTECTED_SITE_ID);
   if (writable.length !== sites.length) combined.skippedProtected += 1;
   for (const table of tables) {
-    const plan = planTable({
-      table,
-      idHeaders: ["site id"],
-      fields: SITE_MIRROR_FIELDS,
-      records: writable
-        .filter((row) => !claimed.has(row.site_id))
-        .map((row) => ({ id: row.site_id, values: { ...row.values, id: row.site_id } })),
-      append: false,
-      protectRow: true,
-      skipBlank: true,
-    });
+    const idAt = headerIndex(table.headers, ["site id"]);
+    if (idAt < 0) throw new Error(`${table.title} is missing an id column (site id).`);
+    const byId = new Map<string, { row: number; cells: string[] }>();
     for (const row of table.rows) {
-      const idAt = headerIndex(table.headers, ["site id"]);
       const id = cellText(row.cells[idAt]);
+      if (id && !byId.has(id)) byId.set(id, row);
       if (id) claimed.add(id);
     }
-    combined.changes.push(...plan.changes);
-    combined.skippedProtected += plan.skippedProtected;
-    combined.unmatched.push(...plan.unmatched.filter((id) => !claimed.has(id)));
+    for (const record of writable) {
+      if (claimed.has(record.site_id) && !byId.has(record.site_id)) continue;
+      const existing = byId.get(record.site_id);
+      if (!existing) {
+        if (!claimed.has(record.site_id)) combined.unmatched.push(record.site_id);
+        continue;
+      }
+      if (existing.row === PROTECTED_ROW) {
+        combined.skippedProtected += 1;
+        continue;
+      }
+      table.headers.forEach((header, index) => {
+        const norm = header.trim().toLowerCase();
+        if (!norm || norm === "site id" || MIRROR_DENY.has(norm)) return;
+        const key = Object.keys(record.cells).find((name) => name.trim().toLowerCase() === norm);
+        if (!key) return;
+        const after = cellText(record.cells[key]);
+        if (!after) return;
+        const before = cellText(existing.cells[index]);
+        if (before === after) return;
+        combined.changes.push({
+          sheet: table.title,
+          row: existing.row,
+          column: index + 1,
+          header: header || key,
+          id: record.site_id,
+          before,
+          after,
+        });
+      });
+    }
   }
   const seen = new Set<string>();
   combined.unmatched = combined.unmatched.filter((id) => {
@@ -397,14 +429,12 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   stages: { site_id: string; stage: string }[];
   activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string }[];
   comms: { entity_id: string; values: Record<string, string> }[];
-  sites: { site_id: string; values: Record<string, string> }[];
+  sites: { site_id: string; cells: Record<string, string> }[];
 }> {
   const stages = await sql.query<StageDb>(`SELECT site_id, stage FROM site_stages ORDER BY site_id`);
   const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload FROM activities ORDER BY entity_id`);
   const comms = await sql.query<CommsDb>(`SELECT entity_id, payload FROM comms_entries ORDER BY entity_id`);
-  const sites = await sql.query<Record<string, unknown>>(
-    `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")} FROM sites ORDER BY site_id`,
-  );
+  const sites = await sql.query<{ site_id: string; sheet: unknown }>(`SELECT site_id, sheet FROM sites ORDER BY site_id`);
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
     activities: activities.rows.map((row) => {
@@ -424,15 +454,10 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       for (const field of COMMS_FIELDS) values[field] = text(payload[field]);
       return { entity_id: text(row.entity_id), values };
     }),
-    sites: sites.rows.map((row) => {
-      const values: Record<string, string> = {};
-      for (const field of SITE_FIELDS) {
-        if (field === "photo_refs") continue;
-        const raw = text(row[field]);
-        values[field] = field === "service_area_class" ? mirrorClassLabel(raw) : raw;
-      }
-      return { site_id: text(row.site_id), values };
-    }),
+    sites: sites.rows.map((row) => ({
+      site_id: text(row.site_id),
+      cells: typeof row.sheet === "string" ? parseSheet(row.sheet) : parseSheet(JSON.stringify(row.sheet ?? {})),
+    })),
   };
 }
 

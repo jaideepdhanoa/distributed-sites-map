@@ -8,8 +8,8 @@ import { enqueueAlert, flushInstant } from "./deliver";
 import { loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
 
-function siteLabel(siteId: string): string {
-  const hit = loadCatalog().find((item) => item.id === siteId);
+async function siteLabel(siteId: string): Promise<string> {
+  const hit = (await loadCatalog()).find((item) => item.id === siteId);
   const name = hit?.name?.trim();
   if (name && name !== siteId) return `${name} (${siteId})`;
   return siteId;
@@ -43,7 +43,7 @@ async function queueFor(
       category: input.category,
       channel: mode === "instant" ? "instant" : "digest",
       siteId: input.siteId,
-      siteLabel: siteLabel(input.siteId),
+      siteLabel: await siteLabel(input.siteId),
       summary: input.summary,
       authorId: input.actorId,
       href: input.href,

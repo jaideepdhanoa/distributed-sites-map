@@ -1,3 +1,4 @@
+import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 
 const MARKETS = [
@@ -9,10 +10,10 @@ const MARKETS = [
 export type ListedMarket = { city: string; name: string; listed: number };
 
 /** Listed deals in the three markets whose stage is not dropped. */
-export function listedDealsByMarket(): ListedMarket[] {
+export async function listedDealsByMarket(): Promise<ListedMarket[]> {
   let features: { properties?: Record<string, unknown> }[] = [];
   try {
-    const file = readGenerated("deals.geojson") as { features?: { properties?: Record<string, unknown> }[] };
+    const file = await readDeals();
     features = file.features || [];
   } catch {
     features = [];
@@ -27,7 +28,7 @@ export function listedDealsByMarket(): ListedMarket[] {
   }));
 }
 
-export function listedCountLine(): string {
-  const rows = listedDealsByMarket();
+export async function listedCountLine(): Promise<string> {
+  const rows = await listedDealsByMarket();
   return `Listed deals still in play, not dropped: ${rows.map((row) => `${row.name} ${row.listed}`).join(". ")}.`;
 }

@@ -1,3 +1,4 @@
+import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 import { isPipelineStore } from "@/lib/labels";
 import { safeSnapshot } from "@/lib/policy/banned";
@@ -66,13 +67,37 @@ function clean(value: unknown, max = 180): string {
   return safeSnapshot(String(value ?? ""), max);
 }
 
-export function loadCatalog(): CatalogSite[] {
-  const deals = readJson("deals.geojson") as { features?: { geometry?: { type?: string; coordinates?: number[] } | null; properties?: DealProps }[] } | null;
-  const sites = readJson("sites.geojson") as { features?: { properties?: SiteProps }[] } | null;
-  const timeline = readJson("timeline.json") as {
+export function loadCatalogFromDisk(): CatalogSite[] {
+  return catalogFrom(
+    readJson("deals.geojson") as { features?: { geometry?: { type?: string; coordinates?: number[] } | null; properties?: DealProps }[] } | null,
+    readJson("sites.geojson") as { features?: { properties?: SiteProps }[] } | null,
+    readJson("timeline.json") as {
+      items?: { record_id?: string; event_id?: string; date?: string; summary?: string; type?: string }[];
+      records?: Record<string, { folder_url?: string; materials?: { label?: string; count?: number; latest?: string; category?: string }[]; last_touched?: string }>;
+    } | null,
+  );
+}
+
+export async function loadCatalog(): Promise<CatalogSite[]> {
+  const deals = await readDeals();
+  return catalogFrom(
+    deals as { features?: { geometry?: { type?: string; coordinates?: number[] } | null; properties?: DealProps }[] },
+    readJson("sites.geojson") as { features?: { properties?: SiteProps }[] } | null,
+    readJson("timeline.json") as {
+      items?: { record_id?: string; event_id?: string; date?: string; summary?: string; type?: string }[];
+      records?: Record<string, { folder_url?: string; materials?: { label?: string; count?: number; latest?: string; category?: string }[]; last_touched?: string }>;
+    } | null,
+  );
+}
+
+function catalogFrom(
+  deals: { features?: { geometry?: { type?: string; coordinates?: number[] } | null; properties?: DealProps }[] } | null,
+  sites: { features?: { properties?: SiteProps }[] } | null,
+  timeline: {
     items?: { record_id?: string; event_id?: string; date?: string; summary?: string; type?: string }[];
     records?: Record<string, { folder_url?: string; materials?: { label?: string; count?: number; latest?: string; category?: string }[]; last_touched?: string }>;
-  } | null;
+  } | null,
+) {
   const verdictByDeal = new Map<string, string>();
   for (const feature of sites?.features || []) {
     const props = feature.properties || {};

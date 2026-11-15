@@ -160,7 +160,7 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
     let promptTokens = usage.inputTokens || 0;
     let completionTokens = usage.outputTokens || 0;
     if (!text && !fromTable) {
-      const facts = [listedCountLine(), ...gathered.map((value) => JSON.stringify(value))].join("\n").slice(0, 6000);
+      const facts = [await listedCountLine(), ...gathered.map((value) => JSON.stringify(value))].join("\n").slice(0, 6000);
       const follow = streamText({
         ...shared,
         prompt: `${input.prompt}\n\nFacts already looked up:\n${facts}\n\nWrite the answer in sentences. Do not call tools.`,

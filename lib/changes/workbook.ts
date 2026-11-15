@@ -62,7 +62,7 @@ function firstSite(value: string): string {
   return token;
 }
 
-export function workbookFromFiles(files: { deals: string; timeline: string; comms: string; pricing?: string }): WorkbookSlice {
+export function workbookFromFiles(files: { deals: string; timeline: string; comms: string; pricing?: string; sheet?: string }): WorkbookSlice {
   const deals = JSON.parse(files.deals) as { features?: { properties?: Record<string, unknown> }[] };
   const stages = dedupe(
     (deals.features || []).map((feature) => {
@@ -121,7 +121,7 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
     (row) => row.entity_id,
   );
 
-  return { stages, activities, comms, sites: sitesFromFiles(files.deals, files.pricing || "") };
+  return { stages, activities, comms, sites: sitesFromFiles(files.deals, files.pricing || "", files.sheet || "") };
 }
 
 export type RowIssue = { id: string; field: string; value: string };

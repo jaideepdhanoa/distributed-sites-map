@@ -77,7 +77,7 @@ test("a contributor or agent can update site content, and stage stays off this p
   );
   assert.doesNotThrow(() =>
     validateBatch(agent, "agent-ok", {
-      changes: [siteChange({ name: "Sonoran Express", asking_price: 1600000, sources: { asking_price: "LoopNet listing" } })],
+      changes: [siteChange({ asking_price: 1600000, sources: { asking_price: "LoopNet listing" } }, 1)],
     }),
   );
 
@@ -98,10 +98,10 @@ test("a contributor or agent can update site content, and stage stays off this p
   assert.equal(row.rows[0]?.fact_sources.asking_price, "LoopNet listing");
 
   await assert.rejects(
-    () => applyBatch(sql, agent, "site-conflict", { changes: [siteChange({ notes: "A public note" })] }),
+    () => applyBatch(sql, contributor, "site-conflict", { changes: [siteChange({ notes: "A public note", market: "PHX" })] }),
     (error: unknown) => error instanceof VersionConflictError,
   );
-  const updated = await applyBatch(sql, agent, "site-2", {
+  const updated = await applyBatch(sql, contributor, "site-2", {
     changes: [siteChange({ notes: "A public note", lat: 33.39, sources: { lat: "listing pin" } }, 1)],
   });
   assert.equal(updated.results[0]?.version, 2);
@@ -120,6 +120,9 @@ test("unknown site values are stored as written and listed in the diff", async (
   const row: SiteRow = {
     site_id: "PIPE-PHX-0008",
     ...emptySiteFields(),
+    coord_status: "",
+    sheet: "{}",
+    facts: {},
     name: "Yard",
     market: "Phoenix",
     category: "Car wash",
@@ -164,7 +167,7 @@ test("the site read flag skips import and the overlay falls back to the snapshot
         stages: [],
         activities: [],
         comms: [],
-        sites: [{ site_id: "PIPE-PHX-0001", ...emptySiteFields(), name: "From sheet", market: "PHX", photo_refs: "[]" }],
+        sites: [{ site_id: "PIPE-PHX-0001", ...emptySiteFields(), coord_status: "", sheet: "{}", facts: {}, name: "From sheet", market: "PHX", photo_refs: "[]" }],
       },
       "snap-flag",
     );
@@ -223,6 +226,9 @@ test("scores match the generated deals and the scorecard is not applied", { time
   const hand: SiteRow = {
     site_id: "PIPE-LAS-0099",
     ...emptySiteFields(),
+    coord_status: "",
+    sheet: "{}",
+    facts: {},
     name: "Hand",
     market: "LAS",
     category: "Land",
@@ -249,6 +255,13 @@ test("scores match the generated deals and the scorecard is not applied", { time
     assert.equal(row?.score, props.score == null ? "" : String(props.score));
     assert.equal(row?.location_points, props.location_points == null ? "" : String(props.location_points));
   }
+  const sourced = await sql.query<{ coord_status: string; fact_sources: { lat?: string; lng?: string } }>(
+    "SELECT coord_status, fact_sources FROM sites WHERE coord_status IN ('geocoded', 'linked site') LIMIT 1",
+  );
+  if (sourced.rows[0]) {
+    assert.equal(sourced.rows[0].fact_sources.lat, sourced.rows[0].coord_status);
+    assert.notEqual(sourced.rows[0].fact_sources.lat, "workbook snapshot snap-scores");
+  }
   const sample = byId.get("PIPE-PHX-0001");
   assert.equal(sample?.county_value, "2236814");
   assert.equal(sample?.land_value, "");
@@ -268,7 +281,7 @@ test("a missing sites table leaves the other imports running", async () => {
       stages: [{ site_id: "PIPE-PHX-0001", stage: "1 Desk screen", market: "PHX", service_area_class: "inside", reason: "" }],
       activities: [],
       comms: [],
-      sites: [{ site_id: "PIPE-PHX-0001", ...emptySiteFields(), name: "Later", market: "PHX", photo_refs: "[]" }],
+      sites: [{ site_id: "PIPE-PHX-0001", ...emptySiteFields(), coord_status: "", sheet: "{}", facts: {}, name: "Later", market: "PHX", photo_refs: "[]" }],
     },
     "snap-old",
   );
@@ -279,34 +292,73 @@ test("a missing sites table leaves the other imports running", async () => {
   assert.equal(stage.rows[0]?.stage, "1 Desk screen");
 });
 
-test("the site mirror writes by header and skips row 10 and PIPE-PHX-0006", () => {
-  const headers = ["Stage", "Folder", "Name", "Site ID", "Asking price ($)", "Land value ($)", "Next step"];
+test("the site mirror writes raw cells by header and skips row 10 and PIPE-PHX-0006", () => {
+  const headers = ["Stage", "Folder", "Name", "Site ID", "Asking price ($)", "Next step"];
+  const raw = {
+    Name: "Sonoran Express",
+    "Asking price ($)": "$1,600,000",
+    "Next step": "Call the broker about the driveway. The package is in the folder.",
+  };
   const pipeline = sheet(headers, [
-    ["1 Desk screen", "https://drive.google.com/folder", "Old", "PIPE-PHX-0001", "100", "9", ""],
-    ["Dropped", "secret", "Quarantine", PROTECTED_SITE_ID, "1", "1", ""],
+    ["1 Desk screen", "https://drive.google.com/folder", raw.Name, "PIPE-PHX-0001", raw["Asking price ($)"], raw["Next step"]],
+    ["Dropped", "secret", "Quarantine", PROTECTED_SITE_ID, "$1", "secret note"],
   ]);
   pipeline.rows[1].row = PROTECTED_ROW;
-  const plan = planSiteMirror(
+  const unchanged = planSiteMirror(
     [pipeline, { title: "Land Sites", headerRow: 4, headers, rows: [] }],
     [
-      {
-        site_id: "PIPE-PHX-0001",
-        values: { name: "Sonoran Express", asking_price: "1600000", land_value: "", notes: "Call the broker", service_area_class: "Inside" },
-      },
-      { site_id: PROTECTED_SITE_ID, values: { name: "Do not write", asking_price: "1" } },
-      { site_id: "PIPE-MIA-0099", values: { name: "Missing" } },
+      { site_id: "PIPE-PHX-0001", cells: raw },
+      { site_id: PROTECTED_SITE_ID, cells: { Name: "Do not write" } },
     ],
   );
-  assert.deepEqual(
-    plan.changes.map((change) => change.header),
-    ["Name", "Asking price ($)", "Next step"],
+  assert.equal(unchanged.changes.length, 0);
+  assert.equal(unchanged.changes.some((change) => change.row === PROTECTED_ROW || change.id === PROTECTED_SITE_ID), false);
+
+  const edited = planSiteMirror([pipeline], [
+    { site_id: "PIPE-PHX-0001", cells: { ...raw, "Next step": "A new raw next step." } },
+    { site_id: "PIPE-MIA-0099", cells: { Name: "Missing" } },
+  ]);
+  assert.deepEqual(edited.changes.map((change) => change.header), ["Next step"]);
+  assert.equal(edited.changes[0]?.column, 6);
+  assert.equal(edited.changes[0]?.after, "A new raw next step.");
+  assert.equal(edited.changes.some((change) => change.header === "Stage" || change.header === "Folder"), false);
+  assert.deepEqual(edited.unmatched, ["PIPE-MIA-0099"]);
+});
+
+test("agents write only their fields, and a new site needs a Phoenix, Las Vegas, or Miami market", () => {
+  assert.throws(
+    () => validateBatch(agent, "muse-photo", { changes: [siteChange({ photo_notes: "Frontage", photo_status: "Partial" }, 1)] }),
+    /cannot write that field/,
   );
-  assert.equal(plan.changes[0]?.column, 3);
-  assert.equal(plan.changes[1]?.column, 5);
-  assert.equal(plan.changes.every((change) => change.header !== "Stage" && change.header !== "Folder"), true);
-  assert.equal(plan.changes.some((change) => change.row === PROTECTED_ROW || change.id === PROTECTED_SITE_ID), false);
-  assert.equal(plan.changes.some((change) => change.header === "Land value ($)"), false);
-  assert.deepEqual(plan.unmatched, ["PIPE-MIA-0099"]);
+  assert.throws(
+    () => validateBatch({ id: "indie", kind: "agent" }, "indie-note", { changes: [siteChange({ notes: "A public note" }, 1)] }),
+    /cannot write that field/,
+  );
+  assert.throws(
+    () => validateBatch(agent, "muse-edge", { changes: [siteChange({ service_area_class: "edge_legacy" }, 1)] }),
+    /cannot set that service area/,
+  );
+  assert.throws(
+    () => validateBatch(contributor, "new-sna", { changes: [siteChange({ name: "Newport", market: "SNA" })] }),
+    /PHX, LAS, or MIA/,
+  );
+  assert.throws(
+    () => validateBatch(contributor, "bad-source", { changes: [siteChange({ name: "Yard", market: "PHX", asking_price: 10, sources: { nickname: "desk" } })] }),
+    /not for a numeric fact/,
+  );
+  assert.doesNotThrow(() =>
+    validateBatch({ id: "indie", kind: "agent" }, "indie-photo", {
+      changes: [siteChange({
+        photo_status: "Partial",
+        photo_refs: [{ role: "lot_aerial", source: "esri_world_imagery", view_url: "https://example.com/lot.jpg", visibility: "map" }],
+      }, 1)],
+    }),
+  );
+  assert.doesNotThrow(() =>
+    validateBatch(agent, "muse-distance", {
+      changes: [siteChange({ service_area_class: "inside", miles_to_depot: 3.2, sources: { miles_to_depot: "depot file" } }, 1)],
+    }),
+  );
 });
 
 type ScorePoints = { Inside: number; "Near 0-5": number; "Near 5-10": number; Outside: number };

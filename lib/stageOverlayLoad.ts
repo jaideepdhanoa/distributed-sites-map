@@ -72,7 +72,7 @@ export async function overlayStageFile<T extends { features?: { properties?: Rec
   try {
     const decisions = await loadAcceptedStageDecisions();
     if (!decisions.length) return file;
-    return applyStageOverlay(file, decisions, { kind, links: recordLinks(), includeNames });
+    return applyStageOverlay(file, decisions, { kind, links: await recordLinks(), includeNames });
   } catch (error) {
     const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code || "") : "";
     if (code !== "42P01") console.error(JSON.stringify({ event: "stage_overlay_unavailable", code: code || "unknown" }));

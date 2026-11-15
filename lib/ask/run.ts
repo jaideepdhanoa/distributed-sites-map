@@ -84,14 +84,14 @@ export async function answerQuestion(input: {
     };
   } else {
     const runner = input.runner || liveAskModel;
-    const scopeLine = input.siteId ? siteScopeLine(input.siteId) : "Scope: portfolio and markets";
+    const scopeLine = input.siteId ? await siteScopeLine(input.siteId) : "Scope: portfolio and markets";
     const audience = input.role === "reviewer" ? "Audience: internal" : "Audience: map";
     let draft: AskModelOutput;
     let upstream = false;
     let timedOut = false;
     try {
       draft = await runner({
-        system: askPrefix(),
+        system: await askPrefix(),
         prompt: `${audience}\n${scopeLine}\nQuestion: ${question}`,
         role: input.role,
         signal: input.signal,

@@ -39,7 +39,13 @@ export const SITE_FIELDS = [
 
 export type SiteField = (typeof SITE_FIELDS)[number];
 
-export type SiteRow = { site_id: string } & Record<SiteField, string>;
+export type SiteRow = {
+  site_id: string;
+  coord_status: string;
+  /** Canonical JSON of raw workbook cells. The mirror writes only this map. */
+  sheet: string;
+  facts: Record<string, string>;
+} & Record<SiteField, string>;
 
 /** Numeric facts a content write must name a source for. Score is not writable. */
 export const SITE_NUMERIC_FIELDS = [
@@ -55,6 +61,179 @@ export const SITE_NUMERIC_FIELDS = [
 ] as const;
 
 export type SiteNumericField = (typeof SITE_NUMERIC_FIELDS)[number];
+
+/** Workbook Listing status values the read path understands. Annotated cells keep the same first token. */
+export const LISTING_STATUSES = ["Listed", "Active", "Off-market", "Under contract", "Sold or withdrawn", "Gone", "Removed"] as const;
+
+export type ListingStatus = (typeof LISTING_STATUSES)[number];
+
+/** Measures and sources stored beside the raw sheet. Financial claims are not in this list. */
+export const FACT_FIELDS = [
+  "asking_price_source",
+  "land_acres_basis",
+  "parcel_acres",
+  "parcel_match",
+  "open_land_sqft",
+  "open_land_basis",
+  "bays_that_fit",
+  "site_capacity",
+  "source_kind",
+  "source_line",
+  "folder_url",
+  "checked_live",
+  "price_per_acre",
+  "cap_a_substation_mi",
+  "cap_a_line_ft",
+  "cap_a_source",
+  "cap_a_as_of",
+  "cap_a_confidence",
+  "cap_b_feeder",
+  "cap_b_frontage",
+  "cap_b_nearby",
+  "cap_b_horizon",
+  "cap_b_source",
+  "cap_b_as_of",
+  "cap_b_confidence",
+  "cap_c_amps",
+  "cap_c_volts",
+  "cap_c_phase",
+  "cap_c_panels",
+  "cap_c_source",
+  "cap_c_as_of",
+  "cap_c_confidence",
+  "cap_d_peak",
+  "cap_d_year",
+  "cap_d_source",
+  "cap_d_as_of",
+  "cap_d_confidence",
+  "trade_aadt",
+  "trade_aadt_road",
+  "trade_aadt_m",
+  "trade_aadt_max",
+  "trade_population",
+  "trade_growth",
+  "trade_income",
+  "trade_washes_1mi",
+  "trade_washes_3mi",
+] as const;
+
+export type FactField = (typeof FACT_FIELDS)[number];
+
+export const NUMERIC_FACT_FIELDS = [
+  ...SITE_NUMERIC_FIELDS,
+  "parcel_acres",
+  "open_land_sqft",
+  "bays_that_fit",
+  "cap_a_substation_mi",
+  "cap_a_line_ft",
+  "cap_b_frontage",
+  "cap_b_nearby",
+  "cap_c_amps",
+  "cap_c_volts",
+  "cap_c_panels",
+  "cap_d_peak",
+  "cap_d_year",
+  "trade_aadt",
+  "trade_aadt_m",
+  "trade_aadt_max",
+  "trade_population",
+  "trade_growth",
+  "trade_income",
+  "trade_washes_1mi",
+  "trade_washes_3mi",
+] as const;
+
+export type NumericFactField = (typeof NUMERIC_FACT_FIELDS)[number];
+
+/** Identity fields. Agents do not write these. */
+export const SCHEMA_FIELDS = ["name", "address", "market", "category", "apn", "universe_id", "lat", "lng", "folder_url"] as const;
+
+export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes"] as const;
+
+export const CHECK_FIELDS = ["checked_live", "bays_that_fit", "site_capacity", "cap_a_substation_mi", "cap_a_line_ft", "cap_a_source", "cap_a_as_of", "cap_a_confidence", "cap_b_feeder", "cap_b_frontage", "cap_b_nearby", "cap_b_horizon", "cap_b_source", "cap_b_as_of", "cap_b_confidence", "cap_c_amps", "cap_c_volts", "cap_c_phase", "cap_c_panels", "cap_c_source", "cap_c_as_of", "cap_c_confidence", "cap_d_peak", "cap_d_year", "cap_d_source", "cap_d_as_of", "cap_d_confidence"] as const;
+
+/** Capture, distances, and service area. Muse writes these. Comms stay on the comms entity. */
+export const MUSE_FIELDS = ["notes", "listing_url", "listing_status", "asking_price", "acreage", "land_value", "improvement_value", "county_value", "county_value_basis", "broker", "firm", "service_area_class", "service_area_distance_mi", "service_area_polygon", "miles_to_depot", "asking_price_source", "land_acres_basis", "open_land_sqft", "open_land_basis", "parcel_acres", "parcel_match", "source_line", "source_kind", "trade_aadt", "trade_aadt_road", "trade_aadt_m", "trade_aadt_max", "trade_population", "trade_growth", "trade_income", "trade_washes_1mi", "trade_washes_3mi"] as const;
+
+export const PHOTO_ROLES = ["spare_land_annotated", "lot_aerial", "access_spare", "building", "street_level", "electrical", "listing", "street_frontage"] as const;
+
+export const PHOTO_SOURCES = ["esri_world_imagery", "google_street_view", "broker_listing", "broker_email", "site_visit", "other"] as const;
+
+export const CREATE_MARKETS = ["PHX", "LAS", "MIA"] as const;
+
+const AGENT_NAME = /\b(?:muse|torque|indie|grok)\b/i;
+const GONE = /delist|listing removed|not live|sold or withdrawn|withdrawn/i;
+
+export function listingToken(value: string): ListingStatus | "" {
+  const text = value.trim();
+  if (!text) return "";
+  const found = LISTING_STATUSES.find((status) => text === status || text.startsWith(`${status} `) || text.startsWith(`${status}—`) || text.startsWith(`${status}-`) || text.startsWith(`${status}(`));
+  return found || "";
+}
+
+export function listingKnown(value: string): boolean {
+  return value.trim() === "" || listingToken(value) !== "";
+}
+
+/** Same gate the build uses for Listed, plus the annotated cells and the gone regex. */
+export function listingFlags(value: string): { listed: boolean; removed: boolean } {
+  const token = listingToken(value);
+  const removed = GONE.test(value) || token === "Gone" || token === "Removed" || token === "Sold or withdrawn";
+  return { listed: token === "Listed" && !removed, removed };
+}
+
+export function scrubText(value: string): string {
+  return value
+    .replace(/\bodd\b/gi, "service area")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .replace(/^[\s,;:-]+|[\s,;:-]+$/g, "");
+}
+
+/** Drop sentences that name an agent, then cap the public note. */
+export function displayNote(value: string): string {
+  const text = scrubText(value);
+  if (!text) return "";
+  const kept = text
+    .split(/(?<=[.!?])\s+|;\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part && !AGENT_NAME.test(part));
+  return kept.join(". ").slice(0, 400);
+}
+
+export function parseMeasure(value: string): number | null {
+  if (!value.trim()) return null;
+  const match = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const number = Number(match[0]);
+  return Number.isFinite(number) ? number : null;
+}
+
+export function pricePerAcre(asking: string, acres: string): string {
+  const price = parseMeasure(asking);
+  const land = parseMeasure(acres);
+  if (price == null || land == null || land === 0) return "";
+  return String(Math.round((price / land) * 100) / 100);
+}
+
+export function sheetCanonical(cells: Record<string, string>): string {
+  const keys = Object.keys(cells).filter((key) => cells[key]?.trim()).sort((a, b) => a.localeCompare(b));
+  const out: Record<string, string> = {};
+  for (const key of keys) out[key] = cells[key].trim();
+  return JSON.stringify(out);
+}
+
+export function parseSheet(value: string): Record<string, string> {
+  if (!value || value === "{}") return {};
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [key, cell] of Object.entries(parsed)) out[key] = text(cell);
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 export type PhotoRef = {
   role: string;
@@ -191,6 +370,7 @@ export function siteIssues(rows: SiteRow[]): SiteIssue[] {
     if (row.service_area_class && !SERVICE_AREA_CLASSES.includes(row.service_area_class as (typeof SERVICE_AREA_CLASSES)[number])) {
       issues.push({ id: row.site_id, field: "service_area_class", value: row.service_area_class });
     }
+    if (!listingKnown(row.listing_status)) issues.push({ id: row.site_id, field: "listing_status", value: row.listing_status });
   }
   return issues;
 }
@@ -216,7 +396,56 @@ function listingStatus(props: Record<string, unknown>): string {
   return "";
 }
 
-export function sitesFromFiles(dealsJson: string, pricingJson = ""): SiteRow[] {
+function factRecord(props: Record<string, unknown>): Record<string, string> {
+  const facts: Record<string, string> = {};
+  const put = (key: FactField, value: unknown) => {
+    const textValue = key.endsWith("_source") || key.endsWith("_basis") || key.endsWith("_kind") || key.endsWith("_line") || key.endsWith("_match") || key.endsWith("_road") || key.endsWith("_phase") || key.endsWith("_feeder") || key.endsWith("_horizon") || key === "folder_url" || key === "checked_live" || key === "site_capacity" || key.endsWith("_as_of") || key.endsWith("_confidence")
+      ? text(value)
+      : canonicalFact(value);
+    if (textValue) facts[key] = textValue;
+  };
+  put("asking_price_source", props.asking_price_source);
+  put("land_acres_basis", props.land_acres_basis);
+  put("parcel_acres", props.parcel_acres);
+  put("parcel_match", props.parcel_match);
+  put("open_land_sqft", props.open_land_sqft);
+  put("open_land_basis", props.open_land_basis);
+  put("bays_that_fit", props.bays_that_fit);
+  put("site_capacity", props.site_capacity);
+  put("source_kind", props.source_kind);
+  put("source_line", props.source_line);
+  put("folder_url", props.folder_url);
+  put("checked_live", props.checked_live);
+  for (const key of FACT_FIELDS) {
+    if (key.startsWith("cap_") || key.startsWith("trade_")) put(key, props[key]);
+  }
+  if (!facts.price_per_acre) facts.price_per_acre = pricePerAcre(canonicalFact(props.asking_price), canonicalFact(props.land_acres));
+  if (!facts.price_per_acre) delete facts.price_per_acre;
+  return facts;
+}
+
+function sheetById(sheetJson: string): Map<string, Record<string, string>> {
+  const map = new Map<string, Record<string, string>>();
+  if (!sheetJson.trim()) return map;
+  try {
+    const parsed = JSON.parse(sheetJson) as { rows?: { site_id?: string; cells?: Record<string, unknown> }[] };
+    for (const row of parsed.rows || []) {
+      const id = text(row.site_id);
+      if (!id || !row.cells) continue;
+      const cells: Record<string, string> = {};
+      for (const [key, value] of Object.entries(row.cells)) {
+        const cell = text(value);
+        if (cell) cells[key] = cell;
+      }
+      map.set(id, cells);
+    }
+  } catch {
+    return map;
+  }
+  return map;
+}
+
+export function sitesFromFiles(dealsJson: string, pricingJson = "", sheetJson = ""): SiteRow[] {
   const deals = JSON.parse(dealsJson) as { features?: DealFeature[] };
   let pricing: PricingFile = {};
   if (pricingJson.trim()) {
@@ -227,6 +456,7 @@ export function sitesFromFiles(dealsJson: string, pricingJson = ""): SiteRow[] {
     }
   }
   const priced = pricing.deals || {};
+  const sheets = sheetById(sheetJson);
   const map = new Map<string, SiteRow>();
   for (const feature of deals.features || []) {
     const props = feature.properties || {};
@@ -235,21 +465,26 @@ export function sitesFromFiles(dealsJson: string, pricingJson = ""): SiteRow[] {
     const point = coordinates(feature);
     const county = priced[siteId] || {};
     const picture = photosFromUnknown(props.photos);
+    const cells = sheets.get(siteId) || {};
+    const raw = (header: string): string => cells[header] || "";
     const row: SiteRow = {
       site_id: siteId,
+      coord_status: text(props.coord_status),
+      sheet: sheetCanonical(cells),
+      facts: factRecord(props),
       ...emptySiteFields(),
-      name: text(props.name),
-      address: text(props.address),
-      market: text(props.city),
+      name: raw("Name") || text(props.name),
+      address: raw("Address") || raw("Site") || text(props.address),
+      market: raw("Market") || text(props.city),
       lat: point.lat,
       lng: point.lng,
       category: text(props.business_type),
       broker: text(props.broker),
       firm: text(props.firm),
-      listing_url: text(props.listing_url),
-      asking_price: canonicalFact(props.asking_price),
-      acreage: canonicalFact(props.land_acres),
-      apn: text(props.apn),
+      listing_url: raw("Listing link") || text(props.listing_url),
+      asking_price: raw("Asking price ($)") || canonicalFact(props.asking_price),
+      acreage: raw("Land (acres)") || canonicalFact(props.land_acres),
+      apn: raw("APN or folio") || raw("APN") || text(props.apn),
       land_value: canonicalFact(props.land_value ?? county.land_value),
       improvement_value: canonicalFact(props.improvement_value ?? county.improvement_value),
       county_value: canonicalFact(county.county_value),
@@ -258,7 +493,7 @@ export function sitesFromFiles(dealsJson: string, pricingJson = ""): SiteRow[] {
       service_area_distance_mi: canonicalFact(props.service_area_distance_mi),
       service_area_polygon: text(props.service_area_polygon),
       miles_to_depot: canonicalFact(props.miles_to_depot),
-      notes: text(props.next_step),
+      notes: raw("Next step") || text(props.next_step),
       photo_refs: photoCanonical(picture),
       photo_status: text(props.photo_status),
       photo_diligence_count: canonicalFact(props.photo_diligence_count),
@@ -266,7 +501,7 @@ export function sitesFromFiles(dealsJson: string, pricingJson = ""): SiteRow[] {
       photos_checked: text(props.photos_checked),
       photo_notes: text(props.photo_notes),
       universe_id: text(props.universe_id),
-      listing_status: listingStatus(props),
+      listing_status: raw("Listing status") || listingStatus(props),
       score: canonicalFact(props.score),
       location_points: canonicalFact(props.location_points),
     };
@@ -281,3 +516,12 @@ export function fieldsOf(row: SiteRow): Record<SiteField, string> {
   if (!fields.photo_refs) fields.photo_refs = "[]";
   return fields;
 }
+
+/** Diff and import compare raw cells plus the stored measures. Display text is not the comparison. */
+export function siteComparable(row: SiteRow): Record<string, string> {
+  const fields: Record<string, string> = { ...fieldsOf(row), coord_status: row.coord_status || "", sheet: row.sheet || "{}" };
+  for (const field of FACT_FIELDS) fields[field] = row.facts?.[field] || "";
+  return fields;
+}
+
+export const SITE_COMPARE_FIELDS = ["coord_status", "sheet", ...SITE_FIELDS, ...FACT_FIELDS] as const;

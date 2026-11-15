@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       await reconcileSuggestions(sql);
       const rows = await listSuggestions(sql);
       await audit(sql, { actorId: session.u, action: "export", after: { kind: nextSteps ? "next-steps" : "suggestions", count: rows.length } });
-      return nextSteps ? nextStepsCsv(rows) : suggestionsCsv(rows);
+      return nextSteps ? await nextStepsCsv(rows) : suggestionsCsv(rows);
     });
     return new NextResponse(csv, {
       headers: {

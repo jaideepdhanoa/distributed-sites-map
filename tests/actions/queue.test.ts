@@ -239,11 +239,11 @@ test("an approved next step stays on the card and earlier approvals remain histo
   assert.equal(ordered[1]?.title, "Ask the broker for the sales package");
   assert.equal(await reconcileSuggestions(sql, lookup), 0);
   assert.equal(site.pipeline_stage, "1 Desk screen");
-  const csv = nextStepsCsv(await listSuggestions(sql), lookup);
+  const csv = await nextStepsCsv(await listSuggestions(sql), lookup);
   assert.match(csv, /PIPE-PHX-0008/);
   assert.match(csv, /Schedule a site visit/);
   assert.match(csv, /2026-12-01/);
-  assert.equal(permanentSiteId("site", "PHX-U180", lookup), "PIPE-PHX-0008");
+  assert.equal(await permanentSiteId("site", "PHX-U180", lookup), "PIPE-PHX-0008");
   const reply = await createNote(sql, { targetKind: "suggestion", targetId: second.id, body: "Bring the site plan.", authorId: "writer" });
   assert.equal(reply.targetId, second.id);
 });

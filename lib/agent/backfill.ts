@@ -103,10 +103,10 @@ async function place(
     );
     const row = found.rows[0];
     if (!row) return { siteId: id, recordId: id };
-    return { siteId: permanentSiteId(row.target_kind, row.target_id, lookup), recordId: id };
+    return { siteId: await permanentSiteId(row.target_kind, row.target_id, lookup), recordId: id };
   }
   if (kind === "site" || kind === "deal") {
-    return { siteId: permanentSiteId(kind, id, lookup), recordId: id };
+    return { siteId: await permanentSiteId(kind, id, lookup), recordId: id };
   }
   return { siteId: id, recordId: id };
 }
@@ -125,7 +125,8 @@ function later(value: string): string {
 }
 
 /** Feed rows the live ingest would have written for notes, mentions, flags, proposals, and decisions. */
-export async function planInboxBackfill(sql: Sql, lookup: RecordLookup = fileLookup()): Promise<FeedInsert[]> {
+export async function planInboxBackfill(sql: Sql, lookup?: RecordLookup): Promise<FeedInsert[]> {
+  lookup = lookup ?? await fileLookup();
   const notes = await sql.query<NoteRow>(
     `SELECT id, target_kind, target_id, parent_id, body, author_id, created_at
      FROM notes ORDER BY created_at ASC, id ASC`,
@@ -163,7 +164,7 @@ export async function planInboxBackfill(sql: Sql, lookup: RecordLookup = fileLoo
   }
   for (const row of suggestions.rows) {
     if (!row.author_id) continue;
-    const siteId = permanentSiteId(row.target_kind, row.target_id, lookup);
+    const siteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
     events.push(suggestionFeed({
       id: row.id,
       siteId,

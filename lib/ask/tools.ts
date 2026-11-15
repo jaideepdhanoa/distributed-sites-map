@@ -3,6 +3,7 @@ import { actionsEnabled, withSql, type Sql } from "@/lib/actions/db";
 import { listNotes } from "@/lib/actions/notes";
 import { roleAllows, type ActionRole } from "@/lib/actions/roles";
 import { listSuggestions } from "@/lib/actions/suggestions";
+import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 import { loadFinancialPanel } from "@/lib/financialsLoad";
 import { listAppEvents } from "@/lib/queue/events";
@@ -43,7 +44,6 @@ const SITE_FIELDS = [
 type Feature = { properties: Record<string, unknown> };
 
 let siteFeatures: Feature[] | null = null;
-let dealFeatures: Feature[] | null = null;
 let quarantined: Set<string> | null = null;
 
 function loadSites(): Feature[] {
@@ -51,9 +51,9 @@ function loadSites(): Feature[] {
   return siteFeatures;
 }
 
-function loadDeals(): Feature[] {
-  if (!dealFeatures) dealFeatures = (readGenerated("deals.geojson") as { features?: Feature[] }).features || [];
-  return dealFeatures;
+async function loadDeals(): Promise<Feature[]> {
+  const file = await readDeals();
+  return (file.features || []) as Feature[];
 }
 
 export function quarantineIds(): Set<string> {
@@ -92,15 +92,15 @@ function findSite(id: string): Record<string, unknown> | null {
   return loadSites().find((feature) => feature.properties.site_id === id)?.properties || null;
 }
 
-function findDeal(id: string): Record<string, unknown> | null {
-  return loadDeals().find((feature) => feature.properties.deal_id === id)?.properties || null;
+async function findDeal(id: string): Promise<Record<string, unknown> | null> {
+  return (await loadDeals()).find((feature) => feature.properties.deal_id === id)?.properties || null;
 }
 
 async function searchSites(query: string) {
   const needle = query.trim();
   if (needle.length < 2) return { results: [] };
   const results: Record<string, unknown>[] = [];
-  for (const feature of loadDeals()) {
+  for (const feature of await loadDeals()) {
     const props = feature.properties;
     const id = String(props.deal_id || "");
     if (!id || !matchesQuery(needle, dealSearchParts(props as { deal_id?: string; name?: string; address?: string }))) continue;
@@ -129,11 +129,11 @@ async function searchSites(query: string) {
   return { results };
 }
 
-function getSite(id: string) {
+async function getSite(id: string) {
   const key = id.trim();
   if (!key) return { error: "not_found" };
   if (isQuarantined(key)) return quarantinedRecord(key);
-  const deal = findDeal(key);
+  const deal = await findDeal(key);
   if (deal) {
     const universe = deal.universe_id ? findSite(String(deal.universe_id)) : null;
     const suggested = suggestedReason(String(deal.deal_id || key), deal.stage, deal.stage_group);
@@ -149,7 +149,7 @@ function getSite(id: string) {
   }
   const site = findSite(key);
   if (!site) return { error: "not_found" };
-  const linked = site.linked_deal_id ? findDeal(String(site.linked_deal_id)) : null;
+  const linked = site.linked_deal_id ? await findDeal(String(site.linked_deal_id)) : null;
   const suggested = linked ? suggestedReason(String(linked.deal_id || site.linked_deal_id), linked.stage, linked.stage_group) : "";
   return {
     id: key,
@@ -163,8 +163,8 @@ function getSite(id: string) {
 }
 
 /** Scope line for one open site. Same card facts as getSite. */
-export function siteScopeLine(id: string): string {
-  const record = getSite(id) as Record<string, unknown>;
+export async function siteScopeLine(id: string): Promise<string> {
+  const record = (await getSite(id)) as Record<string, unknown>;
   if (record.status === "quarantined") return `Scope: site ${id}. This record is quarantined.`;
   const card = (record.card || {}) as Record<string, unknown>;
   const bits: string[] = [];
@@ -193,7 +193,7 @@ function funnel() {
   };
 }
 
-function portfolio() {
+async function portfolio() {
   const report = readGenerated("build_report.json") as {
     generated_at?: string;
     changes?: { new_sites?: number; verdict_changes?: number; stage_moves?: number };
@@ -203,12 +203,12 @@ function portfolio() {
     label: "Portfolio",
     generatedAt: report.generated_at || "",
     changes: report.changes || {},
-    listedByMarket: listedDealsByMarket(),
+    listedByMarket: await listedDealsByMarket(),
   };
 }
 
-function stages(market?: string, stage?: string) {
-  const rows = filterStageRows(listedStageRows(isQuarantined), market, stage);
+async function stages(market?: string, stage?: string) {
+  const rows = filterStageRows(await listedStageRows(isQuarantined), market, stage);
   return {
     href: "/",
     label: "Stages",
@@ -246,9 +246,11 @@ async function discussion(id: string) {
   });
 }
 
-function financials(id: string) {
+async function financials(id: string) {
   if (isQuarantined(id)) return quarantinedRecord(id);
-  const deal = findDeal(id) || (findSite(id)?.linked_deal_id ? findDeal(String(findSite(id)?.linked_deal_id)) : null);
+  const direct = await findDeal(id);
+  const linkedId = findSite(id)?.linked_deal_id;
+  const deal = direct || (linkedId ? await findDeal(String(linkedId)) : null);
   if (!deal) return { error: "not_found" };
   const panel = loadFinancialPanel(deal as unknown as DealProps, true);
   return {
@@ -276,11 +278,11 @@ function timeline(id: string) {
   };
 }
 
-function activityIds(id: string): string[] {
+async function activityIds(id: string): Promise<string[]> {
   const ids = [id];
   const site = findSite(id);
   if (site?.linked_deal_id) ids.push(String(site.linked_deal_id));
-  const deal = findDeal(id);
+  const deal = await findDeal(id);
   if (deal?.universe_id) ids.push(String(deal.universe_id));
   return ids;
 }
@@ -291,7 +293,7 @@ async function activity(id: string) {
   let events: { type: string; summary: string; at: string; href: string }[] = [];
   if (actionsEnabled()) {
     const rows = await withSql((sql: Sql) => listAppEvents(sql));
-    const ids = new Set(activityIds(id));
+    const ids = new Set(await activityIds(id));
     events = rows.filter((row) => ids.has(row.siteId)).slice(-20).map((row) => ({
       type: row.type,
       summary: row.summary,
@@ -299,7 +301,7 @@ async function activity(id: string) {
       href: `${siteHref(id)}&panel=activity`,
     }));
   }
-  for (const item of suggestedDropHistory(activityIds(id))) {
+  for (const item of suggestedDropHistory(await activityIds(id))) {
     events.push({ type: item.type, summary: item.summary, at: item.date, href: `${siteHref(id)}&panel=activity` });
   }
   const timelineItems = card.items || [];
@@ -325,12 +327,12 @@ export async function runAskTool(
   const id = String(args.id || args.siteId || "").trim();
   let raw: unknown;
   if (name === "searchSites") raw = await searchSites(String(args.query || ""));
-  else if (name === "getSite") raw = getSite(id);
+  else if (name === "getSite") raw = await getSite(id);
   else if (name === "funnel") raw = funnel();
-  else if (name === "portfolio") raw = portfolio();
-  else if (name === "stages") raw = stages(String(args.market || ""), String(args.stage || ""));
+  else if (name === "portfolio") raw = await portfolio();
+  else if (name === "stages") raw = await stages(String(args.market || ""), String(args.stage || ""));
   else if (name === "discussion") raw = await discussion(id);
-  else if (name === "financials") raw = financials(id);
+  else if (name === "financials") raw = await financials(id);
   else if (name === "timeline") raw = timeline(id);
   else raw = await activity(id);
   if (raw && typeof raw === "object" && (raw as { status?: string }).status === "quarantined") return raw;

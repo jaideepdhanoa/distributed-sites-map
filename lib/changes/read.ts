@@ -3,7 +3,8 @@ import type { CommsSnapshot, CommsRecord } from "@/lib/comms";
 import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
 import { readEntityFromDb } from "./flags";
-import { SITE_FIELDS, passingClass, photoCanonical, photosFromCanonical, type PhotoRef, type SiteField } from "./site";
+import { readGenerated } from "@/lib/guard";
+import { SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, scrubText, type PhotoRef, type SiteField } from "./site";
 
 type DealFile = {
   features?: {
@@ -43,12 +44,10 @@ export function applyStageRows<T extends DealFile>(file: T, rows: StageRecord[])
   return { ...file, features };
 }
 
-type SiteRead = Record<SiteField, string> & { site_id: string };
+type SiteRead = Record<SiteField, string> & { site_id: string; sheet?: string; facts?: Record<string, string>; coord_status?: string };
 
 function numberOrNull(value: string): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseMeasure(value);
 }
 
 function photosOf(value: unknown): PhotoRef[] {
@@ -63,24 +62,27 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
     const props = feature.properties || {};
     const row = byId.get(text(props.deal_id));
     if (!row) return feature;
-    const asking = numberOrNull(row.asking_price);
-    const acres = numberOrNull(row.acreage);
+    const cells = parseSheet(row.sheet || "{}");
+    const asking = numberOrNull(cells["Asking price ($)"] || row.asking_price);
+    const acres = numberOrNull(cells["Land (acres)"] || row.acreage);
     const photos = photosOf(row.photo_refs);
     const frontage = photos.find((photo) => photo.role === "street_frontage" && photo.view_url);
+    const status = cells["Listing status"] || row.listing_status;
+    const flags = listingFlags(status);
     const next: Record<string, unknown> = {
       ...props,
-      name: row.name,
-      address: row.address,
-      city: row.market || props.city,
+      name: scrubText(cells.Name || row.name),
+      address: scrubText((cells.Address || cells.Site || row.address).replace(/^(PHX|LAS|MIA|SNA)\s+/i, "")),
+      city: cells.Market || row.market || props.city,
       business_type: row.category || props.business_type,
       broker: row.broker,
       firm: row.firm,
-      listing_url: row.listing_url,
+      listing_url: cells["Listing link"] || row.listing_url,
       asking_price: asking,
       asking_price_display: asking == null ? null : moneyText(asking),
       land_acres: acres,
-      apn: row.apn,
-      next_step: row.notes,
+      apn: cells["APN or folio"] || cells.APN || row.apn,
+      next_step: displayNote(cells["Next step"] || row.notes),
       universe_id: row.universe_id,
       miles_to_depot: numberOrNull(row.miles_to_depot),
       service_area_class: row.service_area_class || props.service_area_class,
@@ -98,14 +100,23 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
       photo_listing_count: numberOrNull(row.photo_listing_count),
       photos_checked: row.photos_checked,
       photo_notes: row.photo_notes,
-      listed: row.listing_status === "Listed",
-      listing_removed: row.listing_status === "Removed",
+      listed: flags.listed,
+      listing_removed: flags.removed,
       street_view_url: frontage?.view_url || "",
     };
     if (row.county_value) next.county_value = numberOrNull(row.county_value);
     if (row.county_value_basis) next.county_value_basis = row.county_value_basis;
     if (row.land_value) next.land_value = numberOrNull(row.land_value);
     if (row.improvement_value) next.improvement_value = numberOrNull(row.improvement_value);
+    const perAcre = asking != null && acres ? Math.round((asking / acres) * 100) / 100 : null;
+    next.price_per_acre = perAcre;
+    if (row.facts) {
+      for (const [key, value] of Object.entries(row.facts)) {
+        if (!value || key === "price_per_acre") continue;
+        next[key] = numberOrNull(value) ?? value;
+      }
+    }
+    if (row.coord_status) next.coord_status = row.coord_status;
     const gate = passingClass(row.service_area_class);
     if (gate != null) next.in_area = gate;
     let geometry = feature.geometry;
@@ -122,11 +133,16 @@ export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> 
   try {
     const rows = await withSql((sql) =>
       sql.query<Record<string, unknown>>(
-        `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")}, photo_refs FROM sites`,
+        `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")}, photo_refs, sheet, facts, coord_status FROM sites`,
       ),
     );
     const mapped: SiteRead[] = rows.rows.map((row) => {
-      const record = { site_id: text(row.site_id) } as SiteRead;
+      const record = {
+        site_id: text(row.site_id),
+        sheet: typeof row.sheet === "string" ? row.sheet : JSON.stringify(row.sheet ?? {}),
+        facts: (row.facts && typeof row.facts === "object" ? row.facts : {}) as Record<string, string>,
+        coord_status: text(row.coord_status),
+      } as SiteRead;
       for (const field of SITE_FIELDS) {
         if (field === "photo_refs") record.photo_refs = photoCanonical(photosOf(row.photo_refs));
         else record[field] = text(row[field]);
@@ -138,6 +154,12 @@ export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> 
     console.error(JSON.stringify({ event: "site_read_fallback" }));
     return file;
   }
+}
+
+/** The deals file, with Neon site rows painted on when the site read flag is on. */
+export async function readDeals(): Promise<DealFile> {
+  const file = readGenerated("deals.geojson") as DealFile;
+  return overlayDealSites(file);
 }
 
 export async function overlayDealStages<T extends DealFile>(file: T): Promise<T> {

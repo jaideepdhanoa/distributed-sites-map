@@ -1,6 +1,6 @@
 import type { Sql } from "@/lib/actions/db";
 import { importEntityFromWorkbook, type ShadowEntity } from "./flags";
-import { SITE_FIELDS, emptySiteFields, fieldsOf, photoCanonical, photosFromCanonical, type SiteRow } from "./site";
+import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, parseSheet, photoCanonical, photosFromCanonical, sheetCanonical, siteComparable, type SiteRow } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 import { issueIds, legacyStageIds, workbookIssues, type ActivityRow, type CommsRow, type RowIssue, type StageRow, type WorkbookSlice } from "./workbook";
 
@@ -103,7 +103,7 @@ function commsMap(rows: CommsRow[]): Map<string, Record<string, string>> {
 }
 
 function siteMap(rows: SiteRow[]): Map<string, Record<string, string>> {
-  return new Map(rows.map((row) => [row.site_id, fieldsOf(row)]));
+  return new Map(rows.map((row) => [row.site_id, siteComparable(row)]));
 }
 
 function withoutIds<T extends { site_id?: string; entity_id?: string }>(rows: T[], ids: Set<string>, idOf: (row: T) => string): T[] {
@@ -137,7 +137,7 @@ export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, wo
     site: compare(
       siteMap(withoutIds(workbook.sites || [], skip.site, (row) => row.site_id)),
       siteMap(withoutIds(database.sites || [], skip.site, (row) => row.site_id)),
-      SITE_FIELDS,
+      SITE_COMPARE_FIELDS,
     ),
   };
   const cutOver: ShadowEntity[] = [];
@@ -186,7 +186,7 @@ export async function readDatabaseSlice(sql: Sql): Promise<WorkbookSlice> {
   const sitesReady = await sql.query<{ name: string | null }>(`SELECT to_regclass('public.sites') AS name`);
   const sites = sitesReady.rows[0]?.name
     ? await sql.query<Record<string, unknown>>(
-        `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")}, photo_refs FROM sites`,
+        `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")}, photo_refs, sheet, facts, coord_status FROM sites`,
       )
     : { rows: [] as Record<string, unknown>[] };
   return {
@@ -218,7 +218,13 @@ export async function readDatabaseSlice(sql: Sql): Promise<WorkbookSlice> {
       return record;
     }),
     sites: sites.rows.map((row) => {
-      const record = { site_id: text(row.site_id), ...emptySiteFields() } as SiteRow;
+      const record = {
+        site_id: text(row.site_id),
+        coord_status: text(row.coord_status),
+        sheet: sheetCanonical(typeof row.sheet === "string" ? parseSheet(row.sheet) : parseSheet(JSON.stringify(row.sheet ?? {}))),
+        facts: asObject(row.facts) as Record<string, string>,
+        ...emptySiteFields(),
+      } as SiteRow;
       for (const field of SITE_FIELDS) {
         if (field === "photo_refs") {
           const raw = row.photo_refs;
@@ -228,6 +234,7 @@ export async function readDatabaseSlice(sql: Sql): Promise<WorkbookSlice> {
           record[field] = text(row[field]);
         }
       }
+      if (!record.sheet) record.sheet = "{}";
       return record;
     }),
   };

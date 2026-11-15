@@ -4,10 +4,21 @@ import { canDecide, canWriteContent } from "@/lib/actions/roles";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 import {
+  CHECK_FIELDS,
+  CREATE_MARKETS,
+  FACT_FIELDS,
+  LISTING_STATUSES,
+  MUSE_FIELDS,
+  NUMERIC_FACT_FIELDS,
+  PHOTO_FIELDS,
+  PHOTO_ROLES,
+  PHOTO_SOURCES,
+  SCHEMA_FIELDS,
   SITE_NUMERIC_FIELDS,
   canonicalFact,
+  photoCanonical,
+  type PhotoRef,
   type SiteField,
-  type SiteNumericField,
 } from "./site";
 import {
   ACTIVITY_TYPES,
@@ -63,7 +74,11 @@ export type CommsPayload = {
 
 export type SitePayload = {
   fields: Partial<Record<SiteField, string>>;
-  sources?: Partial<Record<SiteNumericField, string>>;
+  sources?: Partial<Record<string, string>>;
+  sheet?: Record<string, string>;
+  facts?: Record<string, string>;
+  coord_status?: string;
+  photos?: import("./site").PhotoRef[];
 };
 
 export type ParsedChange = {
@@ -131,7 +146,24 @@ const sitePayload = z
     miles_to_depot: z.number().finite().nullable().optional(),
     notes: z.string().trim().max(400).optional(),
     universe_id: z.string().trim().max(40).optional(),
-    listing_status: z.string().trim().max(40).optional(),
+    listing_status: z.union([z.enum(LISTING_STATUSES), z.literal("")]).optional(),
+    folder_url: z.string().trim().max(500).optional(),
+    photo_status: z.string().trim().max(40).optional(),
+    photo_diligence_count: z.number().finite().nullable().optional(),
+    photo_listing_count: z.number().finite().nullable().optional(),
+    photos_checked: z.string().trim().max(40).optional(),
+    photo_notes: z.string().trim().max(400).optional(),
+    photo_refs: z.array(z.object({
+      role: z.enum(PHOTO_ROLES),
+      source: z.enum(PHOTO_SOURCES).optional(),
+      file_id: z.string().trim().max(200).optional(),
+      view_url: z.string().trim().max(500).optional(),
+      as_of: z.string().trim().max(40).optional(),
+      caption: z.string().trim().max(240).optional(),
+      attribution: z.string().trim().max(240).optional(),
+      visibility: z.literal("map").optional(),
+    }).strict()).max(40).optional(),
+    facts: z.record(z.string(), z.union([z.string().trim().max(500), z.number().finite(), z.null()])).optional(),
     sources: z.record(z.string(), z.string().trim().min(1).max(200)).optional(),
   })
   .strict();
@@ -341,13 +373,13 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
       `Change ${index + 1}: A new site does not copy Folder, photos, land evidence, typed power, check statuses, or financial claims.`,
     );
   }
-  if (guarded.length) throw new InputError(`Change ${index + 1}: That field is not accepted.`);
   const parsedPayload = sitePayload.safeParse(payload);
   if (!parsedPayload.success) {
     const issue = parsedPayload.error.issues[0];
     fail(index, issue.path.map(String).join("."), issue.code);
   }
   const data = parsedPayload.data;
+  assertContentActor(actor, index);
   const fields: Partial<Record<SiteField, string>> = {};
   const put = (key: SiteField, value: string | number | null | undefined) => {
     if (value === undefined) return;
@@ -376,14 +408,49 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   put("notes", data.notes);
   put("universe_id", data.universe_id);
   put("listing_status", data.listing_status);
-  if (!Object.keys(fields).length) throw new InputError(`Change ${index + 1}: Add a field to change.`);
-  const sources: Partial<Record<SiteNumericField, string>> = {};
-  for (const field of SITE_NUMERIC_FIELDS) {
-    if (fields[field] === undefined) continue;
+  put("photo_status", data.photo_status);
+  put("photo_diligence_count", data.photo_diligence_count);
+  put("photo_listing_count", data.photo_listing_count);
+  put("photos_checked", data.photos_checked);
+  put("photo_notes", data.photo_notes);
+  const photos: PhotoRef[] = (data.photo_refs || []).map((photo) => ({
+    role: photo.role,
+    source: photo.source || "",
+    file_id: photo.file_id || "",
+    view_url: photo.view_url || "",
+    as_of: photo.as_of || "",
+    caption: photo.caption || "",
+    attribution: photo.attribution || "",
+    visibility: photo.visibility || "",
+  }));
+  if (data.photo_refs) fields.photo_refs = photoCanonical(photos);
+  const facts: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data.facts || {})) {
+    if (!FACT_FIELDS.includes(key as (typeof FACT_FIELDS)[number])) {
+      throw new InputError(`Change ${index + 1}: That field is not accepted.`);
+    }
+    facts[key] = value == null ? "" : canonicalFact(value);
+  }
+  if (data.folder_url !== undefined) facts.folder_url = data.folder_url;
+  if (!Object.keys(fields).length && !Object.keys(facts).length) throw new InputError(`Change ${index + 1}: Add a field to change.`);
+  for (const key of Object.keys(data.sources || {})) {
+    if (!NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+      throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
+    }
+  }
+  const sources: Record<string, string> = {};
+  for (const field of NUMERIC_FACT_FIELDS) {
+    const inFields = fields[field as SiteField];
+    const inFacts = facts[field];
+    const value = inFields !== undefined ? inFields : inFacts;
+    if (value === undefined || value === "") continue;
     const source = data.sources?.[field]?.trim() || "";
     if (!source) throw new InputError(`Change ${index + 1}: Every numeric fact needs a source.`);
     cleanText(source);
     sources[field] = source;
+  }
+  if (expectedVersion === 0 && !CREATE_MARKETS.includes(data.market as (typeof CREATE_MARKETS)[number])) {
+    throw new InputError(`Change ${index + 1}: A new site needs a market of PHX, LAS, or MIA.`);
   }
   cleanText(fields.name);
   cleanText(fields.address);
@@ -396,6 +463,26 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   cleanText(fields.listing_url);
   cleanText(fields.universe_id);
   cleanText(fields.listing_status);
-  assertContentActor(actor, index);
-  return { fields, sources };
+  cleanText(fields.photo_notes);
+  cleanText(facts.source_line);
+  cleanText(facts.folder_url);
+  for (const photo of photos) {
+    cleanText(photo.caption);
+    cleanText(photo.attribution);
+  }
+  assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class);
+  return { fields, sources, facts, photos: data.photo_refs ? photos : undefined };
+}
+
+function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, serviceArea: string | undefined): void {
+  if (actor.kind !== "agent") return;
+  if (serviceArea === "edge_legacy" || serviceArea === "unknown") {
+    throw new InputError(`Change ${index + 1}: An agent cannot set that service area.`);
+  }
+  const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
+  for (const key of touched) {
+    if ((SCHEMA_FIELDS as readonly string[]).includes(key) || !allowed.has(key)) {
+      throw new InputError(`Change ${index + 1}: An agent cannot write that field.`);
+    }
+  }
 }

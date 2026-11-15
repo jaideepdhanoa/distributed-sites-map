@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/actions/db";
 import { applyParsedChanges, numericSuffix, raiseIdFloor } from "./apply";
 import type { Actor, ParsedChange } from "./schema";
 import { importEntityFromWorkbook } from "./flags";
-import { SITE_FIELDS, fieldsOf } from "./site";
+import { SITE_COMPARE_FIELDS, fieldsOf, parseSheet, siteComparable } from "./site";
 import { COMMS_FIELDS, type ActivityType, type Market, type ServiceAreaClass, type StageName } from "./vocab";
 import { issueIds, workbookIssues, type ActivityRow, type CommsRow, type StageRow, type WorkbookSlice } from "./workbook";
 import { readDatabaseSlice } from "./diff";
@@ -196,9 +196,8 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
   else if (sitesReady) {
     for (const row of slice.sites || []) {
       if (invalidSiteId.has(row.site_id)) continue;
-      const fields = fieldsOf(row);
       const prior = currentSite.get(row.site_id);
-      if (prior && sameFields(fieldsOf(prior), fields, SITE_FIELDS)) {
+      if (prior && sameFields(siteComparable(prior), siteComparable(row), SITE_COMPARE_FIELDS)) {
         counts.unchanged.site += 1;
         continue;
       }
@@ -207,7 +206,12 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
         site_id: row.site_id,
         expected_version: version.site.get(row.site_id) || 0,
         source,
-        payload: { fields },
+        payload: {
+          fields: fieldsOf(row),
+          sheet: parseSheet(row.sheet),
+          facts: row.facts,
+          coord_status: row.coord_status,
+        },
       });
       counts.inserted.site += 1;
     }

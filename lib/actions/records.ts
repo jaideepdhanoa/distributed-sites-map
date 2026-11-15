@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
+import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 import { snapshotGeneration } from "@/lib/snapshot/read";
 import type { TargetKind } from "./text";
@@ -26,15 +27,22 @@ function loadCollection(name: string): { rows: Map<string, Record<string, unknow
   return { rows, idKey };
 }
 
-export function fileLookup(): RecordLookup {
+export async function fileLookup(): Promise<RecordLookup> {
   const sitesPath = join(process.cwd(), "data", "generated", "sites.geojson");
   const dealsPath = join(process.cwd(), "data", "generated", "deals.geojson");
   const key = `${snapshotGeneration()}:${statSync(sitesPath).mtimeMs}:${statSync(dealsPath).mtimeMs}`;
   if (!cache || cache.key !== key) {
+    const deals = await readDeals();
+    const dealRows = new Map<string, Record<string, unknown>>();
+    for (const feature of deals.features || []) {
+      const props = feature.properties || {};
+      const id = String(props.deal_id || "");
+      if (id) dealRows.set(id, props);
+    }
     cache = {
       key,
       sites: loadCollection("sites.geojson").rows,
-      deals: loadCollection("deals.geojson").rows,
+      deals: dealRows,
     };
   }
   const current = cache;
@@ -62,8 +70,8 @@ export function recordField(record: Record<string, unknown> | null, field: strin
   return value == null ? "" : String(value).trim();
 }
 
-export function recordLinks(): { dealId: string; siteId: string }[] {
-  fileLookup();
+export async function recordLinks(): Promise<{ dealId: string; siteId: string }[]> {
+  await fileLookup();
   if (!cache) return [];
   const links: { dealId: string; siteId: string }[] = [];
   const seen = new Set<string>();

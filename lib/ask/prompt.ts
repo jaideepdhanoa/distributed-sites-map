@@ -24,23 +24,25 @@ type FunnelFile = { stages?: { id?: string; name?: string; total?: number }[] };
 
 let cachedSummary: { generation: number; text: string } | null = null;
 
-export function portfolioSummary(): string {
+export async function portfolioSummary(): Promise<string> {
   const generation = snapshotGeneration();
   if (cachedSummary && cachedSummary.generation === generation) return cachedSummary.text;
+  const countsLine = await listedCountLine();
+  const stageText = stageTableText(await listedStageRows(isQuarantined));
   try {
     const file = readGenerated("funnel.json") as FunnelFile;
     const lines = (file.stages || [])
       .filter((stage) => stage && stage.name && typeof stage.total === "number")
       .map((stage) => `${stage.name}: ${stage.total}`);
-    const counts = lines.length ? `Portfolio counts. ${lines.join(". ")}. ${listedCountLine()}` : listedCountLine();
-    cachedSummary = { generation, text: `${counts}\n\n${stageTableText(listedStageRows(isQuarantined))}` };
+    const counts = lines.length ? `Portfolio counts. ${lines.join(". ")}. ${countsLine}` : countsLine;
+    cachedSummary = { generation, text: `${counts}\n\n${stageText}` };
   } catch {
-    cachedSummary = { generation, text: `${listedCountLine()}\n\n${stageTableText(listedStageRows(isQuarantined))}` };
+    cachedSummary = { generation, text: `${countsLine}\n\n${stageText}` };
   }
   return cachedSummary.text;
 }
 
 /** Stable prefix. Role and the question stay after it so this text can be cached. */
-export function askPrefix(): string {
-  return `${ASK_SYSTEM}\n\n${portfolioSummary()}`;
+export async function askPrefix(): Promise<string> {
+  return `${ASK_SYSTEM}\n\n${await portfolioSummary()}`;
 }

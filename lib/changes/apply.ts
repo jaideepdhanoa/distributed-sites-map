@@ -5,8 +5,11 @@ import {
   SITE_FIELDS,
   SITE_NUMERIC_FIELDS,
   emptySiteFields,
-  photosFromCanonical,
+  parseSheet,
   photoCanonical,
+  photosFromCanonical,
+  pricePerAcre,
+  sheetCanonical,
   type PhotoRef,
   type SiteField,
 } from "./site";
@@ -276,13 +279,20 @@ async function writeComms(
   return stored;
 }
 
-type SiteDb = Record<SiteField, string> & { photo_refs: unknown; fact_sources: unknown; version: number | string };
+type SiteDb = Record<SiteField, string> & {
+  photo_refs: unknown;
+  fact_sources: unknown;
+  sheet: unknown;
+  facts: unknown;
+  coord_status: string;
+  version: number | string;
+};
 
 const SITE_COLUMNS = SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ");
 
 async function readSite(sql: Sql, siteId: string): Promise<SiteDb | null> {
   const result = await sql.query<SiteDb>(
-    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, version FROM sites WHERE site_id = $1`,
+    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, sheet, facts, coord_status, version FROM sites WHERE site_id = $1`,
     [siteId],
   );
   return result.rows[0] || null;
@@ -313,7 +323,8 @@ async function writeSite(
   const incoming = payload.fields || {};
   for (const field of SITE_FIELDS) {
     if (field === "photo_refs") {
-      if (mode === "workbook") stored.photo_refs = incoming.photo_refs || "[]";
+      if (incoming.photo_refs !== undefined) stored.photo_refs = incoming.photo_refs || "[]";
+      else if (mode === "workbook") stored.photo_refs = "[]";
       continue;
     }
     if (incoming[field] !== undefined) stored[field] = incoming[field] || "";
@@ -322,16 +333,68 @@ async function writeSite(
   const priorSources = asObject(previous?.fact_sources);
   const sources: Record<string, string> = {};
   for (const [key, value] of Object.entries(priorSources)) sources[key] = textOf(value);
+  const priorSheet =
+    mode === "workbook" ? {} : typeof previous?.sheet === "string" ? parseSheet(previous.sheet) : parseSheet(JSON.stringify(previous?.sheet ?? {}));
+  const sheet = { ...priorSheet, ...(payload.sheet || {}) };
+  const priorFacts = mode === "workbook" ? {} : asObject(previous?.facts);
+  const facts: Record<string, string> = {};
+  for (const [key, value] of Object.entries(priorFacts)) facts[key] = textOf(value);
+  for (const [key, value] of Object.entries(payload.facts || {})) facts[key] = value || "";
+  const coord = payload.coord_status ?? textOf(previous?.coord_status);
   if (mode === "workbook") {
     for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points"] as const) {
+      if (field === "lat" || field === "lng") continue;
       if (stored[field]) sources[field] = change.source;
       else delete sources[field];
     }
+    const kind = coord.trim().toLowerCase();
+    const coordSource =
+      kind === "geocoded" || kind === "linked site" || kind === "failed"
+        ? coord.trim()
+        : kind === "listing" || kind === "from listing"
+          ? "listing"
+          : sheet.Lat || sheet.Lng || sheet.Lon
+            ? change.source
+            : "";
+    if (coordSource && stored.lat) sources.lat = coordSource;
+    else delete sources.lat;
+    if (coordSource && stored.lng) sources.lng = coordSource;
+    else delete sources.lng;
   } else {
+    for (const [field, source] of Object.entries(payload.sources || {})) {
+      const cleared = incoming[field as SiteField] === "" || facts[field] === "";
+      if (cleared) delete sources[field];
+      else if (source) sources[field] = source;
+    }
     for (const field of SITE_NUMERIC_FIELDS) {
-      if (payload.sources?.[field]) sources[field] = payload.sources[field];
+      if (incoming[field] === "") delete sources[field];
+    }
+    if (incoming.asking_price === "") delete facts.asking_price_source;
+    if (incoming.acreage === "") delete facts.land_acres_basis;
+    const headers: Partial<Record<SiteField, string>> = {
+      name: "Name",
+      notes: "Next step",
+      asking_price: "Asking price ($)",
+      acreage: "Land (acres)",
+      listing_status: "Listing status",
+      listing_url: "Listing link",
+      apn: "APN or folio",
+      market: "Market",
+      photo_status: "Photo status",
+      photo_notes: "Photo notes",
+      photos_checked: "Photos checked",
+      photo_diligence_count: "Diligence photo count",
+      photo_listing_count: "Listing photo count",
+    };
+    for (const [field, header] of Object.entries(headers) as [SiteField, string][]) {
+      if (incoming[field] === undefined) continue;
+      if (!incoming[field]) delete sheet[header];
+      else sheet[header] = incoming[field];
     }
   }
+  const perAcre = pricePerAcre(stored.asking_price, stored.acreage);
+  if (perAcre) facts.price_per_acre = perAcre;
+  else delete facts.price_per_acre;
   const photos = storedPhotos(stored.photo_refs);
   await sql.query(
     `INSERT INTO sites (
@@ -339,13 +402,13 @@ async function writeSite(
        asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
        service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
        notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
-       universe_id, listing_status, score, location_points, fact_sources, version, updated_by
+       universe_id, listing_status, score, location_points, coord_status, sheet, facts, fact_sources, version, updated_by
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11, $12, $13, $14, $15, $16, $17,
        $18, $19, $20, $21,
        $22, $23::jsonb, $24, $25, $26, $27, $28,
-       $29, $30, $31, $32, $33::jsonb, $34, $35
+       $29, $30, $31, $32, $33, $34::jsonb, $35::jsonb, $36::jsonb, $37, $38
      )
      ON CONFLICT (site_id) DO UPDATE SET
        name = EXCLUDED.name,
@@ -379,6 +442,9 @@ async function writeSite(
        listing_status = EXCLUDED.listing_status,
        score = EXCLUDED.score,
        location_points = EXCLUDED.location_points,
+       coord_status = EXCLUDED.coord_status,
+       sheet = EXCLUDED.sheet,
+       facts = EXCLUDED.facts,
        fact_sources = EXCLUDED.fact_sources,
        version = EXCLUDED.version,
        updated_at = clock_timestamp(),
@@ -416,6 +482,9 @@ async function writeSite(
       stored.listing_status,
       stored.score,
       stored.location_points,
+      coord,
+      sheetCanonical(sheet),
+      JSON.stringify(facts),
       JSON.stringify(sources),
       version,
       actorId,

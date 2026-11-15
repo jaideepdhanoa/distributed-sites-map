@@ -13,7 +13,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "You do not have permission for that." }, { status: 403, headers: privateHeaders });
   }
   const { id } = await context.params;
-  const deal = fileLookup()("deal", id) as DealProps | null;
+  const deal = (await fileLookup())("deal", id) as DealProps | null;
   if (!deal) return NextResponse.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
   const panel = loadFinancialPanel(deal, true);
   const workbookStep = loadWorkbookStep(id);

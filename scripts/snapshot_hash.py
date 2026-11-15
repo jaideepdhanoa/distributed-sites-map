@@ -18,7 +18,12 @@ GENERATED = ROOT / "data" / "generated"
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
+PRIVATE_FILES = {"site_sheet.json"}
+
+
 def is_snapshot_file(name: str) -> bool:
+    if name in PRIVATE_FILES:
+        return False
     return bool(SAFE.match(name)) and name.endswith((".json", ".geojson", ".csv"))
 
 

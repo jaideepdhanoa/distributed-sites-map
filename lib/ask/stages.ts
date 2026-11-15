@@ -1,3 +1,4 @@
+import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 import { summaryRecords } from "@/lib/timeline/filter";
 
@@ -51,10 +52,10 @@ function labelFor(props: Record<string, unknown>, id: string): string {
 }
 
 /** Every listed deal that is still in play. Quarantined ids are left out. No prices or financial figures. */
-export function listedStageRows(extraBlocked?: (id: string) => boolean): StageRow[] {
+export async function listedStageRows(extraBlocked?: (id: string) => boolean): Promise<StageRow[]> {
   let features: { properties?: Record<string, unknown> }[] = [];
   try {
-    const file = readGenerated("deals.geojson") as { features?: { properties?: Record<string, unknown> }[] };
+    const file = await readDeals();
     features = file.features || [];
   } catch {
     features = [];

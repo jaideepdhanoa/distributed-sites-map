@@ -100,7 +100,7 @@ function dayOf(value: Date | string | null): string {
 }
 
 export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters, reviewer: boolean) {
-  const catalog = loadCatalog();
+  const catalog = await loadCatalog();
   const reviews = await sql.query<{ site_id: string; reviewed_at: Date | string }>(
     `SELECT site_id, reviewed_at FROM queue_reviews WHERE user_id = $1`,
     [userId],
@@ -158,7 +158,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
   const followed = new Set(follows.rows.map((row) => row.site_id));
   const assignments = new Map<string, { id: string; title: string; date: string; status: string }[]>();
   for (const row of assignmentRows.rows) {
-    const siteId = permanentSiteId(row.target_kind, row.target_id);
+    const siteId = await permanentSiteId(row.target_kind, row.target_id);
     const title = safeSnapshot(row.title || row.proposed_value, 120);
     if (!title) continue;
     const list = assignments.get(siteId) || [];
@@ -173,8 +173,8 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
     )
     : { rows: [] as { target_kind: "site" | "deal"; target_id: string }[] };
   const needsApproval = new Set([
-    ...openSteps.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)),
-    ...openDocuments.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)),
+    ...(await Promise.all(openSteps.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)))),
+    ...(await Promise.all(openDocuments.rows.map((row) => permanentSiteId(row.target_kind, row.target_id)))),
   ]);
   const reasons: Record<string, QueueReason[]> = {};
   const push = (siteId: string, reason: QueueReason) => {
@@ -197,7 +197,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
   }
   const nextStep = new Map<string, { title: string; date: string }>();
   for (const row of accepted.rows) {
-    const siteId = permanentSiteId(row.target_kind, row.target_id);
+    const siteId = await permanentSiteId(row.target_kind, row.target_id);
     if (nextStep.has(siteId)) continue;
     const title = safeSnapshot(row.title || row.proposed_value, 120);
     if (title) nextStep.set(siteId, { title, date: dayOf(row.target_on) });

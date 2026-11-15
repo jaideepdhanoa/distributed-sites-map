@@ -33,8 +33,8 @@ function batchKey(prefix: string, userId: string, ids: string[]): string {
   return `${prefix}:${userId}:${hash}`;
 }
 
-function asItem(row: OutboxRow): MailItem {
-  const hit = loadCatalog().find((item) => item.id === row.site_id);
+function asItem(row: OutboxRow, catalog: { id: string; stageGroup: string; city?: string; name?: string }[]): MailItem {
+  const hit = catalog.find((item) => item.id === row.site_id);
   const stage = hit ? stageTitle(hit.stageGroup) : "";
   return {
     category: row.category,
@@ -92,7 +92,8 @@ export async function deliverRows(
 ): Promise<string> {
   const now = input.now || new Date();
   const day = losAngelesParts(now).day;
-  const items = [...(input.extra || []), ...input.rows.map(asItem)];
+  const catalog = await loadCatalog();
+  const items = [...(input.extra || []), ...input.rows.map((row) => asItem(row, catalog))];
   const rendered = renderBatch(items, { now, kind: input.kind });
   if (!rendered) {
     await markRows(sql, input.rows.map((row) => row.id), "skipped", input.key);
@@ -179,8 +180,8 @@ export async function flushInstant(sql: Sql, now = new Date()): Promise<number> 
   return sent;
 }
 
-function siteLabel(siteId: string): string {
-  const hit = loadCatalog().find((item) => item.id === siteId);
+async function siteLabel(siteId: string): Promise<string> {
+  const hit = (await loadCatalog()).find((item) => item.id === siteId);
   const name = hit?.name?.trim();
   if (name && name !== siteId) return `${name} (${siteId})`;
   return siteId;
@@ -213,7 +214,7 @@ async function followedItems(sql: Sql, userId: string, since: Date): Promise<Mai
     items.push({
       category: "followed",
       siteId: note.target_id,
-      siteLabel: siteLabel(note.target_id),
+      siteLabel: await siteLabel(note.target_id),
       summary: note.body,
       authorId: note.author_id,
       href: discussionHref(note.target_id),
@@ -223,7 +224,7 @@ async function followedItems(sql: Sql, userId: string, since: Date): Promise<Mai
     items.push({
       category: "followed",
       siteId: row.target_id,
-      siteLabel: siteLabel(row.target_id),
+      siteLabel: await siteLabel(row.target_id),
       summary: row.title || row.proposed_value,
       authorId: row.author_id,
       href: proposalHref(row.target_id),

@@ -49,7 +49,7 @@ test("a knock off needs a reason and exports Dropped", async () => {
   assert.equal(step.proposedValue, "Dropped");
   const accepted = await decideSuggestion(sql, { id: step.id, status: "accepted", actorId: "editor" });
   assert.equal(accepted.status, "accepted");
-  const csv = nextStepsCsv([accepted], lookup);
+  const csv = await nextStepsCsv([accepted], lookup);
   assert.match(csv, /^site_id,date,title,owner,approved_at,done_at,type,stage/);
   assert.match(csv, /knock_off","Dropped/);
   assert.equal(site.pipeline_stage, "1 Desk screen");
@@ -125,7 +125,7 @@ test("mark duplicate names the surviving record and does not set a stage", async
   assert.equal(step.detail, "mark_duplicate");
   assert.equal(step.proposedValue, "WB-PHX-0016");
   assert.equal(step.title, "Duplicate of WB-PHX-0016");
-  const csv = nextStepsCsv([step], lookup);
+  const csv = await nextStepsCsv([step], lookup);
   assert.doesNotMatch(csv, /Dropped/);
 });
 
@@ -197,7 +197,7 @@ test("bring back needs a reason and a stage, and approval records who, why, and 
     assert.match(brought?.summary || "", /Writer/);
     assert.match(brought?.summary || "", /Desk screen/);
     assert.match(brought?.summary || "", /seller put it back on the market/);
-    const csv = nextStepsCsv([accepted], lookup);
+    const csv = await nextStepsCsv([accepted], lookup);
     assert.match(csv, /Desk screen/);
   } finally {
     if (previous == null) delete process.env.AUTH_USERS;

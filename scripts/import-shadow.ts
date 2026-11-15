@@ -1,4 +1,4 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
 import { importChanged } from "../lib/changes/backfill";
@@ -22,15 +22,32 @@ function publicError(error: unknown): string {
     .slice(0, 500);
 }
 
-async function publishedSnapshot(url: string): Promise<{ id: string; deals: string; timeline: string; comms: string }> {
+function optionalFile(files: { name: string; body: string }[], name: string): string {
+  return files.find((file) => file.name === name)?.body || "";
+}
+
+function privateSheet(): string {
+  const path = process.env.SITE_SHEET_PATH?.trim() || "";
+  if (!path) return "";
+  return readFileSync(path, "utf8");
+}
+
+async function publishedSnapshot(url: string): Promise<{
+  id: string;
+  deals: string;
+  timeline: string;
+  comms: string;
+  pricing: string;
+}> {
   const given = process.env.SNAPSHOT_ID?.trim() || "";
   if (given) {
     const files = collectGenerated(join(process.cwd(), "data", "generated"));
     return {
       id: given,
-      deals: files.find((file) => file.name === "deals.geojson")?.body || "",
-      timeline: files.find((file) => file.name === "timeline.json")?.body || "",
-      comms: files.find((file) => file.name === "comms.json")?.body || "",
+      deals: optionalFile(files, "deals.geojson"),
+      timeline: optionalFile(files, "timeline.json"),
+      comms: optionalFile(files, "comms.json"),
+      pricing: optionalFile(files, "pricing.json"),
     };
   }
   return withConnectionString(url, async (sql) => {
@@ -41,11 +58,16 @@ async function publishedSnapshot(url: string): Promise<{ id: string; deals: stri
       if (!packed) throw new Error(`The live snapshot is missing ${name}.`);
       return unpackFile(packed);
     };
+    const readOptional = (name: string): string => {
+      const packed = bundle.files[name];
+      return packed ? unpackFile(packed) : "";
+    };
     return {
       id: bundle.id,
       deals: read("deals.geojson"),
       timeline: read("timeline.json"),
       comms: read("comms.json"),
+      pricing: readOptional("pricing.json"),
     };
   });
 }
@@ -55,14 +77,20 @@ async function main(): Promise<void> {
   assertWorkbookImportAllowed(url);
   const snapshot = await publishedSnapshot(url);
   const snapshotId = snapshot.id;
-  const { deals, timeline, comms } = snapshot;
+  const { deals, timeline, comms, pricing } = snapshot;
+  const sheet = privateSheet();
+  const slice = workbookFromFiles({ deals, timeline, comms, pricing, sheet });
+  if (!sheet) slice.sites = [];
   try {
-    const imported = await withConnectionString(url, (sql) =>
-      importChanged(sql, workbookFromFiles({ deals, timeline, comms }), snapshotId),
-    );
-    const line = `Shadow import inserted stage ${imported.inserted.stage}, activity ${imported.inserted.activity}, comms ${imported.inserted.comms}. Unchanged stage ${imported.unchanged.stage}, activity ${imported.unchanged.activity}, comms ${imported.unchanged.comms}. Invalid stage ${imported.invalid.stage}, activity ${imported.invalid.activity}, comms ${imported.invalid.comms}.`;
-    console.log(line);
-    summary(`## Shadow import\n\n${line}\n\nSource: workbook snapshot ${snapshotId}. Invalid workbook values were left unchanged and were not rewritten.\n`);
+    const imported = await withConnectionString(url, (sql) => importChanged(sql, slice, snapshotId));
+    const line = `Shadow import inserted stage ${imported.inserted.stage}, activity ${imported.inserted.activity}, comms ${imported.inserted.comms}, site ${imported.inserted.site}. Unchanged stage ${imported.unchanged.stage}, activity ${imported.unchanged.activity}, comms ${imported.unchanged.comms}, site ${imported.unchanged.site}. Invalid stage ${imported.invalid.stage}, activity ${imported.invalid.activity}, comms ${imported.invalid.comms}, site ${imported.invalid.site}.`;
+    const pending = imported.unmigrated.length
+      ? ` Pending migration: ${imported.unmigrated.join(", ")}. Run the Production migrations workflow. The other entities were still imported.`
+      : "";
+    const skipped = imported.cut_over.length ? ` Skipped because the database is the record: ${imported.cut_over.join(", ")}.` : "";
+    const privateNote = sheet ? "" : " Site rows were not imported. Set SITE_SHEET_PATH to the private raw sheet. It is not in the public snapshot.";
+    console.log(`${line}${pending}${skipped}${privateNote}`);
+    summary(`## Shadow import\n\n${line}${pending}${skipped}${privateNote}\n\nSource: workbook snapshot ${snapshotId}. Invalid workbook values were left unchanged and were not rewritten. Unknown site values were stored as written.\n`);
   } catch (error) {
     const missing = error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01";
     if (missing) {

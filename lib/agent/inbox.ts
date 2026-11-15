@@ -584,7 +584,7 @@ export async function listInbox(
   sql: Sql,
   input: { after?: string | null; limit?: number; lookup?: RecordLookup } = {},
 ): Promise<{ items: InboxItem[]; next: string | null }> {
-  const lookup = input.lookup || fileLookup();
+  const lookup = input.lookup || (await fileLookup());
   const { refreshProposalReadiness } = await import("@/lib/actions/blockers");
   await refreshProposalReadiness(sql, lookup);
   const limit = input.limit && input.limit > 0 ? Math.min(100, Math.floor(input.limit)) : 50;

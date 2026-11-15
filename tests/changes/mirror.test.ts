@@ -58,6 +58,14 @@ test("stage writes use the Stage header and skip row 10 and PIPE-PHX-0006", () =
   assert.equal(blocked.skippedProtected, 1);
 });
 
+test("an activity date serial matches the stored calendar date", () => {
+  const plan = planActivityMirror(
+    table("Activity", 1, ["Event ID", "Date", "Site ID", "Type", "Summary"], [["A-000001", "46316", "PIPE-PHX-0001", "listing", "Listing noted"]]),
+    [{ entity_id: "A-000001", site_id: "PIPE-PHX-0001", date: "2026-10-21", type: "listing", summary: "Listing noted", source_link: "" }],
+  );
+  assert.equal(plan.changes.length, 0);
+});
+
 test("new activity and comms rows follow the live headers", () => {
   const activity = planActivityMirror(
     table("Activity", 1, ["Summary", "Event ID", "Date", "Site ID", "Type"], [["Listing noted", "A-000001", "2026-11-01", "PIPE-PHX-0001", "listing"]]),

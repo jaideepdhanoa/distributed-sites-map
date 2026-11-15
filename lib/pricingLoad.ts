@@ -27,7 +27,13 @@ export function withPricing<T extends { properties?: object | null }>(feature: T
   if (!props?.deal_id) return feature;
   const extra = pricingFor(props.deal_id);
   if (!extra) return feature;
-  const next: DealProps = { ...props, ...extra };
+  const next: DealProps = { ...props };
+  const keep = new Set(["county_value", "county_value_basis", "land_value", "improvement_value"]);
+  for (const [key, value] of Object.entries(extra)) {
+    const current = (next as Record<string, unknown>)[key];
+    if (keep.has(key) && current != null && current !== "") continue;
+    (next as Record<string, unknown>)[key] = value;
+  }
   if ((extra.stated_revenue != null || extra.stated_cash_flow != null) && next.kind !== "land" && next.figures_status !== "vacant") {
     next.figures_status = "shown";
   }

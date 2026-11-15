@@ -76,9 +76,9 @@ async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): 
     );
     const row = found.rows[0];
     if (!row) return targetId;
-    return permanentSiteId(row.target_kind, row.target_id);
+    return permanentSiteId(row.target_kind, row.target_id, await fileLookup());
   }
-  return permanentSiteId(targetKind, targetId);
+  return permanentSiteId(targetKind, targetId, await fileLookup());
 }
 
 async function loadNote(sql: Sql, id: string): Promise<NoteRow | null> {
@@ -98,8 +98,9 @@ export async function listNotes(sql: Sql, targetKind: ThreadKind, targetId: stri
 export async function createNote(
   sql: Sql,
   input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; parentId?: string | null; mentions?: unknown; recommendationId?: string | null },
-  lookup: RecordLookup = fileLookup(),
+  lookup?: RecordLookup,
 ): Promise<Note> {
+  lookup = lookup ?? await fileLookup();
   const parentId = input.parentId?.trim() || null;
   let targetKind = input.targetKind;
   let targetId = input.targetId;

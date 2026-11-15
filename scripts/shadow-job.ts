@@ -1,7 +1,7 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
-import { diffDatabase, renderReport } from "../lib/changes/diff";
+import { diffDatabase, publicDiffReport, renderReport } from "../lib/changes/diff";
 import { assertProductionDiff } from "../lib/changes/guard";
 import { workbookFromFiles, type WorkbookSlice } from "../lib/changes/workbook";
 import { unpackFile } from "../lib/snapshot/pack";
@@ -34,12 +34,28 @@ async function loadWorkbook(sql: Sql): Promise<{ label: string; slice: WorkbookS
     return unpackFile(packed);
   };
   const label = bundle ? `snapshot ${bundle.id}` : "data/generated (no live snapshot)";
+  const pricing = bundle
+    ? bundle.files["pricing.json"]
+      ? unpackFile(bundle.files["pricing.json"])
+      : "{}"
+    : disk("pricing.json");
+  const sheetPath = process.env.SITE_SHEET_PATH?.trim() || "";
+  let sheet = "";
+  if (sheetPath) {
+    try {
+      sheet = readFileSync(sheetPath, "utf8");
+    } catch {
+      sheet = "";
+    }
+  }
   return {
     label,
     slice: workbookFromFiles({
       deals: read("deals.geojson"),
       timeline: read("timeline.json"),
       comms: read("comms.json"),
+      pricing,
+      sheet,
     }),
   };
 }
@@ -48,17 +64,27 @@ async function main(): Promise<void> {
   const url = process.env.DATABASE_URL?.trim() || "";
   assertProductionDiff(url);
   await withConnectionString(url, async (sql) => {
-    const ready = await sql.query<{ name: string | null }>(`SELECT to_regclass('public.site_stages') AS name`);
-    if (!ready.rows[0]?.name) {
+    const ready = await sql.query<{ stages: string | null; sites: string | null }>(
+      `SELECT to_regclass('public.site_stages') AS stages, to_regclass('public.sites') AS sites`,
+    );
+    if (!ready.rows[0]?.stages) {
       const message = "The shadow tables are not on production. Run the Production migrations workflow. This diff does not migrate.";
       console.log(message);
       summary(`## Shadow diff skipped\n\n${message}\n`);
       return;
     }
     const loaded = await loadWorkbook(sql);
+    if (!ready.rows[0]?.sites && loaded.slice.sites) loaded.slice.sites = [];
     const report = await diffDatabase(sql, loaded.slice, loaded.label);
-    writeFileSync(join(process.cwd(), "shadow-diff.json"), `${JSON.stringify({ ...report, generated_at: new Date().toISOString() }, null, 2)}\n`);
+    const published = publicDiffReport(report);
+    writeFileSync(join(process.cwd(), "shadow-diff.json"), `${JSON.stringify({ ...published, generated_at: new Date().toISOString() }, null, 2)}\n`);
     const rendered = renderReport(report);
+    if (!ready.rows[0]?.sites) {
+      summary("Site rows were not compared. The sites table is not on production. Run the Production migrations workflow.\n");
+    }
+    if (!process.env.SITE_SHEET_PATH?.trim()) {
+      summary("The private raw sheet was not on this runner. Site rows are compared to the published deals. Set SITE_SHEET_PATH to compare raw cells. That file is not in git or the snapshot.\n");
+    }
     console.log(rendered);
     summary(rendered);
   });

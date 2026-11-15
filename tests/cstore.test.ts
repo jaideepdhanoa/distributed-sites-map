@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { isPipelineStore } from "../lib/labels";
-import { loadCatalog, readBuildEvents } from "../lib/queue/catalog";
+import { loadCatalogFromDisk, readBuildEvents } from "../lib/queue/catalog";
 import { buildQueue } from "../lib/queue/order";
 import { collectSearchHits } from "../lib/search";
 
@@ -55,7 +55,7 @@ test("gas stations and c-stores stay out of the default review queue", () => {
   assert.equal(isPipelineStore({ kind: "site", business_type: "Car wash", name: "Chevron" }), false);
   assert.equal(isPipelineStore({ kind: "site", business_type: "Car wash", name: "Circle K" }), false);
   assert.equal(isPipelineStore({ kind: "land", business_type: "Gas station", name: "Closed gas station and c-store across from the airport" }), false);
-  const catalog = loadCatalog();
+  const catalog = loadCatalogFromDisk();
   const stores = catalog.filter((site) => site.isCStore);
   assert.ok(stores.length > 0);
   const reasons: Record<string, { at: string; summary: string; type: string }[]> = {};

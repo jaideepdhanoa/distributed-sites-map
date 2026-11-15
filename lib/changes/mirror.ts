@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
+import { MIRROR_FIELD_HEADERS, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameWorkbookCell, shortHash } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -11,6 +12,15 @@ export const SPREADSHEET_ID = "167rIKoApP3sMJ3vrp1lg3MT-h5yQGqmMhY_TbBIqByY";
 
 /** The sync token uses drive.readonly. Cell writes need the Sheets scope. */
 export const MIRROR_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+
+/** How a cell is read. Unformatted values and formulas are for the site tabs only. */
+export type SheetRender = "formatted" | "unformatted" | "formulas";
+
+export function sheetValueRender(kind: SheetRender): "UNFORMATTED_VALUE" | "FORMULA" | null {
+  if (kind === "formulas") return "FORMULA";
+  if (kind === "unformatted") return "UNFORMATTED_VALUE";
+  return null;
+}
 export const SYNC_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 
 export type CellChange = {
@@ -21,13 +31,15 @@ export type CellChange = {
   id: string;
   before: string;
   after: string;
+  /** RAW for text. USER_ENTERED for numeric and date site cells. */
+  valueInput?: "RAW" | "USER_ENTERED";
 };
 
 export type SheetTable = {
   title: string;
   headerRow: number;
   headers: string[];
-  rows: { row: number; cells: string[] }[];
+  rows: { row: number; cells: string[]; formulas?: string[] }[];
 };
 
 export type MirrorPlan = {
@@ -141,6 +153,7 @@ function planTable(input: {
   append: boolean;
   protectRow: boolean;
   idPattern?: RegExp;
+  skipBlank?: boolean;
 }): MirrorPlan {
   const idAt = headerIndex(input.table.headers, input.idHeaders);
   if (idAt < 0) {
@@ -183,6 +196,7 @@ function planTable(input: {
       for (const column of columns) {
         if (column.index < 0) continue;
         const after = cellText(record.values[column.key]);
+        if (input.skipBlank && column.key !== "id" && !after) continue;
         changes.push({
           sheet: input.table.title,
           row,
@@ -205,8 +219,9 @@ function planTable(input: {
     for (const column of columns) {
       if (column.index < 0 || column.key === "id") continue;
       const after = cellText(record.values[column.key]);
+      if (input.skipBlank && !after) continue;
       const before = cellText(existing.cells[column.index]);
-      if (before === after) continue;
+      if (sameWorkbookCell(before, after)) continue;
       changes.push({
         sheet: input.table.title,
         row: existing.row,
@@ -248,6 +263,74 @@ export function planStageMirror(tables: SheetTable[], stages: { site_id: string;
     combined.changes.push(...plan.changes);
     combined.skippedProtected += plan.skippedProtected;
     combined.unmatched.push(...plan.unmatched.filter((id) => !claimed.has(id)));
+  }
+  const seen = new Set<string>();
+  combined.unmatched = combined.unmatched.filter((id) => {
+    if (claimed.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  return combined;
+}
+
+function headerAliases(header: string): string[] {
+  const norm = header.trim().toLowerCase();
+  const row = MIRROR_FIELD_HEADERS.find((item) => item.headers.some((name) => name.toLowerCase() === norm));
+  return (row?.headers || [header]).map((name) => name.toLowerCase());
+}
+
+/** Write only headers an API change touched, and only those on the allow-list. A fresh import has no writes. */
+export function planSiteMirror(
+  tables: SheetTable[],
+  sites: { site_id: string; writes?: Record<string, string>; cells?: Record<string, string> }[],
+): MirrorPlan {
+  const combined: MirrorPlan = { changes: [], skippedProtected: 0, unmatched: [], appended: 0 };
+  const claimed = new Set<string>();
+  const writable = sites.filter((row) => row.site_id !== PROTECTED_SITE_ID);
+  if (writable.length !== sites.length) combined.skippedProtected += 1;
+  for (const table of tables) {
+    const idAt = headerIndex(table.headers, ["site id"]);
+    if (idAt < 0) throw new Error(`${table.title} is missing an id column (site id).`);
+    const byId = new Map<string, { row: number; cells: string[]; formulas?: string[] }>();
+    for (const row of table.rows) {
+      const id = cellText(row.cells[idAt]);
+      if (id && !byId.has(id)) byId.set(id, row);
+      if (id) claimed.add(id);
+    }
+    for (const record of writable) {
+      if (claimed.has(record.site_id) && !byId.has(record.site_id)) continue;
+      const existing = byId.get(record.site_id);
+      if (!existing) {
+        if (!claimed.has(record.site_id)) combined.unmatched.push(record.site_id);
+        continue;
+      }
+      if (existing.row === PROTECTED_ROW) {
+        combined.skippedProtected += 1;
+        continue;
+      }
+      const writes = record.writes || {};
+      for (const [key, raw] of Object.entries(writes)) {
+        if (!mirrorHeaderAllowed(key)) continue;
+        const wanted = new Set(headerAliases(key));
+        const index = table.headers.findIndex((header) => wanted.has(header.trim().toLowerCase()));
+        if (index < 0) continue;
+        const formula = cellText(existing.formulas?.[index]);
+        if (formula.startsWith("=")) continue;
+        const after = cellText(raw);
+        const before = cellText(existing.cells[index]);
+        if (sameWorkbookCell(before, after)) continue;
+        combined.changes.push({
+          sheet: table.title,
+          row: existing.row,
+          column: index + 1,
+          header: table.headers[index] || key,
+          id: record.site_id,
+          before,
+          after,
+          valueInput: mirrorCellInput(table.headers[index] || key),
+        });
+      }
+    }
   }
   const seen = new Set<string>();
   combined.unmatched = combined.unmatched.filter((id) => {
@@ -314,20 +397,30 @@ export function assertReadBack(changes: CellChange[], actual: { sheet: string; r
   for (const change of changes) {
     const key = `${change.sheet}:${change.row}:${change.column}`;
     const value = found.get(key);
-    if (value !== change.after) {
+    if (value == null || !sameWorkbookCell(value, change.after)) {
       throw new Error(`Read-back mismatch at ${a1(change.sheet, change.row, change.column)} for ${change.id}.`);
     }
   }
 }
 
 export function entitiesToMirror(): ShadowEntity[] {
-  return (["stage", "activity", "comms"] as const).filter((entity) => readEntityFromDb(entity));
+  return (["stage", "activity", "comms", "site"] as const).filter((entity) => readEntityFromDb(entity));
+}
+
+function siteTextHeader(header: string): boolean {
+  const norm = header.trim().toLowerCase();
+  return MIRROR_FIELD_HEADERS.some((row) => row.headers.some((name) => name.toLowerCase() === norm));
+}
+
+function planValue(header: string, value: string): string {
+  const fingerprint = mirrorCellInput(header) !== "USER_ENTERED" && (siteTextHeader(header) || value.trim().startsWith("{"));
+  return fingerprint ? `#${shortHash(value)}` : JSON.stringify(value);
 }
 
 export function formatPlan(changes: CellChange[]): string {
   if (!changes.length) return "No cell changes.";
   return changes
-    .map((change) => `${a1(change.sheet, change.row, change.column)} ${change.header} ${change.id}: ${JSON.stringify(change.before)} -> ${JSON.stringify(change.after)}`)
+    .map((change) => `${a1(change.sheet, change.row, change.column)} ${change.header} ${change.id}: ${planValue(change.header, change.before)} -> ${planValue(change.header, change.after)}`)
     .join("\n");
 }
 
@@ -355,10 +448,12 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   stages: { site_id: string; stage: string }[];
   activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string }[];
   comms: { entity_id: string; values: Record<string, string> }[];
+  sites: { site_id: string; writes: Record<string, string> }[];
 }> {
   const stages = await sql.query<StageDb>(`SELECT site_id, stage FROM site_stages ORDER BY site_id`);
   const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload FROM activities ORDER BY entity_id`);
   const comms = await sql.query<CommsDb>(`SELECT entity_id, payload FROM comms_entries ORDER BY entity_id`);
+  const sites = await sql.query<{ site_id: string; sheet_writes: unknown }>(`SELECT site_id, sheet_writes FROM sites ORDER BY site_id`);
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
     activities: activities.rows.map((row) => {
@@ -378,6 +473,10 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       for (const field of COMMS_FIELDS) values[field] = text(payload[field]);
       return { entity_id: text(row.entity_id), values };
     }),
+    sites: sites.rows.map((row) => ({
+      site_id: text(row.site_id),
+      writes: typeof row.sheet_writes === "string" ? parseSheet(row.sheet_writes) : parseSheet(JSON.stringify(row.sheet_writes ?? {})),
+    })),
   };
 }
 

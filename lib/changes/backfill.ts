@@ -3,18 +3,21 @@ import type { Sql } from "@/lib/actions/db";
 import { applyParsedChanges, numericSuffix, raiseIdFloor } from "./apply";
 import type { Actor, ParsedChange } from "./schema";
 import { importEntityFromWorkbook } from "./flags";
+import { SITE_COMPARE_FIELDS, fieldsOf, parseSheet, siteComparable } from "./site";
 import { COMMS_FIELDS, type ActivityType, type Market, type ServiceAreaClass, type StageName } from "./vocab";
 import { issueIds, workbookIssues, type ActivityRow, type CommsRow, type StageRow, type WorkbookSlice } from "./workbook";
 import { readDatabaseSlice } from "./diff";
 
 export type ImportCounts = {
-  inserted: { stage: number; activity: number; comms: number };
-  unchanged: { stage: number; activity: number; comms: number };
-  invalid: { stage: number; activity: number; comms: number };
+  inserted: { stage: number; activity: number; comms: number; site: number };
+  unchanged: { stage: number; activity: number; comms: number; site: number };
+  invalid: { stage: number; activity: number; comms: number; site: number };
   cut_over: ShadowCut[];
+  /** Tables this process can see are missing. The other entities still import. */
+  unmigrated: ShadowCut[];
 };
 
-type ShadowCut = "stage" | "activity" | "comms";
+type ShadowCut = "stage" | "activity" | "comms" | "site";
 
 const ACTOR: Actor = { id: "workbook-sync", kind: "agent" };
 
@@ -47,14 +50,23 @@ function commsFields(row: CommsRow): Record<string, string> {
   return fields;
 }
 
-async function versions(sql: Sql): Promise<{ stage: Map<string, number>; activity: Map<string, number>; comms: Map<string, number> }> {
+async function tableReady(sql: Sql, name: string): Promise<boolean> {
+  const result = await sql.query<{ name: string | null }>(`SELECT to_regclass($1) AS name`, [`public.${name}`]);
+  return Boolean(result.rows[0]?.name);
+}
+
+async function versions(sql: Sql, sitesReady: boolean): Promise<{ stage: Map<string, number>; activity: Map<string, number>; comms: Map<string, number>; site: Map<string, number> }> {
   const stage = await sql.query<{ site_id: string; version: number | string }>(`SELECT site_id, version FROM site_stages`);
   const activity = await sql.query<{ entity_id: string; version: number | string }>(`SELECT entity_id, version FROM activities`);
   const comms = await sql.query<{ entity_id: string; version: number | string }>(`SELECT entity_id, version FROM comms_entries`);
+  const site = sitesReady
+    ? await sql.query<{ site_id: string; version: number | string }>(`SELECT site_id, version FROM sites`)
+    : { rows: [] as { site_id: string; version: number | string }[] };
   return {
     stage: new Map(stage.rows.map((row) => [row.site_id, Number(row.version)])),
     activity: new Map(activity.rows.map((row) => [row.entity_id, Number(row.version)])),
     comms: new Map(comms.rows.map((row) => [row.entity_id, Number(row.version)])),
+    site: new Map(site.rows.map((row) => [row.site_id, Number(row.version)])),
   };
 }
 
@@ -65,27 +77,33 @@ async function versions(sql: Sql): Promise<{ stage: Map<string, number>; activit
  */
 export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: string): Promise<ImportCounts> {
   const counts: ImportCounts = {
-    inserted: { stage: 0, activity: 0, comms: 0 },
-    unchanged: { stage: 0, activity: 0, comms: 0 },
-    invalid: { stage: 0, activity: 0, comms: 0 },
+    inserted: { stage: 0, activity: 0, comms: 0, site: 0 },
+    unchanged: { stage: 0, activity: 0, comms: 0, site: 0 },
+    invalid: { stage: 0, activity: 0, comms: 0, site: 0 },
     cut_over: [],
+    unmigrated: [],
   };
   const issues = workbookIssues(slice);
   const invalidStage = issueIds(issues.stage);
   const invalidActivity = issueIds(issues.activity);
   const invalidComms = issueIds(issues.comms);
+  const invalidSiteId = issueIds(issues.site.filter((issue) => issue.field === "site_id"));
   counts.invalid = {
     stage: invalidStage.size,
     activity: invalidActivity.size,
     comms: invalidComms.size,
+    site: new Set(issues.site.map((issue) => issue.id)).size,
   };
+  const sitesReady = await tableReady(sql, "sites");
+  if (!sitesReady) counts.unmigrated.push("site");
   const current = await readDatabaseSlice(sql);
-  const version = await versions(sql);
+  const version = await versions(sql, sitesReady);
   const source = `workbook snapshot ${snapshotId}`;
   const changes: ParsedChange[] = [];
   const currentStage = new Map(current.stages.map((row) => [row.site_id, row]));
   const currentActivity = new Map(current.activities.map((row) => [row.entity_id, row]));
   const currentComms = new Map(current.comms.map((row) => [row.entity_id, row]));
+  const currentSite = new Map((current.sites || []).map((row) => [row.site_id, row]));
 
   if (!importEntityFromWorkbook("stage")) counts.cut_over.push("stage");
   else {
@@ -171,6 +189,31 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
         },
       });
       counts.inserted.comms += 1;
+    }
+  }
+
+  if (sitesReady && !importEntityFromWorkbook("site")) counts.cut_over.push("site");
+  else if (sitesReady) {
+    for (const row of slice.sites || []) {
+      if (invalidSiteId.has(row.site_id)) continue;
+      const prior = currentSite.get(row.site_id);
+      if (prior && sameFields(siteComparable(prior), siteComparable(row), SITE_COMPARE_FIELDS)) {
+        counts.unchanged.site += 1;
+        continue;
+      }
+      changes.push({
+        entity_type: "site",
+        site_id: row.site_id,
+        expected_version: version.site.get(row.site_id) || 0,
+        source,
+        payload: {
+          fields: fieldsOf(row),
+          sheet: parseSheet(row.sheet),
+          facts: row.facts,
+          coord_status: row.coord_status,
+        },
+      });
+      counts.inserted.site += 1;
     }
   }
 

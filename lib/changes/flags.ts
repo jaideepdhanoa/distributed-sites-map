@@ -1,9 +1,10 @@
-export type ShadowEntity = "stage" | "activity" | "comms";
+export type ShadowEntity = "stage" | "activity" | "comms" | "site";
 
 const READ_FLAG: Record<ShadowEntity, string> = {
   stage: "READ_STAGES_FROM_DB",
   activity: "READ_ACTIVITY_FROM_DB",
   comms: "READ_COMMS_FROM_DB",
+  site: "READ_SITES_FROM_DB",
 };
 
 function enabled(value: string | undefined): boolean | null {
@@ -46,5 +47,6 @@ export function readFlags(): Record<ShadowEntity, { requested: boolean; active: 
     stage: { requested: readFlagRequested("stage"), active: readEntityFromDb("stage") },
     activity: { requested: readFlagRequested("activity"), active: readEntityFromDb("activity") },
     comms: { requested: readFlagRequested("comms"), active: readEntityFromDb("comms") },
+    site: { requested: readFlagRequested("site"), active: readEntityFromDb("site") },
   };
 }

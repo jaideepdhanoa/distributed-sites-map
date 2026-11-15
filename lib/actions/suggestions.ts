@@ -151,8 +151,8 @@ async function withMentions(sql: Sql, rows: Suggestion[]): Promise<Suggestion[]>
   return rows.map((row) => ({ ...row, mentions: map.get(row.id) || [] }));
 }
 
-export function permanentSiteId(kind: TargetKind, id: string, lookup: RecordLookup = fileLookup()): string {
-  const record = lookup(kind, id);
+export async function permanentSiteId(kind: TargetKind, id: string, lookup?: RecordLookup): Promise<string> {
+  const record = (lookup ?? await fileLookup())(kind, id);
   if (!record) return id;
   if (kind === "deal") return String(record.deal_id || id);
   const linked = String(record.linked_deal_id || "");
@@ -163,8 +163,9 @@ export function permanentSiteId(kind: TargetKind, id: string, lookup: RecordLook
 export async function listSuggestions(
   sql: Sql,
   filter?: { targetKind?: TargetKind; targetId?: string; status?: SuggestionStatus },
-  lookup: RecordLookup = fileLookup(),
+  lookup?: RecordLookup,
 ): Promise<Suggestion[]> {
+  lookup = lookup ?? await fileLookup();
   await refreshProposalReadiness(sql, lookup);
   const clauses: string[] = [];
   const values: unknown[] = [];
@@ -200,8 +201,9 @@ export async function createSuggestion(
     ownerId?: string | null;
     mentions?: unknown;
   },
-  lookup: RecordLookup = fileLookup(),
+  lookup?: RecordLookup,
 ): Promise<Suggestion> {
+  lookup = lookup ?? await fileLookup();
   const target = parseTarget(input.targetKind, input.targetId);
   const record = lookup(target.targetKind, target.targetId);
   if (!record) throw new InputError("That site or deal is not on the map.", 404);
@@ -257,7 +259,7 @@ export async function createSuggestion(
     targetId: target.targetId,
     after: { id, field, detail, currentValue, proposedValue, reason, status: "open", title, targetOn, ownerId },
   });
-  const siteId = permanentSiteId(target.targetKind, target.targetId, lookup);
+  const siteId = await permanentSiteId(target.targetKind, target.targetId, lookup);
   if (field === "document_request") {
     await recordAppEvent(sql, {
       siteId,
@@ -324,8 +326,9 @@ export async function decideSuggestion(
     recommendationId?: string | null;
     hold?: unknown;
   },
-  lookup: RecordLookup = fileLookup(),
+  lookup?: RecordLookup,
 ): Promise<Suggestion> {
+  lookup = lookup ?? await fileLookup();
   if (input.status !== "accepted" && input.status !== "rejected" && input.status !== "agreed_waiting" && input.status !== "overtaken") {
     throw new InputError("Choose accept, reject, agreed and waiting, or closed as overtaken.");
   }
@@ -380,7 +383,7 @@ export async function decideSuggestion(
     before: { id: row.id, status: row.status },
     after: { id: row.id, status: input.status, note, recommendationId: attached.recommendationId, draftedByAgent: attached.draftedByAgent },
   });
-  const siteId = permanentSiteId(row.target_kind, row.target_id, lookup);
+  const siteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
   if (input.status === "overtaken") {
     await ingestProposalEvent(sql, {
       kind: "proposal_overtaken",
@@ -424,7 +427,7 @@ export async function decideSuggestion(
   }
   if (input.status === "accepted" && row.field_name === "document_request" && row.target_on) {
     const day = dayOf(row.target_on);
-    const siteId = permanentSiteId(row.target_kind, row.target_id);
+    const siteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
     if (day && siteId) {
       await sql.query(
         `INSERT INTO queue_snoozes (user_id, site_id, until_date) VALUES ($1, $2, $3)
@@ -434,7 +437,7 @@ export async function decideSuggestion(
     }
   }
   if (row.field_name === "proposed_next_step" && (input.status === "accepted" || input.status === "rejected")) {
-    const siteId = permanentSiteId(row.target_kind, row.target_id, lookup);
+    const siteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
     if (input.status === "accepted" && row.detail === "bring_back") {
       const who = ownerName(row.author_id) || row.author_id;
       await recordAppEvent(sql, {
@@ -478,8 +481,9 @@ export async function decideSuggestion(
 export async function clearSuggestionBlocker(
   sql: Sql,
   input: { id: string; blockerId: string; actorId: string },
-  lookup: RecordLookup = fileLookup(),
+  lookup?: RecordLookup,
 ): Promise<Suggestion> {
+  lookup = lookup ?? await fileLookup();
   await clearHoldBlocker(sql, { suggestionId: input.id, blockerId: input.blockerId, actorId: input.actorId }, lookup);
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
   const suggestion = present(saved.rows[0]);
@@ -580,7 +584,8 @@ export async function reviseSuggestion(
   return (await withMentions(sql, [suggestion]))[0];
 }
 
-export async function reconcileSuggestions(sql: Sql, lookup: RecordLookup = fileLookup()): Promise<number> {
+export async function reconcileSuggestions(sql: Sql, lookup?: RecordLookup): Promise<number> {
+  lookup = lookup ?? await fileLookup();
   const rows = await sql.query<SuggestionRow>(
     `SELECT ${SELECT} FROM suggestions WHERE status IN ('open', 'accepted')`,
   );
@@ -654,7 +659,8 @@ export function suggestionsCsv(rows: Suggestion[]): string {
   return `${lines.join("\n")}\n`;
 }
 
-export function nextStepsCsv(rows: Suggestion[], lookup: RecordLookup = fileLookup()): string {
+export async function nextStepsCsv(rows: Suggestion[], lookup?: RecordLookup): Promise<string> {
+  lookup = lookup ?? await fileLookup();
   const headers = ["site_id", "date", "title", "owner", "approved_at", "done_at", "type", "stage"];
   const lines = [headers.join(",")];
   const approved = rows
@@ -663,7 +669,7 @@ export function nextStepsCsv(rows: Suggestion[], lookup: RecordLookup = fileLook
   for (const row of approved) {
     lines.push(
       [
-        permanentSiteId(row.targetKind, row.targetId, lookup),
+        await permanentSiteId(row.targetKind, row.targetId, lookup),
         row.targetOn,
         row.title || row.proposedValue,
         row.ownerName,

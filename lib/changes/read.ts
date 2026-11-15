@@ -1,9 +1,17 @@
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import type { CommsSnapshot, CommsRecord } from "@/lib/comms";
+import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
 import { readEntityFromDb } from "./flags";
+import { readGenerated } from "@/lib/guard";
+import { SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, scrubText, type PhotoRef, type SiteField } from "./site";
 
-type DealFile = { features?: { properties?: Record<string, unknown> }[] };
+type DealFile = {
+  features?: {
+    properties?: Record<string, unknown>;
+    geometry?: { type?: string; coordinates?: unknown } | null;
+  }[];
+};
 
 type StageRecord = { site_id: string; stage: string };
 
@@ -34,6 +42,124 @@ export function applyStageRows<T extends DealFile>(file: T, rows: StageRecord[])
     return { ...feature, properties: { ...props, stage, stage_group: stageKey(stage) || props.stage_group } };
   });
   return { ...file, features };
+}
+
+type SiteRead = Record<SiteField, string> & { site_id: string; sheet?: string; facts?: Record<string, string>; coord_status?: string };
+
+function numberOrNull(value: string): number | null {
+  return parseMeasure(value);
+}
+
+function photosOf(value: unknown): PhotoRef[] {
+  if (typeof value === "string") return photosFromCanonical(value);
+  return photosFromCanonical(JSON.stringify(value ?? []));
+}
+
+/** Paint database site rows onto deals. A deal the database does not have keeps the snapshot. */
+export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T {
+  const byId = new Map(rows.map((row) => [row.site_id, row]));
+  const features = (file.features || []).map((feature) => {
+    const props = feature.properties || {};
+    const row = byId.get(text(props.deal_id));
+    if (!row) return feature;
+    const cells = parseSheet(row.sheet || "{}");
+    const asking = numberOrNull(cells["Asking price ($)"] || row.asking_price);
+    const acres = numberOrNull(cells["Land (acres)"] || row.acreage);
+    const photos = photosOf(row.photo_refs);
+    const frontage = photos.find((photo) => photo.role === "street_frontage" && photo.view_url);
+    const status = cells["Listing status"] || row.listing_status;
+    const flags = listingFlags(status);
+    const next: Record<string, unknown> = {
+      ...props,
+      name: scrubText(cells.Name || row.name),
+      address: scrubText((cells.Address || cells.Site || row.address).replace(/^(PHX|LAS|MIA|SNA)\s+/i, "")),
+      city: cells.Market || row.market || props.city,
+      business_type: row.category || props.business_type,
+      broker: row.broker,
+      firm: row.firm,
+      listing_url: cells["Listing link"] || row.listing_url,
+      asking_price: asking,
+      asking_price_display: asking == null ? null : moneyText(asking),
+      land_acres: acres,
+      apn: cells["APN or folio"] || cells.APN || row.apn,
+      next_step: displayNote(cells["Next step"] || row.notes),
+      universe_id: row.universe_id,
+      miles_to_depot: numberOrNull(row.miles_to_depot),
+      service_area_class: row.service_area_class || props.service_area_class,
+      service_area_distance_mi: row.service_area_distance_mi ? numberOrNull(row.service_area_distance_mi) : props.service_area_distance_mi,
+      service_area_polygon: row.service_area_polygon || props.service_area_polygon,
+      score: row.score ? numberOrNull(row.score) : props.score,
+      location_points: row.location_points ? numberOrNull(row.location_points) : props.location_points,
+      photos: photos.map((photo) => {
+        const item: Record<string, string> = {};
+        for (const [key, value] of Object.entries(photo)) if (value) item[key] = value;
+        return item;
+      }),
+      photo_status: row.photo_status,
+      photo_diligence_count: numberOrNull(row.photo_diligence_count),
+      photo_listing_count: numberOrNull(row.photo_listing_count),
+      photos_checked: row.photos_checked,
+      photo_notes: row.photo_notes,
+      listed: flags.listed,
+      listing_removed: flags.removed,
+      street_view_url: frontage?.view_url || "",
+    };
+    if (row.county_value) next.county_value = numberOrNull(row.county_value);
+    if (row.county_value_basis) next.county_value_basis = row.county_value_basis;
+    if (row.land_value) next.land_value = numberOrNull(row.land_value);
+    if (row.improvement_value) next.improvement_value = numberOrNull(row.improvement_value);
+    const perAcre = asking != null && acres ? Math.round((asking / acres) * 100) / 100 : null;
+    next.price_per_acre = perAcre;
+    if (row.facts) {
+      for (const [key, value] of Object.entries(row.facts)) {
+        if (!value || key === "price_per_acre") continue;
+        next[key] = numberOrNull(value) ?? value;
+      }
+    }
+    if (row.coord_status) next.coord_status = row.coord_status;
+    const gate = passingClass(row.service_area_class);
+    if (gate != null) next.in_area = gate;
+    let geometry = feature.geometry;
+    const lat = numberOrNull(row.lat);
+    const lng = numberOrNull(row.lng);
+    if (lat != null && lng != null) geometry = { type: "Point", coordinates: [lng, lat] };
+    return { ...feature, geometry, properties: next };
+  });
+  return { ...file, features };
+}
+
+export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> {
+  if (!readEntityFromDb("site") || !actionsEnabled()) return file;
+  try {
+    const rows = await withSql((sql) =>
+      sql.query<Record<string, unknown>>(
+        `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")}, photo_refs, sheet, facts, coord_status FROM sites`,
+      ),
+    );
+    const mapped: SiteRead[] = rows.rows.map((row) => {
+      const record = {
+        site_id: text(row.site_id),
+        sheet: typeof row.sheet === "string" ? row.sheet : JSON.stringify(row.sheet ?? {}),
+        facts: (row.facts && typeof row.facts === "object" ? row.facts : {}) as Record<string, string>,
+        coord_status: text(row.coord_status),
+      } as SiteRead;
+      for (const field of SITE_FIELDS) {
+        if (field === "photo_refs") record.photo_refs = photoCanonical(photosOf(row.photo_refs));
+        else record[field] = text(row[field]);
+      }
+      return record;
+    });
+    return applySiteRows(file, mapped);
+  } catch {
+    console.error(JSON.stringify({ event: "site_read_fallback" }));
+    return file;
+  }
+}
+
+/** The deals file, with Neon site rows painted on when the site read flag is on. */
+export async function readDeals(): Promise<DealFile> {
+  const file = readGenerated("deals.geojson") as DealFile;
+  return overlayDealSites(file);
 }
 
 export async function overlayDealStages<T extends DealFile>(file: T): Promise<T> {

@@ -194,11 +194,11 @@ test("import keeps the production service areas and the 16 real comms rows", asy
 
   const dirty = await diffDatabase(sql, reported, "snapshot ab50fe1e");
   assert.equal(dirty.clean, false);
-  assert.deepEqual(dirty.clean_by_entity, { stage: false, activity: true, comms: false });
+  assert.deepEqual(dirty.clean_by_entity, { stage: false, activity: true, comms: false, site: true });
   assert.deepEqual(dirty.legacy_stages, ["LAND-PHX-0003"]);
   const clean = await diffDatabase(sql, valid, "snapshot ab50fe1e");
   assert.equal(clean.clean, true);
-  assert.deepEqual(clean.clean_by_entity, { stage: true, activity: true, comms: true });
+  assert.deepEqual(clean.clean_by_entity, { stage: true, activity: true, comms: true, site: true });
   assert.deepEqual(clean.legacy_stages, ["LAND-PHX-0003"]);
 });
 

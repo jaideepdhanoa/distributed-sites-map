@@ -33,6 +33,14 @@ async function openAs(page: import("@playwright/test").Page, username: string, p
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
+async function openDiscussion(page: import("@playwright/test").Page, id: string) {
+  await expect(page.locator("aside.drawer")).toContainText(id);
+  const discussion = page.getByTestId("panel-tab-discussion");
+  await expect(discussion).toBeVisible();
+  await discussion.click();
+  await expect(discussion).toHaveAttribute("aria-selected", "true");
+}
+
 async function discussionInView(page: import("@playwright/test").Page, id: string) {
   await expect(page.locator("aside.drawer")).toContainText(id);
   await expect(page.getByTestId("key-strip")).toHaveCount(1);
@@ -240,8 +248,8 @@ test("viewer is read only on the server and in the card", async ({ page, request
   const decision = await request.post("/api/actions/suggestions/not-a-real-id", { data: { status: "accepted" } });
   expect(decision.status()).toBe(403);
 
-  await openAs(page, "viewer", `/?site=${site}`);
-  await page.getByTestId("panel-tab-discussion").click();
+  await openAs(page, "viewer", `/?site=${site}&panel=discussion`);
+  await openDiscussion(page, site);
   await expect(page.getByText("Notes are read only for this login.")).toBeVisible();
   await expect(page.getByTestId("suggest-change")).toHaveCount(0);
   await mkdir("/opt/cursor/artifacts", { recursive: true });
@@ -360,8 +368,8 @@ test("a contributor can reply, and a non-reviewer cannot approve a next step", a
   const denied = await request.post(`/api/actions/suggestions/${created.id}`, { data: { status: "accepted" } });
   expect(denied.status()).toBe(403);
 
-  await openAs(page, "contributor", `/?site=${site}`);
-  await page.getByTestId("panel-tab-discussion").click();
+  await openAs(page, "contributor", `/?site=${site}&panel=discussion`);
+  await openDiscussion(page, site);
   await expect(page.getByTestId("note-threads")).toContainText("The driveway is the tight part.");
   await page.getByTestId("note-threads").screenshot({ path: "/opt/cursor/artifacts/actions-thread-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });

@@ -224,7 +224,8 @@ async function checklistNeeds(kind: TargetKind, id: string, lookup: RecordLookup
   });
 }
 
-export async function listOpenNeeds(sql: Sql, kind: TargetKind, id: string, lookup: RecordLookup = fileLookup()): Promise<OpenNeed[]> {
+export async function listOpenNeeds(sql: Sql, kind: TargetKind, id: string, lookup?: RecordLookup): Promise<OpenNeed[]> {
+  lookup = lookup ?? await fileLookup();
   const documents = await openDocumentNeeds(sql, kind, id, lookup);
   return [...documents, ...(await checklistNeeds(kind, id, lookup))];
 }
@@ -241,7 +242,7 @@ async function insertNeed(sql: Sql, suggestionId: string, need: OpenNeed): Promi
 export async function linkWaitingBlockers(
   sql: Sql,
   input: { suggestionId: string; kind: TargetKind; id: string; hold: HoldInput | null },
-  lookup: RecordLookup = fileLookup(),
+  lookup: RecordLookup,
 ): Promise<number> {
   const needs = await listOpenNeeds(sql, input.kind, input.id, lookup);
   for (const need of needs) await insertNeed(sql, input.suggestionId, need);
@@ -359,7 +360,8 @@ async function signalMissing(sql: Sql, lookup: RecordLookup): Promise<void> {
 }
 
 /** Close resolved blockers and mark a waiting proposal ready once none remain. */
-export async function refreshProposalReadiness(sql: Sql, lookup: RecordLookup = fileLookup()): Promise<number> {
+export async function refreshProposalReadiness(sql: Sql, lookup?: RecordLookup): Promise<number> {
+  lookup = lookup ?? await fileLookup();
   await closeResolvedBlockers(sql, lookup);
   const waiting = await sql.query<WaitingRow>(
     `SELECT id, target_kind, target_id, field_name, detail, title, proposed_value, reason, author_id
@@ -394,7 +396,7 @@ export async function refreshProposalReadiness(sql: Sql, lookup: RecordLookup = 
 export async function clearHoldBlocker(
   sql: Sql,
   input: { suggestionId: string; blockerId: string; actorId: string },
-  lookup: RecordLookup = fileLookup(),
+  lookup: RecordLookup,
 ): Promise<void> {
   const saved = await sql.query<{ id: string }>(
     `UPDATE proposal_blockers SET closed_at = now()

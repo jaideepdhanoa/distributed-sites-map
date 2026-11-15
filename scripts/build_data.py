@@ -23,7 +23,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import openpyxl
@@ -2940,6 +2940,134 @@ def nearest_depot_miles(lon: float, lat: float, depots: list[dict]) -> float | N
 _SITE_ID = re.compile(r"^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$")
 
 
+def _cell_text(value) -> str:
+    """The workbook cell as text. Numbers keep their value. Display cleaning stays out."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+# Headers copied verbatim into site_sheet.json. Financial claim columns stay out.
+_SHEET_KEEP = {
+    "Name",
+    "Site",
+    "Address",
+    "Market",
+    "Broker",
+    "Listing link",
+    "Listing status",
+    "Asking price ($)",
+    "Land (acres)",
+    "Land basis",
+    "APN or folio",
+    "APN",
+    "Next step",
+    "Business type",
+    "Business Type",
+    "Segment",
+    "Segment group",
+    "Inside the service area",
+    "Service area",
+    "Distance to service area (mi)",
+    "Service area polygon",
+    "Photo status",
+    "Diligence photo count",
+    "Listing photo count",
+    "Photos checked",
+    "Photo notes",
+    "Score (of 100)",
+    "Location points",
+    "Folder",
+    "County value ($)",
+    "Value basis",
+    "Land value ($)",
+    "Improvement value ($)",
+    "Spare area (sq ft)",
+    "Stalls that fit",
+    "Power rating",
+    "Last checked live",
+    "AADT (nearest)",
+    "AADT road",
+    "AADT segment distance (m)",
+    "AADT max within 800 m",
+    "Population within 3 miles",
+    "Population growth (3-mile)",
+    "Median household income (3-mile)",
+    "Washes within 1 mile",
+    "Washes within 3 miles",
+    "pwr_a_substation_mi",
+    "pwr_a_hv_line_ft",
+    "pwr_a_source_type",
+    "pwr_a_as_of",
+    "pwr_a_confidence",
+    "pwr_b_feeder_id",
+    "pwr_b_hosting_mw_frontage",
+    "pwr_b_hosting_mw_nearby",
+    "pwr_b_hosting_horizon",
+    "pwr_b_source_type",
+    "pwr_b_as_of",
+    "pwr_b_confidence",
+    "pwr_c_service_amps",
+    "pwr_c_service_volts",
+    "pwr_c_service_phase",
+    "pwr_c_panel_count",
+    "pwr_c_source_type",
+    "pwr_c_as_of",
+    "pwr_c_confidence",
+    "pwr_d_peak_kw",
+    "pwr_d_kwh_year",
+    "pwr_d_source_type",
+    "pwr_d_as_of",
+    "pwr_d_confidence",
+    "Lat",
+    "Lng",
+    "Lon",
+}
+
+
+def _write_private_sheet(document: dict) -> None:
+    """Raw cells for the importer only. Never under data/generated, git, or a served path."""
+    target = os.environ.get("SITE_SHEET_PATH", "").strip()
+    if not target:
+        return
+    path = Path(target).resolve()
+    generated = (OUT).resolve()
+    if path == generated or generated in path.parents:
+        raise SystemExit("SITE_SHEET_PATH must not be inside data/generated.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, indent=2) + "\n")
+
+
+def site_sheet_document(pipeline_rows: list[dict], land_rows: list[dict]) -> dict:
+    """Raw Pipeline and Land Sites cells, keyed by header. Written only to SITE_SHEET_PATH."""
+    rows = []
+    for kind, group in (("pipeline", pipeline_rows), ("land", land_rows)):
+        for row in group:
+            site_id = permanent_site_id(row, kind)
+            if not site_id:
+                continue
+            cells = {}
+            for key, value in row.items():
+                if not key or str(key).startswith("_") or key not in _SHEET_KEEP:
+                    continue
+                text = _cell_text(value)
+                if text:
+                    cells[key] = text
+            for header, target in row.get("_links") or []:
+                if header in {"Listing link", "Folder"} and target and header not in cells:
+                    cells[header] = str(target).strip()
+            rows.append({"site_id": site_id, "cells": cells})
+    return {"rows": rows}
+
+
 def permanent_site_id(row: dict, kind: str) -> str | None:
     """Use column CK when it is present and well formed. A wrong tab prefix is an error."""
     if "Site ID" not in row:
@@ -5086,6 +5214,7 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         (OUT / "areas.geojson").write_text(json.dumps(areas_fc))
         (OUT / "depots.geojson").write_text(json.dumps(depots))
         (OUT / "deals.geojson").write_text(json.dumps(deals_fc))
+        _write_private_sheet(site_sheet_document(pipeline_rows, land_rows))
         from scripts.comms import write_comms_file
         from scripts.financials import write_financials_file
         from scripts.nda import write_nda_file

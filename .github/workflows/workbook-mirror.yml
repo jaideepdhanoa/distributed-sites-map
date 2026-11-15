@@ -37,5 +37,6 @@ jobs:
           READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
           READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
           READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          READ_SITES_FROM_DB: ${{ vars.READ_SITES_FROM_DB }}
           CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
         run: npx tsx scripts/workbook-mirror.ts

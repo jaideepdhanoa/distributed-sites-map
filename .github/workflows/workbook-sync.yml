@@ -78,6 +78,7 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           MAP_SYNC_INPUTS_FOLDER_ID: ${{ vars.MAP_SYNC_INPUTS_FOLDER_ID }}
           GOOGLE_DRIVE_ROOT_FOLDER_ID: ${{ vars.TIMELINE_SITES_FOLDER_ID }}
+          SITE_SHEET_PATH: /tmp/site_sheet.json
         run: |
           if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
             echo "GOOGLE_SERVICE_ACCOUNT_JSON is not set."
@@ -213,13 +214,15 @@ jobs:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
           SNAPSHOT_ID: ${{ steps.publish.outputs.snapshot_id }}
-          # Same four repository variables as the mirror step. Actions cannot
+          # Same repository variables as the mirror step. Actions cannot
           # see the Vercel Production values. A read flag that is on skips
           # that entity here.
           READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
           READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
           READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          READ_SITES_FROM_DB: ${{ vars.READ_SITES_FROM_DB }}
           CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
+          SITE_SHEET_PATH: /tmp/site_sheet.json
         run: npx tsx scripts/import-shadow.ts
       - name: Refresh the production cache
         if: steps.publish.outputs.published == 'true'
@@ -237,6 +240,7 @@ jobs:
           READ_STAGES_FROM_DB: ${{ vars.READ_STAGES_FROM_DB }}
           READ_ACTIVITY_FROM_DB: ${{ vars.READ_ACTIVITY_FROM_DB }}
           READ_COMMS_FROM_DB: ${{ vars.READ_COMMS_FROM_DB }}
+          READ_SITES_FROM_DB: ${{ vars.READ_SITES_FROM_DB }}
           CHANGES_API_ENABLED: ${{ vars.CHANGES_API_ENABLED || '0' }}
         run: |
           if [ ! -d node_modules/pg ]; then

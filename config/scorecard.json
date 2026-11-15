@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "weights": {
+    "economics": 40,
+    "land": 25,
+    "power": 15,
+    "location": 10,
+    "deal": 10
+  },
+  "location_points": {
+    "Inside": 10,
+    "Near 0-5": 5,
+    "Near 5-10": 2.5,
+    "Outside": 0
+  }
+}

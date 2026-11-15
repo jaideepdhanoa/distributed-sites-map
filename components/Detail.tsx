@@ -128,7 +128,7 @@ function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps
         <strong title={spare.value === "—" ? "Not on file" : undefined}>{spare.value}</strong>
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
-      <div>
+      <div className="headline-wide">
         <span>Power</span>
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
@@ -164,7 +164,7 @@ function SiteNumbers({ site, deal, signedIn = false }: { site: SiteProps; deal?:
         <strong title={spare.value === "—" ? "Not on file" : undefined}>{spare.value}</strong>
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
-      <div>
+      <div className="headline-wide">
         <span>Power</span>
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>

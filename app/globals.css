@@ -2321,6 +2321,8 @@ span.listing-link.muted { text-decoration: none; }
 .headline > div + div { border-left: 1px solid var(--line); }
 .headline > div:nth-child(odd) { border-left: 0; }
 .headline > div:nth-child(n + 3) { border-top: 1px solid var(--line); }
+.headline > div.headline-wide { grid-column: 1 / -1; border-left: 0; }
+.headline > div.headline-wide:not(:first-child) { border-top: 1px solid var(--line); }
 .headline span, .headline small { display: block; font-size: var(--type-cap); line-height: 16px; color: var(--ink-3); overflow-wrap: normal; word-break: normal; }
 .headline strong { display: block; font-size: var(--type-lead); line-height: 24px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .headline strong.neg { color: #7a3a2f; }

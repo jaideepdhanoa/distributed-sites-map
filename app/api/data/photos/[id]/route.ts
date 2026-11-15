@@ -1,10 +1,8 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
-import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
-import { committedPhotoUrl, isPhotoName, photoContentType, resolvePhoto } from "@/lib/photos/bytes";
-import { readStoredPhoto } from "@/lib/photos/store";
+import { MAX_PHOTO_BYTES, committedPhotoUrl, isPhotoName, looksLikeImage, photoContentType, resolvePhoto } from "@/lib/photos/bytes";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,21 +17,22 @@ async function readLocal(name: string): Promise<Buffer | null> {
   }
 }
 
-async function readStored(name: string): Promise<Buffer | null> {
-  if (!actionsEnabled()) return null;
-  try {
-    return await withSql((sql) => readStoredPhoto(sql, name));
-  } catch {
-    return null;
-  }
+function skip(name: string, reason: string): null {
+  console.error(JSON.stringify({ event: "photo_skipped", name, reason }));
+  return null;
 }
 
+/** A file this deploy did not include, read from the copy committed on main. */
 async function readCommitted(name: string): Promise<Buffer | null> {
   const url = committedPhotoUrl(name);
   if (!url) return null;
   const response = await fetch(url, { signal: AbortSignal.timeout(8000), redirect: "follow" });
   if (!response.ok) return null;
+  const declared = Number(response.headers.get("content-length") || "");
+  if (Number.isFinite(declared) && declared > MAX_PHOTO_BYTES) return skip(name, "larger than 8 MB");
   const body = Buffer.from(await response.arrayBuffer());
+  if (body.length > MAX_PHOTO_BYTES) return skip(name, "larger than 8 MB");
+  if (!looksLikeImage(body)) return skip(name, "not an image");
   return body;
 }
 
@@ -41,9 +40,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const session = await requireUser();
   if (!isSession(session)) return session;
   const { id } = await context.params;
-  // Disk is the fast path for a file this deploy contains. A snapshot can name
-  // a file the deploy lacks; that copy is in photo_files, then on main.
-  const photo = await resolvePhoto(id, [readLocal, readStored, readCommitted]);
+  // Disk is the fast path. Photo bytes are not copied into Neon: the files a
+  // snapshot names are about 241 MiB, which does not fit Neon Free beside the
+  // rest of the database. A name this deploy lacks is read from main.
+  const photo = await resolvePhoto(id, [readLocal, readCommitted]);
   if (!photo) return NextResponse.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
   return new NextResponse(new Uint8Array(photo.body), {
     headers: {

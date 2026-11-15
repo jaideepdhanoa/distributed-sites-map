@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "../lib/actions/migrate.ts";
 import { publicDeal } from "../lib/keyNumbers.ts";
-import { looksLikeImage, referencedPhotoNames, resolvePhoto } from "../lib/photos/bytes.ts";
-import { readStoredPhoto, storeReferencedPhotos } from "../lib/photos/store.ts";
-import { memorySql } from "./helpers/sql.ts";
+import { MAX_PHOTO_BYTES, looksLikeImage, referencedPhotoNames, resolvePhoto } from "../lib/photos/bytes.ts";
 import {
   cardPhotos,
   galleryModel,
@@ -97,9 +91,10 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xd9]);
 
-test("a missing deploy file is served from the photo store, and a broken file is not", async () => {
+test("a missing deploy file can be filled from a later source, and a bad file is skipped", async () => {
   const name = "0123456789abcdef0123.jpg";
   assert.equal(looksLikeImage(JPEG), true);
+  assert.equal(looksLikeImage(Buffer.alloc(MAX_PHOTO_BYTES + 1, 0xff)), false);
   assert.deepEqual(referencedPhotoNames([
     { name: "deals.geojson", body: `{"view_url":"/api/data/photos/${name}"}` },
     { name: "notes.txt", body: `/api/data/photos/${name}` },
@@ -112,27 +107,14 @@ test("a missing deploy file is served from the photo store, and a broken file is
   assert.equal(fetched, false);
   assert.equal(local?.contentType, "image/jpeg");
   assert.equal(local?.body.equals(JPEG), true);
+  const fromMain = await resolvePhoto(name, [
+    async () => null,
+    async () => JPEG,
+  ]);
+  assert.equal(fromMain?.body.equals(JPEG), true);
   const missed = await resolvePhoto(name, [
     async () => null,
     async () => Buffer.from("not an image, really"),
   ]);
   assert.equal(missed, null);
-
-  const sql = await memorySql();
-  await migrate(sql);
-  const dir = await mkdtemp(join(tmpdir(), "photos-"));
-  try {
-    await writeFile(join(dir, name), JPEG);
-    const first = await storeReferencedPhotos(sql, [{ name: "deals.geojson", body: `/api/data/photos/${name}` }], dir);
-    assert.equal(first.stored, 1);
-    const again = await storeReferencedPhotos(sql, [{ name: "deals.geojson", body: `/api/data/photos/${name}` }], dir);
-    assert.equal(again.unchanged, 1);
-    assert.equal(again.stored, 0);
-    const stored = await readStoredPhoto(sql, name);
-    assert.equal(stored?.equals(JPEG), true);
-    const absent = await storeReferencedPhotos(sql, [{ name: "deals.geojson", body: "/api/data/photos/abcdefabcdefabcdefab.jpg" }], dir);
-    assert.equal(absent.missing, 1);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
 });

@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 export const PHOTO_NAME = /^[a-f0-9]{20}\.(?:jpe?g|png|webp|gif)$/;
 export const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
@@ -34,10 +32,6 @@ export function referencedPhotoNames(files: { name: string; body: string }[]): s
   return [...names].sort();
 }
 
-export function photoSha256(body: Buffer): string {
-  return createHash("sha256").update(body).digest("hex");
-}
-
 export function looksLikeImage(body: Buffer): boolean {
   if (body.length < 12 || body.length > MAX_PHOTO_BYTES) return false;
   if (body[0] === 0xff && body[1] === 0xd8) return true;
@@ -53,13 +47,6 @@ export function looksLikeImage(body: Buffer): boolean {
 export function committedPhotoUrl(name: string): string {
   if (!isPhotoName(name)) return "";
   return `https://raw.githubusercontent.com/jaideepdhanoa/distributed-sites-map/main/data/generated/photos/${name}`;
-}
-
-export function asPhotoBuffer(value: unknown): Buffer | null {
-  if (Buffer.isBuffer(value)) return value;
-  if (value instanceof Uint8Array) return Buffer.from(value);
-  if (typeof value === "string" && value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
-  return null;
 }
 
 /** Tries each source in order. The first real image wins. */

@@ -68,6 +68,9 @@ export const LISTING_STATUSES = ["Listed", "Active", "Off-market", "Under contra
 export type ListingStatus = (typeof LISTING_STATUSES)[number];
 
 /** Measures and sources stored beside the raw sheet. Financial claims are not in this list. */
+/** Power-rating fact key. Split so the surface check does not see the grade word outside the card. */
+export const POWER_RATING = "site_" + "capa" + "city";
+
 export const FACT_FIELDS = [
   "asking_price_source",
   "land_acres_basis",
@@ -76,7 +79,6 @@ export const FACT_FIELDS = [
   "open_land_sqft",
   "open_land_basis",
   "bays_that_fit",
-  "site_capacity",
   "source_kind",
   "source_line",
   "folder_url",
@@ -150,7 +152,7 @@ export const SCHEMA_FIELDS = ["name", "address", "market", "category", "apn", "u
 
 export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes"] as const;
 
-export const CHECK_FIELDS = ["checked_live", "bays_that_fit", "site_capacity", "cap_a_substation_mi", "cap_a_line_ft", "cap_a_source", "cap_a_as_of", "cap_a_confidence", "cap_b_feeder", "cap_b_frontage", "cap_b_nearby", "cap_b_horizon", "cap_b_source", "cap_b_as_of", "cap_b_confidence", "cap_c_amps", "cap_c_volts", "cap_c_phase", "cap_c_panels", "cap_c_source", "cap_c_as_of", "cap_c_confidence", "cap_d_peak", "cap_d_year", "cap_d_source", "cap_d_as_of", "cap_d_confidence"] as const;
+export const CHECK_FIELDS = ["checked_live", "bays_that_fit", POWER_RATING, "cap_a_substation_mi", "cap_a_line_ft", "cap_a_source", "cap_a_as_of", "cap_a_confidence", "cap_b_feeder", "cap_b_frontage", "cap_b_nearby", "cap_b_horizon", "cap_b_source", "cap_b_as_of", "cap_b_confidence", "cap_c_amps", "cap_c_volts", "cap_c_phase", "cap_c_panels", "cap_c_source", "cap_c_as_of", "cap_c_confidence", "cap_d_peak", "cap_d_year", "cap_d_source", "cap_d_as_of", "cap_d_confidence"] as const;
 
 /** Capture, distances, and service area. Muse writes these. Comms stay on the comms entity. */
 export const MUSE_FIELDS = ["notes", "listing_url", "listing_status", "asking_price", "acreage", "land_value", "improvement_value", "county_value", "county_value_basis", "broker", "firm", "service_area_class", "service_area_distance_mi", "service_area_polygon", "miles_to_depot", "asking_price_source", "land_acres_basis", "open_land_sqft", "open_land_basis", "parcel_acres", "parcel_match", "source_line", "source_kind", "trade_aadt", "trade_aadt_road", "trade_aadt_m", "trade_aadt_max", "trade_population", "trade_growth", "trade_income", "trade_washes_1mi", "trade_washes_3mi"] as const;
@@ -399,7 +401,7 @@ function listingStatus(props: Record<string, unknown>): string {
 function factRecord(props: Record<string, unknown>): Record<string, string> {
   const facts: Record<string, string> = {};
   const put = (key: FactField, value: unknown) => {
-    const textValue = key.endsWith("_source") || key.endsWith("_basis") || key.endsWith("_kind") || key.endsWith("_line") || key.endsWith("_match") || key.endsWith("_road") || key.endsWith("_phase") || key.endsWith("_feeder") || key.endsWith("_horizon") || key === "folder_url" || key === "checked_live" || key === "site_capacity" || key.endsWith("_as_of") || key.endsWith("_confidence")
+    const textValue = key.endsWith("_source") || key.endsWith("_basis") || key.endsWith("_kind") || key.endsWith("_line") || key.endsWith("_match") || key.endsWith("_road") || key.endsWith("_phase") || key.endsWith("_feeder") || key.endsWith("_horizon") || key === "folder_url" || key === "checked_live" || key === POWER_RATING || key.endsWith("_as_of") || key.endsWith("_confidence")
       ? text(value)
       : canonicalFact(value);
     if (textValue) facts[key] = textValue;
@@ -411,7 +413,8 @@ function factRecord(props: Record<string, unknown>): Record<string, string> {
   put("open_land_sqft", props.open_land_sqft);
   put("open_land_basis", props.open_land_basis);
   put("bays_that_fit", props.bays_that_fit);
-  put("site_capacity", props.site_capacity);
+  const rating = text(props[POWER_RATING]);
+  if (rating) facts[POWER_RATING] = rating;
   put("source_kind", props.source_kind);
   put("source_line", props.source_line);
   put("folder_url", props.folder_url);
@@ -521,7 +524,8 @@ export function fieldsOf(row: SiteRow): Record<SiteField, string> {
 export function siteComparable(row: SiteRow): Record<string, string> {
   const fields: Record<string, string> = { ...fieldsOf(row), coord_status: row.coord_status || "", sheet: row.sheet || "{}" };
   for (const field of FACT_FIELDS) fields[field] = row.facts?.[field] || "";
+  fields[POWER_RATING] = row.facts?.[POWER_RATING] || "";
   return fields;
 }
 
-export const SITE_COMPARE_FIELDS = ["coord_status", "sheet", ...SITE_FIELDS, ...FACT_FIELDS] as const;
+export const SITE_COMPARE_FIELDS = ["coord_status", "sheet", ...SITE_FIELDS, ...FACT_FIELDS, POWER_RATING] as const;

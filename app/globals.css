@@ -898,14 +898,16 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .nda-sites { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; }
 .stage-cell { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
 .suggested-inline {
-  flex: 1 0 100%;
-  max-width: 16rem;
+  flex: 0 1 auto;
+  display: inline-block;
+  max-width: 100%;
   color: var(--ink-3);
   font-size: 12px;
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 .nda-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .stage-blocker { margin: 6px 0 0; }

@@ -453,7 +453,7 @@ export default function PipelineList({
                     </td>
                   ))}
                   <td>
-                    <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
+                    <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
                   </td>
                 </tr>
               );
@@ -507,7 +507,7 @@ export default function PipelineList({
               </button>
               <span className="list-card-actions">
                 <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />
-                <button type="button" className="text-link" onClick={() => onShowMap(row.deal.deal_id)}>{row.noPin ? "No pin" : "Show on map"}</button>
+                <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={() => onShowMap(row.deal.deal_id)}>{row.noPin ? "No pin" : "Show on map"}</button>
               </span>
             </li>
           ))}

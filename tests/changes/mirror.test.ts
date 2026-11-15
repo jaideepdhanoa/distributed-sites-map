@@ -6,10 +6,12 @@ import {
   PROTECTED_ROW,
   PROTECTED_SITE_ID,
   a1,
+  assertMirrorRefusals,
   assertPlannedWrites,
   assertReadBack,
   assertWorkbookMirrorAllowed,
   entitiesToMirror,
+  formatPlan,
   formatPlanSummary,
   planActivityMirror,
   planCommsMirror,
@@ -289,4 +291,59 @@ test("a site-flag simulation is a dry run and the plan summary counts entities",
   } finally {
     restore();
   }
+});
+
+test("an activity id the database did not import is not written over the sheet row", () => {
+  const sheet = table("Activity", 1, ["Event ID", "Date", "Site ID", "Type", "Summary"], [
+    ["A-000272", "2026-11-06", "LAND-PHX-0046", "email", "Sheet row"],
+  ]);
+  const plan = planActivityMirror(sheet, [
+    { entity_id: "A-000272", site_id: "PIPE-PHX-0001", date: "2026-11-15", type: "visit", summary: "Database row", source_link: "", imported: false },
+    { entity_id: "A-000274", site_id: "PIPE-PHX-0001", date: "2026-11-15", type: "visit", summary: "Database row", source_link: "", imported: false },
+  ]);
+  assert.deepEqual(plan.refused, ["A-000272"]);
+  assert.equal(plan.changes.some((change) => change.id === "A-000272"), false);
+  assert.equal(plan.appended, 1);
+  assert.equal(plan.changes.every((change) => change.id === "A-000274"), true);
+  assert.throws(() => assertMirrorRefusals(plan.refused), (error: unknown) => {
+    const message = error instanceof Error ? error.message : "";
+    assert.match(message, /A-000272/);
+    assert.equal(message.includes("Database row"), false);
+    assert.equal(message.includes("Sheet row"), false);
+    return true;
+  });
+});
+
+test("a comms summary that only shortens the sheet is not written, and a trailing PT matches", () => {
+  const full = `${"x".repeat(40)} tail`;
+  const clipped = "x".repeat(40);
+  const sheet = table("Comms Log", 1, ["Comms ID", "Date/time", "Summary", "Direction"], [
+    ["CM-0382", "2026-11-06 09:00 PT", full, "in"],
+  ]);
+  const plan = planCommsMirror(sheet, [
+    { entity_id: "CM-0382", values: { at: "2026-11-06 09:00", summary: clipped, direction: "in" } },
+    { entity_id: "CM-0581", values: { at: "2026-11-15 10:00", summary: "New row", direction: "out" } },
+  ]);
+  assert.equal(plan.changes.some((change) => change.id === "CM-0382"), false);
+  assert.deepEqual(plan.held.map((row) => row.id), ["CM-0382"]);
+  const stamped = plan.changes.find((change) => change.id === "CM-0581" && change.header === "Date/time");
+  assert.equal(stamped?.after, "2026-11-15 10:00 PT");
+  assert.equal(plan.appended, 1);
+});
+
+test("activity and comms plan lines are hashed", () => {
+  const note = "Visited and left a sample note.";
+  const link = "https://example.test/message";
+  const plan = formatPlan([
+    { sheet: "Activity", row: 3, column: 5, header: "Summary", id: "A-000274", before: "", after: note },
+    { sheet: "Comms Log", row: 4, column: 3, header: "Link", id: "CM-0382", before: link, after: "" },
+    { sheet: "Comms Log", row: 4, column: 10, header: "Summary", id: "CM-0382", before: note, after: `${note} more` },
+    { sheet: "Activity", row: 3, column: 2, header: "Date", id: "A-000274", before: "", after: "2026-11-15" },
+  ]);
+  assert.equal(plan.includes(note), false);
+  assert.equal(plan.includes(link), false);
+  assert.equal(plan.includes("example.test"), false);
+  assert.match(plan, /Summary A-000274: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /Link CM-0382: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.match(plan, /Date A-000274: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
 });

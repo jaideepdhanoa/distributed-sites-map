@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
-import { MIRROR_FIELD_HEADERS, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameWorkbookCell, shortHash } from "./site";
+import { numericSuffix } from "./apply";
+import { MIRROR_FIELD_HEADERS, isTruncatedCell, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameCommsStamp, sameWorkbookCell, shortHash, withSheetStamp } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -47,7 +48,15 @@ export type MirrorPlan = {
   skippedProtected: number;
   unmatched: string[];
   appended: number;
+  /** Sheet ids whose database rows were never imported and do not match the sheet. */
+  refused: string[];
+  /** Cells skipped because the database value is only a prefix of the sheet. */
+  held: { id: string; header: string }[];
 };
+
+function emptyPlan(): MirrorPlan {
+  return { changes: [], skippedProtected: 0, unmatched: [], appended: 0, refused: [], held: [] };
+}
 
 const STAGE_TABS = [
   { title: "Pipeline", headerRow: 4 },
@@ -157,7 +166,11 @@ export function mirrorDryRun(): boolean {
   return value === "1" || value === "true" || value === "on";
 }
 
-type RecordRow = { id: string; values: Record<string, string> };
+type RecordRow = { id: string; values: Record<string, string>; imported?: boolean };
+
+function cellsEqual(input: { sameCell?: (key: string, before: string, after: string) => boolean }, key: string, before: string, after: string): boolean {
+  return input.sameCell ? input.sameCell(key, before, after) : sameWorkbookCell(before, after);
+}
 
 function planTable(input: {
   table: SheetTable;
@@ -168,6 +181,12 @@ function planTable(input: {
   protectRow: boolean;
   idPattern?: RegExp;
   skipBlank?: boolean;
+  /** An API-minted id that already names a different sheet row is not a write. */
+  refuseUnimported?: boolean;
+  /** Never replace a sheet cell with a clipped prefix of itself. */
+  holdTruncation?: boolean;
+  sameCell?: (key: string, before: string, after: string) => boolean;
+  appendValue?: (key: string, value: string, samples: string[]) => string;
 }): MirrorPlan {
   const idAt = headerIndex(input.table.headers, input.idHeaders);
   if (idAt < 0) {
@@ -188,8 +207,18 @@ function planTable(input: {
   }
   const changes: CellChange[] = [];
   const unmatched: string[] = [];
+  const refused: string[] = [];
+  const held: { id: string; header: string }[] = [];
   let skippedProtected = 0;
   let appended = 0;
+  const samplesFor = (index: number): string[] => {
+    if (index < 0) return [];
+    return input.table.rows.map((row) => cellText(row.cells[index])).filter(Boolean);
+  };
+  const writtenValue = (key: string, value: string, index: number): string => {
+    const text = cellText(value);
+    return input.appendValue ? input.appendValue(key, text, samplesFor(index)) : text;
+  };
   for (const record of input.records) {
     if (record.id === PROTECTED_SITE_ID) {
       skippedProtected += 1;
@@ -207,9 +236,11 @@ function planTable(input: {
       }
       const row = nextAppendRow(input.table.rows, input.table.headerRow, input.protectRow);
       appended += 1;
+      const stored: string[] = [];
       for (const column of columns) {
         if (column.index < 0) continue;
-        const after = cellText(record.values[column.key]);
+        const after = writtenValue(column.key, record.values[column.key] || "", column.index);
+        stored[column.index] = after;
         if (input.skipBlank && column.key !== "id" && !after) continue;
         changes.push({
           sheet: input.table.title,
@@ -221,37 +252,51 @@ function planTable(input: {
           after,
         });
       }
-      input.table.rows.push({
-        row,
-        cells: columns.reduce<string[]>((cells, column) => {
-          if (column.index >= 0) cells[column.index] = cellText(record.values[column.key]);
-          return cells;
-        }, []),
-      });
+      input.table.rows.push({ row, cells: stored });
       continue;
+    }
+    if (input.refuseUnimported && record.imported === false) {
+      const conflict = columns.some((column) => {
+        if (column.index < 0 || column.key === "id") return false;
+        const after = cellText(record.values[column.key]);
+        if (input.skipBlank && !after) return false;
+        const before = cellText(existing.cells[column.index]);
+        if (cellsEqual(input, column.key, before, after)) return false;
+        if (input.holdTruncation && isTruncatedCell(before, after)) return false;
+        return true;
+      });
+      if (conflict) {
+        refused.push(record.id);
+        continue;
+      }
     }
     for (const column of columns) {
       if (column.index < 0 || column.key === "id") continue;
       const after = cellText(record.values[column.key]);
       if (input.skipBlank && !after) continue;
       const before = cellText(existing.cells[column.index]);
-      if (sameWorkbookCell(before, after)) continue;
+      if (cellsEqual(input, column.key, before, after)) continue;
+      const header = input.table.headers[column.index] || column.headers[0];
+      if (input.holdTruncation && isTruncatedCell(before, after)) {
+        held.push({ id: record.id, header });
+        continue;
+      }
       changes.push({
         sheet: input.table.title,
         row: existing.row,
         column: column.index + 1,
-        header: input.table.headers[column.index] || column.headers[0],
+        header,
         id: record.id,
         before,
         after,
       });
     }
   }
-  return { changes, skippedProtected, unmatched, appended };
+  return { changes, skippedProtected, unmatched, appended, refused, held };
 }
 
 export function planStageMirror(tables: SheetTable[], stages: { site_id: string; stage: string }[]): MirrorPlan {
-  const combined: MirrorPlan = { changes: [], skippedProtected: 0, unmatched: [], appended: 0 };
+  const combined: MirrorPlan = emptyPlan();
   const claimed = new Set<string>();
   const writable = stages.filter((row) => row.site_id !== PROTECTED_SITE_ID);
   if (writable.length !== stages.length) combined.skippedProtected += 1;
@@ -277,6 +322,8 @@ export function planStageMirror(tables: SheetTable[], stages: { site_id: string;
     combined.changes.push(...plan.changes);
     combined.skippedProtected += plan.skippedProtected;
     combined.unmatched.push(...plan.unmatched.filter((id) => !claimed.has(id)));
+    combined.refused.push(...plan.refused);
+    combined.held.push(...plan.held);
   }
   const seen = new Set<string>();
   combined.unmatched = combined.unmatched.filter((id) => {
@@ -298,7 +345,7 @@ export function planSiteMirror(
   tables: SheetTable[],
   sites: { site_id: string; writes?: Record<string, string>; cells?: Record<string, string> }[],
 ): MirrorPlan {
-  const combined: MirrorPlan = { changes: [], skippedProtected: 0, unmatched: [], appended: 0 };
+  const combined: MirrorPlan = emptyPlan();
   const claimed = new Set<string>();
   const writable = sites.filter((row) => row.site_id !== PROTECTED_SITE_ID);
   if (writable.length !== sites.length) combined.skippedProtected += 1;
@@ -357,7 +404,7 @@ export function planSiteMirror(
 
 export function planActivityMirror(
   table: SheetTable,
-  rows: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string }[],
+  rows: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean }[],
 ): MirrorPlan {
   return planTable({
     table,
@@ -365,6 +412,7 @@ export function planActivityMirror(
     fields: ACTIVITY_FIELDS,
     records: rows.map((row) => ({
       id: row.entity_id,
+      imported: row.imported,
       values: {
         id: row.entity_id,
         date: row.date,
@@ -377,6 +425,8 @@ export function planActivityMirror(
     append: true,
     protectRow: false,
     idPattern: /^A-\d{4,}$/,
+    refuseUnimported: true,
+    holdTruncation: true,
   });
 }
 
@@ -392,7 +442,27 @@ export function planCommsMirror(
     append: true,
     protectRow: false,
     idPattern: /^CM-\d{4,}$/,
+    holdTruncation: true,
+    sameCell: (key, before, after) => (key === "at" ? sameCommsStamp(before, after) : sameWorkbookCell(before, after)),
+    appendValue: (key, value, samples) => (key === "at" ? withSheetStamp(samples, value) : value),
   });
+}
+
+/** Ids only. A refusal means the mirror must not write any cell. */
+export function assertMirrorRefusals(refused: string[]): void {
+  if (!refused.length) return;
+  throw new Error(
+    `Refusing to write ${refused.join(", ")}. Those ids are already on the sheet with different content the database did not import. Nothing was written.`,
+  );
+}
+
+/** Highest numeric id on a sheet tab. The value is a number, not cell text. */
+export function sheetIdFloor(table: SheetTable, idHeaders: string[], prefix: string): number {
+  const idAt = headerIndex(table.headers, idHeaders);
+  if (idAt < 0) return 0;
+  let max = 0;
+  for (const row of table.rows) max = Math.max(max, numericSuffix(prefix, cellText(row.cells[idAt])));
+  return max;
 }
 
 export function assertPlannedWrites(changes: CellChange[]): void {
@@ -449,7 +519,8 @@ function planValue(change: CellChange, value: string): string {
   const header = change.header.trim().toLowerCase();
   const siteTab = change.sheet === "Pipeline" || change.sheet === "Land Sites";
   const siteCell = siteTextHeader(change.header) || (siteTab && header !== "stage");
-  if (siteCell || value.trim().startsWith("{")) return `#${shortHash(value)}`;
+  const logTab = change.sheet === ACTIVITY_SHEET || change.sheet === COMMS_SHEET;
+  if (logTab || siteCell || value.trim().startsWith("{")) return `#${shortHash(value)}`;
   return JSON.stringify(value);
 }
 
@@ -480,27 +551,42 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 }
 
+/** The shadow import writes this source. An API batch does not. */
+export function importedFromWorkbook(source: string | null | undefined): boolean {
+  return (source || "").trim().toLowerCase().startsWith("workbook snapshot");
+}
+
 export async function loadMirrorRows(sql: Sql): Promise<{
   stages: { site_id: string; stage: string }[];
-  activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string }[];
+  activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean }[];
   comms: { entity_id: string; values: Record<string, string> }[];
   sites: { site_id: string; writes: Record<string, string> }[];
 }> {
   const stages = await sql.query<StageDb>(`SELECT site_id, stage FROM site_stages ORDER BY site_id`);
   const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload FROM activities ORDER BY entity_id`);
+  const origins = await sql.query<{ entity_id: string; source: string }>(
+    `SELECT DISTINCT ON (entity_id) entity_id, source
+     FROM events
+     WHERE entity_type = 'activity'
+     ORDER BY entity_id, created_at ASC, id ASC`,
+  );
+  const originOf = new Map(origins.rows.map((row) => [text(row.entity_id), text(row.source)]));
   const comms = await sql.query<CommsDb>(`SELECT entity_id, payload FROM comms_entries ORDER BY entity_id`);
   const sites = await sql.query<{ site_id: string; sheet_writes: unknown }>(`SELECT site_id, sheet_writes FROM sites ORDER BY site_id`);
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
     activities: activities.rows.map((row) => {
       const payload = asObject(row.payload);
+      const entityId = text(row.entity_id);
+      const origin = originOf.get(entityId);
       return {
-        entity_id: text(row.entity_id),
+        entity_id: entityId,
         site_id: text(row.site_id),
         date: text(payload.date),
         type: text(payload.type),
         summary: text(payload.summary),
         source_link: text(payload.source_link),
+        imported: origin == null ? undefined : importedFromWorkbook(origin),
       };
     }),
     comms: comms.rows.map((row) => {

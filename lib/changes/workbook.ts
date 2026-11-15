@@ -40,6 +40,11 @@ export type WorkbookSlice = {
   comms: CommsRow[];
   /** Pipeline and land rows. Omitted slices are treated as none. */
   sites?: SiteRow[];
+  /**
+   * Every Activity tab event id, including rows the timeline does not import.
+   * The allocator stays above this set. Ids only; no cell text.
+   */
+  workbookActivityIds?: string[];
 };
 
 function text(value: unknown): string {
@@ -78,7 +83,7 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
     (row) => row.site_id,
   );
 
-  const timeline = JSON.parse(files.timeline) as { items?: Record<string, unknown>[] };
+  const timeline = JSON.parse(files.timeline) as { items?: Record<string, unknown>[]; workbook_event_ids?: unknown[] };
   const activities = dedupe(
     (timeline.items || []).map((item) => ({
       entity_id: text(item.event_id),
@@ -90,6 +95,10 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
     })).filter((row) => row.entity_id),
     (row) => row.entity_id,
   );
+  const workbookActivityIds = dedupe(
+    (Array.isArray(timeline.workbook_event_ids) ? timeline.workbook_event_ids : []).map((id) => text(id)).filter((id) => /^A-\d{4,}$/.test(id)).map((id) => ({ id })),
+    (row) => row.id,
+  ).map((row) => row.id);
 
   const commsFile = JSON.parse(files.comms) as { rows?: Record<string, unknown>[] };
   const comms = dedupe(
@@ -121,7 +130,7 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
     (row) => row.entity_id,
   );
 
-  return { stages, activities, comms, sites: sitesFromFiles(files.deals, files.pricing || "", files.sheet || "") };
+  return { stages, activities, comms, workbookActivityIds, sites: sitesFromFiles(files.deals, files.pricing || "", files.sheet || "") };
 }
 
 export type RowIssue = { id: string; field: string; value: string };

@@ -94,18 +94,40 @@ async function lockKey(sql: Sql, key: string): Promise<void> {
   await sql.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [key]);
 }
 
-async function mint(sql: Sql, name: "activity" | "comms" | "event"): Promise<number> {
-  const result = await sql.query<{ value: number | string }>(
-    `INSERT INTO id_counters (name, value)
-     VALUES ($1, 1)
-     ON CONFLICT (name) DO UPDATE SET value = id_counters.value + 1
-     RETURNING value`,
-    [name],
-  );
-  return Number(result.rows[0]?.value || 0);
+async function tableIdFloor(sql: Sql, name: "activity" | "comms"): Promise<number> {
+  const prefix = name === "activity" ? "A-" : "CM-";
+  const table = name === "activity" ? "activities" : "comms_entries";
+  const rows = await sql.query<{ entity_id: string }>(`SELECT entity_id FROM ${table}`);
+  let max = 0;
+  for (const row of rows.rows) max = Math.max(max, numericSuffix(prefix, textOf(row.entity_id)));
+  return max;
 }
 
-function formatId(kind: "activity" | "comms" | "event", value: number): string {
+async function mint(sql: Sql, name: "activity" | "comms" | "event"): Promise<number> {
+  if (name === "event") {
+    const result = await sql.query<{ value: number | string }>(
+      `INSERT INTO id_counters (name, value)
+       VALUES ($1, 1)
+       ON CONFLICT (name) DO UPDATE SET value = id_counters.value + 1
+       RETURNING value`,
+      [name],
+    );
+    return Number(result.rows[0]?.value || 0);
+  }
+  // Above the counter and above every id already stored. The import raises the
+  // counter to the highest workbook id, including rows that were not copied in.
+  const counter = await sql.query<{ value: number | string }>(`SELECT value FROM id_counters WHERE name = $1`, [name]);
+  const current = Number(counter.rows[0]?.value || 0);
+  const next = Math.max(current, await tableIdFloor(sql, name)) + 1;
+  await sql.query(
+    `INSERT INTO id_counters (name, value) VALUES ($1, $2)
+     ON CONFLICT (name) DO UPDATE SET value = GREATEST(id_counters.value, EXCLUDED.value)`,
+    [name, next],
+  );
+  return next;
+}
+
+export function formatEntityId(kind: "activity" | "comms" | "event", value: number): string {
   if (kind === "activity") return `A-${String(value).padStart(6, "0")}`;
   if (kind === "comms") return `CM-${String(value).padStart(4, "0")}`;
   return `EV-${String(value).padStart(8, "0")}`;
@@ -141,7 +163,7 @@ async function insertEvent(
     runId: string | null;
   },
 ): Promise<string> {
-  const eventId = formatId("event", await mint(sql, "event"));
+  const eventId = formatEntityId("event", await mint(sql, "event"));
   await sql.query(
     `INSERT INTO events (id, entity_type, entity_id, site_id, payload, source, actor, idempotency_key, run_id)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)`,
@@ -529,7 +551,7 @@ async function applyOne(
     : change.preserve_id && change.entity_id
       ? change.entity_id
       : change.expected_version === 0
-        ? formatId(mintedKind, await mint(sql, mintedKind))
+        ? formatEntityId(mintedKind, await mint(sql, mintedKind))
         : change.entity_id || "";
   const actual = await readVersion(sql, { ...change, entity_id: entityId });
   if (actual !== change.expected_version) throw conflict(change, entityId, actual);

@@ -18,7 +18,7 @@ GENERATED = ROOT / "data" / "generated"
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
-PRIVATE_FILES = {"site_sheet.json"}
+PRIVATE_FILES = {"site_sheet.json", "comms_full.json"}
 
 
 def is_snapshot_file(name: str) -> bool:

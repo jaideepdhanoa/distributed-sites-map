@@ -100,6 +100,43 @@ def read_activity(workbook: Path | None, config: dict, known_ids: set[str] | Non
     return items, warnings
 
 
+def workbook_event_ids(workbook: Path | None, config: dict) -> list[str]:
+    """Every Event ID on the Activity tab. No other cell is read."""
+    if workbook is None or not workbook.exists():
+        return []
+    sheet_name = (config.get("activity") or {}).get("sheet") or "Activity"
+    wb = openpyxl.load_workbook(workbook, read_only=True, data_only=True)
+    if sheet_name not in wb.sheetnames:
+        wb.close()
+        return []
+    rows = list(wb[sheet_name].iter_rows(values_only=True))
+    wb.close()
+    header_at = int((config.get("activity") or {}).get("headerRow") or 1) - 1
+    if header_at < 0 or header_at >= len(rows):
+        return []
+    headers = [_norm(cell) for cell in rows[header_at]]
+    index: dict[str, int] = {}
+    for key, aliases in ((config.get("activity") or {}).get("columns") or {}).items():
+        if key != "eventId":
+            continue
+        for alias in aliases:
+            name = _norm(alias)
+            if name in headers:
+                index[key] = headers.index(name)
+                break
+    if "eventId" not in index:
+        return []
+    found: list[str] = []
+    seen: set[str] = set()
+    for row in rows[header_at + 1 :]:
+        event_id = str(_cell(row, index, "eventId") or "").strip()
+        if not re.fullmatch(r"A-\d{4,}", event_id) or event_id in seen:
+            continue
+        seen.add(event_id)
+        found.append(event_id)
+    return found
+
+
 def broker_contact_dates(workbook: Path | None, config: dict | None = None) -> dict[str, str]:
     """Latest broker email or call per Site ID.
 

@@ -369,10 +369,13 @@ test("the public next step drops outreach, names, and package text", () => {
 
 test("the raw site sheet is not a snapshot file and is not served", () => {
   assert.match(execFileSync("git", ["check-ignore", "-v", "data/generated/site_sheet.json"], { encoding: "utf8" }), /site_sheet\.json/);
+  assert.match(execFileSync("git", ["check-ignore", "-v", "data/generated/comms_full.json"], { encoding: "utf8" }), /comms_full\.json/);
   assert.equal(execFileSync("git", ["ls-files", "--", "data/generated/site_sheet.json"], { encoding: "utf8" }).trim(), "");
   assert.equal(isSnapshotFile("site_sheet.json"), false);
+  assert.equal(isSnapshotFile("comms_full.json"), false);
   assert.equal(isSnapshotFile("deals.geojson"), true);
   assert.throws(() => readGenerated("site_sheet.json"), /not a public snapshot file/);
+  assert.throws(() => readGenerated("comms_full.json"), /not a public snapshot file/);
   assert.equal(mirrorHeaderAllowed("Folder"), false);
   assert.equal(mirrorHeaderAllowed("Broker"), true);
   assert.equal(mirrorHeaderAllowed("Score (of 100)"), false);

@@ -4,9 +4,10 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { applyBatch } from "../../lib/changes/apply";
 import { importChanged } from "../../lib/changes/backfill";
-import { diffDatabase, readDatabaseSlice, renderReport } from "../../lib/changes/diff";
+import { buildReport, diffDatabase, publicDiffReport, readDatabaseSlice, renderReport } from "../../lib/changes/diff";
 import type { Actor } from "../../lib/changes/schema";
-import { workbookFromFiles, type WorkbookSlice } from "../../lib/changes/workbook";
+import { COMMS_FIELDS } from "../../lib/changes/vocab";
+import { workbookFromFiles, type CommsRow, type WorkbookSlice } from "../../lib/changes/workbook";
 import { memorySql } from "../helpers/sql";
 
 const human: Actor = { id: "jaideep", kind: "human", role: "reviewer" };
@@ -93,4 +94,32 @@ test("a backfill is idempotent and the diff is clean until a write drifts", { ti
   assert.ok(drifted.entities.stage.changed.some((row) => row.id === "PIPE-PHX-0001" && row.field === "stage"));
   assert.match(renderReport(drifted), /Clean: no/);
   assert.match(renderReport(drifted), /clean_by_entity: stage no/);
+});
+
+function commsRow(id: string, summary: string, at: string): CommsRow {
+  const row = { entity_id: id, site_id: "PIPE-PHX-0001" } as CommsRow;
+  for (const field of COMMS_FIELDS) row[field] = "";
+  row.summary = summary;
+  row.at = at;
+  row.direction = "in";
+  return row;
+}
+
+test("a clipped comms summary is flagged and a trailing PT is not a change", () => {
+  const full = `${"x".repeat(40)} tail`;
+  const clipped = "x".repeat(40);
+  const empty = { stages: [], activities: [], sites: [] };
+  const report = buildReport(
+    { ...empty, comms: [commsRow("CM-0382", full, "2026-11-06 09:00 PT")] },
+    { ...empty, comms: [commsRow("CM-0382", clipped, "2026-11-06 09:00")] },
+    "files",
+  );
+  assert.equal(report.clean_by_entity.comms, false);
+  const change = report.entities.comms.changed.find((row) => row.id === "CM-0382" && row.field === "summary");
+  assert.equal(change?.truncated, true);
+  assert.equal(report.entities.comms.changed.some((row) => row.field === "at"), false);
+  const rendered = `${renderReport(report)}\n${JSON.stringify(publicDiffReport(report))}`;
+  assert.match(rendered, /CM-0382 summary truncated #[0-9a-f]{12} #[0-9a-f]{12}/);
+  assert.equal(rendered.includes(full), false);
+  assert.equal(rendered.includes(clipped), false);
 });

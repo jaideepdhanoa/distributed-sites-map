@@ -27,7 +27,7 @@ export function generatedContentHash(files: { name: string; body: string }[]): s
   return hashFileDigests(files.map((file) => ({ name: file.name, sha256: contentSha256(file.body) })));
 }
 
-const PRIVATE_FILES = new Set(["site_sheet.json"]);
+const PRIVATE_FILES = new Set(["site_sheet.json", "comms_full.json"]);
 
 export function isSnapshotFile(name: string): boolean {
   if (PRIVATE_FILES.has(name)) return false;

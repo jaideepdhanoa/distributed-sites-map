@@ -30,6 +30,7 @@ jobs:
           MAP_SYNC_INPUTS_FOLDER_ID: ${{ vars.MAP_SYNC_INPUTS_FOLDER_ID }}
           GOOGLE_DRIVE_ROOT_FOLDER_ID: ${{ vars.TIMELINE_SITES_FOLDER_ID }}
           SITE_SHEET_PATH: /tmp/site_sheet.json
+          COMMS_FULL_PATH: /tmp/comms_full.json
         run: |
           if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ] || [ -z "$MAP_SYNC_INPUTS_FOLDER_ID" ]; then
             echo "The private sheet was not built. The diff skips raw site cells."
@@ -38,6 +39,7 @@ jobs:
           python scripts/sync_workbook.py
           python scripts/build_data.py
           test ! -e data/generated/site_sheet.json
+          test ! -e data/generated/comms_full.json
       - name: Diff production
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -56,6 +58,9 @@ jobs:
           fi
           if [ -s /tmp/site_sheet.json ]; then
             export SITE_SHEET_PATH=/tmp/site_sheet.json
+          fi
+          if [ -s /tmp/comms_full.json ]; then
+            export COMMS_FULL_PATH=/tmp/comms_full.json
           fi
           npx tsx scripts/shadow-job.ts
       - uses: actions/upload-artifact@v4

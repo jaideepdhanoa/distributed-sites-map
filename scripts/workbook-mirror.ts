@@ -11,6 +11,7 @@ import {
   MIRROR_SHEETS_SCOPE,
   SPREADSHEET_ID,
   a1,
+  assertMirrorRefusals,
   assertPlannedWrites,
   assertReadBack,
   assertWorkbookMirrorAllowed,
@@ -25,6 +26,7 @@ import {
   planSiteMirror,
   planStageMirror,
   recordMirrorRun,
+  sheetIdFloor,
   stageTabs,
   type CellChange,
   type SheetRender,
@@ -159,9 +161,12 @@ async function main(): Promise<void> {
   if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set.");
   const token = await sheetsToken(raw);
   const changes: CellChange[] = [];
+  const refused: string[] = [];
+  const held: { id: string; header: string }[] = [];
   let skippedProtected = 0;
   let appended = 0;
   let unmatched = 0;
+  let activitySheetFloor = 0;
   if (selected.includes("stage")) {
     const tables = [];
     for (const tab of stageTabs()) {
@@ -195,11 +200,14 @@ async function main(): Promise<void> {
       ["summary"],
       ["source link", "source_link"],
     ]);
+    activitySheetFloor = sheetIdFloor(table, ["event id"], "A-");
     const plan = planActivityMirror(table, rows.activities);
     changes.push(...plan.changes);
     skippedProtected += plan.skippedProtected;
     appended += plan.appended;
     unmatched += plan.unmatched.length;
+    refused.push(...plan.refused);
+    held.push(...plan.held);
   }
   if (selected.includes("comms")) {
     const table = await loadTable(token, COMMS_SHEET, COMMS_HEADER_ROW, [
@@ -226,6 +234,8 @@ async function main(): Promise<void> {
     skippedProtected += plan.skippedProtected;
     appended += plan.appended;
     unmatched += plan.unmatched.length;
+    refused.push(...plan.refused);
+    held.push(...plan.held);
   }
   assertPlannedWrites(changes);
   const byEntity = entityChangeCounts(changes);
@@ -238,15 +248,26 @@ async function main(): Promise<void> {
     appended,
     unmatched,
     skipped_protected: skippedProtected,
+    refused: refused.length,
+    held_truncations: held.length,
+    activity_sheet_floor: activitySheetFloor,
   };
   const preview = formatPlan(changes);
   const counted = formatPlanSummary(changes);
+  const heldIds = [...new Set(held.map((row) => row.id))];
+  const notes = [
+    counted,
+    `activity_sheet_floor ${activitySheetFloor}`,
+    `refused ${refused.length}${refused.length ? ` ${refused.join(", ")}` : ""}`,
+    `held_truncations ${held.length}${heldIds.length ? ` ${heldIds.join(", ")}` : ""}`,
+  ].join("\n");
+  console.log(notes);
+  console.log(preview);
   if (dryRun) {
-    console.log(counted);
-    console.log(preview);
-    summary(`## Workbook mirror dry run\n\nNothing was written.\n\n${counted}\n\n\`\`\`\n${preview.slice(0, 8000)}\n\`\`\`\n`);
-    return;
+    summary(`## Workbook mirror dry run\n\nNothing was written.\n\n${notes}\n\n\`\`\`\n${preview.slice(0, 8000)}\n\`\`\`\n`);
   }
+  assertMirrorRefusals(refused);
+  if (dryRun) return;
   try {
     await writeCells(token, changes);
     assertReadBack(changes, await readBack(token, changes));

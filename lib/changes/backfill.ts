@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/actions/db";
 import { applyParsedChanges, numericSuffix, raiseIdFloor } from "./apply";
 import type { Actor, ParsedChange } from "./schema";
 import { importEntityFromWorkbook } from "./flags";
-import { SITE_COMPARE_FIELDS, fieldsOf, parseSheet, siteComparable } from "./site";
+import { SITE_COMPARE_FIELDS, fieldsOf, isTruncatedCell, parseSheet, siteComparable } from "./site";
 import { COMMS_FIELDS, type ActivityType, type Market, type ServiceAreaClass, type StageName } from "./vocab";
 import { issueIds, workbookIssues, type ActivityRow, type CommsRow, type StageRow, type WorkbookSlice } from "./workbook";
 import { readDatabaseSlice } from "./diff";
@@ -158,7 +158,9 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
       if (invalidComms.has(row.entity_id)) continue;
       const prior = currentComms.get(row.entity_id);
       const fields = ["site_id", ...COMMS_FIELDS] as const;
-      if (prior && sameFields(commsFields(prior), commsFields(row), fields)) {
+      const incoming = commsFields(row);
+      if (prior && isTruncatedCell(prior.summary, incoming.summary)) incoming.summary = prior.summary;
+      if (prior && sameFields(commsFields(prior), incoming, fields)) {
         counts.unchanged.comms += 1;
         continue;
       }
@@ -175,7 +177,7 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
           person: row.person,
           firm: row.firm,
           channel: row.channel,
-          summary: row.summary,
+          summary: incoming.summary,
           subject: row.subject,
           site_ids: row.site_ids,
           thread_id: row.thread_id,
@@ -217,7 +219,16 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
     }
   }
 
-  await raiseIdFloor(sql, "activity", Math.max(0, ...slice.activities.map((row) => numericSuffix("A-", row.entity_id))));
+  const workbookActivityIds = slice.workbookActivityIds || [];
+  await raiseIdFloor(
+    sql,
+    "activity",
+    Math.max(
+      0,
+      ...slice.activities.map((row) => numericSuffix("A-", row.entity_id)),
+      ...workbookActivityIds.map((id) => numericSuffix("A-", id)),
+    ),
+  );
   await raiseIdFloor(sql, "comms", Math.max(0, ...slice.comms.map((row) => numericSuffix("CM-", row.entity_id))));
   if (!changes.length) return counts;
   const digest = createHash("sha256").update(JSON.stringify(changes)).digest("hex").slice(0, 24);

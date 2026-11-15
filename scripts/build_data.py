@@ -5223,6 +5223,11 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
         write_financials_file(workbook, OUT / "financials.json", reg)
         write_nda_file(workbook, OUT / "nda.json")
         write_comms_file(workbook, OUT / "comms.json")
+        full_comms = os.environ.get("COMMS_FULL_PATH", "").strip()
+        if full_comms:
+            from scripts.comms import write_full_comms_file
+
+            write_full_comms_file(workbook, Path(full_comms))
         write_open_loops_file(workbook, OUT / "open-loops.json")
         (OUT / "parcels.geojson").write_text(json.dumps(parcels_fc))
         for city_code in ("PHX", "LAS", "MIA"):

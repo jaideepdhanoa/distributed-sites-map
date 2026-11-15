@@ -2,6 +2,8 @@
 data/source/
 # Raw workbook cells. The build writes this only when SITE_SHEET_PATH is set, outside this tree.
 data/generated/site_sheet.json
+# Full comms summaries. The build writes this only when COMMS_FULL_PATH is set, outside this tree.
+data/generated/comms_full.json
 node_modules
 .next
 .vercel/

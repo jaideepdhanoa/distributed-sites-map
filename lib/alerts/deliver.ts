@@ -8,6 +8,7 @@ import { DAILY_CAP, batchWindowMs, losAngelesParts, stampOf } from "./clock";
 import { renderBatch, type MailItem } from "./compose";
 import { discussionHref, proposalHref, reviewHomeHref } from "./links";
 import { digestEnabled, loadPreferences, shouldSendDigest, type AlertCategory } from "./preferences";
+import { emptyBrief, loadDigestBrief } from "./summary";
 import { accountEmail } from "./recipients";
 import { alertFrom, alertReplyTo, liveMailAllowed, mailTransport } from "./transport";
 
@@ -88,7 +89,17 @@ async function claimLog(
 
 export async function deliverRows(
   sql: Sql,
-  input: { userId: string; email: string; rows: OutboxRow[]; extra?: MailItem[]; key: string; now?: Date; subjectPrefix?: string; kind?: "instant" | "digest" | "updates" | "catchup" },
+  input: {
+    userId: string;
+    email: string;
+    rows: OutboxRow[];
+    extra?: MailItem[];
+    key: string;
+    now?: Date;
+    subjectPrefix?: string;
+    subject?: string;
+    kind?: "instant" | "digest" | "updates" | "catchup";
+  },
 ): Promise<string> {
   const now = input.now || new Date();
   const day = losAngelesParts(now).day;
@@ -99,7 +110,8 @@ export async function deliverRows(
     await markRows(sql, input.rows.map((row) => row.id), "skipped", input.key);
     return "skipped";
   }
-  const subject = input.subjectPrefix ? `${input.subjectPrefix} ${rendered.subject}`.replace(/\s+/g, " ").trim() : rendered.subject;
+  const base = input.subject?.trim() || rendered.subject;
+  const subject = input.subjectPrefix ? `${input.subjectPrefix} ${base}`.replace(/\s+/g, " ").trim() : base;
   if (input.key.startsWith("batch:")) {
     await sql.query(
       `DELETE FROM alert_log
@@ -351,22 +363,25 @@ export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
       [user.u],
     );
     const since = prior.rows[0] ? new Date(stampOf(prior.rows[0].sent_at)) : new Date(0);
-    const followed = digestEnabled(prefs) ? await followedItems(sql, user.u, since) : [];
-    let queueCount = 0;
-    if (digestEnabled(prefs)) {
-      const { loadQueue } = await import("@/lib/queue/load");
-      const queue = await loadQueue(sql, user.u, { market: "all", viable: true }, resolveActionRole(user) === "reviewer");
-      queueCount = queue.items.length;
-    }
     const digestOn = digestEnabled(prefs);
-    if (!shouldSendDigest({ items: pending.rows.length + followed.length, queueCount, digestOn })) continue;
-    const extra = [...followed];
-    if (queueCount > 0) {
+    const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const followed = digestOn ? await followedItems(sql, user.u, since) : [];
+    const brief = digestOn ? await loadDigestBrief(sql, { userId: user.u, since: windowStart, prefs }) : emptyBrief();
+    let queueCount = 0;
+    if (digestOn) {
+      const { loadQueue } = await import("@/lib/queue/load");
+      const { isExcludedSite } = await import("./excluded");
+      const queue = await loadQueue(sql, user.u, { market: "all", viable: true }, resolveActionRole(user) === "reviewer");
+      queueCount = queue.items.filter((item) => !isExcludedSite(item.siteId)).length;
+    }
+    if (!shouldSendDigest({ items: pending.rows.length + followed.length + brief.items.length, queueCount, digestOn })) continue;
+    const extra = [...brief.items, ...followed];
+    if (digestOn) {
       extra.unshift({
         category: "queue",
         siteId: "",
         siteLabel: "",
-        summary: `${queueCount} waiting in Review`,
+        summary: queueCount > 0 ? `${queueCount} waiting in Review` : "Nothing is waiting in Review.",
         authorId: user.u,
         href: reviewHomeHref(),
       });

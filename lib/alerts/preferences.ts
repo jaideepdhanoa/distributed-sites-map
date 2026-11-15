@@ -2,11 +2,23 @@ import { resolveActionRole, type ActionRole } from "@/lib/actions/roles";
 import type { Sql } from "@/lib/actions/db";
 import { getUsers } from "@/lib/users";
 
-export const ALERT_CATEGORIES = ["approvals", "mentions", "replies", "flags", "assignments"] as const;
+export const ALERT_CATEGORIES = [
+  "approvals",
+  "mentions",
+  "replies",
+  "flags",
+  "assignments",
+  "recommendations",
+  "proposals",
+  "decisions",
+  "stages",
+] as const;
 export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
 export type AlertMode = "instant" | "digest" | "off";
 
 export type AlertPreferences = Record<AlertCategory, AlertMode> & { followed: AlertMode };
+
+const PREFERENCE_FIELDS = [...ALERT_CATEGORIES, "followed"] as const;
 
 const MODES = new Set<AlertMode>(["instant", "digest", "off"]);
 
@@ -18,6 +30,10 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
       replies: "instant",
       flags: "instant",
       assignments: "instant",
+      recommendations: "instant",
+      proposals: "instant",
+      decisions: "instant",
+      stages: "instant",
       followed: "digest",
     };
   }
@@ -28,6 +44,10 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
       replies: "instant",
       flags: "instant",
       assignments: "instant",
+      recommendations: "digest",
+      proposals: "digest",
+      decisions: "digest",
+      stages: "digest",
       followed: "digest",
     };
   }
@@ -37,6 +57,10 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
     replies: "off",
     flags: "off",
     assignments: "off",
+    recommendations: "off",
+    proposals: "off",
+    decisions: "off",
+    stages: "off",
     followed: "off",
   };
 }
@@ -59,24 +83,27 @@ export function parsePreferences(value: unknown, fallback: AlertPreferences): Al
     replies: mode(row.replies, fallback.replies),
     flags: mode(row.flags, fallback.flags),
     assignments: mode(row.assignments, fallback.assignments),
+    recommendations: mode(row.recommendations, fallback.recommendations),
+    proposals: mode(row.proposals, fallback.proposals),
+    decisions: mode(row.decisions, fallback.decisions),
+    stages: mode(row.stages, fallback.stages),
     followed: mode(row.followed, fallback.followed),
   };
 }
 
-type PrefRow = {
-  approvals: string;
-  mentions: string;
-  replies: string;
-  flags: string;
-  assignments: string;
-  followed: string;
-};
+async function storedColumns(sql: Sql): Promise<Set<string>> {
+  const rows = await sql.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'alert_preferences'`,
+  );
+  return new Set(rows.rows.map((row) => row.column_name));
+}
 
 export async function loadPreferences(sql: Sql, userId: string): Promise<AlertPreferences | null> {
   const base = preferencesForRole(userId);
   if (!base) return null;
-  const rows = await sql.query<PrefRow>(
-    `SELECT approvals, mentions, replies, flags, assignments, followed FROM alert_preferences WHERE user_id = $1`,
+  const rows = await sql.query<Record<string, unknown>>(
+    `SELECT * FROM alert_preferences WHERE user_id = $1`,
     [userId],
   );
   const stored = rows.rows[0];
@@ -87,18 +114,19 @@ export async function savePreferences(sql: Sql, userId: string, value: unknown):
   const base = preferencesForRole(userId);
   if (!base) return null;
   const next = parsePreferences(value, base);
+  const have = await storedColumns(sql);
+  const fields = PREFERENCE_FIELDS.filter((field) => have.has(field));
+  const columns = ["user_id", ...fields, "updated_at"];
+  const values: unknown[] = [userId, ...fields.map((field) => next[field])];
+  const marks = values.map((_, index) => `$${index + 1}`);
+  marks.push("now()");
+  const assignments = fields.map((field) => `${field} = EXCLUDED.${field}`);
+  assignments.push("updated_at = now()");
   await sql.query(
-    `INSERT INTO alert_preferences (user_id, approvals, mentions, replies, flags, assignments, followed, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
-     ON CONFLICT (user_id) DO UPDATE SET
-       approvals = EXCLUDED.approvals,
-       mentions = EXCLUDED.mentions,
-       replies = EXCLUDED.replies,
-       flags = EXCLUDED.flags,
-       assignments = EXCLUDED.assignments,
-       followed = EXCLUDED.followed,
-       updated_at = now()`,
-    [userId, next.approvals, next.mentions, next.replies, next.flags, next.assignments, next.followed],
+    `INSERT INTO alert_preferences (${columns.join(", ")})
+     VALUES (${marks.join(", ")})
+     ON CONFLICT (user_id) DO UPDATE SET ${assignments.join(", ")}`,
+    values,
   );
   return next;
 }
@@ -107,8 +135,8 @@ export function digestEnabled(prefs: AlertPreferences): boolean {
   return prefs.followed === "digest" || prefs.followed === "instant";
 }
 
-/** A digest goes out only when a followed-site note, a digest item, or a waiting Review count exists. */
+/** The morning digest sends every day it is on, including quiet mornings. Pending digest mail still goes out when the digest is off. */
 export function shouldSendDigest(input: { items: number; queueCount: number; digestOn: boolean }): boolean {
-  if (input.items > 0) return true;
-  return input.digestOn && input.queueCount > 0;
+  if (input.digestOn) return true;
+  return input.items > 0;
 }

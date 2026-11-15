@@ -1,4 +1,5 @@
 import { absoluteSiteUrl } from "@/lib/agent/links";
+import { isExcludedSite } from "./excluded";
 
 const PRODUCTION_ORIGIN = "https://distributedsites.com";
 
@@ -45,6 +46,12 @@ export function reviewHomeHref(): string {
   return `${appOrigin()}/?view=review`;
 }
 
+/** Opens the site on the map. The quarantined site never gets a link. */
+export function siteHref(siteId: string): string {
+  if (isExcludedSite(siteId)) return reviewHomeHref();
+  return absoluteSiteUrl(appOrigin(), "ask_gap", siteId);
+}
+
 export function settingsHref(): string {
   return `${appOrigin()}/?alerts=1`;
 }
@@ -52,12 +59,21 @@ export function settingsHref(): string {
 type MailLink = { category: string; siteId: string; href?: string };
 
 /** The same absolute site link the agent feed uses, always on the production host. */
+function proposalLink(href: string | undefined): boolean {
+  return Boolean(href && /[?&]panel=proposal(?:&|$)/.test(href));
+}
+
 export function mailLink(item: MailLink): string {
   const siteId = item.siteId.trim();
-  if (item.category === "queue" || !siteId) return reviewHomeHref();
+  if (item.category === "queue" || item.category === "brief" || !siteId) return reviewHomeHref();
+  if (isExcludedSite(siteId)) return reviewHomeHref();
   if (siteId === "portfolio") return homeHref();
   if (item.category === "flags") return reviewHref(siteId);
-  if (item.category === "approvals" || item.category === "assignments") return proposalHref(siteId);
-  if (item.category === "followed" && item.href && /[?&]panel=proposal(?:&|$)/.test(item.href)) return proposalHref(siteId);
+  if (item.category === "stages" || item.category === "activity" || item.category === "comms") return siteHref(siteId);
+  if (item.category === "decisions" && !proposalLink(item.href)) return siteHref(siteId);
+  if (item.category === "approvals" || item.category === "assignments" || item.category === "proposals" || item.category === "decisions") {
+    return proposalHref(siteId);
+  }
+  if ((item.category === "followed" || item.category === "recommendations") && proposalLink(item.href)) return proposalHref(siteId);
   return discussionHref(siteId);
 }

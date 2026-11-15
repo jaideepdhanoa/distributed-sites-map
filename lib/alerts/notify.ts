@@ -6,6 +6,7 @@ import { getUsers } from "@/lib/users";
 import { discussionHref, proposalHref, reviewHref } from "./links";
 import { batchWindowMs } from "./clock";
 import { enqueueAlert, flushInstant } from "./deliver";
+import { isExcludedSite } from "./excluded";
 import { scheduleInstantFlush } from "./schedule";
 import { loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
@@ -69,6 +70,34 @@ async function queueFor(
 
 function reviewerIds(): string[] {
   return getUsers().filter((user) => resolveActionRole(user) === "reviewer").map((user) => user.u);
+}
+
+export function reviewerRecipients(): string[] {
+  return reviewerIds();
+}
+
+async function finishInstant(sql: Sql, instant: boolean): Promise<void> {
+  if (!instant) return;
+  await flushQueued(sql);
+}
+
+/** Queue one alert for an agent write. The author is never a recipient. The quarantined site is skipped. */
+export async function queueAgentAlert(
+  sql: Sql,
+  input: {
+    actorId: string;
+    userIds: string[];
+    category: AlertCategory;
+    siteId: string;
+    summary: string;
+    href: string;
+    refId: string;
+  },
+): Promise<boolean> {
+  if (isExcludedSite(input.siteId)) return false;
+  const instant = await queueFor(sql, input);
+  await finishInstant(sql, instant);
+  return instant;
 }
 
 export async function notifyNote(

@@ -6,6 +6,9 @@ const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, s
 const SERIF = "Georgia, 'Times New Roman', Times, serif";
 
 const SECTIONS: { title: string; categories: MailItem["category"][] }[] = [
+  { title: "Waiting on you", categories: ["recommendations", "proposals", "decisions"] },
+  { title: "Stage changes", categories: ["stages"] },
+  { title: "Activity and comms", categories: ["activity", "comms"] },
   { title: "Needs your approval", categories: ["approvals"] },
   { title: "Mentions & replies", categories: ["mentions", "replies", "followed"] },
   { title: "Assigned to you", categories: ["assignments"] },
@@ -50,18 +53,26 @@ export function instantSubject(item: MailItem): string {
   if (item.category === "replies") return `${who} replied on ${name}`;
   if (item.category === "flags") return `${who} flagged ${name} for you`;
   if (item.category === "assignments") return `${who} assigned ${name} to you`;
+  if (item.category === "recommendations") return `${who} left a recommendation on ${name}`;
+  if (item.category === "proposals") return market ? `Proposal waiting: ${name} (${market})` : `Proposal waiting: ${name}`;
+  if (item.category === "decisions") return market ? `Decision needed: ${name} (${market})` : `Decision needed: ${name}`;
+  if (item.category === "stages") return market ? `Stage change: ${name} (${market})` : `Stage change: ${name}`;
   return `${categoryLabel(item.category)}: ${name}`;
 }
 
 export function digestSubject(items: MailItem[], now: Date): string {
-  const count = items.filter((item) => item.category !== "queue").length;
+  const count = items.filter((item) => item.category !== "queue" && item.category !== "brief").length;
   const date = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     weekday: "short",
     month: "short",
     day: "numeric",
   }).format(now).replace(/,/g, "");
-  if (!count) return `Distributed Sites daily digest · ${date} · Review`;
+  if (!count) {
+    const review = items.find((item) => item.category === "queue");
+    if (review && !/^Nothing\b/.test(review.summary)) return `Distributed Sites daily digest · ${date} · Review`;
+    return `Distributed Sites daily digest · ${date} · Quiet`;
+  }
   const noun = count === 1 ? "item" : "items";
   return `Distributed Sites daily digest · ${date} · ${count} ${noun}`;
 }
@@ -83,6 +94,11 @@ function actionLine(item: MailItem): string {
   if (item.category === "replies") return `${who} replied.`;
   if (item.category === "flags") return `${who} flagged this for you.`;
   if (item.category === "assignments") return `${who} assigned this to you.`;
+  if (item.category === "recommendations") return `${who} left a recommendation.`;
+  if (item.category === "proposals") return `${who} sent a proposal.`;
+  if (item.category === "decisions") return `${who} asked for a decision.`;
+  if (item.category === "stages") return `${who} changed the stage.`;
+  if (item.category === "activity" || item.category === "comms" || item.category === "brief" || item.category === "queue") return "";
   return `${who} added a note.`;
 }
 
@@ -92,6 +108,10 @@ function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchu
   if (category === "replies") return "You received this because someone replied on a thread you are part of.";
   if (category === "flags") return "You received this because someone flagged a site for you.";
   if (category === "assignments") return "You received this because a site was assigned to you.";
+  if (category === "recommendations") return "You received this because an agent left a recommendation for you.";
+  if (category === "proposals") return "You received this because a proposal is waiting on you.";
+  if (category === "decisions") return "You received this because a decision is waiting on you.";
+  if (category === "stages") return "You received this because an agent changed a stage.";
   if (category === "updates") return "You received this because several updates arrived together.";
   if (category === "catchup") return "You received this because these updates were waiting to be sent.";
   return "You received this because it is your daily digest.";
@@ -99,7 +119,11 @@ function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchu
 
 function buttonLabel(item: MailItem): string {
   if (item.siteId === "portfolio") return "Open the map";
-  if (item.category === "approvals" || item.category === "assignments") return "Open the proposal";
+  if (item.category === "approvals" || item.category === "assignments" || item.category === "proposals") return "Open the proposal";
+  if (item.category === "decisions" && item.href && !/[?&]panel=proposal(?:&|$)/.test(item.href)) return "Open the site";
+  if (item.category === "decisions") return "Open the proposal";
+  if (item.category === "recommendations") return "Open the recommendation";
+  if (item.category === "stages" || item.category === "activity" || item.category === "comms") return "Open the site";
   if (item.category === "flags") return "Open in Review";
   if (item.category === "mentions" || item.category === "replies" || item.category === "followed") return "Reply in Discussion";
   return "Open in Review";
@@ -210,7 +234,7 @@ function batchHeading(tone: BatchTone): string {
 }
 
 function batchSubject(items: MailItem[], now: Date, tone: BatchTone): string {
-  const count = items.filter((item) => item.category !== "queue").length;
+  const count = items.filter((item) => item.category !== "queue" && item.category !== "brief").length;
   if (tone === "catchup") return catchUpSubject(count);
   if (tone === "updates") return updatesSubject(count);
   return digestSubject(items, now);
@@ -221,7 +245,7 @@ function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: 
   const heading = batchHeading(tone);
   const textLines = ["Distributed Sites", "", heading];
   const html: string[] = [eyebrow(heading)];
-  for (const item of items.filter((row) => row.category === "queue")) {
+  for (const item of items.filter((row) => row.category === "queue" || row.category === "brief")) {
     const line = clean(item.summary, 180) || "Waiting in Review.";
     textLines.push(line);
     html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.45;color:#1c1914;">${esc(line)}</td></tr>`);
@@ -254,14 +278,14 @@ function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: 
 export type AlertKind = "instant" | "digest" | "updates" | "catchup";
 
 export function renderAlert(items: MailItem[], options?: { now?: Date; kind?: AlertKind; settingsHref?: string }): RenderedMail | null {
-  const content = items.filter((item) => item.category !== "queue");
-  const queued = items.some((item) => item.category === "queue");
-  if (!content.length && !queued) return null;
+  const content = items.filter((item) => item.category !== "queue" && item.category !== "brief");
+  const framed = items.some((item) => item.category === "queue" || item.category === "brief");
+  if (!content.length && !framed) return null;
   const now = options?.now || new Date();
   const settings = options?.settingsHref || settingsHref();
   const tone: BatchTone = options?.kind === "digest" || options?.kind === "updates" || options?.kind === "catchup" ? options.kind : "updates";
-  const oneInstant = options?.kind !== "digest" && options?.kind !== "updates" && options?.kind !== "catchup" && content.length === 1 && !queued;
-  const rendered = oneInstant ? renderInstant(content[0], settings) : renderDigest(content, now, settings, tone);
+  const oneInstant = options?.kind !== "digest" && options?.kind !== "updates" && options?.kind !== "catchup" && content.length === 1 && !framed;
+  const rendered = oneInstant ? renderInstant(content[0], settings) : renderDigest(items, now, settings, tone);
   const screened = screenEmail(rendered.subject, rendered.text);
   if (!screened) return null;
   return { subject: screened.subject, body: screened.body, html: shell(rendered.rows) };

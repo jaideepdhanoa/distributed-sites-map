@@ -5,6 +5,7 @@ import { migrate, whenReady } from "@/lib/actions/migrate";
 import { InputError } from "@/lib/actions/text";
 import { privateHeaders } from "@/lib/guard";
 import { PolicyError } from "@/lib/policy/banned";
+import { notifyAppliedChanges } from "@/lib/alerts/agentWrite";
 import { actorFromRequest, isActor } from "@/lib/changes/auth";
 import { applyBatch, IdempotencyConflictError, VersionConflictError } from "@/lib/changes/apply";
 import { cookieWriteAllowed } from "@/lib/changes/csrf";
@@ -35,7 +36,17 @@ export async function POST(request: Request) {
     await whenReady(() => withSql(async (sql) => {
       await migrate(sql);
     }));
-    const result = await withSql((sql) => applyBatch(sql, actor, request.headers.get("idempotency-key") || "", body));
+    const result = await withSql(async (sql) => {
+      const applied = await applyBatch(sql, actor, request.headers.get("idempotency-key") || "", body);
+      if (!applied.replayed) {
+        try {
+          await notifyAppliedChanges(sql, actor, applied.results);
+        } catch (error) {
+          console.error(JSON.stringify({ event: "agent_alert_error", name: error instanceof Error ? error.name : "error" }));
+        }
+      }
+      return applied;
+    });
     return jsonOk(result);
   } catch (error) {
     if (error instanceof VersionConflictError || error instanceof IdempotencyConflictError) {

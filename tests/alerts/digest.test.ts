@@ -28,8 +28,9 @@ test("the digest uses the Pacific day and sends at most once per user that day",
     const summer = new Date("2026-07-09T15:30:00.000Z");
     assert.equal(await sendDigests(sql, winter), 1);
     assert.equal(await sendDigests(sql, winter), 0);
-    const winterLogs = await sql.query(`SELECT id FROM alert_log`);
+    const winterLogs = await sql.query<{ id: string; body: string; subject: string }>(`SELECT id, body, subject FROM alert_log`);
     assert.equal(winterLogs.rows.length, 1);
+    assert.equal(winterLogs.rows.some((row) => row.body.includes("PIPE-PHX-0006") || row.subject.includes("PIPE-PHX-0006")), false);
     assert.equal(await sendDigests(sql, summer), 1);
     const summerLogs = await sql.query(`SELECT id FROM alert_log`);
     assert.equal(summerLogs.rows.length, 2);

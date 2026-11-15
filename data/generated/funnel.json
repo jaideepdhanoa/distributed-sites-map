@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-11-12T19:41:57Z",
-  "workbook_as_of": "2026-11-12",
+  "generated_at": "2026-11-15T06:08:30Z",
+  "workbook_as_of": "2026-11-15",
   "stages": [
     {
       "id": "census",
       "name": "Census rows",
       "unit": "rows",
-      "total": 1751,
+      "total": 1821,
       "by_city": {
-        "LAS": 440,
-        "PHX": 593,
-        "MIA": 717,
+        "LAS": 447,
+        "PHX": 655,
+        "MIA": 718,
         "SNA": 1
       },
       "note": "Workbook Universe tab. A census union, not a count of operating businesses. The Universe step keeps the rows marked counted, one site each."
@@ -19,11 +19,11 @@
       "id": "unique",
       "name": "Unique sites",
       "unit": "sites",
-      "total": 1707,
+      "total": 1777,
       "by_city": {
-        "LAS": 429,
-        "PHX": 587,
-        "MIA": 691
+        "LAS": 436,
+        "PHX": 649,
+        "MIA": 692
       },
       "by_class": {
         "Gas-attached": 512,
@@ -35,19 +35,19 @@
         "Licence-only": 18,
         "Closed": 1,
         "Quarantined": 3,
-        "Unknown": 49
+        "Unknown": 119
       },
-      "note": "Counted rows on the Universe tab: 1707. The tab has 1751 rows in all. Census file records not on a counted row are left out (24)."
+      "note": "Counted rows on the Universe tab: 1777. The tab has 1821 rows in all. Census file records not on a counted row are left out (24)."
     },
     {
       "id": "in_area",
       "name": "Service area",
       "unit": "sites",
-      "total": 1081,
+      "total": 1160,
       "by_city": {
-        "LAS": 186,
-        "PHX": 283,
-        "MIA": 612
+        "LAS": 193,
+        "PHX": 354,
+        "MIA": 613
       },
       "by_class": {
         "Gas-attached": 406,
@@ -56,7 +56,8 @@
         "Not a wash": 45,
         "Licence-only": 15,
         "Quarantined": 2,
-        "Unknown": 38
+        "Out of area": 8,
+        "Unknown": 109
       },
       "by_city_class": {
         "LAS": {
@@ -66,13 +67,14 @@
           "Not a wash": 31,
           "Licence-only": 3,
           "Quarantined": 2,
-          "Unknown": 7
+          "Unknown": 14
         },
         "PHX": {
           "Embedded": 63,
           "Gas-attached": 63,
           "Core": 128,
-          "Unknown": 29
+          "Out of area": 8,
+          "Unknown": 92
         },
         "MIA": {
           "Gas-attached": 291,
@@ -80,32 +82,31 @@
           "Embedded": 168,
           "Not a wash": 14,
           "Licence-only": 12,
-          "Unknown": 2
+          "Unknown": 3
         }
       },
-      "note": "Service area comes from the Universe tab. Inside, Near 0-5, and Near 5-10 pass. Outside, more than 10.0 miles from the polygon, is a knock-out. Legacy In and Yes count as Inside. Legacy No and Out count as Outside. Legacy Edge stays its own class, edge (not re-measured), and passes, because those rows were not measured again under the four-class rule. Unknown stays out. The step is split by class so Near is not counted as Inside. Las Vegas rings 200 and 300 stay on the expansion horizon when they do not pass.",
       "by_service_area": {
         "inside": {
-          "total": 1081,
+          "total": 1087,
           "by_city": {
-            "LAS": 186,
-            "PHX": 283,
+            "LAS": 187,
+            "PHX": 288,
             "MIA": 612
           }
         },
         "near_0_5": {
-          "total": 0,
+          "total": 47,
           "by_city": {
-            "LAS": 0,
-            "PHX": 0,
-            "MIA": 0
+            "LAS": 6,
+            "PHX": 40,
+            "MIA": 1
           }
         },
         "near_5_10": {
-          "total": 0,
+          "total": 26,
           "by_city": {
             "LAS": 0,
-            "PHX": 0,
+            "PHX": 26,
             "MIA": 0
           }
         },
@@ -117,18 +118,37 @@
             "MIA": 0
           }
         }
-      }
+      },
+      "service_area_excluded": {
+        "outside": {
+          "total": 604,
+          "by_city": {
+            "LAS": 237,
+            "PHX": 295,
+            "MIA": 72
+          }
+        },
+        "unknown": {
+          "total": 13,
+          "by_city": {
+            "LAS": 6,
+            "PHX": 0,
+            "MIA": 7
+          }
+        }
+      },
+      "note": "Service area comes from the Universe tab. Inside, Near 0-5, and Near 5-10 pass. Outside, more than 10.0 miles from the polygon, is a knock-out. Legacy In and Yes count as Inside. Legacy No and Out count as Outside. Legacy Edge stays its own class, edge (not re-measured), and passes, because those rows were not measured again under the four-class rule. Unknown stays out. The step is split by class so Near is not counted as Inside. Las Vegas rings 200 and 300 stay on the expansion horizon when they do not pass."
     },
     {
       "id": "land_tier",
       "name": "Land tier",
       "unit": "sites",
-      "total": 39,
+      "total": 40,
       "L10": {
-        "total": 21,
+        "total": 22,
         "by_city": {
           "LAS": 6,
-          "PHX": 11,
+          "PHX": 12,
           "MIA": 4
         },
         "county_checked": 21,
@@ -148,6 +168,7 @@
           "PHX-U210",
           "PHX-U236",
           "PHX-U252",
+          "PHX-U274",
           "PHX-U462",
           "PHX-U476",
           "PHX-U510",
@@ -218,9 +239,9 @@
       "id": "verified",
       "name": "Verified",
       "unit": "sites",
-      "total": 39,
+      "total": 40,
       "county_checked": 39,
-      "pending": 0,
+      "pending": 1,
       "by_city_checked": {
         "LAS": 10,
         "PHX": 19,
@@ -228,7 +249,7 @@
       },
       "by_city_pending": {
         "LAS": 0,
-        "PHX": 0,
+        "PHX": 1,
         "MIA": 0
       },
       "note": "Among in-area L10 and L4. County-checked sites have a verdict and evidence. The rest are aerial only, pending verification. New verdict files dropped in data/source/incoming are picked up on the next data build."
@@ -339,23 +360,23 @@
       "id": "listed",
       "name": "Of which listed",
       "unit": "sites",
-      "total": 2,
+      "total": 3,
       "by_city": {
         "LAS": 1,
-        "PHX": 0,
+        "PHX": 1,
         "MIA": 1
       },
-      "of": 39,
+      "of": 40,
       "note": "Split of the in-area L10 and L4 sites that are not eliminated. Off-market rows are not listed. Nobody drops at this step."
     },
     {
       "id": "contacted",
       "name": "Deals contacted",
       "unit": "deals",
-      "total": 56,
+      "total": 94,
       "by_city": {
-        "LAS": 16,
-        "PHX": 34,
+        "LAS": 18,
+        "PHX": 70,
         "MIA": 6
       },
       "note": "Deals in this city, in the categories you have on, with an outbound email or call to the broker on file. Dropped deals stay out. Census sites are a separate count."
@@ -392,6 +413,7 @@
       "PHX-U232",
       "PHX-U236",
       "PHX-U252",
+      "PHX-U274",
       "PHX-U462",
       "PHX-U463",
       "PHX-U476",

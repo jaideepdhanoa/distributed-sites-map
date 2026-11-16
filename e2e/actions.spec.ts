@@ -477,13 +477,16 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await openAs(page, "reviewer", "/?funnel=pipeline&pstage=desk&view=list");
   await expect(page.getByTestId("pipeline-list")).toBeVisible();
   await expect(page.getByTestId("pipeline-list")).not.toContainText("Sinclair");
-  await page.getByRole("textbox", { name: "Search" }).first().fill("Sinclair");
-  await expect(page.getByTestId("search-hits")).toBeVisible();
-  await expect(page.getByTestId("search-hits")).not.toContainText("PIPE-PHX-0067");
-  await page.getByRole("textbox", { name: "Search" }).first().fill("PIPE-MIA-0075");
-  await expect(page.getByTestId("search-hits")).not.toContainText("PIPE-MIA-0075");
-  await page.getByRole("textbox", { name: "Search" }).first().fill("");
-  await page.waitForFunction(() => !location.search.includes("q="));
+  await page.getByTestId("scope-search").locator("visible=true").first().click();
+  const palette = page.getByTestId("command-search");
+  await palette.getByLabel("Search everything").fill("Sinclair");
+  await expect(palette).toBeVisible();
+  await expect(palette).not.toContainText("PIPE-PHX-0067");
+  await palette.getByLabel("Search everything").fill("PIPE-MIA-0075");
+  await expect(palette).not.toContainText("PIPE-MIA-0075");
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+  await expect(page).not.toHaveURL(/[?&]q=/);
   await page.screenshot({ path: "/opt/cursor/artifacts/cstore-hidden-list.png" });
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.locator("button.tool", { hasText: "Filters" }).click();
@@ -534,7 +537,7 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   const firstCard = page.getByTestId("review-approvals").locator("button").first();
   await expect(firstCard).toContainText("Wash N Go");
   await page.setViewportSize({ width: 390, height: 800 });
-  const searchBox = await page.getByRole("textbox", { name: "Search" }).locator("visible=true").first().boundingBox();
+  const searchBox = await page.getByTestId("scope-search").locator("visible=true").first().boundingBox();
   const stageBox = await page.locator(".phone-step").boundingBox();
   const reviewBox = await page.getByTestId("review-bar").boundingBox();
   const overlaps = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>

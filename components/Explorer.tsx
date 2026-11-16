@@ -25,7 +25,8 @@ import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
 import { displayAddress, folderHref, leadSourceLine, listingHref } from "@/lib/format";
-import { collectSearchHits, dealSearchParts, matchesQuery, partyMatch, siteSearchParts, type SearchHit } from "@/lib/search";
+import { dealSearchParts, matchesQuery, partyMatch, siteSearchParts } from "@/lib/search";
+import { paletteGroups } from "@/lib/search/palette";
 import { PIPELINE_COLUMNS, capacitySummary, defaultColumnIds, displayScore, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
 import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
@@ -53,15 +54,6 @@ import NdaQueue from "./NdaQueue";
 import OpenLoops from "./OpenLoops";
 
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
-
-function searchLead(hit: SearchHit) {
-  const address = displayAddress(hit.address);
-  const named = Boolean(hit.title) && hit.title !== hit.id && hit.title !== hit.address;
-  if (named) {
-    return { title: hit.title, address: address && address !== hit.title ? address : "", id: hit.id };
-  }
-  return { title: address || hit.id, address: "", id: address ? hit.id : "" };
-}
 
 const PIPE_STEPS: { id: PipeId; label: string }[] = [
   { id: "desk", label: "Desk screen" },
@@ -235,12 +227,8 @@ export default function Explorer() {
     observer.observe(bar);
     return () => observer.disconnect();
   }, [selected, stepsOpen, menuOpen]);
-  const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
-  const [hitsOpen, setHitsOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [indexedIds, setIndexedIds] = useState<Set<string> | null>(null);
-  const searchTimer = useRef<number | null>(null);
-  const searchFocused = useRef(false);
   const [catalog, setCatalog] = useState<SiteFeature[] | null>(null);
   const sheetQuery = params.get("sheet");
   const sheetQueryRef = useRef(sheetQuery);
@@ -316,18 +304,6 @@ export default function Explorer() {
     categoriesRef.current = categories;
   }
   const query = params.get("q") || "";
-  useEffect(() => {
-    if (!searchFocused.current) setQueryDraft(query);
-  }, [query]);
-  useEffect(() => {
-    function onPointer(event: PointerEvent) {
-      const target = event.target as Element | null;
-      if (target?.closest(".search, .search-hits")) return;
-      setHitsOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
-  }, []);
   const who = params.get("who") || "";
   const [funnelPref, setFunnelPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const funnel = resolveFunnelMode(params.get("funnel"), funnelPref);
@@ -467,7 +443,8 @@ export default function Explorer() {
 
   function write(next: Record<string, string | null>, history = false) {
     const live = typeof window === "undefined" ? params.toString() : window.location.search;
-    replaceSearch(live, next, history);
+    const patch = next.site ? { q: null, ...next } : next;
+    replaceSearch(live, patch, history);
   }
 
   function stopReview(next: Record<string, string | null> = {}) {
@@ -632,9 +609,7 @@ export default function Explorer() {
     };
   }, [needCatalog, catalog]);
 
-  const queueKey = new URLSearchParams({
-    market: queueMarket,
-    stage: queueStage,
+  const queueParams = {
     viable: queueViable ? "1" : "0",
     fresh: queueFresh ? "1" : "0",
     flagged: queueFlagged ? "1" : "0",
@@ -642,6 +617,13 @@ export default function Explorer() {
     mentions: queueMentions ? "1" : "0",
     assigned: queueAssigned ? "1" : "0",
     reach,
+  };
+  const queueKey = new URLSearchParams({ market: queueMarket, stage: queueStage, ...queueParams }).toString();
+  // The Review button opens every market and stage. The badge counts that queue before the click, so the number does not jump when the click widens the filter.
+  const badgeKey = new URLSearchParams({
+    market: reviewing ? queueMarket : "all",
+    stage: reviewing ? queueStage : "any",
+    ...queueParams,
   }).toString();
   useEffect(() => {
     if (!me?.actionsEnabled) return;
@@ -677,7 +659,7 @@ export default function Explorer() {
         firstVisit: Boolean(item.firstVisit),
         reviewedAt: item.reviewedAt || "",
       }));
-      setQueueCount(next.length);
+      if (key === badgeKey) setQueueCount(next.length);
       setFeed(next);
       setLoadedQueueKey(key);
       setFeedLoaded(true);
@@ -690,7 +672,27 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, queueKey]);
+  }, [me?.actionsEnabled, queueKey, badgeKey]);
+
+  useEffect(() => {
+    if (!me?.actionsEnabled || badgeKey === queueKey) return;
+    let cancel = false;
+    quietActionsFetch(`/api/queue?${badgeKey}`).then(async (response) => {
+      if (cancel || !response.ok) return;
+      const payload = (await response.json()) as { items?: { snapshot?: { name?: string } | null }[] };
+      if (cancel) return;
+      const next = (payload.items || []).filter((item) => !isPipelineStore({
+        kind: "pipeline",
+        name: item.snapshot?.name,
+        business_type: (item.snapshot as { businessType?: string } | null)?.businessType,
+        description: (item.snapshot as { description?: string } | null)?.description,
+      }));
+      setQueueCount(next.length);
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [me?.actionsEnabled, badgeKey, queueKey]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
@@ -736,15 +738,21 @@ export default function Explorer() {
   }, [params]);
 
   useEffect(() => {
+    function onCommand(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setCommandOpen(true);
+    }
+    window.addEventListener("keydown", onCommand, true);
+    return () => window.removeEventListener("keydown", onCommand, true);
+  }, []);
+
+  useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      if (event.key === "/" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLSelectElement)) {
         event.preventDefault();
         setCommandOpen(true);
-        return;
-      }
-      if (event.key === "/" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
-        event.preventDefault();
-        document.querySelector<HTMLInputElement>(".search")?.focus();
         return;
       }
       if (event.key !== "Escape") return;
@@ -956,7 +964,7 @@ export default function Explorer() {
 
   function openInReview(id: string) {
     const at = visibleFeed.findIndex((site) => site.siteId === id);
-    write({ review: "1", i: String(at >= 0 ? at + 1 : 1), view: null, table: null, funnel: "pipeline", qmarket: "all", qstage: "any" });
+    write({ review: "1", i: String(at >= 0 ? at + 1 : 1), view: null, table: null, funnel: "pipeline", q: null, qmarket: "all", qstage: "any" });
   }
 
   function setCompared(id: string, on?: boolean) {
@@ -1398,64 +1406,9 @@ export default function Explorer() {
     );
   }
 
-  const searchHits = collectSearchHits(
-    queryDraft,
-    dealRows,
-    (catalog ?? features).map((feature) => feature.properties),
-    (site) => deepestStage(presentSite(site as SiteProps)),
-    { cStores: categories.store, land: categories.land, auto: categories.auto },
-  );
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const focus = (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : (CITY_VIEW[city] ?? CITY_VIEW.PHX);
   const dropCount = sites.filter((site) => droppedAt(site, stage) && (allCities || site.city === city) && siteInCategories(site, links, categories)).length;
-
-  function onSearchInput(value: string) {
-    setQueryDraft(value);
-    setHitsOpen(value.trim().length >= 2);
-    if (searchTimer.current) window.clearTimeout(searchTimer.current);
-    searchTimer.current = window.setTimeout(() => write({ q: value || null }), 200);
-  }
-
-  function closeSearch(clear = false) {
-    setHitsOpen(false);
-    if (!clear) return;
-    if (searchTimer.current) window.clearTimeout(searchTimer.current);
-    setQueryDraft("");
-    write({ q: null });
-  }
-
-  function openHit(hit: SearchHit) {
-    if (searchTimer.current) window.clearTimeout(searchTimer.current);
-    setQueryDraft("");
-    setHitsOpen(false);
-    const patch: Record<string, string | null> = { site: hit.id, who: null, q: null };
-    if (hit.city === "PHX" || hit.city === "LAS" || hit.city === "MIA") patch.city = hit.city === "PHX" ? null : hit.city;
-    if (hit.kind === "deal") {
-      const known = PIPE_STEPS.some((step) => step.id === hit.stage);
-      patch.funnel = "pipeline";
-      patch.tab = "pipeline";
-      patch.pstage = !known ? null : hit.stage;
-      patch.view = listView ? "list" : null;
-    } else {
-      patch.funnel = "universe";
-      patch.tab = null;
-      patch.stage = !hit.stage || hit.stage === "land" ? null : hit.stage;
-      patch.view = listView ? "list" : null;
-    }
-    setSelected(hit.id);
-    write(patch, true);
-  }
-
-  function onSearchKey(event: { key: string; preventDefault: () => void }) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeSearch(true);
-      return;
-    }
-    if (event.key !== "Enter" || !searchHits[0]) return;
-    event.preventDefault();
-    openHit(searchHits[0]);
-  }
 
   const sheet = {
     expanded: sheetSnap === "full",
@@ -1672,7 +1625,7 @@ export default function Explorer() {
   function goReview(index: number) {
     const count = Math.max(visibleFeed.length, 1);
     const next = Math.min(Math.max(index, 0), count - 1);
-    write({ review: "1", i: String(next + 1), view: null });
+    write({ review: "1", i: String(next + 1), view: null, q: null });
   }
 
   async function markCurrentReviewed() {
@@ -1830,7 +1783,15 @@ export default function Explorer() {
       {askOpen && me?.u ? (
         <AskPanel open site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
-      <CommandSearch open={commandOpen} onClose={() => setCommandOpen(false)} />
+      <CommandSearch
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        fallback={(needle) => paletteGroups(needle, dealRows, (catalog ?? features).map((feature) => feature.properties), {
+          cStores: categories.store,
+          land: categories.land,
+          auto: categories.auto,
+        })}
+      />
       <header className="bar">
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
@@ -1842,7 +1803,7 @@ export default function Explorer() {
             ))}
           </div>
           <div className="search-wrap only-desktop">
-            <input className="search" aria-label="Search" placeholder="Search name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} data-testid="grid-search" />
+            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onClick={() => setCommandOpen(true)}>Search name, address, broker, APN, id</button>
             <kbd aria-hidden="true">/</kbd>
           </div>
           <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>⌘K</button>
@@ -1855,7 +1816,7 @@ export default function Explorer() {
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", view: null, table: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any" })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any" })}>
               Review{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
             </button>
           ) : null}
@@ -1893,7 +1854,7 @@ export default function Explorer() {
               ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
           </button>
-          <input className="search mobile-search" aria-label="Search" placeholder="Search sites" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
+          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onClick={() => setCommandOpen(true)} />
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
@@ -1927,26 +1888,6 @@ export default function Explorer() {
           <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
-        {hitsOpen && queryDraft.trim().length >= 2 ? (
-          <div className="search-hits" role="listbox" aria-label="Search results" data-testid="search-hits">
-            {universeWide || pipelineWide ? (
-              <div className="search-wide" data-testid="search-wide">
-                <p className="search-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg>No matches in this view, showing other stages and markets.</p>
-              </div>
-            ) : null}
-            {searchHits.length ? searchHits.map((hit) => {
-              const lead = searchLead(hit);
-              return (
-                <button key={`${hit.kind}-${hit.id}`} type="button" role="option" onClick={() => openHit(hit)} className="menu-item">
-                  <span className="hit-title">{lead.title}</span>
-                  {lead.address ? <span className="hit-address">{lead.address}</span> : null}
-                  <span className="hit-meta">{[marketName(hit.city), hit.kind === "deal" ? stageTitle(hit.stage) : (STEPS.find((step) => step.id === hit.stage)?.label || "Universe")].filter(Boolean).join(" · ")}</span>
-                  {lead.id ? <span className="hit-id">{lead.id}</span> : null}
-                </button>
-              );
-            }) : <p className="search-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg>No matches.</p>}
-          </div>
-        ) : null}
         <div className="funnel-row">
           <div className="funnel-sheet-head only-mobile">
             <p className="eyebrow">Steps</p>

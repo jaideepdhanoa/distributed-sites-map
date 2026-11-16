@@ -2,16 +2,34 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { PaletteGroups } from "@/lib/search/palette";
 
-type Hit = { id: string; title: string; path: string; url: string };
-type Groups = { sites: Hit[]; brokers: Hit[]; conversations: Hit[] };
+type Groups = PaletteGroups;
 
 const EMPTY: Groups = { sites: [], brokers: [], conversations: [] };
 
-export default function CommandSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
+function count(groups: Groups) {
+  return groups.sites.length + groups.brokers.length + groups.conversations.length;
+}
+
+export default function CommandSearch({
+  open,
+  onClose,
+  fallback,
+}: {
+  open: boolean;
+  onClose: () => void;
+  fallback?: (query: string) => Groups;
+}) {
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<Groups>(EMPTY);
   const input = useRef<HTMLInputElement>(null);
+  const fallbackRef = useRef(fallback);
+  fallbackRef.current = fallback;
+
+  useEffect(() => {
+    if (open) setQuery("");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -26,14 +44,22 @@ export default function CommandSearch({ open, onClose }: { open: boolean; onClos
       setGroups(EMPTY);
       return;
     }
+    const local = fallbackRef.current?.(needle) || EMPTY;
+    setGroups(local);
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(needle)}`, { signal: ctrl.signal })
         .then((response) => (response.ok ? response.json() : null))
-        .then((body: { groups?: Groups } | null) => {
-          setGroups(body?.groups || EMPTY);
+        .then((body: { mode?: string; groups?: Groups } | null) => {
+          if (ctrl.signal.aborted) return;
+          const remote = body?.groups || EMPTY;
+          if (body?.mode === "index" && count(remote) > 0) setGroups(remote);
+          else setGroups(fallbackRef.current?.(needle) || EMPTY);
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (ctrl.signal.aborted) return;
+          setGroups(fallbackRef.current?.(needle) || EMPTY);
+        });
     }, 160);
     return () => {
       ctrl.abort();
@@ -59,6 +85,7 @@ export default function CommandSearch({ open, onClose }: { open: boolean; onClos
     ["Brokers", groups.brokers],
     ["Conversations", groups.conversations],
   ] as const;
+  const any = count(groups);
   return createPortal(
     <>
     <button type="button" className="backdrop" aria-label="Close search" onClick={onClose} />
@@ -75,16 +102,17 @@ export default function CommandSearch({ open, onClose }: { open: boolean; onClos
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      {sections.map(([label, hits]) => (
+      {query.trim().length >= 2 && any === 0 ? <p className="layer-meta" data-testid="command-empty">No matches.</p> : null}
+      {sections.map(([label, hits]) => hits.length ? (
         <section key={label} data-testid={`command-group-${label.toLowerCase()}`}>
           <p className="eyebrow">{label}</p>
-          {hits.length ? hits.map((hit) => (
-            <a key={`${label}-${hit.id}`} className="menu-item" href={hit.path || hit.url}>
-              <span className="hit-title">{hit.title}</span>
+          {hits.map((item) => (
+            <a key={`${label}-${item.id}`} className="menu-item" href={item.path || item.url} onClick={onClose}>
+              <span className="hit-title">{item.title}</span>
             </a>
-          )) : <p className="layer-meta">No matches.</p>}
+          ))}
         </section>
-      ))}
+      ) : null)}
     </div>
     </>,
     document.body,

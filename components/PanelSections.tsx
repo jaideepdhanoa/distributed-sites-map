@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
   ["overview", "Summary"],
@@ -24,6 +24,7 @@ export default function PanelSections({
   discussion: ReactNode;
 }) {
   const params = useSearchParams();
+  const router = useRouter();
   const site = params.get("site");
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
@@ -66,6 +67,16 @@ export default function PanelSections({
       added.disconnect();
     };
   }, [site, panel, tab]);
+  function chooseTab(id: TabId) {
+    setTab(id);
+    const next = new URLSearchParams(params.toString());
+    next.delete("q");
+    next.delete("msg");
+    if (id === "overview") next.delete("panel");
+    else next.set("panel", id);
+    const query = next.toString();
+    router.replace(query ? `/?${query}` : "/", { scroll: false });
+  }
   const panels = { overview, numbers, activity, discussion };
   const intel = panel === "intel";
   return (
@@ -86,7 +97,7 @@ export default function PanelSections({
             aria-controls={`panel-${id}`}
             className={tab === id ? "chip on" : "chip"}
             data-testid={`panel-tab-${id}`}
-            onClick={() => setTab(id)}
+            onClick={() => chooseTab(id)}
           >
             {label}
           </button>

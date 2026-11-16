@@ -84,12 +84,8 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
             return;
           }
           ignoreClick.current = true;
-<<<<<<< HEAD
           const dragged = Number.parseFloat(drawer.style.height);
-          const height = Number.isFinite(dragged) ? dragged : drawer.getBoundingClientRect().height;
-=======
-          const height = Number.parseFloat(drawer.style.height) || info.height;
->>>>>>> e76a2a5 (Keep the phone sheet drag on the snap it released to.)
+          const height = Number.isFinite(dragged) ? dragged : info.height || drawer.getBoundingClientRect().height;
           drawer.style.height = "";
           sheet.onSnap(nearestSheetSnap(height, window.innerHeight));
         }}

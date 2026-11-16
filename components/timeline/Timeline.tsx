@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatActivityWhen } from "@/lib/actions/time";
 import {
   counterparty,
@@ -79,7 +79,7 @@ function activityLine(item: MergedLine, index: number) {
   );
 }
 
-function commsLine(item: MergedLine, index: number, msg: string) {
+function commsLine(item: MergedLine, index: number, msg: string, onOpen: (id: string) => void) {
   const party = counterparty(item);
   const internal = item.direction.trim().toLowerCase() === "internal";
   return (
@@ -87,15 +87,17 @@ function commsLine(item: MergedLine, index: number, msg: string) {
       key={`${item.commsId}-${index}`}
       className={[internal ? "tl-internal" : "", msg && item.commsId === msg ? "tl-highlight" : ""].filter(Boolean).join(" ") || undefined}
       ref={msg && item.commsId === msg ? (node) => node?.scrollIntoView({ block: "center" }) : undefined}
-      data-testid={`comms-${item.commsId}`}
+      data-testid={item.commsId ? `comms-${item.commsId}` : undefined}
       data-direction={item.direction}
     >
-      <p>
-        <strong>{item.direction}</strong>
-        <WhenStamp at={item.at} approximate={item.approximate} />
-        {item.channel ? ` · ${item.channel}` : ""}
-      </p>
-      {party ? <p>{party}</p> : null}
+      <button type="button" className="list-row" onClick={() => item.commsId && onOpen(item.commsId)}>
+        <p>
+          <strong>{item.direction}</strong>
+          <WhenStamp at={item.at} approximate={item.approximate} />
+          {item.channel ? ` · ${item.channel}` : ""}
+        </p>
+        {party ? <p>{party}</p> : null}
+      </button>
       <ExpandableText text={summaryText(item.summary)} />
       {item.href ? (
         <p>
@@ -123,7 +125,15 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
   const [pending, setPending] = useState(true);
   const [timelineError, setTimelineError] = useState(false);
   const params = useSearchParams();
+  const router = useRouter();
   const msg = params.get("msg") || "";
+  function openMessage(id: string) {
+    const next = new URLSearchParams(params.toString());
+    next.delete("q");
+    next.set("panel", "activity");
+    next.set("msg", id);
+    router.replace(`/?${next.toString()}`, { scroll: false });
+  }
   const [commsError, setCommsError] = useState(false);
 
   useEffect(() => {
@@ -217,7 +227,7 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
       {lastTouched ? <p className="note">Last touched {lastTouched}</p> : null}
       {merged.length ? (
         <ol className="tl-list">
-          {merged.map((item, index) => (item.kind === "comms" ? commsLine(item, index, msg) : activityLine(item, index)))}
+          {merged.map((item, index) => (item.kind === "comms" ? commsLine(item, index, msg, openMessage) : activityLine(item, index)))}
         </ol>
       ) : null}
     </section>

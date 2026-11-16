@@ -69,13 +69,14 @@ export default function PanelSections({
   }, [site, panel, tab]);
   function chooseTab(id: TabId) {
     setTab(id);
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(window.location.search);
     next.delete("q");
     next.delete("msg");
     if (id === "overview") next.delete("panel");
     else next.set("panel", id);
-    const query = next.toString();
-    router.replace(query ? `/?${query}` : "/", { scroll: false });
+    const href = next.toString() ? `/?${next.toString()}` : "/";
+    window.history.replaceState(null, "", href);
+    router.replace(href, { scroll: false });
   }
   const panels = { overview, numbers, activity, discussion };
   const intel = panel === "intel";

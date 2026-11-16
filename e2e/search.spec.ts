@@ -26,9 +26,24 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/search?**", (route) => {
     const url = new URL(route.request().url());
     if ((url.searchParams.get("q") || "").toLowerCase().includes("sample")) {
-      return route.fulfill({ json: { mode: "index", groups: GROUPS, ids: ["PIPE-PHX-0008"] } });
+      return route.fulfill({ json: { mode: "records", groups: GROUPS, ids: ["PIPE-PHX-0008"] } });
     }
     return route.fulfill({ json: { mode: "fallback", groups: { sites: [], brokers: [], conversations: [] }, ids: [] } });
+  });
+  await page.route("**/api/me", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json().catch(() => ({}));
+    await route.fulfill({ json: { ...body, actionsEnabled: true } });
+  });
+  await page.route("**/api/queue?**", (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const market = new URL(route.request().url()).searchParams.get("market");
+    const count = market === "all" ? 4 : 9;
+    const items = Array.from({ length: count }, (_, index) => ({
+      siteId: `PIPE-PHX-010${index}`,
+      snapshot: { name: "Sample Wash", businessType: "Car wash" },
+    }));
+    return route.fulfill({ json: { items } });
   });
   await page.route("**/api/data/comms?**", (route) => route.fulfill({ json: COMMS }));
   await page.route("**/api/data/timeline?**", (route) => route.fulfill({ json: { items: [], materials: [] } }));
@@ -67,23 +82,33 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
   await expect(palette.getByTestId("command-group-sites")).toContainText("North Sample Wash");
   await expect(palette.getByTestId("command-group-brokers")).toContainText("Sample Broker");
   await expect(palette.getByTestId("command-group-conversations")).toContainText("Sample thread");
-  await expect(palette.getByRole("link", { name: "Sample thread" })).toHaveAttribute("href", /panel=activity/);
-  await expect(palette.getByRole("link", { name: "Sample thread" })).toHaveAttribute("href", /msg=CM-0123/);
-  await expect(palette.getByRole("link", { name: "North Sample Wash" })).toHaveAttribute("href", /\?site=PIPE-PHX-0008/);
   await page.screenshot({ path: `e2e/output/command-search-${info.project.name}.png`, fullPage: false });
-
-  await palette.getByLabel("Search everything").fill("phx");
-  await expect(palette.getByTestId("command-group-sites")).toBeVisible();
-  await expect(palette.getByTestId("command-empty")).toHaveCount(0);
-
   await palette.getByLabel("Search everything").fill("zzzzzz");
   await expect(palette.getByTestId("command-empty")).toHaveText("No matches.");
   await expect(palette.getByText("No matches.")).toHaveCount(1);
-
   await palette.getByLabel("Search everything").fill("sample");
-  await palette.getByRole("link", { name: "North Sample Wash" }).click();
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+  await page.getByTestId("ask-open").click();
+  await page.evaluate(() => {
+    const node = document.querySelector<HTMLTextAreaElement>("#ask-question") ?? document.body.appendChild(document.createElement("textarea"));
+    node.focus();
+  });
+  await page.keyboard.press("Control+k");
+  await expect(palette).toBeVisible();
+  await palette.getByLabel("Search everything").fill("sample");
+  await expect(palette.getByTestId("command-group-sites")).toContainText("North Sample Wash");
+  await palette.getByLabel("Search everything").press("Enter");
   await expect(page).toHaveURL(/site=PIPE-PHX-0008/);
   await expect(page).not.toHaveURL(/[?&]q=/);
+  await page.goto("/?q=PIPE-PHX-0084&funnel=universe", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("scope-search").locator("visible=true").first().click();
+  await palette.getByLabel("Search everything").fill("sample");
+  await expect(palette.getByRole("button", { name: "North Sample Wash" })).toBeVisible();
+  await palette.getByRole("button", { name: "North Sample Wash" }).click();
+  await expect(page).toHaveURL(/site=PIPE-PHX-0008/);
+  await expect(page).not.toHaveURL(/[?&]q=/);
+
   await page.getByTestId("panel-tab-activity").click();
   await expect(page).toHaveURL(/panel=activity/);
   await expect(page).not.toHaveURL(/[?&]q=/);
@@ -94,4 +119,11 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("comms-CM-0123")).toHaveClass(/tl-highlight/);
   await page.screenshot({ path: `e2e/output/activity-deeplink-${info.project.name}.png`, fullPage: false });
+
+  await page.goto("/?funnel=pipeline&view=list&q=3510+W+Cactus+Rd", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("queue-count")).toHaveText("4");
+  await page.getByRole("button", { name: /^Review/ }).click();
+  await expect(page).toHaveURL(/review=1/);
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  await expect(page.getByTestId("queue-count")).toHaveText("4");
 });

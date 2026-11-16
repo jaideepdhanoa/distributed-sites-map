@@ -621,8 +621,8 @@ export default function Explorer() {
   const queueKey = new URLSearchParams({ market: queueMarket, stage: queueStage, ...queueParams }).toString();
   // The Review button opens every market and stage. The badge counts that queue before the click, so the number does not jump when the click widens the filter.
   const badgeKey = new URLSearchParams({
-    market: reviewing ? queueMarket : "all",
-    stage: reviewing ? queueStage : "any",
+    market: "all",
+    stage: "any",
     ...queueParams,
   }).toString();
   useEffect(() => {
@@ -659,7 +659,6 @@ export default function Explorer() {
         firstVisit: Boolean(item.firstVisit),
         reviewedAt: item.reviewedAt || "",
       }));
-      if (key === badgeKey) setQueueCount(next.length);
       setFeed(next);
       setLoadedQueueKey(key);
       setFeedLoaded(true);
@@ -672,10 +671,10 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, queueKey, badgeKey]);
+  }, [me?.actionsEnabled, queueKey]);
 
   useEffect(() => {
-    if (!me?.actionsEnabled || badgeKey === queueKey) return;
+    if (!me?.actionsEnabled) return;
     let cancel = false;
     quietActionsFetch(`/api/queue?${badgeKey}`).then(async (response) => {
       if (cancel || !response.ok) return;
@@ -692,7 +691,7 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, badgeKey, queueKey]);
+  }, [me?.actionsEnabled, badgeKey]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
@@ -738,14 +737,27 @@ export default function Explorer() {
   }, [params]);
 
   useEffect(() => {
-    function onCommand(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
-      event.preventDefault();
-      event.stopPropagation();
+    if (params.get("review") !== "1" || !params.get("q")) return;
+    write({ q: null });
+  }, [params]);
+
+  useEffect(() => {
+    function openCommand() {
       setCommandOpen(true);
     }
+    function onCommand(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key.toLowerCase() !== "k" && event.code !== "KeyK") return;
+      event.preventDefault();
+      event.stopPropagation();
+      openCommand();
+    }
     window.addEventListener("keydown", onCommand, true);
-    return () => window.removeEventListener("keydown", onCommand, true);
+    window.addEventListener("sites-open-command", openCommand);
+    return () => {
+      window.removeEventListener("keydown", onCommand, true);
+      window.removeEventListener("sites-open-command", openCommand);
+    };
   }, []);
 
   useEffect(() => {
@@ -1803,7 +1815,7 @@ export default function Explorer() {
             ))}
           </div>
           <div className="search-wrap only-desktop">
-            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onClick={() => setCommandOpen(true)}>Search name, address, broker, APN, id</button>
+            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }}>Search name, address, broker, APN, id</button>
             <kbd aria-hidden="true">/</kbd>
           </div>
           <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>⌘K</button>
@@ -1854,7 +1866,7 @@ export default function Explorer() {
               ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
           </button>
-          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onClick={() => setCommandOpen(true)} />
+          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>

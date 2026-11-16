@@ -1,6 +1,6 @@
 import { isAutoBusinessType, isPipelineStore } from "@/lib/labels";
 import { isProtectedId } from "@/lib/protectedSite";
-import { collectSearchHits, foldSearch, partyMatch, type SearchHit, type SearchOptions } from "@/lib/search";
+import { collectSearchHits, foldSearch, type SearchHit, type SearchOptions } from "@/lib/search";
 
 export type PaletteHit = { id: string; title: string; path: string; url: string };
 export type PaletteGroups = { sites: PaletteHit[]; brokers: PaletteHit[]; conversations: PaletteHit[] };
@@ -17,6 +17,13 @@ function sitePath(id: string): string {
 function hit(id: string, title: string): PaletteHit {
   const path = sitePath(id);
   return { id, title, path, url: `https://distributedsites.com${path}` };
+}
+
+function nameHit(query: string, value: string | undefined): boolean {
+  const needle = foldSearch(query);
+  const name = foldSearch(value);
+  if (needle.length < 2 || name.length < 2) return false;
+  return name === needle || name.includes(needle) || (name.length >= 8 && needle.includes(name));
 }
 
 function hiddenDeal(deal: DealSource, options: SearchOptions): boolean {
@@ -38,8 +45,10 @@ export function paletteGroups(query: string, deals: DealSource[], sites: SiteSou
   const brokers = new Map<string, PaletteHit>();
   for (const deal of deals) {
     if (hiddenDeal(deal, options)) continue;
-    const name = String(deal.broker || deal.firm || "").trim();
-    if (!name || !partyMatch(needle, deal.broker, deal.firm)) continue;
+    const firm = String(deal.firm || "").trim();
+    const broker = String(deal.broker || "").trim();
+    const name = nameHit(needle, firm) ? firm : nameHit(needle, broker) ? broker : "";
+    if (!name) continue;
     const key = foldSearch(name);
     if (!key || brokers.has(key)) continue;
     brokers.set(key, hit(deal.deal_id, name));

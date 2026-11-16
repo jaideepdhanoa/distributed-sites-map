@@ -13,7 +13,7 @@ test("palette groups sites and brokers without the search index", () => {
   assert.equal(groups.sites.length, 1);
   assert.equal(groups.sites[0]?.path, "/?site=PIPE-PHX-0008");
   assert.equal(groups.sites[0]?.path.includes("q="), false);
-  assert.equal(groups.brokers[0]?.title, "Ada Broker");
+  assert.equal(groups.brokers[0]?.title, "Ada Co");
   assert.equal(groups.conversations.length, 0);
   const hidden = paletteGroups("hidden", deals, []);
   assert.equal(hidden.sites.some((item) => item.id === "PIPE-PHX-0006"), false);

@@ -128,11 +128,13 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
   const router = useRouter();
   const msg = params.get("msg") || "";
   function openMessage(id: string) {
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(window.location.search);
     next.delete("q");
     next.set("panel", "activity");
     next.set("msg", id);
-    router.replace(`/?${next.toString()}`, { scroll: false });
+    const href = `/?${next.toString()}`;
+    window.history.replaceState(null, "", href);
+    router.replace(href, { scroll: false });
   }
   const [commsError, setCommsError] = useState(false);
 

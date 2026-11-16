@@ -702,9 +702,10 @@ button.search {
 .search-hits .hit-title { font-weight: 650; font-size: var(--type-body); color: var(--ink); }
 .search-hits .hit-address { color: var(--ink); font-weight: 450; }
 .search-hits .hit-meta { color: var(--muted); font-size: var(--type-cap); }
+button.backdrop.command-backdrop { z-index: 500; background: rgba(28, 25, 20, 0.28); }
 .command-search {
   position: fixed;
-  z-index: 80;
+  z-index: 501;
   left: 16px;
   right: 16px;
   top: 72px;
@@ -3310,3 +3311,17 @@ button.paper-btn.on,
 }
 .panel-error p { margin: 0 0 8px; }
 .panel-error .paper-btn { margin-top: 4px; }
+.list-table td[data-col="site"] .site-name,
+.list-table td[data-col="site"] .site-title,
+.list-table td[data-col="site"] .site-name-text,
+.list-table td[data-col="asking"] .metric,
+.list-table td[data-col="asking"] .metric-label,
+.list-table td[data-col="asking"] .metric-label button {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  max-width: none;
+}
+button.scope-search,
+button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

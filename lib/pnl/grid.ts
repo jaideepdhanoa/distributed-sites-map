@@ -228,7 +228,7 @@ function monthBuckets(statement: PnlStatement, year: number): Bucket[] {
   if (row?.annual) buckets.push({ missing: false, period: row.annual });
   else {
     const total = row ? partialTotal(row) : null;
-    buckets.push(total ? { missing: false, period: total } : missingBucket(row, 0));
+    buckets.push({ missing: false, period: total });
   }
   return buckets;
 }

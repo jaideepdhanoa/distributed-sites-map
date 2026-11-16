@@ -284,9 +284,12 @@ function buildYears(lines: CapturedLine[], missing: MissingMonth[], normalizedIn
     const full = annuals.filter(isFullYear);
     const annual = full.find((period) => (period.startMonth ?? 1) === 1) ?? full[0] ?? null;
     const ranges = annuals.filter((period) => period !== annual);
-    const months = Array.from({ length: 12 }, (_, index) => (
-      periods.find((period) => period.year === year && period.grain === "monthly" && period.month === index + 1) ?? null
-    ));
+    const months = Array.from({ length: 12 }, (_, index) => {
+      const period = periods.find((item) => item.year === year && item.grain === "monthly" && item.month === index + 1) ?? null;
+      if (!period) return null;
+      const marked = missing.some((month) => month.year === year && month.month === index + 1 && month.periodId === period.id);
+      return marked ? null : period;
+    });
     const missingRows = missing.filter((month) => month.year === year && month.month >= 1 && month.month <= 12 && !months[month.month - 1]);
     const missingMonths = [...new Set(missingRows.map((month) => month.month))].sort((a, b) => a - b);
     const missingDetails = missingMonths.map((month) => {

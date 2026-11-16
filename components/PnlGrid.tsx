@@ -27,7 +27,7 @@ function ConflictMark({ cell }: { cell: GridCell }) {
 
 function missingTitle(cell: GridCell): string | undefined {
   if (cell.kind !== "missing") return undefined;
-  const source = [cell.markerSource, cell.sourceDocument, cell.sourcePage].filter(Boolean).join(" · ");
+  const source = [cell.sourceDocument, cell.sourcePage, cell.markerSource].filter(Boolean).join(" · ");
   return source ? `Missing · ${source}` : "Missing";
 }
 
@@ -183,8 +183,8 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           {popover.kind === "missing" ? (
             <div data-testid="pnl-missing-source">
               <p>Missing</p>
-              {popover.markerSource ? <p>{popover.markerSource}</p> : null}
               <p>{[popover.sourceDocument, popover.sourcePage].filter(Boolean).join(" · ")}</p>
+              {popover.markerSource ? <p>{popover.markerSource}</p> : null}
               {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
             </div>
           ) : null}

@@ -40,9 +40,9 @@ export function sampleStatement(): PnlStatement {
 }
 
 /**
- * A partial year plus two missing months in the shape Muse writes.
- * `missing: true` has no line, amount, or status. "Not in package" is the
- * change source. The document name here is a stand-in, not a package.
+ * Display twin of the stored missing-month rows. The rows themselves are
+ * inserted by `insertMissingMonthShape`: null line code, status missing,
+ * and period.missing true. Amounts here are samples.
  */
 export function gapStatement(): PnlStatement {
   const lines: CapturedLine[] = [];
@@ -112,8 +112,8 @@ export function gapStatement(): PnlStatement {
       year: 2025,
       month: 4,
       business: "car_wash",
-      periodId: "PP-apr",
-      sourceDocument: "Sample package",
+      periodId: "PP-000095",
+      sourceDocument: "Sample package. Stand-in for the missing month.",
       sourcePage: "Month index",
       capturedAt: CAPTURED,
       markerSource: "Not in package",
@@ -122,8 +122,8 @@ export function gapStatement(): PnlStatement {
       year: 2026,
       month: 5,
       business: "car_wash",
-      periodId: "PP-may",
-      sourceDocument: "Sample package",
+      periodId: "PP-000096",
+      sourceDocument: "Sample package. Stand-in for the missing month.",
       sourcePage: "Month index",
       capturedAt: CAPTURED,
       markerSource: "Not in package",

@@ -97,6 +97,58 @@ test("a dry-run renumber plan moves only the API collisions, and apply keeps the
   assert.equal(next.results[0]?.entity_id, "A-000276");
 });
 
+test("renumber rewrites receipt entity ids that jsonb stores with a space", async () => {
+  const sql = await memorySql();
+  await migrate(sql);
+  await raiseIdFloor(sql, "activity", 271);
+  await applyBatch(sql, human, "collide-272", { changes: [activityChange()] });
+  await sql.query(
+    `UPDATE change_receipts
+     SET response = jsonb_build_object(
+       'ok', true,
+       'idempotency_key', 'collide-272',
+       'results', jsonb_build_array(
+         jsonb_build_object('entity_type', 'activity', 'entity_id', 'A-000272', 'site_id', 'PIPE-PHX-0001', 'event_id', 'EV-keep', 'version', 1),
+         jsonb_build_object('entity_type', 'activity', 'entity_id', 'A-0002720', 'site_id', 'PIPE-PHX-0001', 'event_id', 'EV-longer', 'version', 1)
+       )
+     )
+     WHERE idempotency_key = 'collide-272'`,
+  );
+  await sql.query(
+    `INSERT INTO change_receipts (idempotency_key, request_hash, response, actor)
+     VALUES ('untouched', 'hash', $1::jsonb, 'jaideep')`,
+    [JSON.stringify({ ok: true, results: [{ entity_id: "A-000299", event_id: "EV-other" }] })],
+  );
+  const before = await sql.query<{ text: string }>(
+    `SELECT response::text AS text FROM change_receipts WHERE idempotency_key = 'collide-272'`,
+  );
+  const stored = before.rows[0]?.text || "";
+  assert.equal(stored.includes('"entity_id": "A-000272"'), true);
+  assert.equal(stored.includes('"entity_id":"A-000272"'), false);
+
+  await applyActivityRenumber(sql, 273, ["A-000272"]);
+
+  const rows = await sql.query<{ entity_id: string; event_id: string; site_id: string; version: number | string }>(
+    `SELECT item->>'entity_id' AS entity_id, item->>'event_id' AS event_id, item->>'site_id' AS site_id, item->>'version' AS version
+     FROM change_receipts, jsonb_array_elements(response->'results') AS item
+     WHERE idempotency_key = 'collide-272'
+     ORDER BY item->>'event_id'`,
+  );
+  assert.deepEqual(
+    rows.rows.map((row) => ({ entity_id: row.entity_id, event_id: row.event_id, site_id: row.site_id, version: Number(row.version) })),
+    [
+      { entity_id: "A-000274", event_id: "EV-keep", site_id: "PIPE-PHX-0001", version: 1 },
+      { entity_id: "A-0002720", event_id: "EV-longer", site_id: "PIPE-PHX-0001", version: 1 },
+    ],
+  );
+  const other = await sql.query<{ entity_id: string }>(
+    `SELECT item->>'entity_id' AS entity_id
+     FROM change_receipts, jsonb_array_elements(response->'results') AS item
+     WHERE idempotency_key = 'untouched'`,
+  );
+  assert.equal(other.rows[0]?.entity_id, "A-000299");
+});
+
 test("an imported activity id is not re-numbered", async () => {
   const sql = await memorySql();
   await migrate(sql);

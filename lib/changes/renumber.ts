@@ -100,9 +100,26 @@ export async function applyActivityRenumber(sql: Sql, workbookFloor = 0, ids: re
       if (!row) throw new Error(`Activity ${move.from} was not updated.`);
       await sql.query(
         `UPDATE change_receipts
-         SET response = replace(response::text, $1, $2)::jsonb
-         WHERE position($1 in response::text) > 0`,
-        [`"entity_id":"${move.from}"`, `"entity_id":"${move.to}"`],
+         SET response = jsonb_set(
+           response,
+           '{results}',
+           (
+             SELECT COALESCE(jsonb_agg(
+               CASE
+                 WHEN elem->>'entity_id' = $1 THEN jsonb_set(elem, '{entity_id}', to_jsonb($2::text))
+                 ELSE elem
+               END
+               ORDER BY ordinality
+             ), '[]'::jsonb)
+             FROM jsonb_array_elements(COALESCE(response->'results', '[]'::jsonb)) WITH ORDINALITY AS listed(elem, ordinality)
+           )
+         )
+         WHERE EXISTS (
+           SELECT 1
+           FROM jsonb_array_elements(COALESCE(response->'results', '[]'::jsonb)) AS elem
+           WHERE elem->>'entity_id' = $1
+         )`,
+        [move.from, move.to],
       );
       await insertEvent(sql, {
         entityType: "activity",

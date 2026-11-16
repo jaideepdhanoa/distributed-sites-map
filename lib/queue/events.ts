@@ -4,7 +4,7 @@ import type { Sql } from "@/lib/actions/db";
 import { stamp } from "@/lib/actions/text";
 import { pacificToday } from "./today";
 
-export type AppEventType = "note" | "reply" | "next_proposed" | "next_accepted" | "next_rejected" | "document_request" | "bring_back" | "drop_suggested" | "drop";
+export type AppEventType = "note" | "reply" | "next_proposed" | "next_accepted" | "next_rejected" | "document_request" | "bring_back" | "drop_suggested" | "drop" | "proposal_closed";
 
 export async function recordAppEvent(
   sql: Sql,

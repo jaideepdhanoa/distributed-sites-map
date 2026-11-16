@@ -50,6 +50,7 @@ async function ready() {
     "017_site_spaces.sql",
     "018_pnl_basis.sql",
     "019_pnl_retract.sql",
+    "020_proposal_close.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

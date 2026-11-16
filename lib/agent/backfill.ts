@@ -52,6 +52,8 @@ type SuggestionRow = {
   decided_by: string | null;
   decided_at: Date | string | null;
   decision_note: string | null;
+  closed_by: string | null;
+  close_reason: string | null;
 };
 
 type FlagRow = {
@@ -137,7 +139,7 @@ export async function planInboxBackfill(sql: Sql, lookup?: RecordLookup): Promis
   const mentioned = new Set(mentionRows.rows.map((row) => row.source_id));
   const suggestions = await sql.query<SuggestionRow>(
     `SELECT id, target_kind, target_id, field_name, detail, proposed_value, reason, status, author_id,
-            title, created_at, decided_by, decided_at, decision_note
+            title, created_at, decided_by, decided_at, decision_note, closed_by, close_reason
      FROM suggestions ORDER BY created_at ASC, id ASC`,
   );
   const flags = await sql.query<FlagRow>(
@@ -199,12 +201,13 @@ export async function planInboxBackfill(sql: Sql, lookup?: RecordLookup): Promis
         createdAt: when,
       }));
     }
-    if (row.status === "ready" || row.status === "overtaken") {
+    if (row.status === "ready" || row.status === "overtaken" || row.status === "superseded") {
+      const kind = row.status === "ready" ? "proposal_ready" : row.status === "overtaken" ? "proposal_overtaken" : "proposal_closed";
       events.push(proposalEventFeed({
-        kind: row.status === "ready" ? "proposal_ready" : "proposal_overtaken",
+        kind,
         id: row.id,
-        actorId: row.status === "ready" ? "system" : (actor || row.author_id),
-        note: row.decision_note || "",
+        actorId: kind === "proposal_ready" ? "system" : (row.closed_by || actor || row.author_id),
+        note: kind === "proposal_closed" ? (row.close_reason || row.decision_note || "") : (row.decision_note || ""),
         siteId,
         recordId: row.target_id,
         field: row.field_name,
@@ -242,21 +245,21 @@ export async function reconcileInboxThreads(sql: Sql): Promise<number> {
         FROM agent_inbox
         GROUP BY thread_key
       ) latest ON latest.thread_key = row.thread_key AND latest.created_at = row.created_at
-      WHERE row.kind IN ('proposal_ready', 'proposal_overtaken')
+      WHERE row.kind IN ('proposal_ready', 'proposal_overtaken', 'proposal_closed')
          OR (
            row.kind = 'decision'
            AND NOT EXISTS (
              SELECT 1 FROM agent_inbox ready
              WHERE ready.thread_key = row.thread_key
                AND ready.created_at = row.created_at
-               AND ready.kind IN ('proposal_ready', 'proposal_overtaken')
+               AND ready.kind IN ('proposal_ready', 'proposal_overtaken', 'proposal_closed')
            )
          )
          OR NOT EXISTS (
            SELECT 1 FROM agent_inbox other
            WHERE other.thread_key = row.thread_key
              AND other.created_at = row.created_at
-             AND other.kind IN ('decision', 'proposal_ready', 'proposal_overtaken')
+             AND other.kind IN ('decision', 'proposal_ready', 'proposal_overtaken', 'proposal_closed')
          )
     )
     UPDATE agent_inbox SET status = 'superseded'

@@ -1,0 +1,48 @@
+name: Close dropped proposals
+
+# One-off. Dry run is the default and writes nothing. It prints proposal ids
+# and site ids only. Apply needs dry_run false, apply true, and the confirm
+# phrase. It is not on a schedule and it does not run from a pull request.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List proposal ids and site ids. Do not write.
+        type: boolean
+        default: true
+      apply:
+        description: Close open proposals on Dropped sites. Also set dry_run to false and type the confirm phrase.
+        type: boolean
+        default: false
+      confirm:
+        description: To apply, type close-dropped-proposals. Leave blank on a dry run.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  close:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse an apply that is still a dry run or missing the phrase
+        if: ${{ (inputs.apply == true || inputs.apply == 'true') && ((inputs.dry_run == true || inputs.dry_run == 'true') || inputs.confirm != 'close-dropped-proposals') }}
+        run: |
+          echo "Refusing to close proposals. Set dry_run to false, set apply to true, and type close-dropped-proposals." >&2
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Plan or close
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          ALLOW_CLOSE_DROPPED_PROPOSALS: ${{ (inputs.apply == true || inputs.apply == 'true') && (inputs.dry_run == false || inputs.dry_run == 'false') && '1' || '0' }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+        run: npx tsx scripts/close-dropped-proposals.ts ${{ (inputs.apply == true || inputs.apply == 'true') && (inputs.dry_run == false || inputs.dry_run == 'false') && '--apply' || '' }}

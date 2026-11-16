@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { canCloseProposal } from "@/lib/actions/proposalAccess";
 import { quietActionsFetch } from "@/lib/actions/quiet";
 import { canReview, canWrite, useActionStatus } from "./actions/panel";
 import {
@@ -15,6 +16,25 @@ import {
 } from "@/lib/financials";
 
 type Account = { id: string; name: string };
+
+function CloseRequestForm({ pending, onClose }: { pending: boolean; onClose: (reason: string) => void }) {
+  const [reason, setReason] = useState("");
+  return (
+    <form
+      data-testid="close-proposal"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onClose(reason);
+      }}
+    >
+      <label>
+        Reason
+        <input className="field" aria-label="Close reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={200} required />
+      </label>
+      <button type="submit" className="paper-btn" disabled={pending || !reason.trim()}>Close</button>
+    </form>
+  );
+}
 
 function decisionFromSuggestion(item: { status: string; proposedValue: string; ownerName: string | null; targetOn: string | null; decidedAt: string | null }): DocumentDecision | null {
   const parsed = parseDocumentRequest(item.proposedValue);
@@ -50,7 +70,7 @@ export default function FinancialsPanel({
   const [wholePackage, setWholePackage] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [openRequests, setOpenRequests] = useState<{ id: string; proposedValue: string; ownerName: string | null }[]>([]);
+  const [openRequests, setOpenRequests] = useState<{ id: string; proposedValue: string; ownerId: string | null; ownerName: string | null }[]>([]);
   const writable = canWrite(status.actionRole);
   const reviewer = canReview(status.actionRole);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -83,7 +103,7 @@ export default function FinancialsPanel({
       if (cancel) return;
       if (accountsRes.ok) setAccounts(((await accountsRes.json()) as { accounts: Account[] }).accounts || []);
       if (!suggestionsRes.ok) return;
-      const body = (await suggestionsRes.json()) as { suggestions?: { id: string; field: string; status: string; proposedValue: string; ownerName: string | null; targetOn: string | null; decidedAt: string | null }[] };
+      const body = (await suggestionsRes.json()) as { suggestions?: { id: string; field: string; status: string; proposedValue: string; ownerId: string | null; ownerName: string | null; targetOn: string | null; decidedAt: string | null }[] };
       const rows = (body.suggestions || []).filter((item) => item.field === "document_request");
       setOpenRequests(rows.filter((item) => item.status === "open"));
       const decisions = rows.map(decisionFromSuggestion).filter((item): item is DocumentDecision => Boolean(item));
@@ -132,12 +152,30 @@ export default function FinancialsPanel({
     const query = new URLSearchParams({ targetKind: "deal", targetId: dealId });
     const listed = await fetch(`/api/actions/suggestions?${query}`);
     if (listed.ok) {
-      const body = (await listed.json()) as { suggestions?: { id: string; field: string; status: string; proposedValue: string; ownerName: string | null; targetOn: string | null; decidedAt: string | null }[] };
+      const body = (await listed.json()) as { suggestions?: { id: string; field: string; status: string; proposedValue: string; ownerId: string | null; ownerName: string | null; targetOn: string | null; decidedAt: string | null }[] };
       const rows = (body.suggestions || []).filter((item) => item.field === "document_request");
       setOpenRequests(rows.filter((item) => item.status === "open"));
       const decisions = rows.map(decisionFromSuggestion).filter((item): item is DocumentDecision => Boolean(item));
       setPanel(applyDecisions(initial, decisions));
     }
+  }
+
+  async function closeRequest(id: string, reason: string) {
+    setPending(true);
+    setError("");
+    const response = await fetch(`/api/actions/suggestions/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "superseded", reason }),
+    });
+    setPending(false);
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      setError(payload.error || "That could not be saved.");
+      return;
+    }
+    window.dispatchEvent(new Event("queue-refresh"));
+    setOpenRequests((rows) => rows.filter((item) => item.id !== id));
   }
 
   async function decide(id: string, next: "accepted" | "rejected") {
@@ -300,16 +338,21 @@ export default function FinancialsPanel({
       {openRequests.length ? (
         <div data-testid="document-requests">
           {openRequests.map((item) => (
-            <p key={item.id}>
-              Waiting for approval
-              {item.ownerName ? ` · ${item.ownerName}` : ""}
-              {reviewer ? (
-                <>
-                  <button type="button" disabled={pending} onClick={() => void decide(item.id, "accepted")} className="menu-item">Approve</button>
-                  <button type="button" disabled={pending} onClick={() => void decide(item.id, "rejected")} className="menu-item">Reject</button>
-                </>
+            <div key={item.id}>
+              <p>
+                Waiting for approval
+                {item.ownerName ? ` · ${item.ownerName}` : ""}
+                {reviewer ? (
+                  <>
+                    <button type="button" disabled={pending} onClick={() => void decide(item.id, "accepted")} className="menu-item">Approve</button>
+                    <button type="button" disabled={pending} onClick={() => void decide(item.id, "rejected")} className="menu-item">Reject</button>
+                  </>
+                ) : null}
+              </p>
+              {canCloseProposal({ actorId: status.username, ownerId: item.ownerId, admin: reviewer }) ? (
+                <CloseRequestForm pending={pending} onClose={(reason) => void closeRequest(item.id, reason)} />
               ) : null}
-            </p>
+            </div>
           ))}
         </div>
       ) : null}

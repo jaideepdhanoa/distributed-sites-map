@@ -768,6 +768,19 @@ export async function applyParsedChanges(
       results.push(await applyOne(sql, actor, changes[index], `${idempotencyKey}#${index}`, runId, mode));
     }
     results.push(...(await ensureCapture(sql, actor, changes, idempotencyKey, runId, mode)));
+    if (results.some((row) => row.entity_type === "stage")) {
+      await sql.exec("SAVEPOINT proposal_close");
+      try {
+        const { closeProposalsForStageDrops } = await import("@/lib/actions/proposalClose");
+        await closeProposalsForStageDrops(sql, actor.id, results);
+        await sql.exec("RELEASE SAVEPOINT proposal_close");
+      } catch (error) {
+        await sql.exec("ROLLBACK TO SAVEPOINT proposal_close");
+        const { missingCloseSchema } = await import("@/lib/actions/proposalClose");
+        if (!missingCloseSchema(error)) throw error;
+        console.error(JSON.stringify({ event: "proposal_close_skipped" }));
+      }
+    }
     const counts: Record<string, number> = { changes: results.length };
     for (const result of results) counts[result.entity_type] = (counts[result.entity_type] || 0) + 1;
     await sql.query(

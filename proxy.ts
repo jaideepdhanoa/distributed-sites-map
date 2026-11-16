@@ -22,6 +22,8 @@ const CRON_BEARER_PATHS = new Set([
   "/api/alerts/flush",
   "/api/cron/alert-flush",
   "/api/cron/workbook-sync",
+  "/api/cron/search",
+  "/api/cron/stale",
   "/api/data/revalidate",
 ]);
 

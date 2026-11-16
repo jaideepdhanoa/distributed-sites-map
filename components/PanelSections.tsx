@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
 const TABS = [
   ["overview", "Summary"],
@@ -24,6 +25,7 @@ export default function PanelSections({
   discussion: ReactNode;
 }) {
   const params = useSearchParams();
+  const router = useRouter();
   const site = params.get("site");
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
@@ -66,9 +68,31 @@ export default function PanelSections({
       added.disconnect();
     };
   }, [site, panel, tab]);
+  function chooseTab(id: TabId) {
+    setTab(id);
+  }
+  useEffect(() => {
+    const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
+    const shown = next.get("panel") || "overview";
+    if (shown === tab && (tab === "activity" || !next.get("msg"))) return;
+    next.delete("q");
+    if (tab !== "activity") next.delete("msg");
+    if (tab === "overview") next.delete("panel");
+    else next.set("panel", tab);
+    const href = next.toString() ? `/?${next.toString()}` : "/";
+    rememberSearch(href);
+    router.replace(href, { scroll: false });
+  }, [tab, router]);
   const panels = { overview, numbers, activity, discussion };
+  const intel = panel === "intel";
   return (
     <div className="panel-sections" ref={sections}>
+      {intel ? (
+        <section id="panel-intel" data-testid="intel-panel">
+          <p className="eyebrow">Intel</p>
+          <p className="layer-meta">No intel is recorded for this site.</p>
+        </section>
+      ) : null}
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
         {TABS.map(([id, label]) => (
           <button
@@ -79,7 +103,7 @@ export default function PanelSections({
             aria-controls={`panel-${id}`}
             className={tab === id ? "chip on" : "chip"}
             data-testid={`panel-tab-${id}`}
-            onClick={() => setTab(id)}
+            onClick={() => chooseTab(id)}
           >
             {label}
           </button>

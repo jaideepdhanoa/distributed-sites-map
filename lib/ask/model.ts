@@ -8,6 +8,7 @@ export type AskModelInput = {
   system: string;
   prompt: string;
   role: ActionRole;
+  userId?: string;
   signal?: AbortSignal;
 };
 
@@ -131,7 +132,37 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
       inputSchema: id,
       execute: async ({ id: siteId }) => {
         called.push("activity");
-        const value = await runAskTool("activity", { id: siteId }, role);
+        const value = await runAskTool("activity", { id: siteId }, role, input.userId);
+        gathered.push(value);
+        return value;
+      },
+    }),
+    searchAll: tool({
+      description: "Hybrid search across sites, brokers, and conversations. Quarantined records are omitted.",
+      inputSchema: z.object({ query: z.string() }),
+      execute: async ({ query }) => {
+        called.push("searchAll");
+        const value = await runAskTool("searchAll", { query }, role, input.userId);
+        gathered.push(value);
+        return value;
+      },
+    }),
+    getBroker: tool({
+      description: "Read one broker. Broker records are not connected yet.",
+      inputSchema: z.object({ id: z.string() }),
+      execute: async () => {
+        called.push("getBroker");
+        const value = await runAskTool("getBroker", {}, role, input.userId);
+        gathered.push(value);
+        return value;
+      },
+    }),
+    siteIntel: tool({
+      description: "Intel notes for one site. Quarantined records return only that status.",
+      inputSchema: id,
+      execute: async ({ id: siteId }) => {
+        called.push("siteIntel");
+        const value = await runAskTool("siteIntel", { id: siteId }, role, input.userId);
         gathered.push(value);
         return value;
       },

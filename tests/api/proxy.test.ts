@@ -47,7 +47,7 @@ test("a bearer on /api/changes reaches the handler and other routes stay closed"
 });
 
 test("a bearer on the cron paths reaches the handler and other routes stay closed", async () => {
-  for (const path of ["/api/alerts/digest", "/api/alerts/flush", "/api/cron/alert-flush", "/api/cron/workbook-sync", "/api/data/revalidate"]) {
+  for (const path of ["/api/alerts/digest", "/api/alerts/flush", "/api/cron/alert-flush", "/api/cron/workbook-sync", "/api/cron/search", "/api/cron/stale", "/api/data/revalidate"]) {
     const passed = await call(path, { authorization: "Bearer present" });
     assert.equal(passed.headers.get("x-middleware-next"), "1", path);
     assert.equal(passed.status, 200, path);

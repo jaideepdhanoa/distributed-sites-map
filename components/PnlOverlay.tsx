@@ -9,20 +9,26 @@ import PnlPhone from "./PnlPhone";
 
 export default function PnlOverlay({
   statement = emptyStatement(),
+  initialGrain = null,
   onClose,
   onChecklist,
 }: {
   statement?: PnlStatement;
+  initialGrain?: "annual" | "monthly" | null;
   onClose: () => void;
   onChecklist?: () => void;
 }) {
-  const [mode, setMode] = useState<"months" | "years">("months");
+  const [mode, setMode] = useState<"months" | "years">(initialGrain === "annual" ? "years" : "months");
   const [percent, setPercent] = useState(false);
   const [basis, setBasis] = useState<"stated" | "normalized">("stated");
   const shown: PnlStatement = basis === "normalized"
     ? { ...statement, years: statement.normalizedYears ?? [] }
     : statement;
   const years = shown.years.map((item) => item.year);
+  useEffect(() => {
+    if (initialGrain === "annual") setMode("years");
+    if (initialGrain === "monthly") setMode("months");
+  }, [initialGrain]);
   const [year, setYear] = useState(years[0] || 0);
   const grid = useMemo(() => buildPnlGrid(shown, mode, year), [shown, mode, year]);
   const business = shown.years.find((item) => item.year === year)?.businessLabel || shown.years[0]?.businessLabel || "";

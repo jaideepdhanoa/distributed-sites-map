@@ -1,0 +1,94 @@
+import { isAutoBusinessType, isPipelineStore } from "@/lib/labels";
+import { isProtectedId } from "@/lib/protectedSite";
+import { citySearchText, collectSearchHits, foldSearch, tokensMatch, type SearchHit, type SearchOptions } from "@/lib/search";
+import { siteResultDetail } from "@/lib/search/siteLine";
+
+export type PaletteHit = { id: string; title: string; path: string; url: string; site?: string; when?: string; detail?: string };
+export type PaletteGroups = { sites: PaletteHit[]; brokers: PaletteHit[]; conversations: PaletteHit[] };
+
+export function filledSections(groups: PaletteGroups): Array<{ label: string; hits: PaletteHit[] }> {
+  return [
+    { label: "Sites", hits: groups.sites },
+    { label: "Brokers", hits: groups.brokers },
+    { label: "Conversations", hits: groups.conversations },
+  ].filter((section) => section.hits.length > 0);
+}
+
+type DealSource = Parameters<typeof collectSearchHits>[1][number];
+type SiteSource = Parameters<typeof collectSearchHits>[2][number];
+
+const EMPTY: PaletteGroups = { sites: [], brokers: [], conversations: [] };
+
+function sitePath(id: string): string {
+  return `/?site=${encodeURIComponent(id)}`;
+}
+
+function hit(id: string, title: string, detail?: string): PaletteHit {
+  const path = sitePath(id);
+  return { id, title, path, url: `https://distributedsites.com${path}`, ...(detail ? { detail } : {}) };
+}
+
+function detailFor(item: SearchHit): string {
+  return siteResultDetail({
+    id: item.id,
+    address: item.address,
+    city: item.city,
+    stageGroup: item.kind === "deal" ? item.stage : "",
+    universe: item.kind === "site",
+  });
+}
+
+function nameHit(query: string, value: string | undefined): boolean {
+  const needle = foldSearch(query);
+  const name = foldSearch(value);
+  if (needle.length < 2 || name.length < 2) return false;
+  return name === needle || name.includes(needle) || (name.length >= 8 && needle.includes(name));
+}
+
+function hiddenDeal(deal: DealSource, options: SearchOptions): boolean {
+  if (isProtectedId(deal.deal_id) || isProtectedId(deal.universe_id)) return true;
+  const store = deal.is_c_store === true || isPipelineStore(deal);
+  if (options.cStores !== true && store) return true;
+  if (options.land !== true && deal.kind === "land") return true;
+  if (options.auto === false && deal.kind === "pipeline" && isAutoBusinessType(deal.business_type)) return true;
+  return false;
+}
+
+/** Group the map's own rows when the search index is empty. Conversations stay empty until the index has them. */
+export function paletteGroups(query: string, deals: DealSource[], sites: SiteSource[], options: SearchOptions = {}): PaletteGroups {
+  const needle = query.trim();
+  if (needle.length < 2) return EMPTY;
+  const linkedUniverse = new Set(deals.map((deal) => deal.universe_id).filter((id): id is string => Boolean(id)));
+  const sitesGroup = collectSearchHits(needle, deals, sites, () => "", options)
+    .filter((item: SearchHit) => !isProtectedId(item.id) && !linkedUniverse.has(item.id))
+    .map((item) => hit(item.id, item.title || item.id, detailFor(item)));
+  const seen = new Set(sitesGroup.map((item) => item.id));
+  for (const deal of deals) {
+    if (sitesGroup.length >= 8) break;
+    if (hiddenDeal(deal, options) || seen.has(deal.deal_id)) continue;
+    if (!tokensMatch(needle, [deal.name, deal.address, citySearchText(deal.city), deal.business_type])) continue;
+    sitesGroup.push(hit(deal.deal_id, String(deal.name || deal.deal_id), siteResultDetail({
+      id: deal.deal_id,
+      address: deal.address,
+      city: deal.city,
+      stageGroup: deal.stage_group,
+    })));
+    seen.add(deal.deal_id);
+  }
+  const brokers = new Map<string, PaletteHit>();
+  for (const deal of deals) {
+    if (hiddenDeal(deal, options)) continue;
+    const firm = String(deal.firm || "").trim();
+    const broker = String(deal.broker || "").trim();
+    const name = nameHit(needle, firm) ? firm : nameHit(needle, broker) ? broker : "";
+    if (!name) continue;
+    const key = foldSearch(name);
+    if (!key || brokers.has(key)) continue;
+    brokers.set(key, hit(deal.deal_id, name));
+  }
+  return {
+    sites: sitesGroup,
+    brokers: [...brokers.values()].slice(0, 8),
+    conversations: [],
+  };
+}

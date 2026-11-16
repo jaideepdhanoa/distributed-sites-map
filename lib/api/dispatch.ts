@@ -15,6 +15,11 @@ import * as suggestionsDone from "@/lib/api/handlers/actions/suggestions-done";
 import * as recommendations from "@/lib/api/handlers/actions/recommendations";
 import * as recommendationsDismiss from "@/lib/api/handlers/actions/recommendations-dismiss";
 import * as agentInbox from "@/lib/api/handlers/agent/inbox";
+import * as agentSearch from "@/lib/api/handlers/agent/search";
+import * as agentSite from "@/lib/api/handlers/agent/sites-id";
+import * as cronSearch from "@/lib/api/handlers/cron/search";
+import * as cronStale from "@/lib/api/handlers/cron/stale";
+import * as search from "@/lib/api/handlers/search";
 import * as agentInboxAck from "@/lib/api/handlers/agent/inbox-ack";
 import * as agentInboxRecommendation from "@/lib/api/handlers/agent/inbox-recommendation";
 import * as ask from "@/lib/api/handlers/ask";
@@ -97,6 +102,8 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/actions/views/:id", { DELETE: viewsId.DELETE as Handler }),
   route("/api/actions/views", { GET: views.GET as Handler, POST: views.POST as Handler }),
   route("/api/agent/inbox/ack", { POST: agentInboxAck.POST as Handler }),
+  route("/api/agent/search", { GET: agentSearch.GET as Handler }),
+  route("/api/agent/sites/:id", { GET: agentSite.GET as Handler }),
   route("/api/agent/inbox/:id/recommendation", { POST: agentInboxRecommendation.POST as Handler }),
   route("/api/agent/inbox", { GET: agentInbox.GET as Handler }),
   route("/api/alerts/digest", { GET: digest.GET as Handler }),
@@ -122,6 +129,9 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/timeline/summary", { GET: timelineSummary.GET as Handler }),
   route("/api/data/timeline", { GET: timeline.GET as Handler }),
   route("/api/data/unscreened", { GET: unscreened.GET as Handler }),
+  route("/api/cron/search", { GET: cronSearch.GET as Handler }),
+  route("/api/cron/stale", { GET: cronStale.GET as Handler }),
+  route("/api/search", { GET: search.GET as Handler }),
   route("/api/ask/status", { GET: askStatus.GET as Handler }),
   route("/api/ask", { POST: ask.POST as Handler }),
   route("/api/changes", { POST: changes.POST as Handler }),

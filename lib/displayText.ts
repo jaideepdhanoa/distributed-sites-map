@@ -22,6 +22,13 @@ export function stripGmailIds(value: string): string {
     .trim();
 }
 
+const GMAIL_URL = /https?:\/\/(?:mail\.google\.com|gmail\.com)\S*/gi;
+
+/** Palette text. Strips Gmail ids and inbox URLs. The activity line is the place that may keep a link. */
+export function withoutGmail(value: string): string {
+  return stripGmailIds(value).replace(GMAIL_URL, "").replace(/\s+/g, " ").trim();
+}
+
 /** Client payloads drop Gmail ids from prose and from id fields. Inbox links stay. */
 export function redactGmailPayload<T>(value: T): T {
   return walkGmail(value) as T;

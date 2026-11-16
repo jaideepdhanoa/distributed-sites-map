@@ -23,6 +23,7 @@ import {
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_LAYOUT_IDS, SPACE_TYPE_IDS, spaceSiteAllowed, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import { safeGmailLink } from "@/lib/comms";
 import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
 import { coverageOf } from "@/lib/pnl/period";
@@ -84,6 +85,8 @@ export type CommsPayload = {
   site_ids?: string;
   thread_id?: string;
   link?: string;
+  gmail_message_id?: string;
+  gmail_thread_id?: string;
   asks_made?: string;
   asks_answered?: string;
   attachments?: string;
@@ -193,6 +196,11 @@ const commsPayload = z
     channel: z.string().trim().max(80).optional(),
     summary: z.string().trim().max(50000).optional(),
     subject: z.string().trim().max(2000).optional(),
+    message_id: z.string().trim().max(200).optional(),
+    thread_id: z.string().trim().max(200).optional(),
+    link: z.string().trim().max(500).optional(),
+    gmail_message_id: z.string().trim().max(64).optional(),
+    gmail_thread_id: z.string().trim().max(64).optional(),
   })
   .strict();
 
@@ -351,6 +359,9 @@ function issueMessage(path: string, code: string): string {
   if (path.endsWith("category")) return "Category must be one of the map business types.";
   if (path.endsWith("stage")) return "That stage is not a known stage.";
   if (path.endsWith("direction")) return "Comms direction must be in or out.";
+  if (path.endsWith("gmail_message_id") || path.endsWith("gmail_thread_id")) return "Gmail ids are 16 hex characters.";
+  if (path.endsWith("message_id") || path.endsWith("thread_id")) return "That id is not valid.";
+  if (path.endsWith("link")) return "The link must be an https URL.";
   if (path.endsWith("site_id")) return "That site id is not valid.";
   if (path.endsWith("expected_version")) return "Version must be a whole number.";
   if (path === "changes" || path.endsWith("changes")) return "Add at least one change.";
@@ -415,6 +426,39 @@ function realDate(value: string): boolean {
 
 function cleanText(value: string | undefined): void {
   if (value) assertClean(value);
+}
+
+function commsToken(index: number, label: string, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (!value) return "";
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(value)) {
+    throw new InputError(`Change ${index + 1}: ${label === "thread_id" ? "That thread id is not valid." : "That message id is not valid."}`);
+  }
+  return /^[0-9a-f]{16}$/i.test(value) ? value.toLowerCase() : value;
+}
+
+function gmailToken(index: number, label: string, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (!value) return "";
+  if (!/^[0-9a-f]{16}$/i.test(value)) {
+    throw new InputError(`Change ${index + 1}: ${label === "gmail_thread_id" ? "Gmail thread ids are 16 hex characters." : "Gmail message ids are 16 hex characters."}`);
+  }
+  return value.toLowerCase();
+}
+
+function commsLink(index: number, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const text = value.trim();
+  if (!text) return "";
+  if (text.startsWith("https://mail.google.com/")) {
+    const safe = safeGmailLink(text);
+    if (!safe) throw new InputError(`Change ${index + 1}: The link must be an https URL.`);
+    return safe;
+  }
+  if (!/^https:\/\/\S+$/.test(text) || text.includes("@")) {
+    throw new InputError(`Change ${index + 1}: The link must be an https URL.`);
+  }
+  return text;
 }
 
 export function validateBatch(actor: Actor, idempotencyKey: string, body: unknown): { key: string; changes: ParsedChange[] } {
@@ -488,12 +532,18 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
         fail(index, issue.path.map(String).join("."), issue.code);
       }
       const data = parsedPayload.data;
-      const zoned = parseZonedTimestamp(data.date);
-      if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
       cleanText(data.summary);
       cleanText(data.source_link);
       assertActivityActor(actor, index, data.type);
-      return { ...row, payload: { ...data, date: zoned.date, date_iso: zoned.iso } };
+      const zoned = parseZonedTimestamp(data.date);
+      if (data.at_approximate === true && !zoned && realDate(data.date)) {
+        return { ...row, payload: { ...data, date: data.date, at_approximate: true } };
+      }
+      if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+      return {
+        ...row,
+        payload: { ...data, date: zoned.date, date_iso: zoned.iso, ...(data.at_approximate ? { at_approximate: true } : {}) },
+      };
     }
     if (row.entity_type === "pnl_line") {
       return {
@@ -525,7 +575,22 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     cleanText(data.at);
     cleanText(data.summary);
     assertContentActor(actor, index);
-    return { ...row, payload: data };
+    const messageId = commsToken(index, "message_id", data.message_id);
+    const threadId = commsToken(index, "thread_id", data.thread_id);
+    const link = commsLink(index, data.link);
+    const gmailMessageId = gmailToken(index, "gmail_message_id", data.gmail_message_id);
+    const gmailThreadId = gmailToken(index, "gmail_thread_id", data.gmail_thread_id);
+    return {
+      ...row,
+      payload: {
+        ...data,
+        ...(messageId !== undefined ? { message_id: messageId } : {}),
+        ...(threadId !== undefined ? { thread_id: threadId } : {}),
+        ...(link !== undefined ? { link } : {}),
+        ...(gmailMessageId !== undefined ? { gmail_message_id: gmailMessageId } : {}),
+        ...(gmailThreadId !== undefined ? { gmail_thread_id: gmailThreadId } : {}),
+      },
+    };
   });
   return { key, changes };
 }

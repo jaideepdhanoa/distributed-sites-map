@@ -263,10 +263,14 @@ async function writeActivity(
   version: number,
 ): Promise<Record<string, unknown>> {
   const payload = change.payload as ActivityPayload;
-  const previous = await sql.query<{ payload: unknown }>(`SELECT payload FROM activities WHERE entity_id = $1`, [entityId]);
+  const previous = await sql.query<{ payload: unknown; at_approximate?: boolean }>(
+    `SELECT payload, at_approximate FROM activities WHERE entity_id = $1`,
+    [entityId],
+  );
   const prior = asObject(previous.rows[0]?.payload);
   // false clears a stored approximate flag. Omitting the field keeps it.
-  const approximate = payload.at_approximate === true || (payload.at_approximate == null && prior.at_approximate === true);
+  const priorFlag = previous.rows[0]?.at_approximate === true || prior.at_approximate === true;
+  const approximate = payload.at_approximate === true || (payload.at_approximate == null && priorFlag);
   const dateIso = (payload.date_iso ?? textOf(prior.date_iso)).trim();
   const stored: Record<string, unknown> = {
     date: payload.date,
@@ -280,15 +284,16 @@ async function writeActivity(
   if (provenance) stored.provenance = provenance;
   if (approximate) stored.at_approximate = true;
   await sql.query(
-    `INSERT INTO activities (entity_id, site_id, payload, version, updated_by)
-     VALUES ($1, $2, $3::jsonb, $4, $5)
+    `INSERT INTO activities (entity_id, site_id, payload, version, updated_by, at_approximate)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6)
      ON CONFLICT (entity_id) DO UPDATE SET
        site_id = EXCLUDED.site_id,
        payload = EXCLUDED.payload,
        version = EXCLUDED.version,
        updated_at = clock_timestamp(),
-       updated_by = EXCLUDED.updated_by`,
-    [entityId, change.site_id, JSON.stringify(stored), version, actorId],
+       updated_by = EXCLUDED.updated_by,
+       at_approximate = EXCLUDED.at_approximate`,
+    [entityId, change.site_id, JSON.stringify(stored), version, actorId, approximate],
   );
   return stored;
 }
@@ -301,8 +306,27 @@ async function writeComms(
   version: number,
 ): Promise<Record<string, unknown>> {
   const payload = change.payload as CommsPayload;
-  const previous = await sql.query<{ payload: unknown }>(`SELECT payload FROM comms_entries WHERE entity_id = $1`, [entityId]);
-  const prior = asObject(previous.rows[0]?.payload);
+  const previous = await sql.query<{
+    payload: unknown;
+    message_id?: string | null;
+    thread_id?: string | null;
+    link?: string | null;
+    gmail_message_id?: string | null;
+    gmail_thread_id?: string | null;
+  }>(
+    `SELECT payload, message_id, thread_id, link, gmail_message_id, gmail_thread_id
+     FROM comms_entries WHERE entity_id = $1`,
+    [entityId],
+  );
+  const priorRow = previous.rows[0];
+  const prior = asObject(priorRow?.payload);
+  const keep = (next: string | undefined, column: string | null | undefined, payloadKey: string) =>
+    next !== undefined ? next : textOf(column) || textOf(prior[payloadKey]);
+  const messageId = keep(payload.message_id, priorRow?.message_id, "message_id");
+  const threadId = keep(payload.thread_id, priorRow?.thread_id, "thread_id");
+  const link = keep(payload.link, priorRow?.link, "link");
+  const gmailMessageId = keep(payload.gmail_message_id, priorRow?.gmail_message_id, "gmail_message_id");
+  const gmailThreadId = keep(payload.gmail_thread_id, priorRow?.gmail_thread_id, "gmail_thread_id");
   const stored = {
     site_ids: payload.site_ids ?? change.site_id,
     direction: payload.direction,
@@ -314,25 +338,31 @@ async function writeComms(
     channel: payload.channel ?? textOf(prior.channel),
     summary: payload.summary ?? textOf(prior.summary),
     subject: payload.subject ?? textOf(prior.subject),
-    thread_id: payload.thread_id ?? textOf(prior.thread_id),
-    link: payload.link ?? textOf(prior.link),
+    thread_id: threadId,
+    link,
     asks_made: payload.asks_made ?? textOf(prior.asks_made),
     asks_answered: payload.asks_answered ?? textOf(prior.asks_answered),
     attachments: payload.attachments ?? textOf(prior.attachments),
     state_changes: payload.state_changes ?? textOf(prior.state_changes),
     workbook_source: payload.workbook_source ?? textOf(prior.workbook_source),
-    message_id: payload.message_id ?? textOf(prior.message_id),
+    message_id: messageId,
   };
   await sql.query(
-    `INSERT INTO comms_entries (entity_id, site_id, payload, version, updated_by)
-     VALUES ($1, $2, $3::jsonb, $4, $5)
+    `INSERT INTO comms_entries (
+       entity_id, site_id, payload, version, updated_by, message_id, thread_id, link, gmail_message_id, gmail_thread_id
+     ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, NULLIF($9, ''), NULLIF($10, ''))
      ON CONFLICT (entity_id) DO UPDATE SET
        site_id = EXCLUDED.site_id,
        payload = EXCLUDED.payload,
        version = EXCLUDED.version,
        updated_at = clock_timestamp(),
-       updated_by = EXCLUDED.updated_by`,
-    [entityId, change.site_id, JSON.stringify(stored), version, actorId],
+       updated_by = EXCLUDED.updated_by,
+       message_id = EXCLUDED.message_id,
+       thread_id = EXCLUDED.thread_id,
+       link = EXCLUDED.link,
+       gmail_message_id = EXCLUDED.gmail_message_id,
+       gmail_thread_id = EXCLUDED.gmail_thread_id`,
+    [entityId, change.site_id, JSON.stringify(stored), version, actorId, messageId, threadId, link, gmailMessageId, gmailThreadId],
   );
   return stored;
 }
@@ -658,6 +688,17 @@ async function applyOne(
     idempotencyKey,
     runId,
   });
+  try {
+    const { indexRecord } = await import("@/lib/search/docs");
+    await indexRecord(sql, {
+      entityType: change.entity_type,
+      entityId,
+      siteId: change.site_id,
+      payload,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));
+  }
   return { entity_type: change.entity_type, entity_id: entityId, site_id: change.site_id, event_id: eventId, version };
 }
 
@@ -793,6 +834,12 @@ export async function applyParsedChanges(
       [idempotencyKey, hash, JSON.stringify(response), actor.id],
     );
     await sql.exec(join ? "RELEASE SAVEPOINT apply_batch" : "COMMIT");
+    try {
+      const { scheduleEmbed } = await import("@/lib/search/embed");
+      scheduleEmbed();
+    } catch (error) {
+      console.error(JSON.stringify({ event: "embedding_error", name: error instanceof Error ? error.name : "error" }));
+    }
     return response;
   } catch (error) {
     try {

@@ -82,6 +82,8 @@ test("vercel cron matches the two dispatch routes and keeps the digest", () => {
     { path: "/api/alerts/digest", schedule: "0 14 * * *" },
     { path: "/api/alerts/digest", schedule: "0 15 * * *" },
     ...CRON_JOBS.map((job) => ({ path: job.path, schedule: job.schedule })),
+    { path: "/api/cron/search", schedule: "*/15 * * * *" },
+    { path: "/api/cron/stale", schedule: "15 13 * * *" },
   ]);
   const readme = readFileSync("README.md", "utf8");
   const example = readFileSync(".env.example", "utf8");

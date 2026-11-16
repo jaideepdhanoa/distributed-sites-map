@@ -439,7 +439,17 @@ function referencesProtectedSite(siteId: string, siteIds = ""): boolean {
 
 export function planActivityMirror(
   table: SheetTable,
-  rows: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean }[],
+  rows: {
+    entity_id: string;
+    site_id: string;
+    date: string;
+    type: string;
+    summary: string;
+    source_link: string;
+    imported?: boolean;
+    date_iso?: string;
+    at_approximate?: boolean | string;
+  }[],
 ): MirrorPlan {
   let skippedProtected = 0;
   const kept = rows.filter((row) => {
@@ -461,6 +471,8 @@ export function planActivityMirror(
         type: row.type,
         summary: row.summary,
         source_link: row.source_link,
+        at_iso: row.date_iso || "",
+        at_approximate: row.at_approximate === true || row.at_approximate === "1" ? "1" : "",
       },
     })),
     append: true,
@@ -626,8 +638,14 @@ export function formatPlan(changes: CellChange[]): string {
 }
 
 type StageDb = { site_id: string; stage: string };
-type ActivityDb = { entity_id: string; site_id: string; payload: unknown };
-type CommsDb = { entity_id: string; payload: unknown };
+type ActivityDb = { entity_id: string; site_id: string; payload: unknown; at_approximate?: boolean | null };
+type CommsDb = {
+  entity_id: string;
+  payload: unknown;
+  message_id?: string | null;
+  thread_id?: string | null;
+  link?: string | null;
+};
 
 function asObject(value: unknown): Record<string, unknown> {
   if (typeof value === "string") {
@@ -653,12 +671,12 @@ export function importedFromWorkbook(source: string | null | undefined): boolean
 
 export async function loadMirrorRows(sql: Sql): Promise<{
   stages: { site_id: string; stage: string }[];
-  activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean }[];
+  activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean; date_iso?: string; at_approximate?: boolean }[];
   comms: { entity_id: string; values: Record<string, string> }[];
   sites: { site_id: string; writes: Record<string, string> }[];
 }> {
   const stages = await sql.query<StageDb>(`SELECT site_id, stage FROM site_stages ORDER BY site_id`);
-  const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload FROM activities ORDER BY entity_id`);
+  const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload, at_approximate FROM activities ORDER BY entity_id`);
   const origins = await sql.query<{ entity_id: string; source: string }>(
     `SELECT DISTINCT ON (entity_id) entity_id, source
      FROM events
@@ -666,7 +684,9 @@ export async function loadMirrorRows(sql: Sql): Promise<{
      ORDER BY entity_id, created_at ASC, id ASC`,
   );
   const originOf = new Map(origins.rows.map((row) => [text(row.entity_id), text(row.source)]));
-  const comms = await sql.query<CommsDb>(`SELECT entity_id, payload FROM comms_entries ORDER BY entity_id`);
+  const comms = await sql.query<CommsDb>(
+    `SELECT entity_id, payload, message_id, thread_id, link FROM comms_entries ORDER BY entity_id`,
+  );
   const sites = await sql.query<{ site_id: string; sheet_writes: unknown }>(`SELECT site_id, sheet_writes FROM sites ORDER BY site_id`);
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
@@ -678,6 +698,8 @@ export async function loadMirrorRows(sql: Sql): Promise<{
         entity_id: entityId,
         site_id: text(row.site_id),
         date: text(payload.date),
+        date_iso: text(payload.date_iso),
+        at_approximate: row.at_approximate === true || payload.at_approximate === true || payload.at_approximate === "1",
         type: text(payload.type),
         summary: text(payload.summary),
         source_link: text(payload.source_link),
@@ -688,6 +710,9 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       const payload = asObject(row.payload);
       const values: Record<string, string> = {};
       for (const field of COMMS_FIELDS) values[field] = text(payload[field]);
+      if (text(row.message_id)) values.message_id = text(row.message_id);
+      if (text(row.thread_id)) values.thread_id = text(row.thread_id);
+      if (text(row.link)) values.link = text(row.link);
       const clock = values.at || "";
       values.at_iso = /T\d{2}:\d{2}/.test(clock) ? clock : "";
       values.at_approximate = payload.at_approximate === true || payload.at_approximate === "1" ? "1" : "";

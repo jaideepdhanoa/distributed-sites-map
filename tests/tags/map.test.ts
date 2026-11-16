@@ -3,6 +3,7 @@ import test from "node:test";
 import { EXCLUDED_SITE_ID } from "../../lib/alerts/excluded";
 import { prepareRows, type SheetColumn } from "../../lib/listLayout";
 import { advanceReasonCode, calendarToZoned, dropReasonCode, mapTags, sinceLabel, tagHash } from "../../lib/tags/map";
+import { chipsForDeal, suggestedDropChip } from "../../lib/tags/show";
 import { sectionChips, TAG_FAMILIES } from "../../lib/tags/vocab";
 
 test("today's cells become chips, and the free text stays on the note", () => {
@@ -105,4 +106,12 @@ test("a chip-set filter keeps rows whose code is selected", () => {
     touched: true,
   }, ["chip_waiting"]);
   assert.deepEqual(kept.map((row) => row.code), ["broker_reply"]);
+});
+
+test("an empty tag table still derives waiting, and a suggestion is a short chip", () => {
+  const chips = chipsForDeal({ deal_id: "PIPE-PHX-0014", stage_blocker: "—", chips: [] }, true);
+  assert.equal(chips.find((chip) => chip.family === "waiting_on")?.code, "nothing");
+  assert.equal(chips.some((chip) => chip.family === "diligence_land"), true);
+  assert.equal(suggestedDropChip("Lot too small")?.label, "Lot too small");
+  assert.equal(suggestedDropChip("not a listed reason"), null);
 });

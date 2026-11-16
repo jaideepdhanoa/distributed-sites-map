@@ -57,7 +57,8 @@ test("the desk list keeps the location note out of the stage tabs", async ({ pag
   }
   const mark = page.locator("[data-testid=pipeline-list] [data-testid=suggested-drop]").first();
   await expect(mark).toBeVisible();
-  await expect(mark).toHaveText(/^Suggested drop: /);
+  await expect(mark).not.toContainText("Suggested drop:");
+  await expect(mark).not.toContainText("…");
   const lines = await mark.evaluate((el) => {
     const range = document.createRange();
     range.selectNodeContents(el);

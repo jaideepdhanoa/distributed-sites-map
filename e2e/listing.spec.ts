@@ -33,7 +33,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   const step = page.getByTestId("workbook-step");
   await expect(step).toBeVisible();
   await expect(step).not.toContainText(/\b[RT]-\d{2,4}\b/);
-  const more = step.getByRole("button", { name: "Full next step" });
+  const more = step.getByRole("button", { name: "Show full note" });
   if (await more.count()) await more.click();
   await expect(step).toContainText("POS/car counts");
   await expect(page.locator("aside.drawer")).not.toContainText("Broker contacted");

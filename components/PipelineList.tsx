@@ -37,14 +37,13 @@ import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { stageDetail, stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
+import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily, tagFamily } from "@/lib/tags/vocab";
 import { ReasonPicker } from "./ReasonPicker";
-import { NdaChip } from "./NdaChip";
 import { PhoneCards } from "./PhoneCards";
 import { TagChip } from "./TagChip";
 import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
-import { SuggestedDropMark } from "./SuggestedDrop";
 
 export type PipelineRow = {
   deal: DealProps;
@@ -79,6 +78,10 @@ function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
   const land = openLandLabel(deal.open_land_sqft, deal.open_land_basis);
   const openLand = isOpenLandBlank(land) ? "" : `${land} open`;
   return [score, asking, party, openLand];
+}
+
+function dealChips(deal: DealProps, signedIn: boolean) {
+  return chipsForDeal({ ...deal }, signedIn);
 }
 
 function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
@@ -121,7 +124,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "area") return serviceAreaColumn(deal) || "—";
   if (id === "nda") {
     if (!signedIn) return "—";
-    return deal.chips?.find((chip) => chip.family === "nda")?.label || cardNdaLabel(deal, signedIn) || "—";
+    return dealChips(deal, signedIn).find((chip) => chip.family === "nda")?.label || cardNdaLabel(deal, signedIn) || "—";
   }
   if (id === "lastContact") return contactDate(deal.last_broker_contact) || "—";
   if (id === "nextStep") return stripGmailIds(String(deal.next_step || "").trim()) || "—";
@@ -129,7 +132,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const family = columnFamily(id);
   if (family) {
     if (!signedIn && family.signedIn) return "—";
-    return deal.chips?.find((chip) => chip.family === family.family)?.label || "—";
+    return dealChips(deal, signedIn).find((chip) => chip.family === family.family)?.label || "—";
   }
   return checkedShort(deal.checked_live) || "—";
 }
@@ -266,16 +269,18 @@ export default function PipelineList({
   const sheetColumns: SheetColumn<PipelineRow>[] = visible.map((id) => {
     const family = columnFamily(id);
     const choices = id === "stage" ? STAGE_CHOICES : family?.codes.map((item) => ({ code: item.code, label: item.label }));
+    const codeOf = (row: PipelineRow) => {
+      if (id === "stage") return stageFilterCode(row.deal);
+      return dealChips(row.deal, signedIn).find((chip) => chip.family === family?.family)?.code || "";
+    };
     return {
       id,
       label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
-      className: id === "capacity" ? "power-col" : undefined,
+      className: id === "capacity" ? "power-col" : id === "stage" ? "stage-col" : undefined,
       text: (row) => cell(row, id as PipelineColumnId, signedIn),
       choices,
-      code: (row) => {
-        if (id === "stage") return stageFilterCode(row.deal);
-        return row.deal.chips?.find((chip) => chip.family === family?.family)?.code || "";
-      },
+      hasValues: choices ? rows.some((row) => Boolean(codeOf(row))) : undefined,
+      code: codeOf,
       sortValue: (row) => {
         const value = sortValue(row, id as PipelineColumnId, signedIn);
         return typeof value === "number" ? value : null;
@@ -560,17 +565,20 @@ export default function PipelineList({
           if (column === "capacity") return <NumberCell label={cell(row, "capacity", signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={capacitySummary(factsForDeal(row.deal)) || "Not on file"} />;
           const family = columnFamily(column);
           if (family) {
-            const chip = row.deal.chips?.find((item) => item.family === family.family);
+            const chip = dealChips(row.deal, signedIn).find((item) => item.family === family.family);
             if (chip && (signedIn || !family.signedIn)) return <TagChip chip={chip} compact />;
             if (column !== "nda") return "—";
           }
-          if (column === "stage") return (
-            <span className="stage-cell">
-              <span className={`stage-pill tone-${stageTone(row.deal)}`} title={String(cell(row, "stage", signedIn))}>{cell(row, "stage", signedIn)}</span>
-              <NdaChip deal={row.deal} signedIn={signedIn} />
-              <StagePending note={row.deal.stage_pending} />
-            </span>
-          );
+          if (column === "stage") {
+            const nda = signedIn ? dealChips(row.deal, signedIn).find((chip) => chip.family === "nda" && chip.code !== "not_required") : undefined;
+            return (
+              <span className="stage-cell">
+                <span className={`stage-pill tone-${stageTone(row.deal)}`} title={String(cell(row, "stage", signedIn))}>{cell(row, "stage", signedIn)}</span>
+                {nda ? <TagChip chip={nda} compact /> : null}
+                <StagePending note={row.deal.stage_pending} />
+              </span>
+            );
+          }
           if (column === "site") return (
             <span className="site-name">
               {showChecks ? (
@@ -589,7 +597,11 @@ export default function PipelineList({
                     <span className="site-address" title={displayAddress(row.deal.address)}>{displayAddress(row.deal.address)}</span>
                   ) : <span className="site-address" />}
                   <NearMark deal={row.deal} />
-                  <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
+                  {signedIn ? (() => {
+                    const drop = dealChips(row.deal, signedIn).find((chip) => chip.family === "drop_reason") || suggestedDropChip(String(row.deal.suggested_drop || ""));
+                    if (!drop) return null;
+                    return <span data-testid={drop.source === "suggested_drop" ? "suggested-drop" : undefined}><TagChip chip={drop} compact /></span>;
+                  })() : null}
                 </span>
               </span>
               <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />

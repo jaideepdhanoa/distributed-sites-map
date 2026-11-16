@@ -20,8 +20,8 @@ import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
 import { ChipRow, TagChip } from "./TagChip";
-import { chipsFromDeal } from "@/lib/tags/show";
-import { DILIGENCE_FAMILIES, sectionChips, tagFamily } from "@/lib/tags/vocab";
+import { chipsForDeal } from "@/lib/tags/show";
+import { DILIGENCE_FAMILIES, sectionChips } from "@/lib/tags/vocab";
 import type { TagView } from "@/lib/tags/map";
 
 function acres(value: number | null | undefined, text?: string) {
@@ -247,8 +247,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null }: { site: Sit
 }
 
 function visibleChips(deal: DealProps, signedIn: boolean): TagView[] {
-  const chips = deal.chips?.length ? deal.chips : chipsFromDeal(deal, signedIn);
-  return chips.filter((chip) => signedIn || !tagFamily(chip.family)?.signedIn).map((chip) => (signedIn ? chip : { ...chip, note: "" }));
+  return chipsForDeal({ ...deal }, signedIn);
 }
 
 function StageChip({ deal }: { deal: DealProps }) {
@@ -751,7 +750,7 @@ export function DealDetail({
   const revenue = revenueTile(deal);
   const cue = listingCue(deal);
   const chips = visibleChips(deal, signedIn);
-  const waiting = chips.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
+  const waiting = chips.find((chip) => chip.family === "waiting_on");
   const gap = chips.find((chip) => chip.family === "biggest_gap");
   const recordChips = sectionChips(chips, ["drop_reason", "advance_reason", "package", "listing", "lead_source", "business_check", "photos", "nda"]);
   const diligence = sectionChips(chips, DILIGENCE_FAMILIES);
@@ -789,6 +788,7 @@ export function DealDetail({
           {waiting ? <TagChip chip={waiting} compact /> : null}
           {gap ? <TagChip chip={gap} compact /> : null}
         </div>
+        <ChipRow chips={diligence} testId="diligence-home" titled />
         <p className="note">{deal.address}</p>
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}

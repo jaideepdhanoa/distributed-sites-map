@@ -725,17 +725,18 @@ function WorkbookLine({ text, owner, due }: { text: string; owner: string; due: 
   const plain = plainNextStep(text);
   const [open, setOpen] = useState(false);
   const meta = [owner ? `Owner ${owner}` : "", due ? `Due ${due}` : ""].filter(Boolean).join(" · ");
+  const more = Boolean(plain.full && plain.full !== plain.line);
   if (!plain.line && !meta) return null;
   return (
-    <div className="workbook-step" data-testid="workbook-step">
-      {plain.line ? <p className="next-line" title={plain.full}>{plain.line}</p> : null}
+    <div className="workbook-step" data-testid="workbook-step" data-note={open ? "full" : "line"}>
+      {plain.line && !open ? <p className="next-line" title={plain.full}>{plain.line}</p> : null}
+      {open ? <p className="next-full">{plain.full}</p> : null}
       {meta ? <p className="proposal-meta">{meta}</p> : null}
-      {plain.full && plain.full !== plain.line ? (
+      {more ? (
         <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-          {open ? "Hide full next step" : "Full next step"}
+          {open ? "Hide full note" : "Show full note"}
         </button>
       ) : null}
-      {open && plain.full !== plain.line ? <p className="next-full">{plain.full}</p> : null}
     </div>
   );
 }

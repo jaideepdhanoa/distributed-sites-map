@@ -57,6 +57,14 @@ class OpenLoopsReadTest(unittest.TestCase):
         self.assertEqual(court_days(8), 8)
         self.assertIsNone(court_days("2026-11-11"))
 
+    def test_a_long_next_step_is_kept_for_the_signed_in_note(self) -> None:
+        from scripts.open_loops import public_step
+
+        note = "Confirm the survey and the population count. " * 40
+        self.assertFalse(public_step(note, 8000).endswith("…"))
+        self.assertGreater(len(public_step(note, 8000)), 600)
+        self.assertTrue(public_step(note).endswith("…"))
+
     def test_reader_does_not_write_the_workbook(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "book.xlsx"

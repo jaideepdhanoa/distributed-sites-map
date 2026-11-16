@@ -13,9 +13,9 @@ import { capacitySummary, factsForDeal, factsForSite } from "@/lib/keyNumbers";
 import { spareTier } from "@/lib/filter";
 import { TIER_NOTES, plainVerdict, stageDetail, tierLabel } from "@/lib/labels";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { NdaChip } from "./NdaChip";
+import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { StagePending } from "./StagePending";
-import { SuggestedDropMark } from "./SuggestedDrop";
+import { TagChip } from "./TagChip";
 
 type SortingState = { id: string; desc: boolean }[];
 
@@ -216,14 +216,19 @@ const dealColumns: LegacyColumnDef<DealProps>[] = [
     id: "stage",
     accessorFn: (row) => stageDetail(row.stage, row.stage_group),
     header: "Stage",
-    cell: ({ row }) => (
-      <span className="stage-cell">
-        <span>{stageDetail(row.original.stage, row.original.stage_group)}</span>
-        <NdaChip deal={row.original} />
-        <SuggestedDropMark reason={row.original.suggested_drop} stageGroup={row.original.stage_group} stage={row.original.stage} />
-        <StagePending note={row.original.stage_pending} />
-      </span>
-    ),
+    cell: ({ row }) => {
+      const chips = chipsForDeal({ ...row.original }, true);
+      const nda = chips.find((chip) => chip.family === "nda" && chip.code !== "not_required");
+      const drop = chips.find((chip) => chip.family === "drop_reason") || suggestedDropChip(String(row.original.suggested_drop || ""));
+      return (
+        <span className="stage-cell">
+          <span>{stageDetail(row.original.stage, row.original.stage_group)}</span>
+          {nda ? <TagChip chip={nda} compact /> : null}
+          {drop ? <TagChip chip={drop} compact /> : null}
+          <StagePending note={row.original.stage_pending} />
+        </span>
+      );
+    },
   },
   { id: "firm", accessorFn: (row) => shownFirm(row), header: "Firm" },
   { id: "broker", accessorFn: (row) => shownBroker(row), header: "Broker" },
@@ -319,8 +324,17 @@ export function DealTable({
             <button type="button" className={row.deal_id === selectedId ? "list-row on" : "list-row"} onClick={() => onSelect(row.deal_id)}>
               <strong>{row.name || row.address || row.deal_id}</strong>
               <span>{stageDetail(row.stage, row.stage_group)}{row.asking_price_display ? ` · ${row.asking_price_display}` : ""}</span>
-              <NdaChip deal={row} />
-              <SuggestedDropMark reason={row.suggested_drop} stageGroup={row.stage_group} stage={row.stage} />
+              {(() => {
+                const chips = chipsForDeal({ ...row }, true);
+                const nda = chips.find((chip) => chip.family === "nda" && chip.code !== "not_required");
+                const drop = chips.find((chip) => chip.family === "drop_reason") || suggestedDropChip(String(row.suggested_drop || ""));
+                return (
+                  <>
+                    {nda ? <TagChip chip={nda} compact /> : null}
+                    {drop ? <TagChip chip={drop} compact /> : null}
+                  </>
+                );
+              })()}
               <StagePending note={row.stage_pending} />
               <span>{row.address}</span>
               {touchOf(activity, row.deal_id)?.lastTouched || touchOf(activity, row.deal_id)?.materials ? (

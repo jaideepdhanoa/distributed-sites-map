@@ -994,6 +994,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .nda-sites { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; }
 .stage-cell { display: flex; flex-wrap: nowrap; gap: 4px 6px; align-items: center; min-width: 0; overflow: hidden; }
 .list-table .stage-cell { flex-wrap: wrap; align-items: flex-start; overflow: visible; white-space: normal; }
+.stage-cell .stage-pill { flex: 0 0 auto; margin-top: 0; max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
 .suggested-inline {
   flex: 1 1 16rem;
   display: inline-block;

@@ -23,6 +23,8 @@ export type SheetColumn<Row> = {
   sortValue?: (row: Row) => number | null;
   /** Chip-set filter. The saved value is the selected codes joined with |. */
   choices?: { code: string; label: string }[];
+  /** False when no visible row carries a code for this chip-set. */
+  hasValues?: boolean;
   code?: (row: Row) => string;
   private?: boolean;
   className?: string;

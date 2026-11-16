@@ -333,6 +333,7 @@ export default function SheetGrid<Row>({
                       )}
                       {column.choices ? (
                         <div className="chip-filter" role="group" aria-label={`Filter ${column.label}`}>
+                          {column.hasValues === false ? <p className="menu-note">No sites have this chip yet.</p> : null}
                           {column.choices.map((choice) => {
                             const selected = (layout.filters[column.id] || "").split("|").filter(Boolean);
                             const on = selected.includes(choice.code);

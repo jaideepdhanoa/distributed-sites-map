@@ -14,7 +14,7 @@ import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
-import type { PnlTiles } from "./FinancialsEntry";
+import { PendingFigure, type PnlTiles } from "./FinancialsEntry";
 
 export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
   if (!facts.length) return <strong title="Not on file">—</strong>;
@@ -85,13 +85,17 @@ export function SitePacket({
   deal,
   hasPin,
   signedIn = false,
+  tiles = null,
+  pending = false,
 }: {
   site: SiteProps;
   deal?: DealProps | null;
   hasPin: boolean;
   signedIn?: boolean;
+  tiles?: PnlTiles | null;
+  pending?: boolean;
 }) {
-  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} />;
+  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} tiles={tiles} pending={pending} />;
   const facts = factsForSite(site);
   const capacity = capacityTiles(facts);
   const asking = site.asking_price_display || "";
@@ -125,6 +129,7 @@ export default function KeyStrip({
   universeSite,
   signedIn = false,
   tiles = null,
+  pending = false,
 }: {
   deal: DealProps;
   hasPin: boolean;
@@ -132,6 +137,7 @@ export default function KeyStrip({
   universeSite?: SiteProps | null;
   signedIn?: boolean;
   tiles?: PnlTiles | null;
+  pending?: boolean;
 }) {
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "—";
@@ -159,7 +165,7 @@ export default function KeyStrip({
   useEffect(() => {
     if (!signedIn || !showFinancials) return undefined;
     let cancel = false;
-    fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`)
+    fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`, { cache: "no-store" })
       .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel : null))
       .then((panel) => {
         if (!cancel && panel) setFinancials({ ...panel, pnl: readPnl(panel.pnl) });
@@ -202,22 +208,36 @@ export default function KeyStrip({
       <div className="metrics">
         {signedIn && showFinancials ? (
           <article className="wide">
-            <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
-              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-              <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
-              {tiles ? (tiles.revenue.note ? <small>{tiles.revenue.note}</small> : null) : deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-              {tiles ? null : revenueBasis ? <em>{revenueBasis}</em> : null}
-            </button>
+            {pending ? (
+              <div className="fin-tile" data-testid="revenue-tile" aria-busy="true">
+                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
+                <PendingFigure />
+              </div>
+            ) : (
+              <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
+                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
+                <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
+                <small className="figure-hold">{tiles ? tiles.revenue.note : (deal.revenue_period || "")}</small>
+                {tiles ? null : revenueBasis ? <em>{revenueBasis}</em> : null}
+              </button>
+            )}
           </article>
         ) : null}
         {signedIn && !cash.hidden && showFinancials ? (
           <article className="wide">
-            <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
-              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
-              <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
-              {tiles ? (tiles.cash.note ? <small>{tiles.cash.note}</small> : null) : cashNote ? <small>{cashNote}</small> : null}
-              {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
-            </button>
+            {pending ? (
+              <div className="fin-tile" data-testid="cash-flow-tile" aria-busy="true">
+                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
+                <PendingFigure />
+              </div>
+            ) : (
+              <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
+                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
+                <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
+                <small className="figure-hold">{tiles ? tiles.cash.note : cashNote}</small>
+                {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
+              </button>
+            )}
           </article>
         ) : null}
         <Metric icon={Wallet} label="Asking" value={signedIn ? askingText : "—"} title={signedIn ? askingText : "—"} note={signedIn ? (shownPriceSource(deal) || "") : ""} basis={signedIn && deal.asking_price_display ? "Broker-stated" : ""} />

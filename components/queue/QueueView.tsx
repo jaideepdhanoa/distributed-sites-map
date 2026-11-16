@@ -361,6 +361,7 @@ export function ReviewRail({
       <button
         type="button"
         className={`review-row ${site.siteId === currentId ? "on" : ""} ${site.status === "reviewed" ? "done" : ""}`}
+        data-site={site.siteId}
         onClick={() => onPick(index)}
       >
         <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
@@ -418,6 +419,7 @@ export function ReviewFeedSheet({
             <button
               type="button"
               className={`review-row ${site.siteId === currentId ? "on" : ""}`}
+              data-site={site.siteId}
               onClick={() => { onPick(index); onClose(); }}
             >
               <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{index + 1}. {site.name}</strong>

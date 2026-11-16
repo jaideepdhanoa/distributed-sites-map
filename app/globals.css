@@ -358,13 +358,13 @@ span.listing-link.muted {
   padding: 0;
 }
 .site-name { display: flex; align-items: flex-start; flex-wrap: nowrap; gap: 8px; min-width: 0; }
-.site-title { display: grid; grid-template-rows: auto auto; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.site-title { display: grid; grid-template-rows: auto auto; gap: 2px; min-width: 10rem; flex: 1 1 auto; }
 .site-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; overflow: visible; }
 .site-meta .site-address { flex: 1 1 100%; max-width: none; white-space: normal; }
 .site-meta .near-chip, .site-meta .suggested-inline, .site-meta [data-testid="suggested-drop"] { flex: 0 1 auto; margin-top: 0; max-width: 100%; }
 .list-table .stage-pill { margin-top: 0; max-width: 100%; overflow: visible; text-overflow: clip; white-space: normal; height: auto; }
 .list-table .site-name .row-links { margin-left: auto; align-self: flex-start; }
-.site-name-text { display: block; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: break-word; font-weight: 650; }
+.site-name-text { display: block; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: normal; word-break: normal; font-weight: 650; }
 .list-table td[data-col="site"] { white-space: normal; overflow: visible; text-overflow: unset; vertical-align: top; }
 .site-address {
   color: var(--ink-3);
@@ -1064,7 +1064,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   z-index: 2;
   box-shadow: inset -1px 0 0 var(--line);
 }
-.list-table th[data-col="site"], .list-table td[data-col="site"] { min-width: 180px; }
+.list-table th[data-col="site"], .list-table td[data-col="site"] { min-width: 280px; }
 .list-table thead th.is-pinned { z-index: 5; background: #faf7f1; }
 .list-scroll.is-scrolled .list-table th.is-pinned,
 .list-scroll.is-scrolled .list-table td.is-pinned {

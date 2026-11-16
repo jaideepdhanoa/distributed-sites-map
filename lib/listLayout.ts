@@ -51,7 +51,7 @@ export const LAYOUT_SURFACES = ["pipeline", "universe"] as const;
 export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 
 const MIN_WIDTH = 96;
-const SITE_MIN_WIDTH = 180;
+const SITE_MIN_WIDTH = 280;
 const MAX_WIDTH = 480;
 
 /** Columns that take leftover pane width. The pipeline list adds its power column. */
@@ -144,7 +144,8 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   if (raw.widths && typeof raw.widths === "object") {
     for (const [id, value] of Object.entries(raw.widths)) {
       if (!known.has(id) || typeof value !== "number" || !Number.isFinite(value)) continue;
-      widths[id] = clampWidth(value);
+      const width = clampWidth(value);
+      widths[id] = id === "site" ? Math.max(SITE_MIN_WIDTH, width) : width;
     }
   }
   const filters: Record<string, string> = {};
@@ -227,6 +228,8 @@ export function fitColumnWidths(
     return typeof saved === "number" && Number.isFinite(saved) ? saved : columnWidth(id);
   });
   if (!ids.length || paneWidth <= 0) return base;
+  const siteAt = ids.indexOf("site");
+  if (siteAt >= 0) base[siteAt] = Math.max(SITE_MIN_WIDTH, base[siteAt]);
   const target = Math.max(0, Math.floor(paneWidth) - Math.max(0, Math.round(trailing)));
   const sum = base.reduce((total, width) => total + width, 0);
   const delta = target - sum;

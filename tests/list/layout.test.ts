@@ -115,14 +115,24 @@ test("a default sheet uses the pane and keeps rigid columns", () => {
   assert.ok(wide[7] > columnWidth("cashFlow"));
   const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(narrow[0] < columnWidth("site"));
-  assert.ok(narrow[0] >= 180);
+  assert.ok(narrow[0] >= 280);
   const withWaiting = fitColumnWidths(["site", "chip_waiting", ...pipelineIds.slice(1)], {}, 1024, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.ok(withWaiting[0] >= 180);
+  assert.ok(withWaiting[0] >= 280);
+  const savedNarrow = fitColumnWidths(
+    ["site", "chip_waiting", "stage", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"],
+    { site: 48, stage: 140, score: 96, asking: 160, openLand: 110, capacity: 120, traffic: 100, cashFlow: 140 },
+    1024,
+    TRAILING_COLUMN_WIDTH,
+    flexIds,
+  );
+  assert.ok(savedNarrow[0] >= 280);
+  const loaded = sanitizeLayout({ widths: { site: 48, stage: 90 }, order: ["site", "stage"], touched: true }, ["site", "stage", "chip_waiting"]);
+  assert.ok((loaded.widths.site || 0) >= 280);
 });
 
 test("a saved layout keeps its widths and the last flexible column fills a wider pane", () => {
   const widths = {
-    site: 200,
+    site: 300,
     stage: 140,
     score: 100,
     asking: 150,
@@ -132,15 +142,15 @@ test("a saved layout keeps its widths and the last flexible column fills a wider
     cashFlow: 140,
   };
   const fitted = fitColumnWidths(pipelineIds, widths, 1600, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.equal(fitted[0], 200);
+  assert.equal(fitted[0], 300);
   assert.equal(fitted[1], 140);
   assert.equal(fitted[3], 150);
   assert.equal(fitted[5], 130);
   assert.equal(fitted[6], 100);
   assert.ok(fitted[7] > 140);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1600);
-  const askingLast = fitColumnWidths(["site", "cashFlow", "asking"], { site: 200, cashFlow: 120, asking: 140 }, 900, 0, flexIds);
-  assert.deepEqual(askingLast, [200, 120, 580]);
+  const askingLast = fitColumnWidths(["site", "cashFlow", "asking"], { site: 300, cashFlow: 120, asking: 140 }, 900, 0, flexIds);
+  assert.deepEqual(askingLast, [300, 120, 480]);
   const wider = fitColumnWidths(pipelineIds, { ...widths, site: 420, asking: 400, capacity: 400, traffic: 300, cashFlow: 400 }, 1280, TRAILING_COLUMN_WIDTH, flexIds);
   assert.equal(wider[0], 420);
   assert.equal(wider[7], 400);

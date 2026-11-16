@@ -1088,7 +1088,7 @@ th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity
 .list-table th.col-over { background: var(--green-tint); }
 .list-bar .chip.removable { max-width: 180px; }
 .list-table tr.on td:first-child { background: #e7f0ea; }
-.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: nowrap; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.list-table th button, .list-table td button { border: 0; background: transparent; padding: 0; font: inherit; white-space: nowrap; text-align: left; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .list-table tr.on td { background: #e7f0ea; }
 .list-cards { display: none; list-style: none; margin: 0; padding: 0; }
 .list-cards li { display: flex; flex-direction: row; align-items: stretch; gap: 8px; border-bottom: 1px solid var(--line); padding: 10px 12px; background: #fffdf8; }

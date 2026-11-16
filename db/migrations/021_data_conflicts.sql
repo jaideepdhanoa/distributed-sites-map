@@ -1,7 +1,8 @@
 -- Two sources that disagree about one site field or one P&L line.
 -- Writes stay on POST /api/changes. Events stay append-only.
 -- Adds data_conflict to the events check without dropping types other migrations added.
--- Safe before or after 017_site_spaces.sql and 018_pnl_basis.sql.
+-- Safe before or after 015_tags.sql (tag), 017_site_spaces.sql (site_space),
+-- and 018_pnl_basis.sql. 015 may land before or after this file.
 
 CREATE TABLE IF NOT EXISTS data_conflicts (
   entity_id text PRIMARY KEY,
@@ -43,7 +44,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS data_conflicts_open_key
 DO $$
 DECLARE
   def text;
-  names text[] := ARRAY['stage', 'activity', 'comms', 'site', 'pnl_line', 'site_space', 'data_conflict'];
+  names text[] := ARRAY['stage', 'activity', 'comms', 'site', 'pnl_line', 'site_space', 'tag', 'data_conflict'];
   token text;
 BEGIN
   SELECT pg_get_constraintdef(oid) INTO def

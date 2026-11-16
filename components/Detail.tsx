@@ -8,7 +8,7 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import FinancialsEntry from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
@@ -139,6 +139,7 @@ function FigureSkeleton() {
 
 function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps; censusAcres?: number | null; signedIn?: boolean }) {
   const cash = cashTile(deal);
+  const revenue = revenueTile(deal);
   const spare = spareLandSqft(deal.open_land_sqft, censusAcres);
   const bays = deal.bays_that_fit == null ? "—" : String(Math.round(deal.bays_that_fit));
   const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
@@ -152,14 +153,14 @@ function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps
       {showMoney ? (
         <div>
           <span>Revenue</span>
-          <strong>{deal.stated_revenue_display || "—"}</strong>
+          <strong className={revenue.text === "Not in package" ? "phrase" : undefined} title={revenue.title}>{revenue.text}</strong>
           {deal.revenue_basis ? <small>{deal.revenue_basis}</small> : null}
         </div>
       ) : null}
       {showMoney ? (
         <div>
           <span>Cash flow</span>
-          <strong className={negative ? "neg" : ""}>{cash.value || "—"}</strong>
+          <strong className={`${negative ? "neg" : ""} ${cash.value === "Not in package" ? "phrase" : ""}`.trim()} title={cash.value === "—" ? "Not on file" : cash.value}>{cash.value || "—"}</strong>
           {[cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).length ? <small>{[cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</small> : null}
         </div>
       ) : null}
@@ -694,6 +695,7 @@ export function DealDetail({
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
   const cash = cashTile(deal);
+  const revenue = revenueTile(deal);
   const cue = listingCue(deal);
   return (
     <aside
@@ -816,7 +818,7 @@ export function DealDetail({
               <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}
-              {signedIn && !cash.hidden ? <div>{[deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? <div title={revenue.title}>{[revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
               {signedIn && !cash.hidden ? <span>Cash flow</span> : null}
               {signedIn && !cash.hidden ? <div>{[cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div> : null}
             </div>

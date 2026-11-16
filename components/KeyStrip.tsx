@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
@@ -128,7 +128,7 @@ export default function KeyStrip({
   const cashView = deal.stated_cash_flow != null || deal.stated_cash_flow_display
     ? { text: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display), title: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) }
     : { text: cash.value || "—", title: cash.value || "—" };
-  const revenueText = deal.stated_revenue_display || (deal.stated_revenue != null ? sheetMoney(deal.stated_revenue, null) : "—");
+  const revenue = revenueTile(deal);
   const revenueBasis = deal.stated_revenue != null ? basisBadge(deal.revenue_basis) : "";
   const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
@@ -190,9 +190,9 @@ export default function KeyStrip({
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
               <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-              <strong title={revenueText}>{revenueText}</strong>
+              <strong title={revenue.title}>{revenue.text}</strong>
               {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-              {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small title="Not on file">—</small> : null}
+              {revenueBasis ? <em>{revenueBasis}</em> : null}
             </button>
           </article>
         ) : null}

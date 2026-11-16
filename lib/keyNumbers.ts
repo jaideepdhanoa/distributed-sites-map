@@ -1,3 +1,4 @@
+import { packageOnFile } from "./pnl/package.ts";
 import type { DealProps, SiteProps } from "./types";
 
 function asText(value: unknown): string {
@@ -214,6 +215,23 @@ export function factsForSite(site: CapacityRecord | null | undefined, deal?: Cap
 
 export const UNKNOWN = "—";
 export const UNKNOWN_TITLE = "Not on file";
+export const NOT_IN_PACKAGE = "Not in package";
+
+/** A blank revenue or cash-flow line. A package that omits the line is not the same as no package. */
+export function absentFigure(deal: Pick<DealProps, "package_status" | "package_line">): { text: string; title: string } {
+  if (packageOnFile(deal.package_status, deal.package_line)) return { text: NOT_IN_PACKAGE, title: NOT_IN_PACKAGE };
+  return { text: UNKNOWN, title: UNKNOWN_TITLE };
+}
+
+export function revenueTile(deal: Pick<DealProps, "stated_revenue" | "stated_revenue_display" | "package_status" | "package_line">): { text: string; title: string } {
+  const display = asText(deal.stated_revenue_display).trim();
+  if (display) return { text: display, title: display };
+  if (deal.stated_revenue != null) {
+    const text = sheetMoney(deal.stated_revenue, null);
+    return { text, title: text };
+  }
+  return absentFigure(deal);
+}
 
 export function capacitySummary(facts: CapacityFact[]): string {
   if (!facts.length) return "";
@@ -501,8 +519,10 @@ export function cashTile(deal: DealProps) {
   if (deal.figures_status === "withheld") {
     return { value: "Package figures not shown", note: "Seller package", basis: "", extra: "", hidden: false };
   }
+  const absent = absentFigure(deal);
+  if (absent.text === NOT_IN_PACKAGE) return { value: absent.text, note: "", basis: "", extra: "", hidden: false };
   const line = packageLine(deal);
-  return { value: UNKNOWN, note: line || UNKNOWN_TITLE, basis: claimWord(deal), extra: "", hidden: false };
+  return { value: absent.text, note: line || UNKNOWN_TITLE, basis: claimWord(deal), extra: "", hidden: false };
 }
 
 export function growthText(value?: number | null) {

@@ -1,11 +1,7 @@
 import { buildPnlGrid } from "./grid";
 import type { PnlStatement } from "./statement";
 
-export function packageOnFile(status?: string | null, line?: string | null): boolean {
-  const text = `${status || ""} ${line || ""}`.toLowerCase();
-  if (text.includes("refus") || text.includes("unavailable")) return false;
-  return text.includes("received") || text.includes("partial") || text.includes("on file");
-}
+export { packageOnFile } from "./package.ts";
 
 export type FinancialsCard = {
   revenue: string;

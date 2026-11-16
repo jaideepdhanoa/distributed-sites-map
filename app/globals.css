@@ -2253,6 +2253,15 @@ tr { cursor: pointer; }
   box-shadow: inset -1px 0 0 var(--line);
 }
 .pnl-table thead th:not([data-col="line"]), .pnl-table td { width: 120px; min-width: 108px; max-width: 148px; }
+.pnl-table thead th:not([data-col="line"]) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.15;
+  vertical-align: bottom;
+}
+.pnl-col { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.pnl-col small { color: var(--ink-3); font-size: var(--type-cap); font-weight: 550; letter-spacing: 0; }
 .pnl-table thead th.is-pinned { z-index: 6; }
 .pnl-table td, .pnl-table th { text-align: right; font-variant-numeric: tabular-nums; }
 .pnl-table th[data-col="line"], .pnl-table td[data-col="line"], .pnl-table .is-pinned { text-align: left; }
@@ -2617,6 +2626,7 @@ span.listing-link.muted { text-decoration: none; }
 .score-tile strong { font-size: var(--type-num); line-height: 1.2; font-variant-numeric: tabular-nums; }
 .score-tile p { margin: 0; color: var(--ink-3); font-size: var(--type-cap); line-height: 1.35; }
 .headline strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--type-lead); line-height: 24px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.headline strong.phrase { font-size: var(--type-body); letter-spacing: -0.02em; font-variant-numeric: normal; }
 .headline strong.neg { color: #7a3a2f; }
 .skeleton-block { display: grid; gap: 8px; margin: 12px 0; }
 .skeleton {

@@ -1,11 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { GridCell, PnlGrid, ValueCell } from "@/lib/pnl/grid";
+import type { GridCell, GridColumn, PnlGrid, ValueCell } from "@/lib/pnl/grid";
 
 function figure(cell: ValueCell, percent: boolean): { primary: string; secondary: string } {
   if (percent) return { primary: cell.share || "—", secondary: cell.amount === cell.share ? "" : cell.amount };
   return { primary: cell.amount, secondary: cell.share && cell.share !== cell.amount ? cell.share : "" };
+}
+
+function HeaderLabel({ column }: { column: GridColumn }) {
+  const match = column.statement ? /^(FY\d+)\s+\(statement\)$/.exec(column.label) : null;
+  if (!match) return column.label;
+  return (
+    <span className="pnl-col">
+      <span>{match[1]}</span>
+      <small>statement</small>
+    </span>
+  );
 }
 
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
@@ -108,8 +119,8 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           <tr role="row">
             <th className="is-pinned" data-col="line" scope="col">Line</th>
             {grid.columns.map((column) => (
-              <th key={column.id} scope="col" data-col={column.id} className={column.missing ? "is-missing" : undefined}>
-                {column.label}
+              <th key={column.id} scope="col" data-col={column.id} aria-label={column.label} className={column.missing ? "is-missing" : undefined}>
+                <HeaderLabel column={column} />
               </th>
             ))}
           </tr>

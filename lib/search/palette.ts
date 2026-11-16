@@ -1,8 +1,9 @@
 import { isAutoBusinessType, isPipelineStore } from "@/lib/labels";
 import { isProtectedId } from "@/lib/protectedSite";
 import { citySearchText, collectSearchHits, foldSearch, tokensMatch, type SearchHit, type SearchOptions } from "@/lib/search";
+import { siteResultDetail } from "@/lib/search/siteLine";
 
-export type PaletteHit = { id: string; title: string; path: string; url: string; site?: string; when?: string };
+export type PaletteHit = { id: string; title: string; path: string; url: string; site?: string; when?: string; detail?: string };
 export type PaletteGroups = { sites: PaletteHit[]; brokers: PaletteHit[]; conversations: PaletteHit[] };
 
 export function filledSections(groups: PaletteGroups): Array<{ label: string; hits: PaletteHit[] }> {
@@ -22,9 +23,19 @@ function sitePath(id: string): string {
   return `/?site=${encodeURIComponent(id)}`;
 }
 
-function hit(id: string, title: string): PaletteHit {
+function hit(id: string, title: string, detail?: string): PaletteHit {
   const path = sitePath(id);
-  return { id, title, path, url: `https://distributedsites.com${path}` };
+  return { id, title, path, url: `https://distributedsites.com${path}`, ...(detail ? { detail } : {}) };
+}
+
+function detailFor(item: SearchHit): string {
+  return siteResultDetail({
+    id: item.id,
+    address: item.address,
+    city: item.city,
+    stageGroup: item.kind === "deal" ? item.stage : "",
+    universe: item.kind === "site",
+  });
 }
 
 function nameHit(query: string, value: string | undefined): boolean {
@@ -47,15 +58,21 @@ function hiddenDeal(deal: DealSource, options: SearchOptions): boolean {
 export function paletteGroups(query: string, deals: DealSource[], sites: SiteSource[], options: SearchOptions = {}): PaletteGroups {
   const needle = query.trim();
   if (needle.length < 2) return EMPTY;
+  const linkedUniverse = new Set(deals.map((deal) => deal.universe_id).filter((id): id is string => Boolean(id)));
   const sitesGroup = collectSearchHits(needle, deals, sites, () => "", options)
-    .filter((item: SearchHit) => !isProtectedId(item.id))
-    .map((item) => hit(item.id, item.title || item.id));
+    .filter((item: SearchHit) => !isProtectedId(item.id) && !linkedUniverse.has(item.id))
+    .map((item) => hit(item.id, item.title || item.id, detailFor(item)));
   const seen = new Set(sitesGroup.map((item) => item.id));
   for (const deal of deals) {
     if (sitesGroup.length >= 8) break;
     if (hiddenDeal(deal, options) || seen.has(deal.deal_id)) continue;
     if (!tokensMatch(needle, [deal.name, deal.address, citySearchText(deal.city), deal.business_type])) continue;
-    sitesGroup.push(hit(deal.deal_id, String(deal.name || deal.deal_id)));
+    sitesGroup.push(hit(deal.deal_id, String(deal.name || deal.deal_id), siteResultDetail({
+      id: deal.deal_id,
+      address: deal.address,
+      city: deal.city,
+      stageGroup: deal.stage_group,
+    })));
     seen.add(deal.deal_id);
   }
   const brokers = new Map<string, PaletteHit>();

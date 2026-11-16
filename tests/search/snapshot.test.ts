@@ -33,6 +33,29 @@ test("a firm query groups sites, brokers, and conversations", () => {
   assert.equal(groups.conversations.some((item) => item.id === "CM-0999"), false);
 });
 
+test("site rows carry the address, id, and stage, and a linked universe row folds into the deal", () => {
+  const rows = [
+    { deal_id: "PIPE-PHX-0005", name: "North Wash", address: "515 E Union Hills Dr", city: "PHX", stage: "Dropped", stage_group: "dropped", universe_id: "PHX-U435", broker: "Ada Lane" },
+    { deal_id: "PIPE-PHX-0081", name: "North Wash", address: "5515 N 59th Ave", city: "PHX", stage: "2 Financial screen", stage_group: "financial", broker: "Ada Lane" },
+  ];
+  const catalog = [
+    { site_id: "PHX-U435", name: "", address: "515 E Union Hills Dr", city: "PHX", linked_deal_id: "PIPE-PHX-0005" },
+    { site_id: "PHX-U428", name: "Corner Store", address: "4250 W Union Hills Dr", city: "PHX" },
+  ];
+  const named = groupSnapshot("north wash", rows, [], catalog);
+  const dropped = named.sites.find((item) => item.id === "PIPE-PHX-0005");
+  assert.equal(dropped?.detail, "515 E Union Hills Dr, Phoenix · PIPE-PHX-0005 · Dropped");
+  const other = named.sites.find((item) => item.id === "PIPE-PHX-0081");
+  assert.equal(other?.detail, "5515 N 59th Ave, Phoenix · PIPE-PHX-0081 · Financial screen");
+  const groups = groupSnapshot("union hills", rows, [], catalog);
+  assert.equal(groups.sites.some((item) => item.id === "PHX-U435"), false);
+  assert.equal(groups.sites.some((item) => item.title === "515 E Union Hills Dr"), false);
+  assert.equal(groups.sites.some((item) => item.id === "PIPE-PHX-0005"), true);
+  const store = groups.sites.find((item) => item.id === "PHX-U428");
+  assert.equal(store?.title, "Corner Store");
+  assert.match(store?.detail || "", /Universe$/);
+});
+
 test("a place query does not open an empty broker group", () => {
   const groups = groupSnapshot("union hills", deals, comms);
   assert.equal(groups.sites[0]?.id, "PIPE-PHX-0108");

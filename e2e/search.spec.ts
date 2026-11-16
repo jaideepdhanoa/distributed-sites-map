@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 const GROUPS = {
-  sites: [{ id: "PIPE-PHX-0008", title: "North Sample Wash", path: "/?site=PIPE-PHX-0008&sheet=full", url: "https://distributedsites.com/?site=PIPE-PHX-0008" }],
+  sites: [
+    { id: "PIPE-PHX-0008", title: "North Sample Wash", detail: "1 Main St, Phoenix · PIPE-PHX-0008 · Desk screen", path: "/?site=PIPE-PHX-0008&sheet=full", url: "https://distributedsites.com/?site=PIPE-PHX-0008" },
+    { id: "PIPE-PHX-0009", title: "South Sample Wash", detail: "2 Side St, Phoenix · PIPE-PHX-0009 · Dropped", path: "/?site=PIPE-PHX-0009", url: "https://distributedsites.com/?site=PIPE-PHX-0009" },
+  ],
   brokers: [{ id: "sample-broker", title: "Sample Broker", path: "/?site=PIPE-PHX-0008", url: "https://distributedsites.com/?site=PIPE-PHX-0008" }],
   conversations: [{
     id: "CM-0123",
@@ -41,6 +44,16 @@ test.beforeEach(async ({ page }) => {
     const query = (url.searchParams.get("q") || "").toLowerCase();
     if (query.includes("siteonly")) {
       return route.fulfill({ json: { mode: "records", groups: SITES_ONLY, ids: ["PIPE-PHX-0008"] } });
+    }
+    if (query.includes("stack")) {
+      const sites = Array.from({ length: 12 }, (_, index) => ({
+        id: `PIPE-PHX-${String(index + 1).padStart(4, "0")}`,
+        title: `Stack Wash ${index + 1}`,
+        detail: `${index + 1} Stack St, Phoenix · PIPE-PHX-${String(index + 1).padStart(4, "0")} · Desk screen`,
+        path: `/?site=PIPE-PHX-${String(index + 1).padStart(4, "0")}`,
+        url: "https://distributedsites.com/",
+      }));
+      return route.fulfill({ json: { mode: "records", groups: { sites, brokers: [], conversations: [] }, ids: sites.map((item) => item.id) } });
     }
     if (query.includes("sample")) {
       return route.fulfill({ json: { mode: "records", groups: GROUPS, ids: ["PIPE-PHX-0008"] } });
@@ -96,7 +109,17 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
   await palette.getByLabel("Search everything").fill("sample");
   const after = await bar.boundingBox();
   expect(Math.abs((after?.height || 0) - (before?.height || 0))).toBeLessThan(4);
-  await expect(palette.getByTestId("command-group-sites")).toContainText("North Sample Wash");
+  const sitesGroup = palette.getByTestId("command-group-sites");
+  await expect(sitesGroup).toContainText("North Sample Wash");
+  await expect(sitesGroup).toContainText("1 Main St, Phoenix · PIPE-PHX-0008 · Desk screen");
+  await expect(sitesGroup).toContainText("2 Side St, Phoenix · PIPE-PHX-0009 · Dropped");
+  await page.keyboard.press("ArrowDown");
+  const active = palette.locator("[data-active=true]");
+  await expect(active).toContainText("South Sample Wash");
+  await expect(active).toContainText("Dropped");
+  await expect(active).toHaveCSS("background-color", "rgb(231, 240, 234)");
+  await page.keyboard.press("ArrowUp");
+  await expect(palette.locator("[data-active=true]")).toContainText("North Sample Wash");
   await expect(palette.getByTestId("command-group-brokers")).toContainText("Sample Broker");
   const threads = palette.getByTestId("command-group-conversations");
   await expect(threads).toContainText("Sample note");
@@ -115,6 +138,18 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
   await expect(palette.getByTestId("command-group-sites")).toContainText("North Sample Wash");
   await expect(palette.getByTestId("command-group-brokers")).toHaveCount(0);
   await expect(palette.getByTestId("command-group-conversations")).toHaveCount(0);
+  await palette.getByLabel("Search everything").fill("stack");
+  await expect(palette.getByTestId("command-group-sites")).toContainText("Stack Wash 12");
+  for (let step = 0; step < 11; step += 1) await page.keyboard.press("ArrowDown");
+  const last = palette.locator("[data-active=true]");
+  await expect(last).toContainText("Stack Wash 12");
+  const inView = await last.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const scroller = node.closest(".command-results");
+    const frame = scroller?.getBoundingClientRect();
+    return Boolean(frame && box.top >= frame.top - 1 && box.bottom <= frame.bottom + 1 && (scroller?.scrollTop || 0) > 0);
+  });
+  expect(inView).toBe(true);
   await palette.getByLabel("Search everything").fill("sample");
   await page.screenshot({ path: `e2e/output/command-search-${info.project.name}.png`, fullPage: false });
   await palette.getByLabel("Search everything").fill("zzzzzz");

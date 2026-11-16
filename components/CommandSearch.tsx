@@ -16,9 +16,23 @@ function count(groups: Groups) {
   return groups.sites.length + groups.brokers.length + groups.conversations.length;
 }
 
+function mergeHits(remote: PaletteHit[], local: PaletteHit[]): PaletteHit[] {
+  if (!remote.length) return local;
+  const localById = new Map(local.map((item) => [item.id, item]));
+  const seen = new Set<string>();
+  const merged: PaletteHit[] = [];
+  for (const item of [...remote, ...local]) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    const extra = localById.get(item.id);
+    merged.push({ ...extra, ...item, detail: item.detail || extra?.detail });
+  }
+  return merged;
+}
+
 function filled(remote: Groups, local: Groups): Groups {
   return {
-    sites: remote.sites.length ? remote.sites : local.sites,
+    sites: mergeHits(remote.sites, local.sites),
     brokers: remote.brokers.length ? remote.brokers : local.brokers,
     conversations: remote.conversations.length ? remote.conversations : local.conversations,
   };
@@ -53,11 +67,17 @@ export default function CommandSearch({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<Groups>(EMPTY);
+  const [active, setActive] = useState(0);
+  const queryKey = useRef("");
   const input = useRef<HTMLInputElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
   const fallbackRef = useRef(fallback);
   fallbackRef.current = fallback;
+  if (queryKey.current !== query) {
+    queryKey.current = query;
+    if (active !== 0) setActive(0);
+  }
   if (open && !opened.current) {
     opened.current = true;
     if (query) setQuery("");
@@ -142,10 +162,18 @@ export default function CommandSearch({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open || typeof document === "undefined") return null;
   const sections = filledSections(groups);
+  const flat = sections.flatMap((section) => section.hits);
+  const index = flat.length ? Math.min(active, flat.length - 1) : 0;
+  const current = flat[index];
+
+  useEffect(() => {
+    if (!open) return;
+    panel.current?.querySelector<HTMLElement>("[data-active=true]")?.scrollIntoView({ block: "nearest" });
+  }, [open, index, groups]);
+
+  if (!open || typeof document === "undefined") return null;
   const any = count(groups);
-  const first = groups.sites[0] || groups.brokers[0] || groups.conversations[0];
   return createPortal(
     <>
     <button type="button" className="backdrop command-backdrop" aria-label="Close search" onClick={onClose} />
@@ -162,9 +190,16 @@ export default function CommandSearch({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key !== "Enter" || !first) return;
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (!flat.length) return;
+            const delta = event.key === "ArrowDown" ? 1 : -1;
+            setActive((index + delta + flat.length) % flat.length);
+            return;
+          }
+          if (event.key !== "Enter" || !current) return;
           event.preventDefault();
-          choose(first);
+          choose(current);
         }}
       />
       <div className="command-results">
@@ -174,13 +209,20 @@ export default function CommandSearch({
           <p className="eyebrow">{section.label}</p>
           {section.hits.map((item) => {
             const title = shown(item.title) || item.id;
-            const meta = [shown(item.site), shown(item.when)].filter(Boolean).join(" · ");
+            const meta = shown(item.detail) || [shown(item.site), shown(item.when)].filter(Boolean).join(" · ");
+            const selected = item === current;
             return (
             <button
               key={`${section.label}-${item.id}`}
               type="button"
-              className="menu-item"
+              className={selected ? "menu-item is-active" : "menu-item"}
               data-testid="command-hit"
+              data-active={selected ? "true" : undefined}
+              aria-selected={selected}
+              onMouseMove={() => {
+                const at = flat.indexOf(item);
+                if (at >= 0) setActive(at);
+              }}
               onMouseDown={(event) => {
                 event.preventDefault();
                 choose(item);

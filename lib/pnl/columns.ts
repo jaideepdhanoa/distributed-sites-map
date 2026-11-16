@@ -11,10 +11,18 @@ import type { PnlPeriodView, PnlYearView } from "./statement";
 
 export type MonthColumnState = "present" | "missing" | "blank";
 
+/** Months named by either list. A detail without `missingMonths` still counts. */
+export function markedMonths(year: PnlYearView): number[] {
+  const months = [
+    ...(year.missingMonths ?? []),
+    ...(year.missingDetails ?? []).map((item) => item.month),
+  ].map((month) => Number(month)).filter((month) => month >= 1 && month <= 12);
+  return [...new Set(months)].sort((a, b) => a - b);
+}
+
 export function monthColumnState(year: PnlYearView, monthIndex: number): MonthColumnState {
   if (year.months[monthIndex]) return "present";
-  const missing = (year.missingMonths ?? []).map((month) => Number(month));
-  if (missing.includes(monthIndex + 1)) return "missing";
+  if (markedMonths(year).includes(monthIndex + 1)) return "missing";
   return "blank";
 }
 

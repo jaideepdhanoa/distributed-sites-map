@@ -1,3 +1,4 @@
+import { markedMonths } from "./columns";
 import { MONTH_SHORT } from "./lines";
 import type { PnlPeriodView, PnlYearView } from "./statement";
 
@@ -18,7 +19,7 @@ export function monthWindow(year: PnlYearView): MonthWindow | null {
   }
   const marked = [
     ...year.months.flatMap((period, index) => (period ? [index + 1] : [])),
-    ...(year.missingMonths ?? []),
+    ...markedMonths(year),
   ];
   if (!marked.length) return null;
   const start = Math.min(...marked);
@@ -46,7 +47,7 @@ export function windowCoverage(year: PnlYearView): string | null {
   let present = 0;
   for (let month = window.start; month <= window.end; month += 1) {
     if (year.months[month - 1]) present += 1;
-    else if ((year.missingMonths ?? []).map((item) => Number(item)).includes(month)) missingNames.push(MONTH_SHORT[month - 1]);
+    else if (markedMonths(year).includes(month)) missingNames.push(MONTH_SHORT[month - 1]);
   }
   const span = window.end - window.start + 1;
   const named = missingNames.length ? ` (${missingNames.join(", ")} missing)` : "";

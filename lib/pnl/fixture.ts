@@ -131,3 +131,75 @@ export function gapStatement(): PnlStatement {
   ];
   return buildStatement(lines, missing);
 }
+
+const MEASURED_DOCUMENT = "Sample package. Stand-in for the missing month.";
+
+/**
+ * The statement shape read for a site that has a Jan–Jul range, a full prior
+ * year, and two missing months. Amounts are samples. The document name is a
+ * stand-in of the same length as the stored one.
+ */
+export function measuredStatement(): PnlStatement {
+  const captured = "2026-11-16T12:00:00Z";
+  const lines: CapturedLine[] = [];
+  function add(
+    id: string,
+    periodId: string,
+    year: number,
+    grain: "annual" | "monthly",
+    month: number | null,
+    throughMonth: number | null,
+    code: "revenue" | "labor",
+    raw: string,
+    page: string,
+  ) {
+    const amount = parseAmount(raw);
+    if (!amount) throw new Error("Sample amount is not a captured number.");
+    lines.push({
+      id,
+      periodId,
+      grain,
+      year,
+      month,
+      throughMonth,
+      business: "car_wash",
+      code,
+      amount,
+      status: "reported",
+      sourceDocument: "Sample package",
+      sourcePage: page,
+      sourceHref: "",
+      capturedAt: captured,
+    });
+  }
+  for (const month of [1, 2, 3, 4, 6, 7]) {
+    add(`PL-m-${month}-r`, `PP-m-${month}`, 2026, "monthly", month, null, "revenue", "10000", String(month));
+    add(`PL-m-${month}-l`, `PP-m-${month}`, 2026, "monthly", month, null, "labor", "2000", String(month));
+  }
+  add("PL-range-r", "PP-000003", 2026, "annual", null, 7, "revenue", "90000", "Range");
+  add("PL-range-l", "PP-000003", 2026, "annual", null, 7, "labor", "30000", "Range");
+  add("PL-2025-r", "PP-000002", 2025, "annual", null, null, "revenue", "80000", "2025");
+  add("PL-2025-l", "PP-000002", 2025, "annual", null, null, "labor", "24000", "2025");
+  return buildStatement(lines, [
+    {
+      year: 2026,
+      month: 5,
+      business: "car_wash",
+      periodId: "PP-000096",
+      sourceDocument: MEASURED_DOCUMENT,
+      sourcePage: "Month index",
+      capturedAt: captured,
+      markerSource: "Not in package",
+    },
+    {
+      year: 2025,
+      month: 4,
+      business: "car_wash",
+      periodId: "PP-000095",
+      sourceDocument: MEASURED_DOCUMENT,
+      sourcePage: "Month index",
+      capturedAt: captured,
+      markerSource: "Not in package",
+    },
+  ]);
+}

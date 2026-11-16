@@ -5,7 +5,11 @@ import type { DealProps } from "./types";
 /** Workbook default. Moove does not open an NDA until a broker asks. */
 export const NOT_REQUIRED = "Not required";
 export const NO_VALUE = "—";
+/** Stored rows may still carry the old rule code. The screen never shows it. */
 export const NOT_GATING = "None — not gating (R-076)";
+export function gateLabel(value?: string | null): string {
+  return String(value || "").replace(/\s*\([RT]-\d+\)/g, "").replace(/\s+/g, " ").trim();
+}
 
 export const CLOSED_NDA_STATUSES = new Set([
   NOT_REQUIRED,

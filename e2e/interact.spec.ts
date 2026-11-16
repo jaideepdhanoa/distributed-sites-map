@@ -80,7 +80,7 @@ test("a shared link restores the city, step, filter, card, and table", async ({ 
   await page.waitForSelector(".shell");
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "LAS");
   await expect(page.locator(".shell")).toHaveAttribute("data-stage", "cleared");
-  await expect(page.locator("aside.drawer")).toContainText("LAS-U129");
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", "LAS-U129");
   await expect(page.locator(".removable")).toContainText(/Larger|10,000/);
   const visibleRows = info.project.name === "mobile" ? page.locator(".dock .stack-list button") : page.locator(".dock tbody tr");
   await expect(visibleRows.first()).toBeVisible();
@@ -109,7 +109,7 @@ test("review holds are Possible", async ({ page }, info) => {
   for (const id of HOLDS) {
     await page.goto(`/?site=${id}`, { waitUntil: "domcontentloaded" });
     const drawer = page.locator("aside.drawer");
-    await expect(drawer).toContainText(id);
+    await expect(drawer).toHaveAttribute("data-record", id);
     await expect(drawer).not.toContainText("Utility proximity");
     await expect(drawer).not.toContainText("Serving utility");
     await expect(drawer.locator(".badge.pending, .badge.checked, .badge.gone")).toHaveText("Possible");

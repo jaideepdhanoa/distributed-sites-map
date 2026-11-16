@@ -8,7 +8,7 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, powerSummary, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
@@ -100,11 +100,13 @@ function FigureSkeleton() {
 function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps; censusAcres?: number | null; signedIn?: boolean }) {
   const cash = cashTile(deal);
   const spare = spareLandSqft(deal.open_land_sqft, censusAcres);
-  const bays = deal.bays_that_fit == null ? "Not on file" : String(Math.round(deal.bays_that_fit));
+  const bays = deal.bays_that_fit == null ? "—" : String(Math.round(deal.bays_that_fit));
   const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
   const negative = deal.stated_cash_flow != null && deal.stated_cash_flow < 0;
   const showMoney = signedIn && !cash.hidden;
-  const traffic = deal.trade_aadt != null ? Math.round(deal.trade_aadt).toLocaleString() : "Not on file";
+  const traffic = deal.trade_aadt != null ? Math.round(deal.trade_aadt).toLocaleString() : "—";
+  const facts = factsForDeal(deal);
+  const power = powerSummary(facts);
   return (
     <div className="headline" data-testid="card-numbers">
       {showMoney ? (
@@ -122,18 +124,22 @@ function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps
         </div>
       ) : null}
       <div>
-        <span>Spare land</span>
-        <strong>{spare.value}</strong>
+        <span>Open land</span>
+        <strong title={spare.value === "—" ? "Not on file" : undefined}>{spare.value}</strong>
         {spare.note ? <small>{spare.note}</small> : null}
+      </div>
+      <div className="headline-wide">
+        <span>Power</span>
+        <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
         <span>Bays that fit</span>
-        <strong>{bays}</strong>
+        <strong title={deal.bays_that_fit == null ? "Not on file" : undefined}>{bays}</strong>
         {land ? <small>{land}</small> : null}
       </div>
       <div>
         <span>Traffic</span>
-        <strong>{traffic}</strong>
+        <strong title={deal.trade_aadt == null ? "Not on file" : undefined}>{traffic}</strong>
         {deal.trade_aadt != null ? <small>vehicles/day</small> : null}
       </div>
     </div>
@@ -143,22 +149,28 @@ function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps
 function SiteNumbers({ site, deal, signedIn = false }: { site: SiteProps; deal?: DealProps | null; signedIn?: boolean }) {
   if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} signedIn={signedIn} />;
   const spare = spareLandSqft(null, site.spare_ac_own);
-  const traffic = site.aadt_count ? site.aadt_count : "—";
+  const traffic = site.aadt_count != null && site.aadt_count !== "" ? site.aadt_count : "—";
   const year = countYear(site.aadt_year);
+  const facts = factsForSite(site, deal);
+  const power = powerSummary(facts);
   return (
     <div className="headline" data-testid="card-numbers">
       <div>
         <span>Cash flow</span>
-        <strong>Not on file</strong>
+        <strong title="Not on file">—</strong>
       </div>
       <div>
-        <span>Spare land</span>
-        <strong>{spare.value}</strong>
+        <span>Open land</span>
+        <strong title={spare.value === "—" ? "Not on file" : undefined}>{spare.value}</strong>
         {spare.note ? <small>{spare.note}</small> : null}
+      </div>
+      <div className="headline-wide">
+        <span>Power</span>
+        <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
         <span>Bays that fit</span>
-        <strong>Not on file</strong>
+        <strong title="Not on file">—</strong>
       </div>
       <div>
         <span>Traffic</span>
@@ -359,6 +371,7 @@ export default function Detail({
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   return (
     <aside
+      data-record={site.site_id}
       className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
       onTouchStart={(event) => {
         if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
@@ -375,6 +388,7 @@ export default function Detail({
         onSwipe?.(dx < 0 ? "next" : "prev");
       }}
     >
+      <span className="sr">{site.site_id}</span>
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
@@ -396,13 +410,13 @@ export default function Detail({
         </div>
         {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
         <p className="note">{site.address || "—"}</p>
-        <p className="note">{site.site_id}{signedIn && figuresReady && price ? ` · Asking ${price}` : ""}{figuresReady ? "" : " · Loading figures"}</p>
+        {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
         {site.linked_deal_id ? (
           <p>
-            <button className="text-link" type="button" data-testid="pipeline-deal-link" onClick={onOpenDeal}>
-              Pipeline deal {site.linked_deal_id}
+            <button className="text-link" type="button" data-testid="pipeline-deal-link" title={site.linked_deal_id} onClick={onOpenDeal}>
+              Open the pipeline deal
             </button>
           </p>
         ) : null}
@@ -434,6 +448,10 @@ export default function Detail({
       <PanelSections
         overview={
           <>
+            <details className="disclosure">
+              <summary className="disclosure">Record</summary>
+              <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
+            </details>
             {unscreened ? (
               <p>Not screened yet.</p>
             ) : (
@@ -451,11 +469,11 @@ export default function Detail({
                 <div className="kv">
                   <span>Broker</span>
                   <div>
-                    {shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : "Not provided"}
+                    {shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : <span title="Not on file">—</span>}
                     {linkedDeal.last_broker_contact ? ` · Last contact ${contactDate(linkedDeal.last_broker_contact)}` : ""}
                   </div>
                   <span>Firm</span>
-                  <div>{shownFirm(linkedDeal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(linkedDeal))}>{shownFirm(linkedDeal)}</button> : "Not provided"}</div>
+                  <div>{shownFirm(linkedDeal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(linkedDeal))}>{shownFirm(linkedDeal)}</button> : <span title="Not on file">—</span>}</div>
                 </div>
               </>
             ) : null}
@@ -516,7 +534,7 @@ export default function Detail({
             <div className="kv">
               <span>Listed</span><div>{site.listed ? "Yes" : "No"}</div>
               <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
-              <span>Nearest depot</span><div>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
+              <span>Depot</span><div title={depotMiles == null && site.miles_to_depot == null ? "Not on file" : undefined}>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
               <span>County parcel</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
               <span>Street View</span><div>{street ? <a href={street} target="_blank" rel="noopener noreferrer">Open Street View</a> : "—"}</div>
               <span>Parcel</span><div>{site.parcel_match === "none" ? "No parcel found" : site.parcel_match === "pin location" ? "Matched by pin location" : site.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
@@ -552,16 +570,16 @@ export default function Detail({
             <div className="kv">
               <span>Asking price</span>
               <div>
-                {price || "Not on file"}
+                {price || "—"}
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Spare land</span><div>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span>Site capacity</span>
+              <span>Open land</span><div title={spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <span>Power</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
               <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-              <span>Traffic count</span><div>{universeTrafficLine(site) || "—"}</div>
+              <span>Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
               <span>Flood</span><div>{site.flood_zone || "—"}</div>
               <span>Year built</span><div>{site.year_built || "—"}</div>
               <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
@@ -641,6 +659,7 @@ export function DealDetail({
   const cue = listingCue(deal);
   return (
     <aside
+      data-record={deal.deal_id}
       className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
       onTouchStart={(event) => {
         if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
@@ -657,6 +676,7 @@ export function DealDetail({
         onSwipe?.(dx < 0 ? "next" : "prev");
       }}
     >
+      <span className="sr">{deal.deal_id}</span>
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
@@ -676,7 +696,7 @@ export function DealDetail({
           <NdaChip deal={deal} signedIn={signedIn} />
         </div>
         <p className="note">{deal.address}</p>
-        <p className="note">{deal.deal_id}{deal.checked_live ? ` · ${checkedPhrase(deal.checked_live)}` : ""}{signedIn ? ` · Asking ${deal.asking_price_display || "—"}` : ""}</p>
+        {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
         <CardLinks
           listing={cue.url}
           folder={folderHref(deal.folder_url)}
@@ -704,19 +724,23 @@ export function DealDetail({
       <PanelSections
         overview={
           <>
+            <details className="disclosure">
+              <summary className="disclosure">Record</summary>
+              <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>
+            </details>
             <h3>Broker</h3>
             <div className="kv">
               <span>Broker</span>
               <div>
-                {shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : "Not provided"}
+                {shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : <span title="Not on file">—</span>}
                 {deal.last_broker_contact ? ` · Last contact ${contactDate(deal.last_broker_contact)}` : ""}
               </div>
               <span>Firm</span>
-              <div>{shownFirm(deal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(deal))}>{shownFirm(deal)}</button> : "Not provided"}</div>
+              <div>{shownFirm(deal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(deal))}>{shownFirm(deal)}</button> : <span title="Not on file">—</span>}</div>
               <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
               <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
               <span>Parcel</span><div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "Not matched"}</div>
-              <span>Nearest depot</span><div>{depotMiles == null ? (hasPin ? "Not provided" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
+              <span>Depot</span><div title={depotMiles == null && hasPin ? "Not on file" : undefined}>{depotMiles == null ? (hasPin ? "—" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
               <span>Listing</span>
               <div>
                 {deal.listing_url ? (
@@ -751,9 +775,9 @@ export function DealDetail({
               </div>
               <span>Per acre</span>
               <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
-              <span>Spare land</span>
-              <div>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span>Site capacity</span>
+              <span>Open land</span>
+              <div title={spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}
               {signedIn && !cash.hidden ? <div>{[deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}

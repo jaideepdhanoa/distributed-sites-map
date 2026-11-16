@@ -57,10 +57,10 @@ export function dealTip(props: Record<string, unknown>): TipModel {
     ...(text(props.suggested_drop) && text(props.stage_group) !== "dropped" && !/^dropped\b/i.test(text(props.stage))
       ? [{ label: "Suggested drop", value: text(props.suggested_drop) }]
       : []),
-    { label: "Asking", value: text(props.asking_price_display) || "Not provided" },
-    { label: "Acres", value: acres || "Not provided" },
-    { label: "Per acre", value: text(props.price_per_acre_display) || "Not provided" },
-    { label: "Open land", value: open || "Not measured" },
+    { label: "Asking", value: text(props.asking_price_display) || "—" },
+    { label: "Acres", value: acres || "—" },
+    { label: "Per acre", value: text(props.price_per_acre_display) || "—" },
+    { label: "Open land", value: open || "—" },
     { label: "Depot", value: depotLine(miles, miles != null) },
     { label: "Listing", value: listingCue({ listing_url: text(props.listing_url), listing_removed: Boolean(props.listing_removed) }).label },
   ];

@@ -67,7 +67,7 @@ const PIPE_STEPS: { id: PipeId; label: string }[] = [
 const STEPS: { id: StageId; label: string }[] = [
   { id: "universe", label: "Universe" },
   { id: "in_area", label: "Service area" },
-  { id: "land", label: "Spare land" },
+  { id: "land", label: "Open land" },
   { id: "county", label: "County-checked" },
   { id: "cleared", label: "Cleared" },
 ];
@@ -1449,7 +1449,7 @@ export default function Explorer() {
       stage: row.approximate ? "Approximate location" : row.pinned ? "Listed" : "Address withheld",
       tier: "",
       spare: row.acres_text || (row.acres != null ? `${row.acres} ac` : ""),
-      grade: "Not on file",
+      grade: "—",
       zoning: "",
       traffic: "",
       listed: price || "Yes",
@@ -1711,7 +1711,7 @@ export default function Explorer() {
           <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
             {funnel === "pipeline"
               ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
-              : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Spare land"))}
+              : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
           </button>
           <input className="search mobile-search" aria-label="Search" placeholder="Search sites" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
@@ -1952,9 +1952,9 @@ export default function Explorer() {
                 ))}
               </div>
             </div>
-            <h3>Spare land</h3>
+            <h3>Open land</h3>
             <p className="filter-note">{SPARE_LAND_NOTE}</p>
-            <div className="segmented" role="group" aria-label="Spare land">
+            <div className="segmented" role="group" aria-label="Open land">
               {([["any", "Any"], ["L10", "10k+ sq ft"], ["L4", "4k+ sq ft"]] as const).map(([item, label]) => (
                 <button key={item} type="button" className={`segmented ${landTier === item ? "on" : ""}`} onClick={() => write({ tier: item === "any" ? null : item })}>{label}</button>
               ))}
@@ -2385,9 +2385,9 @@ export default function Explorer() {
             <button className="close" type="button" aria-label="Close" onClick={() => setGuideOpen(false)}><span aria-hidden="true">×</span></button>
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
-            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of spare land. A smaller site has about 4,000. Spare land is leftover land on an operating wash. It is not a vacant parcel.</p>
+            <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of open land. A smaller site has about 4,000. Open land is leftover land on an operating wash. It is not a vacant parcel.</p>
             <p>Filters chooses the working set. Car washes and auto service are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
-            <p>Site capacity sits beside spare land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
+            <p>Power sits beside open land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
             <p>Deals contacted, beside Universe, counts deals in the categories you have on, in this city, with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>
             <ul>

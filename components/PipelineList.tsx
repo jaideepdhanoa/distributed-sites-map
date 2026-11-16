@@ -13,6 +13,7 @@ import {
   fullMoney,
   capacitySummary,
   factsForDeal,
+  powerSummary,
   openLandText,
   vehiclesPerDay,
   summaryOf,
@@ -52,20 +53,20 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "stage") return stageDetail(deal.stage, deal.stage_group);
   if (id === "asking") {
     if (!signedIn) return "—";
-    if (!deal.asking_price_display) return "Not provided";
+    if (!deal.asking_price_display) return "—";
     const source = shownPriceSource(deal);
     return source ? `${deal.asking_price_display} · ${source}` : deal.asking_price_display;
   }
-  if (id === "acres") return acresText(deal.land_acres) || "Not provided";
-  if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "Not provided") : "—";
-  if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "Not measured";
-  if (id === "capacity") return capacitySummary(factsForDeal(deal));
+  if (id === "acres") return acresText(deal.land_acres) || "—";
+  if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "—") : "—";
+  if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "—";
+  if (id === "capacity") return powerSummary(factsForDeal(deal)) || "—";
   if (id === "traffic") return vehiclesPerDay(deal.trade_aadt) || "—";
   if (id === "cashFlow") {
     if (!signedIn) return "—";
     const cash = cashTile(deal);
     if (cash.hidden) return "";
-    if (cash.value === "Not provided" || cash.value === "Vacant land, no business") return cash.value;
+    if (cash.value === "—" || cash.value === "Vacant land, no business") return cash.value;
     return [cash.value, cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ");
   }
   if (id === "revenue" || id === "askingRevenue" || id === "askingCash" || id === "businessMultiple" || id === "landEstimate" || id === "countyValue") {
@@ -87,7 +88,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "lastContact") return contactDate(deal.last_broker_contact) || "—";
   if (id === "nextStep") return (deal.next_step || "").trim() || "—";
   if (id === "type") return typeLabel(deal) || "—";
-  return checkedShort(deal.checked_live) || "Not provided";
+  return checkedShort(deal.checked_live) || "—";
 }
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
@@ -309,7 +310,7 @@ export default function PipelineList({
     <div className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
       <div className="summary-row" data-testid="summary-row">
         <div><span>In this filter</span><strong>{summary.count.toLocaleString()}</strong><small>{summary.withAsking} with an asking price</small></div>
-        <div><span>Median asking</span><strong>{summary.medianAsking == null ? "Not provided" : fullMoney(summary.medianAsking)}</strong></div>
+        <div><span>Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
         <div><span>Land listed</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
         <div><span>Median per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
       </div>
@@ -420,7 +421,7 @@ export default function PipelineList({
                       ) : column === "countyValue" ? (
                         <NumberCell label={cell(row, column, signedIn)} badge={signedIn && row.deal.county_value != null ? "County" : ""} value={signedIn ? row.deal.county_value : null} stats={strips.county} format={fullMoney} labelTitle={row.deal.county_value_basis || undefined} />
                       ) : column === "capacity" ? (
-                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={cell(row, column, signedIn)} />
+                        <NumberCell label={cell(row, column, signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={capacitySummary(factsForDeal(row.deal)) || "Not on file"} />
                       ) : column === "stage" ? (
                         <span className="stage-cell">
                           <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, column, signedIn)}</span>
@@ -494,11 +495,11 @@ export default function PipelineList({
                 {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? <span className="site-address">{displayAddress(row.deal.address)}</span> : null}
                 <NearMark deal={row.deal} />
                 <span className="list-card-line">
-                  {[stageDetail(row.deal.stage, row.deal.stage_group), signedIn ? dealAsking(row) : "—", row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "Spare land not measured"].join(" · ")}
+                  {[stageDetail(row.deal.stage, row.deal.stage_group), signedIn ? dealAsking(row) : "—", row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "—"].join(" · ")}
                   {phoneRank(row, strips, signedIn)}
                 </span>
-                <span className="list-card-line" title={capacitySummary(factsForDeal(row.deal))}>
-                  {capacitySummary(factsForDeal(row.deal))} · {vehiclesPerDay(row.deal.trade_aadt) || "—"}
+                <span className="list-card-line" title={capacitySummary(factsForDeal(row.deal)) || "Not on file"}>
+                  {powerSummary(factsForDeal(row.deal)) || "—"} · {vehiclesPerDay(row.deal.trade_aadt) || "—"}
                 </span>
                 <NdaChip deal={row.deal} signedIn={signedIn} />
                 <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
@@ -662,7 +663,7 @@ function NumberCell({
 function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stats: StripStats | null; onBroker?: (name: string) => void; signedIn: boolean }) {
   if (!signedIn) return <span>—</span>;
   const price = deal.asking_price_display;
-  if (!price) return <span>Not provided</span>;
+  if (!price) return <span title="Not on file">—</span>;
   const source = shownPriceSource(deal);
   const listing = listingHref(deal.listing_url);
   const party = shownBroker(deal) || shownFirm(deal);

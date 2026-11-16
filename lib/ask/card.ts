@@ -5,7 +5,7 @@ import type { DealProps } from "@/lib/types";
 export type SiteCardFacts = Record<string, string | number>;
 
 function joinSpare(value: string, note: string) {
-  if (!value || value === "Not measured") return "";
+  if (!value || value === "Not measured" || value === "—") return "";
   return note ? `${value} · ${note}` : value;
 }
 

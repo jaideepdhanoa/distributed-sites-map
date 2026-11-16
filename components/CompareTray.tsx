@@ -1,12 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
-import { acreUnit, acresText, capacitySummary, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { stageDetail } from "@/lib/labels";
 import { cardNdaLabel } from "@/lib/nda";
 
-const MISSING = "Not on file";
+const MISSING = "—";
 
 type CompareRow = { label: string; value: string };
 
@@ -36,8 +36,8 @@ function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): Compa
     { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(workbookTrafficLine(deal)) },
     { label: "Land", value: shown(acresText(deal.land_acres)) },
-    { label: "Spare land", value: shown(spare) },
-    { label: "Site capacity", value: capacitySummary(factsForDeal(deal)) },
+    { label: "Open land", value: shown(spare) },
+    { label: "Power", value: powerSummary(factsForDeal(deal)) || "—" },
     { label: "3-mile population", value: population ? population.replace("3-mile population ", "") : MISSING },
     { label: "Washes", value: washes ? washes.replace(/^Washes /, "") : MISSING },
     { label: "Depot", value: depotLine(deal.miles_to_depot, deal.miles_to_depot != null) },
@@ -84,8 +84,8 @@ function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): Compa
     { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
     { label: "Traffic", value: shown(universeTrafficLine(site)) },
     { label: "Land", value: shown(acres) },
-    { label: "Spare land", value: shown(spare) },
-    { label: "Site capacity", value: capacitySummary(factsForSite(site, linked)) },
+    { label: "Open land", value: shown(spare) },
+    { label: "Power", value: powerSummary(factsForSite(site, linked)) || "—" },
     { label: "3-mile population", value: linked?.trade_population != null ? Math.round(linked.trade_population).toLocaleString() : MISSING },
     { label: "Washes", value: linked && (linked.trade_washes_1mi != null || linked.trade_washes_3mi != null) ? [linked.trade_washes_1mi != null ? `${linked.trade_washes_1mi} within 1 mile` : "", linked.trade_washes_3mi != null ? `${linked.trade_washes_3mi} within 3 miles` : ""].filter(Boolean).join(" · ") : MISSING },
     { label: "Depot", value: depotLine(site.miles_to_depot, site.miles_to_depot != null) },

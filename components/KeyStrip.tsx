@@ -11,7 +11,7 @@ import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
 
 export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
-  if (!facts.length) return <strong>Not on file</strong>;
+  if (!facts.length) return <strong title="Not on file">—</strong>;
   return (
     <div className="fact-stack" data-testid="capacity-facts">
       {facts.map((fact) => (
@@ -42,7 +42,7 @@ function Metric({
   return (
     <article className={label === "Cash flow" || label === "Revenue" ? "wide" : ""}>
       <span><Icon size={15} strokeWidth={1.75} aria-hidden="true" /> {label}</span>
-      <strong title={title || value}>{value}</strong>
+      <strong title={title || (value === "—" ? "Not on file" : value)}>{value}</strong>
       {note ? <small>{note}</small> : null}
       {basis ? <em>{basis}</em> : null}
     </article>
@@ -80,17 +80,17 @@ export function SitePacket({
       <h3 className="job">Space</h3>
       <div className="metrics">
         {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
-        <Metric icon={Trees} label="Spare land" value={spare.value} note={spare.note} />
+        <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={spare.value === "—" ? "Not on file" : undefined} />
       </div>
-      <h3 className="job">Capacity</h3>
+      <h3 className="job">Power</h3>
       {capacity.length ? (
         <div className="metrics">
           {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
         </div>
-      ) : <p className="note">Not on file</p>}
+      ) : <p className="note" title="Not on file">—</p>}
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
-        {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="Not on file" />}
+        {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="—" title="Not on file" />}
         <Metric icon={Ruler} label="Depot" value={depotLine(site.miles_to_depot, hasPin)} />
       </div>
     </section>
@@ -110,7 +110,7 @@ export default function KeyStrip({
   signedIn?: boolean;
 }) {
   const cash = cashTile(deal);
-  const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "Not provided";
+  const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "—";
   const askingText = sheetMoney(deal.asking_price, deal.asking_price_display);
   const cashView = deal.stated_cash_flow != null || deal.stated_cash_flow_display
     ? { text: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display), title: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) }
@@ -161,15 +161,15 @@ export default function KeyStrip({
       <h3 className="job">Space</h3>
       <div className="metrics">
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
-        <Metric icon={Trees} label="Spare land" value={spare.value} note={spare.note} />
-        <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "Not provided"} />
+        <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={spare.value === "—" ? "Not on file" : undefined} />
+        <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
-      <h3 className="job">Capacity</h3>
+      <h3 className="job">Power</h3>
       {capacity.length ? (
         <div className="metrics">
           {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
         </div>
-      ) : <p className="note">Not on file</p>}
+      ) : <p className="note" title="Not on file">—</p>}
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         {signedIn && showFinancials ? (
@@ -177,7 +177,7 @@ export default function KeyStrip({
             <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
             <strong title={revenueText}>{revenueText}</strong>
             {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-            {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small>Not on file</small> : null}
+            {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small title="Not on file">—</small> : null}
           </article>
         ) : null}
         {signedIn && !cash.hidden && showFinancials ? (

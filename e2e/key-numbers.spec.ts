@@ -21,19 +21,19 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
   }
   await expect(page.locator("nav.funnel")).toBeVisible();
   await expect(page.locator("nav.funnel")).toContainText("Desk screen");
-  await expect(page.locator("nav.funnel")).not.toContainText("Spare land");
+  await expect(page.locator("nav.funnel")).not.toContainText("Open land");
   if (mobile) await page.getByRole("button", { name: "Close steps" }).click();
   if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator("aside.layers.open")).toContainText("Universe sites");
   await page.goto("/?funnel=universe", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   if (mobile) {
-    await expect(page.locator(".phone-step")).toContainText("Spare land");
+    await expect(page.locator(".phone-step")).toContainText("Open land");
     await page.locator(".phone-step").click();
   } else {
     await expect(page.getByRole("button", { name: "Universe", exact: true }).first()).toHaveClass(/on/);
   }
-  await expect(page.locator("nav.funnel")).toContainText("Spare land");
+  await expect(page.locator("nav.funnel")).toContainText("Open land");
 });
 
 test("satellite is the default basemap and a switch is remembered", async ({ page }, info) => {
@@ -144,7 +144,7 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
   await expect(page.getByTestId("key-strip")).toContainText("104,100");
   await expect(page.getByTestId("key-strip")).toContainText("Estimated");
   await expect(page.getByTestId("key-strip")).toContainText("Space");
-  await expect(page.getByTestId("key-strip")).toContainText("Capacity");
+  await expect(page.getByTestId("key-strip")).toContainText("Power");
   await expect(page.getByTestId("key-strip")).toContainText("Attractiveness");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&compare=LAND-PHX-0035|PIPE-PHX-0067");

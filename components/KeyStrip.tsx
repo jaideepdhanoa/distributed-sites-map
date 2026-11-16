@@ -7,6 +7,7 @@ import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, 
 import { basisBadge } from "@/lib/pricing";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
+import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
 
@@ -47,6 +48,16 @@ function Metric({
       {basis ? <em>{basis}</em> : null}
     </article>
   );
+}
+
+function readPnl(value: unknown): PnlStatement {
+  if (!value || typeof value !== "object") return emptyStatement();
+  const row = value as PnlStatement;
+  if (row.status === "empty" || row.status === "unavailable") {
+    return { status: row.status, message: typeof row.message === "string" && row.message ? row.message : emptyStatement().message, years: [] };
+  }
+  if (row.status !== "ready" || !Array.isArray(row.years)) return emptyStatement();
+  return row;
 }
 
 function capacityTiles(facts: { lines: string[] }[]) {
@@ -134,7 +145,7 @@ export default function KeyStrip({
     fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`)
       .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel : null))
       .then((panel) => {
-        if (!cancel) setFinancials(panel);
+        if (!cancel && panel) setFinancials({ ...panel, pnl: readPnl(panel.pnl) });
       })
       .catch(() => undefined);
     return () => {
@@ -174,10 +185,12 @@ export default function KeyStrip({
       <div className="metrics">
         {signedIn && showFinancials ? (
           <article className="wide">
-            <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-            <strong title={revenueText}>{revenueText}</strong>
-            {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-            {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small title="Not on file">—</small> : null}
+            <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
+              <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
+              <strong title={revenueText}>{revenueText}</strong>
+              {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
+              {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small title="Not on file">—</small> : null}
+            </button>
           </article>
         ) : null}
         {signedIn && !cash.hidden && showFinancials ? (

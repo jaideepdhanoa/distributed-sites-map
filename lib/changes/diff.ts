@@ -161,7 +161,7 @@ function withoutIds<T extends { site_id?: string; entity_id?: string }>(rows: T[
   return rows.filter((row) => !ids.has(idOf(row)));
 }
 
-export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, workbookSource: string): DiffReport {
+export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, workbookSource: string, drift = false): DiffReport {
   const invalid = workbookIssues(workbook);
   const skip = {
     stage: issueIds(invalid.stage),
@@ -199,6 +199,7 @@ export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, wo
   for (const entity of ENTITIES) {
     if (importEntityFromWorkbook(entity)) continue;
     cutOver.push(entity);
+    if (drift) continue;
     entities[entity] = { ...entities[entity], missing: [], extra: [], changed: [] };
     invalid[entity] = [];
   }

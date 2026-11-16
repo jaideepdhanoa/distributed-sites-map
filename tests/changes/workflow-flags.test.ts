@@ -72,4 +72,22 @@ test("import and mirror steps receive the cutover flags", () => {
     mirror,
     /READ_SITES_FROM_DB: \$\{\{ \(inputs\.simulate_site_flag == true \|\| inputs\.simulate_site_flag == 'true'\) && \(inputs\.dry_run == true \|\| inputs\.dry_run == 'true'\) && '1' \|\| vars\.READ_SITES_FROM_DB \}\}/,
   );
+
+  const protect = readFileSync(join(root, "workbook-protect.yml"), "utf8");
+  assert.match(protect, /^name: Workbook protect/m);
+  assert.match(protect, /^on:\n {2}workflow_dispatch:\n/m);
+  assert.doesNotMatch(protect, /schedule:|pull_request:/);
+  assert.match(protect, /dry_run:\n\s+description: Print the plan and do not change the workbook\n\s+type: boolean\n\s+default: true/);
+  assert.match(protect, /apply:\n\s+description: Protect ranges\. Also set dry_run to false and type the confirm phrase\.\n\s+type: boolean\n\s+default: false/);
+  assert.match(protect, /protect-workbook-readonly/);
+  assert.match(protect, /if: github\.ref == 'refs\/heads\/main'/);
+  assert.match(protect, /WORKBOOK_PROTECT_APPLY: \$\{\{ \(inputs\.apply == true \|\| inputs\.apply == 'true'\) && \(inputs\.dry_run == false \|\| inputs\.dry_run == 'false'\) && '1' \|\| '0' \}\}/);
+  assert.match(protect, /Rules & Decisions and Run Log stay writable/);
+  assert.doesNotMatch(protect, /NEON_DATABASE_URL/);
+
+  const sync = readFileSync(join(root, "workbook-sync.yml"), "utf8");
+  const importStep = stepBlocks(sync).find((block) => block.includes("scripts/import-shadow.ts"));
+  assert.ok(importStep);
+  assert.match(importStep, /Report workbook drift/);
+  assert.doesNotMatch(importStep, /importChanged|WORKBOOK_IMPORT_APPLY/);
 });

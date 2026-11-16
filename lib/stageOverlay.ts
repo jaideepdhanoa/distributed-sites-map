@@ -45,7 +45,7 @@ export type ApprovedStage = {
   stage: string;
   /** Short label, such as "Financial screen". */
   label: string;
-  /** Value the feed tells the workbook writer to put in the Stage column. */
+  /** Stage token stored on the decision. The mirror copies it. The workbook is not edited by hand. */
   token: string;
 };
 
@@ -173,7 +173,7 @@ export function workbookInstruction(
   else if (/^\s*\d+\b/.test(approved.token)) shown = approved.token.trim();
   return {
     stage: approved.token,
-    line: `Approved stage: ${shown}. Write this stage on the workbook Stage column.`,
+    line: `Approved stage: ${shown}. Stored in the database. The workbook mirror copies it. Do not edit the workbook.`,
   };
 }
 

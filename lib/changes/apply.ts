@@ -16,7 +16,8 @@ import {
   type PhotoRef,
   type SiteField,
 } from "./site";
-import type { ActivityPayload, Actor, CommsPayload, ParsedChange, SitePayload, StagePayload } from "./schema";
+import { storePnlLine } from "@/lib/pnl/store";
+import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, StagePayload } from "./schema";
 import { validateBatch } from "./schema";
 import type { EntityType } from "./vocab";
 
@@ -94,17 +95,17 @@ async function lockKey(sql: Sql, key: string): Promise<void> {
   await sql.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [key]);
 }
 
-async function tableIdFloor(sql: Sql, name: "activity" | "comms"): Promise<number> {
-  const prefix = name === "activity" ? "A-" : "CM-";
-  const table = name === "activity" ? "activities" : "comms_entries";
+async function tableIdFloor(sql: Sql, name: "activity" | "comms" | "pnl_period" | "pnl_line"): Promise<number> {
+  const prefix = name === "activity" ? "A-" : name === "comms" ? "CM-" : name === "pnl_period" ? "PP-" : "PL-";
+  const table = name === "activity" ? "activities" : name === "comms" ? "comms_entries" : name === "pnl_period" ? "pnl_periods" : "pnl_lines";
   const rows = await sql.query<{ entity_id: string }>(`SELECT entity_id FROM ${table}`);
   let max = 0;
   for (const row of rows.rows) max = Math.max(max, numericSuffix(prefix, textOf(row.entity_id)));
   return max;
 }
 
-async function mint(sql: Sql, name: "activity" | "comms" | "event"): Promise<number> {
-  if (name === "event") {
+async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line"): Promise<number> {
+  if (name === "event" || name === "pnl_period" || name === "pnl_line") {
     const result = await sql.query<{ value: number | string }>(
       `INSERT INTO id_counters (name, value)
        VALUES ($1, 1)
@@ -127,9 +128,11 @@ async function mint(sql: Sql, name: "activity" | "comms" | "event"): Promise<num
   return next;
 }
 
-export function formatEntityId(kind: "activity" | "comms" | "event", value: number): string {
+export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line", value: number): string {
   if (kind === "activity") return `A-${String(value).padStart(6, "0")}`;
   if (kind === "comms") return `CM-${String(value).padStart(4, "0")}`;
+  if (kind === "pnl_period") return `PP-${String(value).padStart(6, "0")}`;
+  if (kind === "pnl_line") return `PL-${String(value).padStart(6, "0")}`;
   return `EV-${String(value).padStart(8, "0")}`;
 }
 
@@ -142,7 +145,7 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
     );
     return result.rows[0] ? Number(result.rows[0].version) : 0;
   }
-  const table = change.entity_type === "activity" ? "activities" : "comms_entries";
+  const table = change.entity_type === "activity" ? "activities" : change.entity_type === "pnl_line" ? "pnl_lines" : "comms_entries";
   const result = await sql.query<{ version: number | string }>(
     `SELECT version FROM ${table} WHERE entity_id = $1`,
     [change.entity_id],
@@ -555,7 +558,7 @@ async function applyOne(
   const siteKeyed = change.entity_type === "stage" || change.entity_type === "site";
   const lock = siteKeyed ? `${change.entity_type}:${change.site_id}` : `${change.entity_type}:${change.entity_id || "new"}`;
   await lockKey(sql, lock);
-  const mintedKind = change.entity_type === "comms" ? "comms" : "activity";
+  const mintedKind = change.entity_type === "comms" ? "comms" : change.entity_type === "pnl_line" ? "pnl_line" : "activity";
   const entityId = siteKeyed
     ? change.site_id
     : change.preserve_id && change.entity_id
@@ -574,6 +577,18 @@ async function applyOne(
     payload = await writeSite(sql, change, actor.id, version, mode);
   } else if (change.entity_type === "activity") {
     payload = await writeActivity(sql, change, entityId, actor.id, version);
+  } else if (change.entity_type === "pnl_line") {
+    const written = await storePnlLine(sql, {
+      siteId: change.site_id,
+      entityId,
+      expectedVersion: change.expected_version,
+      actorId: actor.id,
+      version,
+      payload: change.payload as PnlLinePayload,
+      mintPeriod: async () => formatEntityId("pnl_period", await mint(sql, "pnl_period")),
+    });
+    if (!written.ok) throw conflict(change, written.entityId, written.actual);
+    payload = written.payload;
   } else {
     payload = await writeComms(sql, change, entityId, actor.id, version);
   }

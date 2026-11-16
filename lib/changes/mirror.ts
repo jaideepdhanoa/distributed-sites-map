@@ -181,7 +181,7 @@ function planTable(input: {
   protectRow: boolean;
   idPattern?: RegExp;
   skipBlank?: boolean;
-  /** An API-minted id that already names a different sheet row is not a write. */
+  /** Optional. The mirror does not set this. A caller can still refuse an unimported collision instead of overwriting it. */
   refuseUnimported?: boolean;
   /** Never replace a sheet cell with a clipped prefix of itself. */
   holdTruncation?: boolean;
@@ -406,6 +406,10 @@ export function planSiteMirror(
           }
         }
         if (sameWorkbookCell(before, after)) continue;
+        if (isTruncatedCell(before, after)) {
+          combined.held.push({ id: record.site_id, header });
+          continue;
+        }
         combined.changes.push({
           sheet: table.title,
           row: existing.row,
@@ -428,15 +432,26 @@ export function planSiteMirror(
   return combined;
 }
 
+function referencesProtectedSite(siteId: string, siteIds = ""): boolean {
+  if (siteId === PROTECTED_SITE_ID) return true;
+  return siteIds.split(/[;,\s]+/).some((part) => part === PROTECTED_SITE_ID);
+}
+
 export function planActivityMirror(
   table: SheetTable,
   rows: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean }[],
 ): MirrorPlan {
-  return planTable({
+  let skippedProtected = 0;
+  const kept = rows.filter((row) => {
+    if (!referencesProtectedSite(row.site_id)) return true;
+    skippedProtected += 1;
+    return false;
+  });
+  const plan = planTable({
     table,
     idHeaders: ["event id"],
     fields: ACTIVITY_FIELDS,
-    records: rows.map((row) => ({
+    records: kept.map((row) => ({
       id: row.entity_id,
       imported: row.imported,
       values: {
@@ -451,20 +466,27 @@ export function planActivityMirror(
     append: true,
     protectRow: false,
     idPattern: /^A-\d{4,}$/,
-    refuseUnimported: true,
     holdTruncation: true,
   });
+  plan.skippedProtected += skippedProtected;
+  return plan;
 }
 
 export function planCommsMirror(
   table: SheetTable,
   rows: { entity_id: string; values: Record<string, string> }[],
 ): MirrorPlan {
-  return planTable({
+  let skippedProtected = 0;
+  const kept = rows.filter((row) => {
+    if (!referencesProtectedSite(row.values.site_id || "", row.values.site_ids || "")) return true;
+    skippedProtected += 1;
+    return false;
+  });
+  const plan = planTable({
     table,
     idHeaders: ["comms id"],
     fields: COMMS_FIELDS_BY_HEADER,
-    records: rows.map((row) => ({ id: row.entity_id, values: { ...row.values, id: row.entity_id } })),
+    records: kept.map((row) => ({ id: row.entity_id, values: { ...row.values, id: row.entity_id } })),
     append: true,
     protectRow: false,
     idPattern: /^CM-\d{4,}$/,
@@ -475,6 +497,8 @@ export function planCommsMirror(
       return withSheetStamp(samples, value);
     },
   });
+  plan.skippedProtected += skippedProtected;
+  return plan;
 }
 
 /** Ids only. A refusal means the mirror must not write any cell. */
@@ -496,8 +520,8 @@ export function sheetIdFloor(table: SheetTable, idHeaders: string[], prefix: str
 
 export function assertPlannedWrites(changes: CellChange[]): void {
   for (const change of changes) {
-    if (change.id === PROTECTED_SITE_ID) {
-      throw new Error(`Refusing to write ${PROTECTED_SITE_ID}.`);
+    if (change.id === PROTECTED_SITE_ID || change.before === PROTECTED_SITE_ID || change.after === PROTECTED_SITE_ID) {
+      throw new Error("Refusing to write a quarantined site.");
     }
     if (change.row === PROTECTED_ROW && (change.sheet === "Pipeline" || change.sheet === "Land Sites")) {
       throw new Error(`Refusing to write sheet row ${PROTECTED_ROW}.`);
@@ -539,18 +563,59 @@ export function formatPlanSummary(changes: CellChange[]): string {
   return `site ${counts.site}\nstage ${counts.stage}\nactivity ${counts.activity}\ncomms ${counts.comms}`;
 }
 
-function siteTextHeader(header: string): boolean {
-  const norm = header.trim().toLowerCase();
-  return MIRROR_FIELD_HEADERS.some((row) => row.headers.some((name) => name.toLowerCase() === norm));
+function planValue(_change: CellChange, value: string): string {
+  return `#${shortHash(value)}`;
 }
 
-function planValue(change: CellChange, value: string): string {
-  const header = change.header.trim().toLowerCase();
-  const siteTab = change.sheet === "Pipeline" || change.sheet === "Land Sites";
-  const siteCell = siteTextHeader(change.header) || (siteTab && header !== "stage");
-  const logTab = change.sheet === ACTIVITY_SHEET || change.sheet === COMMS_SHEET;
-  if (logTab || siteCell || value.trim().startsWith("{")) return `#${shortHash(value)}`;
-  return JSON.stringify(value);
+export type MirrorDrift = { cells: number; fills: number; ids: string[] };
+
+function driftChange(change: CellChange): boolean {
+  if (change.id === PROTECTED_SITE_ID || change.before === PROTECTED_SITE_ID || change.after === PROTECTED_SITE_ID) return false;
+  if (change.row === PROTECTED_ROW && (change.sheet === "Pipeline" || change.sheet === "Land Sites")) return false;
+  return true;
+}
+
+/**
+ * A drifted cell already had a value that differs from the database.
+ * The count includes a database change not yet copied and a hand edit.
+ * The mirror overwrites both with the database value.
+ */
+export function mirrorDrift(changes: CellChange[]): MirrorDrift {
+  const safe = changes.filter(driftChange);
+  const drifted = safe.filter((change) => change.before.trim() !== "");
+  const ids = [...new Set(drifted.map((change) => shortHash(change.id)))].sort();
+  return {
+    cells: drifted.length,
+    fills: safe.filter((change) => change.before.trim() === "").length,
+    ids,
+  };
+}
+
+/** Held rows stay on the sheet. The report is a count and hashed ids. */
+export function formatHeld(held: { id: string; header: string }[]): string {
+  const ids = [...new Set(held.map((row) => row.id).filter((id) => id !== PROTECTED_SITE_ID))].map((id) => shortHash(id)).sort();
+  const shown = ids.slice(0, 20).map((id) => `#${id}`).join(" ");
+  const more = ids.length > 20 ? ` and ${ids.length - 20} more` : "";
+  const text = [
+    `held ${held.length}`,
+    `held_ids ${ids.length}${shown ? ` ${shown}` : ""}${more}`,
+    "A shorter database value that is only a prefix of the sheet cell was not written.",
+  ].join("\n");
+  if (text.includes(PROTECTED_SITE_ID)) throw new Error("Held report included a quarantined id.");
+  return text;
+}
+
+export function formatMirrorDrift(drift: MirrorDrift): string {
+  const shown = drift.ids.slice(0, 20).map((id) => `#${id}`).join(" ");
+  const more = drift.ids.length > 20 ? ` and ${drift.ids.length - 20} more` : "";
+  const text = [
+    `drift_cells ${drift.cells}`,
+    `drift_ids ${drift.ids.length}${shown ? ` ${shown}` : ""}${more}`,
+    `fills ${drift.fills}`,
+    "The mirror overwrites drifted cells with the database value. Cell text is not printed.",
+  ].join("\n");
+  if (text.includes(PROTECTED_SITE_ID)) throw new Error("Drift report included a quarantined id.");
+  return text;
 }
 
 export function formatPlan(changes: CellChange[]): string {

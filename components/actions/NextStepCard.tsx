@@ -641,7 +641,7 @@ export function NextStepCard({
             ))}
           </div>
         </div>
-        <p className="hint">Approval updates the stage on the map. It stays waiting for workbook until the sync matches. Resolving a comment does not change Stage.</p>
+        <p className="hint">Approval updates the stage on the map. The database is the record, and the mirror copies it. Do not edit the workbook. Resolving a comment does not change Stage.</p>
       </>
     );
   }
@@ -802,7 +802,7 @@ function OutcomeForm({
           <option value="reply">Reply only</option>
         </select>
       </label>
-      {stageMove && outcome === "accepted" ? <p className="hint">The map updates now. The workbook Stage column is written after the workbook approver accepts.</p> : null}
+      {stageMove && outcome === "accepted" ? <p className="hint">The map updates now. The stage is stored in the database. The workbook mirror copies it. Do not edit the workbook.</p> : null}
       {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
       {showReply ? (
         <label>

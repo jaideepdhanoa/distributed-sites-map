@@ -48,8 +48,14 @@ export default function CommandSearch({
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<Groups>(EMPTY);
   const input = useRef<HTMLInputElement>(null);
+  const opened = useRef(false);
   const fallbackRef = useRef(fallback);
   fallbackRef.current = fallback;
+  if (open && !opened.current) {
+    opened.current = true;
+    if (query) setQuery("");
+  }
+  if (!open) opened.current = false;
 
   function choose(hit: PaletteHit) {
     const href = openPath(hit);
@@ -57,10 +63,6 @@ export default function CommandSearch({
     onClose();
     router.push(href);
   }
-
-  useEffect(() => {
-    if (open) setQuery("");
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;

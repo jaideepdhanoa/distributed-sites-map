@@ -63,6 +63,8 @@ export type ActivityPayload = {
   source_link?: string;
   /** The workbook date had no clock. The calendar day is still exact. */
   at_approximate?: boolean;
+  /** Workbook capture import line. Later edits keep it. The HTTP API does not set it. */
+  provenance?: string;
 };
 
 export type CommsPayload = {

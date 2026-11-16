@@ -1,0 +1,65 @@
+name: Capture import
+
+# Copies workbook Activity rows of type capture into the production database.
+# Jaideep or Indie runs this by hand on main. Dry run is the default and writes nothing.
+# A write needs mode write and the confirm phrase import-production.
+# The log lists workbook ids, site ids, kind, and date. It does not list
+# summaries, links, or prices. The sheet is not written.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry-run writes nothing. write copies capture rows into production.
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - write
+      confirm:
+        description: Type import-production to write. Leave blank for a dry run.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse a write without the confirm phrase
+        if: inputs.mode == 'write' && inputs.confirm != 'import-production'
+        run: |
+          echo "Refusing to import. Set mode to write and type import-production." >&2
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Import capture activity
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          CAPTURE_IMPORT_MODE: ${{ inputs.mode }}
+          CONFIRM: ${{ inputs.confirm }}
+          ALLOW_PRODUCTION_CAPTURE_IMPORT: ${{ inputs.mode == 'write' && inputs.confirm == 'import-production' && '1' || '0' }}
+          IMPORT_ACTOR: ${{ github.actor }}
+        run: |
+          if [ "$CAPTURE_IMPORT_MODE" = "write" ]; then
+            npx tsx scripts/import-capture-activity.ts --apply
+          else
+            npx tsx scripts/import-capture-activity.ts
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capture-import-plan
+          path: capture-import-plan.json
+          retention-days: 1
+          if-no-files-found: ignore

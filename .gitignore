@@ -19,6 +19,7 @@ review-shots/
 *.log
 .workbook-sync-cache/
 shadow-diff.json
+capture-import-plan.json
 tsconfig.tsbuildinfo
 test-results/
 playwright-report/

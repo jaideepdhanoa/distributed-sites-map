@@ -265,14 +265,19 @@ async function writeActivity(
   const payload = change.payload as ActivityPayload;
   const previous = await sql.query<{ payload: unknown }>(`SELECT payload FROM activities WHERE entity_id = $1`, [entityId]);
   const prior = asObject(previous.rows[0]?.payload);
+  // false clears a stored approximate flag. Omitting the field keeps it.
   const approximate = payload.at_approximate === true || (payload.at_approximate == null && prior.at_approximate === true);
+  const dateIso = (payload.date_iso ?? textOf(prior.date_iso)).trim();
   const stored: Record<string, unknown> = {
     date: payload.date,
-    date_iso: payload.date_iso ?? textOf(prior.date_iso),
     type: payload.type,
     summary: payload.summary,
     source_link: payload.source_link ?? textOf(prior.source_link),
   };
+  if (dateIso) stored.date_iso = dateIso;
+  // An empty provenance does not clear one that is already stored.
+  const provenance = textOf(payload.provenance).trim() || textOf(prior.provenance).trim();
+  if (provenance) stored.provenance = provenance;
   if (approximate) stored.at_approximate = true;
   await sql.query(
     `INSERT INTO activities (entity_id, site_id, payload, version, updated_by)

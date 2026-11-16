@@ -645,9 +645,10 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 }
 
-/** The shadow import writes this source. An API batch does not. */
+/** The shadow import and the capture import write these sources. An API batch does not. */
 export function importedFromWorkbook(source: string | null | undefined): boolean {
-  return (source || "").trim().toLowerCase().startsWith("workbook snapshot");
+  const text = (source || "").trim().toLowerCase();
+  return text.startsWith("workbook snapshot") || text.startsWith("workbook capture import");
 }
 
 export async function loadMirrorRows(sql: Sql): Promise<{

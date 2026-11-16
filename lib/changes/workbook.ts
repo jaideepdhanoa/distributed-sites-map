@@ -110,6 +110,7 @@ export function workbookFromFiles(files: { deals: string; timeline: string; comm
         site_ids: siteIds,
         direction: text(row.direction),
         at: text(row.at),
+        at_text: text(row.at_text),
         person: text(row.person),
         firm: text(row.firm),
         channel: text(row.channel),

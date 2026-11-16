@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
 import { numericSuffix } from "./apply";
-import { MIRROR_FIELD_HEADERS, isTruncatedCell, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameCommsStamp, sameWorkbookCell, shortHash, withSheetStamp } from "./site";
+import { MIRROR_FIELD_HEADERS, isDateField, isTruncatedCell, losesSheetDate, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameCommsStamp, sameSheetDate, sameWorkbookCell, sheetAllowsApprox, shortHash, withSheetStamp } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
 /** The quarantined pipeline row. Never written. */
@@ -275,9 +275,27 @@ function planTable(input: {
       const after = cellText(record.values[column.key]);
       if (input.skipBlank && !after) continue;
       const before = cellText(existing.cells[column.index]);
-      if (cellsEqual(input, column.key, before, after)) continue;
       const header = input.table.headers[column.index] || column.headers[0];
-      if (input.holdTruncation && isTruncatedCell(before, after)) {
+      let next = after;
+      if (isDateField(column.key, header)) {
+        const raw = cellText(record.values.at_text);
+        const iso = cellText(record.values.at_iso);
+        const approximate = record.values.at_approximate === "1";
+        if (raw && sameSheetDate(before, raw)) continue;
+        if (approximate && iso) {
+          if (!sheetAllowsApprox(before, iso)) {
+            held.push({ id: record.id, header });
+            continue;
+          }
+          next = `${iso} (approx.)`;
+        }
+        if (sameSheetDate(before, next)) continue;
+        if (losesSheetDate(before, next)) {
+          held.push({ id: record.id, header });
+          continue;
+        }
+      } else if (cellsEqual(input, column.key, before, next)) continue;
+      if (input.holdTruncation && isTruncatedCell(before, next)) {
         held.push({ id: record.id, header });
         continue;
       }
@@ -288,7 +306,7 @@ function planTable(input: {
         header,
         id: record.id,
         before,
-        after,
+        after: next,
       });
     }
   }
@@ -379,6 +397,14 @@ export function planSiteMirror(
         if (formula.startsWith("=")) continue;
         const after = cellText(raw);
         const before = cellText(existing.cells[index]);
+        const header = table.headers[index] || key;
+        if (isDateField(key, header)) {
+          if (sameSheetDate(before, after)) continue;
+          if (losesSheetDate(before, after)) {
+            combined.held.push({ id: record.site_id, header });
+            continue;
+          }
+        }
         if (sameWorkbookCell(before, after)) continue;
         combined.changes.push({
           sheet: table.title,
@@ -444,7 +470,10 @@ export function planCommsMirror(
     idPattern: /^CM-\d{4,}$/,
     holdTruncation: true,
     sameCell: (key, before, after) => (key === "at" ? sameCommsStamp(before, after) : sameWorkbookCell(before, after)),
-    appendValue: (key, value, samples) => (key === "at" ? withSheetStamp(samples, value) : value),
+    appendValue: (key, value, samples) => {
+      if (key !== "at" || value.includes("(approx.)")) return value;
+      return withSheetStamp(samples, value);
+    },
   });
 }
 
@@ -593,6 +622,10 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       const payload = asObject(row.payload);
       const values: Record<string, string> = {};
       for (const field of COMMS_FIELDS) values[field] = text(payload[field]);
+      const clock = values.at || "";
+      values.at_iso = /T\d{2}:\d{2}/.test(clock) ? clock : "";
+      values.at_approximate = payload.at_approximate === true || payload.at_approximate === "1" ? "1" : "";
+      if (!values.at_text && values.at_approximate === "1" && values.at_iso) values.at = `${values.at_iso} (approx.)`;
       return { entity_id: text(row.entity_id), values };
     }),
     sites: sites.rows.map((row) => ({

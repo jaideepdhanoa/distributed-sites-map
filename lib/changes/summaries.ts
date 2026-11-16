@@ -54,6 +54,27 @@ export function summariesFromCommsTable(table: SheetTable): Map<string, string> 
   return out;
 }
 
+/** Comms ID to the Date/time cell, whitespace collapsed and not clipped. */
+export function datesFromCommsTable(table: SheetTable): Map<string, string> {
+  const idAt = table.headers.findIndex((header) => header.trim().toLowerCase() === "comms id");
+  const dateAt = table.headers.findIndex((header) => header.trim().toLowerCase() === "date/time");
+  const out = new Map<string, string>();
+  if (idAt < 0 || dateAt < 0) return out;
+  for (const row of table.rows) {
+    const id = text(row.cells[idAt]);
+    const when = fullSummaryText(String(row.cells[dateAt] ?? ""));
+    if (id && when) out.set(id, when);
+  }
+  return out;
+}
+
+/** The Comms Log Date/time column, one batched values read. The cell text is not logged. */
+export async function readCommsDates(token: string): Promise<Map<string, string>> {
+  const read = (ranges: string[], kind: SheetRender) => readSheetRanges(token, SPREADSHEET_ID, ranges, kind);
+  const table = await loadSheetTable(read, COMMS_SHEET, COMMS_HEADER_ROW, [["comms id"], ["date/time"]]);
+  return datesFromCommsTable(table);
+}
+
 /** The Comms Log tab, one batched values read with the Sheets retry. Summary text is not logged. */
 export async function readCommsSummaries(token: string): Promise<Map<string, string>> {
   const read = (ranges: string[], kind: SheetRender) => readSheetRanges(token, SPREADSHEET_ID, ranges, kind);

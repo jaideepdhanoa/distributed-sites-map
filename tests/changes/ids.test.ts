@@ -18,7 +18,7 @@ function activityChange() {
     site_id: "PIPE-PHX-0001",
     expected_version: 0,
     source: "listing note",
-    payload: { date: "2026-11-15", type: "listing" as const, summary: "Listing noted" },
+    payload: { date: "2026-11-15T12:00:00-08:00", type: "listing" as const, summary: "Listing noted" },
   };
 }
 

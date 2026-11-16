@@ -1,0 +1,93 @@
+name: Workbook repairs
+
+# Manual, confirm-gated repairs. Dry run is the default and writes nothing.
+# A real write needs dry_run false and the script's confirm phrase typed in.
+# The job runs only on main. It does not change repository variables.
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: Which repair to run
+        type: choice
+        options:
+          - renumber-activity
+          - restore-comms-summaries
+          - restore-comms-dates
+        default: restore-comms-dates
+      dry_run:
+        description: Print the plan and do not write
+        type: boolean
+        default: true
+      confirm:
+        description: To apply, type the script's confirm phrase. Leave blank on a dry run.
+        type: string
+        required: false
+        default: ""
+      activity_floor:
+        description: Highest Activity event id from a mirror dry run. Used by renumber-activity.
+        type: string
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Dry-run or apply
+        env:
+          SCRIPT: ${{ inputs.script }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+          ACTIVITY_FLOOR: ${{ inputs.activity_floor }}
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          dry="$DRY_RUN"
+          case "$SCRIPT" in
+            renumber-activity)
+              expected="renumber-activity-ids"
+              allow="ALLOW_ACTIVITY_RENUMBER"
+              cmd=(npx tsx scripts/renumber-activity-collisions.ts)
+              ;;
+            restore-comms-summaries)
+              expected="restore-comms-summaries"
+              allow="ALLOW_COMMS_SUMMARY_RESTORE"
+              cmd=(npx tsx scripts/restore-comms-summaries.ts)
+              ;;
+            restore-comms-dates)
+              expected="restore-comms-dates"
+              allow="ALLOW_COMMS_DATE_RESTORE"
+              cmd=(npx tsx scripts/restore-comms-dates.ts)
+              ;;
+            *)
+              echo "Unknown script." >&2
+              exit 1
+              ;;
+          esac
+          export WORKBOOK_ACTIVITY_FLOOR="${ACTIVITY_FLOOR:-0}"
+          if [ "$dry" = "true" ] || [ "$dry" = "1" ]; then
+            echo "Dry run of ${SCRIPT}. Nothing will be written."
+            "${cmd[@]}"
+            exit 0
+          fi
+          if [ "$CONFIRM_INPUT" != "$expected" ]; then
+            echo "Refusing to apply ${SCRIPT}. Type ${expected} in confirm, and set dry_run to false." >&2
+            exit 1
+          fi
+          export CONFIRM="$expected"
+          export "$allow=1"
+          echo "Applying ${SCRIPT}."
+          "${cmd[@]}" --apply

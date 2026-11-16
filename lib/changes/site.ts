@@ -681,6 +681,72 @@ export function sameCommsStamp(sheet: string, database: string): boolean {
   return left === right || sameWorkbookCell(left, right);
 }
 
+function dateCore(value: string): string {
+  return stripPacific(value).replace(/ \(approx\.\)$/i, "").replace(/ \(approximate\)$/i, "").trim();
+}
+
+function markedApprox(value: string): boolean {
+  return / \(approx\.\)$/i.test(value.trim()) || / \(approximate\)$/i.test(value.trim());
+}
+
+/** A whole date or timestamp, with nothing else in the cell. */
+function plainClock(value: string): string {
+  const text = dateCore(value);
+  const iso = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.exec(text);
+  if (iso) return `${iso[1]} ${iso[2]}`;
+  const plain = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?$/.exec(text);
+  if (!plain) return "";
+  return plain[2] ? `${plain[1]} ${plain[2]}` : plain[1];
+}
+
+/** The sheet cell and the stored value are the same instant, including a trailing PT or approx mark. */
+export function sameSheetDate(sheet: string, next: string): boolean {
+  const before = sheet.trim();
+  const after = next.trim();
+  if (before === after) return true;
+  if (sameCommsStamp(before, after)) return true;
+  if (markedApprox(before) !== markedApprox(after)) return false;
+  const left = dateCore(before);
+  const right = dateCore(after);
+  if (left && (left === right || sameCommsStamp(left, right))) return true;
+  const clockLeft = plainClock(before);
+  const clockRight = plainClock(after);
+  return Boolean(clockLeft) && clockLeft === clockRight;
+}
+
+/**
+ * The database value would erase a sheet date or replace it with a shorter one.
+ * An empty cell can still be filled. A richer sheet string is kept.
+ */
+export function losesSheetDate(sheet: string, next: string): boolean {
+  const before = sheet.trim();
+  const after = next.trim();
+  if (!before || sameSheetDate(before, after)) return false;
+  if (!after) return true;
+  if (isTruncatedCell(before, after)) return true;
+  const sheetCore = dateCore(before);
+  const nextCore = dateCore(after);
+  if (nextCore && sheetCore.startsWith(nextCore) && sheetCore.length > nextCore.length) return true;
+  if (/[A-Za-z~()]/.test(before) && !/\(approx\.\)$/i.test(before) && !sameCommsStamp(before, after)) return true;
+  return false;
+}
+
+/** A plain timestamp cell can take an approximate mark. Free text stays as written. */
+export function sheetAllowsApprox(sheet: string, iso: string): boolean {
+  const before = sheet.trim();
+  if (!before) return true;
+  if (before === iso || before === `${iso} (approx.)`) return true;
+  if (sameCommsStamp(before, iso)) return true;
+  const clock = iso.replace("T", " ").replace(/:\d{2}(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/, "$1").replace(/(Z|[+-]\d{2}:\d{2})$/, "").trim();
+  return Boolean(clock) && sameCommsStamp(before, clock);
+}
+
+export function isDateField(key: string, header: string): boolean {
+  if (key === "at" || key === "date") return true;
+  const name = header.trim().toLowerCase();
+  return name === "date" || name === "date/time" || name === "when" || name === "last checked live" || name.endsWith("as_of") || name.endsWith("as of");
+}
+
 /** New rows follow the sheet. An existing Date/time that ends in " PT" keeps that suffix. */
 export function withSheetStamp(samples: string[], value: string): string {
   const text = value.trim();

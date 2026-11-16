@@ -26,6 +26,7 @@ export type CommsRecord = {
   source: string;
   message_id: string;
   subject: string;
+  at_approximate?: boolean | string;
 };
 
 export type CommsSnapshot = {
@@ -46,6 +47,7 @@ export type CommsLine = {
   firm: string;
   channel: string;
   summary: string;
+  approximate: boolean;
   citedEventIds: string[];
   messageId: string;
   href?: string;
@@ -71,6 +73,7 @@ export type MergedLine = {
   firm: string;
   channel: string;
   href: string;
+  approximate: boolean;
 };
 
 export type CommsBody =
@@ -119,6 +122,14 @@ export function sortStamp(at: string): string {
   const match = /^(\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}))?$/.exec(when);
   if (!match) return "";
   return `${match[1]}T${match[2] || "00:00"}`;
+}
+
+/** The timeline clock. An approximate comms time keeps the parsed clock and says so. */
+export function commsWhenText(at: string, approximate: boolean): string {
+  const when = whenParts(at);
+  const body = [when.date, when.time ? `${when.time} PT` : ""].filter(Boolean).join(" ");
+  if (!body) return approximate ? "(approximate)" : "";
+  return approximate ? `${body} (approximate)` : body;
 }
 
 export function whenParts(at: string): { date: string; time: string } {
@@ -182,6 +193,7 @@ export function toCommsLine(row: Partial<CommsRecord>): CommsLine {
     firm: text(row.firm),
     channel: text(row.channel),
     summary: clipSummary(text(row.summary)),
+    approximate: row.at_approximate === true || row.at_approximate === "1" || row.at_approximate === "true",
     href: gmailHref(text(row.link), messageId, threadId),
     citedEventIds: eventIds(text(row.source)),
     messageId,
@@ -295,6 +307,7 @@ function activityLine(item: ActivityInput): MergedLine {
     firm: "",
     channel: "",
     href: "",
+    approximate: false,
   };
 }
 
@@ -311,6 +324,7 @@ function commsMerged(line: CommsLine): MergedLine {
     firm: line.firm,
     channel: line.channel,
     href: line.href || "",
+    approximate: line.approximate,
   };
 }
 

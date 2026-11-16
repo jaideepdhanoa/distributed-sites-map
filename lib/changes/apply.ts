@@ -244,6 +244,7 @@ async function writeActivity(
   const prior = asObject(previous.rows[0]?.payload);
   const stored = {
     date: payload.date,
+    date_iso: payload.date_iso ?? textOf(prior.date_iso),
     type: payload.type,
     summary: payload.summary,
     source_link: payload.source_link ?? textOf(prior.source_link),
@@ -276,6 +277,8 @@ async function writeComms(
     site_ids: payload.site_ids ?? change.site_id,
     direction: payload.direction,
     at: payload.at ?? textOf(prior.at),
+    at_text: payload.at_text ?? textOf(prior.at_text),
+    at_approximate: payload.at_approximate ?? prior.at_approximate === true,
     person: payload.person ?? textOf(prior.person),
     firm: payload.firm ?? textOf(prior.firm),
     channel: payload.channel ?? textOf(prior.channel),

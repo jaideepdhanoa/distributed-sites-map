@@ -1,10 +1,10 @@
 import type { Sql } from "@/lib/actions/db";
 import { importEntityFromWorkbook, type ShadowEntity } from "./flags";
-import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, isTruncatedCell, parseSheet, photoCanonical, photosFromCanonical, sameCommsStamp, sheetCanonical, shortHash, siteComparable, type SiteRow } from "./site";
+import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, isTruncatedCell, losesSheetDate, parseSheet, photoCanonical, photosFromCanonical, sameSheetDate, sheetCanonical, shortHash, siteComparable, type SiteRow } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 import { issueIds, legacyStageIds, workbookIssues, type ActivityRow, type CommsRow, type RowIssue, type StageRow, type WorkbookSlice } from "./workbook";
 
-export type DiffChange = { id: string; field: string; workbook: string; database: string; truncated?: boolean };
+export type DiffChange = { id: string; field: string; workbook: string; database: string; truncated?: boolean; blanked?: boolean };
 
 export type EntityDiff = {
   workbook: number;
@@ -67,10 +67,17 @@ export function hideDiffValue(entity: string, field: string): boolean {
   return (entity === "activity" || entity === "comms") && SENSITIVE_FIELDS.has(field);
 }
 
+function dateField(entity: string, field: string): boolean {
+  return (entity === "comms" && (field === "at" || field === "at_text")) || (entity === "activity" && field === "date");
+}
+
 function fieldChange(entity: string, field: string, workbook: string, database: string): DiffChange | null {
   const left = workbook || "";
   const right = database || "";
-  if (entity === "comms" && field === "at" && sameCommsStamp(left, right)) return null;
+  if (dateField(entity, field)) {
+    if (sameSheetDate(left, right)) return null;
+    if (losesSheetDate(left, right)) return { id: "", field, workbook: left, database: right, blanked: true };
+  }
   if ((entity === "comms" || entity === "activity") && field === "summary" && isTruncatedCell(left, right)) {
     return { id: "", field, workbook: left, database: right, truncated: true };
   }
@@ -298,8 +305,9 @@ function sample(ids: string[], changes: DiffChange[], entity: string): string[] 
   for (const id of ids.slice(0, 20)) lines.push(`- missing ${id}`);
   if (ids.length > 20) lines.push(`- and ${ids.length - 20} more missing in the artifact`);
   for (const change of changes.slice(0, 20)) {
-    if (change.truncated) {
-      lines.push(`- ${change.id} ${change.field} truncated #${shortHash(change.workbook)} #${shortHash(change.database)}`);
+    if (change.truncated || change.blanked) {
+      const kind = change.blanked ? "blank" : "truncated";
+      lines.push(`- ${change.id} ${change.field} ${kind} #${shortHash(change.workbook)} #${shortHash(change.database)}`);
       continue;
     }
     lines.push(
@@ -316,7 +324,7 @@ function hashEntity(row: EntityDiff, entity: string): EntityDiff {
   return {
     ...row,
     changed: row.changed.map((change) =>
-      hideDiffValue(entity, change.field) || change.truncated
+      hideDiffValue(entity, change.field) || change.truncated || change.blanked
         ? { ...change, workbook: shortHash(change.workbook), database: shortHash(change.database) }
         : change,
     ),

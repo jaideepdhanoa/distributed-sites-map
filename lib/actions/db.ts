@@ -54,6 +54,13 @@ function wrap(client: PoolClient | Pool): Sql {
   };
 }
 
+export async function closePool(): Promise<void> {
+  if (!pool) return;
+  const current = pool;
+  pool = null;
+  await current.end();
+}
+
 export async function withSql<T>(fn: (sql: Sql) => Promise<T>): Promise<T> {
   const client = await getPool().connect();
   try {

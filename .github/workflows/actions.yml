@@ -17,5 +17,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Site read type parity
+        run: npx tsx scripts/parity-site-types.ts
       - run: npx playwright install --with-deps chromium
       - run: npm run test:actions

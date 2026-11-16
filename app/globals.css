@@ -2903,3 +2903,21 @@ button.paper-btn.on,
   .shell.steps-open .map-corner,
   .shell:has(.menu-sheet) .map-corner { display: none; }
 }
+.page-error {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+.panel-error {
+  max-width: 28rem;
+  padding: 16px;
+  background: #faf7f1;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.panel-error p { margin: 0 0 8px; }
+.panel-error .paper-btn { margin-top: 4px; }

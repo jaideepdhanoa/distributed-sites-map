@@ -4,7 +4,7 @@ import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
 import { readEntityFromDb } from "./flags";
 import { readGenerated } from "@/lib/guard";
-import { SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, recordedPerAcre, scrubText, type PhotoRef, type SiteField } from "./site";
+import { NUMERIC_FACT_FIELDS, SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, recordedPerAcre, scrubText, type PhotoRef, type SiteField } from "./site";
 
 type DealFile = {
   features?: {
@@ -48,6 +48,24 @@ type SiteRead = Record<SiteField, string> & { site_id: string; sheet?: string; f
 
 function numberOrNull(value: string): number | null {
   return parseMeasure(value);
+}
+
+/** Numeric facts, plus the site columns that share that allowlist. Text facts are not in this set. */
+const NUMERIC_FACT_KEYS = new Set<string>(NUMERIC_FACT_FIELDS);
+
+/**
+ * Facts are stored as text. Copy a number only when the snapshot value for
+ * that key is a number, or the key is on the numeric allowlist. A link, a
+ * date, a road, or a phase stays a string. An empty cell leaves the snapshot,
+ * including null.
+ */
+function paintFact(key: string, value: unknown, snapshot: unknown): string | number | undefined {
+  const textValue = typeof value === "string" ? value : value == null ? "" : String(value);
+  if (!textValue || key === "price_per_acre") return undefined;
+  const numeric = NUMERIC_FACT_KEYS.has(key) || typeof snapshot === "number";
+  if (!numeric) return textValue;
+  const parsed = numberOrNull(textValue);
+  return parsed == null ? undefined : parsed;
 }
 
 function photosOf(value: unknown): PhotoRef[] {
@@ -102,8 +120,8 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
       photo_notes: row.photo_notes,
       listed: flags.listed,
       listing_removed: flags.removed,
-      street_view_url: frontage?.view_url || "",
     };
+    if (frontage?.view_url) next.street_view_url = frontage.view_url;
     if (row.county_value) next.county_value = numberOrNull(row.county_value);
     if (row.county_value_basis) next.county_value_basis = row.county_value_basis;
     if (row.land_value) next.land_value = numberOrNull(row.land_value);
@@ -111,8 +129,9 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
     next.price_per_acre = recordedPerAcre(row.facts?.price_per_acre || "", cells["Asking price ($)"] || row.asking_price, cells["Land (acres)"] || row.acreage);
     if (row.facts) {
       for (const [key, value] of Object.entries(row.facts)) {
-        if (!value || key === "price_per_acre") continue;
-        next[key] = numberOrNull(value) ?? value;
+        const painted = paintFact(key, value, props[key]);
+        if (painted === undefined) continue;
+        next[key] = painted;
       }
     }
     if (row.coord_status) next.coord_status = row.coord_status;

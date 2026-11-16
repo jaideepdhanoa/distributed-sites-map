@@ -97,7 +97,8 @@ test("a P&L write stores the exact timestamp, flags the line, and does not inven
   assert.equal(replay.results[0]?.entity_id, created.results[0]?.entity_id);
   const empty = await loadPnlStatement(sql, "PIPE-LAS-9002");
   assert.equal(empty.status, "empty");
-  assert.match(empty.message, /No financial package has been captured yet/);
+  assert.match(empty.message, /No P&L captured yet/);
+  assert.match(empty.message, /broken into line items/);
 });
 
 test("a second create conflicts, an update keeps the source, and a bad version rolls back", async () => {

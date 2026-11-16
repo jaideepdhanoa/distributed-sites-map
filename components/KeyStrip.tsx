@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
@@ -211,8 +212,9 @@ export default function KeyStrip({
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
-      {signedIn && showFinancials && financialsOpen && shownPanel ? (
-        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />
+      {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+        document.body,
       ) : null}
       {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (
         <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setChecklistOpen(false)} />

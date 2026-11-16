@@ -77,7 +77,7 @@ export type PnlStatement = {
 };
 
 export function emptyStatement(): PnlStatement {
-  return { status: "empty", message: "No financial package has been captured yet.", years: [] };
+  return { status: "empty", message: "No P&L captured yet. A broker package still needs to be broken into line items.", years: [] };
 }
 
 export function unavailableStatement(): PnlStatement {

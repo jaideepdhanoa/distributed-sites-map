@@ -9,6 +9,8 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import FinancialsEntry from "./FinancialsEntry";
+import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
@@ -466,6 +468,9 @@ export default function Detail({
       </div>
       <ScoreTile score={linkedDeal?.score} />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} /> : <FigureSkeleton />}
+      {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
+        <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} />
+      ) : null}
       <SitePhotos card={photos} />
       <NextStepCard
         kind="site"
@@ -738,6 +743,9 @@ export function DealDetail({
       </div>
       <ScoreTile score={deal.score} />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} /> : <FigureSkeleton />}
+      {signedIn && deal.kind !== "land" ? (
+        <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} />
+      ) : null}
       <SitePhotos card={photos} />
       <NextStepCard
         kind="deal"

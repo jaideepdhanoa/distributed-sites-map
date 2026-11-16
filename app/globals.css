@@ -2197,6 +2197,24 @@ tr { cursor: pointer; }
   font-size: var(--type-body);
   line-height: 1.4;
 }
+.fin-entry {
+  margin: 12px 0;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.fin-entry .fin-tile { width: 100%; text-align: left; }
+.fin-entry span {
+  display: flex;
+  color: var(--muted);
+  font-size: var(--type-cap);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.fin-entry strong { display: block; margin-top: 2px; font-size: var(--type-lead); letter-spacing: -0.02em; }
+.fin-entry small { display: block; margin-top: 2px; color: var(--ink-2); font-size: var(--type-body); line-height: 1.35; }
+.fin-quiet { margin: 4px 0 8px; color: var(--ink-3); font-size: var(--type-body); }
 .pnl-overlay {
   position: fixed;
   inset: 0;

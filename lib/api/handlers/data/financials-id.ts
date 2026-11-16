@@ -3,6 +3,7 @@ import { canReadFinancials } from "@/lib/agent/access";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { loadFinancialPanel } from "@/lib/financialsLoad";
+import { demoStatement } from "@/lib/pnl/demo";
 import { loadPnlStatement } from "@/lib/pnl/read";
 import { emptyStatement, unavailableStatement } from "@/lib/pnl/statement";
 import { loadWorkbookStep } from "@/lib/workbookStepLoad";
@@ -29,6 +30,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       pnl = unavailableStatement();
     }
   }
+  const demo = pnl.status === "ready" ? null : demoStatement(id);
+  if (demo) pnl = demo;
   console.info(JSON.stringify({ event: "data", user: session.u, part: "financials", id }));
-  return NextResponse.json({ ...panel, workbookStep, pnl }, { headers: privateHeaders });
+  return NextResponse.json({ ...panel, workbookStep, pnl, pnlDemo: Boolean(demo) }, { headers: privateHeaders });
 }

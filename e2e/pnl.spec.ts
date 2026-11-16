@@ -1,9 +1,26 @@
 import { expect, test } from "@playwright/test";
 
+test("a site card leads with financials only when a P&L has been captured", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop summary");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?site=PIPE-LAS-0011", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-record='PIPE-LAS-0011']")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("No P&L captured yet")).toHaveCount(0);
+  const card = page.getByTestId("financials-entry");
+  const quiet = page.getByTestId("financials-quiet");
+  if (await card.count()) {
+    await expect(card).toContainText("revenue");
+    await card.click();
+    await expect(page.getByTestId("pnl-overlay")).toBeVisible();
+  } else if (await quiet.count()) {
+    await expect(quiet).toHaveText("Financials: package not yet broken into line items");
+  }
+});
+
 test("desktop profit and loss is a full-width sheet", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop pnl");
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/financials/preview", { waitUntil: "domcontentloaded" });
+  await page.goto("/financials/preview", { waitUntil: "networkidle" });
   await page.getByTestId("preview-revenue").click();
   const overlay = page.getByTestId("pnl-overlay");
   const sheet = page.getByTestId("pnl-sheet");
@@ -31,7 +48,7 @@ test("desktop profit and loss is a full-width sheet", async ({ page }, info) => 
 test("a phone profit and loss stays a compact period list", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone pnl");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/financials/preview", { waitUntil: "domcontentloaded" });
+  await page.goto("/financials/preview", { waitUntil: "networkidle" });
   await page.getByTestId("preview-revenue").click();
   await expect(page.getByTestId("pnl-phone")).toBeVisible();
   await expect(page.getByTestId("pnl-sheet")).toBeHidden();

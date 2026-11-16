@@ -27,9 +27,12 @@ import {
   planActivityMirror,
   planCommsMirror,
   planSiteMirror,
+  newMirrorRunId,
   planStageMirror,
-  recordMirrorRun,
+  saveMirrorRun,
   sheetIdFloor,
+  watchMirrorCancel,
+  type MirrorWritePhase,
   stageTabs,
   type CellChange,
   type SheetRender,
@@ -237,14 +240,33 @@ async function main(): Promise<void> {
   }
   assertMirrorRefusals(refused);
   if (dryRun) return;
+  const runId = newMirrorRunId();
+  let phase: MirrorWritePhase = "idle";
+  let settled = false;
+  const finish = (status: "succeeded" | "failed", note: string): Promise<void> => {
+    if (settled) return Promise.resolve();
+    settled = true;
+    return withConnectionString(url, (sql) => saveMirrorRun(sql, runId, counts, note, status)).then(
+      () => undefined,
+      () => undefined,
+    );
+  };
+  watchMirrorCancel(
+    () => phase,
+    (note) => finish("failed", note),
+    (code) => process.exit(code),
+  );
   try {
+    await withConnectionString(url, (sql) => saveMirrorRun(sql, runId, counts, "writing cells", "running"));
+    phase = "writing";
     await writeCells(token, changes);
+    phase = "written";
     assertReadBack(changes, await readBack(token, changes));
   } catch (error) {
-    await withConnectionString(url, (sql) => recordMirrorRun(sql, counts, "read-back or write failed", "failed")).catch(() => undefined);
+    await finish("failed", "read-back or write failed");
     throw error;
   }
-  await withConnectionString(url, (sql) => recordMirrorRun(sql, counts, "wrote cells", "succeeded"));
+  await finish("succeeded", "wrote cells");
   console.log(`Wrote ${counts.cells} cells.\n${driftText}\n${counted}`);
   summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Protected rows skipped: ${skippedProtected}. Drifted cells were overwritten with the database value.\n\n${driftText}\n\n${counted}\n`);
 }

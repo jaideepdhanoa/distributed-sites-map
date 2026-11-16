@@ -24,6 +24,8 @@ import * as views from "@/lib/api/handlers/actions/views";
 import * as viewsId from "@/lib/api/handlers/actions/views-id";
 import * as digest from "@/lib/api/handlers/alerts/digest";
 import * as flush from "@/lib/api/handlers/alerts/flush";
+import * as alertFlushCron from "@/lib/api/handlers/cron/alert-flush";
+import * as workbookSyncCron from "@/lib/api/handlers/cron/workbook-sync";
 import * as preferences from "@/lib/api/handlers/alerts/preferences";
 import * as alertTest from "@/lib/api/handlers/alerts/test";
 import { primeSnapshot } from "@/lib/snapshot/read";
@@ -98,6 +100,8 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/agent/inbox", { GET: agentInbox.GET as Handler }),
   route("/api/alerts/digest", { GET: digest.GET as Handler }),
   route("/api/alerts/flush", { GET: flush.GET as Handler, POST: flush.POST as Handler }),
+  route("/api/cron/alert-flush", { GET: alertFlushCron.GET as Handler }),
+  route("/api/cron/workbook-sync", { GET: workbookSyncCron.GET as Handler }),
   route("/api/alerts/preferences", { GET: preferences.GET as Handler, PUT: preferences.PUT as Handler }),
   route("/api/alerts/test", { POST: alertTest.POST as Handler }),
   route("/api/data/areas", { GET: areas.GET as Handler }),
@@ -163,7 +167,8 @@ export async function dispatch(method: string, request: NextRequest, parts: stri
   const found = findRoute(parts);
   if (!found) notFound();
   // Refreshing the cache must not read the snapshot it is about to drop.
-  const skipPrime = parts[0] === "data" && parts[1] === "revalidate";
+  // Cron dispatch only talks to GitHub. A snapshot read must not block it.
+  const skipPrime = (parts[0] === "data" && parts[1] === "revalidate") || parts[0] === "cron";
   if (method !== "OPTIONS" && !skipPrime) await primeSnapshot();
   if (method === "OPTIONS") {
     return new Response(null, { status: 204, headers: { Allow: allowHeader(Object.keys(found.route.methods)) } });

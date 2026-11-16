@@ -20,6 +20,8 @@ const AGENT_BEARER_PATHS = new Set(["/api/changes"]);
 const CRON_BEARER_PATHS = new Set([
   "/api/alerts/digest",
   "/api/alerts/flush",
+  "/api/cron/alert-flush",
+  "/api/cron/workbook-sync",
   "/api/data/revalidate",
 ]);
 

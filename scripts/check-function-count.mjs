@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-// Hobby allows 12 Serverless Functions. Fail at 10 so a new route still fits.
+// Fail at 10 so a new route still fits the catch-all. A separate route file is another function.
 const LIMIT = 10;
 const root = path.join(process.cwd(), ".vercel", "output", "functions");
 

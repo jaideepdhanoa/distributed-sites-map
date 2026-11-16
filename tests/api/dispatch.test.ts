@@ -33,6 +33,8 @@ const expected = [
   "GET /api/alerts/digest",
   "GET /api/alerts/flush",
   "POST /api/alerts/flush",
+  "GET /api/cron/alert-flush",
+  "GET /api/cron/workbook-sync",
   "GET /api/alerts/preferences",
   "PUT /api/alerts/preferences",
   "POST /api/alerts/test",

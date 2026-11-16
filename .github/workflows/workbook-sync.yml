@@ -24,8 +24,10 @@ name: Workbook sync
 # not restored for 7 days. An unchanged sheet restores it every run, so the
 # entry stays. If the cache is missing, one read of the live snapshot's
 # file hashes runs. A match still skips the write and the refresh, and the
-# hash is then saved. The cache is otherwise saved only after a successful
-# publish. When WORKBOOK_MIRROR_ENABLED is 1, that same run still reads
+# hash is then saved. The cache is saved after a successful publish, or
+# after the live snapshot already matches. That save still runs when a later
+# step is cancelled, so a cancelled mirror does not publish the same snapshot
+# again. When WORKBOOK_MIRROR_ENABLED is 1, that same run still reads
 # Neon and can write the cut-over cells. The mirror is the only workbook
 # writer. The drift step does not copy sheet edits into the database.
 # The mirror does not publish a snapshot.
@@ -44,6 +46,8 @@ name: Workbook sync
 # changes on every run. Neon Free allows 1 GB per project, so that day of
 # history stays.
 on:
+  # Backup. Vercel Cron dispatches this workflow every 15 minutes.
+  # GitHub may run this schedule later than the mark.
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
@@ -250,15 +254,18 @@ jobs:
             npm ci
           fi
           npx tsx scripts/workbook-mirror.ts
+      # always() still runs after a cancelled mirror or drift step. The hash
+      # file is the snapshot fingerprint. A cancel during publish leaves the
+      # output unset, and this step does not save a partial fingerprint.
       - name: Record the published hash
         id: record-hash
-        if: steps.publish.outputs.published == 'true' || steps.live.outputs.unchanged == 'true'
+        if: always() && (steps.publish.outputs.published == 'true' || steps.live.outputs.unchanged == 'true')
         run: |
           mkdir -p .workbook-sync-cache
           tr -d '[:space:]' < /tmp/snapshot-hash > .workbook-sync-cache/published-hash
           echo >> .workbook-sync-cache/published-hash
       - name: Save the published hash
-        if: steps.record-hash.outcome == 'success'
+        if: always() && steps.record-hash.outcome == 'success'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:

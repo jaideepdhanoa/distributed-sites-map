@@ -7,6 +7,14 @@
     {
       "path": "/api/alerts/digest",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/workbook-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/alert-flush",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

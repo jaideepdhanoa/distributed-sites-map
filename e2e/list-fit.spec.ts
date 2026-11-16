@@ -155,8 +155,8 @@ test("a saved layout keeps its columns and the last flexible one fills the pane"
   expect(fit.missing).toBe(false);
   if (fit.missing) return;
   expect(fit.gap).toBeLessThanOrEqual(4);
-  expect(fit.site).toBeGreaterThanOrEqual(190);
-  expect(fit.site).toBeLessThanOrEqual(210);
+  expect(fit.site).toBeGreaterThanOrEqual(280);
+  expect(fit.site).toBeLessThanOrEqual(290);
   expect(fit.cash).toBeGreaterThan(400);
   expect(fit.map).toBeLessThanOrEqual(140);
 });

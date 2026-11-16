@@ -179,6 +179,8 @@ function methodNotAllowed(): Response {
 
 export function blocksPreviewWrite(method: string, parts: string[]): boolean {
   if (!previewPointsAtProduction()) return false;
+  // The list layout handler answers 200 and keeps the browser layout.
+  if (parts[0] === "list" && parts[1] === "layout") return false;
   if (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") return true;
   if (method !== "GET") return false;
   if (parts[0] === "cron") return true;

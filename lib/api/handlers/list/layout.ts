@@ -4,6 +4,7 @@ import { ProductionWriteRefused, shadowContext } from "@/lib/changes/guard";
 import { PIPELINE_COLUMNS } from "@/lib/keyNumbers";
 import { isLayoutSurface, sanitizeLayout, type LayoutSurface } from "@/lib/listLayout";
 import { loadListLayout, missingLayoutTable, saveListLayout } from "@/lib/listLayoutStore";
+import { previewPointsAtProduction } from "@/lib/preview/safety";
 import { isSession, requireUser } from "@/lib/guard";
 
 const UNIVERSE_IDS = ["site", "type", "stage", "score", "spare", "grade", "traffic", "listed"];
@@ -28,10 +29,11 @@ function surfaceOf(request: Request, body?: { surface?: unknown }): LayoutSurfac
 }
 
 export async function GET(request: Request) {
-  const session = await requireUser();
-  if (!isSession(session)) return session;
   const surface = surfaceOf(request);
   if (!surface) return jsonError("That list is not available.", 400);
+  if (previewPointsAtProduction()) return jsonOk({ layout: null, stored: false });
+  const session = await requireUser();
+  if (!isSession(session)) return session;
   if (!actionsEnabled()) return jsonOk({ layout: null, stored: false });
   try {
     const layout = await withSql((sql) => loadListLayout(sql, session.u, surface, allowedFor(surface)));
@@ -44,8 +46,6 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const session = await requireUser();
-  if (!isSession(session)) return session;
   let body: { surface?: unknown; layout?: unknown };
   try {
     body = (await request.json()) as typeof body;
@@ -54,6 +54,11 @@ export async function PUT(request: Request) {
   }
   const surface = surfaceOf(request, body);
   if (!surface) return jsonError("That list is not available.", 400);
+  if (previewPointsAtProduction()) {
+    return jsonOk({ layout: sanitizeLayout(body.layout, allowedFor(surface)), stored: false });
+  }
+  const session = await requireUser();
+  if (!isSession(session)) return session;
   if (!actionsEnabled()) return jsonOk({ layout: sanitizeLayout(body.layout, allowedFor(surface)), stored: false });
   try {
     const saved = await withSql((sql) => saveListLayout(sql, session.u, surface, sanitizeLayout(body.layout, allowedFor(surface)), allowedFor(surface)));

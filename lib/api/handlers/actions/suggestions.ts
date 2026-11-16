@@ -2,6 +2,7 @@ import { listOpenNeeds } from "@/lib/actions/blockers";
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 import { createSuggestion, listSuggestions, reconcileSuggestions } from "@/lib/actions/suggestions";
 import { InputError, parseTarget, type TargetKind } from "@/lib/actions/text";
+import { PREVIEW_POINTS_AT_PRODUCTION, previewPointsAtProduction } from "@/lib/preview/safety";
 
 function targetFilter(url: URL): { targetKind?: TargetKind; targetId?: string } {
   const kind = url.searchParams.get("targetKind");
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     return jsonError(error instanceof InputError ? error.message : "Choose a site or a deal.", 400);
   }
   const payload = await runWrite(session, { action: "suggestion.list" }, async (sql) => {
-    await reconcileSuggestions(sql);
+    if (!previewPointsAtProduction()) await reconcileSuggestions(sql);
     const suggestions = await listSuggestions(sql, filter);
     const needs = filter.targetKind && filter.targetId ? await listOpenNeeds(sql, filter.targetKind, filter.targetId) : [];
     return { suggestions, needs };

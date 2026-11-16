@@ -5,6 +5,7 @@ import { NextRequest } from "next/server";
 import { POST } from "../../lib/api/handlers/changes";
 import { GET as digest } from "../../lib/api/handlers/alerts/digest";
 import { blocksPreviewWrite, dispatch } from "../../lib/api/dispatch";
+import { migrationDecision } from "../../lib/changes/guard";
 import { workbookMirrorEnabled } from "../../lib/changes/mirror";
 import { sameDatabaseHost } from "../../lib/changes/host";
 import { transportKind } from "../../lib/alerts/transport";
@@ -84,6 +85,8 @@ test("preview writes refuse the production host and other hosts stay open", asyn
     );
     assert.equal(digestResponse.status, 503);
     assert.equal(blocksPreviewWrite("GET", ["data", "deals"]), false);
+    assert.equal(blocksPreviewWrite("GET", ["list", "layout"]), false);
+    assert.equal(blocksPreviewWrite("PUT", ["list", "layout"]), false);
     assert.equal(blocksPreviewWrite("GET", ["cron", "workbook-sync"]), true);
     assert.equal(blocksPreviewWrite("POST", ["changes"]), true);
     assert.equal(blocksPreviewWrite("PUT", ["alerts", "preferences"]), true);
@@ -249,6 +252,7 @@ test("preview fails closed until the reset marker says the host is not productio
     for (const key of ENV_KEYS) delete process.env[key];
     process.env.VERCEL_ENV = "preview";
     process.env.DATABASE_URL = PROD;
+    assert.equal(migrationDecision(PREVIEW), "refuse");
     const closed = renderToStaticMarkup(PreviewDbBannerView());
     assert.equal(previewPointsAtProduction(), true);
     assert.match(closed, /preview-db-banner/);

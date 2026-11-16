@@ -11,6 +11,7 @@ import type { Sql } from "./db";
 import { allowsAssignee, allowsDate, bringBackActivitySummary, dropActivitySummary, dropSuggestionSummary, exportStage, normalizeNextStep } from "./nextStep";
 import { parseDocumentRequest } from "@/lib/financials";
 import { blockersBySuggestion, clearHoldBlocker, linkWaitingBlockers, parseHold, refreshProposalReadiness, stagesDiffer, type Blocker } from "./blockers";
+import { previewPointsAtProduction } from "@/lib/preview/safety";
 import { stageDecisionMatchesWorkbook } from "@/lib/stageOverlay";
 import { writeAcceptedStage } from "@/lib/changes/stageDecision";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
@@ -167,7 +168,7 @@ export async function listSuggestions(
   lookup?: RecordLookup,
 ): Promise<Suggestion[]> {
   lookup = lookup ?? await fileLookup();
-  await refreshProposalReadiness(sql, lookup);
+  if (!previewPointsAtProduction()) await refreshProposalReadiness(sql, lookup);
   const clauses: string[] = [];
   const values: unknown[] = [];
   if (filter?.targetKind && filter.targetId) {

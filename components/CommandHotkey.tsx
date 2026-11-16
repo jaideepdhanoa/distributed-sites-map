@@ -2,17 +2,27 @@
 
 import { useLayoutEffect } from "react";
 
-/** Capture Ctrl+K and Cmd+K before the browser address bar, including while Ask is focused. */
+function typing(target: EventTarget | null) {
+  return target instanceof HTMLElement && (target.isContentEditable || Boolean(target.closest("input, textarea, select")));
+}
+
+/** Capture Ctrl+K, Cmd+K, and / before the browser address bar, including while Ask is focused. */
+function onKey(event: KeyboardEvent) {
+  const key = event.key.toLowerCase();
+  const command = (event.metaKey || event.ctrlKey) && (key === "k" || event.code === "KeyK");
+  const slash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !typing(event.target);
+  if (!command && !slash) return;
+  event.preventDefault();
+  event.stopPropagation();
+  window.dispatchEvent(new Event("sites-open-command"));
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", onKey, true);
+}
+
 export default function CommandHotkey() {
   useLayoutEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey)) return;
-      const key = event.key.toLowerCase();
-      if (key !== "k" && event.code !== "KeyK") return;
-      event.preventDefault();
-      event.stopPropagation();
-      window.dispatchEvent(new Event("sites-open-command"));
-    }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);

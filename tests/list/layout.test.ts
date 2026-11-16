@@ -16,6 +16,7 @@ import {
   sortFromParam,
   TRAILING_COLUMN_WIDTH,
 } from "../../lib/listLayout";
+import { layoutStoreUnavailable } from "../../lib/api/handlers/list/layout";
 import { loadListLayout, saveListLayout } from "../../lib/listLayoutStore";
 import { isProtectedId, omitProtectedDeals, omitProtectedSites } from "../../lib/protectedSite";
 
@@ -156,6 +157,22 @@ test("a saved layout keeps its widths and the last flexible column fills a wider
   assert.equal(wider[7], 400);
   assert.ok(wider.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH > 1280);
   assert.deepEqual(fitColumnWidths(pipelineIds, {}, 0, TRAILING_COLUMN_WIDTH, flexIds), pipelineIds.map((id) => columnWidth(id)));
+});
+
+test("a preview keeps the sheet when the layout table cannot be read", () => {
+  const missing = Object.assign(new Error("relation"), { code: "42P01" });
+  assert.equal(layoutStoreUnavailable(missing), true);
+  const aborted = Object.assign(new Error("aborted"), { code: "25P02" });
+  assert.equal(layoutStoreUnavailable(aborted), true);
+  const previous = process.env.VERCEL_ENV;
+  process.env.VERCEL_ENV = "preview";
+  try {
+    assert.equal(layoutStoreUnavailable(new Error("connection")), true);
+  } finally {
+    if (previous === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previous;
+  }
+  assert.equal(layoutStoreUnavailable(new Error("connection")), false);
 });
 
 test("list layouts are stored per user and ignored until the table exists", async () => {

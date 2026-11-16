@@ -1,5 +1,6 @@
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { jsonError, jsonOk } from "@/lib/actions/http";
+import { ProductionWriteRefused, shadowContext } from "@/lib/changes/guard";
 import { PIPELINE_COLUMNS } from "@/lib/keyNumbers";
 import { isLayoutSurface, sanitizeLayout, type LayoutSurface } from "@/lib/listLayout";
 import { loadListLayout, missingLayoutTable, saveListLayout } from "@/lib/listLayoutStore";
@@ -10,6 +11,14 @@ const UNIVERSE_IDS = ["site", "type", "stage", "score", "spare", "grade", "traff
 function allowedFor(surface: LayoutSurface): string[] {
   if (surface === "pipeline") return PIPELINE_COLUMNS.map((column) => column.id);
   return UNIVERSE_IDS;
+}
+
+/** A preview pointed at production must keep the sheet usable while 015 is still pending. */
+export function layoutStoreUnavailable(error: unknown): boolean {
+  if (missingLayoutTable(error) || error instanceof ProductionWriteRefused) return true;
+  const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : "";
+  if (code === "42P01" || code === "42703" || code === "25P02") return true;
+  return shadowContext() === "preview";
 }
 
 function surfaceOf(request: Request, body?: { surface?: unknown }): LayoutSurface | null {
@@ -28,8 +37,8 @@ export async function GET(request: Request) {
     const layout = await withSql((sql) => loadListLayout(sql, session.u, surface, allowedFor(surface)));
     return jsonOk({ layout, stored: true });
   } catch (error) {
-    if (missingLayoutTable(error)) return jsonOk({ layout: null, stored: false });
-    console.error(JSON.stringify({ event: "list_layout_read" }));
+    if (layoutStoreUnavailable(error)) return jsonOk({ layout: null, stored: false });
+    console.error(JSON.stringify({ event: "list_layout_read", name: error instanceof Error ? error.name : "error" }));
     return jsonError("The list layout could not be read.", 500);
   }
 }
@@ -51,8 +60,8 @@ export async function PUT(request: Request) {
     if (!saved) return jsonError("The list layout could not be saved.", 400);
     return jsonOk({ layout: saved, stored: true });
   } catch (error) {
-    if (missingLayoutTable(error)) return jsonOk({ layout: sanitizeLayout(body.layout, allowedFor(surface)), stored: false });
-    console.error(JSON.stringify({ event: "list_layout_write" }));
+    if (layoutStoreUnavailable(error)) return jsonOk({ layout: sanitizeLayout(body.layout, allowedFor(surface)), stored: false });
+    console.error(JSON.stringify({ event: "list_layout_write", name: error instanceof Error ? error.name : "error" }));
     return jsonError("The list layout could not be saved.", 500);
   }
 }

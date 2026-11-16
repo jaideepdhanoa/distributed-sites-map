@@ -79,6 +79,20 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/data/timeline?**", (route) => route.fulfill({ json: { items: [], materials: [] } }));
 });
 
+test("ctrl+k and slash open search, and the chip names the shortcut", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".shell");
+  const apple = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac OS|iPhone|iPad/.test(navigator.userAgent));
+  await expect(page.getByTestId("command-search-open")).toHaveText(apple ? "⌘K" : "Ctrl K");
+  await page.keyboard.press("Control+k");
+  const palette = page.getByTestId("command-search");
+  await expect(palette).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+  await page.keyboard.press("/");
+  await expect(palette).toBeVisible();
+});
+
 test("command search opens from the keyboard and the scope bar, then deeplinks", async ({ page }, info) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; } body:has(.command-search) .map-corner, body:has(.command-search) .map-key { display: none !important; }" });

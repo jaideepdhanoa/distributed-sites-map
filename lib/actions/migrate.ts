@@ -5,6 +5,7 @@ import {
   migrationDecision,
   migrationRefusalMessage,
   ProductionWriteRefused,
+  shadowContext,
 } from "../changes/guard";
 import { databaseUrl, type Sql } from "./db";
 
@@ -24,7 +25,7 @@ function migrationFiles(): string[] {
 
 export async function migrate(
   sql: Sql,
-  options?: { connectionString?: string | null; onProduction?: "skip" },
+  options?: { connectionString?: string | null; onProduction?: "skip"; onPreview?: "skip" },
 ): Promise<string[]> {
   const url = options && "connectionString" in options ? options.connectionString : databaseUrl();
   let decision = migrationDecision(url);
@@ -32,6 +33,9 @@ export async function migrate(
   // migrations from CI, and it must not fail when those migrations are waiting
   // for the manual workflow.
   if (options?.onProduction === "skip" && isProductionDatabase(url)) decision = "skip";
+  // A preview request must not apply a pending file, and it must not fail the
+  // request when that file is waiting for the manual workflow.
+  if (options?.onPreview === "skip" && shadowContext() === "preview") decision = "skip";
   if (decision === "refuse") throw new ProductionWriteRefused(migrationRefusalMessage());
   if (decision === "skip") {
     try {

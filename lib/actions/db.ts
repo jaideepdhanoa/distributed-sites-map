@@ -65,6 +65,9 @@ export async function withSql<T>(fn: (sql: Sql) => Promise<T>): Promise<T> {
   const client = await getPool().connect();
   try {
     return await fn(wrap(client));
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
   } finally {
     client.release();
   }

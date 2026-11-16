@@ -122,6 +122,11 @@ export default function Explorer() {
     node.style.setProperty("--drawer-width", `${width}px`);
     node.dataset.drawerWidth = String(width);
   }, []);
+  const appleShortcut = useSyncExternalStore(
+    () => () => undefined,
+    () => /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac OS|iPhone|iPad/.test(navigator.userAgent),
+    () => false,
+  );
   const bindShell = useCallback((node: HTMLDivElement | null) => {
     shellRef.current = node;
     applyDrawerWidth();
@@ -1820,7 +1825,7 @@ export default function Explorer() {
             <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }}>Search name, address, broker, APN, id</button>
             <kbd aria-hidden="true">/</kbd>
           </div>
-          <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>⌘K</button>
+          <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>

@@ -42,6 +42,7 @@ import * as parcels from "@/lib/api/handlers/data/parcels";
 import * as revalidate from "@/lib/api/handlers/data/revalidate";
 import * as sites from "@/lib/api/handlers/data/sites";
 import * as sitesId from "@/lib/api/handlers/data/sites-id";
+import * as spaces from "@/lib/api/handlers/data/spaces";
 import * as timeline from "@/lib/api/handlers/data/timeline";
 import * as timelineSummary from "@/lib/api/handlers/data/timeline-summary";
 import * as unscreened from "@/lib/api/handlers/data/unscreened";
@@ -117,6 +118,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/revalidate", { POST: revalidate.POST as Handler }),
   route("/api/data/sites/:id", { GET: sitesId.GET as Handler }),
   route("/api/data/sites", { GET: sites.GET as Handler }),
+  route("/api/data/spaces", { GET: spaces.GET as Handler }),
   route("/api/data/timeline/summary", { GET: timelineSummary.GET as Handler }),
   route("/api/data/timeline", { GET: timeline.GET as Handler }),
   route("/api/data/unscreened", { GET: unscreened.GET as Handler }),

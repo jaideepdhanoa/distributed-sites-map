@@ -46,6 +46,12 @@ export function reviewHomeHref(): string {
   return `${appOrigin()}/?view=review`;
 }
 
+/** Opens the marked space on that site's aerial. The quarantined site never gets a link. */
+export function spaceHref(siteId: string, spaceId: string): string {
+  if (isExcludedSite(siteId) || !/^SS-\d{4,}$/.test(spaceId)) return reviewHomeHref();
+  return `${appOrigin()}/?site=${encodeURIComponent(siteId)}&space=${encodeURIComponent(spaceId)}`;
+}
+
 /** Opens the site on the map. The quarantined site never gets a link. */
 export function siteHref(siteId: string): string {
   if (isExcludedSite(siteId)) return reviewHomeHref();
@@ -75,5 +81,19 @@ export function mailLink(item: MailLink): string {
     return proposalHref(siteId);
   }
   if ((item.category === "followed" || item.category === "recommendations") && proposalLink(item.href)) return proposalHref(siteId);
+  const space = spaceIdFromHref(item.href);
+  if (space && (item.category === "mentions" || item.category === "replies" || item.category === "followed")) {
+    return spaceHref(siteId, space);
+  }
   return discussionHref(siteId);
+}
+
+function spaceIdFromHref(href: string | undefined): string {
+  if (!href) return "";
+  try {
+    const space = new URL(href, "https://distributedsites.com").searchParams.get("space") || "";
+    return /^SS-\d{4,}$/.test(space) ? space : "";
+  } catch {
+    return "";
+  }
 }

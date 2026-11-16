@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/actions/db";
 import { resolveActionRole } from "@/lib/actions/roles";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
-import { discussionHref, proposalHref, reviewHref } from "./links";
+import { discussionHref, proposalHref, reviewHref, spaceHref } from "./links";
 import { batchWindowMs } from "./clock";
 import { enqueueAlert, flushInstant } from "./deliver";
 import { isExcludedSite } from "./excluded";
@@ -110,6 +110,7 @@ export async function notifyNote(
   sql: Sql,
   input: { noteId: string; siteId: string; recordId?: string; body: string; authorId: string; parentId: string | null; mentionIds: string[] },
 ): Promise<void> {
+  const href = input.recordId && /^SS-\d{4,}$/.test(input.recordId) ? spaceHref(input.siteId, input.recordId) : discussionHref(input.siteId);
   let instant = false;
   if (input.parentId) {
     const people = await sql.query<{ user_id: string }>(
@@ -126,7 +127,7 @@ export async function notifyNote(
       category: "replies",
       siteId: input.siteId,
       summary: input.body,
-      href: discussionHref(input.siteId),
+      href,
       refId: input.noteId,
     })) instant = true;
   }
@@ -136,7 +137,7 @@ export async function notifyNote(
     category: "mentions",
     siteId: input.siteId,
     summary: input.body,
-    href: discussionHref(input.siteId),
+    href,
     refId: input.noteId,
   })) instant = true;
   if (instant) await flushQueued(sql);

@@ -33,6 +33,9 @@ import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
+import type { SpaceShape } from "./spaces/SpacePopover";
+import type { GroundBox } from "@/lib/spaces/measure";
+import type { SpaceLayout, SpaceType } from "@/lib/spaces/vocab";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
@@ -243,6 +246,48 @@ export default function Explorer() {
   const leaveSite = useRef("");
   const wantedReview = useRef("");
   const [sheetSnap, setSheetSnap] = useState<SheetSnap>(() => initialSheetSnap(sheetQuery));
+  const [showSpaces, setShowSpaces] = useState(true);
+  const [markedSpaces, setMarkedSpaces] = useState<SpaceShape[]>([]);
+  const [spaceNames, setSpaceNames] = useState<Record<string, string>>({});
+  const [marking, setMarking] = useState<{ siteId: string; lng: number; lat: number; nonce: number } | null>(null);
+  const [pickedSpace, setPickedSpace] = useState("");
+  const [mapNote, setMapNote] = useState("");
+  useEffect(() => {
+    if (!me?.u) return undefined;
+    let cancel = false;
+    const pull = () => {
+      void fetch("/api/data/spaces", { cache: "no-store" })
+        .then((response) => response.ok ? response.json() : { spaces: [] })
+        .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }> }) => {
+          if (cancel) return;
+          setMarkedSpaces((body.spaces || []).map((row) => ({
+            id: row.id,
+            siteId: row.siteId,
+            version: row.version,
+            box: row.box || { center: row.center, lengthFt: row.lengthFt, widthFt: row.widthFt, rotationDeg: row.rotationDeg },
+            type: row.type,
+            layout: row.layout,
+            estSlots: row.estSlots,
+            status: row.status,
+            author: row.author,
+          })));
+        })
+        .catch(() => undefined);
+    };
+    pull();
+    void fetch("/api/actions/accounts", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { accounts: [] })
+      .then((body: { accounts?: { id: string; name: string }[] }) => {
+        if (cancel) return;
+        const next: Record<string, string> = {};
+        for (const account of body.accounts || []) next[account.id] = account.name;
+        setSpaceNames(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [me?.u]);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
@@ -1676,8 +1721,73 @@ export default function Explorer() {
     return [{ id: site.siteId, lng: point[0], lat: point[1], n: index + 1, current: site.siteId === reviewCurrent?.siteId }];
   }) : [];
 
+  function spacePoint(): [number, number] | null {
+    if (!selected) return null;
+    const deal = dealRows.find((row) => row.deal_id === selected);
+    if (deal) return dealPoint(deal);
+    const coords = featureById.get(selected)?.geometry?.coordinates;
+    return coords ? [coords[0], coords[1]] : null;
+  }
+
+  async function refreshSpaces() {
+    const response = await fetch("/api/data/spaces", { cache: "no-store" });
+    if (!response.ok) return;
+    const body = await response.json() as { spaces?: Array<SpaceShape & { center?: { lng: number; lat: number }; lengthFt?: number; widthFt?: number; rotationDeg?: number }> };
+    setMarkedSpaces((body.spaces || []).map((row) => ({
+      id: row.id,
+      siteId: row.siteId,
+      version: row.version,
+      box: row.box?.center ? row.box : { center: row.center || { lng: 0, lat: 0 }, lengthFt: row.lengthFt || 0, widthFt: row.widthFt || 0, rotationDeg: row.rotationDeg || 0 },
+      type: row.type,
+      layout: row.layout,
+      estSlots: row.estSlots,
+      status: row.status,
+      author: row.author,
+    })));
+  }
+
+  async function writeSpace(space: { siteId: string; id: string; version: number; box: GroundBox; type: SpaceType; layout: SpaceLayout }, deleted = false) {
+    const response = await fetch("/api/changes", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+      body: JSON.stringify({
+        changes: [{
+          entity_type: "site_space",
+          site_id: space.siteId,
+          ...(space.version > 0 ? { entity_id: space.id } : {}),
+          expected_version: space.version,
+          source: "Site aerial",
+          payload: deleted ? { deleted: true } : {
+            center_lng: space.box.center.lng,
+            center_lat: space.box.center.lat,
+            length_ft: space.box.lengthFt,
+            width_ft: space.box.widthFt,
+            rotation_deg: space.box.rotationDeg,
+            type: space.type,
+            layout: space.layout,
+          },
+        }],
+      }),
+    });
+    if (!response.ok) return "";
+    const body = await response.json() as { results?: { entity_id?: string }[] };
+    await refreshSpaces();
+    return body.results?.[0]?.entity_id || space.id;
+  }
+
+  function beginMark() {
+    if (mapNote) return;
+    const point = spacePoint();
+    if (!selected || !point) return;
+    chooseBasemap("satellite");
+    setShowSpaces(true);
+    setMarking({ siteId: selected, lng: point[0], lat: point[1], nonce: Date.now() });
+  }
+
+  const recordSpaces = markedSpaces.filter((space) => space.siteId === selected);
+
   return (
-    <div ref={bindShell} className={`shell ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} className={`shell ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -2241,6 +2351,24 @@ export default function Explorer() {
             if (dealRows.some((deal) => deal.deal_id === id)) setTableTab(dealRows.find((deal) => deal.deal_id === id)?.kind === "land" ? "land" : "pipeline");
             choose(id);
           }}
+          spaceShapes={markedSpaces}
+          showSpaces={showSpaces}
+          spaceDrawing={Boolean(marking)}
+          spaceFly={marking}
+          selectedSpaceId={pickedSpace}
+          spaceNames={spaceNames}
+          onSpaceSelect={setPickedSpace}
+          onSpaceCreate={(box) => {
+            if (!marking) return;
+            void writeSpace({ siteId: marking.siteId, id: "", version: 0, box, type: "excess_parking", layout: "stalls_90" }).then((id) => {
+              if (id) setPickedSpace(id);
+            });
+          }}
+          onSpaceChange={(space) => {
+            void writeSpace(space);
+          }}
+          onSpaceDone={() => { setMarking(null); setPickedSpace(""); }}
+          onMapFailed={setMapNote}
           onBounds={(bounds, meta) => {
             if (!bounds.getWest || !bounds.getSouth || !bounds.getEast || !bounds.getNorth) return;
             const west = bounds.getWest();
@@ -2384,6 +2512,11 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="swatch stage-dropped" /></span>
                   Dropped deals
                 </label>
+                <label className="layer-row" title="Rectangles marked on the satellite view. Slot counts stay estimated until someone checks them.">
+                  <input className="check" type="checkbox" checked={showSpaces} onChange={(event) => setShowSpaces(event.target.checked)} data-testid="spaces-layer" />
+                  <span className="layer-mark"><i className="swatch l10" /></span>
+                  Marked spaces
+                </label>
                 <p className="eyebrow">Context</p>
                 <label className="layer-row" title={LAYER_TITLES.areas}>
                   <input className="check" type="checkbox" checked={showAreas} onChange={(event) => write({ areas: event.target.checked ? null : "0" })} />
@@ -2480,6 +2613,10 @@ export default function Explorer() {
             sheet={sheet}
             onSwipe={inReview ? (direction) => goReview(direction === "next" ? reviewIndex + 1 : reviewIndex - 1) : undefined}
             signedIn={Boolean(me)}
+            spaceCount={recordSpaces.length}
+            spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            onMarkSpace={me ? beginMark : undefined}
+            spaceNote={mapNote}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             figuresReady={Boolean(selectedDeal) || figuresReady}
             outsideFilter={Boolean(outsideDeal) || !dealInCategories(selectedDeal, categories)}
@@ -2515,6 +2652,10 @@ export default function Explorer() {
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             signedIn={Boolean(me)}
+            spaceCount={recordSpaces.length}
+            spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            onMarkSpace={me ? beginMark : undefined}
+            spaceNote={mapNote}
             figuresReady={figuresReady}
             outsideFilter={Boolean(selectedSite && !siteInCategories(selectedSite, links, categories))}
             related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}

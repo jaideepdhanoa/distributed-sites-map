@@ -334,12 +334,12 @@ export function openLandLabel(sqft?: number | null, basis?: string | null): stri
  * a measurement source is stored. Census acres are an estimate above zero.
  */
 export function spareLandSqft(sqft?: number | null, acres?: number | null, basis?: string | null) {
-  if (sqft === 0) return { value: "Not on file", note: "" };
+  if (sqft === 0) return { value: UNKNOWN, note: "" };
   if (openLandMeasured(sqft, basis)) return { value: openLandText(sqft), note: openLandSource(basis) };
   if (acres != null && Number.isFinite(acres) && acres > 0) {
     return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
   }
-  return { value: "Not on file", note: "" };
+  return { value: UNKNOWN, note: "" };
 }
 
 function daySpan(iso: unknown, today: Date) {

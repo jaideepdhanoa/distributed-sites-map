@@ -50,7 +50,7 @@ const MAX_WIDTH = 480;
 
 /** Starting widths so a default sheet does not clip a label mid-word. */
 const COLUMN_WIDTH: Record<string, number> = {
-  site: 240,
+  site: 320,
   stage: 148,
   score: 96,
   asking: 168,

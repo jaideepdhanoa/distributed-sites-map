@@ -5,6 +5,7 @@ import {
   canSeeGmailLinks,
   commsBody,
   commsForViewer,
+  commsStamp,
   compareLines,
   directionKind,
   linesForSites,
@@ -239,6 +240,25 @@ test("the gmail link is only returned for the allowlisted account", () => {
     else process.env.GMAIL_LINK_VIEWERS = previous;
   }
   assert.match(route, /commsForViewer\(session\.actionRole, session\.u/);
+});
+
+test("a blank parsed clock keeps the stored stamp, and an approximate flag is labeled", () => {
+  const iso = "2026-11-13T19:43:00-08:00";
+  const fromIso = commsStamp({ at: "", at_iso: iso, at_approximate: true });
+  assert.equal(fromIso.at, "2026-11-13 19:43");
+  assert.equal(fromIso.approximate, true);
+  const fromText = commsStamp({ at: "", at_text: "2026-11-13 ~18:20-18:40 PT" });
+  assert.equal(fromText.at, "2026-11-13");
+  const line = toCommsLine(row({ at: "", at_iso: iso, at_approximate: true, direction: "out", channel: "Gmail", summary: "Noted the visit." }));
+  assert.equal(line.at, "2026-11-13 19:43");
+  assert.equal(line.approximate, true);
+  const borrowed = mergeActivity(
+    [{ date: "2026-11-11", type: "doc", summary: "Filed", eventId: "A-1", approximate: true }],
+    [toCommsLine(row({ at: "", direction: "out", channel: "Gmail", summary: "Filed", source: "A-1" }))],
+    { includeInternal: false },
+  );
+  assert.equal(borrowed[0]?.at, "2026-11-11");
+  assert.equal(borrowed[0]?.approximate, true);
 });
 
 test("the activity screen keeps the heading and hides internal rows until asked", () => {

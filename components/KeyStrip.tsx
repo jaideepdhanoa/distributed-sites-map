@@ -165,7 +165,7 @@ export default function KeyStrip({
   const growth = trade.find((line) => line.startsWith("Growth "));
   const income = trade.find((line) => line.startsWith("Income "));
   const listing = listingCue(deal);
-  const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own);
+  const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis);
   const trafficValue = deal.trade_aadt != null ? `${Math.round(deal.trade_aadt).toLocaleString()} vehicles/day` : "";
   const trafficNote = traffic
     .replace(/^[\d,]+ vehicles\/day · /, "")

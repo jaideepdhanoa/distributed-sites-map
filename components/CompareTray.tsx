@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
-import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandText, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, openLandLabel, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { stageDetail } from "@/lib/labels";
 import { cardNdaLabel } from "@/lib/nda";
@@ -22,7 +22,7 @@ function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): Compa
   const population = trade.find((line) => line.startsWith("3-mile population "));
   const washes = trade.find((line) => line.startsWith("Washes "));
   const spare = [
-    deal.open_land_sqft != null ? `${openLandText(deal.open_land_sqft)} sheet` : "",
+    openLandLabel(deal.open_land_sqft, deal.open_land_basis) !== "—" ? `${openLandLabel(deal.open_land_sqft, deal.open_land_basis)} sheet` : "",
     linked && linked.spare_ac_own != null ? `${acreUnit(linked.spare_ac_own, linked.spare_ac_own_text)} census` : "",
   ].filter(Boolean).join(" · ");
   const cashBasis = basisBadge(deal.earnings_basis) || basisBadge(cash.basis);

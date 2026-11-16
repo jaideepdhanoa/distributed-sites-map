@@ -855,7 +855,7 @@ export default function Explorer() {
   const pipelineDeals = dealRows.filter((deal) => {
     if (deal.kind !== "pipeline") return false;
     if (!viewDeal(deal)) return false;
-    if (!dealAllowed(deal, true)) return false;
+    if (!dealAllowed(deal)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
     if (!dealWide && deal.stage_group !== pipeStage) return false;
@@ -866,7 +866,7 @@ export default function Explorer() {
   const landDeals = dealRows.filter((deal) => {
     if (deal.kind !== "land") return false;
     if (!viewDeal(deal)) return false;
-    if (!dealAllowed(deal, true)) return false;
+    if (!dealAllowed(deal)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
     if (!includeDropped(deal.stage_group)) return false;
@@ -907,7 +907,7 @@ export default function Explorer() {
 
   const pipelineStepRows = pipelineDeals;
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
-  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage || deal.deal_id === selected);
+  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage);
   const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const landSiteDrawn = new Set(
     visibleFeatures
@@ -990,6 +990,8 @@ export default function Explorer() {
       ?? offMarketFeatures.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const selectedSquare = selectedDeal ? asSquare(selectedDeal) : null;
+  if (selectedSquare && !drawnDeals.some((feature) => feature.properties.deal_id === selectedDeal?.deal_id)) drawnDeals.push(selectedSquare);
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
   const washPoints = (() => {
     if (!overlaysOn.includes("washes") || (!selectedDeal && !selectedSite)) return [];
@@ -1507,6 +1509,16 @@ export default function Explorer() {
     const linked = deal.universe_id ? siteById.get(deal.universe_id) : undefined;
     return { deal, noPin: !dealPoint(deal), zoning: linked?.zoning || "", apn: deal.apn || linked?.apn || "", point: dealPoint(deal) };
   });
+  const outsideDeal = selectedDeal && !listDeals.some((deal) => deal.deal_id === selectedDeal.deal_id) ? selectedDeal : null;
+  const outsideRow: PipelineRow | null = outsideDeal
+    ? {
+        deal: outsideDeal,
+        noPin: !dealPoint(outsideDeal),
+        zoning: outsideDeal.universe_id ? siteById.get(outsideDeal.universe_id)?.zoning || "" : "",
+        apn: outsideDeal.apn || (outsideDeal.universe_id ? siteById.get(outsideDeal.universe_id)?.apn || "" : ""),
+        point: dealPoint(outsideDeal),
+      }
+    : null;
 
   function exportList() {
     const blob = new Blob([listCsv(listRows)], { type: "text/csv" });
@@ -2261,6 +2273,7 @@ export default function Explorer() {
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
             rows={pipelineRows}
+            outsideRow={outsideRow}
             unreadIds={openQueueIds}
             columns={pipelineColumns}
             selectedId={selected}

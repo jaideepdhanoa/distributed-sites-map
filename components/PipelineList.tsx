@@ -19,6 +19,8 @@ import {
   displayScore,
   factsForDeal,
   powerSummary,
+  openLandLabel,
+  openLandMeasured,
   openLandText,
   vehiclesPerDay,
   summaryOf,
@@ -68,7 +70,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   }
   if (id === "acres") return acresText(deal.land_acres) || "—";
   if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "—") : "—";
-  if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "—";
+  if (id === "openLand") return openLandLabel(deal.open_land_sqft, deal.open_land_basis);
   if (id === "capacity") return powerSummary(factsForDeal(deal)) || "—";
   if (id === "traffic") return vehiclesPerDay(deal.trade_aadt) || "—";
   if (id === "cashFlow") {
@@ -106,7 +108,7 @@ function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "score") return typeof deal.score === "number" ? deal.score : null;
   if (id === "acres") return deal.land_acres;
   if (id === "perAcre") return signedIn ? deal.price_per_acre : null;
-  if (id === "openLand") return deal.open_land_sqft;
+  if (id === "openLand") return openLandMeasured(deal.open_land_sqft, deal.open_land_basis) ? deal.open_land_sqft : null;
   if (id === "capacity") return deal.cap_a_substation_mi;
   if (id === "traffic") return deal.trade_aadt;
   if (id === "cashFlow") return signedIn ? deal.stated_cash_flow : null;
@@ -131,6 +133,7 @@ export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], si
 
 export default function PipelineList({
   rows,
+  outsideRow = null,
   columns,
   selectedId,
   sort,
@@ -155,6 +158,7 @@ export default function PipelineList({
   onDismiss,
 }: {
   rows: PipelineRow[];
+  outsideRow?: PipelineRow | null;
   columns: PipelineColumnId[];
   selectedId: string | null;
   sort: { id: PipelineColumnId; desc: boolean };
@@ -231,7 +235,7 @@ export default function PipelineList({
     asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
     acres: stripStats(ordered.map((row) => row.deal.land_acres)),
     perAcre: stripStats(ordered.map((row) => (signedIn ? row.deal.price_per_acre : null))),
-    openLand: stripStats(ordered.map((row) => row.deal.open_land_sqft)),
+    openLand: stripStats(ordered.map((row) => (openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null))),
     traffic: stripStats(ordered.map((row) => row.deal.trade_aadt)),
     depot: stripStats(ordered.map((row) => (row.noPin ? null : row.deal.miles_to_depot))),
     cash: stripStats(ordered.map((row) => (signedIn ? row.deal.stated_cash_flow : null)), true),
@@ -352,14 +356,27 @@ export default function PipelineList({
     }
   }
 
+  const summaryBar = (
+    <div className="summary-row" data-testid="summary-row">
+      <div><span>In this filter</span><strong>{summary.count.toLocaleString()}</strong><small>{summary.withAsking} with an asking price</small></div>
+      <div><span>Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
+      <div><span>Land listed</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
+      <div><span>Median per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
+    </div>
+  );
+  const outside = outsideRow ? (
+    <div className="outside-row" data-testid="outside-row">
+      <p className="note">Outside this filter</p>
+      <button type="button" className="list-row" onClick={() => onOpen(outsideRow.deal.deal_id)}>
+        <span className="phone-card-name">{outsideRow.deal.name || outsideRow.deal.address || outsideRow.deal.deal_id}</span>
+        {displayAddress(outsideRow.deal.address) ? <span className="site-address">{displayAddress(outsideRow.deal.address)}</span> : null}
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
-      <div className="summary-row" data-testid="summary-row">
-        <div><span>In this filter</span><strong>{summary.count.toLocaleString()}</strong><small>{summary.withAsking} with an asking price</small></div>
-        <div><span>Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
-        <div><span>Land listed</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
-        <div><span>Median per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
-      </div>
+      {phone ? null : summaryBar}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
@@ -437,6 +454,8 @@ export default function PipelineList({
       </div>
       {phone ? (
         <div className="list-scroll">
+          {summaryBar}
+          {outside}
           <PhoneCards rows={ordered.map((row) => {
             const id = row.deal.deal_id;
             const address = displayAddress(row.deal.address);
@@ -460,6 +479,7 @@ export default function PipelineList({
           })} />
         </div>
       ) : null}
+      {phone ? null : outside}
       {phone ? null : <SheetGrid
         rows={ordered}
         rowId={(row) => row.deal.deal_id}
@@ -477,7 +497,7 @@ export default function PipelineList({
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
-          if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={row.deal.open_land_sqft} stats={strips.openLand} direction="higher" format={openLandText} />;
+          if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null} stats={strips.openLand} direction="higher" format={openLandText} />;
           if (column === "asking") return <AskingCell deal={row.deal} stats={strips.asking} onBroker={onBroker} signedIn={signedIn} />;
           if (column === "acres") return <NumberCell label={cell(row, "acres", signedIn)} value={row.deal.land_acres} stats={strips.acres} format={(value) => acresText(value) || String(value)} />;
           if (column === "perAcre") return <NumberCell label={cell(row, "perAcre", signedIn)} value={signedIn ? row.deal.price_per_acre : null} stats={strips.perAcre} direction="lower" format={fullMoney} />;

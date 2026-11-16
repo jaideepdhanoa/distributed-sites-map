@@ -121,6 +121,8 @@ test("a land deeplink does not turn the land filter on", async ({ page }, info) 
   await expect(page).not.toHaveURL(/[?&]cats=/);
   await expect(page.locator(".chip.removable", { hasText: /^Land$/ })).toHaveCount(0);
   const after = Number(await page.locator(".shell").getAttribute("data-list-count"));
-  expect(after).toBeLessThanOrEqual(before + 1);
-  expect(after).toBeGreaterThan(before - 1);
+  expect(after).toBe(before);
+  const filterCount = await page.evaluate(() => document.querySelector("[data-testid=summary-row] strong")?.textContent?.replace(/,/g, "").trim() || "");
+  expect(filterCount).toBe(String(before));
+  await expect(page.getByTestId("outside-row")).toBeVisible();
 });

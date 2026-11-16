@@ -306,13 +306,36 @@ export function openLandText(value?: number | null) {
   return `${Math.round(value).toLocaleString()} sq ft`;
 }
 
+/** A spare-area basis names the measurement. Unknown and blank are not a source. */
+export function openLandSource(basis?: string | null): string {
+  const raw = String(basis || "").trim();
+  if (!raw || /^unknown$/i.test(raw)) return "";
+  if (/^estimated$/i.test(raw)) return "Aerial check";
+  return raw;
+}
+
+export function openLandMeasured(sqft?: number | null, basis?: string | null): boolean {
+  return sqft != null && Number.isFinite(sqft) && Boolean(openLandSource(basis));
+}
+
 /**
- * One spare-land figure, in square feet. A workbook spare-area cell is a
- * measurement, and 0 is a finished check. Census acres are only an estimate
- * when they are above zero; 0 acres is not a measured open-land figure.
+ * List and card text. A number, including a measured zero, needs a source.
+ * Zero keeps that source in the label. Anything else is the same em dash as a blank.
  */
-export function spareLandSqft(sqft?: number | null, acres?: number | null) {
-  if (sqft != null && Number.isFinite(sqft)) return { value: openLandText(sqft), note: "Aerial check" };
+export function openLandLabel(sqft?: number | null, basis?: string | null): string {
+  if (!openLandMeasured(sqft, basis)) return UNKNOWN;
+  const value = openLandText(sqft);
+  const source = openLandSource(basis);
+  if (sqft === 0 && source) return `${value} · ${source}`;
+  return value;
+}
+
+/**
+ * One spare-land figure, in square feet. Workbook square feet count only when
+ * a measurement source is stored. Census acres are an estimate above zero.
+ */
+export function spareLandSqft(sqft?: number | null, acres?: number | null, basis?: string | null) {
+  if (openLandMeasured(sqft, basis)) return { value: openLandText(sqft), note: openLandSource(basis) };
   if (acres != null && Number.isFinite(acres) && acres > 0) {
     return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
   }

@@ -47,8 +47,9 @@ const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop"]);
 
 function WhenStamp({ at, approximate }: { at: string; approximate?: boolean }) {
   const clock = formatActivityWhen(at, approximate);
-  if (!clock.label) return null;
-  return <time dateTime={clock.title} title={clock.title}>{` · ${clock.label}`}</time>;
+  const label = clock.label || (approximate ? "(approx.)" : "");
+  if (!label) return null;
+  return <time dateTime={clock.title || undefined} title={clock.title || label}>{` · ${label}`}</time>;
 }
 
 function ExpandableText({ text }: { text: string }) {

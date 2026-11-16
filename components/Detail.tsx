@@ -156,7 +156,7 @@ function DealHeadline({
     title: cash.value === "—" ? "Not on file" : (cash.value || "Not on file"),
     note: [cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · "),
   };
-  const spare = spareLandSqft(deal.open_land_sqft, censusAcres);
+  const spare = spareLandSqft(deal.open_land_sqft, censusAcres, deal.open_land_basis);
   const bays = deal.bays_that_fit == null ? "—" : String(Math.round(deal.bays_that_fit));
   const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
   const negative = shownCash.text.startsWith("-");
@@ -634,7 +634,7 @@ export default function Detail({
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Open land</span><div title={spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <span>Open land</span><div title={spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
               <span>Power</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
@@ -839,7 +839,7 @@ export function DealDetail({
               <span>Per acre</span>
               <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
               <span>Open land</span>
-              <div title={spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <div title={spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
               <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}

@@ -2,7 +2,7 @@ import { AREA_ROLE_MARK, areaLabel, areaRole } from "@/lib/areas";
 import { listingCue } from "@/lib/format";
 import { spareTier } from "@/lib/filter";
 import { STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
-import { acresText, depotLine, openLandText } from "@/lib/keyNumbers";
+import { acresText, depotLine, openLandLabel } from "@/lib/keyNumbers";
 
 export type TipMark = { swatch: string; label: string };
 export type TipFact = { label: string; value: string };
@@ -50,7 +50,7 @@ export function dealTip(props: Record<string, unknown>): TipModel {
     marks.push({ swatch: "listing", label: STATUS_NOTES.find((item) => item.id === "listing")!.label });
   }
   const acres = typeof props.land_acres === "number" ? acresText(props.land_acres) : "";
-  const open = typeof props.open_land_sqft === "number" ? openLandText(props.open_land_sqft) : "";
+  const open = openLandLabel(typeof props.open_land_sqft === "number" ? props.open_land_sqft : null, typeof props.open_land_basis === "string" ? props.open_land_basis : "");
   const miles = typeof props.miles_to_depot === "number" ? props.miles_to_depot : null;
   const facts: TipFact[] = [
     { label: "Stage", value: stageDetail(text(props.stage), text(props.stage_group) || "desk") },

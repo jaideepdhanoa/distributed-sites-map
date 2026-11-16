@@ -25,9 +25,9 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
             {row.address ? <span className="site-address" title={row.address}>{row.address}</span> : null}
             <span className="phone-card-meta">
               <span className={`stage-pill tone-${row.tone || "pine"}`}>{row.stage}</span>
-              <span data-testid="phone-score">{row.score}</span>
-              <span>{row.asking}</span>
-              <span>{row.metric}</span>
+              <span className="phone-fact" data-testid="phone-score"><span className="phone-fact-label">Score</span>{row.score}</span>
+              <span className="phone-fact">{row.asking}</span>
+              <span className="phone-fact">{row.metric}</span>
             </span>
           </button>
         </li>

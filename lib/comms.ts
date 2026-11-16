@@ -15,6 +15,8 @@ export type CommsRecord = {
   thread_id: string;
   link: string;
   at: string;
+  at_text?: string;
+  at_iso?: string;
   direction: string;
   person: string;
   firm: string;
@@ -184,18 +186,30 @@ export function eventIds(source: string): string[] {
   return out;
 }
 
+/** The first stored clock. Sheet text and an ISO stamp count when the parsed field is empty. */
+export function commsStamp(row: Partial<CommsRecord>): { at: string; approximate: boolean } {
+  const approximate = row.at_approximate === true || row.at_approximate === "1" || row.at_approximate === "true";
+  const candidates = [row.at_iso, row.at, row.at_text].map((value) => text(value)).filter(Boolean);
+  for (const value of candidates) {
+    const parsed = normalizeAt(value);
+    if (parsed) return { at: parsed, approximate };
+  }
+  return { at: candidates[0] || "", approximate };
+}
+
 export function toCommsLine(row: Partial<CommsRecord>): CommsLine {
   const messageId = hexId(text(row.message_id));
   const threadId = hexId(text(row.thread_id));
+  const stamp = commsStamp(row);
   return {
     commsId: text(row.comms_id),
-    at: normalizeAt(text(row.at)),
+    at: stamp.at,
     direction: text(row.direction),
     person: text(row.person),
     firm: text(row.firm),
     channel: text(row.channel),
     summary: clipSummary(text(row.summary)),
-    approximate: row.at_approximate === true || row.at_approximate === "1" || row.at_approximate === "true",
+    approximate: stamp.approximate,
     href: gmailHref(text(row.link), messageId, threadId),
     citedEventIds: eventIds(text(row.source)),
     messageId,
@@ -403,6 +417,13 @@ export function mergeActivity(
     if (gmail) seenMessages.add(gmail);
     if (overlap.length) {
       for (const id of overlap) hide.add(id);
+      if (!line.at) {
+        const donor = overlap.map((id) => activityById.get(id)).find((item) => item?.date);
+        if (donor?.date) {
+          line.at = donor.date;
+          line.approximate = line.approximate || donor.approximate === true;
+        }
+      }
     }
     kept.push(line);
   }

@@ -995,7 +995,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .stage-cell { display: flex; flex-wrap: nowrap; gap: 4px 6px; align-items: center; min-width: 0; overflow: hidden; }
 .list-table .stage-cell { flex-wrap: wrap; align-items: flex-start; overflow: visible; white-space: normal; }
 .stage-cell .tag-pair { flex-wrap: nowrap; max-width: none; }
-.stage-cell .stage-pill { flex: 0 0 auto; margin-top: 0; max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
+.stage-cell .stage-pill { flex: 0 1 auto; margin-top: 0; max-width: 100%; overflow: visible; text-overflow: clip; white-space: normal; height: auto; }
 .suggested-inline {
   flex: 1 1 16rem;
   display: inline-block;

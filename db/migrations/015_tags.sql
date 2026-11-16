@@ -5,8 +5,11 @@
 DO $$
 DECLARE
   cons_name text;
+  def text;
+  list text;
 BEGIN
-  SELECT con.conname INTO cons_name
+  SELECT con.conname, pg_get_constraintdef(con.oid)
+    INTO cons_name, def
   FROM pg_constraint con
   JOIN pg_class rel ON rel.oid = con.conrelid
   JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
@@ -17,10 +20,23 @@ BEGIN
   IF cons_name IS NOT NULL THEN
     EXECUTE format('ALTER TABLE events DROP CONSTRAINT %I', cons_name);
   END IF;
-END $$;
 
-ALTER TABLE events ADD CONSTRAINT events_entity_type_check
-  CHECK (entity_type IN ('stage', 'activity', 'comms', 'site', 'pnl_line', 'tag'));
+  -- Keep entity types already recorded, including site_space from 017, and add tag.
+  SELECT string_agg(quote_literal(t), ', ' ORDER BY t)
+    INTO list
+  FROM (
+    SELECT DISTINCT t
+    FROM (
+      SELECT unnest(ARRAY['stage', 'activity', 'comms', 'site', 'pnl_line', 'tag']) AS t
+      UNION
+      SELECT m[1]
+      FROM regexp_matches(COALESCE(def, ''), '''([a-z0-9_]+)''', 'g') AS m
+      WHERE m[1] NOT IN ('text', 'public', 'integer', 'numeric')
+    ) found
+  ) uniq;
+
+  EXECUTE 'ALTER TABLE events ADD CONSTRAINT events_entity_type_check CHECK (entity_type IN (' || list || '))';
+END $$;
 
 CREATE TABLE tag_vocab (
   family text NOT NULL,

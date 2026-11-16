@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "../../lib/actions/migrate";
+import { migrationDir, migrate } from "../../lib/actions/migrate";
 import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { formatZonedTimestamp, validateBatch, type Actor } from "../../lib/changes/schema";
 import { memorySql } from "../helpers/sql";
@@ -76,4 +78,26 @@ test("Dropped still needs a human actor and a reason in the database", async () 
   );
   const row = await sql.query<{ stage: string }>(`SELECT stage FROM site_stages WHERE site_id = 'PIPE-PHX-0108'`);
   assert.equal(row.rows[0]?.stage, "Dropped");
+});
+
+test("015 still adds tag after 017 is already recorded", async () => {
+  const sql = await memorySql();
+  const files = readdirSync(migrationDir()).filter((name) => name.endsWith(".sql") && name !== "015_tags.sql").sort();
+  await sql.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  for (const file of files) {
+    const body = readFileSync(join(migrationDir(), file), "utf8");
+    await sql.exec(`BEGIN;\n${body}\nINSERT INTO schema_migrations (id) VALUES ('${file}');\nCOMMIT;`);
+  }
+  assert.deepEqual(await migrate(sql), ["015_tags.sql"]);
+  const check = await sql.query<{ def: string }>(
+    `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'events_entity_type_check'`,
+  );
+  const def = check.rows[0]?.def || "";
+  assert.match(def, /'tag'/);
+  assert.match(def, /'site_space'/);
 });

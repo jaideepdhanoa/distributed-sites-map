@@ -66,6 +66,19 @@ body {
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body { background: var(--paper); }
+.preview-db-banner {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--amber-tint);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line-2);
+  font-size: var(--type-cap);
+  line-height: 1.4;
+  text-align: center;
+}
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--pine); }

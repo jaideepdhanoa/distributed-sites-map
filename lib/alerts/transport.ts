@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import alertDefaults from "../../config/alerts.json";
+import { outboundMailEnabled } from "@/lib/preview/safety";
 
 export const DEFAULT_FROM = alertDefaults.from;
 
@@ -18,6 +19,7 @@ export interface MailTransport {
 }
 
 export function transportKind(): "resend" | "smtp" | null {
+  if (!outboundMailEnabled()) return null;
   if (process.env.RESEND_API_KEY?.trim()) return "resend";
   if (process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim()) return "smtp";
   return null;

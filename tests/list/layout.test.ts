@@ -159,6 +159,29 @@ test("a saved layout keeps its widths and the last flexible column fills a wider
   assert.deepEqual(fitColumnWidths(pipelineIds, {}, 0, TRAILING_COLUMN_WIDTH, flexIds), pipelineIds.map((id) => columnWidth(id)));
 });
 
+test("a closed preview layout read stays on the browser layout", async () => {
+  const saved = process.env.VERCEL_ENV;
+  process.env.VERCEL_ENV = "preview";
+  delete process.env.PREVIEW_DATABASE_BRANCH;
+  try {
+    const { GET, PUT } = await import("../../lib/api/handlers/list/layout");
+    const read = await GET(new Request("http://localhost/api/list/layout?surface=pipeline"));
+    assert.equal(read.status, 200);
+    assert.deepEqual(await read.json(), { layout: null, stored: false });
+    const write = await PUT(new Request("http://localhost/api/list/layout", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ surface: "pipeline", layout: { order: ["site"], touched: true } }),
+    }));
+    assert.equal(write.status, 200);
+    const body = (await write.json()) as { stored: boolean };
+    assert.equal(body.stored, false);
+  } finally {
+    if (saved === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = saved;
+  }
+});
+
 test("a preview keeps the sheet when the layout table cannot be read", () => {
   const missing = Object.assign(new Error("relation"), { code: "42P01" });
   assert.equal(layoutStoreUnavailable(missing), true);

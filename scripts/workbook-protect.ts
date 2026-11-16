@@ -38,7 +38,7 @@ function publicError(error: unknown): string {
 }
 
 function assertProtectContext(): void {
-  if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
+  if (process.env.VERCEL_ENV) {
     throw new Error("Refusing to protect the workbook from Vercel.");
   }
   const ref = process.env.GITHUB_REF?.trim();

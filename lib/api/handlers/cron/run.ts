@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { authorizeJob } from "@/lib/alerts/job";
 import { dispatchRepositoryWorkflow, type DispatchWorkflow } from "@/lib/cron/dispatch";
 import { privateHeaders } from "@/lib/guard";
+import { previewDatabaseWriteResponse, productionJobResponse } from "@/lib/preview/block";
 
 export function cronGet(workflow: DispatchWorkflow) {
   return async function GET(request: Request): Promise<Response> {
+    const blocked = previewDatabaseWriteResponse() || productionJobResponse();
+    if (blocked) return blocked;
     if (!(await authorizeJob(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders });
     }

@@ -1,19 +1,13 @@
 import { databaseUrl } from "@/lib/actions/db";
+import { previewPointsAtProduction } from "@/lib/preview/safety";
+import { databaseHost } from "./host";
+
+export { databaseHost };
 
 export class ProductionWriteRefused extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ProductionWriteRefused";
-  }
-}
-
-export function databaseHost(url: string | null | undefined): string {
-  const value = String(url || "").trim();
-  if (!value) return "";
-  try {
-    return new URL(value).hostname.toLowerCase();
-  } catch {
-    return "";
   }
 }
 
@@ -47,6 +41,7 @@ export type MigrationDecision = "apply" | "skip" | "refuse";
  * production does not migrate it.
  */
 export function migrationDecision(url: string | null | undefined): MigrationDecision {
+  if (previewPointsAtProduction(url)) return "refuse";
   if (!isProductionDatabase(url)) return "apply";
   const context = shadowContext();
   if (context === "manual") return "apply";
@@ -64,7 +59,7 @@ export function migrationRefusalMessage(): string {
 /** API writes must not land on production when this process is CI or a preview. */
 export function assertEventsWritable(): void {
   const context = shadowContext();
-  if ((context === "preview" || context === "ci") && isProductionDatabase(databaseUrl())) {
+  if ((context === "preview" || context === "ci") && (previewPointsAtProduction() || isProductionDatabase(databaseUrl()))) {
     throw new ProductionWriteRefused("Refusing to write the production database from CI or a preview.");
   }
 }

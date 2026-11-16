@@ -7,6 +7,8 @@ import { actionsEnabled, withSql, type Sql } from "./db";
 import { migrate, whenReady } from "./migrate";
 import { roleAllows, type ActionRole } from "./roles";
 import { InputError } from "./text";
+import { ProductionWriteRefused } from "@/lib/changes/guard";
+import { PREVIEW_POINTS_AT_PRODUCTION, previewPointsAtProduction } from "@/lib/preview/safety";
 
 export function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: privateHeaders });
@@ -23,13 +25,18 @@ export async function openActions(need: ActionRole): Promise<SessionUser | NextR
   if (!roleAllows(session.actionRole, need)) return jsonError("You do not have permission for that.", 403);
   try {
     await whenReady(() => withSql(async (sql) => {
-      await migrate(sql);
+      await migrate(sql, previewPointsAtProduction() ? { onPreview: "skip" } : undefined);
     }));
   } catch {
     console.error(JSON.stringify({ event: "actions_db_error" }));
     return jsonError("The actions database is unavailable.", 503);
   }
   return session;
+}
+
+function missingPreviewSchema(error: unknown): boolean {
+  const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : "";
+  return code === "42P01" || code === "42703" || code === "25P02";
 }
 
 export async function runWrite<T>(
@@ -57,6 +64,9 @@ export async function runWrite<T>(
       return jsonError(error.message, 400);
     }
     if (error instanceof InputError) return jsonError(error.message, error.status);
+    if (previewPointsAtProduction() && (error instanceof ProductionWriteRefused || missingPreviewSchema(error))) {
+      return jsonError(PREVIEW_POINTS_AT_PRODUCTION, 503);
+    }
     console.error(JSON.stringify({ event: "actions_error", name: error instanceof Error ? error.name : "error" }));
     return jsonError("The action could not be saved.", 500);
   }

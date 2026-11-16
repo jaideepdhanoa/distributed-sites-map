@@ -15,6 +15,10 @@ function previewRequested(): boolean {
 }
 
 async function main() {
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") {
+    console.error("Catch-up does not run from a Vercel preview.");
+    process.exit(1);
+  }
   const preview = previewRequested();
   if (process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_REF && process.env.GITHUB_REF !== "refs/heads/main") {
     console.error("Catch-up runs only on main.");

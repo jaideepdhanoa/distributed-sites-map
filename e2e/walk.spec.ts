@@ -65,7 +65,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
     return {
       missing: false,
       split: mids.length > 0 && Math.max(...mids) - Math.min(...mids) > 12,
-      pieces: Boolean(card.querySelector(".phone-card-name") && card.querySelector(".stage-pill") && meta && meta.children.length >= 4),
+      pieces: Boolean(card.querySelector(".phone-card-name") && card.querySelector(".phone-card-stage") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
       scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth > 1,
     };
   });
@@ -75,6 +75,44 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   expect(fit.scroll).toBe(false);
   await page.locator("[data-testid=phone-cards] button.list-row").first().click();
   await expect(page).toHaveURL(/[?&]site=/);
+});
+
+test("phone cards keep gaps between the stage and the facts", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone card gaps");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?funnel=pipeline&pstage=desk&view=list", { waitUntil: "domcontentloaded" });
+  const card = page.locator("[data-testid=phone-cards] button.list-row").first();
+  await expect(card).toBeVisible();
+  await page.locator("[data-testid=phone-cards]").screenshot({ path: "review-shots/mobile-card-gaps.png" });
+  const gaps = await card.evaluate((node) => {
+    const stage = node.querySelector(".phone-card-stage");
+    const meta = node.querySelector(".phone-card-meta");
+    const facts = [...node.querySelectorAll(".phone-fact")];
+    const sep = node.querySelector(".phone-sep");
+    if (!stage || !meta || facts.length < 2 || !sep) return null;
+    const stageBox = stage.getBoundingClientRect();
+    const metaBox = meta.getBoundingClientRect();
+    const sepStyle = getComputedStyle(sep);
+    const sepSpace = parseFloat(sepStyle.marginLeft) + parseFloat(sepStyle.marginRight);
+    const summary = document.querySelector("[data-testid=summary-row]");
+    const tiles = [...(summary?.querySelectorAll(":scope > div") || [])].map((el) => el.getBoundingClientRect());
+    const tops = tiles.map((box) => box.top);
+    return {
+      stageGap: metaBox.top - stageBox.bottom,
+      sepSpace,
+      bareMissing: /Not on file/.test(node.textContent || ""),
+      summaryHeight: summary?.getBoundingClientRect().height || 0,
+      oneRow: tops.length > 1 && Math.max(...tops) - Math.min(...tops) < 4,
+      tileHeight: tiles.reduce((max, box) => Math.max(max, box.height), 0),
+    };
+  });
+  expect(gaps).toBeTruthy();
+  expect(gaps?.stageGap).toBeGreaterThanOrEqual(4);
+  expect(gaps?.sepSpace).toBeGreaterThanOrEqual(12);
+  expect(gaps?.bareMissing).toBe(false);
+  expect(gaps?.oneRow).toBe(true);
+  expect(gaps?.tileHeight).toBeLessThan(36);
+  expect(gaps?.summaryHeight).toBeLessThan(48);
 });
 
 test("signed-in next step and open loops do not show a gmail id", async ({ page }, info) => {

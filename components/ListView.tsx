@@ -176,9 +176,7 @@ export default function ListView({
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
             stage: shownText(row, "stage", signedIn) || "—",
-            score: shownText(row, "score", signedIn) || "—",
-            asking: shownText(row, "listed", signedIn) || "—",
-            metric: shownText(row, "spare", signedIn) || "—",
+            facts: [shownText(row, "score", signedIn), shownText(row, "listed", signedIn), shownText(row, "spare", signedIn)].filter((fact) => fact && fact !== "—" && fact !== "Not on file"),
             selected: row.id === selectedId,
             onOpen: () => onOpen(row.id),
           }))} />

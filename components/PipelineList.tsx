@@ -14,6 +14,7 @@ import {
   checkedShort,
   compactMoney,
   depotLine,
+  isOpenLandBlank,
   fullMoney,
   capacitySummary,
   displayScore,
@@ -56,6 +57,24 @@ function typeLabel(deal: DealProps): string {
   if (category === "land") return "Land";
   if (category === "store") return "C-store";
   return "";
+}
+
+function phoneScore(value: string): string {
+  if (!value || value === "—") return "";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return `Score ${value}`;
+  const rounded = Math.round(number * 10) / 10;
+  return `Score ${rounded}`;
+}
+
+function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
+  const deal = row.deal;
+  const score = phoneScore(String(cell(row, "score", signedIn)));
+  const asking = signedIn && deal.asking_price != null ? `${compactMoney(deal.asking_price)} asking` : "";
+  const party = shownFirm(deal) || shownBroker(deal) || shownPriceSource(deal);
+  const land = openLandLabel(deal.open_land_sqft, deal.open_land_basis);
+  const openLand = isOpenLandBlank(land) ? "" : `${land} open`;
+  return [score, asking, party, openLand];
 }
 
 function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
@@ -352,10 +371,10 @@ export default function PipelineList({
 
   const summaryBar = (
     <div className="summary-row" data-testid="summary-row">
-      <div><span>In this filter</span><strong>{summary.count.toLocaleString()}</strong><small>{summary.withAsking} with an asking price</small></div>
-      <div><span>Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
-      <div><span>Land listed</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
-      <div><span>Median per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
+      <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{summary.count.toLocaleString()}</strong><small className="only-desktop">{summary.withAsking} with an asking price</small></div>
+      <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
+      <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
+      <div><span className="only-desktop">Median per acre</span><span className="only-mobile">Per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
     </div>
   );
   const outside = outsideRow ? (
@@ -458,9 +477,7 @@ export default function PipelineList({
               address: address && address !== String(row.deal.name || "").trim() ? address : "",
               stage: String(cell(row, "stage", signedIn)),
               tone: stageTone(row.deal),
-              score: String(cell(row, "score", signedIn)),
-              asking: String(cell(row, "asking", signedIn)),
-              metric: String(cell(row, "openLand", signedIn)),
+              facts: phoneFacts(row, signedIn),
               selected: id === selectedId,
               check: showChecks ? (
                 <label className="row-check">

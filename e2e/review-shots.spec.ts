@@ -76,6 +76,20 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   } else {
     await expect(page.getByTestId("phone-cards")).toBeVisible();
     await expect(page.getByTestId("search-area")).toHaveCount(0);
+    const cardGaps = await page.locator("[data-testid=phone-cards] button.list-row").first().evaluate((node) => {
+      const stage = node.querySelector(".phone-card-stage")?.getBoundingClientRect();
+      const meta = node.querySelector(".phone-card-meta")?.getBoundingClientRect();
+      const sep = node.querySelector(".phone-sep");
+      const sepStyle = sep ? getComputedStyle(sep) : null;
+      return {
+        stageGap: stage && meta ? meta.top - stage.bottom : -1,
+        sepSpace: sepStyle ? parseFloat(sepStyle.marginLeft) + parseFloat(sepStyle.marginRight) : 0,
+        bareMissing: /Not on file/.test(node.textContent || ""),
+      };
+    });
+    expect(cardGaps.stageGap).toBeGreaterThanOrEqual(4);
+    expect(cardGaps.sepSpace).toBeGreaterThanOrEqual(12);
+    expect(cardGaps.bareMissing).toBe(false);
   }
   await page.screenshot({ path: `review-shots/${name}-list.png`, fullPage: false });
   await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });

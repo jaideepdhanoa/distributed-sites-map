@@ -9,25 +9,27 @@ test("role defaults", () => {
   assert.deepEqual(defaultPreferences("reviewer"), {
     approvals: "instant",
     mentions: "instant",
-    replies: "instant",
+    replies: "digest",
     flags: "instant",
     assignments: "instant",
-    recommendations: "instant",
+    recommendations: "digest",
     proposals: "instant",
     decisions: "instant",
-    stages: "instant",
+    stages: "digest",
+    asks: "digest",
     followed: "digest",
   });
   assert.deepEqual(defaultPreferences("contributor"), {
     approvals: "off",
     mentions: "instant",
-    replies: "instant",
+    replies: "digest",
     flags: "instant",
     assignments: "instant",
     recommendations: "digest",
     proposals: "digest",
     decisions: "digest",
     stages: "digest",
+    asks: "digest",
     followed: "digest",
   });
   assert.deepEqual(defaultPreferences("viewer"), {
@@ -40,12 +42,13 @@ test("role defaults", () => {
     proposals: "off",
     decisions: "off",
     stages: "off",
+    asks: "off",
     followed: "off",
   });
 });
 
-test("the morning digest sends when it is on, including a quiet day", () => {
-  assert.equal(shouldSendDigest({ items: 0, queueCount: 0, digestOn: true }), true);
+test("the digest is skipped when there is nothing to report", () => {
+  assert.equal(shouldSendDigest({ items: 0, queueCount: 0, digestOn: true }), false);
   assert.equal(shouldSendDigest({ items: 0, queueCount: 4, digestOn: false }), false);
   assert.equal(shouldSendDigest({ items: 0, queueCount: 4, digestOn: true }), true);
   assert.equal(shouldSendDigest({ items: 2, queueCount: 0, digestOn: false }), true);
@@ -60,8 +63,10 @@ test("new categories default on and can be saved", async () => {
   await migrate(sql);
   try {
     const defaults = await loadPreferences(sql, "jaideep");
-    assert.equal(defaults?.recommendations, "instant");
-    assert.equal(defaults?.stages, "instant");
+    assert.equal(defaults?.recommendations, "digest");
+    assert.equal(defaults?.stages, "digest");
+    assert.equal(defaults?.decisions, "instant");
+    assert.equal(defaults?.asks, "digest");
     const saved = await savePreferences(sql, "jaideep", { ...defaults, stages: "off", recommendations: "digest" });
     assert.equal(saved?.stages, "off");
     const loaded = await loadPreferences(sql, "jaideep");

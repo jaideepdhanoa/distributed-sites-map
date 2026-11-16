@@ -12,6 +12,7 @@ export const ALERT_CATEGORIES = [
   "proposals",
   "decisions",
   "stages",
+  "asks",
 ] as const;
 export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
 export type AlertMode = "instant" | "digest" | "off";
@@ -27,13 +28,14 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
     return {
       approvals: "instant",
       mentions: "instant",
-      replies: "instant",
+      replies: "digest",
       flags: "instant",
       assignments: "instant",
-      recommendations: "instant",
+      recommendations: "digest",
       proposals: "instant",
       decisions: "instant",
-      stages: "instant",
+      stages: "digest",
+      asks: "digest",
       followed: "digest",
     };
   }
@@ -41,13 +43,14 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
     return {
       approvals: "off",
       mentions: "instant",
-      replies: "instant",
+      replies: "digest",
       flags: "instant",
       assignments: "instant",
       recommendations: "digest",
       proposals: "digest",
       decisions: "digest",
       stages: "digest",
+      asks: "digest",
       followed: "digest",
     };
   }
@@ -61,6 +64,7 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
     proposals: "off",
     decisions: "off",
     stages: "off",
+    asks: "off",
     followed: "off",
   };
 }
@@ -87,6 +91,7 @@ export function parsePreferences(value: unknown, fallback: AlertPreferences): Al
     proposals: mode(row.proposals, fallback.proposals),
     decisions: mode(row.decisions, fallback.decisions),
     stages: mode(row.stages, fallback.stages),
+    asks: mode(row.asks, fallback.asks),
     followed: mode(row.followed, fallback.followed),
   };
 }
@@ -135,8 +140,8 @@ export function digestEnabled(prefs: AlertPreferences): boolean {
   return prefs.followed === "digest" || prefs.followed === "instant";
 }
 
-/** The morning digest sends every day it is on, including quiet mornings. Pending digest mail still goes out when the digest is off. */
+/** A digest goes out only when something new is waiting, or Review still has items and the digest is on. */
 export function shouldSendDigest(input: { items: number; queueCount: number; digestOn: boolean }): boolean {
-  if (input.digestOn) return true;
-  return input.items > 0;
+  if (input.items > 0) return true;
+  return input.digestOn && input.queueCount > 0;
 }

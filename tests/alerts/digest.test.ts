@@ -25,13 +25,22 @@ test("the digest uses the Pacific day and sends at most once per user that day",
   await migrate(sql);
   try {
     const winter = new Date("2026-11-09T15:30:00.000Z");
-    const summer = new Date("2026-07-09T15:30:00.000Z");
+    const summerMorning = new Date("2026-07-09T14:30:00.000Z");
+    const summerLate = new Date("2026-07-09T15:30:00.000Z");
+    await sql.query(
+      `INSERT INTO events (id, entity_type, entity_id, site_id, payload, source, actor, idempotency_key, created_at)
+       VALUES
+         ('EV-win', 'stage', 'PIPE-PHX-0008', 'PIPE-PHX-0008', '{"stage":"2 Financial screen","previous_stage":"1 Desk screen"}'::jsonb, 'agent', 'jaideep', 'ev-win', '2026-11-09T12:00:00.000Z'),
+         ('EV-jul', 'stage', 'PIPE-PHX-0008', 'PIPE-PHX-0008', '{"stage":"3 Site checks","previous_stage":"2 Financial screen"}'::jsonb, 'agent', 'jaideep', 'ev-jul', '2026-07-09T12:00:00.000Z'),
+         ('EV-hide', 'stage', 'PIPE-PHX-0006', 'PIPE-PHX-0006', '{"stage":"Dropped","previous_stage":"1 Desk screen"}'::jsonb, 'agent', 'jaideep', 'ev-hide', '2026-11-09T12:00:00.000Z')`,
+    );
     assert.equal(await sendDigests(sql, winter), 1);
     assert.equal(await sendDigests(sql, winter), 0);
     const winterLogs = await sql.query<{ id: string; body: string; subject: string }>(`SELECT id, body, subject FROM alert_log`);
     assert.equal(winterLogs.rows.length, 1);
     assert.equal(winterLogs.rows.some((row) => row.body.includes("PIPE-PHX-0006") || row.subject.includes("PIPE-PHX-0006")), false);
-    assert.equal(await sendDigests(sql, summer), 1);
+    assert.equal(await sendDigests(sql, summerLate), 0);
+    assert.equal(await sendDigests(sql, summerMorning), 1);
     const summerLogs = await sql.query(`SELECT id FROM alert_log`);
     assert.equal(summerLogs.rows.length, 2);
   } finally {

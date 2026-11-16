@@ -69,7 +69,7 @@ export function mailLink(item: MailLink): string {
   if (isExcludedSite(siteId)) return reviewHomeHref();
   if (siteId === "portfolio") return homeHref();
   if (item.category === "flags") return reviewHref(siteId);
-  if (item.category === "stages" || item.category === "activity" || item.category === "comms") return siteHref(siteId);
+  if (item.category === "stages" || item.category === "activity" || item.category === "comms" || item.category === "sites" || item.category === "asks") return siteHref(siteId);
   if (item.category === "decisions" && !proposalLink(item.href)) return siteHref(siteId);
   if (item.category === "approvals" || item.category === "assignments" || item.category === "proposals" || item.category === "decisions") {
     return proposalHref(siteId);

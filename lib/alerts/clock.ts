@@ -1,7 +1,9 @@
 export const DAILY_CAP = 400;
+/** Instant emails per person per Pacific day. Further instant rows roll into the digest. */
+export const INSTANT_DAILY_CAP = 6;
 
 /** Oldest unsent instant row waits this long, then the whole batch for that person goes. */
-export const DEFAULT_BATCH_MS = 60 * 1000;
+export const DEFAULT_BATCH_MS = 10 * 60 * 1000;
 
 export function batchWindowMs(): number {
   const raw = process.env.ALERT_BATCH_MS;

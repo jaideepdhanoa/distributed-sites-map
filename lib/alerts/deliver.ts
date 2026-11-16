@@ -4,8 +4,9 @@ import { resolveActionRole } from "@/lib/actions/roles";
 import { stageTitle } from "@/lib/labels";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
-import { DAILY_CAP, batchWindowMs, losAngelesParts, stampOf } from "./clock";
+import { DAILY_CAP, INSTANT_DAILY_CAP, batchWindowMs, losAngelesParts, stampOf } from "./clock";
 import { renderBatch, type MailItem } from "./compose";
+import { isExcludedSite } from "./excluded";
 import { discussionHref, proposalHref, reviewHomeHref } from "./links";
 import { digestEnabled, loadPreferences, shouldSendDigest, type AlertCategory } from "./preferences";
 import { emptyBrief, loadDigestBrief } from "./summary";
@@ -260,6 +261,11 @@ export async function flushInstant(sql: Sql, now = new Date()): Promise<number> 
         await markRows(sql, ids, "skipped", `skip:${userId}`);
         continue;
       }
+      const instantToday = await instantSentToday(sql, userId, losAngelesParts(now).day);
+      if (instantToday >= INSTANT_DAILY_CAP) {
+        await rollToDigest(sql, ids);
+        continue;
+      }
       const status = await deliverRows(sql, {
         userId,
         email,
@@ -338,10 +344,30 @@ async function followedItems(sql: Sql, userId: string, since: Date): Promise<Mai
   return items;
 }
 
+async function instantSentToday(sql: Sql, userId: string, day: string): Promise<number> {
+  const rows = await sql.query<{ count: string | number }>(
+    `SELECT COUNT(*)::text AS count FROM alert_log
+     WHERE user_id = $1 AND status = 'sent' AND sent_on = $2 AND idempotency_key LIKE 'batch:' || $1 || ':%'`,
+    [userId, day],
+  );
+  return Number(rows.rows[0]?.count || 0);
+}
+
+async function rollToDigest(sql: Sql, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(", ");
+  await sql.query(
+    `UPDATE alert_outbox SET channel = 'digest', status = 'pending', batch_key = NULL WHERE id IN (${placeholders})`,
+    ids,
+  );
+}
+
 export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
-  // Vercel Hobby runs this once, inside the 15:00 UTC hour (7:00 AM PST, 8:00 AM PDT).
-  // The Pacific calendar day is the idempotency key, so a late fire still counts as that day.
-  const { day } = losAngelesParts(now);
+  // Two UTC hours cover 7:00 AM Pacific in both standard time and daylight time.
+  // A run outside that hour does not send and does not consume the day's idempotency key.
+  const parts = losAngelesParts(now);
+  if (parts.hour !== 7) return 0;
+  const { day } = parts;
   let count = 0;
   for (const user of getUsers()) {
     if (resolveActionRole(user) == null) continue;
@@ -376,12 +402,12 @@ export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
     }
     if (!shouldSendDigest({ items: pending.rows.length + followed.length + brief.items.length, queueCount, digestOn })) continue;
     const extra = [...brief.items, ...followed];
-    if (digestOn) {
+    if (digestOn && queueCount > 0) {
       extra.unshift({
         category: "queue",
         siteId: "",
         siteLabel: "",
-        summary: queueCount > 0 ? `${queueCount} waiting in Review` : "Nothing is waiting in Review.",
+        summary: `${queueCount} waiting in Review`,
         authorId: user.u,
         href: reviewHomeHref(),
       });
@@ -422,6 +448,7 @@ export async function enqueueAlert(
     idempotencyKey: string;
   },
 ): Promise<void> {
+  if (isExcludedSite(input.siteId)) return;
   await sql.query(
     `INSERT INTO alert_outbox (
       id, idempotency_key, user_id, to_email, category, channel, site_id, site_label, summary, author_id, href, ref_id

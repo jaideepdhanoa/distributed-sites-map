@@ -28,10 +28,12 @@ const SAMPLE_NOTES: Record<MailItem["category"], string> = {
   proposals: "A sample proposal is waiting.",
   decisions: "A sample decision is waiting.",
   stages: "A sample stage change.",
+  asks: "An open question was logged.",
   followed: "This is a sample note for the daily digest.",
   queue: "A sample item is waiting in Review.",
   activity: "One new activity record.",
   comms: "One new comms record.",
+  sites: "A new listing.",
   brief: "Nothing new is waiting.",
 };
 

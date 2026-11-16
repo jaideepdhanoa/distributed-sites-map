@@ -186,19 +186,26 @@ function textOf(value: unknown): string {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
-async function writeStage(
+export type StageWrite = {
+  stored: Record<string, string>;
+  /** Null when this insert is the site's first stage row. */
+  previousStage: string | null;
+};
+
+export async function applyStage(
   sql: Sql,
   change: ParsedChange,
   actorId: string,
   version: number,
   mode: "api" | "workbook",
-): Promise<Record<string, unknown>> {
+): Promise<StageWrite> {
   const payload = change.payload as StagePayload;
   const previous = await sql.query<{ stage: string; service_area_class: string }>(
     `SELECT stage, service_area_class FROM site_stages WHERE site_id = $1`,
     [change.site_id],
   );
-  const priorStage = previous.rows[0]?.stage || "";
+  const previousStage = previous.rows[0] ? previous.rows[0].stage : null;
+  const priorStage = previousStage || "";
   const bringingBack = priorStage === "Dropped" && payload.stage !== "Dropped";
   if (mode === "api" && bringingBack && !payload.reason?.trim()) {
     throw new InputError("Bring back needs a reason.");
@@ -229,7 +236,7 @@ async function writeStage(
        updated_by = EXCLUDED.updated_by`,
     [change.site_id, stored.market, stored.stage, stored.service_area_class, stored.reason, version, actorId],
   );
-  return stored;
+  return { stored, previousStage };
 }
 
 async function writeActivity(
@@ -559,14 +566,17 @@ async function applyOne(
   const actual = await readVersion(sql, { ...change, entity_id: entityId });
   if (actual !== change.expected_version) throw conflict(change, entityId, actual);
   const version = change.expected_version + 1;
-  const payload =
-    change.entity_type === "stage"
-      ? await writeStage(sql, change, actor.id, version, mode)
-      : change.entity_type === "site"
-        ? await writeSite(sql, change, actor.id, version, mode)
-        : change.entity_type === "activity"
-          ? await writeActivity(sql, change, entityId, actor.id, version)
-          : await writeComms(sql, change, entityId, actor.id, version);
+  let payload: Record<string, unknown>;
+  if (change.entity_type === "stage") {
+    const written = await applyStage(sql, change, actor.id, version, mode);
+    payload = { ...written.stored, previous_stage: written.previousStage };
+  } else if (change.entity_type === "site") {
+    payload = await writeSite(sql, change, actor.id, version, mode);
+  } else if (change.entity_type === "activity") {
+    payload = await writeActivity(sql, change, entityId, actor.id, version);
+  } else {
+    payload = await writeComms(sql, change, entityId, actor.id, version);
+  }
   const eventId = await insertEvent(sql, {
     entityType: change.entity_type,
     entityId,

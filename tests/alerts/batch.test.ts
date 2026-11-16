@@ -6,7 +6,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Pool } from "pg";
 import type { Sql } from "../../lib/actions/db";
 import { migrate } from "../../lib/actions/migrate";
-import { DAILY_CAP, losAngelesParts } from "../../lib/alerts/clock";
+import { DAILY_CAP, batchWindowMs, losAngelesParts } from "../../lib/alerts/clock";
 import { flushInstant } from "../../lib/alerts/deliver";
 import { memorySql } from "../helpers/sql";
 
@@ -41,7 +41,7 @@ test("a burst inside the minute is one email, and a later item does not hold it"
   delete process.env.SMTP_PASS;
   const sql = await ready();
   const start = Date.parse("2026-11-09T15:00:00.000Z");
-  const windowMs = 60_000;
+  const windowMs = batchWindowMs();
   for (let i = 0; i < 10; i += 1) {
     await enqueue(sql, new Date(start + i * 2_000).toISOString(), randomUUID(), "reviewer", `Next step proposed ${i}.`);
   }
@@ -71,15 +71,16 @@ test("an older item is sent with anything already waiting, and it does not wait 
   delete process.env.RESEND_API_KEY;
   const sql = await ready();
   const start = Date.parse("2026-11-09T16:00:00.000Z");
+  const windowMs = batchWindowMs();
   await enqueue(sql, new Date(start).toISOString(), randomUUID(), "reviewer", "First proposal.");
   await enqueue(sql, new Date(start + 20_000).toISOString(), randomUUID(), "reviewer", "Second proposal.");
-  assert.equal(await flushInstant(sql, new Date(start + 60_000)), 1);
+  assert.equal(await flushInstant(sql, new Date(start + windowMs)), 1);
   const first = await sql.query<{ body: string }>(`SELECT body FROM alert_log`);
   assert.match(first.rows[0]?.body || "", /First proposal/);
   assert.match(first.rows[0]?.body || "", /Second proposal/);
-  await enqueue(sql, new Date(start + 70_000).toISOString(), randomUUID(), "reviewer", "After the send.");
-  assert.equal(await flushInstant(sql, new Date(start + 70_000 + 30_000)), 0);
-  assert.equal(await flushInstant(sql, new Date(start + 70_000 + 60_000)), 1);
+  await enqueue(sql, new Date(start + windowMs + 10_000).toISOString(), randomUUID(), "reviewer", "After the send.");
+  assert.equal(await flushInstant(sql, new Date(start + windowMs + 10_000 + windowMs - 1)), 0);
+  assert.equal(await flushInstant(sql, new Date(start + windowMs + 10_000 + windowMs)), 1);
   const logs = await sql.query<{ body: string }>(`SELECT body FROM alert_log`);
   assert.equal(logs.rows.length, 2);
   const laterMail = logs.rows.find((row) => row.body.includes("After the send"));

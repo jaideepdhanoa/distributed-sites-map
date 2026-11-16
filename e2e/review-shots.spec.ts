@@ -120,7 +120,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(stars).toContainText("Financial screen");
   const step = stars.getByTestId("workbook-step");
   await expect(step).toBeVisible();
-  const more = step.getByRole("button", { name: "Full next step" });
+  const more = step.getByRole("button", { name: "Show full note" });
   if (await more.count()) await more.click();
   await expect(step).toContainText("POS/car counts");
   await expect(stars).toContainText("Last contact Nov 6");

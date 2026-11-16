@@ -482,6 +482,7 @@ export async function decideSuggestion(
       detail: row.detail,
       proposedValue: row.proposed_value,
       reason: row.reason,
+      note: row.detail === "knock_off" ? row.title || "" : "",
       siteId: stageSiteId,
       actorId: input.actorId,
     }, { joinTransaction: true });

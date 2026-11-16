@@ -2,6 +2,7 @@ import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { approvedStage } from "@/lib/stageOverlay";
+import { advanceReasonCode, dropReasonCode } from "@/lib/tags/map";
 import { applyBatch, VersionConflictError, type ApplyOptions, type ApplyResult } from "./apply";
 import { formatZonedTimestamp, type Actor } from "./schema";
 import { canonicalStageName, marketCode, serviceAreaCode } from "./stageLabel";
@@ -28,6 +29,7 @@ export async function writeAcceptedStage(
     detail: string | null;
     proposedValue: string;
     reason: string;
+    note?: string;
     siteId: string;
     actorId: string;
   },
@@ -71,7 +73,7 @@ export async function writeAcceptedStage(
   if (area) payload.service_area_class = area;
   if (reason && (stage === "Dropped" || input.detail === "bring_back")) payload.reason = reason;
   try {
-    return await applyBatch(
+    const applied = await applyBatch(
       sql,
       actor,
       `stage-decision-${input.id}`,
@@ -88,6 +90,46 @@ export async function writeAcceptedStage(
       },
       options,
     );
+    const family = stage === "Dropped" ? "drop_reason" : input.detail === "stage_move" ? "advance_reason" : "";
+    const code = family === "drop_reason" ? dropReasonCode(reason) : family === "advance_reason" ? advanceReasonCode(reason) : "";
+    if (family && code && !applied.replayed) {
+      const note = (input.note || "").trim();
+      await sql.exec("SAVEPOINT tag_decision");
+      try {
+        const open = await sql.query<{ version: number | string }>(
+          `SELECT version FROM site_tags WHERE site_id = $1 AND family = $2`,
+          [input.siteId, family],
+        );
+        await applyBatch(
+          sql,
+          actor,
+          `stage-decision-${input.id}-${family}`,
+          {
+            changes: [
+              {
+                entity_type: "tag",
+                site_id: input.siteId,
+                expected_version: open.rows[0] ? Number(open.rows[0].version) : 0,
+                source: STAGE_DECISION_SOURCE,
+                payload: {
+                  family,
+                  code,
+                  source_ref: "stage_decision",
+                  ...(note ? { note } : {}),
+                },
+              },
+            ],
+          },
+          options,
+        );
+        await sql.exec("RELEASE SAVEPOINT tag_decision");
+      } catch (error) {
+        await sql.exec("ROLLBACK TO SAVEPOINT tag_decision");
+        const missing = Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
+        if (!missing) throw error;
+      }
+    }
+    return applied;
   } catch (error) {
     if (error instanceof VersionConflictError) {
       throw new InputError("The stage changed. Reload this site and try the decision again.", 409);

@@ -219,7 +219,18 @@
   font-weight: 550;
   color: var(--ink);
 }
-.next-card .next-full { margin: 8px 0 0; white-space: normal; line-height: 1.45; }
+.next-card .workbook-step { overflow: visible; max-width: 100%; }
+.next-card .next-full {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
 .next-card .step-actions .paper-btn { max-width: 100%; }
 .next-card .act-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
 .next-card form label,

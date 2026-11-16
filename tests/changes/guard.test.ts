@@ -60,6 +60,10 @@ test("migrations and the shadow job refuse production from CI and preview", asyn
     delete process.env.VERCEL_ENV;
     process.env.VERCEL_ENV = "preview";
     await assert.rejects(async () => migrate(await memorySql(), { connectionString: prod }), /Refusing to migrate the production database/);
+    const previewRequest = await memorySql();
+    assert.deepEqual(await migrate(previewRequest, { connectionString: prod, onPreview: "skip" }), []);
+    const previewUntouched = await previewRequest.query<{ name: string | null }>("SELECT to_regclass('public.events') AS name");
+    assert.equal(previewUntouched.rows[0]?.name, null);
 
     delete process.env.VERCEL_ENV;
     assert.throws(() => assertPreviewTarget(preview, "backfill"), /NEON_BRANCH is preview/);

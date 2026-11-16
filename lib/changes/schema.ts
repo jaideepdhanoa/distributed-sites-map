@@ -24,6 +24,7 @@ import {
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_LAYOUT_IDS, SPACE_TYPE_IDS, spaceSiteAllowed, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
 import { safeGmailLink } from "@/lib/comms";
+import { parseTag, type TagPayload } from "@/lib/tags/parse";
 import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
 import { coverageOf } from "@/lib/pnl/period";
@@ -155,6 +156,8 @@ export type SiteSpacePayload =
       layout: SpaceLayout;
     };
 
+export type { TagPayload } from "@/lib/tags/parse";
+
 export type ParsedChange = {
   entity_type: EntityType;
   site_id: string;
@@ -163,7 +166,7 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload;
 };
 
 const stagePayload = z
@@ -333,7 +336,7 @@ const siteSpacePayload = z
 
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag"]),
     site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -477,10 +480,11 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
 
   const changes: ParsedChange[] = parsed.data.changes.map((row, index) => {
     const siteKeyed = row.entity_type === "stage" || row.entity_type === "site";
-    if (row.entity_id && (row.expected_version === 0 || siteKeyed)) {
+    const tagKeyed = row.entity_type === "tag";
+    if (row.entity_id && (row.expected_version === 0 || siteKeyed || tagKeyed)) {
       throw new InputError(`Change ${index + 1}: The server assigns ids.`);
     }
-    if (row.expected_version > 0 && !siteKeyed && !row.entity_id) {
+    if (row.expected_version > 0 && !siteKeyed && !tagKeyed && !row.entity_id) {
       throw new InputError(`Change ${index + 1}: That update needs the record id.`);
     }
     if (row.entity_id && row.entity_type === "activity" && !/^A-\d{4,}$/.test(row.entity_id)) {
@@ -556,6 +560,15 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     }
     if (row.entity_type === "site_space") {
       return { ...row, payload: parseSiteSpace(actor, index, row.site_id, row.expected_version, row.payload) };
+    }
+    if (row.entity_type === "tag") {
+      const parsedTag = parseTag(actor, index, row.site_id, row.payload);
+      if (parsedTag.since) {
+        const zoned = parseZonedTimestamp(parsedTag.since);
+        if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+        parsedTag.since = zoned.iso;
+      }
+      return { ...row, payload: parsedTag };
     }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {

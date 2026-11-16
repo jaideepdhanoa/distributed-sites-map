@@ -67,7 +67,7 @@ def _site_row(row: dict) -> dict | None:
         "label": public_step(name or site, 180),
         "market": _clean(row.get("Market")),
         "stage": _clean(row.get("Stage")),
-        "next_step": public_step(row.get("Next step") or ""),
+        "next_step": public_step(row.get("Next step") or "", 8000),
         "nda_id": _clean(row.get("NDA ID")),
         "stage_blocker": blocker,
         "stage_blocker_since": _date_text(row.get("Stage blocker since")),

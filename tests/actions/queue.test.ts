@@ -47,6 +47,7 @@ async function ready() {
     "012_alert_asks.sql",
     "013_list_layouts.sql",
     "014_pnl.sql",
+    "015_tags.sql",
     "016_search.sql",
     "017_site_spaces.sql",
     "018_pnl_basis.sql",

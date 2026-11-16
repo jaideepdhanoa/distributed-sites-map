@@ -155,7 +155,7 @@ export async function primeSnapshot(): Promise<void> {
   if (!actionsEnabled()) return;
   try {
     await whenReady(() => withSql(async (sql) => {
-      await migrate(sql);
+      await migrate(sql, { onPreview: "skip", onProduction: "skip" });
     }));
     remember(await loadCachedBundle());
   } catch {

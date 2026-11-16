@@ -19,6 +19,10 @@ import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
+import { ChipRow, TagChip } from "./TagChip";
+import { chipsForDeal } from "@/lib/tags/show";
+import { DILIGENCE_FAMILIES, sectionChips } from "@/lib/tags/vocab";
+import type { TagView } from "@/lib/tags/map";
 
 function acres(value: number | null | undefined, text?: string) {
   const shown = acreUnit(value, text);
@@ -240,6 +244,10 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null }: { site: Sit
       </div>
     </div>
   );
+}
+
+function visibleChips(deal: DealProps, signedIn: boolean): TagView[] {
+  return chipsForDeal({ ...deal }, signedIn);
 }
 
 function StageChip({ deal }: { deal: DealProps }) {
@@ -741,6 +749,11 @@ export function DealDetail({
   const cash = cashTile(deal);
   const revenue = revenueTile(deal);
   const cue = listingCue(deal);
+  const chips = visibleChips(deal, signedIn);
+  const waiting = chips.find((chip) => chip.family === "waiting_on");
+  const gap = chips.find((chip) => chip.family === "biggest_gap");
+  const recordChips = sectionChips(chips, ["drop_reason", "advance_reason", "package", "listing", "lead_source", "business_check", "photos", "nda"]);
+  const diligence = sectionChips(chips, DILIGENCE_FAMILIES);
   return (
     <aside
       data-record={deal.deal_id}
@@ -770,11 +783,12 @@ export function DealDetail({
       <div className="drawer-scroll">
       <div className="card-top">
         <h2>{deal.name || deal.address}</h2>
-        <div className="card-chips">
+        <div className="card-chips" data-testid="header-chips">
           <StageChip deal={deal} />
-          <AreaChip record={deal} />
-          <NdaChip deal={deal} signedIn={signedIn} />
+          {waiting ? <TagChip chip={waiting} compact /> : null}
+          {gap ? <TagChip chip={gap} compact /> : null}
         </div>
+        <ChipRow chips={diligence} testId="diligence-home" titled />
         <p className="note">{deal.address}</p>
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
@@ -803,6 +817,7 @@ export function DealDetail({
         signedIn={signedIn}
         suggestedDrop={deal.suggested_drop}
         blocker={deal}
+        chips={chips}
       />
       {related}
       <PanelSections
@@ -812,6 +827,8 @@ export function DealDetail({
               <summary className="disclosure">Record</summary>
               <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>
             </details>
+            <AreaChip record={deal} />
+            <ChipRow chips={recordChips} testId="section-chips" />
             <h3>Broker</h3>
             <div className="kv">
               <span>Broker</span>
@@ -851,6 +868,7 @@ export function DealDetail({
         numbers={
           <>
             {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} /> : null}
+            <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">
               <span>Asking price</span>
               <div>

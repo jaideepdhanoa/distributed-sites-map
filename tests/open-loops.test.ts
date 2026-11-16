@@ -15,7 +15,8 @@ import {
   type OpenLoopsSnapshot,
   type OpenLoopSite,
 } from "../lib/openLoops.ts";
-import { workbookStepFor } from "../lib/workbookStep.ts";
+import { plainNextStep } from "../lib/nextStepLine.ts";
+import { workbookNote, workbookStepFor } from "../lib/workbookStep.ts";
 
 const snapshot = JSON.parse(readFileSync("data/fixtures/open-loops.json", "utf8")) as OpenLoopsSnapshot;
 const derived = deriveOpenLoops(snapshot);
@@ -291,6 +292,17 @@ test("the open-loops API is signed in the same way as the NDA queue", () => {
 
 // Tax returns, P&L, insurance, addbacks, and package status stay off every public next step.
 const PUBLIC_PACKAGE = /tax returns?|p\s*&\s*l\b|\binsurance\b|\badd-?backs?\b|package status/i;
+
+test("the expanded note keeps the text past the old 600 character clip", () => {
+  const note = `${"Confirm the survey and the population count. ".repeat(20)}AADT/population via the daily sweep.`;
+  const full = workbookNote(note);
+  assert.equal(full.endsWith("…"), false);
+  assert.match(full, /AADT\/population via the daily sweep\./);
+  assert.ok(full.length > 600);
+  const plain = plainNextStep(full);
+  assert.equal(plain.full.endsWith("…"), false);
+  assert.match(plain.full, /AADT\/population via the daily sweep/);
+});
 
 test("the signed-in workbook step keeps the text the public card drops", () => {
   const site = {

@@ -21,6 +21,11 @@ export type SheetColumn<Row> = {
   label: string;
   text: (row: Row) => string;
   sortValue?: (row: Row) => number | null;
+  /** Chip-set filter. The saved value is the selected codes joined with |. */
+  choices?: { code: string; label: string }[];
+  /** False when no visible row carries a code for this chip-set. */
+  hasValues?: boolean;
+  code?: (row: Row) => string;
   private?: boolean;
   className?: string;
 };
@@ -46,6 +51,7 @@ export const LAYOUT_SURFACES = ["pipeline", "universe"] as const;
 export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 
 const MIN_WIDTH = 96;
+const SITE_MIN_WIDTH = 280;
 const MAX_WIDTH = 480;
 
 /** Columns that take leftover pane width. The pipeline list adds its power column. */
@@ -86,6 +92,7 @@ const COLUMN_WIDTH: Record<string, number> = {
   nda: 140,
   lastContact: 124,
   nextStep: 240,
+  chip_waiting: 148,
 };
 
 export function columnWidth(id: string): number {
@@ -137,7 +144,8 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   if (raw.widths && typeof raw.widths === "object") {
     for (const [id, value] of Object.entries(raw.widths)) {
       if (!known.has(id) || typeof value !== "number" || !Number.isFinite(value)) continue;
-      widths[id] = clampWidth(value);
+      const width = clampWidth(value);
+      widths[id] = id === "site" ? Math.max(SITE_MIN_WIDTH, width) : width;
     }
   }
   const filters: Record<string, string> = {};
@@ -220,6 +228,8 @@ export function fitColumnWidths(
     return typeof saved === "number" && Number.isFinite(saved) ? saved : columnWidth(id);
   });
   if (!ids.length || paneWidth <= 0) return base;
+  const siteAt = ids.indexOf("site");
+  if (siteAt >= 0) base[siteAt] = Math.max(SITE_MIN_WIDTH, base[siteAt]);
   const target = Math.max(0, Math.floor(paneWidth) - Math.max(0, Math.round(trailing)));
   const sum = base.reduce((total, width) => total + width, 0);
   const delta = target - sum;
@@ -241,7 +251,8 @@ export function fitColumnWidths(
     return base;
   }
   if (!openFlex.length) return base;
-  const room = openFlex.map((index) => Math.max(0, base[index] - MIN_WIDTH));
+  const floor = (index: number) => (ids[index] === "site" ? SITE_MIN_WIDTH : MIN_WIDTH);
+  const room = openFlex.map((index) => Math.max(0, base[index] - floor(index)));
   if (room.every((value) => value === 0)) return base;
   const cuts = shares(Math.min(-delta, room.reduce((total, value) => total + value, 0)), room, room);
   openFlex.forEach((index, position) => {
@@ -291,6 +302,13 @@ export function prepareRows<Row>(
     for (const [id, query] of Object.entries(layout.filters)) {
       const column = byId.get(id);
       if (!column || !visible.includes(id)) continue;
+      if (column.choices) {
+        const selected = query.split("|").map((item) => item.trim()).filter(Boolean);
+        if (!selected.length) continue;
+        const code = column.code ? column.code(row) : column.text(row);
+        if (!selected.includes(code)) return false;
+        continue;
+      }
       const hay = column.text(row).toLowerCase();
       if (!hay.includes(query.toLowerCase())) return false;
     }

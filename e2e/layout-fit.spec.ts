@@ -57,15 +57,10 @@ test("the desk list keeps the location note out of the stage tabs", async ({ pag
   }
   const mark = page.locator("[data-testid=pipeline-list] [data-testid=suggested-drop]").first();
   await expect(mark).toBeVisible();
-  await expect(mark).toHaveText(/^Suggested drop: /);
-  const lines = await mark.evaluate((el) => {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    // A clipped one-line label can report two rects on the same top. Count lines, not fragments.
-    const tops = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
-    return tops.size;
-  });
-  expect(lines).toBe(1);
+  await expect(mark).not.toContainText("Suggested drop:");
+  await expect(mark).not.toContainText("…");
+  const full = await mark.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+  expect(full).toBe(true);
 });
 
 test("phone chrome stays inside the viewport and the map pill sits in its track", async ({ page }, info) => {

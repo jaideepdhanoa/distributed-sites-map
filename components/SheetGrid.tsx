@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { GripVertical, ListFilter, Pin } from "lucide-react";
 import {
@@ -55,6 +56,7 @@ export default function SheetGrid<Row>({
   const scrollRef = scrollRefProp ?? innerRef;
   const [paneWidth, setPaneWidth] = useState(0);
   const [menu, setMenu] = useState<string | null>(null);
+  const [menuPlace, setMenuPlace] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [focus, setFocus] = useState({ row: 0, col: 0 });
   const focusRef = useRef(focus);
@@ -75,6 +77,35 @@ export default function SheetGrid<Row>({
   const items = virtualizer.getVirtualItems();
   const padTop = items.length ? items[0].start : 0;
   const padBottom = items.length ? virtualizer.getTotalSize() - items[items.length - 1].end : 0;
+
+  useLayoutEffect(() => {
+    if (!menu) {
+      setMenuPlace(null);
+      return undefined;
+    }
+    const place = () => {
+      const anchor = scrollRef.current?.querySelector(`th[data-col="${CSS.escape(menu)}"]`);
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const width = 260;
+      const margin = 8;
+      const left = Math.min(Math.max(margin, rect.left), Math.max(margin, window.innerWidth - width - margin));
+      const spaceBelow = window.innerHeight - rect.bottom - margin;
+      const spaceAbove = rect.top - margin;
+      const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.max(160, Math.min(420, openBelow ? spaceBelow - 4 : spaceAbove - 4));
+      const top = openBelow ? rect.bottom + 4 : Math.max(margin, rect.top - 4 - maxHeight);
+      setMenuPlace({ top, left, maxHeight });
+    };
+    place();
+    const scroller = scrollRef.current;
+    window.addEventListener("resize", place);
+    scroller?.addEventListener("scroll", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      scroller?.removeEventListener("scroll", place);
+    };
+  }, [menu, scrollRef]);
 
   useLayoutEffect(() => {
     const node = scrollRef.current;
@@ -305,8 +336,13 @@ export default function SheetGrid<Row>({
                       onPointerDown={(event) => onResizeDown(event, column.id)}
                     />
                   </span>
-                  {menu === column.id ? (
-                    <div className="menu col-menu" role="group" aria-label={`${column.label} column`}>
+                  {menu === column.id && menuPlace ? createPortal(
+                    <div
+                      className="menu col-menu floating"
+                      role="group"
+                      aria-label={`${column.label} column`}
+                      style={{ top: menuPlace.top, left: menuPlace.left, maxHeight: menuPlace.maxHeight }}
+                    >
                       <label>
                         <input
                           className="check"
@@ -331,6 +367,32 @@ export default function SheetGrid<Row>({
                           Hide
                         </button>
                       )}
+                      {column.choices ? (
+                        <div className="chip-filter" role="group" aria-label={`Filter ${column.label}`}>
+                          {column.hasValues === false ? <p className="menu-note">No sites have this chip yet.</p> : null}
+                          {column.choices.map((choice) => {
+                            const selected = (layout.filters[column.id] || "").split("|").filter(Boolean);
+                            const on = selected.includes(choice.code);
+                            return (
+                              <label key={choice.code}>
+                                <input
+                                  className="check"
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={() => {
+                                    const next = on ? selected.filter((code) => code !== choice.code) : [...selected, choice.code];
+                                    const filters = { ...layout.filters };
+                                    if (next.length) filters[column.id] = next.join("|");
+                                    else delete filters[column.id];
+                                    onLayout({ ...layout, filters, touched: true });
+                                  }}
+                                />
+                                {choice.label}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
                       <label>
                         Filter
                         <input
@@ -347,6 +409,7 @@ export default function SheetGrid<Row>({
                           }}
                         />
                       </label>
+                      )}
                       {filtered ? (
                         <button
                           type="button"
@@ -360,7 +423,8 @@ export default function SheetGrid<Row>({
                           Clear filter
                         </button>
                       ) : null}
-                    </div>
+                    </div>,
+                    document.body,
                   ) : null}
                 </th>
               );
@@ -440,6 +504,9 @@ export default function SheetGrid<Row>({
           ) : null}
         </tbody>
       </table>
+      {rows.length === 0 ? (
+        <p className="note empty-filter" data-testid="empty-filter">No sites match this filter.</p>
+      ) : null}
     </div>
   );
 }

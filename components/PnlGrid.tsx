@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { statusLabel } from "@/lib/conflicts/view";
 import type { GridCell, GridColumn, PnlGrid, ValueCell } from "@/lib/pnl/grid";
 
 function figure(cell: ValueCell, percent: boolean): { primary: string; secondary: string } {
@@ -19,14 +20,20 @@ function HeaderLabel({ column }: { column: GridColumn }) {
   );
 }
 
+function ConflictMark({ cell }: { cell: GridCell }) {
+  if (!cell.conflict || cell.conflict.status === "resolved") return null;
+  return <i className="pnl-mark conflict" data-testid="pnl-conflict-mark" aria-label="Sources disagree" />;
+}
+
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
-  if (cell.kind === "missing") return <span className="pnl-missing" />;
-  if (cell.kind === "blank") return <span className="pnl-blank">—</span>;
+  if (cell.kind === "missing") return <span className="pnl-missing"><ConflictMark cell={cell} /></span>;
+  if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} />—</span>;
   const shown = figure(cell, percent);
   return (
     <span className="pnl-figure">
       <span className="pnl-amount">
         {cell.status === "calculated" ? null : <i className={`pnl-mark ${cell.status}`} aria-label={cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"} />}
+        <ConflictMark cell={cell} />
         <strong>{shown.primary}</strong>
       </span>
       {shown.secondary ? <small>{shown.secondary}</small> : null}
@@ -67,7 +74,7 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
 
   function reveal(row: number, col: number, target: HTMLElement) {
     const cell = focusable[row]?.cells[col];
-    if (!cell || cell.kind !== "value") {
+    if (!cell || (cell.kind !== "value" && !cell.conflict)) {
       setOpen(null);
       return;
     }
@@ -150,7 +157,7 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
                       data-cell={`${index}:${col}`}
                       data-col={grid.columns[col]?.id}
                       tabIndex={focused || (!focus && index === 0 && col === 0) ? 0 : -1}
-                      className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${focused ? "cell-focus" : ""}`.trim()}
+                      className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${cell.conflict && cell.conflict.status !== "resolved" ? "is-conflict" : ""} ${focused ? "cell-focus" : ""}`.trim()}
                       title={cell.kind === "missing" ? "Month not in the package" : cell.kind === "value" && cell.flag ? cell.flag : undefined}
                       onFocus={() => setFocus({ row: index, col })}
                       onClick={(event) => reveal(index, col, event.currentTarget)}
@@ -164,15 +171,28 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           })}
         </tbody>
       </table>
-      {open && popover && popover.kind === "value" ? (
+      {open && popover && (popover.kind === "value" || popover.conflict) ? (
         <div className="pnl-pop" role="dialog" aria-label="Line source" data-testid="pnl-popover" style={{ top: open.top, left: open.left }}>
           <strong>{focusable[open.row]?.label}</strong>
-          <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>
-          <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : popover.status === "normalized" ? "Normalized" : "Reported"}</p>
-          <p>{popover.sourceDocument}{popover.sourcePage ? ` · ${popover.sourcePage}` : ""}</p>
-          {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
-          {popover.sourceHref ? <a className="text-link" href={popover.sourceHref} target="_blank" rel="noopener noreferrer">Open source ↗</a> : null}
-          {popover.flag ? <p className="pnl-flag">{popover.flag}</p> : null}
+          {popover.kind === "value" ? (
+            <>
+              <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>
+              <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : popover.status === "normalized" ? "Normalized" : "Reported"}</p>
+              <p>{popover.sourceDocument}{popover.sourcePage ? ` · ${popover.sourcePage}` : ""}</p>
+              {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
+              {popover.sourceHref ? <a className="text-link" href={popover.sourceHref} target="_blank" rel="noopener noreferrer">Open source ↗</a> : null}
+              {popover.flag ? <p className="pnl-flag">{popover.flag}</p> : null}
+            </>
+          ) : null}
+          {popover.conflict ? (
+            <div data-testid="pnl-conflict">
+              <p>Conflict · {statusLabel(popover.conflict.status)}</p>
+              {popover.conflict.sources.map((source) => (
+                <p key={`${source.document}-${source.page}`}>{source.value} · {source.document} · {source.page}</p>
+              ))}
+              <p>In use: {popover.conflict.valueInUse}</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

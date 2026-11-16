@@ -1,3 +1,4 @@
+import type { DataConflict } from "@/lib/conflicts/view";
 import { monthColumnState } from "./columns";
 import { formatCapturedDate } from "./dateLabel";
 import { LINE_LABELS, MONTH_SHORT, lineSection, sectionOrder, type PnlLineCode } from "./lines";
@@ -22,7 +23,15 @@ export type ValueCell = {
   flag: string | null;
 };
 
-export type GridCell = ValueCell | { kind: "missing" } | { kind: "blank" };
+export type CellConflict = {
+  status: DataConflict["status"];
+  valueInUse: string;
+  sources: DataConflict["sources"];
+};
+
+export type GridCell = (ValueCell | { kind: "missing" } | { kind: "blank" }) & {
+  conflict?: CellConflict;
+};
 
 export type GridRow = {
   id: string;
@@ -31,7 +40,15 @@ export type GridRow = {
   cells: GridCell[];
 };
 
-export type GridColumn = { id: string; label: string; missing: boolean; statement?: boolean };
+export type GridColumn = {
+  id: string;
+  label: string;
+  missing: boolean;
+  statement?: boolean;
+  periodStart?: string;
+  periodEnd?: string;
+  periodLabel?: string;
+};
 
 export type PnlGrid = { columns: GridColumn[]; rows: GridRow[]; years: number[]; note: string };
 
@@ -183,6 +200,50 @@ function monthBuckets(statement: PnlStatement, year: number): Bucket[] {
   return buckets;
 }
 
+function withPeriod(column: GridColumn, period: PnlPeriodView | null | undefined): GridColumn {
+  if (!period?.periodStart || !period.periodEnd) return column;
+  return {
+    ...column,
+    periodStart: period.periodStart,
+    periodEnd: period.periodEnd,
+    periodLabel: period.label,
+  };
+}
+
+function periodKeys(column: GridColumn): string[] {
+  const keys = [column.label, column.periodLabel || ""];
+  if (column.periodStart && column.periodEnd) {
+    keys.push(`${column.periodStart}/${column.periodEnd}`);
+    if (column.periodStart.endsWith("-01-01") && column.periodEnd.endsWith("-12-31")) {
+      keys.push(column.periodStart.slice(0, 4));
+      keys.push(`FY${column.periodStart.slice(0, 4)}`);
+    }
+  }
+  return keys.filter((key): key is string => Boolean(key));
+}
+
+function attachConflicts(grid: PnlGrid, conflicts: DataConflict[]): PnlGrid {
+  const marks = conflicts.filter((row) => row.subject === "pnl_line");
+  if (!marks.length) return grid;
+  return {
+    ...grid,
+    rows: grid.rows.map((row) => ({
+      ...row,
+      cells: row.cells.map((cell, index) => {
+        const column = grid.columns[index];
+        if (!column) return cell;
+        const keys = periodKeys(column);
+        const hit = marks.find((mark) => mark.field === row.id && keys.includes(mark.period));
+        if (!hit) return cell;
+        return {
+          ...cell,
+          conflict: { status: hit.status, valueInUse: hit.valueInUse, sources: hit.sources },
+        };
+      }),
+    })),
+  };
+}
+
 function annualLayout(statement: PnlStatement): { column: GridColumn; bucket: Bucket }[] {
   const layout: { column: GridColumn; bucket: Bucket }[] = [];
   for (const year of statement.years) {
@@ -191,7 +252,10 @@ function annualLayout(statement: PnlStatement): { column: GridColumn; bucket: Bu
       const present = year.months.filter((period): period is PnlPeriodView => Boolean(period));
       layout.push(present.length
         ? {
-            column: { id: `year-${year.year}`, label: year.columnLabel || String(year.year), missing: false, statement: false },
+            column: withPeriod(
+              { id: `year-${year.year}`, label: year.columnLabel || String(year.year), missing: false, statement: false },
+              mergeMonths(present, year.year),
+            ),
             bucket: { missing: false, period: mergeMonths(present, year.year) },
           }
         : {
@@ -202,12 +266,12 @@ function annualLayout(statement: PnlStatement): { column: GridColumn; bucket: Bu
     }
     for (const period of periods) {
       layout.push({
-        column: {
+        column: withPeriod({
           id: period.id,
           label: period.columnLabel,
           missing: false,
           statement: spanMonths(period.periodStart, period.periodEnd) === 12,
-        },
+        }, period),
         bucket: { missing: false, period },
       });
     }
@@ -227,7 +291,7 @@ function usedCodes(buckets: Bucket[], section: "revenue" | "costs" | "addbacks")
   return sectionOrder(section).filter((code) => found.has(code));
 }
 
-export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number): PnlGrid {
+export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number, conflicts: DataConflict[] = []): PnlGrid {
   const years = statement.years.map((item) => item.year);
   if (statement.status !== "ready" || !years.length) return { columns: [], rows: [], years, note: "" };
   const selected = year && years.includes(year) ? year : years[0];
@@ -239,17 +303,17 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
   const columns: GridColumn[] = mode === "years"
     ? yearLayout.map((item) => item.column)
     : [
-        ...MONTH_SHORT.map((label, index) => ({
+        ...MONTH_SHORT.map((label, index) => withPeriod({
           id: label.toLowerCase(),
           label,
           missing: selectedYear ? monthColumnState(selectedYear, index) === "missing" : false,
-        })),
-        {
+        }, buckets[index]?.period)),
+        withPeriod({
           id: "ytd",
           label: annualIsStatement ? `FY${selected} (statement)` : "YTD",
           missing: false,
           statement: annualIsStatement,
-        },
+        }, buckets[12]?.period),
       ];
   const hatched = "Hatched = month not in package.";
   const note = mode === "months" && annualIsStatement
@@ -372,7 +436,7 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
       cells: sdeCells.map((cell) => (cell.kind === "value" && cell.share ? fromMath(cell.cents, cell.share, "SDE divided by revenue for this column.", cell.share) : cell.kind === "missing" ? cell : { kind: "blank" })),
     });
   }
-  return { columns, rows, years, note };
+  return attachConflicts({ columns, rows, years, note }, conflicts);
 }
 
 export function columnSummary(grid: PnlGrid, index: number): { revenue: string; costs: string; ebitda: string; margin: string } {

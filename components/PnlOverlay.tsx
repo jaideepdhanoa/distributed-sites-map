@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { DataConflict } from "@/lib/conflicts/view";
 import { buildPnlGrid } from "@/lib/pnl/grid";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlBasis from "./PnlBasis";
@@ -10,11 +11,13 @@ import PnlPhone from "./PnlPhone";
 export default function PnlOverlay({
   statement = emptyStatement(),
   initialGrain = null,
+  conflicts = [],
   onClose,
   onChecklist,
 }: {
   statement?: PnlStatement;
   initialGrain?: "annual" | "monthly" | null;
+  conflicts?: DataConflict[];
   onClose: () => void;
   onChecklist?: () => void;
 }) {
@@ -30,7 +33,7 @@ export default function PnlOverlay({
     if (initialGrain === "monthly") setMode("months");
   }, [initialGrain]);
   const [year, setYear] = useState(years[0] || 0);
-  const grid = useMemo(() => buildPnlGrid(shown, mode, year), [shown, mode, year]);
+  const grid = useMemo(() => buildPnlGrid(shown, mode, year, conflicts), [shown, mode, year, conflicts]);
   const business = shown.years.find((item) => item.year === year)?.businessLabel || shown.years[0]?.businessLabel || "";
 
   useEffect(() => {
@@ -75,7 +78,7 @@ export default function PnlOverlay({
       {statement.status !== "ready" ? <p className="pnl-empty" data-testid="pnl-empty">{statement.message}</p> : (
         <>
           <div className="pnl-desktop"><PnlGrid grid={grid} percent={percent} /></div>
-          <PnlPhone statement={shown} />
+          <PnlPhone statement={shown} conflicts={conflicts} />
         </>
       )}
     </section>

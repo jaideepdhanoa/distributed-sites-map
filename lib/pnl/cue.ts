@@ -12,31 +12,59 @@ export type FinancialsCard = {
   coverage: string;
 };
 
-function amount(statement: PnlStatement, year: number, id: string): string {
+function amount(statement: PnlStatement, columnId: string, id: string): string {
   const grid = buildPnlGrid(statement, "years");
-  const view = statement.years.find((item) => item.year === year);
-  const columnId = view?.annual?.id || `year-${year}`;
   const index = grid.columns.findIndex((column) => column.id === columnId);
   if (index < 0) return "";
   const cell = grid.rows.find((row) => row.id === id)?.cells[index];
   return cell?.kind === "value" ? cell.amount : "";
 }
 
-/** Compact figures for the latest full year, plus coverage across every captured year. */
+function calendarYearLabel(period: { year: number; columnLabel: string; periodStart: string; periodEnd: string }): string {
+  const startYear = period.periodStart.slice(0, 4);
+  if (
+    startYear === String(period.year)
+    && period.periodEnd.slice(0, 4) === startYear
+    && period.periodStart.endsWith("-01-01")
+    && period.periodEnd.endsWith("-12-31")
+  ) {
+    return `FY${period.year}`;
+  }
+  return period.columnLabel || `FY${period.year}`;
+}
+
+/**
+ * The newest captured period. A full year on that year wins over an earlier
+ * partial of the same year. An older full year is not summed in, and the
+ * label names this period rather than a span across years.
+ */
+function cardPeriod(statement: PnlStatement): { columnId: string; label: string; months: number } | null {
+  for (const year of statement.years) {
+    const months = year.months.filter(Boolean).length;
+    if (year.annual) return { columnId: year.annual.id, label: calendarYearLabel(year.annual), months };
+    const ranges = [...(year.ranges ?? [])].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
+    if (ranges[0]) return { columnId: ranges[0].id, label: ranges[0].columnLabel, months };
+    if (months) {
+      const label = year.columnLabel && year.columnLabel !== String(year.year) ? year.columnLabel : `FY${year.year}`;
+      return { columnId: `year-${year.year}`, label, months };
+    }
+  }
+  return null;
+}
+
+/** Compact figures for the latest period, labeled as that period. */
 export function financialsCard(statement: PnlStatement, sample = false): FinancialsCard | null {
   if (statement.status !== "ready" || !statement.years.length) return null;
-  const full = statement.years.find((year) => year.annual) ?? statement.years[0];
-  const sde = amount(statement, full.year, "sde");
-  const ebitda = amount(statement, full.year, "ebitda");
-  const years = statement.years.map((year) => year.year).sort((a, b) => a - b);
-  const span = years.length === 1 ? `FY${years[0]}` : `FY${years[0]}–${years[years.length - 1]}`;
-  const months = statement.years.reduce((sum, year) => sum + year.months.filter(Boolean).length, 0);
-  const coverage = `${span} · ${months} of ${statement.years.length * 12} months${sample ? " · Sample package" : ""}`;
+  const period = cardPeriod(statement);
+  if (!period) return null;
+  const sde = amount(statement, period.columnId, "sde");
+  const ebitda = amount(statement, period.columnId, "ebitda");
+  const coverage = `${period.label} · ${period.months} of 12 months${sample ? " · Sample package" : ""}`;
   return {
-    revenue: amount(statement, full.year, "total-revenue") || "—",
+    revenue: amount(statement, period.columnId, "total-revenue") || "—",
     cash: sde || ebitda || "—",
     cashLabel: sde ? "SDE" : "EBITDA",
-    margin: (sde ? amount(statement, full.year, "sde-margin") : "") || amount(statement, full.year, "margin") || "—",
+    margin: (sde ? amount(statement, period.columnId, "sde-margin") : "") || amount(statement, period.columnId, "margin") || "—",
     coverage,
   };
 }

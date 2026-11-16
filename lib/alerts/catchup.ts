@@ -45,6 +45,7 @@ export function printCatchUp(result: CatchUpResult): void {
         `comms: ${counts.comms}`,
         `sites: ${counts.sites}`,
         `asks: ${counts.asks}`,
+        `conflicts: ${counts.conflicts}`,
       ].join("\n"),
     );
     return;

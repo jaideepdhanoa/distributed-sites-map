@@ -4,7 +4,7 @@ import { financialsCard, packageOnFile, statementTiles } from "../../lib/pnl/cue
 import { DEMO_PNL_SITE_ID, demoStatement } from "../../lib/pnl/demo.ts";
 import { sampleStatement } from "../../lib/pnl/fixture.ts";
 import { parseAmount } from "../../lib/pnl/money.ts";
-import { buildStatement, emptyStatement } from "../../lib/pnl/statement.ts";
+import { buildStatement, emptyStatement, type CapturedLine } from "../../lib/pnl/statement.ts";
 
 test("a package on file is not the same as a captured P&L", () => {
   assert.equal(packageOnFile("Received", "Package on file"), true);
@@ -60,4 +60,38 @@ test("overview tiles use the sample statement period and leave a missing line ou
   assert.equal(costsOnly?.revenue.text, "Not in package");
   assert.equal(costsOnly?.cash.text, "Not in package");
   assert.equal(costsOnly?.revenue.note, "");
+});
+
+test("the card names the latest period instead of summing older years into the label", () => {
+  function line(id: string, year: number, code: "revenue" | "ebitda", raw: string, throughMonth: number | null): CapturedLine {
+    const amount = parseAmount(raw);
+    if (!amount) throw new Error("amount");
+    return {
+      id,
+      periodId: throughMonth ? `PP-${year}-part` : `PP-${year}`,
+      grain: "annual",
+      year,
+      month: null,
+      throughMonth,
+      business: "car_wash",
+      code,
+      amount,
+      status: "reported",
+      sourceDocument: "Sample package",
+      sourcePage: "1",
+      sourceHref: "",
+      capturedAt: "2026-03-01T15:00:00-07:00",
+    };
+  }
+  const card = financialsCard(buildStatement([
+    line("PL-1", 2024, "revenue", "500000", null),
+    line("PL-2", 2024, "ebitda", "400000", null),
+    line("PL-3", 2026, "revenue", "200000", 6),
+    line("PL-4", 2026, "ebitda", "150000", 6),
+  ]));
+  assert.equal(card?.cashLabel, "EBITDA");
+  assert.equal(card?.cash, "$150,000");
+  assert.equal(card?.revenue, "$200,000");
+  assert.match(card?.coverage || "", /^Jan–Jun 2026 · 0 of 12 months$/);
+  assert.equal((card?.coverage || "").includes("2024"), false);
 });

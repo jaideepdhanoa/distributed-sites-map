@@ -158,6 +158,20 @@ export type SiteSpacePayload =
 
 export type { TagPayload } from "@/lib/tags/parse";
 
+export type ConflictSourcePayload = { value: string; document: string; page: string };
+
+/** Two sources that disagree. Muse writes it. The values stay on the signed-in read. */
+export type ConflictPayload = {
+  subject: "field" | "pnl_line";
+  field: string;
+  period: string;
+  sources: [ConflictSourcePayload, ConflictSourcePayload];
+  value_in_use: string;
+  status: "open" | "asked_broker" | "resolved";
+  resolution_note: string;
+  at: string;
+};
+
 export type ParsedChange = {
   entity_type: EntityType;
   site_id: string;
@@ -166,7 +180,7 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload;
 };
 
 const stagePayload = z
@@ -334,9 +348,30 @@ const siteSpacePayload = z
   })
   .strict();
 
+const conflictSourcePayload = z
+  .object({
+    value: z.string().trim().min(1).max(80),
+    document: z.string().trim().min(1).max(200),
+    page: z.string().trim().min(1).max(80),
+  })
+  .strict();
+
+const conflictPayload = z
+  .object({
+    subject: z.enum(["field", "pnl_line"]),
+    field: z.string().trim().min(1).max(80),
+    period: z.string().trim().max(80).optional(),
+    sources: z.tuple([conflictSourcePayload, conflictSourcePayload]),
+    value_in_use: z.string().trim().min(1).max(80),
+    status: z.enum(["open", "asked_broker", "resolved"]),
+    resolution_note: z.string().trim().max(500).optional(),
+    at: z.string().trim().min(1).max(40),
+  })
+  .strict();
+
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict"]),
     site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -499,6 +534,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_id && row.entity_type === "site_space" && !/^SS-\d{4,}$/.test(row.entity_id)) {
       throw new InputError(`Change ${index + 1}: That record id is not valid.`);
     }
+    if (row.entity_id && row.entity_type === "data_conflict" && !/^CF-\d{4,}$/.test(row.entity_id)) {
+      throw new InputError(`Change ${index + 1}: That record id is not valid.`);
+    }
     const siteAllowed = row.entity_type === "comms"
       ? commsSiteAllowed(row.site_id)
       : row.entity_type === "site_space"
@@ -569,6 +607,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
         parsedTag.since = zoned.iso;
       }
       return { ...row, payload: parsedTag };
+    }
+    if (row.entity_type === "data_conflict") {
+      return { ...row, payload: parseDataConflict(actor, index, row.site_id, row.payload) };
     }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
@@ -767,6 +808,71 @@ function parsePnlRetract(
   if (!zoned) pnlError(index, "at", "at must be an ISO-8601 time with a zone offset");
   cleanText(parsed.data.reason);
   return { retract: true, reason: parsed.data.reason, at: zoned.iso };
+}
+
+function sourceValueIsNumber(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  const sources = (payload as { sources?: unknown }).sources;
+  if (!Array.isArray(sources)) return false;
+  return sources.some((source) => source && typeof source === "object" && typeof (source as { value?: unknown }).value === "number");
+}
+
+function parseDataConflict(actor: Actor, index: number, siteId: string, payload: unknown): ConflictPayload {
+  if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
+  if (actor.kind !== "agent" || actor.id.trim().toLowerCase() !== "muse") {
+    throw new InputError(`Change ${index + 1}: Only Muse can record a data conflict.`, 403, "actor");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
+  }
+  const raw = payload as Record<string, unknown>;
+  if (!("at" in raw) || raw.at == null || raw.at === "") {
+    throw new InputError(`Change ${index + 1}: at is required`, 400, "at");
+  }
+  if (sourceValueIsNumber(raw) || typeof raw.value_in_use === "number") {
+    throw new InputError(`Change ${index + 1}: value must be a string such as "12345", not a number`, 400, "value");
+  }
+  const parsed = conflictPayload.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.length ? String(issue.path[issue.path.length - 1]) : "payload";
+    throw new InputError(`Change ${index + 1}: ${field} is not valid`, 400, field);
+  }
+  const zoned = parseZonedTimestamp(parsed.data.at);
+  if (!zoned) throw new InputError(`Change ${index + 1}: at must be an ISO-8601 time with a zone offset`, 400, "at");
+  const sources = parsed.data.sources;
+  if (sources[0].value === sources[1].value) {
+    throw new InputError(`Change ${index + 1}: the two sources must disagree`, 400, "sources");
+  }
+  if (parsed.data.value_in_use !== sources[0].value && parsed.data.value_in_use !== sources[1].value) {
+    throw new InputError(`Change ${index + 1}: value_in_use must be one of the source values`, 400, "value_in_use");
+  }
+  const note = parsed.data.resolution_note?.trim() || "";
+  if (parsed.data.status === "resolved" && !note) {
+    throw new InputError(`Change ${index + 1}: a resolved conflict needs a resolution note`, 400, "resolution_note");
+  }
+  if (parsed.data.status !== "resolved" && note) {
+    throw new InputError(`Change ${index + 1}: a resolution note is only stored when the conflict is resolved`, 400, "resolution_note");
+  }
+  cleanText(parsed.data.field);
+  cleanText(parsed.data.period);
+  cleanText(parsed.data.value_in_use);
+  cleanText(note);
+  for (const source of sources) {
+    cleanText(source.value);
+    cleanText(source.document);
+    cleanText(source.page);
+  }
+  return {
+    subject: parsed.data.subject,
+    field: parsed.data.field,
+    period: parsed.data.period?.trim() || "",
+    sources,
+    value_in_use: parsed.data.value_in_use,
+    status: parsed.data.status,
+    resolution_note: note,
+    at: zoned.iso,
+  };
 }
 
 function assertSpaceActor(actor: Actor, index: number): void {

@@ -17,9 +17,10 @@ import {
   type SiteField,
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
+import { storeConflict } from "@/lib/conflicts/record";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
-import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
+import type { ActivityPayload, Actor, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
 import { formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, validateBatch } from "./schema";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import type { EntityType, Market, ServiceAreaClass } from "./vocab";
@@ -109,8 +110,8 @@ async function tableIdFloor(sql: Sql, name: "activity" | "comms" | "pnl_period" 
   return max;
 }
 
-async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space"): Promise<number> {
-  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space") {
+async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict"): Promise<number> {
+  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space" || name === "data_conflict") {
     const result = await sql.query<{ value: number | string }>(
       `INSERT INTO id_counters (name, value)
        VALUES ($1, 1)
@@ -133,12 +134,13 @@ async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period
   return next;
 }
 
-export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space", value: number): string {
+export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict", value: number): string {
   if (kind === "activity") return `A-${String(value).padStart(6, "0")}`;
   if (kind === "comms") return `CM-${String(value).padStart(4, "0")}`;
   if (kind === "pnl_period") return `PP-${String(value).padStart(6, "0")}`;
   if (kind === "pnl_line") return `PL-${String(value).padStart(6, "0")}`;
   if (kind === "site_space") return `SS-${String(value).padStart(6, "0")}`;
+  if (kind === "data_conflict") return `CF-${String(value).padStart(6, "0")}`;
   return `EV-${String(value).padStart(8, "0")}`;
 }
 
@@ -165,7 +167,9 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
       ? "pnl_lines"
       : change.entity_type === "site_space"
         ? "site_spaces"
-        : "comms_entries";
+        : change.entity_type === "data_conflict"
+          ? "data_conflicts"
+          : "comms_entries";
   const column = change.entity_type === "site_space" ? "id" : "entity_id";
   const result = await sql.query<{ version: number | string }>(
     `SELECT version FROM ${table} WHERE ${column} = $1`,
@@ -655,7 +659,9 @@ async function applyOne(
       ? "pnl_line"
       : change.entity_type === "site_space"
         ? "site_space"
-        : "activity";
+        : change.entity_type === "data_conflict"
+          ? "data_conflict"
+          : "activity";
   const entityId = tag
     ? `${change.site_id}:${family}`
     : siteKeyed
@@ -701,6 +707,37 @@ async function applyOne(
     });
     if (!written.ok) throw conflict(change, written.entityId, written.actual);
     payload = written.payload;
+  } else if (change.entity_type === "data_conflict") {
+    const body = change.payload as ConflictPayload;
+    const written = await storeConflict(sql, entityId, {
+      siteId: change.site_id,
+      subject: body.subject,
+      field: body.field,
+      period: body.period,
+      sources: body.sources,
+      valueInUse: body.value_in_use,
+      status: body.status,
+      resolutionNote: body.resolution_note,
+      actor: actor.id,
+      at: body.at,
+    }, change.expected_version);
+    if ("conflict" in written) throw conflict(change, written.conflict.id, written.conflict.version);
+    const stored = written.record;
+    payload = {
+      subject: stored.subject,
+      field: stored.field,
+      period: stored.period,
+      sources: stored.sources,
+      value_in_use: stored.valueInUse,
+      status: stored.status,
+      resolution_note: stored.resolutionNote,
+      created_by: stored.createdBy,
+      updated_by: stored.updatedBy,
+      created_at: stored.createdAt,
+      updated_at: stored.updatedAt,
+      actor: actor.id,
+      at: body.at,
+    };
   } else if (change.entity_type === "site_space") {
     const space = change.payload as SiteSpacePayload;
     payload = await storeSiteSpace(sql, {

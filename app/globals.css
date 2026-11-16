@@ -2421,6 +2421,8 @@ tr { cursor: pointer; }
 }
 .pnl-mark.reported { background: var(--pine-700); }
 .pnl-mark.estimated, .pnl-dot { background: #a67c2d; }
+.pnl-mark.conflict { background: #8a3b2a; }
+td.is-conflict { box-shadow: inset 3px 0 0 #8a3b2a; }
 .pnl-missing, .pnl-blank { color: var(--ink-3); }
 .pnl-pop {
   position: fixed;
@@ -2433,6 +2435,7 @@ tr { cursor: pointer; }
   box-shadow: var(--shadow-2);
 }
 .pnl-pop p { margin: 4px 0; font-size: var(--type-body); }
+.pnl-year-pick { display: flex; align-items: center; gap: 8px; margin: 0 12px; }
 .pnl-phone-body { display: none; }
 .pnl-expand { margin: 0 12px 8px; color: var(--ink-2); font-size: var(--type-body); }
 .pnl-phone-body .list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 10px; gap: 8px; align-items: center; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; }

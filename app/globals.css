@@ -735,12 +735,12 @@ body:has(.command-search) .maplibregl-ctrl-bottom-right { display: none; }
 .tl-highlight { background: #e7f0ea; outline: 2px solid #1e4636; outline-offset: 2px; }
 @media (max-width: 767px) {
   .command-search {
-    top: auto;
+    top: 8px;
     bottom: var(--command-bottom, 0px);
     left: 0;
     right: 0;
     max-width: none;
-    max-height: var(--command-max, 50vh);
+    max-height: none;
     border-radius: 16px 16px 0 0;
   }
 }

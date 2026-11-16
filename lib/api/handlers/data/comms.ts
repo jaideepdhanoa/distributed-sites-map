@@ -14,6 +14,6 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const ids = [url.searchParams.get("id") || "", url.searchParams.get("related") || ""];
   console.info(JSON.stringify({ event: "data", user: session.u, part: "comms" }));
-  const snapshot = await overlayComms(loadCommsSnapshot());
+  const snapshot = await overlayComms(loadCommsSnapshot(), ids);
   return NextResponse.json(commsForViewer(session.actionRole, session.u, snapshot, ids), { headers: privateHeaders });
 }

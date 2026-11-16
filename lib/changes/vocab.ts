@@ -54,6 +54,7 @@ export const ACTIVITY_TYPES = [
   "doc",
   "visit",
   "stage",
+  "capture",
 ] as const;
 
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];

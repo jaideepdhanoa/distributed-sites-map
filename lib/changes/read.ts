@@ -1,5 +1,6 @@
 import { actionsEnabled, withSql } from "@/lib/actions/db";
-import type { CommsSnapshot, CommsRecord } from "@/lib/comms";
+import { commsSnapshotForIds, type CommsSnapshot, type CommsRecord } from "@/lib/comms";
+import { timelineForIds } from "@/lib/timeline/filter";
 import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
 import { readEntityFromDb } from "./flags";
@@ -191,18 +192,38 @@ export async function overlayDealStages<T extends DealFile>(file: T): Promise<T>
   }
 }
 
-type ActivityItem = { record_id: string; event_id: string; date: string; type: string; summary: string; source_link?: string };
+type ActivityItem = {
+  record_id: string;
+  event_id: string;
+  date: string;
+  type: string;
+  summary: string;
+  source_link?: string;
+  at_approximate?: boolean;
+};
 
 export function applyActivityItems(raw: unknown, items: ActivityItem[]): unknown {
   const root = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return { ...root, items };
 }
 
-export async function overlayTimeline(raw: unknown): Promise<unknown> {
-  if (!readEntityFromDb("activity") || !actionsEnabled()) return raw;
+function wantedIds(ids: string[] | undefined): string[] | null {
+  if (!ids) return null;
+  return [...new Set(ids.map((id) => id.trim().toUpperCase()).filter(Boolean))];
+}
+
+export async function overlayTimeline(raw: unknown, ids?: string[]): Promise<unknown> {
+  const base = ids?.length ? timelineForIds(raw, ids) : raw;
+  if (!readEntityFromDb("activity") || !actionsEnabled()) return base;
+  const wanted = wantedIds(ids);
   try {
     const rows = await withSql((sql) =>
-      sql.query<{ entity_id: string; site_id: string; payload: unknown }>(`SELECT entity_id, site_id, payload FROM activities`),
+      wanted
+        ? sql.query<{ entity_id: string; site_id: string; payload: unknown }>(
+            `SELECT entity_id, site_id, payload FROM activities WHERE upper(site_id) = ANY($1::text[])`,
+            [wanted],
+          )
+        : sql.query<{ entity_id: string; site_id: string; payload: unknown }>(`SELECT entity_id, site_id, payload FROM activities`),
     );
     const items: ActivityItem[] = rows.rows.map((row) => {
       const payload = asObject(row.payload);
@@ -215,12 +236,13 @@ export async function overlayTimeline(raw: unknown): Promise<unknown> {
       };
       const link = text(payload.source_link);
       if (link) item.source_link = link;
+      if (payload.at_approximate === true || payload.at_approximate === "1") item.at_approximate = true;
       return item;
     });
-    return applyActivityItems(raw, items);
+    return applyActivityItems(base, items);
   } catch {
     console.error(JSON.stringify({ event: "activity_read_fallback" }));
-    return raw;
+    return base;
   }
 }
 
@@ -238,11 +260,25 @@ export function applyCommsRows(snapshot: CommsSnapshot, rows: CommsRecord[]): Co
   return { ...snapshot, rows, sites };
 }
 
-export async function overlayComms(snapshot: CommsSnapshot): Promise<CommsSnapshot> {
-  if (!readEntityFromDb("comms") || !actionsEnabled()) return snapshot;
+export async function overlayComms(snapshot: CommsSnapshot, ids?: string[]): Promise<CommsSnapshot> {
+  const base = ids?.length ? commsSnapshotForIds(snapshot, ids) : snapshot;
+  if (!readEntityFromDb("comms") || !actionsEnabled()) return base;
+  const wanted = wantedIds(ids);
+  if (wanted && !wanted.length) return applyCommsRows(base, []);
   try {
     const result = await withSql((sql) =>
-      sql.query<{ entity_id: string; payload: unknown }>(`SELECT entity_id, payload FROM comms_entries`),
+      wanted
+        ? sql.query<{ entity_id: string; payload: unknown }>(
+            `SELECT entity_id, payload FROM comms_entries
+             WHERE upper(site_id) = ANY($1::text[])
+                OR EXISTS (
+                  SELECT 1
+                  FROM unnest(string_to_array(coalesce(payload->>'site_ids', ''), ';')) AS token
+                  WHERE upper(btrim(token)) = ANY($1::text[])
+                )`,
+            [wanted],
+          )
+        : sql.query<{ entity_id: string; payload: unknown }>(`SELECT entity_id, payload FROM comms_entries`),
     );
     const rows: CommsRecord[] = result.rows.map((row) => {
       const payload = asObject(row.payload);
@@ -267,9 +303,9 @@ export async function overlayComms(snapshot: CommsSnapshot): Promise<CommsSnapsh
         subject: text(payload.subject),
       };
     });
-    return applyCommsRows(snapshot, rows);
+    return applyCommsRows(base, rows);
   } catch {
     console.error(JSON.stringify({ event: "comms_read_fallback" }));
-    return snapshot;
+    return base;
   }
 }

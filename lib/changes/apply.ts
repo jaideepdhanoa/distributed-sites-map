@@ -16,10 +16,12 @@ import {
   type PhotoRef,
   type SiteField,
 } from "./site";
+import { isExcludedSite } from "@/lib/alerts/excluded";
 import { storePnlLine } from "@/lib/pnl/store";
 import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, StagePayload } from "./schema";
-import { validateBatch } from "./schema";
-import type { EntityType } from "./vocab";
+import { formatZonedTimestamp, parseZonedTimestamp, validateBatch } from "./schema";
+import { marketCode, serviceAreaCode } from "./stageLabel";
+import type { EntityType, Market, ServiceAreaClass } from "./vocab";
 
 export type { Actor } from "./schema";
 
@@ -38,6 +40,8 @@ export type ApplyResult = {
   idempotency_key: string;
   results: ChangeResult[];
 };
+
+export type ApplyOptions = { joinTransaction?: boolean };
 
 export type VersionConflict = {
   entity_type: EntityType;
@@ -252,13 +256,15 @@ async function writeActivity(
   const payload = change.payload as ActivityPayload;
   const previous = await sql.query<{ payload: unknown }>(`SELECT payload FROM activities WHERE entity_id = $1`, [entityId]);
   const prior = asObject(previous.rows[0]?.payload);
-  const stored = {
+  const approximate = payload.at_approximate === true || (payload.at_approximate == null && prior.at_approximate === true);
+  const stored: Record<string, unknown> = {
     date: payload.date,
     date_iso: payload.date_iso ?? textOf(prior.date_iso),
     type: payload.type,
     summary: payload.summary,
     source_link: payload.source_link ?? textOf(prior.source_link),
   };
+  if (approximate) stored.at_approximate = true;
   await sql.query(
     `INSERT INTO activities (entity_id, site_id, payload, version, updated_by)
      VALUES ($1, $2, $3::jsonb, $4, $5)
@@ -572,7 +578,8 @@ async function applyOne(
   let payload: Record<string, unknown>;
   if (change.entity_type === "stage") {
     const written = await applyStage(sql, change, actor.id, version, mode);
-    payload = { ...written.stored, previous_stage: written.previousStage };
+    const at = (change.payload as StagePayload).at;
+    payload = { ...written.stored, previous_stage: written.previousStage, ...(at ? { at } : {}) };
   } else if (change.entity_type === "site") {
     payload = await writeSite(sql, change, actor.id, version, mode);
   } else if (change.entity_type === "activity") {
@@ -605,6 +612,78 @@ async function applyOne(
   return { entity_type: change.entity_type, entity_id: entityId, site_id: change.site_id, event_id: eventId, version };
 }
 
+const SYSTEM_ACTOR: Actor = { id: "system", kind: "agent" };
+const INITIAL_STAGE = "1 Desk screen";
+const INITIAL_STAGE_SOURCE = "Initial stage for new capture";
+
+async function ensureCapture(
+  sql: Sql,
+  actor: Actor,
+  changes: ParsedChange[],
+  idempotencyKey: string,
+  runId: string,
+  mode: "api" | "workbook",
+): Promise<ChangeResult[]> {
+  if (mode !== "api") return [];
+  const extra: ChangeResult[] = [];
+  for (const change of changes) {
+    if (change.entity_type !== "site" || change.expected_version !== 0) continue;
+    if (isExcludedSite(change.site_id)) continue;
+    const staged = await sql.query<{ version: number | string }>(`SELECT version FROM site_stages WHERE site_id = $1`, [change.site_id]);
+    if (!staged.rows.length) {
+      const site = await sql.query<{ market: string; service_area_class: string }>(
+        `SELECT market, service_area_class FROM sites WHERE site_id = $1`,
+        [change.site_id],
+      );
+      const market = marketCode(site.rows[0]?.market || "", change.site_id);
+      if (!market) throw new InputError("That site has no market.");
+      const area = serviceAreaCode(site.rows[0]?.service_area_class || "");
+      const at = formatZonedTimestamp();
+      const payload: StagePayload = { stage: INITIAL_STAGE, market: market as Market, at };
+      if (area) payload.service_area_class = area as ServiceAreaClass;
+      extra.push(
+        await applyOne(
+          sql,
+          SYSTEM_ACTOR,
+          {
+            entity_type: "stage",
+            site_id: change.site_id,
+            expected_version: 0,
+            source: INITIAL_STAGE_SOURCE,
+            payload,
+          },
+          `${idempotencyKey}#initial-stage:${change.site_id}`,
+          runId,
+          "api",
+        ),
+      );
+    }
+    const hasActivity = changes.some((row) => row.entity_type === "activity" && row.site_id === change.site_id);
+    if (!hasActivity) {
+      const zoned = parseZonedTimestamp(formatZonedTimestamp());
+      if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
+      const payload: ActivityPayload = { date: zoned.date, date_iso: zoned.iso, type: "capture", summary: "Site added" };
+      extra.push(
+        await applyOne(
+          sql,
+          actor,
+          {
+            entity_type: "activity",
+            site_id: change.site_id,
+            expected_version: 0,
+            source: change.source,
+            payload,
+          },
+          `${idempotencyKey}#initial-activity:${change.site_id}`,
+          runId,
+          "api",
+        ),
+      );
+    }
+  }
+  return extra;
+}
+
 export async function applyParsedChanges(
   sql: Sql,
   actor: Actor,
@@ -612,9 +691,11 @@ export async function applyParsedChanges(
   changes: ParsedChange[],
   notes: string,
   mode: "api" | "workbook" = "api",
+  options?: ApplyOptions,
 ): Promise<ApplyResult> {
+  const join = options?.joinTransaction === true;
   const hash = requestHash(actor, changes);
-  await sql.exec("BEGIN");
+  await sql.exec(join ? "SAVEPOINT apply_batch" : "BEGIN");
   try {
     await lockKey(sql, `idem:${idempotencyKey}`);
     const existing = await sql.query<{ request_hash: string; response: unknown }>(
@@ -625,7 +706,7 @@ export async function applyParsedChanges(
     if (prior) {
       if (prior.request_hash !== hash) throw new IdempotencyConflictError();
       const stored = asObject(prior.response) as unknown as ApplyResult;
-      await sql.exec("ROLLBACK");
+      await sql.exec(join ? "RELEASE SAVEPOINT apply_batch" : "ROLLBACK");
       return { ...stored, replayed: true };
     }
     const runId = `run_${randomUUID().replaceAll("-", "")}`;
@@ -637,6 +718,7 @@ export async function applyParsedChanges(
     for (let index = 0; index < changes.length; index += 1) {
       results.push(await applyOne(sql, actor, changes[index], `${idempotencyKey}#${index}`, runId, mode));
     }
+    results.push(...(await ensureCapture(sql, actor, changes, idempotencyKey, runId, mode)));
     const counts: Record<string, number> = { changes: results.length };
     for (const result of results) counts[result.entity_type] = (counts[result.entity_type] || 0) + 1;
     await sql.query(
@@ -648,11 +730,11 @@ export async function applyParsedChanges(
       `INSERT INTO change_receipts (idempotency_key, request_hash, response, actor) VALUES ($1, $2, $3::jsonb, $4)`,
       [idempotencyKey, hash, JSON.stringify(response), actor.id],
     );
-    await sql.exec("COMMIT");
+    await sql.exec(join ? "RELEASE SAVEPOINT apply_batch" : "COMMIT");
     return response;
   } catch (error) {
     try {
-      await sql.exec("ROLLBACK");
+      await sql.exec(join ? "ROLLBACK TO SAVEPOINT apply_batch" : "ROLLBACK");
     } catch {
       // The connection already closed the transaction.
     }
@@ -660,9 +742,9 @@ export async function applyParsedChanges(
   }
 }
 
-export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string, body: unknown): Promise<ApplyResult> {
+export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string, body: unknown, options?: ApplyOptions): Promise<ApplyResult> {
   const { key, changes } = validateBatch(actor, idempotencyKey, body);
-  return applyParsedChanges(sql, actor, key, changes, "api", "api");
+  return applyParsedChanges(sql, actor, key, changes, "api", "api", options);
 }
 
 /** Highest numeric suffix already stored, so a later mint does not reuse a workbook id. */

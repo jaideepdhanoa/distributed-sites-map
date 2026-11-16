@@ -19,6 +19,7 @@ STATUS = {
     "doc": "Document on file",
     "visit": "Site visit logged",
     "stage": "Stage updated",
+    "capture": "Capture logged",
 }
 
 

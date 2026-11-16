@@ -12,6 +12,7 @@ import { allowsAssignee, allowsDate, bringBackActivitySummary, dropActivitySumma
 import { parseDocumentRequest } from "@/lib/financials";
 import { blockersBySuggestion, clearHoldBlocker, linkWaitingBlockers, parseHold, refreshProposalReadiness, stagesDiffer, type Blocker } from "./blockers";
 import { stageDecisionMatchesWorkbook } from "@/lib/stageOverlay";
+import { writeAcceptedStage } from "@/lib/changes/stageDecision";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
 import {
   csvCell,
@@ -351,6 +352,8 @@ export async function decideSuggestion(
   if ((input.status === "rejected" || input.status === "overtaken") && !open && !waiting && !ready) {
     throw new InputError("Only an open suggestion can be accepted or rejected.");
   }
+  await sql.exec("BEGIN");
+  try {
   if (input.status === "agreed_waiting") {
     const linked = await linkWaitingBlockers(sql, {
       suggestionId: row.id,
@@ -471,11 +474,33 @@ export async function decideSuggestion(
       }
     }
   }
+  if (input.status === "accepted") {
+    const stageSiteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
+    await writeAcceptedStage(sql, {
+      id: row.id,
+      field: row.field_name,
+      detail: row.detail,
+      proposedValue: row.proposed_value,
+      reason: row.reason,
+      siteId: stageSiteId,
+      actorId: input.actorId,
+    }, { joinTransaction: true });
+  }
   await refreshProposalReadiness(sql, lookup);
   const saved = await sql.query<SuggestionRow>(`SELECT ${SELECT} FROM suggestions WHERE id = $1`, [input.id]);
   const suggestion = present(saved.rows[0]);
   if (!suggestion) throw new InputError("That suggestion could not be updated.");
-  return (await decorate(sql, [suggestion], lookup))[0];
+  const decided = (await decorate(sql, [suggestion], lookup))[0];
+  await sql.exec("COMMIT");
+  return decided;
+  } catch (error) {
+    try {
+      await sql.exec("ROLLBACK");
+    } catch {
+      // The connection already closed the transaction.
+    }
+    throw error;
+  }
 }
 
 export async function clearSuggestionBlocker(

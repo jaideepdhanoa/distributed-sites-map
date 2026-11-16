@@ -1,6 +1,6 @@
 /** Captured dollar amounts. A missing fraction stays missing. Nothing is rounded onto the figure. */
 
-const AMOUNT = /^-?(?:0|[1-9]\d{0,11})(?:\.\d{2})?$/;
+const AMOUNT = /^-?(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/;
 
 export type CapturedAmount = { raw: string; cents: bigint };
 

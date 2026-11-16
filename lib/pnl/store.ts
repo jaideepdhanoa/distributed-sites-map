@@ -1,6 +1,6 @@
 import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
-import type { PnlLinePayload } from "@/lib/changes/schema";
+import type { PnlLinePayload, PnlRetractPayload } from "@/lib/changes/schema";
 import { isPnlLineCode, type PnlBusiness } from "./lines";
 import { parseAmount } from "./money";
 import { coverageOf } from "./period";
@@ -61,7 +61,7 @@ export async function storePnlLine(
   const missing = input.payload.missing === true || input.payload.status === "missing";
   const amount = missing ? null : parseAmount(input.payload.amount || "");
   if (!missing && !amount) {
-    throw new InputError("amount must be a string such as \"12345\" or \"12345.00\", with no commas, symbols, or words", 400, "amount");
+    throw new InputError("amount must be a string such as \"12345\", \"12345.6\", or \"12345.00\", with at most two decimal places and no commas or symbols", 400, "amount");
   }
   const coverage = coverageOf({
     grain: input.payload.grain,
@@ -69,6 +69,7 @@ export async function storePnlLine(
     month: input.payload.month,
     startMonth: input.payload.start_month,
     throughMonth: input.payload.through_month,
+    periodEnd: input.payload.period_end,
   });
   let period = await findPeriod(sql, input.siteId, input.payload, coverage.periodStart, coverage.periodEnd);
   if (period && !sameBusiness(period, input.payload)) {
@@ -113,23 +114,23 @@ export async function storePnlLine(
 
   if (missing) {
     const filled = await sql.query<{ entity_id: string }>(
-      `SELECT entity_id FROM pnl_lines WHERE period_id = $1 AND status <> 'missing' LIMIT 1`,
+      `SELECT entity_id FROM pnl_lines WHERE period_id = $1 AND status <> 'missing' AND deleted_at IS NULL LIMIT 1`,
       [period.entity_id],
     );
     if (filled.rows[0]) throw new InputError("That month already has a captured line.", 400, "missing");
   } else if (period.missing) {
-    await sql.query(`DELETE FROM pnl_lines WHERE period_id = $1 AND status = 'missing'`, [period.entity_id]);
+    await sql.query(`DELETE FROM pnl_lines WHERE period_id = $1 AND status = 'missing' AND deleted_at IS NULL`, [period.entity_id]);
     await sql.query(`UPDATE pnl_periods SET missing = false, updated_at = clock_timestamp(), updated_by = $2 WHERE entity_id = $1`, [period.entity_id, input.actorId]);
   }
 
   const status = missing ? "missing" : input.payload.status;
   const duplicate = missing
     ? await sql.query<{ entity_id: string; version: number | string; line_code: string | null }>(
-      `SELECT entity_id, version, line_code FROM pnl_lines WHERE period_id = $1 AND status = 'missing'`,
+      `SELECT entity_id, version, line_code FROM pnl_lines WHERE period_id = $1 AND status = 'missing' AND deleted_at IS NULL`,
       [period.entity_id],
     )
     : await sql.query<{ entity_id: string; version: number | string; line_code: string | null }>(
-      `SELECT entity_id, version, line_code FROM pnl_lines WHERE period_id = $1 AND line_code = $2 AND status = $3`,
+      `SELECT entity_id, version, line_code FROM pnl_lines WHERE period_id = $1 AND line_code = $2 AND status = $3 AND deleted_at IS NULL`,
       [period.entity_id, input.payload.line, status],
     );
   const prior = duplicate.rows[0];
@@ -137,11 +138,12 @@ export async function storePnlLine(
     return { ok: false, entityId: prior.entity_id, actual: Number(prior.version) };
   }
   if (input.expectedVersion > 0) {
-    const current = await sql.query<{ line_code: string | null; period_id: string; status: string }>(
-      `SELECT line_code, period_id, status FROM pnl_lines WHERE entity_id = $1`,
+    const current = await sql.query<{ line_code: string | null; period_id: string; status: string; deleted_at: string | null }>(
+      `SELECT line_code, period_id, status, deleted_at FROM pnl_lines WHERE entity_id = $1`,
       [input.entityId],
     );
     const row = current.rows[0];
+    if (row?.deleted_at) throw new InputError("That line is retracted.", 400, "entity_id");
     const sameLine = missing
       ? row?.status === "missing"
       : row?.line_code === input.payload.line && row?.status === status;
@@ -206,4 +208,49 @@ export async function storePnlLine(
   );
   if (!missing && !isPnlLineCode(text(stored.line))) throw new InputError("line must be one of the chart of accounts", 400, "line");
   return { ok: true, payload: stored };
+}
+
+export async function retractPnlLine(
+  sql: Sql,
+  input: {
+    siteId: string;
+    entityId: string;
+    actorId: string;
+    version: number;
+    payload: PnlRetractPayload;
+  },
+): Promise<StoreOutcome> {
+  const current = await sql.query<{
+    site_id: string;
+    version: number | string;
+    deleted_at: string | null;
+    line_code: string | null;
+    status: string;
+    period_id: string;
+  }>(
+    `SELECT site_id, version, deleted_at, line_code, status, period_id FROM pnl_lines WHERE entity_id = $1`,
+    [input.entityId],
+  );
+  const row = current.rows[0];
+  if (!row || row.site_id !== input.siteId) throw new InputError("That line is not on this site.", 404, "entity_id");
+  if (row.deleted_at) throw new InputError("That line is already retracted.", 400, "retract");
+  await sql.query(
+    `UPDATE pnl_lines
+     SET deleted_at = $5::timestamptz, deleted_at_iso = $6, deleted_by = $2, delete_reason = $3, version = $4,
+         updated_at = clock_timestamp(), updated_by = $2
+     WHERE entity_id = $1 AND deleted_at IS NULL`,
+    [input.entityId, input.actorId, input.payload.reason, input.version, input.payload.at, input.payload.at],
+  );
+  return {
+    ok: true,
+    payload: {
+      retract: true,
+      reason: input.payload.reason,
+      actor: input.actorId,
+      at: input.payload.at,
+      line: row.line_code,
+      status: row.status,
+      period_id: row.period_id,
+    },
+  };
 }

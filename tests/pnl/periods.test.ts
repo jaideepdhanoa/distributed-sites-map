@@ -61,3 +61,17 @@ test("the year columns use the fiscal label, and only an explicit gap is Missing
   assert.equal(monthColumnState(calendar, 1), "missing");
   assert.equal(monthColumnState(calendar, 2), "blank");
 });
+
+test("a mid-month partial is labeled with the exact days", () => {
+  const statement = buildStatement([
+    annual({
+      id: "PL-9",
+      periodId: "PP-9",
+      year: 2026,
+      periodStart: "2026-01-01",
+      periodEnd: "2026-06-14",
+      amount: money("400000"),
+    }),
+  ]);
+  assert.equal(yearColumns(statement.years)[0]?.label, "Jan 1 - Jun 14 2026");
+});

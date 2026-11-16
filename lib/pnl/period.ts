@@ -27,6 +27,8 @@ export function coverageOf(input: {
   month?: number | null;
   startMonth?: number | null;
   throughMonth?: number | null;
+  /** Exact inclusive end for an annual partial. period_start still comes from year and start month. */
+  periodEnd?: string | null;
 }): PeriodCoverage {
   if (input.grain === "monthly") {
     const month = input.month ?? 1;
@@ -40,6 +42,9 @@ export function coverageOf(input: {
   const start = input.startMonth ?? 1;
   const periodStart = `${input.year}-${pad(start)}-01`;
   const storedStart = start === 1 ? null : start;
+  if (input.periodEnd) {
+    return { periodStart, periodEnd: input.periodEnd, startMonth: storedStart, throughMonth: null };
+  }
   if (input.throughMonth == null) {
     if (start === 1) {
       return { periodStart, periodEnd: `${input.year}-12-31`, startMonth: null, throughMonth: null };
@@ -92,6 +97,17 @@ export function periodLabels(input: {
   const start = input.startMonth ?? (Number(input.periodStart.slice(5, 7)) || 1);
   const endYear = Number(input.periodEnd.slice(0, 4));
   const endMonth = Number(input.periodEnd.slice(5, 7));
+  const endDay = Number(input.periodEnd.slice(8, 10));
+  const startDay = Number(input.periodStart.slice(8, 10));
+  const monthEnds = Number(lastDay(endYear, endMonth).slice(8, 10));
+  if (endDay !== monthEnds || startDay !== 1) {
+    const startText = `${MONTH_SHORT[start - 1]} ${startDay}`;
+    const endText = `${MONTH_SHORT[endMonth - 1]} ${endDay}`;
+    const columnLabel = input.periodStart.slice(0, 4) === input.periodEnd.slice(0, 4)
+      ? `${startText} - ${endText} ${endYear}`
+      : `${startText} ${input.year} - ${endText} ${endYear}`;
+    return { label: columnLabel, columnLabel, title: columnLabel };
+  }
   const months = spanMonths(input.periodStart, input.periodEnd);
   if (start === 1 && endMonth === 12 && endYear === input.year) {
     const label = String(input.year);

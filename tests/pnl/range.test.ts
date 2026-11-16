@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { EXCLUDED_SITE_ID } from "../../lib/alerts/excluded.ts";
 import { flagLine } from "../../lib/pnl/benchmarks.ts";
 import { sampleStatement } from "../../lib/pnl/fixture.ts";
-import { parseAmount, percentOf } from "../../lib/pnl/money.ts";
+import { formatAmount, parseAmount, percentOf } from "../../lib/pnl/money.ts";
 import { buildStatement, type CapturedLine } from "../../lib/pnl/statement.ts";
 
 function line(partial: Partial<CapturedLine> & Pick<CapturedLine, "code" | "amount">): CapturedLine {
@@ -36,7 +36,12 @@ test("a captured amount keeps its fraction and rejects a rounded shorthand", () 
   assert.equal(parseAmount("1000000")?.raw, "1000000");
   assert.equal(parseAmount("1000000.50")?.cents, 100000050n);
   assert.equal(parseAmount("1.2 million"), null);
-  assert.equal(parseAmount("1000000.5"), null);
+  assert.equal(parseAmount("1000000.5")?.raw, "1000000.5");
+  assert.equal(parseAmount("1000000.5")?.cents, 100000050n);
+  assert.equal(parseAmount("1000000.50")?.raw, "1000000.50");
+  assert.equal(formatAmount("12345.6"), "$12,345.6");
+  assert.equal(formatAmount("12345.60"), "$12,345.60");
+  assert.equal(parseAmount("1000000.567"), null);
   assert.equal(parseAmount("010"), null);
   assert.equal(percentOf(50000000n, 100000000n), "50.0%");
   assert.equal(percentOf(1250000n, 10000000n), "12.5%");

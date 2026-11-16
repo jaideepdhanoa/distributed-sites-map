@@ -1,11 +1,14 @@
 -- R-102. Additive period identity and line basis.
 -- Existing rows stay valid: stated is still stored as reported, a calendar
 -- year still starts on January 1, and a partial year still uses through_month.
--- Nothing here is written back to the workbook.
+-- This file does not change the events entity check, so it can run before or
+-- after 017_site_spaces.sql. Nothing here is written back to the workbook.
 
 ALTER TABLE pnl_periods
-  ADD COLUMN start_month integer,
-  ADD COLUMN missing boolean NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS start_month integer;
+
+ALTER TABLE pnl_periods
+  ADD COLUMN IF NOT EXISTS missing boolean NOT NULL DEFAULT false;
 
 ALTER TABLE pnl_periods
   ADD CONSTRAINT pnl_periods_start_month_check

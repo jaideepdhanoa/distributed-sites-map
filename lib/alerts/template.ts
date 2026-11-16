@@ -1,4 +1,5 @@
 import { findPolicyHits, safeSnapshot } from "@/lib/policy/banned";
+import { EXCLUDED_SITE_ID, isExcludedSite } from "./excluded";
 import { mailLink, reviewHomeHref, settingsHref } from "./links";
 import { authorName, categoryLabel, publicSnippet, screenEmail, type MailItem } from "./compose";
 
@@ -33,8 +34,32 @@ function clean(value: string, max = 180): string {
 }
 
 function siteName(item: MailItem): string {
-  const label = clean(item.siteLabel || item.siteId, 120) || clean(item.siteId, 80) || "Site";
+  const label = clean(item.siteLabel || item.siteId, 120) || clean(item.siteId, 80);
+  if (!label || isExcludedSite(label)) return "";
   return label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label;
+}
+
+/** A count or portfolio line has no site. It is not a place on the map. */
+function summaryRow(item: MailItem): boolean {
+  return !item.siteId.trim();
+}
+
+function quarantined(item: MailItem): boolean {
+  const blob = `${item.siteId} ${item.siteLabel} ${item.href} ${item.summary}`.toUpperCase();
+  return blob.includes(EXCLUDED_SITE_ID);
+}
+
+function siteIdLine(item: MailItem, name: string): string {
+  const id = clean(item.siteId, 80);
+  if (!id || id === name || id.toLowerCase() === "portfolio" || isExcludedSite(id)) return "";
+  return id;
+}
+
+function whoLabel(authorId: string, recipientId?: string): string {
+  const id = authorId.trim();
+  if (!id) return "";
+  if (recipientId && id.toLowerCase() === recipientId.trim().toLowerCase()) return "";
+  return authorName(id);
 }
 
 function marketCode(item: MailItem): string {
@@ -45,16 +70,16 @@ function stageName(item: MailItem): string {
   return clean(item.stage || "", 40);
 }
 
-export function instantSubject(item: MailItem): string {
-  const name = siteName(item);
-  const who = authorName(item.authorId);
+export function instantSubject(item: MailItem, recipientId?: string): string {
+  const name = siteName(item) || "Review";
+  const who = whoLabel(item.authorId, recipientId);
   const market = marketCode(item);
   if (item.category === "approvals") return market ? `Approval needed: ${name} (${market})` : `Approval needed: ${name}`;
-  if (item.category === "mentions") return `${who} mentioned you on ${name}`;
-  if (item.category === "replies") return `${who} replied on ${name}`;
-  if (item.category === "flags") return `${who} flagged ${name} for you`;
-  if (item.category === "assignments") return `${who} assigned ${name} to you`;
-  if (item.category === "recommendations") return `${who} left a recommendation on ${name}`;
+  if (item.category === "mentions") return who ? `${who} mentioned you on ${name}` : `Mention on ${name}`;
+  if (item.category === "replies") return who ? `${who} replied on ${name}` : `Reply on ${name}`;
+  if (item.category === "flags") return who ? `${who} flagged ${name} for you` : `Flag on ${name}`;
+  if (item.category === "assignments") return who ? `${who} assigned ${name} to you` : `Assignment on ${name}`;
+  if (item.category === "recommendations") return who ? `${who} left a recommendation on ${name}` : `Recommendation on ${name}`;
   if (item.category === "proposals") return market ? `Proposal waiting: ${name} (${market})` : `Proposal waiting: ${name}`;
   if (item.category === "decisions") return market ? `Decision needed: ${name} (${market})` : `Decision needed: ${name}`;
   if (item.category === "stages") return market ? `Stage change: ${name} (${market})` : `Stage change: ${name}`;
@@ -88,8 +113,9 @@ export function catchUpSubject(count: number): string {
   return `Distributed Sites catch-up · ${count} ${noun}`;
 }
 
-function actionLine(item: MailItem): string {
-  const who = authorName(item.authorId);
+function actionLine(item: MailItem, recipientId?: string): string {
+  const who = whoLabel(item.authorId, recipientId);
+  if (!who || summaryRow(item)) return "";
   if (item.category === "approvals") return `${who} asked you to approve a next step.`;
   if (item.category === "mentions") return `${who} mentioned you.`;
   if (item.category === "replies") return `${who} replied.`;
@@ -99,7 +125,7 @@ function actionLine(item: MailItem): string {
   if (item.category === "proposals") return `${who} sent a proposal.`;
   if (item.category === "decisions") return `${who} asked for a decision.`;
   if (item.category === "stages") return `${who} changed the stage.`;
-  if (item.category === "activity" || item.category === "comms" || item.category === "brief" || item.category === "queue") return "";
+  if (item.category === "activity" || item.category === "comms" || item.category === "brief" || item.category === "queue" || item.category === "asks") return "";
   return `${who} added a note.`;
 }
 
@@ -119,6 +145,7 @@ function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchu
 }
 
 function buttonLabel(item: MailItem): string {
+  if (!item.siteId.trim()) return "Review";
   if (item.siteId === "portfolio") return "Open the map";
   if (item.category === "approvals" || item.category === "assignments" || item.category === "proposals") return "Open the proposal";
   if (item.category === "decisions" && item.href && !/[?&]panel=proposal(?:&|$)/.test(item.href)) return "Open the site";
@@ -180,29 +207,37 @@ ${textLink("Manage alert settings", settingsHref)}
 </td></tr>`;
 }
 
-function summaryBlock(item: MailItem): { html: string; text: string[] } {
-  const name = siteName(item);
-  const id = clean(item.siteId, 80);
+function summaryBlock(item: MailItem, recipientId?: string): { html: string; text: string[] } {
+  if (quarantined(item)) return { html: "", text: [] };
+  const quote = clean(item.summary, 180);
+  if (summaryRow(item)) {
+    const lines = quote ? [quote] : [];
+    const html = quote
+      ? `<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.45;color:#1c1914;">${esc(quote)}</td></tr>`
+      : "";
+    return { html, text: lines };
+  }
+  const name = siteName(item) || "Review";
+  const id = siteIdLine(item, name);
   const market = marketCode(item);
   const stage = stageName(item);
   const meta = [market, stage].filter(Boolean).join(" · ");
-  const who = clean(actionLine(item), 160);
-  const quote = clean(item.summary, 180);
+  const who = clean(actionLine(item, recipientId), 160);
   const lines = [name];
-  if (id && id !== name) lines.push(id);
+  if (id) lines.push(id);
   if (meta) lines.push(meta);
   if (who) lines.push(who);
   if (quote) lines.push(`“${quote}”`);
   const html = `<tr><td style="padding:8px 28px 0;font-family:${SERIF};font-size:28px;line-height:1.15;color:#1c1914;">${esc(name)}</td></tr>
-${id && id !== name ? `<tr><td style="padding:4px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(id)}</td></tr>` : ""}
+${id ? `<tr><td style="padding:4px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(id)}</td></tr>` : ""}
 ${meta ? `<tr><td style="padding:4px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(meta)}</td></tr>` : ""}
 ${who ? `<tr><td style="padding:12px 28px 0;font-family:${SANS};font-size:16px;line-height:1.45;color:#1c1914;">${esc(who)}</td></tr>` : ""}
 ${quote ? `<tr><td style="padding:12px 28px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-left:3px solid #d6cebe;padding:4px 0 4px 12px;font-family:${SANS};font-size:16px;line-height:1.45;color:#1c1914;">“${esc(quote)}”</td></tr></table></td></tr>` : ""}`;
   return { html, text: lines };
 }
 
-function renderInstant(item: MailItem, settingsHref: string): { subject: string; text: string; rows: string } {
-  const block = summaryBlock(item);
+function renderInstant(item: MailItem, settingsHref: string, recipientId?: string): { subject: string; text: string; rows: string } {
+  const block = summaryBlock(item, recipientId);
   const label = buttonLabel(item);
   const href = mailLink(item);
   const text = [
@@ -223,7 +258,43 @@ function renderInstant(item: MailItem, settingsHref: string): { subject: string;
     `<tr><td style="padding:20px 28px 8px;">${button(label, href)}</td></tr>`,
     footer(whyLine(item.category), settingsHref),
   ].join("\n");
-  return { subject: instantSubject(item), text, rows };
+  return { subject: instantSubject(item, recipientId), text, rows };
+}
+
+function summaryLine(item: MailItem): { text: string; html: string } | null {
+  const quote = clean(item.summary, 180);
+  if (!quote) return null;
+  return {
+    text: quote,
+    html: `<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.45;color:#1c1914;">${esc(quote)}</td></tr>`,
+  };
+}
+
+function appendSummary(item: MailItem, textLines: string[], html: string[]): void {
+  if (quarantined(item)) return;
+  const line = summaryLine(item);
+  if (!line) return;
+  textLines.push(line.text);
+  html.push(line.html);
+}
+
+function appendSite(item: MailItem, textLines: string[], html: string[], recipientId?: string): void {
+  if (quarantined(item)) return;
+  const name = siteName(item);
+  if (!name) return;
+  const href = mailLink(item);
+  const id = siteIdLine(item, name);
+  const meta = [marketCode(item), stageName(item), clean(actionLine(item, recipientId), 120)].filter(Boolean).join(" · ");
+  const quote = clean(item.summary, 140);
+  textLines.push(name);
+  if (id) textLines.push(id);
+  textLines.push(href);
+  if (meta) textLines.push(meta);
+  if (quote) textLines.push(`“${quote}”`);
+  html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.4;color:#1c1914;">${textLink(name, href)}</td></tr>`);
+  if (id) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(id)}</td></tr>`);
+  if (meta) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(meta)}</td></tr>`);
+  if (quote) html.push(`<tr><td style="padding:2px 28px 8px;font-family:${SANS};font-size:14px;line-height:1.4;color:#1c1914;">“${esc(quote)}”</td></tr>`);
 }
 
 type BatchTone = "digest" | "updates" | "catchup";
@@ -241,26 +312,38 @@ function batchSubject(items: MailItem[], now: Date, tone: BatchTone): string {
   return digestSubject(items, now);
 }
 
-function renderGrouped(items: MailItem[], settingsHref: string): { subject: string; text: string; rows: string } {
+function renderGrouped(items: MailItem[], settingsHref: string, recipientId?: string): { subject: string; text: string; rows: string } {
   const home = reviewHomeHref();
   const content = items.filter((item) => item.category !== "queue" && item.category !== "brief");
   const textLines = ["Distributed Sites", "", "Updates"];
   const html: string[] = [eyebrow("Updates")];
   const groups = new Map<string, MailItem[]>();
   for (const item of content) {
-    const key = item.siteId || item.siteLabel || "portfolio";
+    const key = item.siteId.trim() || "portfolio";
     const list = groups.get(key) || [];
     list.push(item);
     groups.set(key, list);
   }
-  for (const group of groups.values()) {
-    const name = siteName(group[0]);
-    const href = mailLink(group[0]);
-    textLines.push("", name, href);
+  for (const [key, group] of groups) {
+    if (key === "portfolio") {
+      textLines.push("");
+      for (const item of group) appendSummary(item, textLines, html);
+      continue;
+    }
+    const head = group.find((item) => !quarantined(item));
+    if (!head) continue;
+    const name = siteName(head);
+    if (!name) continue;
+    const href = mailLink(head);
+    const id = siteIdLine(head, name);
+    textLines.push("", name);
+    if (id) textLines.push(id);
+    textLines.push(href);
     html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.4;color:#1c1914;">${textLink(name, href)}</td></tr>`);
+    if (id) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(id)}</td></tr>`);
     for (const item of group) {
       const quote = clean(item.summary, 140);
-      const meta = [categoryLabel(item.category), clean(actionLine(item), 120)].filter(Boolean).join(" · ");
+      const meta = [categoryLabel(item.category), clean(actionLine(item, recipientId), 120)].filter(Boolean).join(" · ");
       if (meta) textLines.push(meta);
       if (quote) textLines.push(`“${quote}”`);
       if (meta) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(meta)}</td></tr>`);
@@ -273,8 +356,8 @@ function renderGrouped(items: MailItem[], settingsHref: string): { subject: stri
   return { subject: updatesSubject(content.length), text: textLines.join("\n"), rows: html.join("\n") };
 }
 
-function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: BatchTone = "digest"): { subject: string; text: string; rows: string } {
-  if (tone === "updates") return renderGrouped(items, settingsHref);
+function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: BatchTone = "digest", recipientId?: string): { subject: string; text: string; rows: string } {
+  if (tone === "updates") return renderGrouped(items, settingsHref, recipientId);
   const home = reviewHomeHref();
   const heading = batchHeading(tone);
   const textLines = ["Distributed Sites", "", heading];
@@ -285,23 +368,12 @@ function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: 
     html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.45;color:#1c1914;">${esc(line)}</td></tr>`);
   }
   for (const section of SECTIONS) {
-    const rows = items.filter((item) => section.categories.includes(item.category));
+    const rows = items.filter((item) => section.categories.includes(item.category) && !quarantined(item));
     if (!rows.length) continue;
     textLines.push("", `${section.title} (${rows.length})`);
     html.push(eyebrow(`${section.title} · ${rows.length}`));
-    for (const item of rows) {
-      const name = siteName(item);
-      const href = mailLink(item);
-      const meta = [marketCode(item), stageName(item), clean(actionLine(item), 120)].filter(Boolean).join(" · ");
-      const quote = clean(item.summary, 140);
-      textLines.push(name);
-      textLines.push(href);
-      if (meta) textLines.push(meta);
-      if (quote) textLines.push(`“${quote}”`);
-      html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.4;color:#1c1914;">${textLink(name, href)}</td></tr>`);
-      if (meta) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(meta)}</td></tr>`);
-      if (quote) html.push(`<tr><td style="padding:2px 28px 8px;font-family:${SANS};font-size:14px;line-height:1.4;color:#1c1914;">“${esc(quote)}”</td></tr>`);
-    }
+    for (const item of rows.filter(summaryRow)) appendSummary(item, textLines, html);
+    for (const item of rows.filter((row) => !summaryRow(row))) appendSite(item, textLines, html, recipientId);
   }
   textLines.push("", "Open Review", home, "", "Manage alert settings", whyLine(tone));
   html.push(`<tr><td style="padding:20px 28px 8px;">${button("Open Review", home)}</td></tr>`);
@@ -311,15 +383,16 @@ function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: 
 
 export type AlertKind = "instant" | "digest" | "updates" | "catchup";
 
-export function renderAlert(items: MailItem[], options?: { now?: Date; kind?: AlertKind; settingsHref?: string }): RenderedMail | null {
+export function renderAlert(items: MailItem[], options?: { now?: Date; kind?: AlertKind; settingsHref?: string; recipientId?: string }): RenderedMail | null {
   const content = items.filter((item) => item.category !== "queue" && item.category !== "brief");
   const framed = items.some((item) => item.category === "queue" || item.category === "brief");
   if (!content.length && !framed) return null;
   const now = options?.now || new Date();
   const settings = options?.settingsHref || settingsHref();
+  const recipientId = options?.recipientId;
   const tone: BatchTone = options?.kind === "digest" || options?.kind === "updates" || options?.kind === "catchup" ? options.kind : "updates";
   const oneInstant = options?.kind !== "digest" && options?.kind !== "updates" && options?.kind !== "catchup" && content.length === 1 && !framed;
-  const rendered = oneInstant ? renderInstant(content[0], settings) : renderDigest(items, now, settings, tone);
+  const rendered = oneInstant ? renderInstant(content[0], settings, recipientId) : renderDigest(items, now, settings, tone, recipientId);
   const screened = screenEmail(rendered.subject, rendered.text);
   if (!screened) return null;
   return { subject: screened.subject, body: screened.body, html: shell(rendered.rows) };

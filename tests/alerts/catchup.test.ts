@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
-import { printCatchUp, runCatchUp } from "../../lib/alerts/catchup";
-import { CATCHUP_KEY, CATCHUP_SUBJECT } from "../../lib/alerts/summary";
+import { catchUpPreviewAllowed, previewCatchUp, printCatchUp, runCatchUp } from "../../lib/alerts/catchup";
+import { proposalHref } from "../../lib/alerts/links";
+import { loadCatchUp, CATCHUP_KEY, CATCHUP_SUBJECT } from "../../lib/alerts/summary";
 import type { Sql } from "../../lib/actions/db";
 import { memorySql } from "../helpers/sql";
 
@@ -64,12 +65,13 @@ test("dry run prints counts and no message content", async () => {
   await seed(sql);
   const result = await runCatchUp(sql, { dryRun: true, now: new Date("2026-11-15T16:00:00.000Z") });
   assert.equal(result.status, "dry_run");
-  assert.equal(result.counts.recommendations, 1);
+  assert.equal(result.counts.recommendations, 2);
   assert.equal(result.counts.decisions, 1);
   assert.equal(result.counts.stages, 1);
   assert.equal(result.counts.activity, 0);
   assert.equal(result.counts.comms, 1);
   assert.equal(result.counts.sites, 0);
+  assert.equal(result.counts.proposals, 0);
   assert.equal(result.counts.asks, 0);
   const lines: string[] = [];
   const original = console.log;
@@ -82,7 +84,8 @@ test("dry run prints counts and no message content", async () => {
     console.log = original;
   }
   const printed = lines.join("\n");
-  assert.match(printed, /recommendations: 1/);
+  assert.match(printed, /recommendations: 2/);
+  assert.match(printed, /proposals: 0/);
   assert.match(printed, /decisions: 1/);
   assert.match(printed, /stages: 1/);
   assert.match(printed, /activity: 0/);
@@ -136,6 +139,9 @@ test("the catch-up sends once to the one mailbox and leaves out PIPE-PHX-0006", 
     assert.equal(text.includes(PRICE), false);
     assert.equal(text.includes("999,999"), false);
     assert.equal(text.includes("PIPE-PHX-0008"), true);
+    assert.match(text, /2 agent draft replies are waiting for you/);
+    assert.equal(text.split("\n").includes("Site"), false);
+    assert.equal(text.toLowerCase().includes("jaideep"), false);
     assert.equal(text.includes("vercel.app"), false);
     assert.equal(text.includes("preview."), false);
     const logs = await sql.query<{ idempotency_key: string; to_email: string; status: string; subject: string }>(
@@ -157,4 +163,93 @@ test("the catch-up sends once to the one mailbox and leaves out PIPE-PHX-0006", 
     if (previous.url == null) delete process.env.APP_URL;
     else process.env.APP_URL = previous.url;
   }
+});
+
+test("catch-up keeps unresolved items from before Nov 9 and lists each open proposal", async () => {
+  const previous = process.env.AUTH_USERS;
+  process.env.AUTH_USERS = JSON.stringify([
+    { u: "cindel", h: "$2b$04$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuuabcdefghijk", role: "user", name: "Cindel" },
+    { u: "jaideep", h: "$2b$04$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuuabcdefghijk", role: "admin", name: "Jaideep" },
+  ]);
+  const sql = await ready();
+  try {
+    await sql.query(
+      `INSERT INTO suggestions (id, target_kind, target_id, field_name, title, proposed_value, reason, status, author_id, created_at)
+       VALUES
+         ('sug-nov8', 'site', 'PIPE-PHX-0100', 'stage', 'Sample proposal headline.', 'Desk screen', 'Fixture reason.', 'open', 'cindel', '2026-11-08T18:00:00.000Z'),
+         ('sug-ready', 'site', 'PIPE-LAS-0103', 'stage', 'Later proposal headline.', 'Desk screen', 'Fixture reason.', 'ready', 'cindel', '2026-11-10T18:00:00.000Z'),
+         ('sug-decided', 'site', 'PIPE-PHX-0101', 'stage', 'Decided proposal headline.', 'Desk screen', 'Fixture reason.', 'accepted', 'cindel', '2026-11-08T18:00:00.000Z'),
+         ('sug-self', 'site', 'PIPE-PHX-0102', 'stage', 'Own proposal headline.', 'Desk screen', 'Fixture reason.', 'open', 'jaideep', '2026-11-08T18:00:00.000Z'),
+         ('sug-hidden', 'site', 'PIPE-PHX-0006', 'stage', 'Hidden proposal headline.', 'Desk screen', 'Fixture reason.', 'open', 'cindel', '2026-11-08T18:00:00.000Z')`,
+    );
+    await sql.query(
+      `INSERT INTO agent_inbox (id, kind, ref_id, site_id, actor, body, thread_key, idempotency_key, status, created_at)
+       VALUES
+         ('gap-old', 'ask_gap', 'gap-old', 'PIPE-PHX-0100', 'cindel', 'Old open question.', 'ask:old', 'ask:old', 'new', '2026-11-01T00:00:00.000Z'),
+         ('gap-done', 'ask_gap', 'gap-done', 'PIPE-PHX-0100', 'cindel', 'Closed question.', 'ask:done', 'ask:done', 'done', '2026-11-01T00:00:00.000Z'),
+         ('gap-hidden', 'ask_gap', 'gap-hidden', 'PIPE-PHX-0006', 'cindel', 'Hidden question.', 'ask:hidden', 'ask:hidden', 'new', '2026-11-12T00:00:00.000Z')`,
+    );
+    await sql.query(
+      `INSERT INTO events (id, entity_type, entity_id, site_id, payload, source, actor, idempotency_key, created_at)
+       VALUES
+         ('EV-nov8', 'stage', 'PIPE-PHX-0104', 'PIPE-PHX-0104', '{"stage":"2 Financial screen","previous_stage":"1 Desk screen"}'::jsonb, 'agent', 'cindel', 'ev-nov8', '2026-11-08T12:00:00.000Z'),
+         ('EV-nov7', 'stage', 'PIPE-PHX-0105', 'PIPE-PHX-0105', '{"stage":"2 Financial screen","previous_stage":"1 Desk screen"}'::jsonb, 'agent', 'cindel', 'ev-nov7', '2026-11-07T12:00:00.000Z'),
+         ('EV-book', 'stage', 'PIPE-PHX-0104', 'PIPE-PHX-0104', '{"stage":"3 Site checks","previous_stage":"1 Desk screen"}'::jsonb, 'workbook import', 'workbook-sync', 'ev-book', '2026-11-08T13:00:00.000Z'),
+         ('EV-first', 'stage', 'PIPE-PHX-0106', 'PIPE-PHX-0106', '{"stage":"1 Desk screen","previous_stage":null}'::jsonb, 'agent', 'jaideep', 'ev-first', '2026-11-08T14:00:00.000Z'),
+         ('EV-same', 'stage', 'PIPE-PHX-0107', 'PIPE-PHX-0107', '{"stage":"2 Financial screen","previous_stage":"2 Financial screen"}'::jsonb, 'agent', 'jaideep', 'ev-same', '2026-11-08T15:00:00.000Z')`,
+    );
+    const loaded = await loadCatchUp(sql);
+    assert.equal(loaded.counts.proposals, 2);
+    assert.equal(loaded.counts.asks, 1);
+    assert.equal(loaded.counts.stages, 1);
+    const proposals = loaded.items.filter((item) => item.category === "proposals" && item.siteId);
+    assert.deepEqual(proposals.map((item) => item.siteId), ["PIPE-PHX-0100", "PIPE-LAS-0103"]);
+    assert.equal(proposals[0]?.authorId, "cindel");
+    assert.equal(proposals[0]?.summary, "Sample proposal headline.");
+    assert.equal(proposals[0]?.href, proposalHref("PIPE-PHX-0100"));
+    assert.equal(proposals.every((item) => item.siteId !== "PIPE-PHX-0006"), true);
+    assert.equal(loaded.items.some((item) => item.summary.includes("Decided proposal") || item.summary.includes("Own proposal") || item.summary.includes("Hidden proposal")), false);
+
+    const mail = await previewCatchUp(sql, new Date("2026-11-15T16:00:00.000Z"));
+    assert.ok(mail);
+    assert.equal(mail.subject, "Distributed Sites catch-up · since Nov 8");
+    assert.match(mail.body, /1 open ask gap\./);
+    assert.match(mail.body, /2 open proposals\./);
+    assert.match(mail.body, /Sample proposal headline\./);
+    assert.match(mail.body, /Cindel sent a proposal\./);
+    assert.match(mail.body, /PIPE-PHX-0100/);
+    assert.match(mail.body, new RegExp(proposalHref("PIPE-PHX-0100").replace(/[?&]/g, "\\$&")));
+    assert.match(mail.html, /Sample proposal headline/);
+    assert.match(mail.html, /Cindel sent a proposal/);
+    assert.equal(mail.html.includes(`href="${proposalHref("PIPE-PHX-0100").replace(/&/g, "&amp;")}"`), true);
+    assert.equal(mail.body.split("\n").includes("Site"), false);
+    assert.equal(mail.html.includes(">Site<"), false);
+    assert.equal(mail.body.toLowerCase().includes("jaideep"), false);
+    assert.equal(mail.html.toLowerCase().includes("jaideep"), false);
+    assert.equal(mail.body.includes("PIPE-PHX-0006"), false);
+    assert.equal(mail.html.includes("PIPE-PHX-0006"), false);
+    assert.equal(mail.body.includes("Decided proposal"), false);
+    assert.equal(mail.body.includes("Own proposal"), false);
+    assert.equal(mail.body.includes("PIPE-PHX-0105"), false);
+    assert.equal(mail.body.includes("PIPE-PHX-0106"), false);
+    const logs = await sql.query(`SELECT id FROM alert_log`);
+    const outbox = await sql.query(`SELECT id FROM alert_outbox`);
+    assert.equal(logs.rows.length, 0);
+    assert.equal(outbox.rows.length, 0);
+  } finally {
+    if (previous == null) delete process.env.AUTH_USERS;
+    else process.env.AUTH_USERS = previous;
+  }
+});
+
+test("preview is refused in CI", () => {
+  const previous = process.env.GITHUB_ACTIONS;
+  process.env.GITHUB_ACTIONS = "true";
+  try {
+    assert.equal(catchUpPreviewAllowed(), false);
+  } finally {
+    if (previous == null) delete process.env.GITHUB_ACTIONS;
+    else process.env.GITHUB_ACTIONS = previous;
+  }
+  assert.equal(catchUpPreviewAllowed(), true);
 });

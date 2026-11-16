@@ -163,7 +163,7 @@ export default function ListView({
           </select>
         </label>
         <button type="button" className="paper-btn only-mobile" data-testid="search-area" onClick={mapArea ? onClearArea : onSearchArea}>{mapArea ? "Clear area" : "Search this area"}</button>
-        <button type="button" className="paper-btn" onClick={onExport}>Export CSV</button>
+        <button type="button" className="paper-btn" onClick={() => downloadVisible(columns, ordered)}>Export CSV</button>
       </div>
       <SheetGrid
         rows={ordered}
@@ -196,6 +196,19 @@ export default function ListView({
       />
     </div>
   );
+}
+
+function downloadVisible(columns: SheetColumn<ListRow>[], rows: ListRow[]) {
+  const header = columns.map((column) => column.label);
+  const lines = [
+    header.join(","),
+    ...rows.map((row) => columns.map((column) => `"${column.text(row).replaceAll('"', '""')}"`).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "list.csv";
+  link.click();
 }
 
 function shownText(row: ListRow, id: ListColumnId, signedIn: boolean) {

@@ -924,6 +924,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   .shell.list-open:not(.drawer-open) .list-pane { right: min(400px, 38vw); }
   .shell.list-open:not(.drawer-open) .stage-map { left: auto; width: min(400px, 38vw); z-index: 2; }
   .shell.list-open:not(.drawer-open) .map-float { display: flex; }
+  .shell.list-open .map-basemap { display: none; }
   .shell.list-open:not(.drawer-open) .maplibregl-ctrl { visibility: visible; }
 }
 .nda-pane { position: absolute; inset: 0; z-index: 4; display: none; flex-direction: column; background: #faf7f1; min-width: 0; }
@@ -981,7 +982,8 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .shell.list-open.drawer-open .list-table th:first-child,
 .shell.list-open.drawer-open .list-table td:first-child { width: 240px; min-width: 240px; }
 .list-table { border-collapse: collapse; width: 100%; min-width: 0; table-layout: fixed; font-size: var(--type-body); }
-.pipeline-list .list-table td.capacity, .pipeline-list .list-table th.capacity { min-width: 0; white-space: nowrap; }
+.pipeline-list .list-table td.capacity, .pipeline-list .list-table th.capacity,
+.pipeline-list .list-table td.power-col, .pipeline-list .list-table th.power-col { min-width: 0; white-space: nowrap; }
 .capacity-cell { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: none; }
 .list-table th.is-pinned, .list-table td.is-pinned {

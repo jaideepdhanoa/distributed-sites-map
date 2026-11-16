@@ -234,7 +234,7 @@ export default function SheetGrid<Row>({
                   role="columnheader"
                   data-col={column.id}
                   data-pinned={pinned ? "true" : "false"}
-                  className={`${pinned ? "is-pinned" : ""} ${dragOver === column.id ? "col-over" : ""} ${column.id === "capacity" ? "capacity" : ""}`.trim()}
+                  className={`${pinned ? "is-pinned" : ""} ${dragOver === column.id ? "col-over" : ""} ${column.className || ""}`.trim()}
                   aria-sort={active ? (layout.sort?.desc ? "descending" : "ascending") : "none"}
                   style={{
                     width: width ? `${width}px` : undefined,
@@ -387,7 +387,7 @@ export default function SheetGrid<Row>({
                       data-col={column.id}
                       data-pinned={pinned ? "true" : "false"}
                       tabIndex={focused || (item.index === 0 && col === 0 && focus.row === 0 && focus.col === 0) ? 0 : -1}
-                      className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.id === "capacity" ? "capacity" : ""}`.trim()}
+                      className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.className || ""}`.trim()}
                       style={{
                         width: width ? `${width}px` : undefined,
                         minWidth: width ? `${width}px` : undefined,

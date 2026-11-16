@@ -212,6 +212,7 @@ export default function PipelineList({
   const sheetColumns: SheetColumn<PipelineRow>[] = visible.map((id) => ({
     id,
     label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
+    className: id === "capacity" ? "power-col" : undefined,
     text: (row) => cell(row, id as PipelineColumnId, signedIn),
     sortValue: (row) => {
       const value = sortValue(row, id as PipelineColumnId, signedIn);

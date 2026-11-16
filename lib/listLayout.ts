@@ -22,6 +22,7 @@ export type SheetColumn<Row> = {
   text: (row: Row) => string;
   sortValue?: (row: Row) => number | null;
   private?: boolean;
+  className?: string;
 };
 
 /** Financials, NDA status, last contact, and next step stay off a signed-out sheet. */

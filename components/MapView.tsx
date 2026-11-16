@@ -1095,7 +1095,10 @@ export default function MapView(props: Props) {
       if (!near) map.jumpTo({ center: pin, zoom: 15, padding: pad });
     };
     observer = new ResizeObserver(() => {
-      map.resize();
+      if (!propsRef.current.selectedId) {
+        map.resize();
+        return;
+      }
       recenter();
     });
     observer.observe(observed);

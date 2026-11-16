@@ -48,11 +48,8 @@ export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 const MIN_WIDTH = 96;
 const MAX_WIDTH = 480;
 
-/**
- * Columns that take leftover pane width.
- * Universe calls Power `grade` and Asking `listed`.
- */
-export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
+/** Columns that take leftover pane width. The pipeline list adds its power column. */
+const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
 
 /** The Show on map column. It stays this wide so spare pane width does not pool there. */
 export const TRAILING_COLUMN_WIDTH = 112;
@@ -216,6 +213,7 @@ export function fitColumnWidths(
   savedWidths: Record<string, number>,
   paneWidth: number,
   trailing = 0,
+  flexIds: ReadonlySet<string> = FLEX_COLUMN_IDS,
 ): number[] {
   const base = ids.map((id) => {
     const saved = savedWidths[id];
@@ -226,7 +224,7 @@ export function fitColumnWidths(
   const sum = base.reduce((total, width) => total + width, 0);
   const delta = target - sum;
   if (delta === 0) return base;
-  const flex = ids.flatMap((id, index) => (FLEX_COLUMN_IDS.has(id) ? [index] : []));
+  const flex = ids.flatMap((id, index) => (flexIds.has(id) ? [index] : []));
   const saved = (index: number) => {
     const width = savedWidths[ids[index]];
     return typeof width === "number" && Number.isFinite(width);

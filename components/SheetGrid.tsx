@@ -14,7 +14,7 @@ import {
   type SheetColumn,
 } from "@/lib/listLayout";
 
-const WRAP_COLUMNS = new Set(["site", "stage", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
+const WRAP_COLUMNS = new Set(["site", "stage", "asking", "listed", "grade", "traffic", "cashFlow"]);
 
 const WINDOW_AT = 180;
 
@@ -32,6 +32,8 @@ export default function SheetGrid<Row>({
   trailing,
   labelledBy,
   scrollRef: scrollRefProp,
+  flexIds,
+  wrapIds,
 }: {
   rows: Row[];
   rowId: (row: Row) => string;
@@ -46,6 +48,8 @@ export default function SheetGrid<Row>({
   trailing?: (row: Row) => ReactNode;
   labelledBy?: string;
   scrollRef?: RefObject<HTMLDivElement | null>;
+  flexIds?: readonly string[];
+  wrapIds?: readonly string[];
 }) {
   const innerRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollRefProp ?? innerRef;
@@ -58,7 +62,9 @@ export default function SheetGrid<Row>({
   const ids = columns.map((column) => column.id);
   const colCount = ids.length + (trailing ? 1 : 0);
   const trailingWidth = trailing ? TRAILING_COLUMN_WIDTH : 0;
-  const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth);
+  const flex = new Set(flexIds ?? ["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
+  const wrap = new Set(wrapIds ?? WRAP_COLUMNS);
+  const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth, flex);
   const widthById = new Map(ids.map((id, index) => [id, fitted[index] || columnWidth(id)]));
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -396,7 +402,7 @@ export default function SheetGrid<Row>({
                       data-cell={`${item.index}:${col}`}
                       data-col={column.id}
                       data-pinned={pinned ? "true" : "false"}
-                      data-wrap={WRAP_COLUMNS.has(column.id) ? "text" : undefined}
+                      data-wrap={wrap.has(column.id) ? "text" : undefined}
                       tabIndex={focused || (item.index === 0 && col === 0 && focus.row === 0 && focus.col === 0) ? 0 : -1}
                       className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.className || ""}`.trim()}
                       title={full && full !== "—" ? full : undefined}

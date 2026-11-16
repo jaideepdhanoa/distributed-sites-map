@@ -96,23 +96,24 @@ test("column filters and numeric sort leave text facts as text", () => {
 });
 
 const pipelineIds = ["site", "stage", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
+const flexIds = new Set(["site", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
 
 test("a default sheet uses the pane and keeps rigid columns", () => {
   for (const pane of [1280, 1440, 1920]) {
-    const fitted = fitColumnWidths(pipelineIds, {}, pane, TRAILING_COLUMN_WIDTH);
+    const fitted = fitColumnWidths(pipelineIds, {}, pane, TRAILING_COLUMN_WIDTH, flexIds);
     assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, pane);
     assert.equal(fitted[1], columnWidth("stage"));
     assert.equal(fitted[2], columnWidth("score"));
     assert.equal(fitted[4], columnWidth("openLand"));
     assert.ok(fitted.every((width) => width >= 96));
   }
-  const wide = fitColumnWidths(pipelineIds, {}, 1920, TRAILING_COLUMN_WIDTH);
+  const wide = fitColumnWidths(pipelineIds, {}, 1920, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(wide[0] > columnWidth("site"));
   assert.ok(wide[3] > columnWidth("asking"));
   assert.ok(wide[5] > columnWidth("capacity"));
   assert.ok(wide[6] > columnWidth("traffic"));
   assert.ok(wide[7] > columnWidth("cashFlow"));
-  const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH);
+  const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(narrow[0] < columnWidth("site"));
   assert.ok(narrow[0] >= 96);
 });
@@ -128,7 +129,7 @@ test("a saved layout keeps its widths and the last flexible column fills a wider
     traffic: 100,
     cashFlow: 140,
   };
-  const fitted = fitColumnWidths(pipelineIds, widths, 1600, TRAILING_COLUMN_WIDTH);
+  const fitted = fitColumnWidths(pipelineIds, widths, 1600, TRAILING_COLUMN_WIDTH, flexIds);
   assert.equal(fitted[0], 200);
   assert.equal(fitted[1], 140);
   assert.equal(fitted[3], 150);
@@ -136,13 +137,13 @@ test("a saved layout keeps its widths and the last flexible column fills a wider
   assert.equal(fitted[6], 100);
   assert.ok(fitted[7] > 140);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1600);
-  const askingLast = fitColumnWidths(["site", "cashFlow", "asking"], { site: 200, cashFlow: 120, asking: 140 }, 900, 0);
+  const askingLast = fitColumnWidths(["site", "cashFlow", "asking"], { site: 200, cashFlow: 120, asking: 140 }, 900, 0, flexIds);
   assert.deepEqual(askingLast, [200, 120, 580]);
-  const wider = fitColumnWidths(pipelineIds, { ...widths, site: 420, asking: 400, capacity: 400, traffic: 300, cashFlow: 400 }, 1280, TRAILING_COLUMN_WIDTH);
+  const wider = fitColumnWidths(pipelineIds, { ...widths, site: 420, asking: 400, capacity: 400, traffic: 300, cashFlow: 400 }, 1280, TRAILING_COLUMN_WIDTH, flexIds);
   assert.equal(wider[0], 420);
   assert.equal(wider[7], 400);
   assert.ok(wider.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH > 1280);
-  assert.deepEqual(fitColumnWidths(pipelineIds, {}, 0, TRAILING_COLUMN_WIDTH), pipelineIds.map((id) => columnWidth(id)));
+  assert.deepEqual(fitColumnWidths(pipelineIds, {}, 0, TRAILING_COLUMN_WIDTH, flexIds), pipelineIds.map((id) => columnWidth(id)));
 });
 
 test("list layouts are stored per user and ignored until the table exists", async () => {

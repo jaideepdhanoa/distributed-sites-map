@@ -1,16 +1,18 @@
 import type { Sql } from "@/lib/actions/db";
 import { loadCatalog } from "@/lib/queue/catalog";
-import type { MailItem } from "./compose";
+import { publicSnippet, type MailItem } from "./compose";
 import { EXCLUDED_SITE_ID, isExcludedSite } from "./excluded";
-import { reviewHomeHref, siteHref } from "./links";
+import { proposalHref, reviewHomeHref, siteHref } from "./links";
 import type { AlertCategory, AlertPreferences } from "./preferences";
 
-export const CATCHUP_SINCE = "2026-11-09T00:00:00.000Z";
-export const CATCHUP_SUBJECT = "Distributed Sites catch-up · since Nov 9";
+/** Stage, listing, and comms rows in the one-time catch-up. Open items are not cut off by this date. */
+export const CATCHUP_SINCE = "2026-11-08T00:00:00.000Z";
+export const CATCHUP_SUBJECT = "Distributed Sites catch-up · since Nov 8";
 export const CATCHUP_EMAIL = "jaideep@dhanoa.in";
-export const CATCHUP_KEY = "catchup:jaideep:since-2026-11-09";
+export const CATCHUP_KEY = "catchup:jaideep:since-2026-11-08";
 
 const TOP_SITES = 5;
+const PROPOSAL_LIST = 25;
 
 export type SummaryCounts = {
   recommendations: number;
@@ -80,10 +82,16 @@ export function isRealStageChange(payload: Record<string, unknown>, source: stri
   return true;
 }
 
-function inboundComms(payload: Record<string, unknown>, source: string, actor: string): boolean {
+function inboundComms(payload: Record<string, unknown>, source: string, actor: string, userId: string): boolean {
   if (isWorkbookWrite(source, actor)) return false;
-  if (actor.trim().toLowerCase() === "jaideep") return false;
+  if (actor.trim().toLowerCase() === userId.trim().toLowerCase()) return false;
   return String(payload.direction || "").trim().toLowerCase() === "in";
+}
+
+function ownAction(authorId: string, userId: string): boolean {
+  const author = authorId.trim().toLowerCase();
+  const user = userId.trim().toLowerCase();
+  return Boolean(author && user && author === user);
 }
 
 function shown(prefs: AlertPreferences | null, key: AlertCategory): boolean {
@@ -105,6 +113,11 @@ function line(summary: string, userId: string, category: MailItem["category"] = 
 function countLine(count: number, singular: string, plural: string): string {
   if (count === 1) return `1 ${singular}.`;
   return `${count} ${plural}.`;
+}
+
+function waitingForYou(count: number, singular: string, plural: string): string {
+  if (count === 1) return `1 ${singular} is waiting for you.`;
+  return `${count} ${plural} are waiting for you.`;
 }
 
 async function labels(): Promise<Map<string, string>> {
@@ -149,9 +162,22 @@ function agentStageIsApproved(actor: string, siteId: string, stage: string, appr
   return approved.has(`${siteId}\n${stage}`) || (stage === "Dropped" && approved.has(`${siteId}\nDropped`));
 }
 
+type ProposalRow = {
+  id: string;
+  target_id: string;
+  title: string | null;
+  author_id: string;
+};
+
 async function collect(
   sql: Sql,
-  input: { userId: string; eventSince: string | null; rowSince: string | null; prefs: AlertPreferences | null },
+  input: {
+    userId: string;
+    eventSince: string | null;
+    rowSince: string | null;
+    prefs: AlertPreferences | null;
+    listProposals?: boolean;
+  },
 ): Promise<SummaryResult> {
   const map = await labels();
   const items: MailItem[] = [];
@@ -182,7 +208,7 @@ async function collect(
     const requests = rows.rows.filter((row) => row.kind === "decision" && kept(row.site_id));
     if (shown(input.prefs, "recommendations") && replies.length) {
       counts.recommendations = replies.length;
-      items.push(line(countLine(replies.length, "agent draft reply is waiting", "agent draft replies are waiting"), input.userId, "recommendations"));
+      items.push(line(waitingForYou(replies.length, "agent draft reply", "agent draft replies"), input.userId, "recommendations"));
     }
     if (shown(input.prefs, "decisions") && requests.length) {
       counts.decisions = requests.length;
@@ -191,16 +217,34 @@ async function collect(
   }
 
   if (shown(input.prefs, "proposals")) {
-    const rows = await sql.query<{ target_id: string }>(
-      `SELECT target_id FROM suggestions
+    const rows = await sql.query<ProposalRow>(
+      `SELECT id, target_id, title, author_id FROM suggestions
        WHERE status IN ('open', 'agreed_waiting', 'ready')
-         AND ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)`,
-      [since],
+         AND upper(target_id) <> $2
+         AND ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)
+       ORDER BY created_at ASC, id ASC`,
+      [since, EXCLUDED_SITE_ID],
     );
-    const open = rows.rows.filter((row) => kept(row.target_id));
+    const open = rows.rows.filter((row) => kept(row.target_id) && !ownAction(row.author_id, input.userId));
     if (open.length) {
       counts.proposals = open.length;
       items.push(line(countLine(open.length, "open proposal", "open proposals"), input.userId, "proposals"));
+      if (input.listProposals) {
+        for (const row of open.slice(0, PROPOSAL_LIST)) {
+          const title = publicSnippet(row.title || "") || "Proposal.";
+          items.push({
+            category: "proposals",
+            siteId: row.target_id,
+            siteLabel: siteLabel(map, row.target_id),
+            summary: title,
+            authorId: row.author_id,
+            href: proposalHref(row.target_id),
+          });
+        }
+        if (open.length > PROPOSAL_LIST) {
+          items.push(line(`${PROPOSAL_LIST} of ${open.length} open proposals are listed.`, input.userId, "proposals"));
+        }
+      }
     }
   }
 
@@ -254,7 +298,7 @@ async function collect(
   for (const row of events.rows) {
     if (row.entity_type !== "comms" || !kept(row.site_id)) continue;
     const payload = asObject(row.payload);
-    if (!inboundComms(payload, row.source, row.actor)) continue;
+    if (!inboundComms(payload, row.source, row.actor, input.userId)) continue;
     commsBySite.set(row.site_id, (commsBySite.get(row.site_id) || 0) + 1);
   }
   const commsSites = [...commsBySite.entries()];
@@ -319,5 +363,11 @@ export async function loadDigestBrief(
 }
 
 export async function loadCatchUp(sql: Sql): Promise<SummaryResult> {
-  return collect(sql, { userId: "jaideep", eventSince: CATCHUP_SINCE, rowSince: CATCHUP_SINCE, prefs: null });
+  return collect(sql, {
+    userId: "jaideep",
+    eventSince: CATCHUP_SINCE,
+    rowSince: null,
+    prefs: null,
+    listProposals: true,
+  });
 }

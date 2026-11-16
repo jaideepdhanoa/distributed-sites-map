@@ -106,7 +106,7 @@ export async function deliverRows(
   const day = losAngelesParts(now).day;
   const catalog = await loadCatalog();
   const items = [...(input.extra || []), ...input.rows.map((row) => asItem(row, catalog))];
-  const rendered = renderBatch(items, { now, kind: input.kind });
+  const rendered = renderBatch(items, { now, kind: input.kind, recipientId: input.userId });
   if (!rendered) {
     await markRows(sql, input.rows.map((row) => row.id), "skipped", input.key);
     return "skipped";

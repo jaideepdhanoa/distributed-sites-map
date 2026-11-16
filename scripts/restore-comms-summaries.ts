@@ -7,9 +7,11 @@ import { applySummaryRestore, formatSummaryPlan, loadCommsSummaries, planSummary
 /**
  * Put full comms summaries back into the database.
  *
- * The Comms Log tab is the source. This reads it with the Sheets client
- * (one batched values read, with backoff). Dry run is the default. It prints
- * ids and character counts only, and it does not write the database or the sheet.
+ * This is a confirm-gated repair, not the scheduled sync. The sync reports
+ * drift and does not apply workbook edits. This reads the Comms Log with the
+ * Sheets client (one batched values read, with backoff). Dry run is the
+ * default. It prints ids and character counts only. It does not write the
+ * sheet. Apply copies summary text into the database only.
  *
  *   npx tsx scripts/restore-comms-summaries.ts
  *

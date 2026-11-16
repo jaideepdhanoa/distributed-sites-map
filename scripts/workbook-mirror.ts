@@ -17,9 +17,11 @@ import {
   assertWorkbookMirrorAllowed,
   entitiesToMirror,
   entityChangeCounts,
+  formatMirrorDrift,
   formatPlan,
   formatPlanSummary,
   loadMirrorRows,
+  mirrorDrift,
   mirrorDryRun,
   planActivityMirror,
   planCommsMirror,
@@ -201,12 +203,16 @@ async function main(): Promise<void> {
   }
   assertPlannedWrites(changes);
   const byEntity = entityChangeCounts(changes);
+  const drift = mirrorDrift(changes);
+  const driftText = formatMirrorDrift(drift);
   const counts = {
     cells: changes.length,
     stage_cells: byEntity.stage,
     site_cells: byEntity.site,
     activity_cells: byEntity.activity,
     comms_cells: byEntity.comms,
+    drift_cells: drift.cells,
+    fills: drift.fills,
     appended,
     unmatched,
     skipped_protected: skippedProtected,
@@ -218,6 +224,7 @@ async function main(): Promise<void> {
   const counted = formatPlanSummary(changes);
   const heldIds = [...new Set(held.map((row) => row.id))];
   const notes = [
+    driftText,
     counted,
     `activity_sheet_floor ${activitySheetFloor}`,
     `refused ${refused.length}${refused.length ? ` ${refused.join(", ")}` : ""}`,
@@ -238,8 +245,8 @@ async function main(): Promise<void> {
     throw error;
   }
   await withConnectionString(url, (sql) => recordMirrorRun(sql, counts, "wrote cells", "succeeded"));
-  console.log(`Wrote ${counts.cells} cells.\n${counted}`);
-  summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Protected rows skipped: ${skippedProtected}.\n\n${counted}\n`);
+  console.log(`Wrote ${counts.cells} cells.\n${driftText}\n${counted}`);
+  summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Protected rows skipped: ${skippedProtected}. Drifted cells were overwritten with the database value.\n\n${driftText}\n\n${counted}\n`);
 }
 
 main().catch((error: unknown) => {

@@ -236,7 +236,7 @@ test("a late workbook response does not erase a stage painted on screen", () => 
   assert.equal(preservePendingStage(painted, confirmed).features[0].properties.stage, "Dropped");
 });
 
-test("every approved stage change Jaideep accepts tells the workbook writer what to write", () => {
+test("every approved stage change Jaideep accepts is stored for the mirror", () => {
   const move = decisionFeed({
     id: "move",
     status: "accepted",
@@ -252,7 +252,7 @@ test("every approved stage change Jaideep accepts tells the workbook writer what
   });
   assert.equal(move.workbookStage, true);
   assert.equal(move.stage, "financial");
-  assert.match(move.text, /Approved stage: Financial screen \(financial\)\. Write this stage on the workbook Stage column\./);
+  assert.match(move.text, /Approved stage: Financial screen \(financial\)\. Stored in the database\. The workbook mirror copies it\. Do not edit the workbook\./);
 
   const drop = decisionFeed({
     id: "drop",
@@ -269,7 +269,7 @@ test("every approved stage change Jaideep accepts tells the workbook writer what
   });
   assert.equal(drop.workbookStage, true);
   assert.equal(drop.stage, "Dropped");
-  assert.match(drop.text, /Approved stage: Dropped\. Write this stage on the workbook Stage column\./);
+  assert.match(drop.text, /Approved stage: Dropped\. Stored in the database\. The workbook mirror copies it\. Do not edit the workbook\./);
   assert.equal(drop.text.includes(REASON), false);
 
   const back = decisionFeed({
@@ -287,7 +287,7 @@ test("every approved stage change Jaideep accepts tells the workbook writer what
   });
   assert.equal(back.workbookStage, true);
   assert.equal(back.stage, "desk");
-  assert.match(back.text, /Approved stage: Desk screen \(desk\)\. Write this stage on the workbook Stage column\./);
+  assert.match(back.text, /Approved stage: Desk screen \(desk\)\. Stored in the database\. The workbook mirror copies it\. Do not edit the workbook\./);
 
   const editor = decisionFeed({
     id: "other",

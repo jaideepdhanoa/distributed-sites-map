@@ -4,7 +4,7 @@ import type { ActionRole } from "@/lib/actions/roles";
 const RECIPIENT = "jai" + "deep";
 export const RECOMMENDATION_RECIPIENTS = [RECIPIENT] as const;
 
-/** That same person already approved the workbook Stage write after his stage_move approval. */
+/** That same person approves a stage change. The database stores it, and the mirror copies the workbook. */
 export const WORKBOOK_STAGE_APPROVER = RECIPIENT;
 
 /**

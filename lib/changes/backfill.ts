@@ -70,10 +70,26 @@ async function versions(sql: Sql, sitesReady: boolean): Promise<{ stage: Map<str
   };
 }
 
+/** Highest sheet id, so a later API id does not collide. Ids only. No cell text. */
+export async function rememberSheetIdFloors(sql: Sql, slice: WorkbookSlice): Promise<void> {
+  const workbookActivityIds = slice.workbookActivityIds || [];
+  await raiseIdFloor(
+    sql,
+    "activity",
+    Math.max(
+      0,
+      ...slice.activities.map((row) => numericSuffix("A-", row.entity_id)),
+      ...workbookActivityIds.map((id) => numericSuffix("A-", id)),
+    ),
+  );
+  await raiseIdFloor(sql, "comms", Math.max(0, ...slice.comms.map((row) => numericSuffix("CM-", row.entity_id))));
+}
+
 /**
  * Copy workbook rows that differ from the database. Invalid cells are left
  * out and reported. A second pass of the same snapshot writes nothing.
  * An entity whose read flag is on is skipped: the database is the record.
+ * The scheduled sync does not call this. It reports drift and does not apply.
  */
 export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: string): Promise<ImportCounts> {
   const counts: ImportCounts = {
@@ -226,17 +242,7 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
     }
   }
 
-  const workbookActivityIds = slice.workbookActivityIds || [];
-  await raiseIdFloor(
-    sql,
-    "activity",
-    Math.max(
-      0,
-      ...slice.activities.map((row) => numericSuffix("A-", row.entity_id)),
-      ...workbookActivityIds.map((id) => numericSuffix("A-", id)),
-    ),
-  );
-  await raiseIdFloor(sql, "comms", Math.max(0, ...slice.comms.map((row) => numericSuffix("CM-", row.entity_id))));
+  await rememberSheetIdFloors(sql, slice);
   if (!changes.length) return counts;
   const digest = createHash("sha256").update(JSON.stringify(changes)).digest("hex").slice(0, 24);
   await applyParsedChanges(sql, ACTOR, `workbook-sync-${snapshotId}-${digest}`, changes, source, "workbook");

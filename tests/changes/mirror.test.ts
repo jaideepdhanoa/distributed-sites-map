@@ -11,8 +11,10 @@ import {
   assertReadBack,
   assertWorkbookMirrorAllowed,
   entitiesToMirror,
+  formatMirrorDrift,
   formatPlan,
   formatPlanSummary,
+  mirrorDrift,
   planActivityMirror,
   planCommsMirror,
   planStageMirror,
@@ -127,7 +129,8 @@ test("a read-back mismatch fails", () => {
     assertReadBack([change], [{ sheet: "Pipeline", row: 5, column: 4, value: "2 Financial screen" }]),
   );
   assert.throws(() => assertPlannedWrites([{ ...change, row: PROTECTED_ROW }]), /row 10/);
-  assert.throws(() => assertPlannedWrites([{ ...change, id: PROTECTED_SITE_ID }]), /PIPE-PHX-0006/);
+  assert.throws(() => assertPlannedWrites([{ ...change, id: PROTECTED_SITE_ID }]), /quarantined site/);
+  assert.throws(() => assertPlannedWrites([{ ...change, after: PROTECTED_SITE_ID }]), /quarantined site/);
 });
 
 test("a dry run does not need WORKBOOK_MIRROR_ENABLED", () => {
@@ -293,23 +296,34 @@ test("a site-flag simulation is a dry run and the plan summary counts entities",
   }
 });
 
-test("an activity id the database did not import is not written over the sheet row", () => {
+test("a hand edit of an activity row is overwritten from the database", () => {
+  const sheetText = "Sheet row kept only on the workbook";
+  const dbText = "Database row is the record";
   const sheet = table("Activity", 1, ["Event ID", "Date", "Site ID", "Type", "Summary"], [
-    ["A-000272", "2026-11-06", "LAND-PHX-0046", "email", "Sheet row"],
+    ["A-000272", "2026-11-06", "LAND-PHX-0046", "email", sheetText],
   ]);
   const plan = planActivityMirror(sheet, [
-    { entity_id: "A-000272", site_id: "PIPE-PHX-0001", date: "2026-11-15", type: "visit", summary: "Database row", source_link: "", imported: false },
-    { entity_id: "A-000274", site_id: "PIPE-PHX-0001", date: "2026-11-15", type: "visit", summary: "Database row", source_link: "", imported: false },
+    { entity_id: "A-000272", site_id: "PIPE-PHX-0001", date: "2026-11-15", type: "visit", summary: dbText, source_link: "", imported: false },
+    { entity_id: "A-000274", site_id: "PIPE-PHX-0001", date: "2026-11-15", type: "visit", summary: dbText, source_link: "", imported: false },
+    { entity_id: "A-000275", site_id: PROTECTED_SITE_ID, date: "2026-11-15", type: "visit", summary: dbText, source_link: "", imported: false },
   ]);
-  assert.deepEqual(plan.refused, ["A-000272"]);
-  assert.equal(plan.changes.some((change) => change.id === "A-000272"), false);
+  assert.deepEqual(plan.refused, []);
+  assert.equal(plan.changes.some((change) => change.id === "A-000272" && change.header === "Summary" && change.after === dbText), true);
   assert.equal(plan.appended, 1);
-  assert.equal(plan.changes.every((change) => change.id === "A-000274"), true);
-  assert.throws(() => assertMirrorRefusals(plan.refused), (error: unknown) => {
+  assert.equal(plan.changes.some((change) => change.id === "A-000275" || change.after === PROTECTED_SITE_ID || change.before === PROTECTED_SITE_ID), false);
+  assert.equal(JSON.stringify(plan).includes(PROTECTED_SITE_ID), false);
+  const drift = formatMirrorDrift(mirrorDrift(plan.changes));
+  assert.equal(drift.includes(sheetText), false);
+  assert.equal(drift.includes(dbText), false);
+  assert.equal(drift.includes("A-000272"), false);
+  assert.match(drift, /drift_cells [1-9]/);
+  assert.match(drift, /#[0-9a-f]{12}/);
+  assert.match(drift, /overwrites drifted cells/);
+  assert.throws(() => assertMirrorRefusals(["A-000272"]), (error: unknown) => {
     const message = error instanceof Error ? error.message : "";
     assert.match(message, /A-000272/);
-    assert.equal(message.includes("Database row"), false);
-    assert.equal(message.includes("Sheet row"), false);
+    assert.equal(message.includes(dbText), false);
+    assert.equal(message.includes(sheetText), false);
     return true;
   });
 });

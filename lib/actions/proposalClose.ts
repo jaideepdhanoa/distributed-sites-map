@@ -8,7 +8,10 @@ import type { Sql } from "./db";
 import { permanentSiteId } from "./suggestions";
 import { recordAppEvent } from "@/lib/queue/events";
 import type { RecordLookup } from "./records";
+import { canCloseProposal } from "./proposalAccess";
 import { InputError, parseBody, type TargetKind } from "./text";
+
+export { canCloseProposal };
 
 /** Statuses that still need a person. Accepted, rejected, applied, and overtaken are already decided. */
 export const OPEN_PROPOSAL_STATUSES = ["open", "agreed_waiting", "ready"] as const;
@@ -52,14 +55,6 @@ function asObject(value: unknown): Record<string, unknown> {
     }
   }
   return {};
-}
-
-export function canCloseProposal(input: { actorId: string; ownerId: string | null; admin: boolean }): boolean {
-  const actor = input.actorId.trim();
-  if (!actor) return false;
-  if (input.admin) return true;
-  const owner = (input.ownerId || "").trim();
-  return Boolean(owner) && owner === actor;
 }
 
 export function droppedCloseReason(dropReason: string): string {

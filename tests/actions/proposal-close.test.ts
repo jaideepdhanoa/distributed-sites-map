@@ -266,6 +266,8 @@ test("Bring back stays off the open proposal and on the empty dropped card", () 
   assert.match(focusBlock, /close-proposal/);
   assert.doesNotMatch(focusBlock, /bring-back-dropped|Bring back/);
   assert.match(card, /bring-back-dropped/);
+  assert.doesNotMatch(card, /proposalClose/);
+  assert.doesNotMatch(readFileSync("components/FinancialsPanel.tsx", "utf8"), /proposalClose/);
 });
 
 test("dry-run lists ids only and writes nothing, and apply without the phrase refuses", async () => {

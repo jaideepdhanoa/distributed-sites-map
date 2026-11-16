@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { canCloseProposal } from "@/lib/actions/proposalClose";
+import { canCloseProposal } from "@/lib/actions/proposalAccess";
 import { quietActionsFetch } from "@/lib/actions/quiet";
 import { canReview, canWrite, useActionStatus } from "./actions/panel";
 import {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { canCloseProposal } from "@/lib/actions/proposalClose";
+import { canCloseProposal } from "@/lib/actions/proposalAccess";
 import { allowsAssignee, allowsDate, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, showCardBringBack, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { stripGmailIds } from "@/lib/displayText";
 import { plainNextStep } from "@/lib/nextStepLine";

@@ -33,22 +33,30 @@ async function seed(sql: Sql) {
      VALUES
        ('rec-old', 'in-old', 'reply', 'Old draft.', 'none', 'Old.', '[]'::jsonb, 'low', 'muse', '2026-11-01T00:00:00.000Z'),
        ('rec-new', 'in-new', 'reply', $1, 'none', 'Because.', '[]'::jsonb, 'medium', 'muse', '2026-11-10T00:00:00.000Z'),
-       ('rec-hidden', 'in-hidden', 'reply', 'Hidden draft.', 'none', 'Hidden.', '[]'::jsonb, 'low', 'muse', '2026-11-10T00:00:00.000Z')`,
+       ('rec-hidden', 'in-hidden', 'reply', 'Hidden draft.', 'none', 'Hidden.', '[]'::jsonb, 'low', 'muse', '2026-11-10T00:00:00.000Z'),
+       ('rec-open', 'in-new', 'decision', 'Approve the step.', 'approve', 'Because.', '[]'::jsonb, 'high', 'muse', '2026-11-11T00:00:00.000Z'),
+       ('rec-closed', 'in-dec', 'decision', 'Already decided.', 'approve', 'Done.', '[]'::jsonb, 'high', 'muse', '2026-11-11T00:00:00.000Z')`,
     [`${MARKER_NOTE} please wire ${PRICE}`],
   );
   await sql.query(
     `INSERT INTO events (id, entity_type, entity_id, site_id, payload, source, actor, idempotency_key, created_at)
      VALUES
-       ('EV-stage', 'stage', 'PIPE-PHX-0008', 'PIPE-PHX-0008', '{"stage":"2 Financial screen"}'::jsonb, 'agent', 'muse', 'ev-stage', '2026-11-12T00:00:00.000Z'),
+       ('EV-stage', 'stage', 'PIPE-PHX-0008', 'PIPE-PHX-0008', '{"stage":"2 Financial screen","previous_stage":"1 Desk screen"}'::jsonb, 'agent', 'jaideep', 'ev-stage', '2026-11-12T00:00:00.000Z'),
+       ('EV-stage-first', 'stage', 'PIPE-PHX-0010', 'PIPE-PHX-0010', '{"stage":"1 Desk screen","previous_stage":null}'::jsonb, 'agent', 'jaideep', 'ev-stage-first', '2026-11-12T00:00:00.000Z'),
+       ('EV-stage-same', 'stage', 'PIPE-PHX-0011', 'PIPE-PHX-0011', '{"stage":"2 Financial screen","previous_stage":"2 Financial screen"}'::jsonb, 'agent', 'jaideep', 'ev-stage-same', '2026-11-12T00:00:00.000Z'),
+       ('EV-stage-book', 'stage', 'PIPE-PHX-0012', 'PIPE-PHX-0012', '{"stage":"3 Site checks","previous_stage":"1 Desk screen"}'::jsonb, 'workbook snapshot nov15', 'workbook-sync', 'ev-stage-book', '2026-11-15T00:00:00.000Z'),
        ('EV-stage-old', 'stage', 'PIPE-PHX-0008', 'PIPE-PHX-0008', '{"stage":"1 Desk screen"}'::jsonb, 'agent', 'muse', 'ev-stage-old', '2026-11-01T00:00:00.000Z'),
        ('EV-stage-hidden', 'stage', 'PIPE-PHX-0006', 'PIPE-PHX-0006', '{"stage":"Dropped"}'::jsonb, 'agent', 'muse', 'ev-stage-hidden', '2026-11-12T00:00:00.000Z'),
        ('EV-act', 'activity', 'A-1', 'PIPE-PHX-0008', '{"summary":"Visited."}'::jsonb, 'agent', 'muse', 'ev-act', '2026-11-12T00:00:00.000Z'),
        ('EV-act-old', 'activity', 'A-0', 'PIPE-PHX-0008', '{"summary":"Old visit."}'::jsonb, 'agent', 'muse', 'ev-act-old', '2026-11-01T00:00:00.000Z'),
        ('EV-act-hidden', 'activity', 'A-9', 'PIPE-PHX-0006', '{"summary":"Hidden visit."}'::jsonb, 'agent', 'muse', 'ev-act-hidden', '2026-11-12T00:00:00.000Z'),
        ('EV-comms', 'comms', 'CM-1', 'PIPE-PHX-0008', $1::jsonb, 'agent', 'muse', 'ev-comms', '2026-11-12T00:00:00.000Z'),
+       ('EV-comms-out', 'comms', 'CM-2', 'PIPE-PHX-0008', '{"direction":"out","summary":"Sent outbound."}'::jsonb, 'agent', 'muse', 'ev-comms-out', '2026-11-12T00:00:00.000Z'),
+       ('EV-comms-self', 'comms', 'CM-3', 'PIPE-PHX-0008', '{"direction":"in","summary":"Sent by the reviewer."}'::jsonb, 'agent', 'jaideep', 'ev-comms-self', '2026-11-12T00:00:00.000Z'),
        ('EV-comms-hidden', 'comms', 'CM-9', 'PIPE-PHX-0006', '{"summary":"Hidden comms."}'::jsonb, 'agent', 'muse', 'ev-comms-hidden', '2026-11-12T00:00:00.000Z')`,
-    [JSON.stringify({ summary: MARKER_COMMS, person: "Alex" })],
+    [JSON.stringify({ summary: MARKER_COMMS, person: "Alex", direction: "in" })],
   );
+  await sql.query(`UPDATE agent_recommendations SET used_at = created_at WHERE id = 'rec-closed'`);
 }
 
 test("dry run prints counts and no message content", async () => {
@@ -59,9 +67,10 @@ test("dry run prints counts and no message content", async () => {
   assert.equal(result.counts.recommendations, 1);
   assert.equal(result.counts.decisions, 1);
   assert.equal(result.counts.stages, 1);
-  assert.equal(result.counts.activity, 1);
+  assert.equal(result.counts.activity, 0);
   assert.equal(result.counts.comms, 1);
-  assert.equal(result.counts.sites, 1);
+  assert.equal(result.counts.sites, 0);
+  assert.equal(result.counts.asks, 0);
   const lines: string[] = [];
   const original = console.log;
   console.log = (message?: unknown) => {
@@ -76,9 +85,10 @@ test("dry run prints counts and no message content", async () => {
   assert.match(printed, /recommendations: 1/);
   assert.match(printed, /decisions: 1/);
   assert.match(printed, /stages: 1/);
-  assert.match(printed, /activity: 1/);
+  assert.match(printed, /activity: 0/);
   assert.match(printed, /comms: 1/);
-  assert.match(printed, /sites: 1/);
+  assert.match(printed, /sites: 0/);
+  assert.match(printed, /asks: 0/);
   assert.equal(printed.includes(MARKER_NOTE), false);
   assert.equal(printed.includes(MARKER_COMMS), false);
   assert.equal(printed.includes(MARKER_DECISION), false);

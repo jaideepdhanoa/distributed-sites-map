@@ -275,7 +275,10 @@ test("the open-loops API is signed in the same way as the NDA queue", () => {
   assert.equal(python.toLowerCase().includes("morning-brief"), false);
   assert.equal(readFileSync("lib/openLoops.ts", "utf8").toLowerCase().includes("morning-brief"), false);
   const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons: { path: string; schedule: string }[] };
-  assert.deepEqual(vercel.crons, [{ path: "/api/alerts/digest", schedule: "0 15 * * *" }]);
+  assert.deepEqual(vercel.crons, [
+    { path: "/api/alerts/digest", schedule: "0 14 * * *" },
+    { path: "/api/alerts/digest", schedule: "0 15 * * *" },
+  ]);
   const raw = readFileSync("data/fixtures/open-loops.json", "utf8");
   assert.equal(/\bcharging\b/i.test(raw), false);
   assert.equal(/\bautonomous\b/i.test(raw), false);

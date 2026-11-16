@@ -70,20 +70,51 @@ test("the author is never alerted, a write alerts once, and routine comms stay o
     const routine = await sql.query(`SELECT id FROM alert_outbox WHERE ref_id = 'EV-2'`);
     assert.equal(routine.rows.length, 0);
 
-    await insertEvent(sql, { id: "EV-3", type: "comms", siteId: "PIPE-PHX-0008", payload: { summary: "Please see this.", person: "Jaideep" } });
+    await insertEvent(sql, { id: "EV-3", type: "comms", siteId: "PIPE-PHX-0008", payload: { summary: "Please see this.", person: "Jaideep", direction: "in" } });
     await notifyAppliedChanges(sql, actor, [{ entity_type: "comms", site_id: "PIPE-PHX-0008", event_id: "EV-3" }]);
-    const mentioned = await sql.query<{ user_id: string; channel: string; category: string }>(
-      `SELECT user_id, channel, category FROM alert_outbox WHERE ref_id = 'EV-3'`,
-    );
-    assert.equal(mentioned.rows.length, 1);
-    assert.equal(mentioned.rows[0]?.user_id, "jaideep");
-    assert.equal(mentioned.rows[0]?.channel, "instant");
-    assert.equal(mentioned.rows[0]?.category, "mentions");
+    await insertEvent(sql, { id: "EV-act", type: "activity", siteId: "PIPE-PHX-0008", payload: { summary: "Jaideep should look." } });
+    await notifyAppliedChanges(sql, actor, [{ entity_type: "activity", site_id: "PIPE-PHX-0008", event_id: "EV-act" }]);
+    const mentioned = await sql.query(`SELECT id FROM alert_outbox WHERE ref_id IN ('EV-3', 'EV-act')`);
+    assert.equal(mentioned.rows.length, 0);
+
+    await insertEvent(sql, {
+      id: "EV-first",
+      type: "stage",
+      siteId: "PIPE-PHX-0010",
+      payload: { stage: "1 Desk screen", previous_stage: null },
+    });
+    await insertEvent(sql, {
+      id: "EV-same",
+      type: "stage",
+      siteId: "PIPE-PHX-0011",
+      payload: { stage: "2 Financial screen", previous_stage: "2 Financial screen" },
+    });
+    await notifyAppliedChanges(sql, actor, [
+      { entity_type: "stage", site_id: "PIPE-PHX-0010", event_id: "EV-first" },
+      { entity_type: "stage", site_id: "PIPE-PHX-0011", event_id: "EV-same" },
+    ]);
+    const skipped = await sql.query(`SELECT id FROM alert_outbox WHERE ref_id IN ('EV-first', 'EV-same')`);
+    assert.equal(skipped.rows.length, 0);
 
     await notifyAppliedChanges(sql, { id: "jaideep", kind: "human" }, [{ entity_type: "stage", site_id: "PIPE-PHX-0008", event_id: "EV-1" }]);
     await notifyAppliedChanges(sql, { id: "workbook-sync", kind: "agent" }, [{ entity_type: "stage", site_id: "PIPE-PHX-0008", event_id: "EV-1" }]);
     const still = await sql.query(`SELECT id FROM alert_outbox WHERE category = 'stages'`);
     assert.equal(still.rows.length, 1);
+
+    await sql.query(
+      `INSERT INTO suggestions (id, target_kind, target_id, field_name, proposed_value, reason, status, author_id)
+       VALUES ('sug-1', 'site', 'PIPE-PHX-0022', 'stage', '3 Site checks', 'Approved.', 'accepted', 'jaideep')`,
+    );
+    await insertEvent(sql, {
+      id: "EV-ok",
+      type: "stage",
+      siteId: "PIPE-PHX-0022",
+      payload: { stage: "3 Site checks", previous_stage: "2 Financial screen" },
+    });
+    await notifyAppliedChanges(sql, actor, [{ entity_type: "stage", site_id: "PIPE-PHX-0022", event_id: "EV-ok" }]);
+    const approved = await sql.query<{ channel: string }>(`SELECT channel FROM alert_outbox WHERE ref_id = 'EV-ok'`);
+    assert.equal(approved.rows.length, 1);
+    assert.equal(approved.rows[0]?.channel, "digest");
   } finally {
     if (previous == null) delete process.env.AUTH_USERS;
     else process.env.AUTH_USERS = previous;
@@ -97,8 +128,12 @@ test("PIPE-PHX-0006 is left out of instant alerts and the digest", async () => {
   process.env.APP_URL = "https://sites-map-preview.vercel.app";
   const sql = await ready();
   try {
-    await insertEvent(sql, { id: "EV-X", type: "stage", siteId: "PIPE-PHX-0006", payload: { stage: "Dropped" } });
-    await insertEvent(sql, { id: "EV-Y", type: "stage", siteId: "PIPE-PHX-0008", payload: { stage: "3 Site checks" } });
+    await sql.query(
+      `INSERT INTO suggestions (id, target_kind, target_id, field_name, proposed_value, reason, status, author_id)
+       VALUES ('sug-y', 'site', 'PIPE-PHX-0008', 'stage', '3 Site checks', 'Approved.', 'accepted', 'jaideep')`,
+    );
+    await insertEvent(sql, { id: "EV-X", type: "stage", siteId: "PIPE-PHX-0006", payload: { stage: "Dropped", previous_stage: "1 Desk screen" } });
+    await insertEvent(sql, { id: "EV-Y", type: "stage", siteId: "PIPE-PHX-0008", payload: { stage: "3 Site checks", previous_stage: "2 Financial screen" } });
     await insertEvent(sql, { id: "EV-Z", type: "activity", siteId: "PIPE-PHX-0006", payload: { summary: "Hidden activity." } });
     await notifyAppliedChanges(sql, { id: "indie", kind: "agent" }, [
       { entity_type: "stage", site_id: "PIPE-PHX-0006", event_id: "EV-X" },

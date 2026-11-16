@@ -4,7 +4,7 @@ import { renderAlert } from "./template";
 import type { AlertCategory } from "./preferences";
 
 export type MailItem = {
-  category: AlertCategory | "followed" | "queue" | "activity" | "comms" | "brief";
+  category: AlertCategory | "followed" | "queue" | "activity" | "comms" | "sites" | "brief";
   siteId: string;
   siteLabel: string;
   summary: string;
@@ -24,10 +24,12 @@ const LABELS: Record<MailItem["category"], string> = {
   proposals: "Proposal",
   decisions: "Decision",
   stages: "Stage",
+  asks: "Ask",
   followed: "Note",
   queue: "Review",
   activity: "Activity",
   comms: "Comms",
+  sites: "Listing",
   brief: "Summary",
 };
 

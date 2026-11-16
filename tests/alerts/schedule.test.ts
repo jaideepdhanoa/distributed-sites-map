@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, test } from "node:test";
 import { migrate } from "../../lib/actions/migrate";
-import { DEFAULT_BATCH_MS } from "../../lib/alerts/clock";
 import { notifyFlag } from "../../lib/alerts/notify";
-import { backgroundFlushDelayMs, runScheduledFlush, scheduleInstantFlush } from "../../lib/alerts/schedule";
+import { BACKGROUND_FLUSH_CAP_MS, backgroundFlushDelayMs, runScheduledFlush, scheduleInstantFlush } from "../../lib/alerts/schedule";
 import { memorySql } from "../helpers/sql";
 
 describe("alert scheduling", { concurrency: 1 }, () => {
@@ -12,7 +11,7 @@ test("the background flush waits just past the debounce and stays capped", () =>
   const previous = process.env.ALERT_BATCH_MS;
   try {
     delete process.env.ALERT_BATCH_MS;
-    assert.equal(backgroundFlushDelayMs(), DEFAULT_BATCH_MS + 1_000);
+    assert.equal(backgroundFlushDelayMs(), BACKGROUND_FLUSH_CAP_MS);
     process.env.ALERT_BATCH_MS = "0";
     assert.equal(backgroundFlushDelayMs(), 0);
     process.env.ALERT_BATCH_MS = "10000";

@@ -38,8 +38,11 @@ async function queueFor(
     summary: string;
     href: string;
     refId: string;
+    channel?: "instant" | "digest";
+    force?: boolean;
   },
 ): Promise<boolean> {
+  if (isExcludedSite(input.siteId)) return false;
   const prefsCache = new Map<string, Awaited<ReturnType<typeof loadPreferences>>>();
   let instant = false;
   for (const recipient of deliveryRecipients(input.actorId, input.userIds)) {
@@ -49,12 +52,13 @@ async function queueFor(
       prefsCache.set(recipient.userId, prefs);
     }
     const mode = prefs?.[input.category] || "off";
-    if (mode === "off") continue;
+    if (!input.force && mode === "off") continue;
+    const channel = input.force ? input.channel || "instant" : mode === "instant" ? "instant" : "digest";
     await enqueueAlert(sql, {
       userId: recipient.userId,
       email: recipient.email,
       category: input.category,
-      channel: mode === "instant" ? "instant" : "digest",
+      channel,
       siteId: input.siteId,
       siteLabel: await siteLabel(input.siteId),
       summary: input.summary,
@@ -63,7 +67,7 @@ async function queueFor(
       refId: input.refId,
       idempotencyKey: `${input.category}:${input.refId}:${recipient.userId}`,
     });
-    if (mode === "instant") instant = true;
+    if (channel === "instant") instant = true;
   }
   return instant;
 }
@@ -92,6 +96,8 @@ export async function queueAgentAlert(
     summary: string;
     href: string;
     refId: string;
+    channel?: "instant" | "digest";
+    force?: boolean;
   },
 ): Promise<boolean> {
   if (isExcludedSite(input.siteId)) return false;

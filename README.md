@@ -189,21 +189,19 @@ Those deals are hidden on the map, the list, the counts, and the default Review 
 
 ### Alerts
 
-Instant mail goes only to the person involved:
+Instant mail goes only to the person involved, one email per ten-minute batch:
 
-- an open next-step proposal or document request waiting for their approval
-- an @mention
-- a reply on a thread they wrote or were mentioned in
-- a flag or an assignment to them
-- an agent recommendation, proposal, or decision request, including an unanswered Ask question
-- a stage change written by Indie or Muse
-- a note or comment from Indie or Muse that addresses or mentions them
+- an open next-step proposal, document request, or suggested drop waiting for their approval
+- an explicit @mention in a note or a suggestion
+- a flag or an assignment sent to them
+- an agent decision request
+- an agent stage change that is not tied to an approved decision
 
-Routine activity and comms from an agent are not instant mail. They are counted in the morning digest. `PIPE-PHX-0006` is left out of every alert, digest, and catch-up, and mail never links to it.
+Replies, agent draft replies, approved stage changes, inbound comms, new listings, and ask gaps wait for the morning digest. Activity rows, workbook imports, a site's first stage row, a stage write that does not change the stage, and the person's own actions are not mailed. `PIPE-PHX-0006` is left out of every alert, digest, and catch-up, and mail never links to it.
 
-A burst for one person is one email, titled `Distributed Sites · N updates`. Mail that has been waiting at least an hour is a catch-up, titled `Distributed Sites catch-up · N updates`. The one-time catch-up since Nov 9 uses the subject `Distributed Sites catch-up · since Nov 9`. The daily digest subject is only used by the morning cron. The flush sends once the oldest unsent item is about a minute old, and it includes everything still waiting for that person. A later item does not hold an earlier one past that minute. The person who took the action is not mailed about it.
+A burst for one person is one email, titled `Distributed Sites · N updates`, grouped by site. Mail that has been waiting at least an hour is a catch-up, titled `Distributed Sites catch-up · N updates`. The one-time catch-up since Nov 9 uses the subject `Distributed Sites catch-up · since Nov 9` and the same filters as the digest. The daily digest subject is only used by the morning cron. The flush sends once the oldest unsent item is about ten minutes old (`ALERT_BATCH_MS`, default 600000), and it includes everything still waiting for that person. A later item does not hold an earlier one past that window. Each person gets at most six instant emails in a Pacific day. Anything past that cap is moved onto the digest and is not dropped. The person who took the action is not mailed about it.
 
-The daily digest runs from a Vercel Cron at `0 15 * * *` UTC. That hour is 7:00 AM PST. On the Hobby plan the job is only promised to start sometime during that hour, and during daylight time it is 8:00 AM Pacific. The handler treats the America/Los_Angeles calendar day as the send day, and it sends at most one digest per person per day. When the digest is on, that mail goes out even on a quiet morning. It counts agent recommendations and proposals still waiting, stage changes, new comms and activity per site over the last day, other notes on sites the person follows, and the open Review count. Each site links on the production host.
+The daily digest runs from two Vercel Crons, `0 14 * * *` and `0 15 * * *` UTC. The handler sends only when the America/Los_Angeles hour is 7, so the mail is 7:00 AM both in standard time and in daylight time, at most once per person per day. On Nov 16 that is the 15:00 UTC run. The first run, and any checkpoint from before then, starts at midnight Pacific on Nov 16, so the Nov 15 workbook import is outside the window. Later runs start at the previous send. It is skipped when there is nothing new. It counts agent draft replies still waiting, open proposals, open decision requests that are not already recorded, stage changes that actually changed and were not the site's first row, new listings by market with up to five links, inbound comms grouped by site, open ask gaps, notes on followed sites, and the open Review count. Workbook imports, activity rows, unchanged stages, and comms the person sent are left out. Each site links on the production host.
 
 Saving a note, reply, mention, proposal, flag, or assignment schedules an instant flush after the response, so the page does not wait on mail. The Alert flush GitHub Actions workflow still runs every five minutes and posts to `/api/alerts/flush` on `APP_URL` (the repository variable, defaulting to `https://distributedsites.com`). That job and the daily digest cron are the backstops when the background flush does not run. GitHub may start the job later than the mark. The flush claims each row before sending, so a repeated or overlapping run does not send the same item twice. The sign-in proxy allows an Authorization Bearer header through to `/api/alerts/flush`, `/api/alerts/digest`, and `/api/data/revalidate`. Any other API path still needs a session. The handler checks the secret. Set the same `CRON_SECRET` as a GitHub Actions secret and as a Vercel environment variable. The workflow sends it as `Authorization: Bearer <CRON_SECRET>`. If the GitHub secret is missing, the workflow logs that and skips instead of failing.
 
@@ -217,7 +215,7 @@ Only app accounts are mailed. Add an optional `email` on that person's `AUTH_USE
 
 `cindel` should be `cindel.pena@moove.io`. `jaideep` should be `jaideep@dhanoa.in`. An address that is not mapped to an app account is not used. Brokers and sellers are not mailed.
 
-The account menu opens a settings sheet. Approvals, mentions, replies, flags, assignments, recommendations, proposals, decisions, and stage changes can each be Instant, Digest, or Off. The daily digest can be on or off. A reviewer starts with those categories instant, and the digest on. A contributor starts with instant mentions, replies, flags, and assignments. Recommendations, proposals, decisions, and stage changes start on the digest, and the digest is on. A viewer starts with mentions only, and the digest off. Replies follow mentions for a reviewer or contributor, and stay off for a viewer. New categories use that default until the person saves, including before the alert-category migration has been applied.
+The account menu opens a settings sheet. Approvals, mentions, replies, flags, assignments, recommendations, proposals, decisions, stage changes, and ask gaps can each be Instant, Digest, or Off. The daily digest can be on or off. A reviewer starts with proposals, decisions, approvals, mentions, flags, and assignments instant. Stages, recommendations, replies, and ask gaps start on the digest, and the digest is on. A contributor starts with instant mentions, flags, and assignments. Replies, recommendations, proposals, decisions, stage changes, and ask gaps start on the digest, and the digest is on. A viewer starts with mentions only, and the digest off. New categories use that default until the person saves, including before the alert-category migration has been applied.
 
 The one-time catch-up is the Alert catch-up workflow, run by hand on `main`. Leave dry run on to print counts only. Set dry run to false to send one email, "Distributed Sites catch-up · since Nov 9", to `jaideep@dhanoa.in`. A second real run does not send again.
 

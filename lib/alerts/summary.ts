@@ -1,9 +1,8 @@
 import type { Sql } from "@/lib/actions/db";
 import { loadCatalog } from "@/lib/queue/catalog";
-import { publicSnippet } from "./compose";
 import type { MailItem } from "./compose";
 import { EXCLUDED_SITE_ID, isExcludedSite } from "./excluded";
-import { discussionHref, proposalHref, reviewHomeHref, siteHref } from "./links";
+import { reviewHomeHref, siteHref } from "./links";
 import type { AlertCategory, AlertPreferences } from "./preferences";
 
 export const CATCHUP_SINCE = "2026-11-09T00:00:00.000Z";
@@ -11,7 +10,7 @@ export const CATCHUP_SUBJECT = "Distributed Sites catch-up · since Nov 9";
 export const CATCHUP_EMAIL = "jaideep@dhanoa.in";
 export const CATCHUP_KEY = "catchup:jaideep:since-2026-11-09";
 
-const LIST_LIMIT = 25;
+const TOP_SITES = 5;
 
 export type SummaryCounts = {
   recommendations: number;
@@ -21,55 +20,27 @@ export type SummaryCounts = {
   activity: number;
   comms: number;
   sites: number;
+  asks: number;
 };
 
 export type SummaryResult = { items: MailItem[]; counts: SummaryCounts };
 
 export function emptyCounts(): SummaryCounts {
-  return { recommendations: 0, proposals: 0, decisions: 0, stages: 0, activity: 0, comms: 0, sites: 0 };
+  return { recommendations: 0, proposals: 0, decisions: 0, stages: 0, activity: 0, comms: 0, sites: 0, asks: 0 };
 }
 
 export function emptyBrief(): SummaryResult {
   return { items: [], counts: emptyCounts() };
 }
 
-type RecommendationRow = {
+type EventRow = {
   id: string;
-  kind: string;
-  decision: string;
-  draft_text: string;
-  model: string;
-  site_id: string;
-  proposal_id: string | null;
-};
-
-type DecisionRow = {
-  id: string;
-  site_id: string;
-  proposal_status: string | null;
-  stage: string | null;
-  actor: string;
-};
-
-type ProposalRow = {
-  id: string;
-  target_id: string;
-  title: string | null;
-  proposed_value: string;
-  author_id: string;
-};
-
-type StageRow = {
-  id: string;
+  entity_type: string;
   site_id: string;
   payload: unknown;
   actor: string;
-};
-
-type CountRow = {
-  site_id: string;
-  entity_type: string;
-  count: number | string;
+  source: string;
+  created_at: Date | string;
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -89,14 +60,40 @@ function kept(siteId: string): boolean {
   return Boolean(siteId) && !isExcludedSite(siteId);
 }
 
+/** Workbook copy and import rows are app history, not mail. */
+export function isWorkbookWrite(source: string, actor: string): boolean {
+  if (actor.trim().toLowerCase() === "workbook-sync") return true;
+  const blob = `${source}\n${actor}`.toLowerCase();
+  return blob.includes("workbook") || blob.includes("import") || blob.includes("workbook-copy");
+}
+
+const BEARER_AGENTS = new Set(["indie", "muse"]);
+
+export function isRealStageChange(payload: Record<string, unknown>, source: string, actor: string): boolean {
+  if (isWorkbookWrite(source, actor)) return false;
+  const next = String(payload.stage || "");
+  if ("previous_stage" in payload) {
+    const previous = payload.previous_stage;
+    if (previous == null || String(previous).trim() === "") return false;
+    if (String(previous) === next) return false;
+  }
+  return true;
+}
+
+function inboundComms(payload: Record<string, unknown>, source: string, actor: string): boolean {
+  if (isWorkbookWrite(source, actor)) return false;
+  if (actor.trim().toLowerCase() === "jaideep") return false;
+  return String(payload.direction || "").trim().toLowerCase() === "in";
+}
+
 function shown(prefs: AlertPreferences | null, key: AlertCategory): boolean {
   if (!prefs) return true;
   return prefs[key] !== "off";
 }
 
-function line(summary: string, userId: string): MailItem {
+function line(summary: string, userId: string, category: MailItem["category"] = "brief"): MailItem {
   return {
-    category: "brief",
+    category,
     siteId: "",
     siteLabel: "",
     summary,
@@ -105,21 +102,9 @@ function line(summary: string, userId: string): MailItem {
   };
 }
 
-function waiting(count: number, plural: string, singular: string): string {
-  if (count <= 0) return `No ${plural} are waiting.`;
-  if (count === 1) return `1 ${singular} is waiting.`;
-  return `${count} ${plural} are waiting.`;
-}
-
-function overSpan(count: number, singular: string, plural: string, span: string): string {
-  if (count <= 0) return `No ${plural} ${span}.`;
-  if (count === 1) return `1 ${singular} ${span}.`;
-  return `${count} ${plural} ${span}.`;
-}
-
-function agentActor(model: string): string {
-  const id = model.trim().toLowerCase();
-  return id === "indie" || id === "muse" ? id : "muse";
+function countLine(count: number, singular: string, plural: string): string {
+  if (count === 1) return `1 ${singular}.`;
+  return `${count} ${plural}.`;
 }
 
 async function labels(): Promise<Map<string, string>> {
@@ -147,264 +132,192 @@ function cleanItems(items: MailItem[]): MailItem[] {
   });
 }
 
-function recommendationItem(row: RecommendationRow, map: Map<string, string>): MailItem | null {
-  if (!kept(row.site_id)) return null;
-  const decision = row.kind === "decision";
-  const proposal = !decision && Boolean(row.proposal_id);
-  const snippet = publicSnippet(row.draft_text);
-  const lead = decision ? "Decision request." : proposal ? "Proposal." : row.kind === "status_reply" ? "Status reply." : "Recommendation.";
-  return {
-    category: decision ? "decisions" : proposal ? "proposals" : "recommendations",
-    siteId: row.site_id,
-    siteLabel: siteLabel(map, row.site_id),
-    summary: snippet ? `${lead} ${snippet}` : lead,
-    authorId: agentActor(row.model),
-    href: decision || proposal ? proposalHref(row.site_id) : discussionHref(row.site_id),
-  };
+async function approvedSites(sql: Sql): Promise<Set<string>> {
+  const rows = await sql.query<{ target_id: string; proposed_value: string; detail: string | null }>(
+    `SELECT target_id, proposed_value, detail FROM suggestions WHERE status = 'accepted'`,
+  );
+  const approved = new Set<string>();
+  for (const row of rows.rows) {
+    if (row.detail === "knock_off") approved.add(`${row.target_id}\nDropped`);
+    if (row.proposed_value) approved.add(`${row.target_id}\n${row.proposed_value}`);
+  }
+  return approved;
 }
 
-async function activityItems(
+function agentStageIsApproved(actor: string, siteId: string, stage: string, approved: Set<string>): boolean {
+  if (!BEARER_AGENTS.has(actor.trim().toLowerCase())) return true;
+  return approved.has(`${siteId}\n${stage}`) || (stage === "Dropped" && approved.has(`${siteId}\nDropped`));
+}
+
+async function collect(
   sql: Sql,
-  since: string,
-  map: Map<string, string>,
-  userId: string,
-  span: string,
-): Promise<{ items: MailItem[]; activity: number; comms: number; sites: number }> {
-  const rows = await sql.query<CountRow>(
-    `SELECT site_id, entity_type, COUNT(*)::int AS count
-     FROM events
-     WHERE entity_type IN ('activity', 'comms')
-       AND created_at >= $1
-       AND btrim(site_id) <> ''
-       AND upper(site_id) <> $2
-     GROUP BY site_id, entity_type
-     ORDER BY site_id ASC, entity_type ASC`,
-    [since, EXCLUDED_SITE_ID],
-  );
-  const bySite = new Map<string, { activity: number; comms: number }>();
-  let activity = 0;
-  let comms = 0;
-  for (const row of rows.rows) {
-    if (!kept(row.site_id)) continue;
-    const count = Number(row.count) || 0;
-    const bucket = bySite.get(row.site_id) || { activity: 0, comms: 0 };
-    if (row.entity_type === "comms") {
-      bucket.comms += count;
-      comms += count;
-    } else {
-      bucket.activity += count;
-      activity += count;
-    }
-    bySite.set(row.site_id, bucket);
-  }
-  const sites = [...bySite.entries()];
+  input: { userId: string; eventSince: string | null; rowSince: string | null; prefs: AlertPreferences | null },
+): Promise<SummaryResult> {
+  const map = await labels();
   const items: MailItem[] = [];
-  const noun = sites.length === 1 ? "site has" : "sites have";
-  items.push(line(
-    sites.length === 0
-      ? `No new activity or comms ${span}.`
-      : `${sites.length} ${noun} new activity or comms ${span}.`,
-    userId,
-  ));
-  for (const [siteId, counts] of sites.slice(0, LIST_LIMIT)) {
-    const parts: string[] = [];
-    if (counts.activity === 1) parts.push("1 new activity record");
-    else if (counts.activity > 1) parts.push(`${counts.activity} new activity records`);
-    if (counts.comms === 1) parts.push("1 new comms record");
-    else if (counts.comms > 1) parts.push(`${counts.comms} new comms records`);
+  const counts = emptyCounts();
+  const since = input.rowSince;
+  const approved = await approvedSites(sql);
+
+  if (shown(input.prefs, "recommendations") || shown(input.prefs, "decisions")) {
+    const rows = await sql.query<{ id: string; kind: string; site_id: string }>(
+      `SELECT r.id, r.kind, i.site_id
+       FROM agent_recommendations r
+       JOIN agent_inbox i ON i.id = r.inbox_id
+       LEFT JOIN suggestions s ON s.id = i.proposal_id
+       WHERE r.dismissed_at IS NULL
+         AND r.used_at IS NULL
+         AND i.status <> 'superseded'
+         AND upper(i.site_id) <> $1
+         AND ($2::timestamptz IS NULL OR r.created_at >= $2::timestamptz)
+         AND (
+           r.kind <> 'decision'
+           OR i.proposal_id IS NULL
+           OR s.status IN ('open', 'agreed_waiting', 'ready')
+         )
+       ORDER BY r.created_at ASC, r.id ASC`,
+      [EXCLUDED_SITE_ID, since],
+    );
+    const replies = rows.rows.filter((row) => row.kind !== "decision" && kept(row.site_id));
+    const requests = rows.rows.filter((row) => row.kind === "decision" && kept(row.site_id));
+    if (shown(input.prefs, "recommendations") && replies.length) {
+      counts.recommendations = replies.length;
+      items.push(line(countLine(replies.length, "agent draft reply is waiting", "agent draft replies are waiting"), input.userId, "recommendations"));
+    }
+    if (shown(input.prefs, "decisions") && requests.length) {
+      counts.decisions = requests.length;
+      items.push(line(countLine(requests.length, "open decision request", "open decision requests"), input.userId, "decisions"));
+    }
+  }
+
+  if (shown(input.prefs, "proposals")) {
+    const rows = await sql.query<{ target_id: string }>(
+      `SELECT target_id FROM suggestions
+       WHERE status IN ('open', 'agreed_waiting', 'ready')
+         AND ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)`,
+      [since],
+    );
+    const open = rows.rows.filter((row) => kept(row.target_id));
+    if (open.length) {
+      counts.proposals = open.length;
+      items.push(line(countLine(open.length, "open proposal", "open proposals"), input.userId, "proposals"));
+    }
+  }
+
+  if (shown(input.prefs, "asks")) {
+    const rows = await sql.query<{ site_id: string }>(
+      `SELECT site_id FROM agent_inbox
+       WHERE kind = 'ask_gap' AND status IN ('new', 'picked')
+         AND upper(site_id) <> $1
+         AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)`,
+      [EXCLUDED_SITE_ID, since],
+    );
+    const gaps = rows.rows.filter((row) => !row.site_id || row.site_id === "portfolio" || kept(row.site_id));
+    if (gaps.length) {
+      counts.asks = gaps.length;
+      items.push(line(countLine(gaps.length, "open ask gap", "open ask gaps"), input.userId, "asks"));
+    }
+  }
+
+  const events = await sql.query<EventRow>(
+    `SELECT id, entity_type, site_id, payload, actor, source, created_at
+     FROM events
+     WHERE entity_type IN ('stage', 'comms')
+       AND upper(site_id) <> $1
+       AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+     ORDER BY created_at ASC, id ASC`,
+    [EXCLUDED_SITE_ID, input.eventSince],
+  );
+
+  const stages = events.rows.filter((row) => {
+    if (row.entity_type !== "stage" || !kept(row.site_id)) return false;
+    const payload = asObject(row.payload);
+    if (!isRealStageChange(payload, row.source, row.actor)) return false;
+    return agentStageIsApproved(row.actor, row.site_id, String(payload.stage || ""), approved);
+  });
+  if (shown(input.prefs, "stages") && stages.length) {
+    counts.stages = stages.length;
+    items.push(line(countLine(stages.length, "stage change from an approved decision", "stage changes from approved decisions"), input.userId, "stages"));
+    for (const row of stages.slice(0, TOP_SITES)) {
+      items.push({
+        category: "stages",
+        siteId: row.site_id,
+        siteLabel: siteLabel(map, row.site_id),
+        summary: "Stage updated.",
+        authorId: row.actor,
+        href: siteHref(row.site_id),
+      });
+    }
+  }
+
+  const commsBySite = new Map<string, number>();
+  for (const row of events.rows) {
+    if (row.entity_type !== "comms" || !kept(row.site_id)) continue;
+    const payload = asObject(row.payload);
+    if (!inboundComms(payload, row.source, row.actor)) continue;
+    commsBySite.set(row.site_id, (commsBySite.get(row.site_id) || 0) + 1);
+  }
+  const commsSites = [...commsBySite.entries()];
+  counts.comms = commsSites.reduce((sum, [, count]) => sum + count, 0);
+  for (const [siteId, count] of commsSites) {
     items.push({
-      category: counts.activity > 0 ? "activity" : "comms",
+      category: "comms",
       siteId,
       siteLabel: siteLabel(map, siteId),
-      summary: `${parts.join(" and ")}.`,
-      authorId: userId,
+      summary: count === 1 ? "1 inbound reply." : `${count} inbound replies.`,
+      authorId: input.userId,
       href: siteHref(siteId),
     });
   }
-  if (sites.length > LIST_LIMIT) {
-    items.push(line(`${LIST_LIMIT} of ${sites.length} sites are listed.`, userId));
+
+  const sites = await sql.query<EventRow>(
+    `SELECT id, entity_type, site_id, payload, actor, source, created_at
+     FROM events
+     WHERE entity_type = 'site'
+       AND upper(site_id) <> $1
+       AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+     ORDER BY created_at DESC, id DESC`,
+    [EXCLUDED_SITE_ID, input.eventSince],
+  );
+  const fresh = sites.rows.filter((row) => kept(row.site_id) && !isWorkbookWrite(row.source, row.actor));
+  const seen = new Set<string>();
+  const unique = fresh.filter((row) => {
+    if (seen.has(row.site_id)) return false;
+    seen.add(row.site_id);
+    return true;
+  });
+  counts.sites = unique.length;
+  if (unique.length) {
+    const byMarket = new Map<string, number>();
+    for (const row of unique) {
+      const market = String(asObject(row.payload).market || "").trim().toUpperCase() || "Other";
+      byMarket.set(market, (byMarket.get(market) || 0) + 1);
+    }
+    const markets = [...byMarket.entries()].map(([market, count]) => `${market} ${count}`).join(", ");
+    items.push(line(`New listings: ${markets}.`, input.userId, "sites"));
+    for (const row of unique.slice(0, TOP_SITES)) {
+      items.push({
+        category: "sites",
+        siteId: row.site_id,
+        siteLabel: siteLabel(map, row.site_id),
+        summary: "New listing.",
+        authorId: row.actor,
+        href: siteHref(row.site_id),
+        market: String(asObject(row.payload).market || ""),
+      });
+    }
   }
-  return { items, activity, comms, sites: sites.length };
+
+  return { items: cleanItems(items), counts };
 }
 
 export async function loadDigestBrief(
   sql: Sql,
   input: { userId: string; since: Date; prefs: AlertPreferences },
 ): Promise<SummaryResult> {
-  const since = input.since.toISOString();
-  const map = await labels();
-  const items: MailItem[] = [];
-  const counts = emptyCounts();
-  const recommendationsOn = shown(input.prefs, "recommendations");
-  const decisionsOn = shown(input.prefs, "decisions");
-  if (recommendationsOn || decisionsOn) {
-    const rows = await sql.query<RecommendationRow>(
-      `SELECT r.id, r.kind, r.decision, r.draft_text, r.model, i.site_id, i.proposal_id
-       FROM agent_recommendations r
-       JOIN agent_inbox i ON i.id = r.inbox_id
-       WHERE r.dismissed_at IS NULL
-         AND r.used_at IS NULL
-         AND i.status <> 'superseded'
-         AND upper(i.site_id) <> $1
-       ORDER BY r.created_at ASC, r.id ASC`,
-      [EXCLUDED_SITE_ID],
-    );
-    const replies = rows.rows.filter((row) => row.kind !== "decision" && kept(row.site_id));
-    const requests = rows.rows.filter((row) => row.kind === "decision" && kept(row.site_id));
-    if (recommendationsOn) {
-      counts.recommendations = replies.length;
-      items.push(line(waiting(replies.length, "agent recommendations", "agent recommendation"), input.userId));
-      for (const row of replies.slice(0, LIST_LIMIT)) {
-        const item = recommendationItem(row, map);
-        if (item) items.push(item);
-      }
-    }
-    if (decisionsOn) {
-      const gaps = await sql.query<{ id: string; site_id: string; actor: string }>(
-        `SELECT id, site_id, actor FROM agent_inbox
-         WHERE kind = 'ask_gap' AND status IN ('new', 'picked') AND upper(site_id) <> $1
-         ORDER BY created_at ASC, id ASC`,
-        [EXCLUDED_SITE_ID],
-      );
-      const openGaps = gaps.rows.filter((row) => kept(row.site_id) || row.site_id === "portfolio");
-      counts.decisions = requests.length + openGaps.length;
-      items.push(line(waiting(counts.decisions, "decision requests", "decision request"), input.userId));
-      for (const row of requests.slice(0, LIST_LIMIT)) {
-        const item = recommendationItem(row, map);
-        if (item) items.push(item);
-      }
-      for (const row of openGaps.slice(0, LIST_LIMIT)) {
-        const siteId = row.site_id || "portfolio";
-        if (isExcludedSite(siteId)) continue;
-        items.push({
-          category: "decisions",
-          siteId,
-          siteLabel: siteId === "portfolio" ? "Portfolio" : siteLabel(map, siteId),
-          summary: "Unanswered question.",
-          authorId: row.actor,
-          href: siteId === "portfolio" ? reviewHomeHref() : siteHref(siteId),
-        });
-      }
-    }
-  }
-  if (shown(input.prefs, "proposals")) {
-    const rows = await sql.query<ProposalRow>(
-      `SELECT id, target_id, title, proposed_value, author_id
-       FROM suggestions
-       WHERE status IN ('open', 'agreed_waiting', 'ready')
-       ORDER BY created_at ASC, id ASC`,
-    );
-    const open = rows.rows.filter((row) => kept(row.target_id));
-    counts.proposals = open.length;
-    items.push(line(waiting(open.length, "proposals", "proposal"), input.userId));
-    for (const row of open.slice(0, LIST_LIMIT)) {
-      const title = publicSnippet(row.title || "") || "Proposal.";
-      items.push({
-        category: "proposals",
-        siteId: row.target_id,
-        siteLabel: siteLabel(map, row.target_id),
-        summary: title,
-        authorId: row.author_id,
-        href: proposalHref(row.target_id),
-      });
-    }
-  }
-  if (shown(input.prefs, "stages")) {
-    const rows = await sql.query<StageRow>(
-      `SELECT id, site_id, payload, actor FROM events
-       WHERE entity_type = 'stage' AND created_at >= $1 AND upper(site_id) <> $2
-       ORDER BY created_at ASC, id ASC`,
-      [since, EXCLUDED_SITE_ID],
-    );
-    const stages = rows.rows.filter((row) => kept(row.site_id));
-    counts.stages = stages.length;
-    items.push(line(overSpan(stages.length, "stage change", "stage changes", "in the last day"), input.userId));
-    for (const row of stages.slice(0, LIST_LIMIT)) {
-      const stage = publicSnippet(String(asObject(row.payload).stage || ""));
-      items.push({
-        category: "stages",
-        siteId: row.site_id,
-        siteLabel: siteLabel(map, row.site_id),
-        summary: stage ? `Now at ${stage}.` : "Stage updated.",
-        authorId: row.actor,
-        href: siteHref(row.site_id),
-      });
-    }
-  }
-  const activity = await activityItems(sql, since, map, input.userId, "in the last day");
-  counts.activity = activity.activity;
-  counts.comms = activity.comms;
-  counts.sites = activity.sites;
-  items.push(...activity.items);
-  return { items: cleanItems(items), counts };
+  return collect(sql, { userId: input.userId, eventSince: input.since.toISOString(), rowSince: null, prefs: input.prefs });
 }
 
 export async function loadCatchUp(sql: Sql): Promise<SummaryResult> {
-  const map = await labels();
-  const items: MailItem[] = [];
-  const counts = emptyCounts();
-  const userId = "jaideep";
-  const recommendations = await sql.query<RecommendationRow>(
-    `SELECT r.id, r.kind, r.decision, r.draft_text, r.model, i.site_id, i.proposal_id
-     FROM agent_recommendations r
-     JOIN agent_inbox i ON i.id = r.inbox_id
-     WHERE r.created_at >= $1 AND upper(i.site_id) <> $2
-     ORDER BY r.created_at ASC, r.id ASC`,
-    [CATCHUP_SINCE, EXCLUDED_SITE_ID],
-  );
-  const recommendationRows = recommendations.rows.filter((row) => kept(row.site_id));
-  counts.recommendations = recommendationRows.length;
-  items.push(line(overSpan(counts.recommendations, "agent recommendation", "agent recommendations", "since Nov 9"), userId));
-  for (const row of recommendationRows.slice(0, LIST_LIMIT)) {
-    const item = recommendationItem(row, map);
-    if (item) items.push({ ...item, category: "recommendations" });
-  }
-  const decisions = await sql.query<DecisionRow>(
-    `SELECT id, site_id, proposal_status, stage, actor FROM agent_inbox
-     WHERE kind = 'decision' AND created_at >= $1 AND upper(site_id) <> $2
-     ORDER BY created_at ASC, id ASC`,
-    [CATCHUP_SINCE, EXCLUDED_SITE_ID],
-  );
-  const decisionRows = decisions.rows.filter((row) => kept(row.site_id));
-  counts.decisions = decisionRows.length;
-  items.push(line(overSpan(counts.decisions, "decision", "decisions", "since Nov 9"), userId));
-  for (const row of decisionRows.slice(0, LIST_LIMIT)) {
-    const status = publicSnippet(row.proposal_status || "");
-    const stage = publicSnippet(row.stage || "");
-    const summary = [status ? `Recorded decision: ${status}.` : "Recorded decision.", stage ? `Stage ${stage}.` : ""].filter(Boolean).join(" ");
-    items.push({
-      category: "decisions",
-      siteId: row.site_id,
-      siteLabel: siteLabel(map, row.site_id),
-      summary,
-      authorId: row.actor,
-      href: proposalHref(row.site_id),
-    });
-  }
-  const stages = await sql.query<StageRow>(
-    `SELECT id, site_id, payload, actor FROM events
-     WHERE entity_type = 'stage' AND created_at >= $1 AND upper(site_id) <> $2
-     ORDER BY created_at ASC, id ASC`,
-    [CATCHUP_SINCE, EXCLUDED_SITE_ID],
-  );
-  const stageRows = stages.rows.filter((row) => kept(row.site_id));
-  counts.stages = stageRows.length;
-  items.push(line(overSpan(counts.stages, "stage change", "stage changes", "since Nov 9"), userId));
-  for (const row of stageRows.slice(0, LIST_LIMIT)) {
-    const stage = publicSnippet(String(asObject(row.payload).stage || ""));
-    items.push({
-      category: "stages",
-      siteId: row.site_id,
-      siteLabel: siteLabel(map, row.site_id),
-      summary: stage ? `Now at ${stage}.` : "Stage updated.",
-      authorId: row.actor,
-      href: siteHref(row.site_id),
-    });
-  }
-  const activity = await activityItems(sql, CATCHUP_SINCE, map, userId, "since Nov 9");
-  counts.activity = activity.activity;
-  counts.comms = activity.comms;
-  counts.sites = activity.sites;
-  items.push(...activity.items);
-  return { items: cleanItems(items), counts };
+  return collect(sql, { userId: "jaideep", eventSince: CATCHUP_SINCE, rowSince: CATCHUP_SINCE, prefs: null });
 }

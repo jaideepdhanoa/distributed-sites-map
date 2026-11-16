@@ -6,9 +6,10 @@ const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, s
 const SERIF = "Georgia, 'Times New Roman', Times, serif";
 
 const SECTIONS: { title: string; categories: MailItem["category"][] }[] = [
-  { title: "Waiting on you", categories: ["recommendations", "proposals", "decisions"] },
+  { title: "Waiting on you", categories: ["recommendations", "proposals", "decisions", "asks"] },
   { title: "Stage changes", categories: ["stages"] },
-  { title: "Activity and comms", categories: ["activity", "comms"] },
+  { title: "New listings", categories: ["sites"] },
+  { title: "Inbound replies", categories: ["comms"] },
   { title: "Needs your approval", categories: ["approvals"] },
   { title: "Mentions & replies", categories: ["mentions", "replies", "followed"] },
   { title: "Assigned to you", categories: ["assignments"] },
@@ -240,7 +241,40 @@ function batchSubject(items: MailItem[], now: Date, tone: BatchTone): string {
   return digestSubject(items, now);
 }
 
+function renderGrouped(items: MailItem[], settingsHref: string): { subject: string; text: string; rows: string } {
+  const home = reviewHomeHref();
+  const content = items.filter((item) => item.category !== "queue" && item.category !== "brief");
+  const textLines = ["Distributed Sites", "", "Updates"];
+  const html: string[] = [eyebrow("Updates")];
+  const groups = new Map<string, MailItem[]>();
+  for (const item of content) {
+    const key = item.siteId || item.siteLabel || "portfolio";
+    const list = groups.get(key) || [];
+    list.push(item);
+    groups.set(key, list);
+  }
+  for (const group of groups.values()) {
+    const name = siteName(group[0]);
+    const href = mailLink(group[0]);
+    textLines.push("", name, href);
+    html.push(`<tr><td style="padding:8px 28px 0;font-family:${SANS};font-size:16px;line-height:1.4;color:#1c1914;">${textLink(name, href)}</td></tr>`);
+    for (const item of group) {
+      const quote = clean(item.summary, 140);
+      const meta = [categoryLabel(item.category), clean(actionLine(item), 120)].filter(Boolean).join(" · ");
+      if (meta) textLines.push(meta);
+      if (quote) textLines.push(`“${quote}”`);
+      if (meta) html.push(`<tr><td style="padding:2px 28px 0;font-family:${SANS};font-size:14px;line-height:1.4;color:#5b554b;">${esc(meta)}</td></tr>`);
+      if (quote) html.push(`<tr><td style="padding:2px 28px 8px;font-family:${SANS};font-size:14px;line-height:1.4;color:#1c1914;">“${esc(quote)}”</td></tr>`);
+    }
+  }
+  textLines.push("", "Open Review", home, "", "Manage alert settings", whyLine("updates"));
+  html.push(`<tr><td style="padding:20px 28px 8px;">${button("Open Review", home)}</td></tr>`);
+  html.push(footer(whyLine("updates"), settingsHref));
+  return { subject: updatesSubject(content.length), text: textLines.join("\n"), rows: html.join("\n") };
+}
+
 function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: BatchTone = "digest"): { subject: string; text: string; rows: string } {
+  if (tone === "updates") return renderGrouped(items, settingsHref);
   const home = reviewHomeHref();
   const heading = batchHeading(tone);
   const textLines = ["Distributed Sites", "", heading];

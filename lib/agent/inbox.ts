@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { approvesWorkbookStage } from "@/lib/agent/access";
+import { VISIBLE_INBOX_SQL } from "@/lib/agent/feedKeys";
 import { entityUrl, feedOrigin, feedSitePath, type FeedKind } from "@/lib/agent/links";
 import type { Sql } from "@/lib/actions/db";
 import { fileLookup, recordField, type RecordLookup } from "@/lib/actions/records";
@@ -617,12 +618,7 @@ export async function listInbox(
   sql: Sql,
   input: { after?: string | null; limit?: number; lookup?: RecordLookup; audience?: "all" | "muse" | "indie" } = {},
 ): Promise<{ items: InboxItem[]; next: string | null }> {
-  try {
-    const { syncEventFeed } = await import("@/lib/agent/eventFeed");
-    await syncEventFeed(sql);
-  } catch (error) {
-    console.error(JSON.stringify({ event: "agent_feed_sync_error", name: error instanceof Error ? error.name : "error" }));
-  }
+  // Projection runs from scripts/drain-agent-feed.ts. A feed read does not write.
   const lookup = input.lookup || (await fileLookup());
   const audience = input.audience || "all";
   const { refreshProposalReadiness } = await import("@/lib/actions/blockers");
@@ -635,6 +631,7 @@ export async function listInbox(
       `SELECT ${SELECT} FROM agent_inbox
        WHERE (created_at, id) > ($1::timestamptz, $2)
          AND ($4 = 'all' OR audience = $4 OR audience = 'both')
+         AND ${VISIBLE_INBOX_SQL}
        ORDER BY created_at ASC, id ASC
        LIMIT $3`,
       [cursor.createdAt, cursor.id, limit, audience],
@@ -642,6 +639,7 @@ export async function listInbox(
     : await sql.query<InboxRow>(
       `SELECT ${SELECT} FROM agent_inbox
        WHERE ($2 = 'all' OR audience = $2 OR audience = 'both')
+         AND ${VISIBLE_INBOX_SQL}
        ORDER BY created_at ASC, id ASC
        LIMIT $1`,
       [limit, audience],

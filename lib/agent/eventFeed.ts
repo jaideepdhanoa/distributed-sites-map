@@ -1,4 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
+import { EVENT_FEED_LIMIT, eventSkipKey } from "@/lib/agent/feedKeys";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { CHECK_FIELDS, PHOTO_FIELDS, SCHEMA_FIELDS } from "@/lib/changes/site";
 import { insertFeedRow, type FeedInsert } from "@/lib/agent/inbox";
@@ -68,6 +69,12 @@ export function routesForEvent(input: {
   if (photos) routes.push({ audience: "indie", kind: "data_change", text: "Photo updated.", after: photos });
   if (distance) routes.push({ audience: "muse", kind: "data_change", text: "Distance updated.", after: distance });
   if (failed.length) routes.push({ audience: "indie", kind: "check_failed", text: "A check failed.", after: failed.sort().join(", ") });
+  if (!routes.length && input.entityType === "stage") {
+    routes.push({ audience: "indie", kind: "data_change", text: "Stage updated.", after: "stage" });
+  }
+  if (!routes.length && input.entityType === "site") {
+    routes.push({ audience: "indie", kind: "data_change", text: "Site updated.", after: "site" });
+  }
   const seen = new Set<string>();
   return routes.filter((route) => {
     const key = `${route.audience}:${route.kind}:${route.text}`;
@@ -89,29 +96,83 @@ export function brokerMatchFeed(siteId: string): FeedInsert {
   };
 }
 
-export async function syncEventFeed(sql: Sql): Promise<number> {
-  const events = await sql.query<{
-    id: string;
-    entity_type: string;
-    entity_id: string;
-    site_id: string;
-    payload: unknown;
-    source: string;
-    actor: string;
-    run_id: string | null;
-    created_at: Date | string;
-  }>(
+const UNPROCESSED_EVENT = `NOT EXISTS (
+  SELECT 1 FROM agent_inbox i
+  WHERE split_part(i.idempotency_key, ':', 1) = 'event'
+    AND split_part(i.idempotency_key, ':', 2) = e.id
+)`;
+
+export type FeedSyncBatch = { scanned: number; projected: number };
+
+type FeedEvent = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  site_id: string;
+  payload: unknown;
+  source: string;
+  actor: string;
+  run_id: string | null;
+  created_at: Date | string;
+};
+
+function eventCreatedAt(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("Event created_at is not a time.");
+  return date.toISOString();
+}
+
+function skipSiteId(event: { site_id: string; entity_id: string }): string {
+  if (isExcludedSite(event.site_id) || isExcludedSite(event.entity_id)) return "portfolio";
+  return event.site_id || event.entity_id || "portfolio";
+}
+
+async function markEventSkipped(sql: Sql, event: FeedEvent, createdAt: string): Promise<void> {
+  const siteId = skipSiteId(event);
+  await insertFeedRow(sql, {
+    kind: "data_change",
+    subtype: "skip",
+    refId: event.id,
+    siteId,
+    recordId: siteId,
+    actor: "system",
+    text: "No feed route.",
+    threadKey: `event:${event.id}`,
+    audience: "muse",
+    createdAt,
+    idempotencyKey: eventSkipKey(event.id),
+  });
+}
+
+export async function countUnprocessedEvents(sql: Sql): Promise<number> {
+  const rows = await sql.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM events e WHERE ${UNPROCESSED_EVENT}`,
+  );
+  return Number(rows.rows[0]?.n || 0);
+}
+
+/**
+ * Project one page of events that have no feed key yet.
+ * Rows keep the event's created_at. An event with no route, and the quarantined
+ * site, get a skip key so they leave this window. A feed read does not call this.
+ */
+export async function syncEventFeed(sql: Sql, limit = EVENT_FEED_LIMIT): Promise<FeedSyncBatch> {
+  const size = Math.max(1, Math.min(EVENT_FEED_LIMIT, Math.floor(limit) || EVENT_FEED_LIMIT));
+  const events = await sql.query<FeedEvent>(
     `SELECT id, entity_type, entity_id, site_id, payload, source, actor, run_id, created_at
      FROM events e
-     WHERE NOT EXISTS (
-       SELECT 1 FROM agent_inbox i WHERE i.idempotency_key LIKE 'event:' || e.id || ':%'
-     )
+     WHERE ${UNPROCESSED_EVENT}
      ORDER BY created_at ASC, id ASC
-     LIMIT 200`,
+     LIMIT $1`,
+    [size],
   );
-  let wrote = 0;
+  let projected = 0;
   for (const event of events.rows) {
-    if (isExcludedSite(event.site_id) || isExcludedSite(event.entity_id)) continue;
+    const createdAt = eventCreatedAt(event.created_at);
+    if (isExcludedSite(event.site_id) || isExcludedSite(event.entity_id)) {
+      await markEventSkipped(sql, event, createdAt);
+      continue;
+    }
     const payload = asObject(event.payload);
     const prior = await sql.query<{ payload: unknown }>(
       `SELECT payload FROM events
@@ -127,6 +188,10 @@ export async function syncEventFeed(sql: Sql): Promise<number> {
       payload,
       changed: changedKeys(prior.rows[0] ? asObject(prior.rows[0].payload) : null, payload),
     });
+    if (!routes.length) {
+      await markEventSkipped(sql, event, createdAt);
+      continue;
+    }
     for (const route of routes) {
       const key = route.kind === "check_failed" ? `event:${event.id}:indie:check` : `event:${event.id}:${route.audience}`;
       const saved = await insertFeedRow(sql, {
@@ -142,11 +207,12 @@ export async function syncEventFeed(sql: Sql): Promise<number> {
         after: route.after,
         runId: event.run_id || "",
         idempotencyKey: key,
+        createdAt,
       });
-      if (saved) wrote += 1;
+      if (saved) projected += 1;
     }
   }
-  return wrote;
+  return { scanned: events.rows.length, projected };
 }
 
 const STALE_DAYS = 14;

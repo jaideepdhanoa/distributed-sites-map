@@ -38,7 +38,7 @@ import {
   type SheetRender,
   type SheetTable,
 } from "../lib/changes/mirror";
-import { loadSheetTable, readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
+import { loadSheetTable, readBackCells, readBackOutcome, readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
 
 function summary(text: string): void {
   const file = process.env.GITHUB_STEP_SUMMARY;
@@ -59,11 +59,6 @@ function publicError(error: unknown): string {
 
 function sheetsToken(raw: string): Promise<string> {
   return sheetsAccessToken(raw, MIRROR_SHEETS_SCOPE);
-}
-
-async function sheetsValues(token: string, range: string, kind: SheetRender = "formatted"): Promise<string[][]> {
-  const [grid] = await readSheetRanges(token, SPREADSHEET_ID, [range], kind);
-  return grid || [];
 }
 
 async function loadTable(token: string, title: string, headerRow: number, fieldHeaders: string[][], siteCells = false): Promise<SheetTable> {
@@ -102,14 +97,8 @@ async function writeCells(token: string, changes: CellChange[]): Promise<void> {
   }
 }
 
-async function readBack(token: string, changes: CellChange[]): Promise<{ sheet: string; row: number; column: number; value: string }[]> {
-  const out: { sheet: string; row: number; column: number; value: string }[] = [];
-  for (const change of changes) {
-    const values = await sheetsValues(token, a1(change.sheet, change.row, change.column));
-    const cell = values[0]?.[0];
-    out.push({ sheet: change.sheet, row: change.row, column: change.column, value: cell == null ? "" : cell });
-  }
-  return out;
+function readBack(token: string, changes: CellChange[]): Promise<{ sheet: string; row: number; column: number; value: string }[]> {
+  return readBackCells(token, SPREADSHEET_ID, changes);
 }
 
 async function main(): Promise<void> {
@@ -261,10 +250,19 @@ async function main(): Promise<void> {
     phase = "writing";
     await writeCells(token, changes);
     phase = "written";
+  } catch (error) {
+    await finish("failed", "write failed");
+    throw error;
+  }
+  try {
     assertReadBack(changes, await readBack(token, changes));
   } catch (error) {
-    await finish("failed", "read-back or write failed");
-    throw error;
+    const outcome = readBackOutcome(error);
+    await finish(outcome.status, outcome.note);
+    if (outcome.rethrow) throw error;
+    console.log(`Wrote ${counts.cells} cells. Read-back was rate limited after retries.\n${driftText}\n${counted}`);
+    summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Read-back was rate limited after retries. The run is recorded as succeeded.\n\n${driftText}\n\n${counted}\n`);
+    return;
   }
   await finish("succeeded", "wrote cells");
   console.log(`Wrote ${counts.cells} cells.\n${driftText}\n${counted}`);

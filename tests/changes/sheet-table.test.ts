@@ -4,10 +4,13 @@ import test from "node:test";
 import { PROTECTED_ROW, PROTECTED_SITE_ID, formatPlan, planSiteMirror, type SheetRender } from "../../lib/changes/mirror";
 import { MIRROR_FIELD_HEADERS } from "../../lib/changes/site";
 import {
+  READ_BACK_BATCH,
   SHEET_READS_PER_SITE_TAB,
   SHEETS_RETRY_MAX_DELAY_MS,
   loadSheetTable,
   loadSheetTablePerColumn,
+  readBackCells,
+  readBackOutcome,
   readSheetRanges,
   sheetsFetch,
   sheetsRetryDelay,
@@ -397,4 +400,95 @@ test("Sheets 429 and 5xx retry with bounded jitter", async () => {
     random: () => 0,
   });
   assert.deepEqual(grid, [["46316"], ["1600000"], ["0"], [""]]);
+});
+
+test("read-back uses one values:batchGet and retries a 429", async () => {
+  const cells = [
+    { sheet: "Pipeline", row: 5, column: 4 },
+    { sheet: "Pipeline", row: 6, column: 4 },
+    { sheet: "O'Brien", row: 3, column: 1 },
+  ];
+  const calls: string[] = [];
+  const sleeps: number[] = [];
+  let hits = 0;
+  const values = await readBackCells("token", "sheet-id", cells, {
+    fetch: async (url) => {
+      const href = String(url);
+      calls.push(href);
+      hits += 1;
+      if (hits === 1) return new Response("limited", { status: 429, headers: { "Retry-After": "0" } });
+      const parsed = new URL(href);
+      assert.equal(parsed.pathname.endsWith("/values:batchGet"), true);
+      const ranges = parsed.searchParams.getAll("ranges");
+      assert.equal(ranges.length, 3);
+      assert.equal(ranges.some((range) => range.includes("'O''Brien'!A3")), true);
+      return Response.json({
+        valueRanges: [
+          { values: [["2 Financial screen"]] },
+          { values: [["Sample"]] },
+          { values: [[""]] },
+        ],
+      });
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    random: () => 0,
+    maxAttempts: 4,
+    baseMs: 1000,
+    maxDelayMs: 16_000,
+  });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(sleeps, [500]);
+  assert.equal(calls.every((url) => url.includes("values:batchGet")), true);
+  assert.equal(values[0]?.value, "2 Financial screen");
+  assert.equal(values[1]?.value, "Sample");
+  assert.equal(values[2]?.value, "");
+
+  const many = Array.from({ length: READ_BACK_BATCH + 1 }, (_, index) => ({ sheet: "Pipeline", row: index + 2, column: 1 }));
+  let batches = 0;
+  const wide = await readBackCells("token", "sheet-id", many, {
+    fetch: async (url) => {
+      batches += 1;
+      const count = new URL(String(url)).searchParams.getAll("ranges").length;
+      return Response.json({ valueRanges: Array.from({ length: count }, () => ({ values: [["ok"]] })) });
+    },
+    sleep: async () => {
+      throw new Error("slept");
+    },
+  });
+  assert.equal(batches, 2);
+  assert.equal(wide.length, READ_BACK_BATCH + 1);
+  assert.equal(wide.every((cell) => cell.value === "ok"), true);
+
+  await assert.rejects(
+    () => readBackCells("token", "sheet-id", cells, {
+      fetch: async () => new Response("limited", { status: 429 }),
+      sleep: async () => undefined,
+      random: () => 0,
+      maxAttempts: 2,
+      baseMs: 10,
+      maxDelayMs: 10,
+    }),
+    (error: unknown) => {
+      const outcome = readBackOutcome(error);
+      assert.equal(outcome.status, "succeeded");
+      assert.equal(outcome.rethrow, false);
+      assert.equal(outcome.note, "wrote cells; read-back rate limited");
+      const message = error instanceof Error ? error.message : "";
+      assert.equal(message.includes("limited"), false);
+      return true;
+    },
+  );
+  const mismatch = readBackOutcome(new Error("Read-back mismatch at Pipeline!D5 for PIPE-PHX-0108."));
+  assert.equal(mismatch.status, "failed");
+  assert.equal(mismatch.rethrow, true);
+
+  const source = readFileSync("scripts/workbook-mirror.ts", "utf8");
+  const readBackAt = source.indexOf("function readBack");
+  const readBackBody = source.slice(readBackAt, source.indexOf("async function main"));
+  assert.match(readBackBody, /readBackCells\(/);
+  assert.doesNotMatch(readBackBody, /for \(const change of changes\)/);
+  assert.match(source, /readBackOutcome\(/);
+  assert.match(source, /finish\("failed", "write failed"\)/);
 });

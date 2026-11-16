@@ -48,6 +48,8 @@ async function ready() {
     "013_list_layouts.sql",
     "014_pnl.sql",
     "017_site_spaces.sql",
+    "018_pnl_basis.sql",
+    "019_pnl_retract.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

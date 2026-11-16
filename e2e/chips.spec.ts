@@ -73,31 +73,37 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
   }, who);
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=pipeline-list]");
-  const waiting = page.locator("th[data-col='chip_waiting']");
-  await expect(waiting).toBeVisible();
-  await waiting.scrollIntoViewIfNeeded();
-  await waiting.hover();
-  await waiting.getByRole("button", { name: "Filter Waiting on" }).click({ force: true });
-  await page.getByRole("group", { name: "Filter Waiting on" }).getByText("Broker reply", { exact: true }).click();
-  await expect(page.locator("[data-testid='chip-waiting_on']").first()).toBeVisible();
-  const filterMenu = page.locator(".col-menu");
-  const headerBox = await waiting.boundingBox();
-  const menuBox = await filterMenu.boundingBox();
-  const chipBox = await page.locator("[data-testid='chip-waiting_on']").first().boundingBox();
-  if (headerBox && menuBox && chipBox) {
-    const x = Math.max(0, Math.min(headerBox.x, menuBox.x, chipBox.x) - 8);
-    const y = Math.max(0, Math.min(headerBox.y, menuBox.y) - 8);
-    const right = Math.max(headerBox.x + headerBox.width, menuBox.x + menuBox.width, chipBox.x + chipBox.width) + 12;
-    const bottom = Math.max(menuBox.y + menuBox.height, chipBox.y + chipBox.height) + 12;
-    await page.screenshot({
-      path: shotPath(`chips-grid-${suffix}`),
-      clip: { x, y, width: Math.min(right - x, 420), height: bottom - y },
-    });
+  if (phone) {
+    await expect(page.getByTestId("phone-cards")).toBeVisible();
+    await page.getByTestId("phone-cards").screenshot({ path: shotPath(`chips-grid-${suffix}`) });
+    await page.getByRole("button", { name: "More list actions" }).click();
+    await page.getByRole("menuitem", { name: "Select", exact: true }).click();
+    await page.locator("[data-testid=phone-cards] input.check").first().click();
+  } else {
+    const waiting = page.locator("th[data-col='chip_waiting']");
+    await expect(waiting).toBeVisible();
+    await waiting.scrollIntoViewIfNeeded();
+    await waiting.hover();
+    await waiting.getByRole("button", { name: "Filter Waiting on" }).click({ force: true });
+    await page.getByRole("group", { name: "Filter Waiting on" }).getByText("Broker reply", { exact: true }).click();
+    await expect(page.locator("[data-testid='chip-waiting_on']").first()).toBeVisible();
+    const filterMenu = page.locator(".col-menu");
+    const headerBox = await waiting.boundingBox();
+    const menuBox = await filterMenu.boundingBox();
+    const chipBox = await page.locator("[data-testid='chip-waiting_on']").first().boundingBox();
+    if (headerBox && menuBox && chipBox) {
+      const x = Math.max(0, Math.min(headerBox.x, menuBox.x, chipBox.x) - 8);
+      const y = Math.max(0, Math.min(headerBox.y, menuBox.y) - 8);
+      const right = Math.max(headerBox.x + headerBox.width, menuBox.x + menuBox.width, chipBox.x + chipBox.width) + 12;
+      const bottom = Math.max(menuBox.y + menuBox.height, chipBox.y + chipBox.height) + 12;
+      await page.screenshot({
+        path: shotPath(`chips-grid-${suffix}`),
+        clip: { x, y, width: Math.min(right - x, 420), height: bottom - y },
+      });
+    }
+    await page.getByRole("heading", { name: "Distributed Sites" }).click({ timeout: 8_000 });
+    await page.locator("[data-testid=sheet-grid] tbody input.check").first().click({ timeout: 8_000 });
   }
-  await page.getByRole("heading", { name: "Distributed Sites" }).click({ timeout: 8_000 });
-
-  if (phone) await page.getByRole("button", { name: "Select", exact: true }).click({ timeout: 8_000 });
-  await page.locator("[data-testid=sheet-grid] tbody input.check").first().click({ timeout: 8_000 });
   await page.getByRole("button", { name: "Drop with reason", exact: true }).click({ timeout: 8_000 });
   await expect(page.getByTestId("drop-reason")).toBeVisible();
   await expect(page.getByTestId("drop-reason")).toContainText("Price vs value");

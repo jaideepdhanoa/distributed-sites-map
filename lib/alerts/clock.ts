@@ -33,3 +33,30 @@ export function stampOf(value: Date | string): number {
   const time = value instanceof Date ? value.getTime() : Date.parse(String(value));
   return Number.isFinite(time) ? time : 0;
 }
+
+/** Midnight at the start of the Pacific calendar day. DST picks UTC-8 or UTC-7. */
+export function pacificDayStart(now = new Date()): Date {
+  const day = losAngelesParts(now).day;
+  for (const offsetHours of [8, 7]) {
+    const start = new Date(`${day}T00:00:00.000Z`);
+    start.setUTCHours(offsetHours);
+    const parts = losAngelesParts(start);
+    if (parts.day === day && parts.hour === 0) return start;
+  }
+  return new Date(`${day}T08:00:00.000Z`);
+}
+
+/**
+ * Midnight Pacific on Nov 16. The Nov 15 workbook import is entirely before this.
+ * A digest with no later checkpoint does not reach back across it.
+ */
+export const FIRST_DIGEST_AT = new Date("2026-11-16T08:00:00.000Z");
+
+export function digestWindowStart(now: Date, prior: Date | null): Date {
+  const dayStart = pacificDayStart(now);
+  const lower = prior && prior.getTime() > 0 ? prior : dayStart;
+  if (now.getTime() >= FIRST_DIGEST_AT.getTime() && lower.getTime() < FIRST_DIGEST_AT.getTime()) {
+    return FIRST_DIGEST_AT;
+  }
+  return lower;
+}

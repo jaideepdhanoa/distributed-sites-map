@@ -4,7 +4,7 @@ import { resolveActionRole } from "@/lib/actions/roles";
 import { stageTitle } from "@/lib/labels";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
-import { DAILY_CAP, INSTANT_DAILY_CAP, batchWindowMs, losAngelesParts, stampOf } from "./clock";
+import { DAILY_CAP, INSTANT_DAILY_CAP, batchWindowMs, digestWindowStart, losAngelesParts, stampOf } from "./clock";
 import { renderBatch, type MailItem } from "./compose";
 import { isExcludedSite } from "./excluded";
 import { discussionHref, proposalHref, reviewHomeHref } from "./links";
@@ -388,10 +388,12 @@ export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
       `SELECT sent_at FROM alert_digest_runs WHERE user_id = $1`,
       [user.u],
     );
-    const since = prior.rows[0] ? new Date(stampOf(prior.rows[0].sent_at)) : new Date(0);
+    const priorAt = prior.rows[0] ? new Date(stampOf(prior.rows[0].sent_at)) : null;
+    // No earlier checkpoint, and a checkpoint from before midnight Nov 16 PT, both
+    // stop at that midnight. The Nov 15 workbook import is outside this window.
+    const windowStart = digestWindowStart(now, priorAt);
     const digestOn = digestEnabled(prefs);
-    const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const followed = digestOn ? await followedItems(sql, user.u, since) : [];
+    const followed = digestOn ? await followedItems(sql, user.u, windowStart) : [];
     const brief = digestOn ? await loadDigestBrief(sql, { userId: user.u, since: windowStart, prefs }) : emptyBrief();
     let queueCount = 0;
     if (digestOn) {

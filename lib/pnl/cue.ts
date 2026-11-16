@@ -1,3 +1,4 @@
+import { NOT_IN_PACKAGE } from "../keyNumbers";
 import { buildPnlGrid } from "./grid";
 import type { PnlStatement } from "./statement";
 
@@ -34,5 +35,18 @@ export function financialsCard(statement: PnlStatement, sample = false): Financi
     cashLabel: sde ? "SDE" : "EBITDA",
     margin: (sde ? amount(statement, full.year, "sde-margin") : "") || amount(statement, full.year, "margin") || "—",
     coverage,
+  };
+}
+
+export type StatementTile = { text: string; title: string; note: string };
+
+/** Overview tiles for a captured statement. The same figures and period as the Financials card. */
+export function statementTiles(statement: PnlStatement, sample = false): { revenue: StatementTile; cash: StatementTile } | null {
+  const card = financialsCard(statement, sample);
+  if (!card) return null;
+  const missing = (): StatementTile => ({ text: NOT_IN_PACKAGE, title: NOT_IN_PACKAGE, note: "" });
+  return {
+    revenue: card.revenue === "—" ? missing() : { text: card.revenue, title: card.revenue, note: card.coverage },
+    cash: card.cash === "—" ? missing() : { text: card.cash, title: `${card.cashLabel} ${card.cash}`, note: `${card.cashLabel} · ${card.coverage}` },
   };
 }

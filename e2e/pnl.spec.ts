@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { expect, test } from "@playwright/test";
+import { sampleStatement } from "../lib/pnl/fixture";
 
 test.beforeAll(() => {
   fs.mkdirSync("review-shots", { recursive: true });
@@ -96,4 +97,36 @@ test("phone overview tiles name a missing line when a package is on file", async
   const emptyCash = empty.locator("div").filter({ hasText: "Cash flow" }).first();
   await expect(emptyCash.locator("strong")).toHaveText("—");
   await expect(emptyCash).toContainText("Not on file");
+});
+
+test("the sample site overview uses the same P&L as the Financials card", async ({ page }) => {
+  await page.route("**/api/data/financials/PIPE-LAS-0011", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ pnl: sampleStatement(), pnlDemo: true }),
+    });
+  });
+  const mobile = (page.viewportSize()?.width ?? 1440) < 768;
+  if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  const numbers = page.getByTestId("card-numbers");
+  await numbers.scrollIntoViewIfNeeded();
+  const revenue = numbers.locator("div").filter({ hasText: "Revenue" }).first();
+  const cash = numbers.locator("div").filter({ hasText: "Cash flow" }).first();
+  await expect(revenue.locator("strong")).toHaveText("$1,000,000");
+  await expect(revenue).toContainText("FY2024");
+  await expect(revenue).toContainText("2 of 12 months");
+  await expect(cash.locator("strong")).toHaveText("$520,000");
+  await expect(cash).toContainText("SDE");
+  await expect(cash).toContainText("2 of 12 months");
+  await expect(revenue).not.toContainText("Not on file");
+  await expect(cash).not.toContainText("Not on file");
+  const entry = page.getByTestId("financials-entry");
+  await expect(entry).toContainText("$1,000,000 revenue");
+  await expect(entry).toContainText("SDE $520,000");
+  await expect(entry).toContainText("FY2024 · 2 of 12 months · Sample package");
+  await numbers.scrollIntoViewIfNeeded();
+  await numbers.screenshot({ path: `review-shots/pnl-sample-tiles-${mobile ? "phone" : "desktop"}.png`, animations: "disabled" });
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });

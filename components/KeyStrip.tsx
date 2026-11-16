@@ -12,6 +12,7 @@ import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
+import type { PnlTiles } from "./FinancialsEntry";
 
 export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
   if (!facts.length) return <strong title="Not on file">—</strong>;
@@ -115,12 +116,14 @@ export default function KeyStrip({
   hasPin,
   universeSite,
   signedIn = false,
+  tiles = null,
 }: {
   deal: DealProps;
   hasPin: boolean;
   peers?: DealProps[];
   universeSite?: SiteProps | null;
   signedIn?: boolean;
+  tiles?: PnlTiles | null;
 }) {
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "—";
@@ -190,9 +193,9 @@ export default function KeyStrip({
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
               <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-              <strong title={revenue.title}>{revenue.text}</strong>
-              {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-              {revenueBasis ? <em>{revenueBasis}</em> : null}
+              <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
+              {tiles ? (tiles.revenue.note ? <small>{tiles.revenue.note}</small> : null) : deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
+              {tiles ? null : revenueBasis ? <em>{revenueBasis}</em> : null}
             </button>
           </article>
         ) : null}
@@ -200,9 +203,9 @@ export default function KeyStrip({
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
               <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
-              <strong title={cashView.title}>{cashView.text}</strong>
-              {cashNote ? <small>{cashNote}</small> : null}
-              {cashBasis ? <em>{cashBasis}</em> : null}
+              <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
+              {tiles ? (tiles.cash.note ? <small>{tiles.cash.note}</small> : null) : cashNote ? <small>{cashNote}</small> : null}
+              {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
             </button>
           </article>
         ) : null}

@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { financialsCard } from "@/lib/pnl/cue";
+import { financialsCard, statementTiles, type StatementTile } from "@/lib/pnl/cue";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
+
+export type PnlTiles = { revenue: StatementTile; cash: StatementTile };
 
 function readStatement(value: unknown): PnlStatement {
   if (!value || typeof value !== "object") return emptyStatement();
@@ -13,14 +15,21 @@ function readStatement(value: unknown): PnlStatement {
   return emptyStatement();
 }
 
-export default function FinancialsEntry({ dealId, packageOnFile = false }: { dealId: string; packageOnFile?: boolean }) {
+export function usePnlTiles(dealId: string) {
   const [statement, setStatement] = useState<PnlStatement | null>(null);
   const [sample, setSample] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [settled, setSettled] = useState(!dealId);
   useEffect(() => {
+    if (!dealId) {
+      setStatement(null);
+      setSample(false);
+      setSettled(true);
+      return undefined;
+    }
     let cancel = false;
     setStatement(null);
-    setOpen(false);
+    setSample(false);
+    setSettled(false);
     fetch(`/api/data/financials/${encodeURIComponent(dealId)}`)
       .then(async (response) => (response.ok ? await response.json() as { pnl?: unknown; pnlDemo?: boolean } : null))
       .then((body) => {
@@ -30,12 +39,35 @@ export default function FinancialsEntry({ dealId, packageOnFile = false }: { dea
       })
       .catch(() => {
         if (!cancel) setStatement(emptyStatement());
+      })
+      .finally(() => {
+        if (!cancel) setSettled(true);
       });
     return () => {
       cancel = true;
     };
   }, [dealId]);
-  const card = statement ? financialsCard(statement, sample) : null;
+  return { statement, sample, settled, tiles: statement ? statementTiles(statement, sample) : null };
+}
+
+export default function FinancialsEntry({
+  dealId,
+  packageOnFile = false,
+  loaded,
+}: {
+  dealId: string;
+  packageOnFile?: boolean;
+  loaded?: { statement: PnlStatement | null; sample: boolean; settled: boolean };
+}) {
+  const own = usePnlTiles(loaded ? "" : dealId);
+  const statement = loaded ? loaded.statement : own.statement;
+  const sample = loaded ? loaded.sample : own.sample;
+  const settled = loaded ? loaded.settled : own.settled;
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    setOpen(false);
+  }, [dealId]);
+  const card = settled && statement ? financialsCard(statement, sample) : null;
   return (
     <>
       {card ? (

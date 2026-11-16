@@ -269,7 +269,12 @@ test("one decimal place is stored as written, and a mid-month end can sit beside
 
 test("only Muse can retract a line, and the row and the event stay", async () => {
   const sql = await ready();
-  const created = await applyBatch(sql, muse, "pnl-keep", { changes: [line({ amount: "12345.6", line: "labor" })] });
+  const created = await applyBatch(sql, muse, "pnl-keep", {
+    changes: [
+      line({ amount: "12345.6", line: "labor" }),
+      line({ amount: "100000", line: "revenue" }),
+    ],
+  });
   const id = created.results[0]?.entity_id || "";
   assert.throws(
     () => validateBatch(indie, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, reason: "Duplicate sample line", at: CAPTURED } }] }),
@@ -280,8 +285,12 @@ test("only Muse can retract a line, and the row and the event stay", async () =>
     /Only Muse can retract/,
   );
   assert.throws(
-    () => validateBatch(muse, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true } }] }),
+    () => validateBatch(muse, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, at: CAPTURED } }] }),
     (error: unknown) => error instanceof InputError && error.field === "reason",
+  );
+  assert.throws(
+    () => validateBatch(muse, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, reason: "Duplicate sample line" } }] }),
+    (error: unknown) => error instanceof InputError && error.field === "at" && error.message.includes("at is required"),
   );
   const retracted = await applyBatch(sql, muse, "pnl-retract", {
     changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, reason: "Duplicate sample line", at: CAPTURED } }],
@@ -304,9 +313,12 @@ test("only Muse can retract a line, and the row and the event stay", async () =>
   assert.equal(event.rows[0]?.payload.actor, "muse");
   assert.equal(event.rows[0]?.payload.at, CAPTURED);
   const statement = await loadPnlStatement(sql, "PIPE-LAS-9001");
-  assert.equal(statement.status, "empty");
+  assert.equal(statement.years[0]?.annual?.revenue[0]?.raw, "100000");
+  assert.equal(statement.years[0]?.annual?.revenue[0]?.amount, "$100,000");
+  assert.equal(statement.years[0]?.annual?.costs.length, 0);
   const again = await applyBatch(sql, muse, "pnl-again", { changes: [line({ amount: "12345.6", line: "labor" })] });
   assert.notEqual(again.results[0]?.entity_id, id);
   const visible = await loadPnlStatement(sql, "PIPE-LAS-9001");
   assert.equal(visible.years[0]?.annual?.costs[0]?.raw, "12345.6");
+  assert.equal(visible.years[0]?.annual?.costs[0]?.amount, "$12,345.6");
 });

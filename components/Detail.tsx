@@ -17,6 +17,7 @@ import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
+import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
 
 function acres(value: number | null | undefined, text?: string) {
@@ -400,6 +401,10 @@ export default function Detail({
   related,
   signedIn = false,
   outsideFilter = false,
+  spaceCount = 0,
+  spaceSlots = 0,
+  onMarkSpace,
+  spaceNote,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -421,6 +426,10 @@ export default function Detail({
   related?: ReactNode;
   signedIn?: boolean;
   outsideFilter?: boolean;
+  spaceCount?: number;
+  spaceSlots?: number;
+  onMarkSpace?: () => void;
+  spaceNote?: string;
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
   const pnl = usePnlTiles(signedIn && linkedDeal && linkedDeal.kind !== "land" ? linkedDeal.deal_id : "");
@@ -494,7 +503,8 @@ export default function Detail({
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
-      <SitePhotos card={photos} siteId={site.site_id} lat={lat} lng={lng} signedIn={signedIn} />
+      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} note={spaceNote} onMark={onMarkSpace} /> : null}
+      <SitePhotos card={photos} />
       <NextStepCard
         kind="site"
         id={site.site_id}
@@ -692,6 +702,10 @@ export function DealDetail({
   figuresReady = true,
   related,
   outsideFilter = false,
+  spaceCount = 0,
+  spaceSlots = 0,
+  onMarkSpace,
+  spaceNote,
 }: {
   deal: DealProps;
   peers?: DealProps[];
@@ -714,6 +728,10 @@ export function DealDetail({
   figuresReady?: boolean;
   related?: ReactNode;
   outsideFilter?: boolean;
+  spaceCount?: number;
+  spaceSlots?: number;
+  onMarkSpace?: () => void;
+  spaceNote?: string;
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
   const pnl = usePnlTiles(signedIn && deal.kind !== "land" ? deal.deal_id : "");
@@ -774,7 +792,8 @@ export function DealDetail({
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
-      <SitePhotos card={photos} siteId={deal.deal_id} lat={lat} lng={lng} signedIn={signedIn} />
+      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} note={spaceNote} onMark={onMarkSpace} /> : null}
+      <SitePhotos card={photos} />
       <NextStepCard
         kind="deal"
         id={deal.deal_id}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { estimateLabel, estimateSlots, stallFootprint } from "../../lib/spaces/slots";
+import { estimateLabel, estimateSlots, spaceRollup, stallFootprint } from "../../lib/spaces/slots";
 
 test("a 90° stall is 9 ft along the row and 18 ft deep", () => {
   const stall = stallFootprint(90);
@@ -31,6 +31,9 @@ test("slot counts follow the layout and stay labelled Estimated", () => {
   assert.equal(estimateLabel(20, "stall"), "Estimated · 20 stalls");
   assert.equal(estimateLabel(1, "bay"), "Estimated · 1 bay");
   assert.equal(estimateLabel(0, "stall"), "Estimated · 0 stalls");
+  assert.equal(spaceRollup(0, 0), "No spaces marked yet");
+  assert.equal(spaceRollup(2, 14), "2 spaces · ~14 slots est.");
+  assert.equal(spaceRollup(1, 20), "1 space · ~20 slots est.");
 });
 
 test("switching layout on the same rectangle changes the estimate", () => {

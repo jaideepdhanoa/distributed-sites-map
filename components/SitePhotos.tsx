@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
 import { LISTING_THUMB_CAP, esriCredit, galleryModel, imageCandidates, photoSetSummary, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
 import type { SitePhoto } from "@/lib/types";
-import SpaceLayer from "./spaces/SpaceLayer";
 
 function altFor(photo: SitePhoto) {
   return photo.caption || roleLabel(photo.role);
@@ -57,25 +55,9 @@ function photoKey(photo: SitePhoto, index: number) {
   return `${index}:${photo.role}:${photo.view_url || photo.file_id || ""}`;
 }
 
-export default function SitePhotos({
-  card,
-  between,
-  siteId,
-  lat,
-  lng,
-  signedIn = false,
-}: {
-  card: PhotoCard;
-  between?: ReactNode;
-  siteId?: string;
-  lat?: number | null;
-  lng?: number | null;
-  signedIn?: boolean;
-}) {
+export default function SitePhotos({ card, between }: { card: PhotoCard; between?: ReactNode }) {
   const model = galleryModel(card);
   const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
-  const canMark = Boolean(signedIn && siteId && lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng));
-  const focusSpace = useSearchParams().get("space") || "";
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const slideKey = model.slides.map((photo, index) => photoKey(photo, index)).join("|");
   useEffect(() => {
@@ -100,7 +82,7 @@ export default function SitePhotos({
   const hiddenListing = Math.max(0, listing.length - listingThumbs.length);
   const [open, setOpen] = useState<number | null>(null);
   const [streetOpen, setStreetOpen] = useState(false);
-  const [hero, setHero] = useState<"street" | "photos" | "spaces">(focusSpace && canMark ? "spaces" : model.showGallery ? "photos" : embed ? "street" : "photos");
+  const [hero, setHero] = useState<"street" | "photos">(model.showGallery ? "photos" : embed ? "street" : "photos");
   const [streetFailed, setStreetFailed] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -114,15 +96,9 @@ export default function SitePhotos({
     }
     if (!dialog.open) dialog.showModal();
   }, [open]);
-  const focusedSpace = useRef(false);
   useEffect(() => {
-    if (focusSpace && canMark && !focusedSpace.current) {
-      focusedSpace.current = true;
-      setHero("spaces");
-      return;
-    }
-    if (!slides.length && embed && hero === "photos") setHero("street");
-  }, [slides.length, embed, focusSpace, canMark, hero]);
+    if (!slides.length && embed) setHero("street");
+  }, [slides.length, embed]);
   useEffect(() => {
     if (hero !== "street" || !embed) {
       setStreetFailed(false);
@@ -154,7 +130,7 @@ export default function SitePhotos({
   }, [streetOpen]);
 
   const credits = Array.from(new Set(slides.map((item) => item.photo.attribution || esriCredit(item.photo)).filter(Boolean)));
-  if (!model.visible && !canMark) {
+  if (!model.visible) {
     return (
       <section className="site-photos">
         <div className="hero-frame empty-hero">
@@ -196,29 +172,8 @@ export default function SitePhotos({
     openGallery();
   }
 
-  function viewTabs(active: "street" | "photos" | "spaces") {
-    return (
-      <div className="hero-tabs" role="tablist" aria-label="Site view">
-        {embed ? <button type="button" role="tab" aria-selected={active === "street"} className={active === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
-        {slides.length ? (
-          <button type="button" role="tab" aria-selected={active === "photos"} className={active === "photos" ? "chip on" : "chip"} data-testid="photo-tab" onClick={openGallery}>
-            Photos · {slides.length}
-          </button>
-        ) : null}
-        {canMark ? (
-          <button type="button" role="tab" aria-selected={active === "spaces"} className={active === "spaces" ? "chip on" : "chip"} data-testid="spaces-tab" onClick={() => setHero("spaces")}>
-            Spaces
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
   return (
     <section className="site-photos card-hero" data-testid="site-photos">
-      {hero === "spaces" && canMark && siteId && lat != null && lng != null ? (
-        <SpaceLayer siteId={siteId} lat={lat} lng={lng} focusId={focusSpace} tabs={viewTabs("spaces")} />
-      ) : (
       <div className="hero-slot">
         <div className="hero-frame">
           {embed && hero === "street" ? (
@@ -249,7 +204,14 @@ export default function SitePhotos({
           ) : null}
         </div>
         <div className="hero-chrome">
-          {viewTabs(hero === "spaces" ? "photos" : hero)}
+          <div className="hero-tabs" role="tablist" aria-label="Site view">
+            {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
+            {slides.length ? (
+              <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "chip on" : "chip"} data-testid="photo-tab" onClick={openGallery}>
+                Photos · {slides.length}
+              </button>
+            ) : null}
+          </div>
           {embed || slides.length ? (
             <button type="button" className="hero-expand" data-testid="hero-expand" aria-label={hero === "street" && embed ? "Expand Street View" : "Expand photos"} onClick={expandHero}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" /></svg>
@@ -267,7 +229,6 @@ export default function SitePhotos({
           ) : null}
         </div>
       </div>
-      )}
       {embed ? (
         <dialog
           ref={streetRef}

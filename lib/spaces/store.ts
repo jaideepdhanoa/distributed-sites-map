@@ -1,4 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
+import { isExcludedSite } from "@/lib/alerts/excluded";
 import { InputError } from "@/lib/actions/text";
 import { formatZonedTimestamp } from "@/lib/changes/schema";
 import { rectanglePolygon, roundFeet, type GeoPolygon, type GroundBox, type LngLat } from "./measure";
@@ -77,6 +78,13 @@ export async function listSiteSpaces(sql: Sql, siteId: string): Promise<SiteSpac
     [siteId],
   );
   return rows.rows.map(present);
+}
+
+export async function listAllSiteSpaces(sql: Sql): Promise<SiteSpaceRecord[]> {
+  const rows = await sql.query<SpaceRow>(
+    `SELECT ${SELECT} FROM site_spaces WHERE deleted_at IS NULL ORDER BY created_at ASC, id ASC`,
+  );
+  return rows.rows.map(present).filter((row) => !isExcludedSite(row.siteId));
 }
 
 export async function readSiteSpace(sql: Sql, id: string): Promise<SiteSpaceRecord | null> {

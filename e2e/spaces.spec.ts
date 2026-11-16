@@ -43,81 +43,103 @@ async function markSample(page: Page) {
   }, site);
 }
 
-async function snap(page: Page, target: string, file: string) {
+async function closeLayers(page: Page) {
   const layers = page.getByRole("button", { name: "Close layers" });
   if (await layers.isVisible().catch(() => false)) await layers.click();
-  await page.locator(target).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: file, animations: "disabled" });
 }
 
 test.beforeAll(() => {
   mkdirSync(shots, { recursive: true });
 });
 
-test("desktop mark, measure, and comment on a space", async ({ page }) => {
+test("desktop summary opens drawing on the main map", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAs(page, `/?funnel=universe&site=${site}`);
-  await expect(page.locator("aside.drawer")).toBeVisible();
+  await expect(page.getByTestId("space-summary")).toContainText("No spaces marked yet");
+  await expect(page.getByTestId("mark-space")).toBeVisible();
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
-  await page.goto(`/?funnel=universe&site=${site}&space=${seeded.id}`);
-  await expect(page.getByTestId("spaces-tab")).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator(".space-stage canvas")).toBeVisible();
-  await expect(page.getByTestId("space-measure")).toContainText("90 ft × 60 ft");
-  await expect(page.getByTestId("space-estimate")).toHaveText("Estimated · 20 stalls");
-  await expect(page.getByTestId("space-caution")).toContainText("Estimated");
-
+  await page.reload();
+  await expect(page.getByTestId("space-summary")).toContainText("1 space · ~20 slots est.");
+  await expect(page.getByTestId("spaces-layer")).toBeChecked();
+  await closeLayers(page);
   await page.getByTestId("mark-space").click();
-  const map = page.getByTestId("space-aerial");
-  await snap(page, "[data-testid='space-aerial']", `${shots}/space-desktop-aerial-ready.png`);
-  const box = await map.boundingBox();
-  if (!box) throw new Error("aerial has no box");
-  await page.mouse.move(box.x + 48, box.y + 72);
+  await expect(page.getByTestId("space-draw-bar")).toBeVisible();
+  const zoom = await page.evaluate(async () => {
+    const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return map ? map.getZoom() : -1;
+  });
+  if (zoom < 17) throw new Error(`map zoom stayed at ${zoom}`);
+  const canvas = page.locator(".stage-map canvas");
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  const point = await page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { project: (lnglat: [number, number]) => { x: number; y: number } } }).__sitesMap;
+    return map?.project([-112.070527, 33.407157]) ?? null;
+  });
+  if (!box || !point) throw new Error("map has no box");
+  await page.mouse.move(box.x + point.x + 130, box.y + point.y + 70);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width - 36, box.y + box.height - 64, { steps: 16 });
-  await page.waitForTimeout(800);
+  await page.mouse.move(box.x + point.x + 250, box.y + point.y + 170, { steps: 14 });
   await page.screenshot({ path: `${shots}/space-desktop-draw.png`, animations: "disabled" });
   await page.mouse.up();
-  await expect(page.getByTestId("space-thread")).toBeVisible();
-  await snap(page, "[data-testid='space-panel']", `${shots}/space-desktop-selected.png`);
-
-  const before = await page.getByTestId("space-estimate").innerText();
-  await page.getByTestId("space-layout").selectOption("pull_through");
-  await expect(page.getByTestId("space-estimate")).not.toHaveText(before);
+  await expect(page.getByTestId("space-summary")).toContainText("2 spaces");
+  await expect(page.getByTestId("space-popover")).toBeVisible();
   await expect(page.getByTestId("space-estimate")).toContainText("Estimated");
-  await expect(page.getByTestId("space-estimate")).toContainText(/bay/);
-
+  await page.getByTestId("space-layout").selectOption("pull_through");
+  await expect(page.getByTestId("space-estimate")).toContainText("bay");
   const thread = page.getByTestId("space-thread");
   await thread.getByTestId("space-note-body").fill("Please look at the east row. @Rev");
   await page.getByRole("option", { name: "Reviewer" }).click();
-  await expect(thread.getByTestId("mention-chip")).toContainText("Reviewer");
   await thread.getByRole("button", { name: "Comment" }).click();
   await expect(thread.getByTestId("space-note")).toContainText("east row");
-  await snap(page, "[data-testid='space-thread']", `${shots}/space-desktop-comment.png`);
+  await page.screenshot({ path: `${shots}/space-desktop-selected.png`, animations: "disabled" });
+  await page.getByTestId("space-done").click();
+  await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
 });
 
-test("phone can view a space and comment", async ({ page }) => {
+test("phone mark space uses the full map and can comment", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await openAs(page, `/?funnel=universe&site=${site}`);
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
-  await page.goto(`/?funnel=universe&site=${site}&space=${seeded.id}`);
-  const grab = page.getByRole("button", { name: "Drag sheet" });
-  await grab.click();
-  await grab.focus();
-  await page.keyboard.press("ArrowUp");
-  const panel = page.getByTestId("space-panel");
-  await panel.scrollIntoViewIfNeeded();
-  await expect(panel.getByTestId("space-measure")).toContainText("90 ft × 60 ft");
-  await expect(panel.getByTestId("space-estimate")).toHaveText("Estimated · 20 stalls");
-  await expect(panel.getByTestId("space-layout")).toBeVisible();
-  await snap(page, "[data-testid='space-aerial']", `${shots}/space-phone-selected.png`);
-
-  const thread = panel.getByTestId("space-thread");
+  await page.reload();
+  await expect(page.getByTestId("space-summary")).toContainText("slots est.");
+  await page.getByTestId("mark-space").click();
+  await expect(page.getByTestId("space-done")).toBeVisible();
+  await expect(page.locator("aside.drawer")).toBeHidden();
+  await page.waitForFunction(() => {
+    const map = (window as unknown as {
+      __sitesMap?: {
+        getZoom: () => number;
+        getLayer: (id: string) => unknown;
+        project: (lnglat: [number, number]) => { x: number; y: number };
+        queryRenderedFeatures: (point: [number, number], options: { layers: string[] }) => unknown[];
+      };
+    }).__sitesMap;
+    if (!map || map.getZoom() <= 17 || !map.getLayer("space-fill")) return false;
+    const projected = map.project([-112.070527, 33.407157]);
+    return map.queryRenderedFeatures([projected.x, projected.y], { layers: ["space-fill"] }).length > 0;
+  }, undefined, { timeout: 15_000 });
+  const point = await page.evaluate(() => {
+    const map = (window as unknown as { __sitesMap?: { project: (lnglat: [number, number]) => { x: number; y: number } } }).__sitesMap;
+    const projected = map?.project([-112.070527, 33.407157]);
+    return projected ? { x: projected.x, y: projected.y } : null;
+  });
+  if (!point) throw new Error("map has no point");
+  const mapBox = await page.locator(".stage-map .map").boundingBox();
+  if (!mapBox) throw new Error("map has no box");
+  await page.mouse.click(mapBox.x + point.x, mapBox.y + point.y);
+  await expect(page.getByTestId("space-popover")).toBeVisible();
+  await expect(page.getByTestId("space-measure")).toContainText("ft");
+  const thread = page.getByTestId("space-thread");
   await thread.getByTestId("space-note-body").fill("The row looks usable from the aerial.");
   await thread.getByRole("button", { name: "Comment" }).click();
   await expect(thread.getByTestId("space-note")).toContainText("usable from the aerial");
-  await snap(page, "[data-testid='space-thread']", `${shots}/space-phone-comment.png`);
+  await page.screenshot({ path: `${shots}/space-phone-selected.png`, animations: "disabled" });
+  await page.getByTestId("space-done").click();
+  await expect(page.locator("aside.drawer")).toBeVisible();
 });

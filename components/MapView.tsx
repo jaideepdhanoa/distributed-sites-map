@@ -12,6 +12,9 @@ import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBounds } from "@/lib/depotRings";
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
+import type { GroundBox } from "@/lib/spaces/measure";
+import SpaceTools from "./spaces/SpaceTools";
+import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
   sites: SiteFeature[];
@@ -57,6 +60,17 @@ type Props = {
   gridFeatures?: GeoFeature[];
   onRingsOutside?: (outside: boolean) => void;
   registerFrameRings?: (frame: (() => void) | null) => void;
+  spaceShapes?: SpaceShape[];
+  showSpaces?: boolean;
+  spaceDrawing?: boolean;
+  spaceFly?: { lng: number; lat: number; nonce: number } | null;
+  selectedSpaceId?: string;
+  spaceNames?: Record<string, string>;
+  onSpaceSelect?: (id: string) => void;
+  onSpaceCreate?: (box: GroundBox) => void;
+  onSpaceChange?: (space: SpaceShape) => void;
+  onSpaceDone?: () => void;
+  onMapFailed?: (message: string) => void;
 };
 
 const RING_LAYER_IDS = ["rings-10-case", "rings-10", "rings-5-case", "rings-5"];
@@ -637,7 +651,8 @@ export default function MapView(props: Props) {
       canDraw = false;
     }
     if (!canDraw) {
-      setMapFailed("This browser cannot draw the map.");
+      setMapFailed("This browser cannot draw the map. Try the latest Chrome, Edge, or Safari.");
+      propsRef.current.onMapFailed?.("This browser cannot draw the map. Try the latest Chrome, Edge, or Safari.");
       return;
     }
     const kept = keptCamera.current;
@@ -653,10 +668,12 @@ export default function MapView(props: Props) {
       fadeDuration: 0,
     });
     } catch {
-      setMapFailed("This browser cannot draw the map.");
+      setMapFailed("This browser cannot draw the map. Try the latest Chrome, Edge, or Safari.");
+      propsRef.current.onMapFailed?.("This browser cannot draw the map. Try the latest Chrome, Edge, or Safari.");
       return;
     }
     setMapFailed("");
+    propsRef.current.onMapFailed?.("");
     active = map;
     keptCamera.current = null;
     heldView.current = kept;
@@ -787,7 +804,7 @@ export default function MapView(props: Props) {
         }).catch(() => undefined);
       });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
-        if (measureRef.current) return;
+        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
         const feature = event.features?.[0];
         const id = feature?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
@@ -953,6 +970,7 @@ export default function MapView(props: Props) {
       map.on("mouseout", hideTip);
       map.on("dragstart", hideTip);
       map.on("click", (event: MapMouseEvent) => {
+        if (propsRef.current.spaceDrawing || event.originalEvent.defaultPrevented) return;
         if (!measureRef.current || measureDoneRef.current) return;
         points.current = [...points.current, [event.lngLat.lng, event.lngLat.lat]];
         const coords = points.current;
@@ -1343,7 +1361,7 @@ export default function MapView(props: Props) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
-      } else if (phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
+      } else if (!propsRef.current.spaceDrawing && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
@@ -1354,7 +1372,7 @@ export default function MapView(props: Props) {
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
-      } else if (appliedFocus.current !== focusToken) {
+      } else if (!propsRef.current.spaceDrawing && appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
@@ -1483,6 +1501,11 @@ export default function MapView(props: Props) {
     let cancel = false;
     const go = () => {
       if (cancel || reviewFocusRef.current) return;
+      if (propsRef.current.spaceDrawing && propsRef.current.spaceFly) {
+        const fly = propsRef.current.spaceFly;
+        map.jumpTo({ center: [fly.lng, fly.lat], zoom: 18, padding: pointPadding(map) });
+        return;
+      }
       if (!props.selectedId) {
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
         return;
@@ -1639,6 +1662,24 @@ export default function MapView(props: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    const fly = props.spaceFly;
+    if (!map || !fly) return;
+    const go = () => {
+      try {
+        map.jumpTo({ center: [fly.lng, fly.lat], zoom: 18, padding: pointPadding(map) });
+      } catch {
+        // The style is still settling. The load listener below retries.
+      }
+    };
+    go();
+    map.on("load", go);
+    return () => {
+      map.off("load", go);
+    };
+  }, [mapGeneration, props.spaceFly]);
+
   function undoMeasure() {
     points.current = points.current.slice(0, -1);
     setMeasureDone(false);
@@ -1661,6 +1702,19 @@ export default function MapView(props: Props) {
   return (
       <div className={`stage-map${mapFailed ? " map-unavailable" : ""}`} data-basemap={props.basemap || "satellite"}>
       <div ref={node} className="map" />
+      {mapGeneration && mapRef.current ? (
+        <SpaceTools
+          map={mapRef.current}
+          spaces={props.spaceShapes || []}
+          visible={props.showSpaces !== false}
+          drawing={Boolean(props.spaceDrawing)}
+          selectedId={props.selectedSpaceId || ""}
+          names={props.spaceNames || {}}
+          onSelect={(id) => props.onSpaceSelect?.(id)}
+          onCreate={(box) => props.onSpaceCreate?.(box)}
+          onChange={(space) => props.onSpaceChange?.(space)}
+        />
+      ) : null}
       {mapFailed ? (
         <div className="map-empty" role="status" data-testid="map-error">
           <p>{mapFailed}</p>
@@ -1673,6 +1727,12 @@ export default function MapView(props: Props) {
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Map</button>
         </div>
         <div className="measure-row">
+          {props.spaceDrawing ? (
+            <div className="measure-bar" data-testid="space-draw-bar">
+              <span>Drag a rectangle, then rotate it to the rows</span>
+              <button type="button" className="paper-btn" data-testid="space-done" onClick={() => props.onSpaceDone?.()}>Done</button>
+            </div>
+          ) : null}
           {measure ? (
             <div className="measure-bar">
               <span>{readout || "Tap the corners"}</span>

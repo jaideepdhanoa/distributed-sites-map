@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
-import { listSiteSpaces } from "@/lib/spaces/store";
+import { listAllSiteSpaces, listSiteSpaces } from "@/lib/spaces/store";
 import { spaceSiteAllowed } from "@/lib/spaces/vocab";
 
 function missingRelation(error: unknown): boolean {
@@ -14,12 +14,12 @@ export async function GET(request: Request) {
   const session = await requireUser();
   if (!isSession(session)) return session;
   const siteId = new URL(request.url).searchParams.get("site")?.trim() || "";
-  if (!spaceSiteAllowed(siteId) || isExcludedSite(siteId)) {
+  if (siteId && (!spaceSiteAllowed(siteId) || isExcludedSite(siteId))) {
     return NextResponse.json({ spaces: [] }, { headers: privateHeaders });
   }
   if (!actionsEnabled()) return NextResponse.json({ spaces: [] }, { headers: privateHeaders });
   try {
-    const spaces = await withSql((sql) => listSiteSpaces(sql, siteId));
+    const spaces = await withSql((sql) => siteId ? listSiteSpaces(sql, siteId) : listAllSiteSpaces(sql));
     return NextResponse.json({ spaces }, { headers: privateHeaders });
   } catch (error) {
     if (missingRelation(error)) return NextResponse.json({ spaces: [] }, { headers: privateHeaders });

@@ -700,17 +700,69 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   };
 }
 
+export type MirrorWritePhase = "idle" | "writing" | "written";
+
+export function newMirrorRunId(): string {
+  return `run_${randomUUID().replaceAll("-", "")}`;
+}
+
+export function cancelledMirrorNote(phase: MirrorWritePhase): string {
+  if (phase === "written") return "cancelled after writing cells";
+  if (phase === "writing") return "cancelled while writing cells";
+  return "cancelled before the sheet write finished";
+}
+
+/**
+ * Insert the runs row before the sheet write, then update that same id.
+ * A cancel that lands after the insert still leaves the row. A second save
+ * does not reopen a row that already finished.
+ */
+export async function saveMirrorRun(
+  sql: Sql,
+  id: string,
+  counts: Record<string, number>,
+  notes: string,
+  status: "running" | "succeeded" | "failed",
+): Promise<void> {
+  await sql.query(
+    `INSERT INTO runs (id, actor, status, finished_at, counts, notes)
+     VALUES ($1, 'workbook-mirror', $2, CASE WHEN $2 = 'running' THEN NULL ELSE clock_timestamp() END, $3::jsonb, $4)
+     ON CONFLICT (id) DO UPDATE
+     SET status = EXCLUDED.status,
+         finished_at = CASE WHEN EXCLUDED.status = 'running' THEN runs.finished_at ELSE clock_timestamp() END,
+         counts = EXCLUDED.counts,
+         notes = EXCLUDED.notes
+     WHERE runs.status = 'running'`,
+    [id, status, JSON.stringify(counts), notes.slice(0, 500)],
+  );
+}
+
 export async function recordMirrorRun(
   sql: Sql,
   counts: Record<string, number>,
   notes: string,
   status: "succeeded" | "failed",
 ): Promise<void> {
-  await sql.query(
-    `INSERT INTO runs (id, actor, status, finished_at, counts, notes)
-     VALUES ($1, 'workbook-mirror', $2, clock_timestamp(), $3::jsonb, $4)`,
-    [`run_${randomUUID().replaceAll("-", "")}`, status, JSON.stringify(counts), notes.slice(0, 500)],
-  );
+  await saveMirrorRun(sql, newMirrorRunId(), counts, notes, status);
+}
+
+/** SIGTERM during a cancel still gets a few seconds. Record the runs row, then exit. */
+export function watchMirrorCancel(
+  getPhase: () => MirrorWritePhase,
+  finish: (note: string) => Promise<void>,
+  exit: (code: number) => void,
+  listen: (signal: "SIGTERM" | "SIGINT", handler: () => void) => void = (signal, handler) => {
+    process.once(signal, handler);
+  },
+): void {
+  let started = false;
+  const onSignal = () => {
+    if (started) return;
+    started = true;
+    void finish(cancelledMirrorNote(getPhase())).finally(() => exit(1));
+  };
+  listen("SIGTERM", onSignal);
+  listen("SIGINT", onSignal);
 }
 
 export function stageTabs(): readonly { title: string; headerRow: number }[] {

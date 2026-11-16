@@ -276,7 +276,7 @@ test("Jaideep approving a stage move emits a workbook decision", async () => {
   assert.equal(decision?.workbookStage, true);
   assert.equal(decision?.stage, "financial");
   assert.match(decision?.text || "", /Financial screen/);
-  assert.match(decision?.text || "", /workbook Stage/);
+  assert.match(decision?.text || "", /Do not edit the workbook/);
 
   const other = await createSuggestion(sql, {
     targetKind: "deal",

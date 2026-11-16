@@ -1,11 +1,10 @@
 name: Shadow import
 
-# Manual import of the latest published snapshot. Workbook sync skips the
-# import when the generated hash matches, so a missed import is repeated
-# here. This workflow refuses any ref other than main. An entity whose
-# read flag is on is left unchanged. Site rows need SITE_SHEET_PATH, the
-# private raw sheet from the workbook build. This job does not have that
-# file, so it leaves site rows unchanged.
+# Manual drift check of the latest published snapshot. Workbook sync skips
+# this step when the generated hash matches. This workflow refuses any ref
+# other than main. It reports counts and hashed ids and does not write
+# workbook rows into the database. Site raw cells need SITE_SHEET_PATH.
+# This job does not have that file, so it does not compare those cells.
 on:
   workflow_dispatch:
 
@@ -23,7 +22,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - name: Import the live snapshot
+      - name: Report drift against the live snapshot
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}

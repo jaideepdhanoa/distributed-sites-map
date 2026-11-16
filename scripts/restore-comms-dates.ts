@@ -8,9 +8,11 @@ import { readCommsDates } from "../lib/changes/summaries";
 /**
  * Put lost Comms Log Date/time text back into the database.
  *
- * The sheet is the source. This reads it with the Sheets client (one batched
- * values read, with backoff). Dry run is the default. It prints ids, character
- * counts, and hashes only. It does not write the sheet.
+ * This is a confirm-gated repair, not the scheduled sync. The sync reports
+ * drift and does not apply workbook edits. This reads the sheet with the
+ * Sheets client (one batched values read, with backoff). Dry run is the
+ * default. It prints ids, character counts, and hashes only. It does not
+ * write the sheet. Apply copies date text into the database only.
  *
  *   npx tsx scripts/restore-comms-dates.ts
  *

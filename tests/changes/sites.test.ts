@@ -521,7 +521,9 @@ test("site reports and mirror plans omit raw site text", () => {
   assert.match(plan, /Asking price \(\$\) PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
   assert.match(plan, /Last checked live PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
   assert.match(plan, /Population within 3 miles LAND-PHX-0064: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
-  assert.match(plan, /Stage PIPE-MIA-0082: "1 Desk screen" -> "2 Financial screen"/);
+  assert.match(plan, /Stage PIPE-MIA-0082: #[0-9a-f]{12} -> #[0-9a-f]{12}/);
+  assert.equal(plan.includes("1 Desk screen"), false);
+  assert.equal(plan.includes("2 Financial screen"), false);
 });
 
 test("agents write only their fields, and a new site needs a Phoenix, Las Vegas, or Miami market", () => {

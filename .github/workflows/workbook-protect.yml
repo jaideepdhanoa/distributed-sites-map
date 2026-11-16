@@ -1,0 +1,49 @@
+name: Workbook protect
+
+# Disabled. Dry run is the default and writes nothing. A real change needs
+# dry_run false, apply true, and the confirm phrase typed in. The job is
+# not on a schedule. It does not change repository variables, and it does
+# not run from a pull request. Rules & Decisions and Run Log stay writable.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the plan and do not change the workbook
+        type: boolean
+        default: true
+      apply:
+        description: Protect ranges. Also set dry_run to false and type the confirm phrase.
+        type: boolean
+        default: false
+      confirm:
+        description: To apply, type protect-workbook-readonly. Leave blank on a dry run.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  protect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse an apply that is still a dry run or missing the phrase
+        if: ${{ (inputs.apply == true || inputs.apply == 'true') && ((inputs.dry_run == true || inputs.dry_run == 'true') || inputs.confirm != 'protect-workbook-readonly') }}
+        run: |
+          echo "Refusing to protect the workbook. Set dry_run to false, set apply to true, and type protect-workbook-readonly." >&2
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Plan or protect
+        env:
+          WORKBOOK_PROTECT_DRY_RUN: ${{ (inputs.dry_run == false || inputs.dry_run == 'false') && '0' || '1' }}
+          WORKBOOK_PROTECT_APPLY: ${{ (inputs.apply == true || inputs.apply == 'true') && (inputs.dry_run == false || inputs.dry_run == 'false') && '1' || '0' }}
+          CONFIRM: ${{ inputs.confirm }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: npx tsx scripts/workbook-protect.ts

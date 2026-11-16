@@ -69,7 +69,7 @@ export function assertEventsWritable(): void {
   }
 }
 
-/** Workbook sync and the manual Shadow import, both on main, write shadow rows. */
+/** Workbook sync and the manual Shadow import, both on main, may raise id floors. They do not apply workbook rows. */
 export function assertWorkbookImportAllowed(url: string): void {
   if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
     throw new ProductionWriteRefused("Refusing to import workbook rows from Vercel.");

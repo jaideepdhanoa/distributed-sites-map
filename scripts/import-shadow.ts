@@ -1,8 +1,8 @@
 import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { withConnectionString } from "../lib/actions/db";
-import { importChanged } from "../lib/changes/backfill";
-import { importEntityFromWorkbook } from "../lib/changes/flags";
+import { rememberSheetIdFloors } from "../lib/changes/backfill";
+import { detectWorkbookDrift } from "../lib/changes/drift";
 import { assertWorkbookImportAllowed } from "../lib/changes/guard";
 import { MIRROR_SHEETS_SCOPE } from "../lib/changes/mirror";
 import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
@@ -19,7 +19,7 @@ function summary(text: string): void {
 }
 
 function publicError(error: unknown): string {
-  const text = error instanceof Error ? error.message : "shadow import failed";
+  const text = error instanceof Error ? error.message : "workbook drift failed";
   return text
     .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
     .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
@@ -87,30 +87,29 @@ async function main(): Promise<void> {
   if (!sheet) slice.sites = [];
   const google = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
   let sheetSummaries = false;
-  if (google && importEntityFromWorkbook("comms")) {
+  if (google) {
     const full = await readCommsSummaries(await sheetsAccessToken(google, MIRROR_SHEETS_SCOPE));
     slice = overlaySummaryMap(slice, full);
     sheetSummaries = full.size > 0;
   }
   try {
-    const imported = await withConnectionString(url, (sql) => importChanged(sql, slice, snapshotId));
-    const line = `Shadow import inserted stage ${imported.inserted.stage}, activity ${imported.inserted.activity}, comms ${imported.inserted.comms}, site ${imported.inserted.site}. Unchanged stage ${imported.unchanged.stage}, activity ${imported.unchanged.activity}, comms ${imported.unchanged.comms}, site ${imported.unchanged.site}. Invalid stage ${imported.invalid.stage}, activity ${imported.invalid.activity}, comms ${imported.invalid.comms}, site ${imported.invalid.site}.`;
-    const pending = imported.unmigrated.length
-      ? ` Pending migration: ${imported.unmigrated.join(", ")}. Run the Production migrations workflow. The other entities were still imported.`
-      : "";
-    const skipped = imported.cut_over.length ? ` Skipped because the database is the record: ${imported.cut_over.join(", ")}.` : "";
-    const privateNote = sheet ? "" : " Site rows were not imported. Set SITE_SHEET_PATH to the private raw sheet. It is not in the public snapshot.";
+    const drift = await withConnectionString(url, async (sql) => {
+      const found = await detectWorkbookDrift(sql, slice);
+      await rememberSheetIdFloors(sql, slice);
+      return found;
+    });
+    const privateNote = sheet ? "" : " Site raw cells were not compared. Set SITE_SHEET_PATH to the private raw sheet. It is not in the public snapshot.";
     const summaryNote = sheetSummaries
-      ? " New comms summaries were taken from the Comms Log in full. A stored summary that is only a prefix of the sheet was left for the confirm-gated restore."
-      : " Comms summaries came from the public snapshot, which clips at 300 characters. GOOGLE_SERVICE_ACCOUNT_JSON was not set.";
-    console.log(`${line}${pending}${skipped}${privateNote}${summaryNote}`);
-    summary(`## Shadow import\n\n${line}${pending}${skipped}${privateNote}${summaryNote}\n\nSource: workbook snapshot ${snapshotId}. Invalid workbook values were left unchanged and were not rewritten. Unknown site values were stored as written.\n`);
+      ? " Comms summaries were compared in full and were not written."
+      : " Comms summaries came from the public snapshot, which clips at 300 characters. A longer stored summary is held, not applied. GOOGLE_SERVICE_ACCOUNT_JSON was not set.";
+    console.log(`${drift.text}\n${privateNote}${summaryNote}`);
+    summary(`## Workbook drift\n\n${drift.text}\n\n${privateNote}${summaryNote}\n\nSource: workbook snapshot ${snapshotId}. Workbook rows were not written to the database. Activity and comms id floors were raised from ids only.\n`);
   } catch (error) {
     const missing = error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01";
     if (missing) {
       const message = "The events tables are not on production. Run the Production migrations workflow. The snapshot is already live.";
       console.log(message);
-      summary(`## Shadow import skipped\n\n${message}\n`);
+      summary(`## Workbook drift skipped\n\n${message}\n`);
       return;
     }
     throw error;
@@ -119,6 +118,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   console.error(publicError(error));
-  summary("## Shadow import failed\n\nThe snapshot is already live. The shadow tables were not updated.\n");
+  summary("## Workbook drift failed\n\nThe snapshot is already live. The database was not updated from the workbook.\n");
   process.exit(1);
 });

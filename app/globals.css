@@ -1064,7 +1064,9 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   z-index: 2;
   box-shadow: inset -1px 0 0 var(--line);
 }
-.list-table th[data-col="site"], .list-table td[data-col="site"] { width: 34%; min-width: 240px; }
+.list-table th[data-col="site"], .list-table td[data-col="site"] { width: 26%; }
+.pipeline-list .list-table th[data-col^="chip_"],
+.pipeline-list .list-table td[data-col^="chip_"] { width: 12%; min-width: 0; }
 .list-table thead th.is-pinned { z-index: 5; background: #faf7f1; }
 .list-scroll.is-scrolled .list-table th.is-pinned,
 .list-scroll.is-scrolled .list-table td.is-pinned {

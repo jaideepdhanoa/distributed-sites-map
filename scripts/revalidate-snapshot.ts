@@ -8,6 +8,10 @@ function summary(text: string): void {
 }
 
 async function main(): Promise<void> {
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") {
+    console.error("Refusing to refresh the production cache from a Vercel preview.");
+    process.exit(1);
+  }
   const secret = process.env.CRON_SECRET?.trim() || "";
   if (!secret) {
     const message = "CRON_SECRET is not set. Skipping cache refresh. The site picks up the snapshot within about 5 minutes.";

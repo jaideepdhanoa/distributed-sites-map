@@ -3,6 +3,7 @@ import { Inter_Tight, Newsreader } from "next/font/google";
 import "./globals.css";
 import PreviewChrome from "@/components/PreviewChrome";
 import CommandHotkey from "@/components/CommandHotkey";
+import PreviewDbBanner from "@/components/PreviewDbBanner";
 
 const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans" });
 const serif = Newsreader({ subsets: ["latin"], variable: "--font-serif" });
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable}`}>
       <body>
+        <PreviewDbBanner />
         {children}
         <CommandHotkey />
         <PreviewChrome />

@@ -33,6 +33,8 @@ import * as alertFlushCron from "@/lib/api/handlers/cron/alert-flush";
 import * as workbookSyncCron from "@/lib/api/handlers/cron/workbook-sync";
 import * as preferences from "@/lib/api/handlers/alerts/preferences";
 import * as alertTest from "@/lib/api/handlers/alerts/test";
+import { previewDatabaseWriteResponse } from "@/lib/preview/block";
+import { previewPointsAtProduction } from "@/lib/preview/safety";
 import { primeSnapshot } from "@/lib/snapshot/read";
 import * as areas from "@/lib/api/handlers/data/areas";
 import * as deals from "@/lib/api/handlers/data/deals";
@@ -175,9 +177,19 @@ function methodNotAllowed(): Response {
   return new Response(null, { status: 405 });
 }
 
+export function blocksPreviewWrite(method: string, parts: string[]): boolean {
+  if (!previewPointsAtProduction()) return false;
+  if (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") return true;
+  return method === "GET" && parts[0] === "alerts" && (parts[1] === "digest" || parts[1] === "flush");
+}
+
 export async function dispatch(method: string, request: NextRequest, parts: string[]): Promise<Response> {
   const found = findRoute(parts);
   if (!found) notFound();
+  if (blocksPreviewWrite(method, parts)) {
+    const blocked = previewDatabaseWriteResponse();
+    if (blocked) return blocked;
+  }
   // Refreshing the cache must not read the snapshot it is about to drop.
   // Cron dispatch only talks to GitHub. A snapshot read must not block it.
   const skipPrime = (parts[0] === "data" && parts[1] === "revalidate") || parts[0] === "cron";

@@ -23,6 +23,11 @@
 # that ref and lease against its SHA.
 set -euo pipefail
 
+if [ "${VERCEL_ENV:-}" = "preview" ] || [ "${VERCEL_ENV:-}" = "development" ]; then
+  echo "Refusing to open a pull request from a Vercel preview."
+  exit 1
+fi
+
 DESIRED="${1:?sync branch name}"
 REMOTE="${SYNC_REMOTE:-origin}"
 BOT_NAME="github-actions[bot]"

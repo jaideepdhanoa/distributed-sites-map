@@ -11,6 +11,7 @@ import { applyBatch, IdempotencyConflictError, VersionConflictError } from "@/li
 import { cookieWriteAllowed } from "@/lib/changes/csrf";
 import { changesApiEnabled } from "@/lib/changes/flags";
 import { assertEventsWritable, ProductionWriteRefused } from "@/lib/changes/guard";
+import { previewDatabaseWriteResponse } from "@/lib/preview/block";
 
 function missingRelation(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
@@ -18,6 +19,8 @@ function missingRelation(error: unknown): boolean {
 
 /** Shadow write path. Production stays off until CHANGES_API_ENABLED is set. */
 export async function POST(request: Request) {
+  const blocked = previewDatabaseWriteResponse();
+  if (blocked) return blocked;
   const bearer = request.headers.get("authorization")?.trim();
   const cookie = request.headers.get("cookie")?.trim();
   if (!bearer && cookie && !cookieWriteAllowed(request)) return jsonError("That request was refused.", 403);

@@ -1,19 +1,12 @@
 import { databaseUrl } from "@/lib/actions/db";
+import { databaseHost } from "./host";
+
+export { databaseHost };
 
 export class ProductionWriteRefused extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ProductionWriteRefused";
-  }
-}
-
-export function databaseHost(url: string | null | undefined): string {
-  const value = String(url || "").trim();
-  if (!value) return "";
-  try {
-    return new URL(value).hostname.toLowerCase();
-  } catch {
-    return "";
   }
 }
 

@@ -1,5 +1,6 @@
 import { losAngelesParts } from "@/lib/alerts/clock";
 import { redisConfig } from "@/lib/lockout";
+import { isolatedKey } from "@/lib/preview/safety";
 
 export type AskCredit = { ok: true } | { ok: false; reason: "limit" | "unconfigured" };
 
@@ -44,7 +45,7 @@ async function redisIncr(key: string): Promise<number> {
 
 export async function consumeAskCredit(userId: string, now = new Date()): Promise<AskCredit> {
   if (process.env.VERCEL_ENV && !backend && !redisConfig()) return { ok: false, reason: "unconfigured" };
-  const key = `ask:cap:${userId}:${losAngelesParts(now).day}`;
+  const key = isolatedKey(`ask:cap:${userId}:${losAngelesParts(now).day}`);
   let count = 0;
   if (backend) count = await backend.incr(key);
   else if (redisConfig()) count = await redisIncr(key);

@@ -1,3 +1,5 @@
+import { isolatedKey } from "@/lib/preview/safety";
+
 const WINDOW = 60 * 15;
 
 type RedisConfig = { url: string; token: string };
@@ -29,19 +31,19 @@ async function command(parts: (string | number)[]): Promise<unknown> {
 
 export async function lockStatus(bucket: string): Promise<"open" | "locked" | "unconfigured"> {
   if (!redisConfig()) return lockoutRequired() ? "unconfigured" : "open";
-  const locked = await command(["GET", `sites:lock:${bucket}`]);
+  const locked = await command(["GET", isolatedKey(`sites:lock:${bucket}`)]);
   return locked ? "locked" : "open";
 }
 
 export async function recordFailure(bucket: string, limit: number): Promise<void> {
   if (!redisConfig()) return;
-  const key = `sites:fail:${bucket}`;
+  const key = isolatedKey(`sites:fail:${bucket}`);
   const count = Number(await command(["INCR", key]));
   if (count === 1) await command(["EXPIRE", key, WINDOW]);
-  if (count >= limit) await command(["SET", `sites:lock:${bucket}`, "1", "EX", WINDOW]);
+  if (count >= limit) await command(["SET", isolatedKey(`sites:lock:${bucket}`), "1", "EX", WINDOW]);
 }
 
 export async function clearFailures(bucket: string): Promise<void> {
   if (!redisConfig()) return;
-  await command(["DEL", `sites:fail:${bucket}`]);
+  await command(["DEL", isolatedKey(`sites:fail:${bucket}`)]);
 }

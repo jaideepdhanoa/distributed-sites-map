@@ -1,0 +1,44 @@
+name: Reset preview database
+
+# One long-lived Neon branch named preview, copied from the production branch.
+# Points only the Vercel Preview environment at that branch. Production and
+# Development are not written. Type reset-preview-db to confirm.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type reset-preview-db to replace the Neon branch named preview from production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-database
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Reset the preview branch and point Vercel Preview at it
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set +x
+          if [ -n "${NEON_API_KEY:-}" ]; then printf '%s\n' "::add-mask::${NEON_API_KEY}"; fi
+          if [ -n "${VERCEL_TOKEN:-}" ]; then printf '%s\n' "::add-mask::${VERCEL_TOKEN}"; fi
+          npx tsx scripts/reset-preview-db.ts

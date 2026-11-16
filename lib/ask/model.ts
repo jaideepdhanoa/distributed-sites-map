@@ -2,6 +2,7 @@ import { ASK_TOOLS, MAX_ASK_STEPS, runAskTool } from "@/lib/ask/tools";
 import type { ActionRole } from "@/lib/actions/roles";
 import { listedCountLine } from "./counts";
 import type { AskSource } from "./policy";
+import { askCallsAllowed } from "@/lib/preview/safety";
 import { ASK_SERVER_BUDGET_MS, answeredByStageTable } from "./wait";
 
 export type AskModelInput = {
@@ -27,6 +28,7 @@ export function askModelName(): string {
 }
 
 export function askReady(): boolean {
+  if (!askCallsAllowed()) return false;
   return Boolean(process.env.XAI_API_KEY?.trim());
 }
 
@@ -36,7 +38,7 @@ export function askReady(): boolean {
  */
 export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput> {
   const apiKey = process.env.XAI_API_KEY?.trim();
-  if (!apiKey) throw new Error("missing_key");
+  if (!askCallsAllowed() || !apiKey) throw new Error("missing_key");
   const { streamText, tool, stepCountIs } = await import("ai");
   const { createXai } = await import("@ai-sdk/xai");
   const { z } = await import("zod");

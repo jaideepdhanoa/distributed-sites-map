@@ -141,9 +141,15 @@ export function assertSiteFlagSimulation(): void {
   }
 }
 
+/** The sheet copy stays off on every Vercel environment, including when the flag is 1. */
+export function workbookMirrorEnabled(): boolean {
+  if (process.env.VERCEL_ENV) return false;
+  return process.env.WORKBOOK_MIRROR_ENABLED === "1";
+}
+
 export function assertWorkbookMirrorAllowed(): void {
   assertSiteFlagSimulation();
-  if (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production") {
+  if (process.env.VERCEL_ENV) {
     throw new Error("Refusing to mirror the workbook from Vercel.");
   }
   if (process.env.GITHUB_EVENT_NAME === "pull_request") {
@@ -154,7 +160,7 @@ export function assertWorkbookMirrorAllowed(): void {
     throw new Error("The workbook mirror runs only on main.");
   }
   if (mirrorDryRun()) return;
-  if (process.env.WORKBOOK_MIRROR_ENABLED !== "1") {
+  if (!workbookMirrorEnabled()) {
     throw new Error(
       "WORKBOOK_MIRROR_ENABLED is not 1. Set the repository variable WORKBOOK_MIRROR_ENABLED to 1 to copy database rows into the workbook.",
     );

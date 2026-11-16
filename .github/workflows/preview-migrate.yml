@@ -1,0 +1,39 @@
+name: Preview migrations
+
+# Applies db/migrations to the long-lived Neon branch named preview.
+# Does not use the production connection string. Type migrate-preview to confirm.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type migrate-preview to apply pending db/migrations to the Neon branch named preview"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-database
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Migrate the preview branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set +x
+          if [ -n "${NEON_API_KEY:-}" ]; then printf '%s\n' "::add-mask::${NEON_API_KEY}"; fi
+          npx tsx scripts/preview-migrate.ts

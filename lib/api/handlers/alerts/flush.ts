@@ -4,8 +4,11 @@ import { migrate, whenReady } from "@/lib/actions/migrate";
 import { flushInstant } from "@/lib/alerts/deliver";
 import { authorizeJob } from "@/lib/alerts/job";
 import { privateHeaders } from "@/lib/guard";
+import { previewDatabaseWriteResponse, productionJobResponse } from "@/lib/preview/block";
 
 async function runFlush(request: Request) {
+  const blocked = previewDatabaseWriteResponse() || productionJobResponse();
+  if (blocked) return blocked;
   if (!(await authorizeJob(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders });
   }

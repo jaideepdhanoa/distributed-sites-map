@@ -38,6 +38,7 @@ type Props = {
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
+  onShowList?: () => void;
   onBounds: (
     bounds: {
       contains: (lnglat: [number, number]) => boolean;
@@ -1663,6 +1664,7 @@ export default function MapView(props: Props) {
       {mapFailed ? (
         <div className="map-empty" role="status" data-testid="map-error">
           <p>{mapFailed}</p>
+          {props.onShowList ? <button type="button" className="paper-btn" data-testid="map-switch-list" onClick={props.onShowList}>Switch to list</button> : null}
         </div>
       ) : null}
       <div className="map-float">

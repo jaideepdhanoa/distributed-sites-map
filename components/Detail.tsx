@@ -398,6 +398,7 @@ export default function Detail({
   figuresReady = true,
   related,
   signedIn = false,
+  outsideFilter = false,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -418,6 +419,7 @@ export default function Detail({
   figuresReady?: boolean;
   related?: ReactNode;
   signedIn?: boolean;
+  outsideFilter?: boolean;
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
   const pnl = usePnlTiles(signedIn && linkedDeal && linkedDeal.kind !== "land" ? linkedDeal.deal_id : "");
@@ -465,6 +467,7 @@ export default function Detail({
         </div>
         {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
         <p className="note">{site.address || "—"}</p>
+        {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
@@ -687,6 +690,7 @@ export function DealDetail({
   signedIn = false,
   figuresReady = true,
   related,
+  outsideFilter = false,
 }: {
   deal: DealProps;
   peers?: DealProps[];
@@ -708,6 +712,7 @@ export function DealDetail({
   signedIn?: boolean;
   figuresReady?: boolean;
   related?: ReactNode;
+  outsideFilter?: boolean;
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
   const pnl = usePnlTiles(signedIn && deal.kind !== "land" ? deal.deal_id : "");
@@ -751,6 +756,7 @@ export function DealDetail({
           <NdaChip deal={deal} signedIn={signedIn} />
         </div>
         <p className="note">{deal.address}</p>
+        {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
         <CardLinks
           listing={cue.url}

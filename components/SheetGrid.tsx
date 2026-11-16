@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { GripVertical, ListFilter, Pin } from "lucide-react";
 import {
   clampWidth,
+  columnWidth,
   cycleSort,
   moveColumn,
   type ListLayout,
@@ -44,7 +45,6 @@ export default function SheetGrid<Row>({
 }) {
   const innerRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollRefProp ?? innerRef;
-  const [measured, setMeasured] = useState<Record<string, number>>({});
   const [menu, setMenu] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [focus, setFocus] = useState({ row: 0, col: 0 });
@@ -90,23 +90,6 @@ export default function SheetGrid<Row>({
     const cell = scrollRef.current.querySelector<HTMLElement>(`[data-cell="${focus.row}:${focus.col}"]`);
     if (cell && active !== cell) cell.focus();
   }, [focus, items.length, scrollRef]);
-
-  const columnKey = ids.join(",");
-  useEffect(() => {
-    const row = scrollRef.current?.querySelector("thead tr");
-    if (!row) return;
-    const next: Record<string, number> = {};
-    row.querySelectorAll<HTMLElement>("th[data-col]").forEach((cell) => {
-      if (cell.dataset.col) next[cell.dataset.col] = Math.round(cell.getBoundingClientRect().width);
-    });
-    setMeasured((current) => {
-      const keys = new Set([...Object.keys(current), ...Object.keys(next)]);
-      for (const id of keys) {
-        if (Math.abs((current[id] || 0) - (next[id] || 0)) >= 2) return next;
-      }
-      return current;
-    });
-  }, [columnKey, layout.widths, layout.pinned, scrollRef]);
 
   useEffect(() => {
     if (!menu) return undefined;
@@ -203,31 +186,31 @@ export default function SheetGrid<Row>({
     window.addEventListener("pointerup", up);
   }
 
+  function widthOf(id: string) {
+    return layout.widths[id] || columnWidth(id);
+  }
+
   let pinnedLeft = 0;
   const pinnedOffset = new Map<string, number>();
   for (const column of columns) {
     if (!layout.pinned.includes(column.id)) continue;
     pinnedOffset.set(column.id, pinnedLeft);
-    const width = layout.widths[column.id] || measured[column.id] || 160;
-    pinnedLeft += width;
+    pinnedLeft += widthOf(column.id);
   }
 
   const span = colCount || 1;
-  const sized = columns.some((column) => layout.widths[column.id]);
-  const tableWidth = sized
-    ? columns.reduce((sum, column) => sum + (layout.widths[column.id] || measured[column.id] || 140), 0) + (trailing ? 96 : 0)
-    : undefined;
+  const tableWidth = columns.reduce((sum, column) => sum + widthOf(column.id), 0) + (trailing ? 112 : 0);
 
   return (
     <div className="list-scroll" ref={scrollRef} data-testid="sheet-grid" onKeyDown={onGridKey}>
-      <table className="list-table" role="grid" aria-labelledby={labelledBy} aria-rowcount={rows.length + 1} aria-colcount={span} style={tableWidth ? { width: tableWidth, minWidth: tableWidth } : undefined}>
+      <table className="list-table" role="grid" aria-labelledby={labelledBy} aria-rowcount={rows.length + 1} aria-colcount={span} style={{ width: "100%", minWidth: tableWidth }}>
         <thead>
           <tr role="row">
             {columns.map((column) => {
               const active = layout.sort?.id === column.id;
               const pinned = layout.pinned.includes(column.id);
               const filtered = Boolean(layout.filters[column.id]);
-              const width = layout.widths[column.id];
+              const width = widthOf(column.id);
               return (
                 <th
                   key={column.id}
@@ -237,8 +220,8 @@ export default function SheetGrid<Row>({
                   className={`${pinned ? "is-pinned" : ""} ${dragOver === column.id ? "col-over" : ""} ${column.className || ""}`.trim()}
                   aria-sort={active ? (layout.sort?.desc ? "descending" : "ascending") : "none"}
                   style={{
-                    width: width ? `${width}px` : undefined,
-                    minWidth: width ? `${width}px` : undefined,
+                    width: `${width}px`,
+                    minWidth: `${width}px`,
                     left: pinned ? pinnedOffset.get(column.id) : undefined,
                   }}
                 >
@@ -377,8 +360,9 @@ export default function SheetGrid<Row>({
               >
                 {columns.map((column, col) => {
                   const pinned = layout.pinned.includes(column.id);
-                  const width = layout.widths[column.id];
+                  const width = widthOf(column.id);
                   const focused = focus.row === item.index && focus.col === col;
+                  const full = column.text(row).trim();
                   return (
                     <td
                       key={column.id}
@@ -388,9 +372,10 @@ export default function SheetGrid<Row>({
                       data-pinned={pinned ? "true" : "false"}
                       tabIndex={focused || (item.index === 0 && col === 0 && focus.row === 0 && focus.col === 0) ? 0 : -1}
                       className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.className || ""}`.trim()}
+                      title={full && full !== "—" ? full : undefined}
                       style={{
-                        width: width ? `${width}px` : undefined,
-                        minWidth: width ? `${width}px` : undefined,
+                        width: `${width}px`,
+                        minWidth: `${width}px`,
                         left: pinned ? pinnedOffset.get(column.id) : undefined,
                       }}
                       onFocus={() => setFocus({ row: item.index, col })}

@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useEffect } from "react";
 import { NdaChip } from "./NdaChip";
+import { PhoneCards } from "./PhoneCards";
 import { RowLinks } from "./RowLinks";
 import SheetGrid from "./SheetGrid";
 import { useListLayout } from "./useListLayout";
@@ -78,7 +79,6 @@ export default function ListView({
   userId = "",
   sortQuery = null,
   mapArea = null,
-  onSearchArea,
   onClearArea,
   onDismiss,
 }: {
@@ -103,6 +103,7 @@ export default function ListView({
   const fallback = useMemo(() => defaultLayout(allowed), [allowed]);
   const { layout, update } = useListLayout({ surface: "universe", signedIn, userId, allowed, seed: null, fallback });
   const [phone, setPhone] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
@@ -162,10 +163,33 @@ export default function ListView({
             })}
           </select>
         </label>
-        <button type="button" className="paper-btn only-mobile" data-testid="search-area" onClick={mapArea ? onClearArea : onSearchArea}>{mapArea ? "Clear area" : "Search this area"}</button>
-        <button type="button" className="paper-btn" onClick={() => downloadVisible(columns, ordered)}>Export CSV</button>
+        <button type="button" className="paper-btn only-desktop" onClick={() => downloadVisible(columns, ordered)}>Export CSV</button>
+        <div className="more-wrap only-mobile">
+          <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
+          {moreOpen ? (
+            <div className="menu" role="menu" aria-label="List actions">
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); downloadVisible(columns, ordered); }}>Export CSV</button>
+              {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
+            </div>
+          ) : null}
+        </div>
       </div>
-      <SheetGrid
+      {phone ? (
+        <div className="list-scroll">
+          <PhoneCards rows={ordered.map((row) => ({
+            id: row.id,
+            name: row.site || "—",
+            address: row.address && row.address !== row.site ? row.address : row.city,
+            stage: shownText(row, "stage", signedIn) || "—",
+            score: shownText(row, "score", signedIn) || "—",
+            asking: shownText(row, "listed", signedIn) || "—",
+            metric: shownText(row, "spare", signedIn) || "—",
+            selected: row.id === selectedId,
+            onOpen: () => onOpen(row.id),
+          }))} />
+        </div>
+      ) : null}
+      {phone ? null : <SheetGrid
         rows={ordered}
         rowId={(row) => row.id}
         columns={columns}
@@ -178,10 +202,12 @@ export default function ListView({
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
             <span className="site-title">
-              <span className="site-name-text">{row.site || "—"}</span>
-              {row.address && row.address !== row.site ? <span className="site-address">{row.address}{row.city && !row.address.toLowerCase().includes(row.city.toLowerCase()) ? `, ${row.city}` : ""}</span> : row.city ? <span className="site-address">{row.city}</span> : null}
+              <span className="site-name-text" title={row.site || undefined}>{row.site || "—"}</span>
+              <span className="site-meta">
+                {row.address && row.address !== row.site ? <span className="site-address" title={row.address}>{row.address}{row.city && !row.address.toLowerCase().includes(row.city.toLowerCase()) ? `, ${row.city}` : ""}</span> : row.city ? <span className="site-address" title={row.city}>{row.city}</span> : <span className="site-address" />}
+                {row.near ? <span className="badge quiet near-chip" data-testid="near-chip" data-short={row.nearShort || row.near} title="Near means outside the service area, within the miles shown. More than 10 miles is a knock-out.">{row.near}</span> : null}
+              </span>
             </span>
-            {row.near ? <span className="badge quiet near-chip" data-testid="near-chip" data-short={row.nearShort || row.near} title="Near means outside the service area, within the miles shown. More than 10 miles is a knock-out.">{row.near}</span> : null}
             <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
           </span>
         ) : (
@@ -193,7 +219,7 @@ export default function ListView({
         trailing={(row) => (
           <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
         )}
-      />
+      />}
     </div>
   );
 }

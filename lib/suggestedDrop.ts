@@ -1,9 +1,23 @@
 import { readGenerated } from "@/lib/guard";
 import { droppedStage } from "@/lib/actions/nextStepTypes";
 import { recommendedDropSummary } from "@/lib/actions/nextStep";
+import { stageKey } from "@/lib/stageOverlay";
 import type { TimelineItem } from "@/lib/timeline/filter";
 
-export type SuggestedDrop = { id: string; stage: string; reason: string };
+export type SuggestedDrop = { id: string; stage: string; reason: string; afterDesk?: boolean };
+
+const PAST_DESK = new Set(["financial", "checks", "close", "contacted", "later"]);
+
+/**
+ * A suggested drop is a Desk screen knock-out. Once the workbook has moved the
+ * site to Financial screen or later, the suggestion stays off unless the rule
+ * that produced it says it still applies (`afterDesk`).
+ */
+export function suggestedDropVisible(stage: unknown, stageGroup?: unknown, afterDesk = false): boolean {
+  if (afterDesk) return !droppedStage(stageGroup == null ? null : String(stageGroup), stage == null ? null : String(stage));
+  const key = stageKey(String(stage || "")) || String(stageGroup || "").trim().toLowerCase();
+  return !PAST_DESK.has(key);
+}
 
 type DealFile = { features?: { properties?: Record<string, unknown> }[] };
 
@@ -19,7 +33,9 @@ export function loadSuggestedDrops(): SuggestedDrop[] {
       const stage = String(row.stage || "").trim();
       const reason = String(row.reason || "").trim();
       if (!id || !stage || !reason || droppedStage(null, stage)) continue;
-      rows.push({ id, stage, reason });
+      const afterDesk = row.afterDesk === true;
+      if (!suggestedDropVisible(stage, null, afterDesk)) continue;
+      rows.push({ id, stage, reason, ...(afterDesk ? { afterDesk: true } : {}) });
     }
     return rows;
   } catch {
@@ -41,6 +57,7 @@ export function withSuggestedDrops<T extends DealFile>(file: T): T {
       const stage = String(props.stage || "");
       const group = String(props.stage_group || "");
       if (droppedStage(group, stage)) return feature;
+      if (!suggestedDropVisible(stage || drop.stage, group, drop.afterDesk === true)) return feature;
       if (stage && stage !== drop.stage) return feature;
       return { ...feature, properties: { ...props, suggested_drop: drop.reason } };
     }),
@@ -53,6 +70,7 @@ export function suggestedReason(id: string, stage: unknown, stageGroup: unknown)
   const text = String(stage || "");
   const group = String(stageGroup || "");
   if (droppedStage(group, text)) return "";
+  if (!suggestedDropVisible(text || drop.stage, group, drop.afterDesk === true)) return "";
   if (text && text !== drop.stage) return "";
   return drop.reason;
 }

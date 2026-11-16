@@ -32,7 +32,9 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { stageDetail, stageTone } from "@/lib/labels";
+import { stripGmailIds } from "@/lib/displayText";
 import { NdaChip } from "./NdaChip";
+import { PhoneCards } from "./PhoneCards";
 import { StagePending } from "./StagePending";
 import { SuggestedDropMark } from "./SuggestedDrop";
 
@@ -93,7 +95,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "area") return serviceAreaColumn(deal) || "—";
   if (id === "nda") return cardNdaLabel(deal, signedIn) || "—";
   if (id === "lastContact") return contactDate(deal.last_broker_contact) || "—";
-  if (id === "nextStep") return String(deal.next_step || "").trim() || "—";
+  if (id === "nextStep") return stripGmailIds(String(deal.next_step || "").trim()) || "—";
   if (id === "type") return typeLabel(deal) || "—";
   return checkedShort(deal.checked_live) || "—";
 }
@@ -149,7 +151,6 @@ export default function PipelineList({
   columnSeed,
   userId,
   mapArea,
-  onSearchArea,
   onClearArea,
   onDismiss,
 }: {
@@ -180,6 +181,7 @@ export default function PipelineList({
 }) {
   const unread = new Set(unreadIds || []);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const allowed = useMemo(() => allowedIds(PIPELINE_COLUMNS.map((column) => column.id), signedIn), [signedIn]);
   const fallback = useMemo(() => {
     const optional = PIPELINE_COLUMNS.filter((column) => "optional" in column && column.optional).map((column) => column.id);
@@ -379,7 +381,6 @@ export default function PipelineList({
             </button>
           );
         })}
-        <button type="button" className="paper-btn only-mobile" data-testid="search-area" onClick={mapArea ? onClearArea : onSearchArea}>{mapArea ? "Clear area" : "Search this area"}</button>
         <div className="col-picker only-desktop">
           <button type="button" className="paper-btn" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((value) => !value)}>Columns</button>
           {columnsOpen ? (
@@ -421,15 +422,45 @@ export default function PipelineList({
             })}
           </select>
         </label>
-        <button type="button" className="paper-btn only-mobile" onClick={() => { setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
-        {selecting ? (
-          <label className="row-check only-mobile">
-            <input className="check" type="checkbox" aria-label="Select all shown" checked={allOn} onChange={toggleAll} />
-          </label>
-        ) : null}
-        <button type="button" className="paper-btn" onClick={() => download(ordered)}>Export CSV</button>
+        <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
+        <div className="more-wrap only-mobile">
+          <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
+          {moreOpen ? (
+            <div className="menu" role="menu" aria-label="List actions">
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
+              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
+              {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
+            </div>
+          ) : null}
+        </div>
       </div>
-      <SheetGrid
+      {phone ? (
+        <div className="list-scroll">
+          <PhoneCards rows={ordered.map((row) => {
+            const id = row.deal.deal_id;
+            const address = displayAddress(row.deal.address);
+            return {
+              id,
+              name: String(cell(row, "site", signedIn)),
+              address: address && address !== String(row.deal.name || "").trim() ? address : "",
+              stage: String(cell(row, "stage", signedIn)),
+              tone: stageTone(row.deal),
+              score: String(cell(row, "score", signedIn)),
+              asking: String(cell(row, "asking", signedIn)),
+              metric: String(cell(row, "openLand", signedIn)),
+              selected: id === selectedId,
+              check: showChecks ? (
+                <label className="row-check">
+                  <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
+                </label>
+              ) : null,
+              onOpen: () => onOpen(id),
+            };
+          })} />
+        </div>
+      ) : null}
+      {phone ? null : <SheetGrid
         rows={ordered}
         rowId={(row) => row.deal.deal_id}
         columns={sheetColumns}
@@ -462,9 +493,8 @@ export default function PipelineList({
           if (column === "capacity") return <NumberCell label={cell(row, "capacity", signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={capacitySummary(factsForDeal(row.deal)) || "Not on file"} />;
           if (column === "stage") return (
             <span className="stage-cell">
-              <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, "stage", signedIn)}</span>
+              <span className={`stage-pill tone-${stageTone(row.deal)}`} title={String(cell(row, "stage", signedIn))}>{cell(row, "stage", signedIn)}</span>
               <NdaChip deal={row.deal} signedIn={signedIn} />
-              <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
               <StagePending note={row.deal.stage_pending} />
             </span>
           );
@@ -476,15 +506,18 @@ export default function PipelineList({
                 </label>
               ) : null}
               <span className="site-title">
-                <span className="site-name-text">
+                <span className="site-name-text" title={String(cell(row, "site", signedIn))}>
                   {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
-                {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
-                  <span className="site-address">{displayAddress(row.deal.address)}</span>
-                ) : null}
-                <NearMark deal={row.deal} />
+                <span className="site-meta">
+                  {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
+                    <span className="site-address" title={displayAddress(row.deal.address)}>{displayAddress(row.deal.address)}</span>
+                  ) : <span className="site-address" />}
+                  <NearMark deal={row.deal} />
+                  <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
+                </span>
               </span>
               <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />
             </span>
@@ -494,7 +527,7 @@ export default function PipelineList({
         trailing={(row) => (
           <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(row.deal.deal_id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
         )}
-      />
+      />}
       {pickedRows.length ? (
         <div className="selection-bar" data-testid="selection-bar" ref={barRef}>
           <p>{pickedRows.length.toLocaleString()} selected</p>
@@ -611,7 +644,7 @@ function NumberCell({
 }) {
   return (
     <span className="metric">
-      <span className="metric-label" title={labelTitle}>
+      <span className="metric-label" title={labelTitle || label}>
         {label || "—"}
         {badge ? <em className="list-basis">{badge}</em> : null}
       </span>
@@ -636,7 +669,7 @@ function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stat
   );
   return (
     <span className="metric">
-      <span className="metric-label">{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
+      <span className="metric-label" title={source ? `${price} · ${source}` : price}>{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
       <Strip value={deal.asking_price} stats={stats} format={fullMoney} />
     </span>
   );

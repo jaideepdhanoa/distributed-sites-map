@@ -1,5 +1,6 @@
 import alertDefaults from "../config/alerts.json";
 import commsConfig from "../config/comms.json";
+import { formatActivityWhen } from "./actions/time";
 import { ndaQueueAllowed } from "./nda";
 
 const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
@@ -107,7 +108,10 @@ export function directionKind(value: string): "in" | "out" | "internal" | "other
 
 export function clipSummary(value: string): string {
   const summary = text(value).replace(/\s+/g, " ");
-  return summary.length > SUMMARY_LIMIT ? summary.slice(0, SUMMARY_LIMIT) : summary;
+  if (summary.length <= SUMMARY_LIMIT) return summary;
+  const slice = summary.slice(0, SUMMARY_LIMIT);
+  const cut = slice.replace(/\s+\S*$/, "").trim();
+  return `${cut || slice.trim()}…`;
 }
 
 export function normalizeAt(value: string): string {
@@ -125,12 +129,9 @@ export function sortStamp(at: string): string {
   return `${match[1]}T${match[2] || "00:00"}`;
 }
 
-/** The timeline clock. An approximate comms time keeps the parsed clock and says so. */
+/** The timeline clock. Approximate stamps show the date and say so. */
 export function commsWhenText(at: string, approximate: boolean): string {
-  const when = whenParts(at);
-  const body = [when.date, when.time ? `${when.time} PT` : ""].filter(Boolean).join(" ");
-  if (!body) return approximate ? "(approximate)" : "";
-  return approximate ? `${body} (approximate)` : body;
+  return formatActivityWhen(at, approximate).label;
 }
 
 export function whenParts(at: string): { date: string; time: string } {

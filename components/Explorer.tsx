@@ -1136,15 +1136,6 @@ export default function Explorer() {
       });
       const stageShown = (view.all || search.get("pstage") === deal.stage_group) && (deal.stage_group !== "dropped" || droppedVisible);
       if (!stageShown) patch.pstage = known ? deal.stage_group : null;
-      const category = dealCategory(deal);
-      if (category === "land" || category === "store" || category === "auto") {
-        const current = parseCategories({
-          cats: search.get("cats"),
-          landlayer: search.get("landlayer"),
-          cstore: search.get("cstore"),
-        });
-        if (!current[category]) Object.assign(patch, categorySearch({ ...current, [category]: true }));
-      }
       return patch;
     }
     const site = features.find((feature) => feature.properties.site_id === id)?.properties;
@@ -1156,14 +1147,6 @@ export default function Explorer() {
     if (resolveFunnelMode(search.get("funnel"), funnelPref) === "pipeline") {
       patch.funnel = "universe";
       patch.tab = null;
-    }
-    if (isLandParcelSite(site, links)) {
-      const current = parseCategories({
-        cats: search.get("cats"),
-        landlayer: search.get("landlayer"),
-        cstore: search.get("cstore"),
-      });
-      if (!current.land) Object.assign(patch, categorySearch({ ...current, land: true }));
     }
     return patch;
   }
@@ -2224,6 +2207,7 @@ export default function Explorer() {
           onPinLabel={setPinLabel}
           basemap={basemap}
           onBasemap={chooseBasemap}
+          onShowList={() => write({ view: "list" })}
           onRingsOutside={setRingsOutside}
           registerFrameRings={registerFrameRings}
           onSelect={(id) => {
@@ -2477,6 +2461,7 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             figuresReady={Boolean(selectedDeal) || figuresReady}
+            outsideFilter={!dealInCategories(selectedDeal, categories) || (funnel === "pipeline" && !allPipes && !who && selectedDeal.stage_group !== pipeStage)}
             related={relatedPanel({ id: selectedDeal.deal_id, kind: "deal", name: selectedDeal.name, address: selectedDeal.address, apn: selectedDeal.apn || siteById.get(selectedDeal.universe_id)?.apn })}
           />
         ) : selectedUnscreened ? (
@@ -2510,6 +2495,7 @@ export default function Explorer() {
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             signedIn={Boolean(me)}
             figuresReady={figuresReady}
+            outsideFilter={Boolean(selectedSite && !siteInCategories(selectedSite, links, categories))}
             related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}
           />
         ) : null}

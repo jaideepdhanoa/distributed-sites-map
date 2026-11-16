@@ -1318,24 +1318,46 @@ def scrub_drift_reason(text: str) -> str:
     return cleaned or "Noted"
 
 
+def stage_past_desk(stage: str) -> bool:
+    """Financial screen and later. A bare 'Financial screen' counts too."""
+    number = stage_number(stage)
+    if number is not None:
+        return number >= 2
+    text = str(stage or "").strip().lower()
+    return text in {"financial screen", "site checks", "offer and close"}
+
+
+def applies_after_desk(rule: str) -> bool:
+    """A knock-out rule opts in by saying it still applies after Desk screen."""
+    return bool(re.search(r"(?i)\bapplies after desk\b", rule or ""))
+
+
 def suggested_drop_rows(drift: list[dict]) -> list[dict]:
     """Knock-outs that stay suggestions. Stage is not rewritten.
 
     A row already at Dropped is a recorded stage, not a new suggestion.
     A listing-flag note with no pipeline stage is not a suggested drop.
+    A site that has moved past Desk screen keeps the suggestion only when
+    the rule says it still applies after Desk.
     """
     rows = []
     for row in drift:
         deal_id = str(row.get("lead id") or "").strip()
         stage = str(row.get("map stage") or row.get("workbook Stage") or "").strip()
         reason = str(row.get("KO reason") or "").strip()
+        rule = str(row.get("rule applied") or "")
         if not re.fullmatch(r"(PIPE|LAND)-[A-Z]{2,4}-\d{4}", deal_id):
             continue
         if not stage or not reason:
             continue
         if stage.lower().startswith("dropped") or stage.lower() == "not listed":
             continue
-        rows.append({"id": deal_id, "stage": stage, "reason": reason})
+        if stage_past_desk(stage) and not applies_after_desk(rule):
+            continue
+        item = {"id": deal_id, "stage": stage, "reason": reason}
+        if applies_after_desk(rule):
+            item["afterDesk"] = True
+        rows.append(item)
     rows.sort(key=lambda item: item["id"])
     return rows
 

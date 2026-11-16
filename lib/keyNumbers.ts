@@ -306,10 +306,16 @@ export function openLandText(value?: number | null) {
   return `${Math.round(value).toLocaleString()} sq ft`;
 }
 
-/** One spare-land figure, in square feet. Workbook square feet win; otherwise own-parcel acres become a census estimate. */
+/**
+ * One spare-land figure, in square feet. A workbook spare-area cell is a
+ * measurement, and 0 is a finished check. Census acres are only an estimate
+ * when they are above zero; 0 acres is not a measured open-land figure.
+ */
 export function spareLandSqft(sqft?: number | null, acres?: number | null) {
-  if (sqft != null) return { value: openLandText(sqft), note: "Aerial check" };
-  if (acres != null) return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
+  if (sqft != null && Number.isFinite(sqft)) return { value: openLandText(sqft), note: "Aerial check" };
+  if (acres != null && Number.isFinite(acres) && acres > 0) {
+    return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
+  }
   return { value: UNKNOWN, note: "" };
 }
 

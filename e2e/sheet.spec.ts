@@ -91,18 +91,15 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   expect(stored).toBe(true);
 });
 
-test("a phone sheet keeps the first column pinned and can search the map area", async ({ page }, info) => {
+test("a phone list is cards and does not offer search this area", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("[data-testid=sheet-grid]");
-  const pinned = page.locator(".pipeline-list th.is-pinned").first();
-  await expect(pinned).toBeVisible();
-  await expect(pinned).toHaveAttribute("data-col", "site");
-  const overflow = await page.locator("[data-testid=sheet-grid]").evaluate((node) => node.scrollWidth - node.clientWidth);
-  expect(overflow).toBeGreaterThan(8);
-  await expect(page.getByTestId("search-area")).toBeVisible();
+  await page.waitForSelector("[data-testid=phone-cards]");
+  await expect(page.locator("[data-testid=phone-cards] button.list-row").first()).toBeVisible();
+  await expect(page.getByTestId("search-area")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Columns" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Show on map" }).first()).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await expect(page.locator(".shell")).not.toContainText("PIPE-PHX-0006");
 });

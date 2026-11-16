@@ -61,7 +61,6 @@ const COLUMN_WIDTH: Record<string, number> = {
   perAcre: 120,
   openLand: 120,
   spare: 120,
-  capacity: 188,
   grade: 168,
   traffic: 112,
   cashFlow: 156,

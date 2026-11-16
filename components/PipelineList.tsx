@@ -376,7 +376,7 @@ export default function PipelineList({
 
   return (
     <div className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
-      {phone ? null : summaryBar}
+      {summaryBar}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
@@ -454,7 +454,6 @@ export default function PipelineList({
       </div>
       {phone ? (
         <div className="list-scroll">
-          {summaryBar}
           {outside}
           <PhoneCards rows={ordered.map((row) => {
             const id = row.deal.deal_id;

@@ -74,8 +74,8 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     const overflow = await page.locator(".pipeline-list .list-scroll").evaluate((node) => node.scrollWidth - node.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   } else {
-    await expect(page.locator(".pipeline-list th.is-pinned").first()).toBeVisible();
-    await expect(page.getByTestId("search-area")).toBeVisible();
+    await expect(page.getByTestId("phone-cards")).toBeVisible();
+    await expect(page.getByTestId("search-area")).toHaveCount(0);
   }
   await page.screenshot({ path: `review-shots/${name}-list.png`, fullPage: false });
   await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });

@@ -34,12 +34,13 @@ test("phone list, columns, compare, and layers are not browser controls", async 
   await expect(page.getByTestId("pipeline-list")).toBeVisible();
   await expect(page.getByRole("button", { name: "Columns" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Filters" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Sort" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Show on map" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "More list actions" }).click();
+  await expect(page.getByRole("menuitem", { name: "Export CSV" })).toBeVisible();
+  await page.getByRole("button", { name: "More list actions" }).click();
   expect(await nativeControls(page)).toEqual([]);
 
-  await page.locator(".pipeline-list tbody tr.list-row").first().click();
+  await page.locator("[data-testid=phone-cards] button.list-row").first().click();
   await expect(page.getByRole("button", { name: /compare/i })).toBeVisible();
   expect(await nativeControls(page)).toEqual([]);
 

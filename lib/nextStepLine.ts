@@ -1,3 +1,5 @@
+import { stripGmailIds } from "@/lib/displayText";
+
 const RULE_CODE = /\b[RT]-\d{2,4}\b/;
 const LINE_LIMIT = 140;
 
@@ -14,7 +16,7 @@ function stripCodes(value: string): string {
 
 /** One plain sentence for the card, and the same note without rule codes. */
 export function plainNextStep(value: string): { line: string; full: string } {
-  const full = stripCodes(String(value || ""));
+  const full = stripCodes(stripGmailIds(String(value || "")));
   if (!full) return { line: "", full: "" };
   const sentence = full.split(/(?<=[.!?])\s+/)[0] || full;
   if (sentence.length <= LINE_LIMIT) return { line: sentence, full };

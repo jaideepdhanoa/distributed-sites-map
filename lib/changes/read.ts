@@ -230,7 +230,7 @@ export async function overlayTimeline(raw: unknown, ids?: string[]): Promise<unk
       const item: ActivityItem = {
         record_id: text(row.site_id),
         event_id: text(row.entity_id),
-        date: text(payload.date),
+        date: text(payload.date_iso) || text(payload.date),
         type: text(payload.type),
         summary: text(payload.summary),
       };
@@ -288,6 +288,8 @@ export async function overlayComms(snapshot: CommsSnapshot, ids?: string[]): Pro
         thread_id: text(payload.thread_id),
         link: text(payload.link),
         at: text(payload.at),
+        at_iso: text(payload.at_iso),
+        at_text: text(payload.at_text),
         at_approximate: payload.at_approximate === true || payload.at_approximate === "1",
         direction: text(payload.direction),
         person: text(payload.person),

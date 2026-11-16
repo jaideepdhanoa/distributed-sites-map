@@ -110,8 +110,9 @@ function presentItem(row: Record<string, unknown>): TimelineItem | null {
   const raw = String(row.summary || "").trim();
   const summary = type === "stage" ? stageLine(raw) : raw;
   if (!summary || blockedText(summary)) return null;
-  const date = String(row.date || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const iso = String(row.date_iso || "");
+  const date = iso || String(row.date || "");
+  if (!/^\d{4}-\d{2}-\d{2}/.test(date)) return null;
   const item: TimelineItem = { date, type, summary, eventId: String(row.event_id || "") };
   const sourceLink = activitySourceLink(row.source_link ?? row.sourceLink);
   if (sourceLink) item.sourceLink = sourceLink;

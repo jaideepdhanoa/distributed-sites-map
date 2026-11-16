@@ -5,11 +5,6 @@
     "reason": "No longer for sale"
   },
   {
-    "id": "LAND-PHX-0003",
-    "stage": "Financial screen",
-    "reason": "Outside the service area"
-  },
-  {
     "id": "LAND-PHX-0007",
     "stage": "1 Desk screen",
     "reason": "Outside the service area"
@@ -110,19 +105,9 @@
     "reason": "Lot too small"
   },
   {
-    "id": "PIPE-PHX-0014",
-    "stage": "2 Financial screen",
-    "reason": "Lot too small"
-  },
-  {
     "id": "PIPE-PHX-0018",
     "stage": "1 Desk screen",
     "reason": "Outside the service area"
-  },
-  {
-    "id": "PIPE-PHX-0084",
-    "stage": "2 Financial screen",
-    "reason": "Land only"
   },
   {
     "id": "PIPE-PHX-0085",

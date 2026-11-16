@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { stripGmailIds } from "@/lib/displayText";
 import {
   OPEN_LOOP_FILTERS,
   PARKED_BADGE,
@@ -124,8 +125,8 @@ export default function OpenLoops({
               <p className="nda-court"><span>{row.loop_class}</span>{row.court}</p>
               {row.loop_class === "Site" ? <p>{[row.market, row.stage].filter(Boolean).join(" · ")}</p> : null}
               <p>{row.days}d · {row.owner}{row.brief_flagged ? " · In brief" : ""}</p>
-              <p>{row.loop_class === "NDA" ? "Gates" : "Blocker"}: {row.detail || "—"}</p>
-              {row.next_step ? <p>{row.next_step}</p> : null}
+              <p>{row.loop_class === "NDA" ? "Gates" : "Blocker"}: {stripGmailIds(row.detail || "") || "—"}</p>
+              {row.next_step ? <p>{stripGmailIds(row.next_step)}</p> : null}
               {row.parked ? <p>{PARKED_BADGE}</p> : null}
               {row.folded_site_ids.length ? (
                 <div className="nda-sites">
@@ -134,7 +135,7 @@ export default function OpenLoops({
                   ))}
                 </div>
               ) : null}
-              {row.site_note ? <p>{row.site_note}</p> : null}
+              {row.site_note ? <p>{stripGmailIds(row.site_note)}</p> : null}
             </li>
           ))}
         </ul>

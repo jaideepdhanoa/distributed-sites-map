@@ -117,10 +117,10 @@ test("the preview comment button stays off phone sheets and list actions", async
   await page.getByRole("group", { name: "Map or list" }).getByRole("button", { name: "List", exact: true }).click();
   await page.waitForSelector("[data-testid=pipeline-list]");
   await expect(button).toHaveCSS("display", "none");
-  const show = page.getByRole("button", { name: "Show on map" }).first();
-  await expect(show).toBeVisible();
-  expect(await overlaps(button, show)).toBe(false);
-  const listing = page.locator(".pipeline-list a.row-link").first();
-  await expect(listing).toBeVisible();
-  expect(await overlaps(button, listing)).toBe(false);
+  const card = page.locator("[data-testid=phone-cards] button.list-row").first();
+  await expect(card).toBeVisible();
+  expect(await overlaps(button, card)).toBe(false);
+  const more = page.getByRole("button", { name: "More list actions" });
+  await expect(more).toBeVisible();
+  expect(await overlaps(button, more)).toBe(false);
 });

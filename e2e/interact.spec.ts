@@ -88,18 +88,27 @@ test("a shared link restores the city, step, filter, card, and table", async ({ 
   expect(page.url()).toContain("table=1");
 });
 
-test("export matches the rows and columns on screen", async ({ page }) => {
+test("export matches the rows and columns on screen", async ({ page }, info) => {
   await page.goto("/?funnel=universe&stage=cleared&view=list", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".list-pane tbody tr", { state: "attached" });
-  const headers = await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter((text) => text && text !== "Map"));
-  const rowIds = await page.locator(".list-pane tbody .site-name-text").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/\s+/g, " ").trim()));
+  const phone = info.project.name === "mobile";
+  if (phone) await page.waitForSelector("[data-testid=phone-cards] button.list-row");
+  else await page.waitForSelector(".list-pane tbody tr", { state: "attached" });
+  const headers = phone ? null : await page.locator(".list-pane thead th").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/[↑↓]/g, "").trim()).filter((text) => text && text !== "Map"));
+  const rowIds = phone
+    ? await page.locator(".phone-card-name").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/\s+/g, " ").trim()))
+    : await page.locator(".list-pane tbody .site-name-text").evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").replace(/\s+/g, " ").trim()));
   expect(rowIds.length).toBeGreaterThan(0);
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
+  if (phone) {
+    await page.getByRole("button", { name: "More list actions" }).click();
+    await page.getByRole("menuitem", { name: "Export CSV" }).click();
+  } else {
+    await page.getByRole("button", { name: "Export CSV" }).click();
+  }
   const download = await downloadPromise;
   const csv = (await import("node:fs")).readFileSync((await download.path()) || "", "utf8");
   const parsed = parseCsv(csv).filter((row) => row.some(Boolean));
-  expect(parsed[0]).toEqual(headers);
+  if (headers) expect(parsed[0]).toEqual(headers);
   expect(parsed.slice(1).map((row) => row[0]).sort()).toEqual([...rowIds].sort());
 });
 

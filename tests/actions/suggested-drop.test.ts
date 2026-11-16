@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { droppedDealsShown } from "../../lib/pipeStage";
-import { loadSuggestedDrops, suggestedDropHistory, withSuggestedDrops } from "../../lib/suggestedDrop";
+import { loadSuggestedDrops, suggestedDropHistory, suggestedDropVisible, withSuggestedDrops } from "../../lib/suggestedDrop";
 import { mergeBringBackHistory } from "../../lib/timeline/history";
 
 type DealProps = { deal_id?: string; stage?: string; stage_group?: string; suggested_drop?: string };
@@ -35,4 +35,12 @@ test("a knock-out stays on the current stage and is labeled a suggested drop", (
   assert.equal(labeled?.suggested_drop, undefined);
   assert.equal(suggestedDropHistory([dropped.properties?.deal_id || ""]).some((item) => item.eventId === `suggested-drop:${dropped.properties?.deal_id}`), drops.some((drop) => drop.id === dropped.properties?.deal_id));
   assert.equal(droppedDealsShown({ all: true, stage: "desk", droppedLayer: false, searchWide: false }), false);
+  const advanced = annotated.features?.find((feature) => feature.properties?.deal_id === "PIPE-PHX-0084")?.properties;
+  assert.equal(advanced?.stage_group, "financial");
+  assert.equal(advanced?.suggested_drop, undefined);
+  assert.equal(suggestedDropVisible("2 Financial screen", "financial"), false);
+  assert.equal(suggestedDropVisible("Financial screen", ""), false);
+  assert.equal(suggestedDropVisible("1 Desk screen", "desk"), true);
+  assert.equal(suggestedDropVisible("2 Financial screen", "financial", true), true);
+  assert.equal(drops.some((drop) => drop.id === "PIPE-PHX-0084"), false);
 });

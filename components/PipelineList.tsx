@@ -14,11 +14,14 @@ import {
   checkedShort,
   compactMoney,
   depotLine,
+  isOpenLandBlank,
   fullMoney,
   capacitySummary,
   displayScore,
   factsForDeal,
   powerSummary,
+  openLandLabel,
+  openLandMeasured,
   openLandText,
   vehiclesPerDay,
   summaryOf,
@@ -32,7 +35,10 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { stageDetail, stageTone } from "@/lib/labels";
+import { stripGmailIds } from "@/lib/displayText";
 import { NdaChip } from "./NdaChip";
+import { PhoneCards } from "./PhoneCards";
+import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 import { SuggestedDropMark } from "./SuggestedDrop";
 
@@ -53,6 +59,24 @@ function typeLabel(deal: DealProps): string {
   return "";
 }
 
+function phoneScore(value: string): string {
+  if (!value || value === "—") return "";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return `Score ${value}`;
+  const rounded = Math.round(number * 10) / 10;
+  return `Score ${rounded}`;
+}
+
+function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
+  const deal = row.deal;
+  const score = phoneScore(String(cell(row, "score", signedIn)));
+  const asking = signedIn && deal.asking_price != null ? `${compactMoney(deal.asking_price)} asking` : "";
+  const party = shownFirm(deal) || shownBroker(deal) || shownPriceSource(deal);
+  const land = openLandLabel(deal.open_land_sqft, deal.open_land_basis);
+  const openLand = isOpenLandBlank(land) ? "" : `${land} open`;
+  return [score, asking, party, openLand];
+}
+
 function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
@@ -66,7 +90,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   }
   if (id === "acres") return acresText(deal.land_acres) || "—";
   if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "—") : "—";
-  if (id === "openLand") return deal.open_land_sqft != null ? openLandText(deal.open_land_sqft) : "—";
+  if (id === "openLand") return openLandLabel(deal.open_land_sqft, deal.open_land_basis);
   if (id === "capacity") return powerSummary(factsForDeal(deal)) || "—";
   if (id === "traffic") return vehiclesPerDay(deal.trade_aadt) || "—";
   if (id === "cashFlow") {
@@ -93,7 +117,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "area") return serviceAreaColumn(deal) || "—";
   if (id === "nda") return cardNdaLabel(deal, signedIn) || "—";
   if (id === "lastContact") return contactDate(deal.last_broker_contact) || "—";
-  if (id === "nextStep") return String(deal.next_step || "").trim() || "—";
+  if (id === "nextStep") return stripGmailIds(String(deal.next_step || "").trim()) || "—";
   if (id === "type") return typeLabel(deal) || "—";
   return checkedShort(deal.checked_live) || "—";
 }
@@ -104,7 +128,7 @@ function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "score") return typeof deal.score === "number" ? deal.score : null;
   if (id === "acres") return deal.land_acres;
   if (id === "perAcre") return signedIn ? deal.price_per_acre : null;
-  if (id === "openLand") return deal.open_land_sqft;
+  if (id === "openLand") return openLandMeasured(deal.open_land_sqft, deal.open_land_basis) ? deal.open_land_sqft : null;
   if (id === "capacity") return deal.cap_a_substation_mi;
   if (id === "traffic") return deal.trade_aadt;
   if (id === "cashFlow") return signedIn ? deal.stated_cash_flow : null;
@@ -129,6 +153,7 @@ export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], si
 
 export default function PipelineList({
   rows,
+  outsideRow = null,
   columns,
   selectedId,
   sort,
@@ -149,11 +174,11 @@ export default function PipelineList({
   columnSeed,
   userId,
   mapArea,
-  onSearchArea,
   onClearArea,
   onDismiss,
 }: {
   rows: PipelineRow[];
+  outsideRow?: PipelineRow | null;
   columns: PipelineColumnId[];
   selectedId: string | null;
   sort: { id: PipelineColumnId; desc: boolean };
@@ -180,6 +205,7 @@ export default function PipelineList({
 }) {
   const unread = new Set(unreadIds || []);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const allowed = useMemo(() => allowedIds(PIPELINE_COLUMNS.map((column) => column.id), signedIn), [signedIn]);
   const fallback = useMemo(() => {
     const optional = PIPELINE_COLUMNS.filter((column) => "optional" in column && column.optional).map((column) => column.id);
@@ -196,7 +222,8 @@ export default function PipelineList({
   });
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
-  const [phone, setPhone] = useState(false);
+  const paneRef = useRef<HTMLDivElement>(null);
+  const phone = useNarrowList(paneRef);
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -229,7 +256,7 @@ export default function PipelineList({
     asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
     acres: stripStats(ordered.map((row) => row.deal.land_acres)),
     perAcre: stripStats(ordered.map((row) => (signedIn ? row.deal.price_per_acre : null))),
-    openLand: stripStats(ordered.map((row) => row.deal.open_land_sqft)),
+    openLand: stripStats(ordered.map((row) => (openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null))),
     traffic: stripStats(ordered.map((row) => row.deal.trade_aadt)),
     depot: stripStats(ordered.map((row) => (row.noPin ? null : row.deal.miles_to_depot))),
     cash: stripStats(ordered.map((row) => (signedIn ? row.deal.stated_cash_flow : null)), true),
@@ -246,14 +273,6 @@ export default function PipelineList({
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
   const showChecks = !phone || selecting;
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
-
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const apply = () => setPhone(query.matches);
-    apply();
-    query.addEventListener("change", apply);
-    return () => query.removeEventListener("change", apply);
-  }, []);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -350,14 +369,27 @@ export default function PipelineList({
     }
   }
 
+  const summaryBar = (
+    <div className="summary-row" data-testid="summary-row">
+      <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{summary.count.toLocaleString()}</strong><small className="only-desktop">{summary.withAsking} with an asking price</small></div>
+      <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
+      <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
+      <div><span className="only-desktop">Median per acre</span><span className="only-mobile">Per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
+    </div>
+  );
+  const outside = outsideRow ? (
+    <div className="outside-row" data-testid="outside-row">
+      <p className="note">Outside this filter</p>
+      <button type="button" className="list-row" onClick={() => onOpen(outsideRow.deal.deal_id)}>
+        <span className="phone-card-name">{outsideRow.deal.name || outsideRow.deal.address || outsideRow.deal.deal_id}</span>
+        {displayAddress(outsideRow.deal.address) ? <span className="site-address">{displayAddress(outsideRow.deal.address)}</span> : null}
+      </button>
+    </div>
+  ) : null;
+
   return (
-    <div className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
-      <div className="summary-row" data-testid="summary-row">
-        <div><span>In this filter</span><strong>{summary.count.toLocaleString()}</strong><small>{summary.withAsking} with an asking price</small></div>
-        <div><span>Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
-        <div><span>Land listed</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
-        <div><span>Median per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
-      </div>
+    <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
+      {summaryBar}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
@@ -379,7 +411,6 @@ export default function PipelineList({
             </button>
           );
         })}
-        <button type="button" className="paper-btn only-mobile" data-testid="search-area" onClick={mapArea ? onClearArea : onSearchArea}>{mapArea ? "Clear area" : "Search this area"}</button>
         <div className="col-picker only-desktop">
           <button type="button" className="paper-btn" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((value) => !value)}>Columns</button>
           {columnsOpen ? (
@@ -421,15 +452,45 @@ export default function PipelineList({
             })}
           </select>
         </label>
-        <button type="button" className="paper-btn only-mobile" onClick={() => { setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
-        {selecting ? (
-          <label className="row-check only-mobile">
-            <input className="check" type="checkbox" aria-label="Select all shown" checked={allOn} onChange={toggleAll} />
-          </label>
-        ) : null}
-        <button type="button" className="paper-btn" onClick={() => download(ordered)}>Export CSV</button>
+        <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
+        <div className="more-wrap only-mobile">
+          <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
+          {moreOpen ? (
+            <div className="menu" role="menu" aria-label="List actions">
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
+              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
+              {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
+            </div>
+          ) : null}
+        </div>
       </div>
-      <SheetGrid
+      {phone ? (
+        <div className="list-scroll">
+          {outside}
+          <PhoneCards rows={ordered.map((row) => {
+            const id = row.deal.deal_id;
+            const address = displayAddress(row.deal.address);
+            return {
+              id,
+              name: String(cell(row, "site", signedIn)),
+              address: address && address !== String(row.deal.name || "").trim() ? address : "",
+              stage: String(cell(row, "stage", signedIn)),
+              tone: stageTone(row.deal),
+              facts: phoneFacts(row, signedIn),
+              selected: id === selectedId,
+              check: showChecks ? (
+                <label className="row-check">
+                  <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
+                </label>
+              ) : null,
+              onOpen: () => onOpen(id),
+            };
+          })} />
+        </div>
+      ) : null}
+      {phone ? null : outside}
+      {phone ? null : <SheetGrid
         rows={ordered}
         rowId={(row) => row.deal.deal_id}
         columns={sheetColumns}
@@ -446,7 +507,7 @@ export default function PipelineList({
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
-          if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={row.deal.open_land_sqft} stats={strips.openLand} direction="higher" format={openLandText} />;
+          if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null} stats={strips.openLand} direction="higher" format={openLandText} />;
           if (column === "asking") return <AskingCell deal={row.deal} stats={strips.asking} onBroker={onBroker} signedIn={signedIn} />;
           if (column === "acres") return <NumberCell label={cell(row, "acres", signedIn)} value={row.deal.land_acres} stats={strips.acres} format={(value) => acresText(value) || String(value)} />;
           if (column === "perAcre") return <NumberCell label={cell(row, "perAcre", signedIn)} value={signedIn ? row.deal.price_per_acre : null} stats={strips.perAcre} direction="lower" format={fullMoney} />;
@@ -462,9 +523,8 @@ export default function PipelineList({
           if (column === "capacity") return <NumberCell label={cell(row, "capacity", signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={capacitySummary(factsForDeal(row.deal)) || "Not on file"} />;
           if (column === "stage") return (
             <span className="stage-cell">
-              <span className={`stage-pill tone-${stageTone(row.deal)}`}>{cell(row, "stage", signedIn)}</span>
+              <span className={`stage-pill tone-${stageTone(row.deal)}`} title={String(cell(row, "stage", signedIn))}>{cell(row, "stage", signedIn)}</span>
               <NdaChip deal={row.deal} signedIn={signedIn} />
-              <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
               <StagePending note={row.deal.stage_pending} />
             </span>
           );
@@ -476,15 +536,18 @@ export default function PipelineList({
                 </label>
               ) : null}
               <span className="site-title">
-                <span className="site-name-text">
+                <span className="site-name-text" title={String(cell(row, "site", signedIn) || row.deal.deal_id)}>
                   {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
-                {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
-                  <span className="site-address">{displayAddress(row.deal.address)}</span>
-                ) : null}
-                <NearMark deal={row.deal} />
+                <span className="site-meta">
+                  {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
+                    <span className="site-address" title={displayAddress(row.deal.address)}>{displayAddress(row.deal.address)}</span>
+                  ) : <span className="site-address" />}
+                  <NearMark deal={row.deal} />
+                  <SuggestedDropMark compact reason={row.deal.suggested_drop} stageGroup={row.deal.stage_group} stage={row.deal.stage} />
+                </span>
               </span>
               <RowLinks listing={listingHref(row.deal.listing_url)} folder={folderHref(row.deal.folder_url)} packageHref={row.deal.package_href} />
             </span>
@@ -494,7 +557,7 @@ export default function PipelineList({
         trailing={(row) => (
           <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(row.deal.deal_id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
         )}
-      />
+      />}
       {pickedRows.length ? (
         <div className="selection-bar" data-testid="selection-bar" ref={barRef}>
           <p>{pickedRows.length.toLocaleString()} selected</p>
@@ -611,7 +674,7 @@ function NumberCell({
 }) {
   return (
     <span className="metric">
-      <span className="metric-label" title={labelTitle}>
+      <span className="metric-label" title={labelTitle || label}>
         {label || "—"}
         {badge ? <em className="list-basis">{badge}</em> : null}
       </span>
@@ -636,7 +699,7 @@ function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stat
   );
   return (
     <span className="metric">
-      <span className="metric-label">{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
+      <span className="metric-label" title={source ? `${price} · ${source}` : price}>{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
       <Strip value={deal.asking_price} stats={stats} format={fullMoney} />
     </span>
   );

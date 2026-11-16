@@ -1,5 +1,7 @@
 import alertDefaults from "../config/alerts.json";
 import commsConfig from "../config/comms.json";
+import { formatActivityWhen } from "./actions/time";
+import { stripGmailIds } from "./displayText";
 import { ndaQueueAllowed } from "./nda";
 
 const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
@@ -14,6 +16,8 @@ export type CommsRecord = {
   thread_id: string;
   link: string;
   at: string;
+  at_text?: string;
+  at_iso?: string;
   direction: string;
   person: string;
   firm: string;
@@ -107,7 +111,10 @@ export function directionKind(value: string): "in" | "out" | "internal" | "other
 
 export function clipSummary(value: string): string {
   const summary = text(value).replace(/\s+/g, " ");
-  return summary.length > SUMMARY_LIMIT ? summary.slice(0, SUMMARY_LIMIT) : summary;
+  if (summary.length <= SUMMARY_LIMIT) return summary;
+  const slice = summary.slice(0, SUMMARY_LIMIT);
+  const cut = slice.replace(/\s+\S*$/, "").trim();
+  return `${cut || slice.trim()}…`;
 }
 
 export function normalizeAt(value: string): string {
@@ -125,12 +132,9 @@ export function sortStamp(at: string): string {
   return `${match[1]}T${match[2] || "00:00"}`;
 }
 
-/** The timeline clock. An approximate comms time keeps the parsed clock and says so. */
+/** The timeline clock. Approximate stamps show the date and say so. */
 export function commsWhenText(at: string, approximate: boolean): string {
-  const when = whenParts(at);
-  const body = [when.date, when.time ? `${when.time} PT` : ""].filter(Boolean).join(" ");
-  if (!body) return approximate ? "(approximate)" : "";
-  return approximate ? `${body} (approximate)` : body;
+  return formatActivityWhen(at, approximate).label;
 }
 
 export function whenParts(at: string): { date: string; time: string } {
@@ -183,18 +187,30 @@ export function eventIds(source: string): string[] {
   return out;
 }
 
+/** The first stored clock. Sheet text and an ISO stamp count when the parsed field is empty. */
+export function commsStamp(row: Partial<CommsRecord>): { at: string; approximate: boolean } {
+  const approximate = row.at_approximate === true || row.at_approximate === "1" || row.at_approximate === "true";
+  const candidates = [row.at_iso, row.at, row.at_text].map((value) => text(value)).filter(Boolean);
+  for (const value of candidates) {
+    const parsed = normalizeAt(value);
+    if (parsed) return { at: parsed, approximate };
+  }
+  return { at: candidates[0] || "", approximate };
+}
+
 export function toCommsLine(row: Partial<CommsRecord>): CommsLine {
   const messageId = hexId(text(row.message_id));
   const threadId = hexId(text(row.thread_id));
+  const stamp = commsStamp(row);
   return {
     commsId: text(row.comms_id),
-    at: normalizeAt(text(row.at)),
+    at: stamp.at,
     direction: text(row.direction),
     person: text(row.person),
     firm: text(row.firm),
     channel: text(row.channel),
-    summary: clipSummary(text(row.summary)),
-    approximate: row.at_approximate === true || row.at_approximate === "1" || row.at_approximate === "true",
+    summary: stripGmailIds(clipSummary(text(row.summary))),
+    approximate: stamp.approximate,
     href: gmailHref(text(row.link), messageId, threadId),
     citedEventIds: eventIds(text(row.source)),
     messageId,
@@ -402,6 +418,13 @@ export function mergeActivity(
     if (gmail) seenMessages.add(gmail);
     if (overlap.length) {
       for (const id of overlap) hide.add(id);
+      if (!line.at) {
+        const donor = overlap.map((id) => activityById.get(id)).find((item) => item?.date);
+        if (donor?.date) {
+          line.at = donor.date;
+          line.approximate = line.approximate || donor.approximate === true;
+        }
+      }
     }
     kept.push(line);
   }

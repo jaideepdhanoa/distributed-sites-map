@@ -43,9 +43,9 @@ A `<select>` uses class `secondary`: fill `#fffdf8`, 1px `#d6cebe`, radius 999, 
 
 A text field uses class `field`: fill `#fffdf8`, 1px `#d6cebe`, radius 8px, and the focus ring. Search keeps class `search`.
 
-The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click cycles ascending, descending, then list order. The same header holds a reorder grip, a resize edge, a filter field, and a pin control, each a `sort-header` or a `check` / `field` inside the column menu. The phone list keeps the Sort `secondary` select and a Show on map `text-link`. On a phone the sheet shows fewer columns, scrolls sideways, and keeps the first column pinned.
+The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click cycles ascending, descending, then list order. The same header holds a reorder grip, a resize edge, a filter field, and a pin control, each a `sort-header` or a `check` / `field` inside the column menu. The phone list is a column of cards: name, address, the stage chip on its own line, then a meta line with a gap and a dot between score, asking, and the firm. A missing open-land figure stays off that line. The stat row is one compact line with short labels. Sort stays a `secondary` select. Select, export, and clear area sit in a More `paper-btn` menu so the toolbar stays one row. Search this area is not shown in list view.
 
-Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle. On a desktop the list sits beside the map, and panning that map filters the rows. On a phone, Search this area applies the map the person was just looking at.
+Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle. In list view the sheet fills the width. Measure and the other map controls stay on the map and hide while the list is open.
 
 ## Panel header
 
@@ -79,7 +79,7 @@ Do not put chrome in a `<details>` or `<summary>`. A closed `<details>` drops it
 
 Satellite is the default basemap. The choice is remembered in `localStorage` under `basemap` (`satellite` or `positron`). Street is the muted Positron style.
 
-On desktop the switch is one segmented control under the zoom buttons, always visible. On a phone it is only at the top of the Layers sheet.
+On desktop the switch is one segmented control under the zoom buttons, always visible while the map is the view. On a phone it is only at the top of the Layers sheet. List view hides the map controls, including Measure.
 
 Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, and Measure. They stay inside the screen, clear of the zoom control.
 

@@ -14,7 +14,7 @@ export function dealCardFacts(deal: Record<string, unknown>, universe?: Record<s
   const typed = deal as unknown as DealProps;
   const censusAcres = typeof universe?.spare_ac_own === "number" ? universe.spare_ac_own : null;
   const cash = cashTile(typed);
-  const spare = spareLandSqft(typed.open_land_sqft, censusAcres);
+  const spare = spareLandSqft(typed.open_land_sqft, censusAcres, typed.open_land_basis);
   const photos = galleryModel(cardPhotos(typed, (universe || null) as PhotoCarrier | null));
   const pack = packageLine(typed);
   const out: SiteCardFacts = {};

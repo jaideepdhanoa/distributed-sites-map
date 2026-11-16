@@ -10,6 +10,7 @@ import { overlayDealStages, readDeals } from "@/lib/changes/read";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { omitProtectedDeals } from "@/lib/protectedSite";
 import { withSuggestedDrops } from "@/lib/suggestedDrop";
+import { redactGmailPayload } from "@/lib/displayText";
 
 export async function GET() {
   const session = await requireUser();
@@ -19,5 +20,5 @@ export async function GET() {
   const staged = await overlayDealStages(await overlayStageFile(overlayDeals(deals, loadNdaSnapshot()), "deal"));
   const dropped = withSuggestedDrops(staged);
   const features = omitProtectedDeals(attachPackageHrefs(dropped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature)));
-  return NextResponse.json({ ...dropped, features }, { headers: privateHeaders });
+  return NextResponse.json(redactGmailPayload({ ...dropped, features }), { headers: privateHeaders });
 }

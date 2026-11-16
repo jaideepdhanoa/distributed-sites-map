@@ -3,6 +3,7 @@ import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { ndaQueueAllowed } from "@/lib/nda";
 import { openLoopsBody } from "@/lib/openLoops";
 import { loadOpenLoops } from "@/lib/openLoopsLoad";
+import { redactGmailPayload } from "@/lib/displayText";
 
 export async function GET() {
   const session = await requireUser();
@@ -11,5 +12,5 @@ export async function GET() {
     return NextResponse.json({ error: "You do not have permission for that." }, { status: 403, headers: privateHeaders });
   }
   console.info(JSON.stringify({ event: "data", user: session.u, part: "open-loops" }));
-  return NextResponse.json(openLoopsBody(loadOpenLoops()), { headers: privateHeaders });
+  return NextResponse.json(redactGmailPayload(openLoopsBody(loadOpenLoops())), { headers: privateHeaders });
 }

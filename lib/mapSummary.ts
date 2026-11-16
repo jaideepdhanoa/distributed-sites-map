@@ -17,3 +17,11 @@ export function pipelineMapSummary(view: {
   if (view.droppedOnly) return droppedOnMap;
   return `${view.placed.toLocaleString()} on the map · ${droppedOnMap}`;
 }
+
+/** The All chip counts what the list and map show. Hidden dropped deals stay beside that count. */
+export function pipelineAllCount(shown: number, hiddenDropped: number): { count: string; dropped: string } {
+  return {
+    count: Math.max(0, shown).toLocaleString(),
+    dropped: hiddenDropped > 0 ? `${hiddenDropped.toLocaleString()} dropped` : "",
+  };
+}

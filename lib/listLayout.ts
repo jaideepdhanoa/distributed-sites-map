@@ -47,6 +47,44 @@ export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 
 const MIN_WIDTH = 96;
 const MAX_WIDTH = 480;
+
+/** Starting widths so a default sheet does not clip a label mid-word. */
+const COLUMN_WIDTH: Record<string, number> = {
+  site: 320,
+  stage: 148,
+  score: 96,
+  asking: 168,
+  listed: 148,
+  type: 120,
+  city: 96,
+  acres: 104,
+  perAcre: 120,
+  openLand: 120,
+  spare: 120,
+  grade: 168,
+  traffic: 112,
+  cashFlow: 156,
+  revenue: 136,
+  askingRevenue: 148,
+  askingCash: 156,
+  businessMultiple: 168,
+  landEstimate: 148,
+  countyValue: 140,
+  depot: 104,
+  checked: 104,
+  address: 220,
+  apn: 140,
+  zoning: 148,
+  broker: 188,
+  area: 156,
+  nda: 140,
+  lastContact: 124,
+  nextStep: 240,
+};
+
+export function columnWidth(id: string): number {
+  return COLUMN_WIDTH[id] || 148;
+}
 const FILTER_LIMIT = 80;
 
 export function isLayoutSurface(value: string | null | undefined): value is LayoutSurface {

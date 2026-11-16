@@ -3,6 +3,7 @@ import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/gua
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { omitProtectedSites } from "@/lib/protectedSite";
 import type { SiteFeature } from "@/lib/types";
+import { redactGmailPayload } from "@/lib/displayText";
 
 const KEEP = [
   "site_id",
@@ -125,5 +126,5 @@ export async function GET(request: NextRequest) {
   });
   const staged = await overlayStageFile({ type: "FeatureCollection", features }, "site");
   console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
-  return NextResponse.json(staged, { headers: privateHeaders });
+  return NextResponse.json(redactGmailPayload(staged), { headers: privateHeaders });
 }

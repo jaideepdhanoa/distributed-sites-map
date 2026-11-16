@@ -1,3 +1,4 @@
+import { stripGmailIds } from "./displayText";
 import type { OpenLoopSite, OpenLoopsSnapshot } from "./openLoops";
 
 export type WorkbookStep = {
@@ -21,7 +22,7 @@ export function workbookStepFor(snapshot: Pick<OpenLoopsSnapshot, "sites"> | nul
   if (!wanted) return null;
   const site = (snapshot?.sites || []).find((row) => row.site_id === wanted) as StepSite | undefined;
   if (!site) return null;
-  const text = clean(site.next_step);
+  const text = stripGmailIds(clean(site.next_step));
   const owner = clean(site.next_step_owner);
   const due = clean(site.next_step_due);
   if (!text && !owner && !due) return null;

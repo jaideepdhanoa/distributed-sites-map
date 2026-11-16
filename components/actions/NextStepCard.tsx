@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { stripGmailIds } from "@/lib/displayText";
 import { plainNextStep } from "@/lib/nextStepLine";
 import { stageTitle } from "@/lib/labels";
 import { contactDate } from "@/lib/cardStatus";
@@ -480,7 +481,7 @@ export function NextStepCard({
     const stepType = nextStepType(focus.detail);
     const knock = stepType === "knock_off";
     const mark = statusMark(focus.status);
-    const headline = focus.title || focus.proposedValue;
+    const headline = stripGmailIds(focus.title || focus.proposedValue);
     const kindLabel = stepType === "stage_move" ? `Move to ${stageTitle(focus.proposedValue)}` : nextStepTypeLabel(focus.detail);
     const canEdit = focus.status === "open" && (reviewer || (writable && focus.authorId === status.username));
     body = (
@@ -497,7 +498,7 @@ export function NextStepCard({
           {focus.targetOn ? ` · Due ${shortDate(focus.targetOn)}` : ""}
         </p>
         {(knock || stepType === "mark_duplicate" || stepType === "bring_back") && focus.reason ? (
-          <p className="proposal-reason"><span>Reason</span>{focus.reason}</p>
+          <p className="proposal-reason"><span>Reason</span>{stripGmailIds(focus.reason)}</p>
         ) : null}
         {focus.stale ? <p className="hint">The stage changed after this proposal{focus.currentStage ? ` (${focus.currentStage})` : ""}.</p> : null}
         {stepType === "stage_move" && focus.status === "open" ? <NeedList items={needs} /> : null}
@@ -511,7 +512,7 @@ export function NextStepCard({
             <ul>
               {proposalNotes.map((note) => (
                 <li key={note.id}>
-                  <p>{note.body}</p>
+                  <p>{stripGmailIds(note.body)}</p>
                   <p className="proposal-meta">{who(accounts, note.authorId)} · {formatPacific(note.createdAt)}</p>
                 </li>
               ))}
@@ -572,7 +573,7 @@ export function NextStepCard({
     );
   } else if (!open && approved) {
     const stepType = nextStepType(approved.detail);
-    const headline = `Next: ${approved.title || approved.proposedValue}`;
+    const headline = stripGmailIds(`Next: ${approved.title || approved.proposedValue}`);
     const kindLabel = stepType === "stage_move" ? `Move to ${stageTitle(approved.proposedValue)}` : nextStepTypeLabel(approved.detail);
     body = (
       <>

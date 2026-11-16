@@ -103,7 +103,9 @@ test("the changes API requires a zoned timestamp and stores an approximate flag"
   assert.equal(activityPayload.date_iso, iso);
   assert.equal(commsPayload.at, iso);
   assert.equal(commsPayload.at_approximate, true);
-  assert.equal(commsWhenText(iso, true), "2026-11-15 18:20 PT (approximate)");
+  assert.equal(commsWhenText(iso, true), "Nov 15 (approx.)");
+  assert.equal(commsWhenText(iso, false), "Nov 15, 6:20 PM PT");
+  assert.equal(commsWhenText("2026-11-13 19:43 PT", false), "Nov 13, 7:43 PM PT");
 });
 
 test("a new import keeps unparsed date text and a later import does not fill an old blank", async () => {

@@ -41,6 +41,12 @@ class StageBuckets(unittest.TestCase):
         ])
         self.assertEqual(rows, [{"id": "PIPE-PHX-0085", "stage": "1 Desk screen", "reason": "Lot too small"}])
         self.assertEqual(stage_group(rows[0]["stage"]), "desk")
+        later = suggested_drop_rows([
+            {"lead id": "PIPE-PHX-0084", "map stage": "2 Financial screen", "KO reason": "Land only", "workbook Stage": "2 Financial screen", "rule applied": "R-042"},
+            {"lead id": "PIPE-PHX-0014", "map stage": "2 Financial screen", "KO reason": "Lot too small", "workbook Stage": "2 Financial screen", "rule applied": "applies after desk"},
+            {"lead id": "LAND-PHX-0003", "map stage": "Financial screen", "KO reason": "Outside the service area", "workbook Stage": "Financial screen", "rule applied": "R-042"},
+        ])
+        self.assertEqual(later, [{"id": "PIPE-PHX-0014", "stage": "2 Financial screen", "reason": "Lot too small", "afterDesk": True}])
         with (ROOT / "data/drift_report.csv").open(newline="", encoding="utf-8") as handle:
             shipped = suggested_drop_rows(list(csv.DictReader(handle)))
         on_disk = json.loads((ROOT / "data/generated/suggested_drops.json").read_text())

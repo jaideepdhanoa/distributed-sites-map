@@ -108,8 +108,8 @@ type DealLike = {
  * Pipeline auto repair, tire and lube, and auto service are the Auto service category.
  * Pipeline fuel and c-stores are the C-stores category. Every other pipeline deal stays with car washes.
  */
-export function dealCategory(deal: DealLike): CategoryId | null {
-  if (deal.kind === "land") return "land";
+export function dealCategory(deal: DealLike & { deal_id?: string | null }): CategoryId | null {
+  if (deal.kind === "land" || String(deal.deal_id || "").startsWith("LAND-")) return "land";
   if (deal.kind !== "pipeline") return null;
   if (isAutoBusinessType(deal.business_type)) return "auto";
   if (deal.is_c_store || isPipelineStore(deal)) return "store";

@@ -690,16 +690,17 @@ function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stat
   const source = shownPriceSource(deal);
   const listing = listingHref(deal.listing_url);
   const party = shownBroker(deal) || shownFirm(deal);
+  const full = source ? `${price} · ${source}` : price;
   const sourceNode = !source ? null : listing ? (
-    <a className="text-link" href={listing} target="_blank" rel="noopener noreferrer" title="Opens the listing" onClick={(event) => event.stopPropagation()}>{source}</a>
+    <a className="text-link" href={listing} target="_blank" rel="noopener noreferrer" title={`${full}. Opens the listing`} onClick={(event) => event.stopPropagation()}>{source}</a>
   ) : party && onBroker ? (
-    <button type="button" className="text-link" title="Filters the list to this broker" onClick={(event) => { event.stopPropagation(); onBroker(party); }}>{source}</button>
+    <button type="button" className="text-link" title={`${full}. Filters the list to this broker`} onClick={(event) => { event.stopPropagation(); onBroker(party); }}>{source}</button>
   ) : (
     source
   );
   return (
     <span className="metric">
-      <span className="metric-label" title={source ? `${price} · ${source}` : price}>{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
+      <span className="metric-label" title={full}>{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
       <Strip value={deal.asking_price} stats={stats} format={fullMoney} />
     </span>
   );

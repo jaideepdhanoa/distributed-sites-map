@@ -7,7 +7,7 @@ import type { PnlLineView, PnlPeriodView, PnlStatement } from "./statement";
 
 const ZERO = BigInt(0);
 
-export type CellStatus = "reported" | "estimated" | "calculated";
+export type CellStatus = "reported" | "estimated" | "normalized" | "calculated";
 
 export type ValueCell = {
   kind: "value";

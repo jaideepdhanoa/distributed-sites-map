@@ -14,12 +14,33 @@ export function parseAmount(value: string): CapturedAmount | null {
   return { raw: text, cents: negative ? -cents : cents };
 }
 
+const ZERO = BigInt(0);
+const HUNDRED = BigInt(100);
+
+export function centsToRaw(cents: bigint): string {
+  const negative = cents < ZERO;
+  const abs = negative ? -cents : cents;
+  const whole = abs / HUNDRED;
+  const frac = abs % HUNDRED;
+  const raw = frac === ZERO ? `${whole}` : `${whole}.${String(frac).padStart(2, "0")}`;
+  return negative ? `-${raw}` : raw;
+}
+
 export function formatAmount(raw: string): string {
   const negative = raw.startsWith("-");
   const body = negative ? raw.slice(1) : raw;
   const [whole, frac] = body.split(".");
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return `${negative ? "-" : ""}$${grouped}${frac ? `.${frac}` : ""}`;
+}
+
+/** Truncated percent. A negative part keeps its sign. Not a stored P&L line. */
+export function signedPercent(part: bigint, whole: bigint): string | null {
+  if (whole <= ZERO) return null;
+  const negative = part < ZERO;
+  const text = percentOf(negative ? -part : part, whole);
+  if (!text) return null;
+  return negative ? `-${text}` : text;
 }
 
 /** Truncated percent of two captured amounts. Not a stored P&L line. */

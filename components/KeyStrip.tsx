@@ -8,6 +8,7 @@ import { basisBadge } from "@/lib/pricing";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
 
@@ -133,6 +134,7 @@ export default function KeyStrip({
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
   const [financialsOpen, setFinancialsOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
@@ -209,8 +211,11 @@ export default function KeyStrip({
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
-      {signedIn && showFinancials && financialsOpen && shownPanel?.open ? (
-        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
+      {signedIn && showFinancials && financialsOpen && shownPanel ? (
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />
+      ) : null}
+      {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (
+        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setChecklistOpen(false)} />
       ) : null}
       {signedIn && deal.kind !== "land" ? <PricingSection deal={deal} /> : null}
       <div className="supporting">

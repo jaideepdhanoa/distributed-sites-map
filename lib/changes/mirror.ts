@@ -406,6 +406,10 @@ export function planSiteMirror(
           }
         }
         if (sameWorkbookCell(before, after)) continue;
+        if (isTruncatedCell(before, after)) {
+          combined.held.push({ id: record.site_id, header });
+          continue;
+        }
         combined.changes.push({
           sheet: table.title,
           row: existing.row,
@@ -585,6 +589,20 @@ export function mirrorDrift(changes: CellChange[]): MirrorDrift {
     fills: safe.filter((change) => change.before.trim() === "").length,
     ids,
   };
+}
+
+/** Held rows stay on the sheet. The report is a count and hashed ids. */
+export function formatHeld(held: { id: string; header: string }[]): string {
+  const ids = [...new Set(held.map((row) => row.id).filter((id) => id !== PROTECTED_SITE_ID))].map((id) => shortHash(id)).sort();
+  const shown = ids.slice(0, 20).map((id) => `#${id}`).join(" ");
+  const more = ids.length > 20 ? ` and ${ids.length - 20} more` : "";
+  const text = [
+    `held ${held.length}`,
+    `held_ids ${ids.length}${shown ? ` ${shown}` : ""}${more}`,
+    "A shorter database value that is only a prefix of the sheet cell was not written.",
+  ].join("\n");
+  if (text.includes(PROTECTED_SITE_ID)) throw new Error("Held report included a quarantined id.");
+  return text;
 }
 
 export function formatMirrorDrift(drift: MirrorDrift): string {

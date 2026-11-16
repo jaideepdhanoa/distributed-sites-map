@@ -4,7 +4,8 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { importChanged } from "../../lib/changes/backfill";
 import { detectWorkbookDrift } from "../../lib/changes/drift";
-import { PROTECTED_SITE_ID, formatMirrorDrift, mirrorDrift, planActivityMirror, type CellChange, type SheetTable } from "../../lib/changes/mirror";
+import { MIRRORED_TEXT_CAPS, SHEET_CELL_MAX } from "../../lib/changes/caps";
+import { PROTECTED_SITE_ID, formatHeld, formatMirrorDrift, mirrorDrift, planActivityMirror, planSiteMirror, type CellChange, type SheetTable } from "../../lib/changes/mirror";
 import {
   PROTECT_BANNER,
   PROTECT_CONFIRM,
@@ -92,6 +93,65 @@ test("mirror drift hashes ids and overwrites a filled cell", () => {
   const quiet = formatMirrorDrift(mirrorDrift([hidden]));
   assert.equal(quiet.includes(PROTECTED_SITE_ID), false);
   assert.match(quiet, /drift_cells 0/);
+});
+
+test("a shorter database prefix does not overwrite the longer sheet cell", () => {
+  const full = `n${"ote ".repeat(400)}tail`;
+  assert.ok(full.length >= 1500 && full.length <= 1870);
+  const clipped = full.slice(0, 400);
+  const table: SheetTable = {
+    title: "Pipeline",
+    headerRow: 4,
+    headers: ["Site ID", "Photo notes", "Next step", "Summary"],
+    rows: [{ row: 5, cells: ["PIPE-PHX-0001", full, full, ""] }],
+  };
+  const plan = planSiteMirror([table], [{
+    site_id: "PIPE-PHX-0001",
+    writes: { "Photo notes": clipped, "Next step": clipped },
+  }]);
+  assert.equal(plan.changes.length, 0);
+  assert.deepEqual(plan.held.map((row) => row.header).sort(), ["Next step", "Photo notes"]);
+  const report = `${formatHeld(plan.held)}\n${formatMirrorDrift(mirrorDrift(plan.changes))}`;
+  assert.equal(report.includes(full), false);
+  assert.equal(report.includes(clipped), false);
+  assert.equal(report.includes("PIPE-PHX-0001"), false);
+  assert.match(report, new RegExp(`#${shortHash("PIPE-PHX-0001")}`));
+  assert.match(report, /held 2/);
+  assert.match(report, /drift_cells 0/);
+
+  const rewritten = planSiteMirror([table], [{
+    site_id: "PIPE-PHX-0001",
+    writes: { "Photo notes": "A different note." },
+  }]);
+  assert.equal(rewritten.changes.length, 1);
+  assert.equal(rewritten.held.length, 0);
+
+  const activity = planActivityMirror(activityTable(), [{
+    entity_id: "A-000010",
+    site_id: "PIPE-PHX-0001",
+    date: "2026-11-06",
+    type: "visit",
+    summary: "Sheet text".slice(0, 5),
+    source_link: "",
+    imported: true,
+  }]);
+  assert.equal(activity.changes.some((change) => change.header === "Summary"), false);
+  assert.equal(activity.held.some((row) => row.header === "Summary"), true);
+  assert.equal(formatHeld(activity.held).includes("Sheet text"), false);
+});
+
+test("mirrored text caps are shorter than a sheet cell", () => {
+  assert.equal(SHEET_CELL_MAX, 50_000);
+  const photo = MIRRORED_TEXT_CAPS.find((row) => row.field === "photo_notes");
+  const next = MIRRORED_TEXT_CAPS.find((row) => row.field === "notes");
+  const summary = MIRRORED_TEXT_CAPS.find((row) => row.sheet === "Activity" && row.field === "summary");
+  assert.equal(photo?.header, "Photo notes");
+  assert.equal(photo?.max, 400);
+  assert.equal(next?.header, "Next step");
+  assert.equal(next?.max, 400);
+  assert.equal(summary?.max, 300);
+  assert.equal(MIRRORED_TEXT_CAPS.some((row) => row.field === "summary" && row.max >= SHEET_CELL_MAX), false);
+  for (const row of MIRRORED_TEXT_CAPS) assert.ok(row.max < SHEET_CELL_MAX, row.header);
 });
 
 test("protection stays a dry run until apply, dry-run off, and the confirm phrase", () => {

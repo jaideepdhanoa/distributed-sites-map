@@ -17,6 +17,7 @@ import {
   assertWorkbookMirrorAllowed,
   entitiesToMirror,
   entityChangeCounts,
+  formatHeld,
   formatMirrorDrift,
   formatPlan,
   formatPlanSummary,
@@ -222,13 +223,12 @@ async function main(): Promise<void> {
   };
   const preview = formatPlan(changes);
   const counted = formatPlanSummary(changes);
-  const heldIds = [...new Set(held.map((row) => row.id))];
   const notes = [
     driftText,
+    formatHeld(held),
     counted,
     `activity_sheet_floor ${activitySheetFloor}`,
     `refused ${refused.length}${refused.length ? ` ${refused.join(", ")}` : ""}`,
-    `held_truncations ${held.length}${heldIds.length ? ` ${heldIds.join(", ")}` : ""}`,
   ].join("\n");
   console.log(notes);
   console.log(preview);

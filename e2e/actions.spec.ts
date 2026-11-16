@@ -419,7 +419,7 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   await page.getByTestId("panel-tab-discussion").click();
   await expect(page.getByRole("checkbox", { name: "Propose next step" })).toHaveCount(0);
   await page.getByTestId("next-step").getByRole("button", { name: "Drop with a reason" }).click();
-  await page.getByLabel("Reason").fill("The broker confirmed another buyer.");
+  await page.getByTestId("drop-reason").getByRole("button", { name: "Sold to another buyer" }).click();
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByTestId("proposed-next-step")).toContainText("Drop from pipeline");
   await expect(page.getByTestId("proposed-next-step")).toContainText("Waiting for");
@@ -456,6 +456,7 @@ test("an approved stage move shows on the open card without a reload", async ({ 
   await openAs(page, "reviewer", `/?funnel=pipeline&site=${id}`);
   await page.getByTestId("panel-tab-discussion").click();
   await page.getByTestId("empty-step-stage_move").click();
+  await page.getByTestId("advance-reason").getByRole("button", { name: "Package received" }).click();
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByTestId("proposed-next-step")).toBeVisible();
   await page.getByLabel("Outcome").selectOption("accepted");

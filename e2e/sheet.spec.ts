@@ -67,7 +67,7 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   await expect(score).toHaveAttribute("data-pinned", "true");
 
   await stage.getByRole("button", { name: "Filter Stage" }).click({ force: true });
-  await page.getByRole("textbox", { name: "Filter Stage" }).fill("zzzz-no-such-stage");
+  await page.getByRole("group", { name: "Filter Stage" }).getByRole("checkbox", { name: "Offer and close" }).check();
   await expect(page.locator("[data-testid=sheet-grid] tbody tr.list-row")).toHaveCount(0);
   await page.getByRole("button", { name: "Clear filter" }).click();
   await expect(page.locator("[data-testid=sheet-grid] tbody tr.list-row").first()).toBeVisible();

@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
 const TABS = [
-  ["overview", "Overview"],
-  ["numbers", "Numbers"],
-  ["activity", "Activity"],
+  ["overview", "Summary"],
+  ["numbers", "Space and power"],
   ["discussion", "Discussion"],
+  ["activity", "Activity"],
 ] as const;
 
 type TabId = (typeof TABS)[number][0];

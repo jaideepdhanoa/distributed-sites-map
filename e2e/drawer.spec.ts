@@ -15,8 +15,8 @@ test("the deal panel can be resized and keeps that width", async ({ page }, info
 
   await expect(grip).toBeVisible();
   const start = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().width));
-  expect(start).toBeGreaterThanOrEqual(370);
-  expect(start).toBeLessThanOrEqual(400);
+  expect(start).toBeGreaterThanOrEqual(470);
+  expect(start).toBeLessThanOrEqual(490);
 
   const box = await grip.boundingBox();
   if (!box) throw new Error("missing resize grip");
@@ -25,8 +25,8 @@ test("the deal panel can be resized and keeps that width", async ({ page }, info
   await page.mouse.move(box.x + box.width / 2 + 18, box.y + 120, { steps: 8 });
   await page.mouse.up();
   const narrow = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().width));
-  expect(narrow).toBeGreaterThanOrEqual(360);
-  expect(narrow).toBeLessThanOrEqual(370);
+  expect(narrow).toBeGreaterThanOrEqual(start - 30);
+  expect(narrow).toBeLessThanOrEqual(start - 8);
 
   const again = await grip.boundingBox();
   if (!again) throw new Error("missing resize grip");

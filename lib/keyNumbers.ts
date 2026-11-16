@@ -30,6 +30,7 @@ function shortRoad(value?: string | null) {
 export const PIPELINE_COLUMNS = [
   { id: "site", label: "Site" },
   { id: "stage", label: "Stage" },
+  { id: "score", label: "Score" },
   { id: "asking", label: "Asking · source" },
   { id: "acres", label: "Acres", optional: true },
   { id: "perAcre", label: "Per acre", optional: true },

@@ -8,7 +8,7 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, powerSummary, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
@@ -83,6 +83,19 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
         }}
       />
     </div>
+  );
+}
+
+const SCORE_SCALE = "Workbook score out of 100. Economics 40, land 25, power 15, location 10, deal 10. Location: Inside 10, near under 5 miles 5, near 5 to 10 miles 2.5, outside 0.";
+
+function ScoreTile({ score }: { score?: number | null }) {
+  const text = displayScore(score);
+  return (
+    <section className="score-tile" data-testid="score-tile">
+      <span>Score</span>
+      <strong title={text ? SCORE_SCALE : "No score on file"}>{text || "—"}</strong>
+      <p>{text ? SCORE_SCALE : "No score on file. A score is not estimated here."}</p>
+    </section>
   );
 }
 
@@ -396,10 +409,6 @@ export default function Detail({
       </div>
       {banner}
       <div className="drawer-scroll">
-      <SitePhotos
-        card={photos}
-        between={(
-          <>
       <div className="card-top">
         <h2>{site.name || site.address || site.site_id}</h2>
         <div className="card-chips">
@@ -430,6 +439,9 @@ export default function Detail({
           listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
         />
       </div>
+      <ScoreTile score={linkedDeal?.score} />
+      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} /> : <FigureSkeleton />}
+      <SitePhotos card={photos} />
       <NextStepCard
         kind="site"
         id={site.site_id}
@@ -439,10 +451,6 @@ export default function Detail({
         workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
         suggestedDrop={linkedDeal?.suggested_drop}
         blocker={linkedDeal}
-      />
-      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} /> : <FigureSkeleton />}
-          </>
-        )}
       />
       {related}
       <PanelSections
@@ -684,10 +692,6 @@ export function DealDetail({
       </div>
       {banner}
       <div className="drawer-scroll">
-      <SitePhotos
-        card={photos}
-        between={(
-          <>
       <div className="card-top">
         <h2>{deal.name || deal.address}</h2>
         <div className="card-chips">
@@ -707,6 +711,9 @@ export function DealDetail({
           listingTitle={deal.listing_removed ? "May be removed" : undefined}
         />
       </div>
+      <ScoreTile score={deal.score} />
+      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} /> : <FigureSkeleton />}
+      <SitePhotos card={photos} />
       <NextStepCard
         kind="deal"
         id={deal.deal_id}
@@ -715,10 +722,6 @@ export function DealDetail({
         signedIn={signedIn}
         suggestedDrop={deal.suggested_drop}
         blocker={deal}
-      />
-      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} /> : <FigureSkeleton />}
-          </>
-        )}
       />
       {related}
       <PanelSections

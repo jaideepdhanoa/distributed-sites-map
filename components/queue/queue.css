@@ -48,6 +48,7 @@
   font-size: var(--type-body);
 }
 .review-bar .primary, .review-done button, .review-toast button { background: #faf7f1; color: #1e4636; border-color: #faf7f1; font-weight: 650; }
+.review-score { font-variant-numeric: tabular-nums; font-size: var(--type-cap); opacity: 0.9; }
 .review-count { display: grid; justify-items: start; line-height: 1.1; text-align: left; color: #faf7f1; }
 .review-kicker { font-size: var(--type-cap); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
 .review-meter { width: 72px; height: 4px; border-radius: 99px; background: rgba(250, 247, 241, 0.25); overflow: hidden; flex: none; }

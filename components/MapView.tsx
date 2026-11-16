@@ -78,7 +78,7 @@ function drawerInset(map: Map) {
   const shell = map.getContainer().closest(".shell");
   if (!shell?.classList.contains("drawer-open")) return 0;
   const raw = Number.parseFloat(getComputedStyle(shell).getPropertyValue("--drawer-width"));
-  return Number.isFinite(raw) && raw > 0 ? raw : 380;
+  return Number.isFinite(raw) && raw > 0 ? raw : 480;
 }
 
 function pointPadding(map: Map) {

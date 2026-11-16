@@ -192,7 +192,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
       ))}
     </div>
   ) : (
-    <p className="note">No notes yet.</p>
+    <p className="note">No discussion yet. Notes added here stay on this record.</p>
   );
 
   const noteForm = writable ? (

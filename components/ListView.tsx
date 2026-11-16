@@ -9,6 +9,7 @@ export type ListRow = {
   type: string;
   city: string;
   stage: string;
+  score: string;
   tier: string;
   spare: string;
   grade: string;
@@ -30,6 +31,7 @@ export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id">; label: string }[] = 
   { id: "site", label: "Site" },
   { id: "type", label: "Type" },
   { id: "stage", label: "Stage" },
+  { id: "score", label: "Score" },
   { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
   { id: "traffic", label: "Traffic" },

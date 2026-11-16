@@ -140,7 +140,7 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     <section className="tl" data-testid="activity">
       <h3>Activity</h3>
       {timeline === null ? <p className="note">Loading activity.</p> : null}
-      {empty ? <p className="note">No materials on file.</p> : null}
+      {empty ? <p className="note">No activity on file yet.</p> : null}
       {internalRows.length ? (
         <label className="tl-toggle">
           <input

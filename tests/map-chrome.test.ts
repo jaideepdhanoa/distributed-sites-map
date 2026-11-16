@@ -5,7 +5,7 @@ import { areaTip, ringTip } from "../lib/markerTip.ts";
 import { nearbyWashPoints } from "../lib/nearbyWashes.ts";
 import { FUNNEL_VERSION, resolveFunnelMode } from "../lib/funnelMode.ts";
 import { PIN_LABEL_VERSION, resolvePinLabel } from "../lib/pinLabel.ts";
-import { pipelineMapSummary } from "../lib/mapSummary.ts";
+import { pipelineAllCount, pipelineMapSummary } from "../lib/mapSummary.ts";
 import { droppedDealsShown, parsePipeView, pipelineStageFilter, stageLandShown } from "../lib/pipeStage.ts";
 import { AREA_TIP_DWELL_MS, boxesOverlap, placeReadableTip, sheetCeiling, type TipBox } from "../lib/tipPlace.ts";
 import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets } from "../lib/depotRings.ts";
@@ -87,6 +87,9 @@ test("the map line calls dropped deals hidden only while they are not drawn", ()
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true }), "23 on the map · 15 dropped on the map");
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true, droppedOnly: true }), "15 dropped on the map");
   assert.equal(pipelineMapSummary({ placed: 23, dropped: 19, droppedPlaced: 19, droppedShown: true, droppedOnly: false }).includes("hidden"), false);
+  assert.deepEqual(pipelineAllCount(14, 1), { count: "14", dropped: "1 dropped" });
+  assert.deepEqual(pipelineAllCount(5, 2), { count: "5", dropped: "2 dropped" });
+  assert.equal(pipelineAllCount(14, 0).dropped, "");
 });
 
 test("a ring note with the site card and Layers open stays in open map space", () => {

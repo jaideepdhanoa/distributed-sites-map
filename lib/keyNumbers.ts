@@ -302,8 +302,13 @@ export function acresTotal(value: number) {
 }
 
 export function openLandText(value?: number | null) {
-  if (value == null) return "";
+  if (value == null || !Number.isFinite(value) || value <= 0) return "";
   return `${Math.round(value).toLocaleString()} sq ft`;
+}
+
+/** Zero and a missing size are the same empty state. */
+export function isOpenLandBlank(value: string): boolean {
+  return !value || value === UNKNOWN || value === "Not on file";
 }
 
 /** A spare-area basis names the measurement. Unknown and blank are not a source. */
@@ -315,19 +320,13 @@ export function openLandSource(basis?: string | null): string {
 }
 
 export function openLandMeasured(sqft?: number | null, basis?: string | null): boolean {
-  return sqft != null && Number.isFinite(sqft) && Boolean(openLandSource(basis));
+  return sqft != null && Number.isFinite(sqft) && sqft > 0 && Boolean(openLandSource(basis));
 }
 
-/**
- * List and card text. A number, including a measured zero, needs a source.
- * Zero keeps that source in the label. Anything else is the same em dash as a blank.
- */
+/** A positive measured area. Zero and a missing size say they are not on file. */
 export function openLandLabel(sqft?: number | null, basis?: string | null): string {
-  if (!openLandMeasured(sqft, basis)) return UNKNOWN;
-  const value = openLandText(sqft);
-  const source = openLandSource(basis);
-  if (sqft === 0 && source) return `${value} · ${source}`;
-  return value;
+  if (!openLandMeasured(sqft, basis)) return "Not on file";
+  return openLandText(sqft);
 }
 
 /**
@@ -335,11 +334,12 @@ export function openLandLabel(sqft?: number | null, basis?: string | null): stri
  * a measurement source is stored. Census acres are an estimate above zero.
  */
 export function spareLandSqft(sqft?: number | null, acres?: number | null, basis?: string | null) {
+  if (sqft === 0) return { value: "Not on file", note: "" };
   if (openLandMeasured(sqft, basis)) return { value: openLandText(sqft), note: openLandSource(basis) };
   if (acres != null && Number.isFinite(acres) && acres > 0) {
     return { value: `${Math.round(acres * 43560).toLocaleString()} sq ft`, note: "Census estimate" };
   }
-  return { value: UNKNOWN, note: "" };
+  return { value: "Not on file", note: "" };
 }
 
 function daySpan(iso: unknown, today: Date) {

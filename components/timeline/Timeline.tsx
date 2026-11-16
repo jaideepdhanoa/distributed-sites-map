@@ -10,7 +10,7 @@ import {
   type CommsLine,
   type MergedLine,
 } from "@/lib/comms";
-import { previewAtWord } from "@/lib/displayText";
+import { previewAtWord, stripGmailIds } from "@/lib/displayText";
 import { ACTIVITY_TIMEOUT_MS, activityView } from "@/lib/timeline/load";
 import "./timeline.css";
 
@@ -47,14 +47,13 @@ const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop"]);
 
 function WhenStamp({ at, approximate }: { at: string; approximate?: boolean }) {
   const clock = formatActivityWhen(at, approximate);
-  const label = clock.label || (approximate ? "(approx.)" : "");
-  if (!label) return null;
+  const label = clock.label || (approximate ? "(approx.)" : "time not recorded");
   return <time dateTime={clock.title || undefined} title={clock.title || label}>{` · ${label}`}</time>;
 }
 
 function ExpandableText({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
-  const view = previewAtWord(text);
+  const view = previewAtWord(stripGmailIds(text));
   if (!view.full) return null;
   if (!view.clipped) return <p>{view.full}</p>;
   return (

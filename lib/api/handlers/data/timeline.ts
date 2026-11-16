@@ -5,6 +5,7 @@ import { listRecordedHistory } from "@/lib/queue/events";
 import { suggestedDropHistory } from "@/lib/suggestedDrop";
 import { overlayTimeline } from "@/lib/changes/read";
 import { presentCard, showActivityLines, type TimelineItem } from "@/lib/timeline/filter";
+import { redactGmailPayload } from "@/lib/displayText";
 import { mergeBringBackHistory } from "@/lib/timeline/history";
 
 async function readTimeline(ids: string[]): Promise<unknown> {
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   const ids = [url.searchParams.get("id") || "", url.searchParams.get("related") || ""];
   const card = presentCard(await readTimeline(ids), ids);
   const items = await activityItems(card.items, ids);
-  return NextResponse.json({ ...card, items, showActivityLines: showActivityLines() }, { headers: privateHeaders });
+  return NextResponse.json(redactGmailPayload({ ...card, items, showActivityLines: showActivityLines() }), { headers: privateHeaders });
 }
 
 async function activityItems(items: TimelineItem[], ids: string[]): Promise<TimelineItem[]> {

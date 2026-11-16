@@ -109,6 +109,7 @@ test("auto service is a pipeline category, separate from car washes", () => {
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Auto repair", name: "8812-8828 N Black Canyon Hwy (auto center)" }), "auto");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Car wash", name: "Rinse My Ride" }), "wash");
   assert.equal(dealCategory({ kind: "land", business_type: "Auto repair" }), "land");
+  assert.equal(dealCategory({ kind: "pipeline", deal_id: "LAND-PHX-0002", business_type: "Car wash" }), "land");
 
   const links = landLinks(deals);
   const census = sites.find((site) => site.origin === "universe" && !isLandParcelSite(site, links));

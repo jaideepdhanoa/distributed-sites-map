@@ -8,7 +8,7 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import FinancialsEntry, { usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
@@ -184,7 +184,7 @@ function DealHeadline({
       ) : null}
       <div>
         <span>Open land</span>
-        <strong title={spare.value === "—" ? "Not on file" : undefined}>{spare.value}</strong>
+        <strong title={isOpenLandBlank(spare.value) ? "Not on file" : undefined}>{spare.value}</strong>
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div className="headline-wide">
@@ -220,7 +220,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null }: { site: Sit
       </div>
       <div>
         <span>Open land</span>
-        <strong title={spare.value === "—" ? "Not on file" : undefined}>{spare.value}</strong>
+        <strong title={isOpenLandBlank(spare.value) ? "Not on file" : undefined}>{spare.value}</strong>
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div className="headline-wide">
@@ -635,7 +635,7 @@ export default function Detail({
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
               <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Open land</span><div title={spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <span>Open land</span><div title={isOpenLandBlank(spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
               <span>Power</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
@@ -840,7 +840,7 @@ export function DealDetail({
               <span>Per acre</span>
               <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
               <span>Open land</span>
-              <div title={spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value === "—" ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <div title={isOpenLandBlank(spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
               <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}

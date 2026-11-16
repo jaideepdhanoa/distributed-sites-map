@@ -3,6 +3,7 @@ import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/gua
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { isProtectedId } from "@/lib/protectedSite";
 import type { SiteFeature } from "@/lib/types";
+import { redactGmailPayload } from "@/lib/displayText";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await requireUser();
@@ -22,5 +23,5 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   delete properties.site_capacity;
   const staged = await overlayStageFile({ features: [{ properties }] }, "site");
   console.info(JSON.stringify({ event: "data", user: session.u, part: "site", id }));
-  return NextResponse.json(staged.features?.[0]?.properties || properties, { headers: privateHeaders });
+  return NextResponse.json(redactGmailPayload(staged.features?.[0]?.properties || properties), { headers: privateHeaders });
 }

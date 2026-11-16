@@ -37,6 +37,7 @@ import { stageDetail, stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
 import { NdaChip } from "./NdaChip";
 import { PhoneCards } from "./PhoneCards";
+import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 import { SuggestedDropMark } from "./SuggestedDrop";
 
@@ -202,7 +203,8 @@ export default function PipelineList({
   });
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
-  const [phone, setPhone] = useState(false);
+  const paneRef = useRef<HTMLDivElement>(null);
+  const phone = useNarrowList(paneRef);
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -252,14 +254,6 @@ export default function PipelineList({
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
   const showChecks = !phone || selecting;
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
-
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const apply = () => setPhone(query.matches);
-    apply();
-    query.addEventListener("change", apply);
-    return () => query.removeEventListener("change", apply);
-  }, []);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -375,7 +369,7 @@ export default function PipelineList({
   ) : null;
 
   return (
-    <div className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
+    <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
       {summaryBar}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
@@ -525,7 +519,7 @@ export default function PipelineList({
                 </label>
               ) : null}
               <span className="site-title">
-                <span className="site-name-text" title={String(cell(row, "site", signedIn))}>
+                <span className="site-name-text" title={String(cell(row, "site", signedIn) || row.deal.deal_id)}>
                   {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}

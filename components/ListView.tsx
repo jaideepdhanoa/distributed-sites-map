@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState } from "react";
 import { NdaChip } from "./NdaChip";
 import { PhoneCards } from "./PhoneCards";
+import { useNarrowList } from "./useNarrowList";
 import { RowLinks } from "./RowLinks";
 import SheetGrid from "./SheetGrid";
 import { useListLayout } from "./useListLayout";
@@ -102,16 +103,10 @@ export default function ListView({
   const allowed = useMemo(() => allowedIds(ids, signedIn), [ids, signedIn]);
   const fallback = useMemo(() => defaultLayout(allowed), [allowed]);
   const { layout, update } = useListLayout({ surface: "universe", signedIn, userId, allowed, seed: null, fallback });
-  const [phone, setPhone] = useState(false);
+  const paneRef = useRef<HTMLDivElement>(null);
+  const phone = useNarrowList(paneRef);
   const [moreOpen, setMoreOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const apply = () => setPhone(query.matches);
-    apply();
-    query.addEventListener("change", apply);
-    return () => query.removeEventListener("change", apply);
-  }, []);
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
   const visible = displayIds(activeLayout, allowed, phone, phoneColumns("universe"));
@@ -132,7 +127,7 @@ export default function ListView({
   }
 
   return (
-    <div className="list-pane" data-list-count={rows.length}>
+    <div ref={paneRef} className="list-pane" data-list-count={rows.length}>
       {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
@@ -202,7 +197,7 @@ export default function ListView({
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
             <span className="site-title">
-              <span className="site-name-text" title={row.site || undefined}>{row.site || "—"}</span>
+              <span className="site-name-text" title={row.site || row.id}>{row.site || "—"}</span>
               <span className="site-meta">
                 {row.address && row.address !== row.site ? <span className="site-address" title={row.address}>{row.address}{row.city && !row.address.toLowerCase().includes(row.city.toLowerCase()) ? `, ${row.city}` : ""}</span> : row.city ? <span className="site-address" title={row.city}>{row.city}</span> : <span className="site-address" />}
                 {row.near ? <span className="badge quiet near-chip" data-testid="near-chip" data-short={row.nearShort || row.near} title="Near means outside the service area, within the miles shown. More than 10 miles is a knock-out.">{row.near}</span> : null}

@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
+import { stripGmailIds } from "@/lib/displayText";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
@@ -94,7 +95,7 @@ export function SitePacket({
       <h3 className="job">Space</h3>
       <div className="metrics">
         {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
-        <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={spare.value === "—" ? "Not on file" : undefined} />
+        <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
       </div>
       <h3 className="job">Power</h3>
       {capacity.length ? (
@@ -178,7 +179,7 @@ export default function KeyStrip({
       <h3 className="job">Space</h3>
       <div className="metrics">
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
-        <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={spare.value === "—" ? "Not on file" : undefined} />
+        <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
         <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
       <h3 className="job">Power</h3>
@@ -228,7 +229,7 @@ export default function KeyStrip({
         {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}
         {signedIn && deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
         <span>Depot</span><strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
-        {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{deal.access_notes}</strong></> : null}
+        {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{stripGmailIds(deal.access_notes)}</strong></> : null}
         {listing.label ? <><span>Listing</span><strong>{listing.label}</strong></> : null}
       </div>
     </section>

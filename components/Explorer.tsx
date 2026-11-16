@@ -32,7 +32,7 @@ import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOT
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
-import { pipelineMapSummary } from "@/lib/mapSummary";
+import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
@@ -1158,6 +1158,10 @@ export default function Explorer() {
     if (placedSite.current === selected) return;
     placedSite.current = selected;
     const patch = selectionPatch(selected);
+    delete patch.cats;
+    delete patch.landlayer;
+    delete patch.cstore;
+    delete patch.land;
     if (Object.keys(patch).length) write(patch);
   }, [data, selected, reviewing, params]);
 
@@ -1655,6 +1659,16 @@ export default function Explorer() {
       : { lng: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[0], lat: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[1], zoom: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).zoom })
     : null;
   const openQueueIds = feed.filter((site) => site.status === "open").map((site) => site.siteId);
+  const allMarketDeals = dealRows.filter((deal) => {
+    if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
+    if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+    if (!allCities && deal.city !== city) return false;
+    if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
+    if (query && !dealQueryHit(deal)) return false;
+    return true;
+  });
+  const hiddenDropped = showDroppedRows ? 0 : allMarketDeals.filter((deal) => deal.stage_group === "dropped").length;
+  const allCount = pipelineAllCount(allMarketDeals.length - hiddenDropped, hiddenDropped);
   const reviewMarkers = inReview ? visibleFeed.flatMap((site, index) => {
     const deal = dealRows.find((row) => row.deal_id === site.siteId);
     const point = (deal ? dealPoint(deal) : null) || (site.lng != null && site.lat != null ? [site.lng, site.lat] as [number, number] : null);
@@ -1795,16 +1809,10 @@ export default function Explorer() {
             {funnel === "universe" ? null : (
               <>
                 <span className="step">
-                  <button className={allPipes ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes ? "step" : undefined} title="Every deal in this market, at every stage." onClick={() => write({ pstage: null }, true)}>
+                  <button className={allPipes ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes ? "step" : undefined} title="Every deal in this market that this view shows. Dropped deals stay out until that step is open." onClick={() => write({ pstage: null }, true)}>
                     <span>All</span>
-                    <strong>{dealRows.filter((deal) => {
-                      if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-                      if (!viewDeal(deal) || !dealAllowed(deal)) return false;
-                      if (!allCities && deal.city !== city) return false;
-                      if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
-                      if (query && !dealQueryHit(deal)) return false;
-                      return true;
-                    }).length.toLocaleString()}</strong>
+                    <strong>{allCount.count}</strong>
+                    {allCount.dropped ? <span className="split"> · {allCount.dropped}</span> : null}
                   </button>
                 </span>
                 <span className="chev" aria-hidden="true">›</span>
@@ -2474,7 +2482,7 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             figuresReady={Boolean(selectedDeal) || figuresReady}
-            outsideFilter={!dealInCategories(selectedDeal, categories) || (funnel === "pipeline" && !allPipes && !who && selectedDeal.stage_group !== pipeStage)}
+            outsideFilter={Boolean(outsideDeal) || !dealInCategories(selectedDeal, categories)}
             related={relatedPanel({ id: selectedDeal.deal_id, kind: "deal", name: selectedDeal.name, address: selectedDeal.address, apn: selectedDeal.apn || siteById.get(selectedDeal.universe_id)?.apn })}
           />
         ) : selectedUnscreened ? (

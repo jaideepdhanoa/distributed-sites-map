@@ -1,6 +1,7 @@
 import alertDefaults from "../config/alerts.json";
 import commsConfig from "../config/comms.json";
 import { formatActivityWhen } from "./actions/time";
+import { stripGmailIds } from "./displayText";
 import { ndaQueueAllowed } from "./nda";
 
 const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
@@ -208,7 +209,7 @@ export function toCommsLine(row: Partial<CommsRecord>): CommsLine {
     person: text(row.person),
     firm: text(row.firm),
     channel: text(row.channel),
-    summary: clipSummary(text(row.summary)),
+    summary: stripGmailIds(clipSummary(text(row.summary))),
     approximate: stamp.approximate,
     href: gmailHref(text(row.link), messageId, threadId),
     citedEventIds: eventIds(text(row.source)),

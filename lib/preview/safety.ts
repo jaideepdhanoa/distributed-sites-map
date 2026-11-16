@@ -28,18 +28,30 @@ export function isolatedKey(key: string): string {
   return vercelOutsideProduction() ? `preview:${key}` : key;
 }
 
+/** Plain Preview-only marker set by the reset workflow. Not a secret. */
+export const PREVIEW_DATABASE_BRANCH = "preview";
+
+/** Bracket access so the value is read at request time and not inlined at build. */
+function runtimeEnv(name: string): string {
+  return (process.env[name] ?? "").trim();
+}
+
+export function previewBranchMarked(): boolean {
+  return runtimeEnv("PREVIEW_DATABASE_BRANCH") === PREVIEW_DATABASE_BRANCH;
+}
+
 /**
- * Preview is using the production database when its URL host matches the
- * production hostname. The hostname is compared with and without the Neon
- * pooler label. The value is not printed.
+ * Preview is closed until the reset workflow has marked this deployment as
+ * the branch named preview. A marked deployment is still closed when its
+ * database host matches a known production host. The host is not printed.
  */
 export function previewPointsAtProduction(url?: string | null): boolean {
-  if (process.env.VERCEL_ENV !== "preview") return false;
-  const current = databaseHost(url === undefined ? process.env.DATABASE_URL : url);
-  if (!current) return false;
-  const named = process.env.NEON_PRODUCTION_HOST?.trim() || "";
+  if (runtimeEnv("VERCEL_ENV") !== "preview") return false;
+  if (!previewBranchMarked()) return true;
+  const current = databaseHost(url === undefined ? runtimeEnv("DATABASE_URL") : url);
+  if (!current) return true;
+  const named = runtimeEnv("NEON_PRODUCTION_HOST");
   if (named && sameDatabaseHost(current, named)) return true;
-  const productionUrl = process.env.NEON_DATABASE_URL?.trim() || "";
-  const productionHost = databaseHost(productionUrl);
+  const productionHost = databaseHost(runtimeEnv("NEON_DATABASE_URL"));
   return Boolean(productionHost) && sameDatabaseHost(current, productionHost);
 }

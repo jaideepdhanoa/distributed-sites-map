@@ -78,5 +78,6 @@ export function previewTargetValues(input: { pooled: string; direct: string; pro
   for (const key of ["PGPASSWORD", "POSTGRES_PASSWORD"]) map.set(key, sensitive(pooled.password));
   for (const key of ["PGDATABASE", "POSTGRES_DATABASE"]) map.set(key, sensitive(pooled.database));
   map.set("NEON_PRODUCTION_HOST", { value: productionHost, type: "plain" });
+  map.set("PREVIEW_DATABASE_BRANCH", { value: "preview", type: "plain" });
   return map;
 }

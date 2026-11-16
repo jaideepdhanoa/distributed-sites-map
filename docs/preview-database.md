@@ -14,7 +14,7 @@ The workflow:
 2. Creates the branch named `preview` from it, or resets that branch to the production head when it already exists. It does not keep the old preview copy under another name.
 3. Reads the pooled and direct connection strings for that branch.
 4. Sets those strings, and the host, role, and database fields, on the Vercel **Preview** target only.
-5. Sets `NEON_PRODUCTION_HOST` on Preview to the production hostname so the app can tell the two hosts apart.
+5. Sets `NEON_PRODUCTION_HOST` on Preview to the production hostname only, and sets `PREVIEW_DATABASE_BRANCH` to `preview`. Both are Preview-only and neither is a secret.
 6. Redeploys the latest ready preview, when one exists, so the new values are picked up.
 
 Production and Development are not written. If a variable is shared by Production and Preview, Preview is removed from that shared variable and a separate Preview value is created. The production value stays where it is.
@@ -33,9 +33,9 @@ Run a reset before a preview migration when you want a fresh copy. Run the previ
 
 ## Runtime check
 
-On `VERCEL_ENV=preview`, if the database host equals the production host (the pooler host and the direct host count as the same), write routes return 503 with `Preview is pointed at production`. That includes `POST /api/changes` and every other POST, PUT, PATCH, or DELETE, plus the digest and flush jobs. A banner with the same text is shown. Reads stay available.
+On `VERCEL_ENV=preview`, writes are refused until the reset workflow has set `PREVIEW_DATABASE_BRANCH` to `preview` on that deployment. Missing that marker is treated as production, including when `NEON_PRODUCTION_HOST` is unset. Write routes return 503 with `Preview is pointed at production`. That includes `POST /api/changes` and every other POST, PUT, PATCH, or DELETE, plus the digest and flush jobs. The banner is rendered on each request, not at build time, and shows the same text. Reads stay available.
 
-The check needs `NEON_PRODUCTION_HOST` on the Preview deployment. The reset workflow sets it. Until that has been run, a preview that still has the production URL cannot see the difference.
+A marked deployment is still refused when `DATABASE_URL`'s host matches `NEON_PRODUCTION_HOST` or the host of `NEON_DATABASE_URL`. The pooler host and the direct host count as the same. The reset workflow writes `NEON_PRODUCTION_HOST` onto Preview so that comparison can run. Until the marker is set, a preview that still has the production URL cannot write.
 
 ## Env split
 
@@ -61,7 +61,8 @@ Checked against the Vercel project. Names only.
 | `NEON_PROJECT_ID` | Production and Preview, and a GitHub variable | Same Neon project. Leave shared. Not a connection string. |
 | `NEON_AUTH_BASE_URL` | Production and Preview | The app does not call Neon Auth. Leave shared. |
 | `VITE_NEON_AUTH_URL` | Production and Preview | The app does not read it. Leave shared. |
-| `NEON_PRODUCTION_HOST` | GitHub variable | Hostname only. The reset workflow copies it to Vercel Preview. Compared, not printed. |
+| `NEON_PRODUCTION_HOST` | GitHub variable, then Vercel Preview | Hostname only. The reset workflow copies it to the Preview target. Compared, not printed. |
+| `PREVIEW_DATABASE_BRANCH` | Vercel Preview, set by the reset workflow | Plain value `preview`. Preview writes stay closed until this is set. |
 | `NEON_DATABASE_URL` | GitHub secret | Production pooled URL. Not set on Vercel. Preview migration does not use it. |
 | `RESEND_API_KEY` | Production and Preview | Shared by the integration. Outbound mail is off when `VERCEL_ENV` is set and is not `production`. |
 | `RESEND_EMAIL_DOMAIN` | Production and Preview | Shared. Unused while preview mail is off. |

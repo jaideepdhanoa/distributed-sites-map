@@ -9,6 +9,8 @@ import { workbookMirrorEnabled } from "../../lib/changes/mirror";
 import { sameDatabaseHost } from "../../lib/changes/host";
 import { transportKind } from "../../lib/alerts/transport";
 import { askReady } from "../../lib/ask/model";
+import { renderToStaticMarkup } from "react-dom/server";
+import { PreviewDbBannerView } from "../../components/PreviewDbBanner";
 import { isolatedKey, PREVIEW_POINTS_AT_PRODUCTION, previewPointsAtProduction } from "../../lib/preview/safety";
 import {
   keysForPreviewSplit,
@@ -36,6 +38,7 @@ const ENV_KEYS = [
   "DATABASE_URL",
   "NEON_PRODUCTION_HOST",
   "NEON_DATABASE_URL",
+  "PREVIEW_DATABASE_BRANCH",
   "RESEND_API_KEY",
   "RESEND_EMAIL_DOMAIN",
   "SMTP_USER",
@@ -86,6 +89,9 @@ test("preview writes refuse the production host and other hosts stay open", asyn
 
     process.env.DATABASE_URL = PREVIEW;
     process.env.NEON_PRODUCTION_HOST = "ep-prod.example.test";
+    delete process.env.PREVIEW_DATABASE_BRANCH;
+    assert.equal(previewPointsAtProduction(), true);
+    process.env.PREVIEW_DATABASE_BRANCH = "preview";
     assert.equal(previewPointsAtProduction(), false);
     const open = await POST(new Request("http://localhost/api/changes", { method: "POST" }));
     assert.notEqual(open.status, 503);
@@ -96,6 +102,8 @@ test("preview writes refuse the production host and other hosts stay open", asyn
 
     process.env.VERCEL_ENV = "preview";
     process.env.DATABASE_URL = PREVIEW;
+    process.env.PREVIEW_DATABASE_BRANCH = "preview";
+    process.env.NEON_PRODUCTION_HOST = "ep-prod.example.test";
     const job = await digest(new Request("http://localhost/api/alerts/digest"));
     assert.equal(job.status, 403);
     assert.match(((await job.json()) as { error: string }).error, /only in production/);
@@ -127,6 +135,7 @@ test("the preview env plan never writes production", () => {
   const keys = keysForPreviewSplit(records);
   assert.ok(keys.includes("DATABASE_URL"));
   assert.ok(keys.includes("NEON_PRODUCTION_HOST"));
+  assert.ok(keys.includes("PREVIEW_DATABASE_BRANCH"));
   assert.equal(keys.includes("RESEND_API_KEY"), false);
   assert.equal(keys.includes("CHANGES_API_ENABLED"), false);
   const plan = planPreviewEnv(records, keys);
@@ -145,6 +154,8 @@ test("preview connection values refuse the production host and stay masked", () 
   assert.equal(values.get("DATABASE_URL")?.value, PREVIEW);
   assert.equal(values.get("PGHOST")?.value, "ep-preview-pooler.example.test");
   assert.equal(values.get("NEON_PRODUCTION_HOST")?.type, "plain");
+  assert.equal(values.get("NEON_PRODUCTION_HOST")?.value, "ep-prod.example.test");
+  assert.deepEqual(values.get("PREVIEW_DATABASE_BRANCH"), { value: "preview", type: "plain" });
   const redacted = redactSecrets(`failed ${PREVIEW}`, [PREVIEW]);
   assert.equal(redacted.includes("secret-value"), false);
 });
@@ -231,6 +242,31 @@ test("vercel preview writes do not include production", async () => {
   assert.equal(redeployBody("sites", "dpl_preview").target, "preview");
 });
 
+test("preview fails closed until the reset marker says the host is not production", () => {
+  const saved = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
+  try {
+    for (const key of ENV_KEYS) delete process.env[key];
+    process.env.VERCEL_ENV = "preview";
+    process.env.DATABASE_URL = PROD;
+    const closed = renderToStaticMarkup(PreviewDbBannerView());
+    assert.equal(previewPointsAtProduction(), true);
+    assert.match(closed, /preview-db-banner/);
+    assert.match(closed, /Preview is pointed at production/);
+
+    process.env.PREVIEW_DATABASE_BRANCH = "preview";
+    process.env.DATABASE_URL = PREVIEW;
+    process.env.NEON_PRODUCTION_HOST = "ep-prod.example.test";
+    assert.equal(previewPointsAtProduction(), false);
+    assert.equal(renderToStaticMarkup(PreviewDbBannerView()), "");
+
+    process.env.DATABASE_URL = PROD;
+    assert.equal(previewPointsAtProduction(), true);
+    assert.match(renderToStaticMarkup(PreviewDbBannerView()), /Preview is pointed at production/);
+  } finally {
+    restoreEnv(saved);
+  }
+});
+
 test("preview workflows confirm, mask, and stay off production", () => {
   const reset = readFileSync(".github/workflows/reset-preview-db.yml", "utf8");
   const migrate = readFileSync(".github/workflows/preview-migrate.yml", "utf8");
@@ -253,6 +289,7 @@ test("preview workflows confirm, mask, and stay off production", () => {
   const banner = readFileSync("components/PreviewDbBanner.tsx", "utf8");
   const layout = readFileSync("app/layout.tsx", "utf8");
   const safety = readFileSync("lib/preview/safety.ts", "utf8");
+  assert.match(banner, /await connection\(\)/);
   assert.match(banner, /PREVIEW_POINTS_AT_PRODUCTION/);
   assert.match(safety, /Preview is pointed at production/);
   assert.match(layout, /PreviewDbBanner/);

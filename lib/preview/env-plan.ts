@@ -39,12 +39,13 @@ export const PREVIEW_DB_KEYS = [
   "PGDATABASE",
   "POSTGRES_DATABASE",
   "NEON_PRODUCTION_HOST",
+  "PREVIEW_DATABASE_BRANCH",
 ] as const;
 
 const MANAGED = new Set<string>(PREVIEW_DB_KEYS);
 
 /** Always set on Preview, even when the key is missing there today. */
-export const ALWAYS_PREVIEW_KEYS = ["DATABASE_URL", "NEON_PRODUCTION_HOST"] as const;
+export const ALWAYS_PREVIEW_KEYS = ["DATABASE_URL", "NEON_PRODUCTION_HOST", "PREVIEW_DATABASE_BRANCH"] as const;
 
 const KEPT_TARGETS = new Set(["production", "development"]);
 

@@ -1,3 +1,5 @@
+import { POWER_RATING } from "./site";
+
 /**
  * A Google Sheet cell holds 50,000 characters. These are the mirrored
  * columns whose API write cap is shorter than that. Postgres stores the
@@ -28,7 +30,7 @@ export const MIRRORED_TEXT_CAPS: readonly MirroredTextCap[] = [
   { sheet: "Pipeline", header: "Photos checked", field: "photos_checked", max: 40 },
   { sheet: "Pipeline", header: "Photo notes", field: "photo_notes", max: 400 },
   { sheet: "Pipeline", header: "Last checked live", field: "checked_live", max: 500 },
-  { sheet: "Pipeline", header: "Power rating", field: "site_capacity", max: 500 },
+  { sheet: "Pipeline", header: "Power rating", field: POWER_RATING, max: 500 },
   { sheet: "Pipeline", header: "pwr_a_source_type", field: "cap_a_source", max: 500 },
   { sheet: "Pipeline", header: "pwr_a_as_of", field: "cap_a_as_of", max: 500 },
   { sheet: "Pipeline", header: "pwr_a_confidence", field: "cap_a_confidence", max: 500 },

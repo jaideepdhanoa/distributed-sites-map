@@ -82,7 +82,8 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
             return;
           }
           ignoreClick.current = true;
-          const height = drawer.getBoundingClientRect().height;
+          const dragged = Number.parseFloat(drawer.style.height);
+          const height = Number.isFinite(dragged) ? dragged : drawer.getBoundingClientRect().height;
           drawer.style.height = "";
           sheet.onSnap(nearestSheetSnap(height, window.innerHeight));
         }}

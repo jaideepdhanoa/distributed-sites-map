@@ -24,17 +24,27 @@ test("sheet steps and drag release stop at half", () => {
 });
 
 async function dragSheet(page: import("@playwright/test").Page, from: "peek" | "half" | "full", to: "peek" | "half" | "full") {
+  const drawer = page.locator("aside.drawer");
+  await expect(drawer).toHaveClass(new RegExp(`snap-${from}`));
+  let previous = -1;
+  await expect.poll(async () => {
+    const height = await drawer.evaluate((node) => node.getBoundingClientRect().height);
+    const settled = previous >= 0 && Math.abs(height - previous) < 0.5;
+    previous = height;
+    return settled;
+  }).toBe(true);
   const grab = page.getByRole("button", { name: "Drag sheet" });
   const box = await grab.boundingBox();
-  const shift = await page.evaluate(({ from, to }) => {
+  const shift = await page.evaluate((destination) => {
+    const sheet = document.querySelector("aside.drawer");
     const view = window.innerHeight;
-    const heights = {
+    const stops = {
       peek: Math.min(320, Math.round(view * 0.45)),
       half: Math.round(view * 0.56),
-      full: Math.round(view * 0.92),
+      full: Math.round(view * 0.88),
     };
-    return heights[from as "peek"] - heights[to as "peek"];
-  }, { from, to });
+    return (sheet?.getBoundingClientRect().height || 0) - stops[destination as "peek"];
+  }, to);
   const x = box!.x + box!.width / 2;
   const y = box!.y + box!.height / 2;
   await page.mouse.move(x, y);
@@ -86,21 +96,7 @@ test("a tap and the keyboard change the phone sheet detent", async ({ page }, in
 test("dragging the grab bar releases on half", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.goto(SONORAN);
-  await expect(page.locator("aside.drawer")).toHaveClass(/snap-peek/);
-  const grab = page.getByRole("button", { name: "Drag sheet" });
-  const box = await grab.boundingBox();
-  const shift = await page.evaluate(() => {
-    const view = window.innerHeight;
-    const peek = Math.min(320, Math.round(view * 0.45));
-    const half = Math.round(view * 0.56);
-    return half - peek;
-  });
-  const x = box!.x + box!.width / 2;
-  const y = box!.y + box!.height / 2;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x, y - shift, { steps: 12 });
-  await page.mouse.up();
+  await dragSheet(page, "peek", "half");
   await expect(page.locator("aside.drawer")).toHaveClass(/snap-half/);
 });
 

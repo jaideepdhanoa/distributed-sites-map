@@ -15,5 +15,6 @@ ALTER TABLE agent_inbox DROP CONSTRAINT IF EXISTS agent_inbox_kind_check;
 ALTER TABLE agent_inbox ADD CONSTRAINT agent_inbox_kind_check
   CHECK (kind IN (
     'note', 'reply', 'mention', 'suggestion', 'flag', 'decision', 'ask_gap',
-    'proposal_ready', 'proposal_overtaken', 'proposal_closed'
+    'proposal_ready', 'proposal_overtaken', 'proposal_closed',
+    'data_change', 'check_failed', 'stale', 'broker_match'
   ));

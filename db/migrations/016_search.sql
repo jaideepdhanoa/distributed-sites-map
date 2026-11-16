@@ -102,7 +102,7 @@ BEGIN
     FROM (
       SELECT unnest(ARRAY[
         'note', 'reply', 'mention', 'suggestion', 'flag', 'decision', 'ask_gap',
-        'proposal_ready', 'proposal_overtaken',
+        'proposal_ready', 'proposal_overtaken', 'proposal_closed',
         'data_change', 'check_failed', 'stale', 'broker_match'
       ]) AS t
       UNION

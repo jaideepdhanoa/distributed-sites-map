@@ -8,6 +8,7 @@ import { loadNdaSnapshot } from "@/lib/ndaLoad";
 import { withPricing } from "@/lib/pricingLoad";
 import { overlayDealStages, readDeals } from "@/lib/changes/read";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
+import { omitProtectedDeals } from "@/lib/protectedSite";
 import { withSuggestedDrops } from "@/lib/suggestedDrop";
 
 export async function GET() {
@@ -17,6 +18,6 @@ export async function GET() {
   const deals = await readDeals();
   const staged = await overlayDealStages(await overlayStageFile(overlayDeals(deals, loadNdaSnapshot()), "deal"));
   const dropped = withSuggestedDrops(staged);
-  const features = attachPackageHrefs(dropped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature));
+  const features = omitProtectedDeals(attachPackageHrefs(dropped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature)));
   return NextResponse.json({ ...dropped, features }, { headers: privateHeaders });
 }

@@ -19,7 +19,8 @@ import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/acti
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
-import { areaQuery, inMapArea, parseMapArea } from "@/lib/geoFilter";
+import { areaQuery, inMapArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
+import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
 import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
 import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
@@ -91,6 +92,23 @@ function ActionsQuietNotice() {
   const down = useSyncExternalStore(subscribeActionsDown, actionsDown, () => false);
   if (!down) return null;
   return <p className="actions-quiet" role="status">Discussion is unavailable on this preview.</p>;
+}
+
+function pointOf(point?: [number, number] | null): { lng?: number; lat?: number } {
+  if (!point || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return {};
+  return { lng: point[0], lat: point[1] };
+}
+
+function guardFeatures<T extends { features?: { properties?: Record<string, unknown> | null }[] }>(body: T): T {
+  if (!body.features) return body;
+  const features = body.features.filter((feature) => {
+    const props = feature.properties || {};
+    const linked = props.linked_deal_ids;
+    const ids = [props.deal_id, props.site_id, props.linked_deal_id];
+    if (ids.some((id) => typeof id === "string" && isProtectedId(id))) return false;
+    return !(Array.isArray(linked) && linked.some((id) => typeof id === "string" && isProtectedId(id)));
+  });
+  return { ...body, features };
 }
 
 export default function Explorer() {
@@ -273,6 +291,9 @@ export default function Explorer() {
   const allPipes = pipeView.all;
   const pipeStage: PipeId = pipeView.stage;
   const listView = params.get("view") === "list";
+  const [liveArea, setLiveArea] = useState<MapArea | null>(null);
+  const [followArea, setFollowArea] = useState(false);
+  const mapAreaLive = followArea ? liveArea : null;
   const reach: Reach = parseReach(params.get("reach"));
   const ndaParam = params.get("nda") === "1";
   const loopsParam = params.get("loops") === "1";
@@ -479,11 +500,11 @@ export default function Explorer() {
       ]);
       if (!cancel && token === dataGen.current) {
         setData((current) => ({
-          sites: current ? preservePendingStage(current.sites, sitesBody) : sitesBody,
+          sites: current ? preservePendingStage(current.sites, guardFeatures(sitesBody)) : guardFeatures(sitesBody),
           areas: areasBody,
           depots: depotsBody,
           parcels: parcelsBody,
-          deals: current ? preservePendingStage(current.deals, dealsBody) : dealsBody,
+          deals: current ? preservePendingStage(current.deals, guardFeatures(dealsBody)) : guardFeatures(dealsBody),
           funnel: funnelPayload.funnel,
         }));
         const unscreenedPayload = await unscreenedRes.json();
@@ -519,11 +540,11 @@ export default function Explorer() {
       const deals = await dealsRes.json();
       const sites = await sitesRes.json();
       if (cancel || token !== dataGen.current) return;
-      setData((current) => (current ? { ...current, deals: preservePendingStage(current.deals, deals), sites: preservePendingStage(current.sites, sites) } : current));
+      setData((current) => (current ? { ...current, deals: preservePendingStage(current.deals, guardFeatures(deals)), sites: preservePendingStage(current.sites, guardFeatures(sites)) } : current));
       if (allSitesRes?.ok) {
         const payload = (await allSitesRes.json()) as { features?: SiteFeature[] };
         if (!cancel && token === dataGen.current) {
-          const incoming = Array.isArray(payload.features) ? payload.features : [];
+          const incoming = omitProtectedSites(Array.isArray(payload.features) ? payload.features : []);
           setCatalog((current) => (current ? preservePendingStage({ features: current }, { features: incoming }).features || incoming : incoming));
         }
       }
@@ -657,7 +678,13 @@ export default function Explorer() {
   }, []);
 
   useEffect(() => {
-    setSelected(params.get("site"));
+    const site = params.get("site");
+    if (site && isProtectedId(site)) {
+      setSelected(null);
+      write({ site: null });
+      return;
+    }
+    setSelected(site);
   }, [params]);
 
   useEffect(() => {
@@ -1013,6 +1040,7 @@ export default function Explorer() {
   }, [selected, selectedSiteId, data]);
 
   function choose(id: string | null) {
+    if (id && isProtectedId(id)) return;
     setSelected(id);
     setFiguresReady(!id);
     write({ site: id }, true);
@@ -1418,6 +1446,7 @@ export default function Explorer() {
       listingUrl: listingHref(dealForSite(site)?.listing_url || site.listing_url),
       folderUrl: folderHref(site.folder_url || dealForSite(site)?.folder_url),
       packageUrl: dealForSite(site)?.package_href || "",
+      ...pointOf(featureById.get(site.site_id)?.geometry?.coordinates),
     };
   }
 
@@ -1446,6 +1475,7 @@ export default function Explorer() {
       listingUrl: listingHref(deal.listing_url || linked?.listing_url),
       folderUrl: folderHref(deal.folder_url || linked?.folder_url),
       packageUrl: deal.package_href || "",
+      ...pointOf(dealPoint(deal)),
     };
   }
 
@@ -1471,15 +1501,7 @@ export default function Explorer() {
   const listRows = [...(funnel === "pipeline"
     ? pipelineSquares.map((feature) => dealRow(feature.properties))
     : [...universePins.map((feature) => siteRow(feature.properties)), ...offMarketShown.map((feature) => siteRow(feature.properties))]
-  ), ...(showUnscreened ? unscreened.filter((feature) => feature.properties.city === city).map((feature) => unscreenedRow(feature.properties)) : [])].sort((a, b) => {
-    const left = String(a[sortKey] || "").trim();
-    const right = String(b[sortKey] || "").trim();
-    if (!left && !right) return 0;
-    if (!left) return 1;
-    if (!right) return -1;
-    const diff = left.localeCompare(right, undefined, { numeric: true });
-    return sortDesc ? -diff : diff;
-  });
+  ), ...(showUnscreened ? unscreened.filter((feature) => feature.properties.city === city).map((feature) => ({ ...unscreenedRow(feature.properties), ...pointOf(feature.geometry?.coordinates) })) : [])];
   const tierOn = (deal: DealProps) => (dealCategory(deal) !== "wash" || matchesOpenLandTier(deal.open_land_sqft, landTier)) && (!mapArea || (() => {
     const point = dealPoint(deal);
     return point ? inMapArea(point[0], point[1], mapArea) : false;
@@ -1500,7 +1522,7 @@ export default function Explorer() {
   }
   const pipelineRows: PipelineRow[] = listDeals.map((deal) => {
     const linked = deal.universe_id ? siteById.get(deal.universe_id) : undefined;
-    return { deal, noPin: !dealPoint(deal), zoning: linked?.zoning || "", apn: deal.apn || linked?.apn || "" };
+    return { deal, noPin: !dealPoint(deal), zoning: linked?.zoning || "", apn: deal.apn || linked?.apn || "", point: dealPoint(deal) };
   });
 
   function exportList() {
@@ -2215,7 +2237,16 @@ export default function Explorer() {
             if (dealRows.some((deal) => deal.deal_id === id)) setTableTab(dealRows.find((deal) => deal.deal_id === id)?.kind === "land" ? "land" : "pipeline");
             choose(id);
           }}
-          onBounds={() => undefined}
+          onBounds={(bounds, meta) => {
+            if (!bounds.getWest || !bounds.getSouth || !bounds.getEast || !bounds.getNorth) return;
+            const west = bounds.getWest();
+            const south = bounds.getSouth();
+            const east = bounds.getEast();
+            const north = bounds.getNorth();
+            if (![west, south, east, north].every((value) => Number.isFinite(value))) return;
+            setLiveArea({ kind: "polygon", points: [[west, south], [east, south], [east, north], [west, north]] });
+            if (meta?.user && listView && !window.matchMedia("(max-width: 767px)").matches) setFollowArea(true);
+          }}
         />
         </PanelBoundary>
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
@@ -2252,15 +2283,22 @@ export default function Explorer() {
             sort={{ id: pipelineSortId, desc: sortDesc }}
             signedIn={Boolean(me?.u)}
             canAct={Boolean(me?.actionRole && canWrite(me.actionRole as ActionRole))}
-            onSort={(id, desc) => write({ sort: `${id}:${(desc ?? (pipelineSortId === id ? !sortDesc : false)) ? "desc" : "asc"}` })}
+            onSort={(id, desc) => write({ sort: desc === undefined ? "none" : `${id}:${desc ? "desc" : "asc"}` })}
             onOpen={choose}
+            onDismiss={() => choose(null)}
             onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
+            sortQuery={params.has("sort") ? params.get("sort") : null}
+            columnSeed={params.has("cols") ? pipelineColumns : null}
+            userId={me?.u || ""}
+            mapArea={mapAreaLive}
+            onSearchArea={() => setFollowArea(true)}
+            onClearArea={() => setFollowArea(false)}
             onColumns={(next) => {
               const defaults = defaultColumnIds().join(",");
               const value = next.join(",");
               write({ cols: value === defaults ? null : value });
             }}
-            onResetColumns={() => write({ cols: null })}
+            onResetColumns={() => write({ cols: null, sort: null })}
             onBroker={(name) => write({ who: name, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list" })}
             onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: "list" })}
             onCopyLink={async (ids) => {
@@ -2286,11 +2324,18 @@ export default function Explorer() {
             rows={listRows}
             selectedId={selected}
             sort={{ id: sortKey, desc: sortDesc }}
-            onSort={(id, desc) => write({ sort: `${id}:${(desc ?? (sortKey === id ? !sortDesc : false)) ? "desc" : "asc"}` })}
+            onSort={(id, desc) => write({ sort: desc === undefined ? "none" : `${id}:${desc ? "desc" : "asc"}` })}
             onOpen={choose}
+            onDismiss={() => choose(null)}
             onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
             onExport={exportList}
             note={handoffCopy}
+            signedIn={Boolean(me?.u)}
+            userId={me?.u || ""}
+            sortQuery={params.has("sort") ? params.get("sort") : null}
+            mapArea={mapAreaLive}
+            onSearchArea={() => setFollowArea(true)}
+            onClearArea={() => setFollowArea(false)}
           />
         ) : null}
         </PanelBoundary>

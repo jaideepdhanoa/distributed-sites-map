@@ -1,0 +1,114 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync } from "node:fs";
+import { memorySql } from "../helpers/sql";
+import {
+  allowedIds,
+  cycleSort,
+  defaultLayout,
+  displayIds,
+  moveColumn,
+  phoneColumns,
+  prepareRows,
+  sanitizeLayout,
+  sortFromParam,
+} from "../../lib/listLayout";
+import { loadListLayout, saveListLayout } from "../../lib/listLayoutStore";
+import { isProtectedId, omitProtectedDeals, omitProtectedSites } from "../../lib/protectedSite";
+
+const pipeline = ["site", "stage", "score", "asking", "openLand", "cashFlow", "nda", "lastContact", "nextStep"];
+
+test("a signed-out sheet drops financials, NDA, contact, and next step", () => {
+  const allowed = allowedIds(pipeline, false);
+  assert.deepEqual(allowed, ["site", "stage", "score", "openLand"]);
+  const layout = sanitizeLayout({ order: pipeline, hidden: [], pinned: ["asking"], filters: { asking: "secret" } }, allowed);
+  assert.equal(layout.order.includes("asking"), false);
+  assert.equal(layout.order.includes("nda"), false);
+  assert.equal(layout.order.includes("lastContact"), false);
+  assert.equal(layout.order.includes("nextStep"), false);
+  assert.equal(layout.pinned.includes("asking"), false);
+});
+
+test("header sort cycles ascending, descending, then none", () => {
+  assert.deepEqual(cycleSort(null, "stage"), { id: "stage", desc: false });
+  assert.deepEqual(cycleSort({ id: "stage", desc: false }, "stage"), { id: "stage", desc: true });
+  assert.equal(cycleSort({ id: "stage", desc: true }, "stage"), null);
+  assert.deepEqual(cycleSort({ id: "stage", desc: false }, "score"), { id: "score", desc: false });
+});
+
+test("reorder, pin, and hide keep the site column and the saved order", () => {
+  const layout = sanitizeLayout({
+    order: moveColumn(pipeline, "score", "stage"),
+    hidden: ["cashFlow", "site"],
+    pinned: ["stage", "site"],
+    touched: true,
+    widths: { stage: 20, score: 900 },
+  }, pipeline);
+  assert.deepEqual(layout.order.slice(0, 3), ["site", "score", "stage"]);
+  assert.equal(layout.hidden.includes("site"), false);
+  assert.equal(layout.hidden.includes("cashFlow"), true);
+  assert.equal(layout.widths.stage, 96);
+  assert.equal(layout.widths.score, 480);
+  const shown = displayIds(layout, allowedIds(pipeline, true), false, phoneColumns("pipeline"));
+  assert.equal(shown[0], "stage");
+  assert.equal(shown[1], "site");
+  assert.equal(shown.includes("cashFlow"), false);
+});
+
+test("an untouched phone sheet uses the short column set", () => {
+  const layout = defaultLayout(pipeline);
+  const shown = displayIds(layout, pipeline, true, phoneColumns("pipeline"));
+  assert.deepEqual(shown, ["site", "stage", "score", "openLand"]);
+});
+
+test("column filters and numeric sort leave text facts as text", () => {
+  const rows = [
+    { id: "SITE-A", name: "North lot", stage: "Desk", acres: "not a number", score: 2 },
+    { id: "SITE-B", name: "South lot", stage: "Land", acres: "12", score: null },
+    { id: "SITE-C", name: "East lot", stage: "Desk", acres: "3", score: 9 },
+  ];
+  const columns = [
+    { id: "site", label: "Site", text: (row: typeof rows[number]) => row.name },
+    { id: "stage", label: "Stage", text: (row: typeof rows[number]) => row.stage },
+    {
+      id: "score",
+      label: "Score",
+      text: (row: typeof rows[number]) => (row.score == null ? "" : String(row.score)),
+      sortValue: (row: typeof rows[number]) => row.score,
+    },
+    { id: "acres", label: "Acres", text: (row: typeof rows[number]) => row.acres },
+  ];
+  const layout = {
+    ...defaultLayout(["site", "stage", "score", "acres"]),
+    filters: { stage: "desk" },
+    sort: { id: "score", desc: true },
+    touched: true,
+  };
+  const shown = prepareRows(rows, columns, layout, ["site", "stage", "score", "acres"]);
+  assert.deepEqual(shown.map((row) => row.id), ["SITE-C", "SITE-A"]);
+  const textSort = prepareRows(rows, columns, { ...layout, filters: {}, sort: { id: "acres", desc: false } }, ["acres"]);
+  assert.deepEqual(textSort.map((row) => row.acres), ["3", "12", "not a number"]);
+  assert.equal(sortFromParam("none", ["site"]), null);
+  assert.equal(sortFromParam(null, ["site"]), undefined);
+});
+
+test("list layouts are stored per user and ignored until the table exists", async () => {
+  const sql = await memorySql();
+  const allowed = ["site", "stage"];
+  const one = sanitizeLayout({ order: ["stage", "site"], pinned: ["site"], touched: true, sort: { id: "stage", desc: true } }, allowed);
+  const two = sanitizeLayout({ order: ["site", "stage"], hidden: ["stage"], touched: true }, allowed);
+  await assert.rejects(() => loadListLayout(sql, "ada", "pipeline", allowed));
+  await sql.exec(readFileSync("db/migrations/013_list_layouts.sql", "utf8"));
+  assert.deepEqual(await saveListLayout(sql, "ada", "pipeline", one, allowed), one);
+  assert.deepEqual(await saveListLayout(sql, "beau", "pipeline", two, allowed), two);
+  assert.deepEqual(await loadListLayout(sql, "ada", "pipeline", allowed), one);
+  assert.equal((await loadListLayout(sql, "beau", "pipeline", allowed))?.hidden.includes("stage"), true);
+  assert.equal(await loadListLayout(sql, "ada", "universe", allowed), null);
+  assert.equal(isProtectedId("PIPE-PHX-0006"), true);
+  assert.equal(omitProtectedDeals([{ properties: { deal_id: "PIPE-PHX-0006" } }, { properties: { deal_id: "SITE-A" } }]).length, 1);
+  assert.equal(omitProtectedSites([
+    { properties: { site_id: "PIPE-PHX-0006" } },
+    { properties: { site_id: "SITE-B", linked_deal_id: "PIPE-PHX-0006" } },
+    { properties: { site_id: "SITE-C" } },
+  ]).length, 1);
+});

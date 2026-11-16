@@ -39,7 +39,7 @@ test("phone list, columns, compare, and layers are not browser controls", async 
   await expect(page.getByRole("button", { name: "Show on map" }).first()).toBeVisible();
   expect(await nativeControls(page)).toEqual([]);
 
-  await page.locator(".list-cards button.list-row").first().click();
+  await page.locator(".pipeline-list tbody tr.list-row").first().click();
   await expect(page.getByRole("button", { name: /compare/i })).toBeVisible();
   expect(await nativeControls(page)).toEqual([]);
 

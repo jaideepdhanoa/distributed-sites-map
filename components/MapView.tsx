@@ -38,7 +38,16 @@ type Props = {
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
-  onBounds: (bounds: { contains: (lnglat: [number, number]) => boolean }) => void;
+  onBounds: (
+    bounds: {
+      contains: (lnglat: [number, number]) => boolean;
+      getWest?: () => number;
+      getSouth?: () => number;
+      getEast?: () => number;
+      getNorth?: () => number;
+    },
+    meta?: { user: boolean },
+  ) => void;
   fitPoints?: [number, number][];
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
@@ -1057,8 +1066,11 @@ export default function MapView(props: Props) {
         paint("review-marks", "circle-stroke-width", 3);
         paint("offmarket-selected", "circle-stroke-width", 3);
       }
-      map.on("moveend", () => propsRef.current.onBounds(map.getBounds()));
-      propsRef.current.onBounds(map.getBounds());
+      map.on("moveend", (event) => {
+        const user = Boolean((event as { originalEvent?: Event }).originalEvent);
+        propsRef.current.onBounds(map.getBounds(), { user });
+      });
+      propsRef.current.onBounds(map.getBounds(), { user: false });
     });
     const observed = node.current;
     const preserveView = Boolean(kept);
@@ -1082,7 +1094,10 @@ export default function MapView(props: Props) {
       const near = padded && Math.abs(center.lng - pin[0]) < 0.01 && Math.abs(center.lat - pin[1]) < 0.01 && map.getZoom() >= 13;
       if (!near) map.jumpTo({ center: pin, zoom: 15, padding: pad });
     };
-    observer = new ResizeObserver(() => recenter());
+    observer = new ResizeObserver(() => {
+      map.resize();
+      recenter();
+    });
     observer.observe(observed);
     resizeTimer = window.setInterval(recenter, 250);
     resizeStop = window.setTimeout(() => window.clearInterval(resizeTimer), 12000);

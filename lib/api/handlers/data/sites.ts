@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
+import { omitProtectedSites } from "@/lib/protectedSite";
 import type { SiteFeature } from "@/lib/types";
 
 const KEEP = [
@@ -115,7 +116,8 @@ export async function GET(request: NextRequest) {
   if (!isSession(session)) return session;
   const city = request.nextUrl.searchParams.get("city");
   const full = readGenerated("sites.geojson") as { features: SiteFeature[] };
-  const chosen = city ? full.features.filter((feature) => feature.properties.city === city) : full.features;
+  const visible = omitProtectedSites(full.features);
+  const chosen = city ? visible.filter((feature) => feature.properties.city === city) : visible;
   const features = chosen.map((feature) => {
     const properties: Record<string, unknown> = {};
     for (const key of KEEP) properties[key] = feature.properties[key];

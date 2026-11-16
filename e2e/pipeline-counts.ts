@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { dealInCategories, defaultCategories, type Categories } from "../lib/categories";
+import { isProtectedId } from "../lib/protectedSite";
 
 type DealProps = {
+  deal_id?: string;
   city?: string;
   kind?: string;
   stage_group?: string;
@@ -28,7 +30,7 @@ export function cityPipelineCounts(city = "PHX", options: { cstore?: boolean; la
   const categories: Categories = { ...defaultCategories(), land: Boolean(options.land), store: Boolean(options.cstore) };
   if (options.auto !== undefined) categories.auto = options.auto;
   if (options.wash !== undefined) categories.wash = options.wash;
-  const cityRows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city);
+  const cityRows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city && !isProtectedId(deal.deal_id));
   const rows = cityRows.filter((deal) => dealInCategories(deal, categories));
   const count = (kind: string, group?: string, source = rows) =>
     source.filter((deal) => deal.kind === kind && (group == null || deal.stage_group === group)).length;

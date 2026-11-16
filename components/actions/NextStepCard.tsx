@@ -327,7 +327,7 @@ export function NextStepCard({
     <>
       <SuggestedDropMark reason={suggestedDrop} stageGroup={stageGroup} stage={recordStage} />
       {nextAction ? <TagChip chip={nextAction} compact={Boolean(workbook?.text)} /> : null}
-      {waiting ? <TagChip chip={{ ...waiting, note: waiting.note || blockerSentenceForDeal(blocker || { stage: recordStage || "", stage_group: "desk" }, pacificToday()) }} /> : blocker ? <BlockerLine deal={blocker} /> : null}
+      {waiting ? <TagChip chip={waiting} compact /> : !workbook?.text && blocker ? <BlockerLine deal={blocker} /> : null}
     </>
   );
   if (!status.enabled) {

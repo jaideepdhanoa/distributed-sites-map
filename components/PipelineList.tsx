@@ -287,12 +287,12 @@ export default function PipelineList({
       },
     };
   });
-  const summary = useMemo(() => summaryOf(rows.map((row) => row.deal)), [rows]);
-  const compMedian = useMemo(() => compMedianOf(rows.map((row) => row.deal)), [rows]);
   const ordered = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => row.point && inMapArea(row.point[0], row.point[1], mapArea)) : rows;
     return prepareRows(scoped, sheetColumns, activeLayout, visible);
   }, [activeLayout, mapArea, rows, sheetColumns, visible]);
+  const summary = useMemo(() => summaryOf(ordered.map((row) => row.deal)), [ordered]);
+  const compMedian = useMemo(() => compMedianOf(ordered.map((row) => row.deal)), [ordered]);
   const strips = useMemo(() => ({
     asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
     acres: stripStats(ordered.map((row) => row.deal.land_acres)),
@@ -520,6 +520,18 @@ export default function PipelineList({
               stage: String(cell(row, "stage", signedIn)),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
+              chips: (() => {
+                const chips = dealChips(row.deal, signedIn);
+                const waiting = chips.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
+                const gap = chips.find((chip) => chip.family === "biggest_gap");
+                if (!waiting && !gap) return null;
+                return (
+                  <>
+                    {waiting ? <TagChip chip={waiting} compact /> : null}
+                    {gap ? <TagChip chip={gap} compact /> : null}
+                  </>
+                );
+              })(),
               selected: id === selectedId,
               check: showChecks ? (
                 <label className="row-check">

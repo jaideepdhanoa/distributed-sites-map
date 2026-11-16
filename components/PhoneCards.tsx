@@ -7,6 +7,7 @@ export type PhoneCard = {
   stage: string;
   tone?: string;
   facts: string[];
+  chips?: ReactNode;
   selected?: boolean;
   check?: ReactNode;
   onOpen: () => void;
@@ -25,6 +26,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
               {row.address ? <span className="site-address" title={row.address}>{row.address}</span> : null}
               <span className="phone-card-stage">
                 <span className={`stage-pill tone-${row.tone || "pine"}`}>{row.stage}</span>
+                {row.chips}
               </span>
               {facts.length ? (
                 <span className="phone-card-meta">

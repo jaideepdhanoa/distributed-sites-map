@@ -51,6 +51,7 @@ export const LAYOUT_SURFACES = ["pipeline", "universe"] as const;
 export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 
 const MIN_WIDTH = 96;
+const SITE_MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
 
 /** Columns that take leftover pane width. The pipeline list adds its power column. */
@@ -91,6 +92,7 @@ const COLUMN_WIDTH: Record<string, number> = {
   nda: 140,
   lastContact: 124,
   nextStep: 240,
+  chip_waiting: 148,
 };
 
 export function columnWidth(id: string): number {
@@ -246,7 +248,8 @@ export function fitColumnWidths(
     return base;
   }
   if (!openFlex.length) return base;
-  const room = openFlex.map((index) => Math.max(0, base[index] - MIN_WIDTH));
+  const floor = (index: number) => (ids[index] === "site" ? SITE_MIN_WIDTH : MIN_WIDTH);
+  const room = openFlex.map((index) => Math.max(0, base[index] - floor(index)));
   if (room.every((value) => value === 0)) return base;
   const cuts = shares(Math.min(-delta, room.reduce((total, value) => total + value, 0)), room, room);
   openFlex.forEach((index, position) => {

@@ -115,7 +115,9 @@ test("a default sheet uses the pane and keeps rigid columns", () => {
   assert.ok(wide[7] > columnWidth("cashFlow"));
   const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(narrow[0] < columnWidth("site"));
-  assert.ok(narrow[0] >= 96);
+  assert.ok(narrow[0] >= 180);
+  const withWaiting = fitColumnWidths(["site", "chip_waiting", ...pipelineIds.slice(1)], {}, 1024, TRAILING_COLUMN_WIDTH, flexIds);
+  assert.ok(withWaiting[0] >= 180);
 });
 
 test("a saved layout keeps its widths and the last flexible column fills a wider pane", () => {

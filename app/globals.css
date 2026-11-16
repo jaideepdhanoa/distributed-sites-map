@@ -364,7 +364,7 @@ span.listing-link.muted {
 .site-meta .near-chip, .site-meta .suggested-inline, .site-meta [data-testid="suggested-drop"] { flex: 0 1 auto; margin-top: 0; max-width: 100%; }
 .list-table .stage-pill { margin-top: 0; max-width: 100%; overflow: visible; text-overflow: clip; white-space: normal; height: auto; }
 .list-table .site-name .row-links { margin-left: auto; align-self: flex-start; }
-.site-name-text { display: block; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-weight: 650; }
+.site-name-text { display: block; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: break-word; font-weight: 650; }
 .list-table td[data-col="site"] { white-space: normal; overflow: visible; text-overflow: unset; vertical-align: top; }
 .site-address {
   color: var(--ink-3);
@@ -1064,9 +1064,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   z-index: 2;
   box-shadow: inset -1px 0 0 var(--line);
 }
-.list-table th[data-col="site"], .list-table td[data-col="site"] { width: 26%; }
-.pipeline-list .list-table th[data-col^="chip_"],
-.pipeline-list .list-table td[data-col^="chip_"] { width: 12%; min-width: 0; }
+.list-table th[data-col="site"], .list-table td[data-col="site"] { min-width: 180px; }
 .list-table thead th.is-pinned { z-index: 5; background: #faf7f1; }
 .list-scroll.is-scrolled .list-table th.is-pinned,
 .list-scroll.is-scrolled .list-table td.is-pinned {
@@ -1083,7 +1081,8 @@ th:hover .col-grip, th:focus-within .col-grip,
 th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity: 1; pointer-events: auto; }
 .col-pin[aria-pressed="true"] { color: var(--green); }
 .col-resize { position: absolute; top: 0; right: 0; width: 8px; height: 100%; min-height: 28px; padding: 0; cursor: col-resize; z-index: 2; }
-.col-menu { top: calc(100% + 4px); left: 0; min-width: 200px; }
+.col-menu { top: calc(100% + 4px); left: 0; min-width: 220px; }
+.col-menu.floating { position: fixed; top: auto; right: auto; z-index: 80; margin: 0; overflow: auto; }
 .col-menu label { display: grid; gap: 6px; padding: 4px 8px; font-size: var(--type-body); }
 .col-menu label:has(input.check) { display: flex; align-items: center; min-height: 36px; }
 .list-table td.cell-focus { box-shadow: inset 0 0 0 2px var(--green); }
@@ -1100,7 +1099,7 @@ th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity
 .phone-card-meta > span:not(.stage-pill) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-cards .stage-pill { margin-top: 0; flex: none; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-cards button.list-row { flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; border: 0; background: transparent; text-align: left; padding: 0; }
-.list-cards .list-row > span.phone-card-stage { display: block; margin-top: 8px; }
+.list-cards .list-row > span.phone-card-stage { margin-top: 8px; }
 .list-cards .list-row > span.phone-card-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1112,6 +1111,9 @@ th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity
 .phone-sep { display: inline-block; margin: 0 8px; color: var(--ink-3); }
 .list-cards button.text-link { flex: none; align-self: center; min-height: 44px; }
 .list-cards .list-row > strong, .list-cards .list-row > span:not(.phone-card-meta) { display: block; }
+.list-cards .list-row > span.phone-card-stage { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.list-cards .phone-card-stage .stage-pill { max-width: 100%; }
+.empty-filter { position: sticky; left: 0; width: fit-content; margin: 18px 12px 28px; }
 .list-card-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-cards .near-chip { display: inline-flex; margin-top: 4px; }
 .list-cards .site-address { font-size: var(--type-cap); color: var(--ink-3); font-weight: 450; }

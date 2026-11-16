@@ -29,9 +29,9 @@ export type GridRow = {
   cells: GridCell[];
 };
 
-export type GridColumn = { id: string; label: string; missing: boolean };
+export type GridColumn = { id: string; label: string; missing: boolean; statement?: boolean };
 
-export type PnlGrid = { columns: GridColumn[]; rows: GridRow[]; years: number[] };
+export type PnlGrid = { columns: GridColumn[]; rows: GridRow[]; years: number[]; note: string };
 
 type Bucket = { missing: boolean; period: PnlPeriodView | null };
 
@@ -188,23 +188,38 @@ function usedCodes(buckets: Bucket[], section: "revenue" | "costs" | "addbacks")
 
 export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number): PnlGrid {
   const years = statement.years.map((item) => item.year);
-  if (statement.status !== "ready" || !years.length) return { columns: [], rows: [], years };
+  if (statement.status !== "ready" || !years.length) return { columns: [], rows: [], years, note: "" };
   const selected = year && years.includes(year) ? year : years[0];
   const buckets = mode === "years" ? annualBuckets(statement) : monthBuckets(statement, selected);
+  const selectedYear = statement.years.find((item) => item.year === selected);
+  const capturedMonths = selectedYear?.months.filter(Boolean).length ?? 0;
+  const annualIsStatement = Boolean(selectedYear?.annual);
   const columns: GridColumn[] = mode === "years"
     ? statement.years.map((item) => ({
         id: String(item.year),
         label: String(item.year),
         missing: !item.annual && item.months.every((period) => !period),
+        statement: Boolean(item.annual),
       }))
     : [
         ...MONTH_SHORT.map((label, index) => ({
           id: label.toLowerCase(),
           label,
-          missing: !statement.years.find((item) => item.year === selected)?.months[index],
+          missing: !selectedYear?.months[index],
         })),
-        { id: "ytd", label: "YTD", missing: false },
+        {
+          id: "ytd",
+          label: annualIsStatement ? `FY${selected} (statement)` : "YTD",
+          missing: false,
+          statement: annualIsStatement,
+        },
       ];
+  const hatched = "Hatched = month not in package.";
+  const note = mode === "months" && annualIsStatement
+    ? `${hatched} ${capturedMonths} of 12 months captured; annual from statement.`
+    : mode === "months"
+      ? `${hatched} YTD is the sum of captured months.`
+      : hatched;
 
   const contexts = buckets.map((bucket) => {
     const revenue = bucket.missing ? null : revenueOf(bucket.period);
@@ -225,8 +240,8 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
     if (bucket.missing || !bucket.period) return { kind: "missing" };
     const revenue = revenueOf(bucket.period);
     if (!revenue) return { kind: "blank" };
-    if (revenue.line && !revenue.summed) return fromLine(revenue.line, revenue.cents, "100%", false);
-    return fromMath(revenue.cents, "100%", "Sum of captured revenue lines. No stated total was on this period.");
+    if (revenue.line && !revenue.summed) return fromLine(revenue.line, revenue.cents, ofRevenue(revenue.cents, revenue.cents), false);
+    return fromMath(revenue.cents, ofRevenue(revenue.cents, revenue.cents), "Sum of captured revenue lines. No stated total was on this period.");
   }
 
   function costCell(bucket: Bucket, costs: bigint | null, revenue: bigint | null): GridCell {
@@ -315,7 +330,7 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
       cells: sdeCells.map((cell) => (cell.kind === "value" && cell.share ? fromMath(cell.cents, cell.share, "SDE divided by revenue for this column.", cell.share) : cell.kind === "missing" ? cell : { kind: "blank" })),
     });
   }
-  return { columns, rows, years };
+  return { columns, rows, years, note };
 }
 
 export function columnSummary(grid: PnlGrid, index: number): { revenue: string; costs: string; ebitda: string; margin: string } {

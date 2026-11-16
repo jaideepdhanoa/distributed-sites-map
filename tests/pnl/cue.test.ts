@@ -19,7 +19,7 @@ test("the card uses the latest full year and counts every captured month", () =>
   assert.equal(card?.revenue, "$1,000,000");
   assert.equal(card?.cashLabel, "SDE");
   assert.equal(card?.cash, "$520,000");
-  assert.equal(card?.margin, "52%");
+  assert.equal(card?.margin, "52.0%");
   assert.equal(card?.coverage, "FY2024 · 2 of 12 months · Sample package");
   const previous = process.env.VERCEL_ENV;
   process.env.VERCEL_ENV = "production";

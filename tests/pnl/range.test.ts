@@ -38,8 +38,9 @@ test("a captured amount keeps its fraction and rejects a rounded shorthand", () 
   assert.equal(parseAmount("1.2 million"), null);
   assert.equal(parseAmount("1000000.5"), null);
   assert.equal(parseAmount("010"), null);
-  assert.equal(percentOf(50000000n, 100000000n), "50%");
+  assert.equal(percentOf(50000000n, 100000000n), "50.0%");
   assert.equal(percentOf(1250000n, 10000000n), "12.5%");
+  assert.equal(percentOf(1200000n, 9000000n), "13.3%");
 });
 
 test("car wash labor outside 15–40% is flagged and an in-range line is not", () => {
@@ -51,7 +52,7 @@ test("car wash labor outside 15–40% is flagged and an in-range line is not", (
     revenueStatus: "reported",
     status: "reported",
   });
-  assert.match(high?.reason || "", /50% of stated revenue/);
+  assert.match(high?.reason || "", /50\.0% of stated revenue/);
   assert.match(high?.reason || "", /15–40%/);
   const inside = flagLine({
     code: "labor",
@@ -83,7 +84,7 @@ test("auto service parts outside 30–45% are flagged and a missing revenue tota
     revenueStatus: "reported",
     status: "reported",
   });
-  assert.match(high?.reason || "", /60% of stated revenue/);
+  assert.match(high?.reason || "", /60\.0% of stated revenue/);
   assert.match(high?.reason || "", /30–45%/);
   const quiet = flagLine({
     code: "cogs",

@@ -6,8 +6,7 @@ import { buildPnlGrid, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
 
 function textOf(cell: GridCell | undefined, percent: boolean): string {
-  if (!cell || cell.kind === "missing") return "Missing";
-  if (cell.kind === "blank") return "—";
+  if (!cell || cell.kind === "missing" || cell.kind === "blank") return "Not in package";
   if (percent) return cell.share || "—";
   return cell.amount;
 }
@@ -27,7 +26,10 @@ export default function PnlPhone({ statement }: { statement: PnlStatement }) {
   );
   const index = grain === "month" ? month : yearIndex;
   const summary = columnSummary(grid, index);
-  const periods = grain === "month" ? [...MONTH_SHORT, "YTD"] : years.map(String);
+  const periods = grain === "month" ? [...MONTH_SHORT, grid.columns[12]?.label || "YTD"] : years.map(String);
+  const periodTitle = grain === "month"
+    ? (month >= 12 ? periods[12] : `${MONTH_SHORT[month]} ${year}`)
+    : String(years[yearIndex] || "");
 
   function step(delta: number) {
     const next = Math.min(Math.max(index + delta, 0), periods.length - 1);
@@ -72,6 +74,7 @@ export default function PnlPhone({ statement }: { statement: PnlStatement }) {
           );
         })}
       </div>
+      <p className="pnl-period-label" data-testid="pnl-period-label">{periodTitle}</p>
       <div
         className="metrics pnl-summary"
         data-testid="pnl-summary"
@@ -102,7 +105,7 @@ export default function PnlPhone({ statement }: { statement: PnlStatement }) {
                 onClick={() => setOpen((current) => (current === row.id ? null : row.id))}
               >
                 <span>{row.label}</span>
-                <strong>{textOf(cell, false)}</strong>
+                <strong className={value ? undefined : "pnl-muted"}>{textOf(cell, false)}</strong>
                 <small>{value?.share || ""}</small>
                 {value?.flag ? <i className="pnl-dot" data-testid="pnl-flag-dot" aria-label="Outside the band" /> : null}
               </button>
@@ -122,7 +125,7 @@ function Detail({ cell }: { cell: GridCell | undefined }) {
     <div className="pnl-expand" data-testid="pnl-expand">
       <p>{cell.status === "calculated" ? "Calculated" : cell.status === "estimated" ? "Estimated" : "Reported"}</p>
       <p>{cell.sourceDocument}{cell.sourcePage ? ` · ${cell.sourcePage}` : ""}</p>
-      {cell.capturedLabel ? <p>{cell.capturedLabel}</p> : null}
+      {cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
       {cell.flag ? <p>{cell.flag}</p> : null}
     </div>
   );

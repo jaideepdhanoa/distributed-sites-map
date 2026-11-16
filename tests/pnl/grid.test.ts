@@ -19,7 +19,9 @@ test("a captured timestamp is shown as a calendar date", () => {
 
 test("the month sheet keeps missing months empty and calculates EBITDA from captured lines", () => {
   const { grid, found } = row("labor");
-  assert.deepEqual(grid.columns.map((column) => column.label), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "YTD"]);
+  assert.deepEqual(grid.columns.map((column) => column.label), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "FY2024 (statement)"]);
+  assert.match(grid.note, /Hatched = month not in package/);
+  assert.match(grid.note, /2 of 12 months captured; annual from statement/);
   assert.equal(grid.columns[1]?.missing, true);
   assert.equal(found.cells[1]?.kind, "missing");
   assert.equal(found.cells[0]?.kind, "value");
@@ -43,7 +45,7 @@ test("the month sheet keeps missing months empty and calculates EBITDA from capt
   }
   const margin = row("margin").found.cells[12];
   assert.equal(margin?.kind, "value");
-  if (margin?.kind === "value") assert.equal(margin.amount, "44%");
+  if (margin?.kind === "value") assert.equal(margin.amount, "44.0%");
   const sde = row("sde").found.cells[12];
   assert.equal(sde?.kind, "value");
   if (sde?.kind === "value") assert.equal(sde.amount, "$520,000");

@@ -9,7 +9,7 @@ function figure(cell: ValueCell, percent: boolean): { primary: string; secondary
 }
 
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
-  if (cell.kind === "missing") return <span className="pnl-missing">Missing</span>;
+  if (cell.kind === "missing") return <span className="pnl-missing" />;
   if (cell.kind === "blank") return <span className="pnl-blank">—</span>;
   const shown = figure(cell, percent);
   return (
@@ -61,7 +61,17 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
       return;
     }
     const rect = target.getBoundingClientRect();
-    setOpen({ row, col, top: rect.bottom + 6, left: Math.min(rect.left, window.innerWidth - 280) });
+    const width = 280;
+    const height = 220;
+    let top = rect.top - height - 8;
+    let left = rect.left;
+    if (top < 8) {
+      left = rect.right + 8;
+      top = Math.max(8, rect.top);
+      if (left + width > window.innerWidth - 8) left = Math.max(8, rect.left - width - 8);
+    }
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+    setOpen({ row, col, top, left });
   }
 
   function onKey(event: React.KeyboardEvent) {
@@ -90,6 +100,8 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
   let cursor = 0;
 
   return (
+    <div className="pnl-grid">
+      {grid.note ? <p className="pnl-legend" data-testid="pnl-legend">{grid.note}</p> : null}
     <div className="list-scroll pnl-scroll" ref={scrollRef} data-testid="pnl-sheet" onKeyDown={onKey}>
       <table className="list-table pnl-table" role="grid" aria-label="Profit and loss" aria-rowcount={focusable.length + 1} aria-colcount={colCount + 1}>
         <thead>
@@ -128,7 +140,7 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
                       data-col={grid.columns[col]?.id}
                       tabIndex={focused || (!focus && index === 0 && col === 0) ? 0 : -1}
                       className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${focused ? "cell-focus" : ""}`.trim()}
-                      title={cell.kind === "value" && cell.flag ? cell.flag : undefined}
+                      title={cell.kind === "missing" ? "Month not in the package" : cell.kind === "value" && cell.flag ? cell.flag : undefined}
                       onFocus={() => setFocus({ row: index, col })}
                       onClick={(event) => reveal(index, col, event.currentTarget)}
                     >
@@ -147,11 +159,12 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>
           <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : "Reported"}</p>
           <p>{popover.sourceDocument}{popover.sourcePage ? ` · ${popover.sourcePage}` : ""}</p>
-          {popover.capturedLabel ? <p>{popover.capturedLabel}</p> : null}
+          {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
           {popover.sourceHref ? <a className="text-link" href={popover.sourceHref} target="_blank" rel="noopener noreferrer">Open source ↗</a> : null}
           {popover.flag ? <p className="pnl-flag">{popover.flag}</p> : null}
         </div>
       ) : null}
+    </div>
     </div>
   );
 }

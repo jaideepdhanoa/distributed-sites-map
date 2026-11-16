@@ -43,16 +43,14 @@ export function signedPercent(part: bigint, whole: bigint): string | null {
   return negative ? `-${text}` : text;
 }
 
-/** Truncated percent of two captured amounts. Not a stored P&L line. */
+/** Percent rounded to one decimal. Not a stored P&L line. */
 export function percentOf(lineCents: bigint, revenueCents: bigint): string | null {
   if (revenueCents <= BigInt(0)) return null;
   const abs = lineCents < BigInt(0) ? -lineCents : lineCents;
-  const bps = (abs * BigInt(10000)) / revenueCents;
-  const whole = bps / BigInt(100);
-  const frac = bps % BigInt(100);
-  if (frac === BigInt(0)) return `${whole}%`;
-  if (frac % BigInt(10) === BigInt(0)) return `${whole}.${frac / BigInt(10)}%`;
-  return `${whole}.${String(frac).padStart(2, "0")}%`;
+  const tenths = (abs * BigInt(1000) + revenueCents / BigInt(2)) / revenueCents;
+  const whole = tenths / BigInt(10);
+  const dec = tenths % BigInt(10);
+  return `${whole}.${dec}%`;
 }
 
 export function outsideBand(lineCents: bigint, revenueCents: bigint, low: number, high: number): boolean {

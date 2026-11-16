@@ -12,7 +12,7 @@ import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayS
 import FinancialsEntry, { usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
-import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
+import { nearestSheetSnap, sheetSnapHeights, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
@@ -59,7 +59,8 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
           if (!drawer) return;
           ignoreClick.current = false;
-          drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height, moved: false };
+          const logical = sheetSnapHeights(window.innerHeight)[sheet.snap ?? "peek"];
+          drag.current = { y: event.clientY, height: logical, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
@@ -83,8 +84,12 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
             return;
           }
           ignoreClick.current = true;
+<<<<<<< HEAD
           const dragged = Number.parseFloat(drawer.style.height);
           const height = Number.isFinite(dragged) ? dragged : drawer.getBoundingClientRect().height;
+=======
+          const height = Number.parseFloat(drawer.style.height) || info.height;
+>>>>>>> e76a2a5 (Keep the phone sheet drag on the snap it released to.)
           drawer.style.height = "";
           sheet.onSnap(nearestSheetSnap(height, window.innerHeight));
         }}

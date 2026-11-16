@@ -2940,7 +2940,16 @@ span.listing-link.muted { text-decoration: none; }
     background: var(--cream);
     pointer-events: auto;
   }
-  .top { height: auto; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+  .top { height: auto; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; max-width: 100%; position: relative; }
+  .command-open {
+    position: absolute;
+    top: 4px;
+    left: 112px;
+    z-index: 8;
+    height: 32px;
+    min-height: 32px !important;
+    padding: 0 8px;
+  }
   .bar { height: auto; max-width: 100%; }
   .mobile-search {
     display: block !important;
@@ -3065,7 +3074,7 @@ span.listing-link.muted { text-decoration: none; }
     position: fixed;
     display: flex;
     flex-direction: column;
-    top: 156px;
+    top: calc(var(--bar-h, 156px) + 8px);
     bottom: calc(var(--sheet-h, 50vh) + 8px);
     left: 8px;
     right: 8px;

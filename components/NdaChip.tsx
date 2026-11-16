@@ -16,7 +16,7 @@ export function NdaChip({
   if (!label) return null;
   const id = deal?.nda_id || "";
   return (
-    <span className="badge quiet nda-chip" data-testid="nda-chip" data-nda-id={id} title={id || undefined}>
+    <span className="badge quiet nda-chip" data-testid="nda-chip" data-nda-id={id} title={label}>
       {label}
     </span>
   );

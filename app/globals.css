@@ -362,7 +362,7 @@ span.listing-link.muted {
 .site-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; overflow: visible; }
 .site-meta .site-address { flex: 1 1 100%; max-width: none; white-space: normal; }
 .site-meta .near-chip, .site-meta .suggested-inline { flex: 0 1 auto; margin-top: 0; max-width: 100%; }
-.list-table .stage-pill { margin-top: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-table .stage-pill { margin-top: 0; max-width: 100%; overflow: visible; text-overflow: clip; white-space: normal; height: auto; }
 .list-table .site-name .row-links { margin-left: auto; align-self: flex-start; }
 .site-name-text { display: block; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-weight: 650; }
 .list-table td[data-col="site"] { white-space: normal; overflow: visible; text-overflow: unset; vertical-align: top; }
@@ -943,6 +943,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .nda-court span { display: block; font-size: var(--type-cap); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .nda-sites { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; }
 .stage-cell { display: flex; flex-wrap: nowrap; gap: 4px 6px; align-items: center; min-width: 0; overflow: hidden; }
+.list-table .stage-cell { flex-wrap: wrap; align-items: flex-start; overflow: visible; white-space: normal; }
 .suggested-inline {
   flex: 0 1 auto;
   display: inline-block;
@@ -966,6 +967,13 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   text-overflow: ellipsis;
   vertical-align: middle;
 }
+.list-table .stage-cell .nda-chip {
+  flex: 1 1 8rem;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+}
 .stage-blocker { margin: 6px 0 0; }
 .shell.reviewing .map-key { display: none; }
 .shell.list-open .map-coverage,
@@ -984,8 +992,20 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-table { border-collapse: collapse; width: 100%; min-width: 0; table-layout: fixed; font-size: var(--type-body); }
 .pipeline-list .list-table td.capacity, .pipeline-list .list-table th.capacity,
 .pipeline-list .list-table td.power-col, .pipeline-list .list-table th.power-col { min-width: 0; white-space: nowrap; }
+.pipeline-list .list-table td.power-col[data-wrap="text"] { white-space: normal; overflow: visible; text-overflow: clip; }
 .capacity-cell { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-table th, .list-table td { border-bottom: 1px solid var(--line); padding: 8px 8px; text-align: left; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: none; }
+.list-table td[data-wrap="text"] { white-space: normal; overflow: visible; text-overflow: clip; vertical-align: top; }
+.list-table td[data-wrap="text"] .metric { overflow: visible; align-content: start; height: auto; }
+.list-table td[data-wrap="text"] .metric-label,
+.list-table td[data-wrap="text"] .metric-label a,
+.list-table td[data-wrap="text"] .metric-label button {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
 .list-table th.is-pinned, .list-table td.is-pinned {
   position: sticky;
   background: #faf7f1;
@@ -1841,8 +1861,9 @@ tr { cursor: pointer; }
 }
 .open-land { display: grid; gap: 4px; min-width: 88px; }
 .open-land b { display: block; height: 100%; border-radius: 99px; background: #2f6a4e; }
-.metric { display: grid; gap: 3px; min-width: 0; max-width: 100%; overflow: hidden; }
+.metric { display: grid; gap: 3px; min-width: 0; max-width: 100%; overflow: hidden; align-content: start; }
 .metric-label { display: block; line-height: 1.35; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-table td[data-wrap="text"] .metric-label { overflow: visible; text-overflow: clip; white-space: normal; }
 .range-strip {
   position: relative;
   display: block;

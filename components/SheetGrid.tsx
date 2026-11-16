@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { GripVertical, ListFilter, Pin } from "lucide-react";
 import {
   clampWidth,
   columnWidth,
   cycleSort,
+  fitColumnWidths,
   moveColumn,
+  TRAILING_COLUMN_WIDTH,
   type ListLayout,
   type SheetColumn,
 } from "@/lib/listLayout";
+
+const WRAP_COLUMNS = new Set(["site", "stage", "asking", "listed", "grade", "traffic", "cashFlow"]);
 
 const WINDOW_AT = 180;
 
@@ -28,6 +32,8 @@ export default function SheetGrid<Row>({
   trailing,
   labelledBy,
   scrollRef: scrollRefProp,
+  flexIds,
+  wrapIds,
 }: {
   rows: Row[];
   rowId: (row: Row) => string;
@@ -42,9 +48,12 @@ export default function SheetGrid<Row>({
   trailing?: (row: Row) => ReactNode;
   labelledBy?: string;
   scrollRef?: RefObject<HTMLDivElement | null>;
+  flexIds?: readonly string[];
+  wrapIds?: readonly string[];
 }) {
   const innerRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollRefProp ?? innerRef;
+  const [paneWidth, setPaneWidth] = useState(0);
   const [menu, setMenu] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [focus, setFocus] = useState({ row: 0, col: 0 });
@@ -52,6 +61,11 @@ export default function SheetGrid<Row>({
   focusRef.current = focus;
   const ids = columns.map((column) => column.id);
   const colCount = ids.length + (trailing ? 1 : 0);
+  const trailingWidth = trailing ? TRAILING_COLUMN_WIDTH : 0;
+  const flex = new Set(flexIds ?? ["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
+  const wrap = new Set(wrapIds ?? WRAP_COLUMNS);
+  const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth, flex);
+  const widthById = new Map(ids.map((id, index) => [id, fitted[index] || columnWidth(id)]));
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
@@ -61,6 +75,19 @@ export default function SheetGrid<Row>({
   const items = virtualizer.getVirtualItems();
   const padTop = items.length ? items[0].start : 0;
   const padBottom = items.length ? virtualizer.getTotalSize() - items[items.length - 1].end : 0;
+
+  useLayoutEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return undefined;
+    const measure = () => {
+      const next = node.clientWidth;
+      setPaneWidth((current) => (current === next ? current : next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [scrollRef]);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -173,7 +200,8 @@ export default function SheetGrid<Row>({
       if (col && widths[col] == null) widths[col] = Math.round(cell.getBoundingClientRect().width);
     });
     const startX = event.clientX;
-    const start = widths[id] || 160;
+    const shown = Math.round(event.currentTarget.closest("th")?.getBoundingClientRect().width || 0);
+    const start = shown || widths[id] || columnWidth(id);
     function move(next: PointerEvent) {
       widths[id] = clampWidth(start + next.clientX - startX);
       onLayout({ ...layout, widths: { ...widths }, touched: true });
@@ -187,7 +215,7 @@ export default function SheetGrid<Row>({
   }
 
   function widthOf(id: string) {
-    return layout.widths[id] || columnWidth(id);
+    return widthById.get(id) || layout.widths[id] || columnWidth(id);
   }
 
   let pinnedLeft = 0;
@@ -199,11 +227,15 @@ export default function SheetGrid<Row>({
   }
 
   const span = colCount || 1;
-  const tableWidth = columns.reduce((sum, column) => sum + widthOf(column.id), 0) + (trailing ? 112 : 0);
+  const tableWidth = fitted.reduce((sum, width) => sum + width, 0) + trailingWidth;
 
   return (
-    <div className="list-scroll" ref={scrollRef} data-testid="sheet-grid" onKeyDown={onGridKey}>
-      <table className="list-table" role="grid" aria-labelledby={labelledBy} aria-rowcount={rows.length + 1} aria-colcount={span} style={{ width: "100%", minWidth: tableWidth }}>
+    <div className="list-scroll" ref={scrollRef} data-testid="sheet-grid" data-pane-width={paneWidth} onKeyDown={onGridKey}>
+      <table className="list-table" role="grid" aria-labelledby={labelledBy} aria-rowcount={rows.length + 1} aria-colcount={span} style={{ width: tableWidth, minWidth: tableWidth }}>
+        <colgroup>
+          {columns.map((column) => <col key={column.id} style={{ width: widthOf(column.id) }} />)}
+          {trailing ? <col style={{ width: trailingWidth }} /> : null}
+        </colgroup>
         <thead>
           <tr role="row">
             {columns.map((column) => {
@@ -333,7 +365,7 @@ export default function SheetGrid<Row>({
                 </th>
               );
             })}
-            {trailing ? <th aria-sort="none"><span className="sr">Map</span></th> : null}
+            {trailing ? <th aria-sort="none" style={{ width: trailingWidth, minWidth: trailingWidth }}><span className="sr">Map</span></th> : null}
           </tr>
         </thead>
         <tbody>
@@ -370,6 +402,7 @@ export default function SheetGrid<Row>({
                       data-cell={`${item.index}:${col}`}
                       data-col={column.id}
                       data-pinned={pinned ? "true" : "false"}
+                      data-wrap={wrap.has(column.id) ? "text" : undefined}
                       tabIndex={focused || (item.index === 0 && col === 0 && focus.row === 0 && focus.col === 0) ? 0 : -1}
                       className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.className || ""}`.trim()}
                       title={full && full !== "—" ? full : undefined}
@@ -388,6 +421,8 @@ export default function SheetGrid<Row>({
                   <td
                     role="gridcell"
                     data-cell={`${item.index}:${ids.length}`}
+                    data-col="map"
+                    style={{ width: trailingWidth, minWidth: trailingWidth }}
                     tabIndex={focus.row === item.index && focus.col === ids.length ? 0 : -1}
                     className={focus.row === item.index && focus.col === ids.length ? "cell-focus" : undefined}
                     onFocus={() => setFocus({ row: item.index, col: ids.length })}

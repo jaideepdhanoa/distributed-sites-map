@@ -48,6 +48,12 @@ export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 const MIN_WIDTH = 96;
 const MAX_WIDTH = 480;
 
+/** Columns that take leftover pane width. The pipeline list adds its power column. */
+const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
+
+/** The Show on map column. It stays this wide so spare pane width does not pool there. */
+export const TRAILING_COLUMN_WIDTH = 112;
+
 /** Starting widths so a default sheet does not clip a label mid-word. */
 const COLUMN_WIDTH: Record<string, number> = {
   site: 320,
@@ -193,6 +199,85 @@ export function moveColumn(order: string[], from: string, to: string): string[] 
 
 export function clampWidth(value: number): number {
   return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, value)));
+}
+
+/**
+ * Pixel widths for the visible columns.
+ * A default sheet spreads leftover width across the flexible columns, and
+ * shrinks those columns (not below the minimum) when the pane is narrower.
+ * A saved width stays put. Leftover width goes to flexible columns that were
+ * not saved, or to the last flexible column when every one of them was saved.
+ */
+export function fitColumnWidths(
+  ids: string[],
+  savedWidths: Record<string, number>,
+  paneWidth: number,
+  trailing = 0,
+  flexIds: ReadonlySet<string> = FLEX_COLUMN_IDS,
+): number[] {
+  const base = ids.map((id) => {
+    const saved = savedWidths[id];
+    return typeof saved === "number" && Number.isFinite(saved) ? saved : columnWidth(id);
+  });
+  if (!ids.length || paneWidth <= 0) return base;
+  const target = Math.max(0, Math.floor(paneWidth) - Math.max(0, Math.round(trailing)));
+  const sum = base.reduce((total, width) => total + width, 0);
+  const delta = target - sum;
+  if (delta === 0) return base;
+  const flex = ids.flatMap((id, index) => (flexIds.has(id) ? [index] : []));
+  const saved = (index: number) => {
+    const width = savedWidths[ids[index]];
+    return typeof width === "number" && Number.isFinite(width);
+  };
+  const openFlex = flex.filter((index) => !saved(index));
+  if (!flex.length) {
+    if (delta > 0) base[base.length - 1] += delta;
+    return base;
+  }
+  if (delta > 0) {
+    const grow = openFlex.length ? openFlex : [flex[flex.length - 1]];
+    if (grow.length === 1 && !openFlex.length) base[grow[0]] += delta;
+    else applyShares(base, grow, shares(delta, grow.map((index) => Math.max(base[index], 1))));
+    return base;
+  }
+  if (!openFlex.length) return base;
+  const room = openFlex.map((index) => Math.max(0, base[index] - MIN_WIDTH));
+  if (room.every((value) => value === 0)) return base;
+  const cuts = shares(Math.min(-delta, room.reduce((total, value) => total + value, 0)), room, room);
+  openFlex.forEach((index, position) => {
+    base[index] -= cuts[position];
+  });
+  return base;
+}
+
+function applyShares(base: number[], indexes: number[], cuts: number[]) {
+  indexes.forEach((index, position) => {
+    base[index] += cuts[position];
+  });
+}
+
+/** Whole pixels that sum to `total`, weighted. A cap stops a column from taking more than it can give up. */
+function shares(total: number, weights: number[], caps?: number[]): number[] {
+  const out = weights.map(() => 0);
+  let left = Math.max(0, Math.round(total));
+  for (let round = 0; round < weights.length + 2 && left > 0; round += 1) {
+    const active = weights.map((weight, index) => {
+      const cap = caps ? caps[index] : Number.POSITIVE_INFINITY;
+      return { index, weight, room: cap - out[index] };
+    }).filter((item) => item.room > 0 && item.weight > 0);
+    if (!active.length) break;
+    const weight = active.reduce((sum, item) => sum + item.weight, 0);
+    let moved = 0;
+    active.forEach((item, position) => {
+      const raw = position === active.length - 1 ? left - moved : Math.round((left * item.weight) / weight);
+      const add = Math.max(0, Math.min(item.room, raw));
+      out[item.index] += add;
+      moved += add;
+    });
+    if (moved <= 0) break;
+    left -= moved;
+  }
+  return out;
 }
 
 export function prepareRows<Row>(

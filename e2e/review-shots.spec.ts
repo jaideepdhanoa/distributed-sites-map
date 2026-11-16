@@ -70,7 +70,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".pipeline-list");
   if (name !== "mobile") {
-    await expect(page.locator(".pipeline-list thead th")).toHaveCount(9);
+    await expect(page.locator(".pipeline-list thead th")).toHaveCount(10);
     const overflow = await page.locator(".pipeline-list .list-scroll").evaluate((node) => node.scrollWidth - node.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   } else {

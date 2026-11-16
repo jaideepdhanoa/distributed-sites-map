@@ -19,7 +19,7 @@ function activitySourceLink(value: unknown): string {
   return link;
 }
 
-const ALLOWED = new Set(["listing", "brochure", "om", "financials", "photos", "legal", "doc", "visit", "stage"]);
+const ALLOWED = new Set(["listing", "brochure", "om", "financials", "photos", "legal", "doc", "visit", "stage", "capture"]);
 const CATEGORY_ORDER = ["financials", "property_legal", "operations"] as const;
 const CATEGORY_LABELS: Record<(typeof CATEGORY_ORDER)[number], string> = {
   financials: "Financials",
@@ -79,6 +79,7 @@ export type TimelineItem = {
   summary: string;
   eventId: string;
   sourceLink?: string;
+  approximate?: boolean;
 };
 
 export type MaterialCount = {
@@ -114,6 +115,7 @@ function presentItem(row: Record<string, unknown>): TimelineItem | null {
   const item: TimelineItem = { date, type, summary, eventId: String(row.event_id || "") };
   const sourceLink = activitySourceLink(row.source_link ?? row.sourceLink);
   if (sourceLink) item.sourceLink = sourceLink;
+  if (row.at_approximate === true || row.at_approximate === "1" || row.approximate === true) item.approximate = true;
   return item;
 }
 
@@ -137,6 +139,24 @@ function presentMaterials(value: unknown): MaterialCount[] {
     });
   }
   return out;
+}
+
+/** Keep the records and items for these ids. The card reader then walks that set, not the whole file. */
+export function timelineForIds(raw: unknown, ids: string[]): unknown {
+  const wanted = new Set(ids.map((id) => id.trim()).filter(Boolean));
+  const root = asRecord(raw) || {};
+  const records = asRecord(root.records) || {};
+  const nextRecords: Record<string, unknown> = {};
+  for (const id of wanted) {
+    if (records[id]) nextRecords[id] = records[id];
+  }
+  const items = Array.isArray(root.items)
+    ? root.items.filter((item) => {
+        const row = asRecord(item);
+        return Boolean(row && wanted.has(String(row.record_id || "")));
+      })
+    : [];
+  return { ...root, records: nextRecords, items };
 }
 
 export function presentCard(raw: unknown, ids: string[]): TimelineCard {

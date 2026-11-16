@@ -10,6 +10,7 @@ import {
   type CommsLine,
   type MergedLine,
 } from "@/lib/comms";
+import { ACTIVITY_TIMEOUT_MS, activityView } from "@/lib/timeline/load";
 import "./timeline.css";
 
 type Material = { category: string; label: string; count: number; latest: string };
@@ -35,6 +36,7 @@ const LABELS: Record<string, string> = {
   doc: "Document",
   visit: "Visit",
   stage: "Stage",
+  capture: "Capture",
   bring_back: "Brought back",
   drop_suggested: "Suggested drop",
   drop: "Dropped",
@@ -84,44 +86,56 @@ function commsLine(item: MergedLine, index: number) {
   );
 }
 
-const ACTIVITY_TIMEOUT_MS = 8000;
+async function loadPart<T>(url: string, signal: AbortSignal, accept: (body: T) => boolean): Promise<T> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error("activity");
+  const body = (await response.json()) as T;
+  if (!accept(body)) throw new Error("activity");
+  return body;
+}
 
 export default function Timeline({ recordId, relatedId }: { recordId: string; relatedId?: string }) {
   const [timeline, setTimeline] = useState<TimelinePayload | null>(null);
   const [comms, setComms] = useState<CommsPayload | null>(null);
   const [showInternal, setShowInternal] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [pending, setPending] = useState(true);
+  const [timelineError, setTimelineError] = useState(false);
+  const [commsError, setCommsError] = useState(false);
 
   useEffect(() => {
     let cancel = false;
     setTimeline(null);
     setComms(null);
     setShowInternal(false);
-    setFailed(false);
+    setPending(true);
+    setTimelineError(false);
+    setCommsError(false);
     const query = new URLSearchParams({ id: recordId });
     if (relatedId) query.set("related", relatedId);
     async function load() {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), ACTIVITY_TIMEOUT_MS);
+      if (!cancel) setPending(true);
+      const timelineAbort = new AbortController();
+      const commsAbort = new AbortController();
+      const timer = window.setTimeout(() => {
+        timelineAbort.abort();
+        commsAbort.abort();
+      }, ACTIVITY_TIMEOUT_MS);
       try {
-        const [timelineResponse, commsResponse] = await Promise.all([
-          fetch(`/api/data/timeline?${query}`, { signal: controller.signal }),
-          fetch(`/api/data/comms?${query}`, { signal: controller.signal }),
+        const [timelineResult, commsResult] = await Promise.allSettled([
+          loadPart<TimelinePayload>(`/api/data/timeline?${query}`, timelineAbort.signal, () => true),
+          loadPart<CommsPayload>(`/api/data/comms?${query}`, commsAbort.signal, (body) => Array.isArray(body?.rows)),
         ]);
-        if (!timelineResponse.ok || !commsResponse.ok) throw new Error("activity");
-        const nextTimeline = (await timelineResponse.json()) as TimelinePayload;
-        const nextComms = (await commsResponse.json()) as CommsPayload;
         if (cancel) return;
-        setFailed(false);
-        setTimeline(nextTimeline);
-        setComms(nextComms && Array.isArray(nextComms.rows) ? nextComms : null);
-      } catch {
-        if (!cancel) {
-          setFailed(true);
-          setTimeline({});
-          setComms(null);
-        }
+        const view = activityView({
+          timeline: timelineResult.status === "fulfilled" ? { ok: true, value: timelineResult.value } : { ok: false },
+          comms: commsResult.status === "fulfilled" ? { ok: true, value: commsResult.value } : { ok: false },
+        });
+        setTimeline(view.timeline);
+        setComms(view.comms);
+        setTimelineError(view.timelineError);
+        setCommsError(view.commsError);
       } finally {
+        if (!cancel) setPending(false);
         window.clearTimeout(timer);
       }
     }
@@ -145,14 +159,15 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
   });
   const folderUrl = timeline?.folderUrl || "";
   const lastTouched = timeline?.lastTouched || "";
-  const empty = timeline !== null && !folderUrl && materials.length === 0 && !lastTouched && merged.length === 0;
+  const empty = !pending && !timelineError && !commsError && !folderUrl && materials.length === 0 && !lastTouched && merged.length === 0;
 
   return (
     <section className="tl" data-testid="activity">
       <h3>Activity</h3>
-      {timeline === null ? <p className="note">Loading activity.</p> : null}
-      {failed ? <p className="note" role="alert" data-testid="activity-error">Activity could not be loaded. Try this site again.</p> : null}
-      {empty && !failed ? <p className="note">No activity on file yet.</p> : null}
+      {pending ? <p className="note">Loading activity.</p> : null}
+      {timelineError ? <p className="note" role="alert" data-testid="activity-timeline-error">Activity could not be loaded. Try this site again.</p> : null}
+      {commsError ? <p className="note" role="alert" data-testid="activity-comms-error">Comms could not be loaded. Try this site again.</p> : null}
+      {empty ? <p className="note" data-testid="activity-gap">No activity or comms are on file for this site.</p> : null}
       {internalRows.length ? (
         <label className="tl-toggle">
           <input

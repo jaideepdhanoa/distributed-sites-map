@@ -59,6 +59,7 @@ export type ActivityInput = {
   summary: string;
   eventId: string;
   sourceLink?: string;
+  approximate?: boolean;
 };
 
 export type MergedLine = {
@@ -208,13 +209,47 @@ export function counterparty(line: { person: string; firm: string }): string {
   return [line.person.trim(), line.firm.trim()].filter(Boolean).join(" · ");
 }
 
-export function linesForSites(snapshot: CommsSnapshot, ids: string[]): CommsLine[] {
-  const wanted = new Set(ids.map((id) => id.trim().toUpperCase()).filter(Boolean));
-  const out: CommsLine[] = [];
-  const seen = new Set<string>();
-  for (const row of snapshot.rows || []) {
+function scanRows(rows: CommsRecord[], wanted: Set<string>): CommsRecord[] {
+  const out: CommsRecord[] = [];
+  for (const row of rows) {
     const tokens = siteTokens(text(row.site_ids));
     if (!tokens.some((id) => wanted.has(id))) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+/** Rows for the requested sites. The site index avoids scanning every comms row. */
+export function rowsForSites(snapshot: CommsSnapshot, ids: string[]): CommsRecord[] {
+  const wanted = new Set(ids.map((id) => id.trim().toUpperCase()).filter(Boolean));
+  const rows = snapshot.rows || [];
+  if (!wanted.size) return [];
+  const index = snapshot.sites;
+  if (!index || !Object.keys(index).length) return scanRows(rows, wanted);
+  const commsIds = new Set<string>();
+  for (const id of wanted) {
+    for (const commsId of index[id] || []) commsIds.add(commsId);
+  }
+  if (!commsIds.size) return scanRows(rows, wanted);
+  const found = rows.filter((row) => commsIds.has(row.comms_id));
+  if (found.length !== commsIds.size) return scanRows(rows, wanted);
+  return found;
+}
+
+export function commsSnapshotForIds(snapshot: CommsSnapshot, ids: string[]): CommsSnapshot {
+  const rows = rowsForSites(snapshot, ids);
+  const wanted = new Set(ids.map((id) => id.trim().toUpperCase()).filter(Boolean));
+  const sites: Record<string, string[]> = {};
+  for (const [site, list] of Object.entries(snapshot.sites || {})) {
+    if (wanted.has(site.trim().toUpperCase())) sites[site] = list;
+  }
+  return { ...snapshot, rows, sites };
+}
+
+export function linesForSites(snapshot: CommsSnapshot, ids: string[]): CommsLine[] {
+  const out: CommsLine[] = [];
+  const seen = new Set<string>();
+  for (const row of rowsForSites(snapshot, ids)) {
     const line = toCommsLine(row);
     if (!line.commsId || seen.has(line.commsId)) continue;
     seen.add(line.commsId);
@@ -307,7 +342,7 @@ function activityLine(item: ActivityInput): MergedLine {
     firm: "",
     channel: "",
     href: "",
-    approximate: false,
+    approximate: item.approximate === true,
   };
 }
 
@@ -345,6 +380,15 @@ export function mergeActivity(
     return true;
   });
   const activityById = new Map(activity.filter((item) => item.eventId).map((item) => [item.eventId, item]));
+  const activityByGmail = new Map<string, string[]>();
+  for (const item of activity) {
+    if (!item.eventId) continue;
+    const gmail = messageKey(item.sourceLink || "", "");
+    if (!gmail) continue;
+    const list = activityByGmail.get(gmail);
+    if (list) list.push(item.eventId);
+    else activityByGmail.set(gmail, [item.eventId]);
+  }
   const hide = new Set<string>();
   const kept: CommsLine[] = [];
   const seenMessages = new Set<string>();
@@ -352,11 +396,7 @@ export function mergeActivity(
     const gmail = messageKey(line.href || "", line.messageId);
     if (gmail && seenMessages.has(gmail)) continue;
     const cited = line.citedEventIds.filter((id) => activityById.has(id));
-    const gmailHit = gmail
-      ? activity
-          .filter((item) => item.eventId && messageKey(item.sourceLink || "", "") === gmail)
-          .map((item) => item.eventId)
-      : [];
+    const gmailHit = gmail ? activityByGmail.get(gmail) || [] : [];
     const overlap = [...new Set([...cited, ...gmailHit])];
     if (overlap.length && !line.summary.trim() && !line.href) continue;
     if (gmail) seenMessages.add(gmail);

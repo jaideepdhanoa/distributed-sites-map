@@ -20,6 +20,7 @@ MAP_TYPES = {
     "doc",
     "visit",
     "stage",
+    "capture",
 }
 
 

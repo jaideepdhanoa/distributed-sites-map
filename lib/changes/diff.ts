@@ -1,4 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
+import { activityGapHashes, formatActivityGaps } from "./activityGap";
 import { importEntityFromWorkbook, type ShadowEntity } from "./flags";
 import { SITE_COMPARE_FIELDS, SITE_FIELDS, emptySiteFields, isTruncatedCell, losesSheetDate, parseSheet, photoCanonical, photosFromCanonical, sameSheetDate, sheetCanonical, shortHash, siteComparable, type SiteRow } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
@@ -20,6 +21,8 @@ export type DiffReport = {
   clean_by_entity: { stage: boolean; activity: boolean; comms: boolean; site: boolean };
   cut_over: ShadowEntity[];
   legacy_stages: string[];
+  /** Hashed site ids with neither an activity row nor a comms row. */
+  activity_gaps: { count: number; hashes: string[] };
   invalid: { stage: RowIssue[]; activity: RowIssue[]; comms: RowIssue[]; site: RowIssue[] };
   entities: { stage: EntityDiff; activity: EntityDiff; comms: EntityDiff; site: EntityDiff };
 };
@@ -210,12 +213,14 @@ export function buildReport(workbook: WorkbookSlice, database: WorkbookSlice, wo
     site: entityClean(entities.site, invalid.site),
   };
   const clean = clean_by_entity.stage && clean_by_entity.activity && clean_by_entity.comms && clean_by_entity.site;
+  const gapHashes = activityGapHashes(database);
   return {
     workbook_source: workbookSource,
     clean,
     clean_by_entity,
     cut_over: cutOver,
     legacy_stages: legacyStageIds(workbook),
+    activity_gaps: { count: gapHashes.length, hashes: gapHashes },
     invalid,
     entities,
   };
@@ -404,6 +409,8 @@ export function renderReport(report: DiffReport): string {
     if (row.extra.length > 20) lines.push(`- and ${row.extra.length - 20} more extra in the artifact`);
     lines.push("");
   }
+  const gaps = formatActivityGaps(report.activity_gaps.hashes);
+  if (gaps) lines.push(gaps, "");
   return `${lines.join("\n")}\n`;
 }
 

@@ -48,6 +48,8 @@ export type StagePayload = {
   market: Market;
   service_area_class?: ServiceAreaClass | "";
   reason?: string;
+  /** Exact ISO-8601 time with a numeric zone offset. R-101. */
+  at?: string;
 };
 
 export type ActivityPayload = {
@@ -58,6 +60,8 @@ export type ActivityPayload = {
   type: ActivityType;
   summary: string;
   source_link?: string;
+  /** The workbook date had no clock. The calendar day is still exact. */
+  at_approximate?: boolean;
 };
 
 export type CommsPayload = {
@@ -125,6 +129,7 @@ const stagePayload = z
     market: z.enum(MARKETS),
     service_area_class: z.enum(SERVICE_AREA_CLASSES).optional(),
     reason: z.string().trim().max(500).optional(),
+    at: z.string().trim().min(1).max(40).optional(),
   })
   .strict();
 
@@ -134,6 +139,7 @@ const activityPayload = z
     type: z.enum(ACTIVITY_TYPES),
     summary: z.string().trim().min(1).max(300),
     source_link: z.string().trim().max(500).optional(),
+    at_approximate: z.boolean().optional(),
   })
   .strict();
 
@@ -301,6 +307,15 @@ function fail(index: number | null, path: string, code: string): never {
 
 const ZONED_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 
+/** Local clock as an ISO-8601 timestamp with a numeric zone offset. R-101. */
+export function formatZonedTimestamp(date = new Date()): string {
+  const pad = (value: number, width = 2) => String(Math.trunc(Math.abs(value))).padStart(width, "0");
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absolute = Math.abs(offsetMinutes);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}${sign}${pad(Math.trunc(absolute / 60))}:${pad(absolute % 60)}`;
+}
+
 /** An ISO-8601 timestamp that names a real calendar day and a numeric zone offset. */
 export function parseZonedTimestamp(value: string): { iso: string; date: string } | null {
   const text = value.trim();
@@ -384,7 +399,16 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       const data = parsedPayload.data;
       cleanText(data.reason);
       assertStageActor(actor, index, data.stage, data.reason);
-      return { ...row, payload: data };
+      let at: string | undefined;
+      if (data.at) {
+        const zoned = parseZonedTimestamp(data.at);
+        if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+        at = zoned.iso;
+      }
+      const payload = { ...data };
+      if (at) payload.at = at;
+      else delete payload.at;
+      return { ...row, payload };
     }
     if (row.entity_type === "activity") {
       const parsedPayload = activityPayload.safeParse(row.payload);
@@ -397,7 +421,7 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
       cleanText(data.summary);
       cleanText(data.source_link);
-      assertContentActor(actor, index);
+      assertActivityActor(actor, index, data.type);
       return { ...row, payload: { ...data, date: zoned.date, date_iso: zoned.iso } };
     }
     if (row.entity_type === "pnl_line") {
@@ -463,15 +487,25 @@ function parsePnlLine(actor: Actor, index: number, siteId: string, payload: unkn
 }
 
 function assertStageActor(actor: Actor, index: number, stage: string, reason: string | undefined): void {
-  // R-097. A drop is a reviewer decision with a reason. Agents cannot make it.
-  if (stage === "Dropped" && actor.kind !== "human") {
+  // R-097. A drop is a reviewer decision with a reason. Agents cannot make it,
+  // and nothing in the capture path may set Dropped on its own.
+  if (stage === "Dropped" && (actor.kind !== "human" || actor.id === "system")) {
     throw new InputError(`Change ${index + 1}: An agent cannot set Stage to Dropped.`);
-  }
-  if (actor.kind !== "human" || !actor.role || !canDecide(actor.role)) {
-    throw new InputError(`Change ${index + 1}: Stage changes need a reviewer.`, 403);
   }
   if (stage === "Dropped" && !reason?.trim()) {
     throw new InputError(`Change ${index + 1}: Stage Dropped needs a reason.`);
+  }
+  if (actor.id === "system") return;
+  if (actor.kind !== "human" || !actor.role || !canDecide(actor.role)) {
+    throw new InputError(`Change ${index + 1}: Stage changes need a reviewer.`, 403);
+  }
+}
+
+function assertActivityActor(actor: Actor, index: number, type: string): void {
+  assertContentActor(actor, index);
+  // Capture rows are Muse's activity write. Other agent tokens stay on their own fields.
+  if (type === "capture" && actor.kind === "agent" && actor.id !== "muse") {
+    throw new InputError(`Change ${index + 1}: An agent cannot write that activity.`, 403);
   }
 }
 

@@ -7,9 +7,9 @@ import { overlayTimeline } from "@/lib/changes/read";
 import { presentCard, showActivityLines, type TimelineItem } from "@/lib/timeline/filter";
 import { mergeBringBackHistory } from "@/lib/timeline/history";
 
-async function readTimeline(): Promise<unknown> {
+async function readTimeline(ids: string[]): Promise<unknown> {
   try {
-    return overlayTimeline(readGenerated("timeline.json"));
+    return overlayTimeline(readGenerated("timeline.json"), ids);
   } catch {
     return { records: {}, items: [] };
   }
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   if (!isSession(session)) return session;
   const url = new URL(request.url);
   const ids = [url.searchParams.get("id") || "", url.searchParams.get("related") || ""];
-  const card = presentCard(await readTimeline(), ids);
+  const card = presentCard(await readTimeline(ids), ids);
   const items = await activityItems(card.items, ids);
   return NextResponse.json({ ...card, items, showActivityLines: showActivityLines() }, { headers: privateHeaders });
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
 const TABS = [
   ["overview", "Summary"],
@@ -69,15 +70,19 @@ export default function PanelSections({
   }, [site, panel, tab]);
   function chooseTab(id: TabId) {
     setTab(id);
-    const next = new URLSearchParams(window.location.search);
-    next.delete("q");
-    next.delete("msg");
-    if (id === "overview") next.delete("panel");
-    else next.set("panel", id);
-    const href = next.toString() ? `/?${next.toString()}` : "/";
-    window.history.replaceState(null, "", href);
-    router.replace(href, { scroll: false });
   }
+  useEffect(() => {
+    const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
+    const shown = next.get("panel") || "overview";
+    if (shown === tab && (tab === "activity" || !next.get("msg"))) return;
+    next.delete("q");
+    if (tab !== "activity") next.delete("msg");
+    if (tab === "overview") next.delete("panel");
+    else next.set("panel", tab);
+    const href = next.toString() ? `/?${next.toString()}` : "/";
+    rememberSearch(href);
+    router.replace(href, { scroll: false });
+  }, [tab, router]);
   const panels = { overview, numbers, activity, discussion };
   const intel = panel === "intel";
   return (

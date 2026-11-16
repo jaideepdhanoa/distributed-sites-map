@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatActivityWhen } from "@/lib/actions/time";
+import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import {
   counterparty,
   mergeActivity,
@@ -128,12 +129,12 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
   const router = useRouter();
   const msg = params.get("msg") || "";
   function openMessage(id: string) {
-    const next = new URLSearchParams(window.location.search);
+    const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
     next.delete("q");
     next.set("panel", "activity");
     next.set("msg", id);
     const href = `/?${next.toString()}`;
-    window.history.replaceState(null, "", href);
+    rememberSearch(href);
     router.replace(href, { scroll: false });
   }
   const [commsError, setCommsError] = useState(false);

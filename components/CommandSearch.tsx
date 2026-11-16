@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { rememberSearch } from "@/lib/navSearch";
 import type { PaletteGroups, PaletteHit } from "@/lib/search/palette";
 
 type Groups = PaletteGroups;
@@ -52,6 +53,7 @@ export default function CommandSearch({
 
   function choose(hit: PaletteHit) {
     const href = openPath(hit);
+    rememberSearch(href);
     onClose();
     router.push(href);
   }

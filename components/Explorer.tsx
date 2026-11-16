@@ -48,6 +48,7 @@ import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
 import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
+import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import { inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "@/lib/reach";
 import { NdaChip } from "./NdaChip";
 import NdaQueue from "./NdaQueue";
@@ -442,7 +443,7 @@ export default function Explorer() {
   }
 
   function write(next: Record<string, string | null>, history = false) {
-    const live = typeof window === "undefined" ? params.toString() : window.location.search;
+    const live = typeof window === "undefined" ? params.toString() : currentSearch();
     const patch = next.site ? { q: null, ...next } : next;
     replaceSearch(live, patch, history);
   }
@@ -462,6 +463,7 @@ export default function Explorer() {
     const query = url.toString();
     // An empty `/?` does not clear a lone search param. `/` does, and it stays a client navigation.
     const href = query ? `/?${query}` : "/";
+    rememberSearch(href);
     if (history) router.push(href, { scroll: false });
     else router.replace(href, { scroll: false });
   }

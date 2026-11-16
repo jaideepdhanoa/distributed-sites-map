@@ -63,6 +63,22 @@ export function droppedStage(stageGroup?: string | null, stage?: string | null):
 
 export type EmptyNextStepAction = { id: NextStepTypeId; prominent: boolean };
 
+/**
+ * Card-level Bring back. Hidden while an open proposal is on the card, so the
+ * proposal block does not offer a stage change. The empty card still does.
+ */
+export function showCardBringBack(input: {
+  stageGroup?: string | null;
+  stage?: string | null;
+  openProposal: boolean;
+  composingBringBack: boolean;
+  approvedDetail?: string | null;
+}): boolean {
+  if (input.openProposal || input.composingBringBack) return false;
+  if (!droppedStage(input.stageGroup, input.stage)) return false;
+  return nextStepType(input.approvedDetail) !== "bring_back";
+}
+
 /** On a dropped site, Bring back is the primary empty-state action. */
 export function emptyNextStepActions(stageGroup?: string | null, stage?: string | null): EmptyNextStepAction[] {
   if (droppedStage(stageGroup, stage)) {

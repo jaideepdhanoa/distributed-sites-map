@@ -328,26 +328,33 @@ async function closeResolvedBlockers(sql: Sql, lookup: RecordLookup): Promise<vo
 }
 
 async function signalMissing(sql: Sql, lookup: RecordLookup): Promise<void> {
-  const rows = await sql.query<WaitingRow & { status: string; decided_by: string | null; decision_note: string | null }>(
+  const rows = await sql.query<WaitingRow & {
+    status: string;
+    decided_by: string | null;
+    decision_note: string | null;
+    closed_by: string | null;
+    close_reason: string | null;
+  }>(
     `SELECT s.id, s.target_kind, s.target_id, s.field_name, s.detail, s.title, s.proposed_value, s.reason, s.author_id,
-            s.status, s.decided_by, s.decision_note
+            s.status, s.decided_by, s.decision_note, s.closed_by, s.close_reason
      FROM suggestions s
-     WHERE s.status IN ('ready', 'overtaken')
+     WHERE s.status IN ('ready', 'overtaken', 'superseded')
        AND NOT EXISTS (
          SELECT 1 FROM agent_inbox i
          WHERE i.idempotency_key = CASE
            WHEN s.status = 'ready' THEN 'proposal_ready:' || s.id
+           WHEN s.status = 'superseded' THEN 'proposal_closed:' || s.id
            ELSE 'proposal_overtaken:' || s.id
          END
        )`,
   );
   for (const row of rows.rows) {
-    const kind = row.status === "ready" ? "proposal_ready" : "proposal_overtaken";
+    const kind = row.status === "ready" ? "proposal_ready" : row.status === "superseded" ? "proposal_closed" : "proposal_overtaken";
     await ingestProposalEvent(sql, {
       kind,
       id: row.id,
-      actorId: kind === "proposal_ready" ? "system" : (row.decided_by || row.author_id),
-      note: row.decision_note || "",
+      actorId: kind === "proposal_ready" ? "system" : (row.closed_by || row.decided_by || row.author_id),
+      note: kind === "proposal_closed" ? (row.close_reason || row.decision_note || "") : (row.decision_note || ""),
       siteId: siteKey(row.target_kind, row.target_id, lookup),
       recordId: row.target_id,
       field: row.field_name,

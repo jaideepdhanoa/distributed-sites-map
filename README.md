@@ -105,6 +105,14 @@ Preview deployments get their own Neon branch from the Vercel Neon integration, 
 
 Stage, activity, comms, and the core site record are stored in Neon. Write them through `POST /api/changes` or the signed-in site. The Pipeline workbook is a read-only mirror of that database. The scheduled sync does not copy sheet edits into Neon, and nothing except the workbook mirror writes the sheet. Production schema changes still go through the Production migrations workflow. Pull-request jobs and preview deployments do not migrate production.
 
+When a site's stage becomes Dropped, each still-open proposal on that site is closed. The assignee or an admin can also close one from the proposal block. That close does not change Stage. Proposals already sitting on Dropped sites are closed by a one-off script. Dry run is the default and prints proposal ids and site ids only:
+
+```
+npx tsx scripts/close-dropped-proposals.ts
+```
+
+Apply needs the confirm phrase, and a production write also needs `ALLOW_CLOSE_DROPPED_PROPOSALS=1` after that dry run has been read. The **Close dropped proposals** workflow is the same job, started by hand on `main`. Previews and pull-request jobs cannot write. Do not run an apply against production from a pull request. Apply migration `020_proposal_close.sql` with the Production migrations workflow before the app writes these closes.
+
 `POST /api/changes` accepts one batch. Send `Idempotency-Key`. Each change has `entity_type` (`stage`, `activity`, `comms`, `site`, or `pnl_line`), `site_id`, `expected_version`, `source`, and `payload`. A new row uses `expected_version: 0` and omits `entity_id`. The server assigns `A-` activity ids, `CM-` comms ids, `PL-` P&L line ids, and `EV-` event ids. A site id is the `PIPE-` or `LAND-` id, not a minted id. An update sends the id the server already assigned and the `version` from the previous response. A mismatch is `409` with `conflicts`, and the whole batch is rolled back. The same key and the same body returns the original ids and does not write again.
 
 A `pnl_line` change stores one captured profit-and-loss line. The first line for a period creates that period. Later lines for the same site, grain, and coverage must use the same business type. The server stores only the lines you send and does not fill a missing month. The sheet may label a total, EBITDA, SDE, or margin as Calculated when that figure is arithmetic on captured lines. Send only figures the package states, normalizes, or estimates. `amount` is a string such as `1000000`, `1000000.5`, or `1000000.50`, stored as sent, not a JSON number. `source_page` is a string. `captured_at` is required, an ISO-8601 time with a numeric offset or `Z`, stored exactly. `status` is `stated`, `reported`, `normalized`, or `estimated`. `stated` is stored as `reported`. A normalized line can sit beside the stated line for the same period. The exact payload, including a fake example for a month, a year, a range, a fiscal year, and a missing month, is in `docs/agent-api.md`. Muse sends `Authorization: Bearer` with `AGENT_WRITE_TOKEN_MUSE`. A contributor or reviewer session can write a line. Indie cannot. The line is not mirrored to the workbook.
@@ -436,22 +444,22 @@ Send `Authorization: Bearer <AGENT_INBOX_SECRET>`. A missing or wrong token is `
 }
 ```
 
-`kind` is `note`, `reply`, `mention`, `suggestion` (with `subtype` for the proposal type, such as `stage_move`), `flag`, `decision`, `ask_gap`, `proposal_ready`, or `proposal_overtaken`. `status` is `new`, `picked`, `done`, or `superseded`. A newer event on the same thread marks older open rows `superseded`. Skip those.
+`kind` is `note`, `reply`, `mention`, `suggestion` (with `subtype` for the proposal type, such as `stage_move`), `flag`, `decision`, `ask_gap`, `proposal_ready`, `proposal_overtaken`, or `proposal_closed`. `status` is `new`, `picked`, `done`, or `superseded`. A newer event on the same thread marks older open rows `superseded`. Skip those.
 
-On `suggestion`, `decision`, `proposal_ready`, and `proposal_overtaken` rows, four fields describe the proposal as it stands now:
+On `suggestion`, `decision`, `proposal_ready`, `proposal_overtaken`, and `proposal_closed` rows, four fields describe the proposal as it stands now:
 
 - `current_stage` is the site's stage on the map.
-- `proposal_outcome` is the live proposal status: `open`, `agreed_waiting`, `ready`, `accepted`, `rejected`, `overtaken`, or `applied`. `proposal_status` stays the status recorded on that event.
+- `proposal_outcome` is the live proposal status: `open`, `agreed_waiting`, `ready`, `accepted`, `rejected`, `overtaken`, `superseded`, or `applied`. `proposal_status` stays the status recorded on that event.
 - `open_blockers` lists blockers that are still open. Each has `id`, `kind` (`document_request`, `checklist`, or `hold`), `label`, `party`, `asked_on`, and `follow_up_on`.
 - `stale` is true when the site's stage changed after the proposal was made. Older proposals with no stored stage are not marked stale.
 
 Other kinds send `current_stage` and `proposal_outcome` as null, `open_blockers` as `[]`, and `stale` as false.
 
-`proposal_ready` is written once, when every blocker linked to an agreed proposal has closed. It does not set `workbook_stage`. `proposal_overtaken` is written once, with the reason, when a proposal is closed because events made it moot. Both use the idempotency key `kind:ref_id`, where `ref_id` is the proposal id.
+`proposal_ready` is written once, when every blocker linked to an agreed proposal has closed. It does not set `workbook_stage`. `proposal_overtaken` is written once, with the reason, when a proposal is closed because events made it moot. `proposal_closed` is written once, with the reason, when an open proposal is closed by its assignee or an admin, or when the site's stage becomes Dropped. Closing a proposal does not change Stage. Each uses the idempotency key `kind:ref_id`, where `ref_id` is the proposal id.
 
 The idempotency key is `kind:ref_id`. Posting the same event twice does not create a second row.
 
-`site_url` is an absolute link to that row on the map. The host is the request host (`x-forwarded-host`, then `Host`). When the request has no host, the link uses `APP_URL`, or `https://distributedsites.com` when that is unset. Notes, replies, and mentions open Discussion (`/?site=ID&panel=discussion`). Suggestions, decisions, `proposal_ready`, and `proposal_overtaken` open the proposal on that site (`/?site=ID&panel=proposal`). Flags open Review on that site (`/?view=review&site=ID`). An `ask_gap` for one site opens that site. `site_id` `portfolio` opens the home map (`/`).
+`site_url` is an absolute link to that row on the map. The host is the request host (`x-forwarded-host`, then `Host`). When the request has no host, the link uses `APP_URL`, or `https://distributedsites.com` when that is unset. Notes, replies, and mentions open Discussion (`/?site=ID&panel=discussion`). Suggestions, decisions, `proposal_ready`, `proposal_overtaken`, and `proposal_closed` open the proposal on that site (`/?site=ID&panel=proposal`). Flags open Review on that site (`/?view=review&site=ID`). An `ask_gap` for one site opens that site. `site_id` `portfolio` opens the home map (`/`).
 
 `next` is the cursor to pass as `after`, or `null` when this page is the end.
 

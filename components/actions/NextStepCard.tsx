@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { canCloseProposal } from "@/lib/actions/proposalClose";
+import { allowsAssignee, allowsDate, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, showCardBringBack, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { stripGmailIds } from "@/lib/displayText";
 import { plainNextStep } from "@/lib/nextStepLine";
 import { stageTitle } from "@/lib/labels";
@@ -150,6 +151,7 @@ export function NextStepCard({
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [decisionRecommendationId, setDecisionRecommendationId] = useState<string | null>(null);
   const [outcome, setOutcome] = useState("accepted");
@@ -280,6 +282,7 @@ export function NextStepCard({
     else if (focus.status === "agreed_waiting") setOutcome("reply");
     else if (nextStepType(focus.detail) === "stage_move") setOutcome("agreed_waiting");
     else setOutcome("accepted");
+    setCloseReason("");
     setDecisionNote("");
     setDecisionRecommendationId(null);
     setHoldLabel("");
@@ -340,6 +343,7 @@ export function NextStepCard({
     setDue("");
     setReassigning(false);
     setDating(false);
+    setCloseReason("");
   }
 
   async function submit(path: string, body: unknown, method = "POST") {
@@ -519,6 +523,24 @@ export function NextStepCard({
             </ul>
           </div>
         ) : null}
+        {canCloseProposal({ actorId: status.username, ownerId: focus.ownerId, admin: reviewer }) ? (
+          <form
+            className="proposal-decide"
+            data-testid="close-proposal"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit(`/api/actions/suggestions/${focus.id}`, { status: "superseded", reason: closeReason });
+            }}
+          >
+            <label>
+              Reason
+              <input className="field" aria-label="Close reason" value={closeReason} onChange={(event) => setCloseReason(event.target.value)} maxLength={200} required />
+            </label>
+            <div className="proposal-send">
+              <button type="submit" className="paper-btn" disabled={pending || !closeReason.trim()}>Close</button>
+            </div>
+          </form>
+        ) : null}
         {siteRecommendations.rows.filter((item) => (item.kind === "decision" || item.kind === "status_reply") && item.proposalId === focus.id).map((item) => (
           <SuggestedBlock
             key={item.id}
@@ -648,7 +670,13 @@ export function NextStepCard({
   }
 
   const tone = open ? "compose" : focus ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved ? "approved" : "empty";
-  const bringBack = droppedStage(stageGroup, recordStage) && !(open && type === "bring_back") && nextStepType(approved?.detail) !== "bring_back";
+  const bringBack = showCardBringBack({
+    stageGroup,
+    stage: recordStage,
+    openProposal: Boolean(focus) && !open,
+    composingBringBack: open && type === "bring_back",
+    approvedDetail: approved?.detail,
+  });
   return (
     <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
       {context}

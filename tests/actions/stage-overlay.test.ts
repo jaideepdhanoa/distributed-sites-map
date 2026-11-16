@@ -340,7 +340,7 @@ test("reconcile marks an accepted stage decision applied only when the workbook 
   };
   assert.equal(await reconcileSuggestions(sql, matched), 1);
   const rows = await sql.query<{ id: string; status: string }>(`SELECT id, status FROM suggestions ORDER BY created_at ASC`);
-  assert.equal(rows.rows.find((row) => row.id === pending.id)?.status, "open");
+  assert.equal(rows.rows.find((row) => row.id === pending.id)?.status, "superseded");
   assert.equal(rows.rows.find((row) => row.id === drop.id)?.status, "applied");
   assert.equal(record.stage, "1 Desk screen");
 });

@@ -27,7 +27,7 @@ import {
   type TargetKind,
 } from "./text";
 
-export type SuggestionStatus = "open" | "accepted" | "rejected" | "applied" | "agreed_waiting" | "ready" | "overtaken";
+export type SuggestionStatus = "open" | "accepted" | "rejected" | "applied" | "agreed_waiting" | "ready" | "overtaken" | "superseded";
 
 export type Suggestion = {
   id: string;

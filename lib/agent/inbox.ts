@@ -7,7 +7,7 @@ import { stamp, type TargetKind } from "@/lib/actions/text";
 import { stageTitle } from "@/lib/labels";
 import { workbookInstruction } from "@/lib/stageOverlay";
 
-export type InboxKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap" | "proposal_ready" | "proposal_overtaken";
+export type InboxKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap" | "proposal_ready" | "proposal_overtaken" | "proposal_closed";
 
 export type FeedBlocker = {
   id: string;
@@ -361,7 +361,7 @@ export async function ingestFlag(
 }
 
 export function proposalEventFeed(input: {
-  kind: "proposal_ready" | "proposal_overtaken";
+  kind: "proposal_ready" | "proposal_overtaken" | "proposal_closed";
   id: string;
   actorId: string;
   note: string;
@@ -381,10 +381,15 @@ export function proposalEventFeed(input: {
       `Ready: ${title}`,
       stageLabel ? `Proposed stage: ${stageLabel} (${input.proposedValue}). The stage stays until it is accepted.` : "The blockers on this proposal are clear.",
     ]
-    : [
-      `Closed, overtaken: ${title}`,
-      input.note ? `Reason: ${input.note}` : "",
-    ].filter(Boolean);
+    : input.kind === "proposal_closed"
+      ? [
+        `Closed: ${title}`,
+        input.note ? `Reason: ${input.note}` : "",
+      ].filter(Boolean)
+      : [
+        `Closed, overtaken: ${title}`,
+        input.note ? `Reason: ${input.note}` : "",
+      ].filter(Boolean);
   return {
     kind: input.kind,
     subtype: input.detail || input.field,
@@ -396,7 +401,7 @@ export function proposalEventFeed(input: {
     threadKey: `proposal:${input.id}`,
     threadContext: [input.title, input.proposedValue, input.reason].filter(Boolean).join("\n"),
     proposalId: input.id,
-    proposalStatus: input.kind === "proposal_ready" ? "ready" : "overtaken",
+    proposalStatus: input.kind === "proposal_ready" ? "ready" : input.kind === "proposal_closed" ? "superseded" : "overtaken",
     createdAt: input.createdAt,
   };
 }
@@ -404,7 +409,7 @@ export function proposalEventFeed(input: {
 export async function ingestProposalEvent(
   sql: Sql,
   input: {
-    kind: "proposal_ready" | "proposal_overtaken";
+    kind: "proposal_ready" | "proposal_overtaken" | "proposal_closed";
     id: string;
     actorId: string;
     note: string;
@@ -514,7 +519,7 @@ export async function ingestAskGap(
   return refId;
 }
 
-const PROPOSAL_KINDS = new Set<InboxKind>(["suggestion", "decision", "proposal_ready", "proposal_overtaken"]);
+const PROPOSAL_KINDS = new Set<InboxKind>(["suggestion", "decision", "proposal_ready", "proposal_overtaken", "proposal_closed"]);
 
 function dayOf(value: Date | string | null | undefined): string | null {
   if (!value) return null;

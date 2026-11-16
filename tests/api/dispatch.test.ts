@@ -55,6 +55,7 @@ const expected = [
   "POST /api/data/revalidate",
   "GET /api/data/sites/:id",
   "GET /api/data/sites",
+  "GET /api/data/spaces",
   "GET /api/data/timeline/summary",
   "GET /api/data/timeline",
   "GET /api/data/unscreened",

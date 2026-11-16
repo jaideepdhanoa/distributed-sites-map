@@ -18,7 +18,8 @@ import {
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { storePnlLine } from "@/lib/pnl/store";
-import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, StagePayload } from "./schema";
+import { storeSiteSpace } from "@/lib/spaces/store";
+import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload } from "./schema";
 import { formatZonedTimestamp, parseZonedTimestamp, validateBatch } from "./schema";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import type { EntityType, Market, ServiceAreaClass } from "./vocab";
@@ -108,8 +109,8 @@ async function tableIdFloor(sql: Sql, name: "activity" | "comms" | "pnl_period" 
   return max;
 }
 
-async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line"): Promise<number> {
-  if (name === "event" || name === "pnl_period" || name === "pnl_line") {
+async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space"): Promise<number> {
+  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space") {
     const result = await sql.query<{ value: number | string }>(
       `INSERT INTO id_counters (name, value)
        VALUES ($1, 1)
@@ -132,11 +133,12 @@ async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period
   return next;
 }
 
-export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line", value: number): string {
+export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space", value: number): string {
   if (kind === "activity") return `A-${String(value).padStart(6, "0")}`;
   if (kind === "comms") return `CM-${String(value).padStart(4, "0")}`;
   if (kind === "pnl_period") return `PP-${String(value).padStart(6, "0")}`;
   if (kind === "pnl_line") return `PL-${String(value).padStart(6, "0")}`;
+  if (kind === "site_space") return `SS-${String(value).padStart(6, "0")}`;
   return `EV-${String(value).padStart(8, "0")}`;
 }
 
@@ -149,9 +151,16 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
     );
     return result.rows[0] ? Number(result.rows[0].version) : 0;
   }
-  const table = change.entity_type === "activity" ? "activities" : change.entity_type === "pnl_line" ? "pnl_lines" : "comms_entries";
+  const table = change.entity_type === "activity"
+    ? "activities"
+    : change.entity_type === "pnl_line"
+      ? "pnl_lines"
+      : change.entity_type === "site_space"
+        ? "site_spaces"
+        : "comms_entries";
+  const column = change.entity_type === "site_space" ? "id" : "entity_id";
   const result = await sql.query<{ version: number | string }>(
-    `SELECT version FROM ${table} WHERE entity_id = $1`,
+    `SELECT version FROM ${table} WHERE ${column} = $1`,
     [change.entity_id],
   );
   return result.rows[0] ? Number(result.rows[0].version) : 0;
@@ -564,7 +573,13 @@ async function applyOne(
   const siteKeyed = change.entity_type === "stage" || change.entity_type === "site";
   const lock = siteKeyed ? `${change.entity_type}:${change.site_id}` : `${change.entity_type}:${change.entity_id || "new"}`;
   await lockKey(sql, lock);
-  const mintedKind = change.entity_type === "comms" ? "comms" : change.entity_type === "pnl_line" ? "pnl_line" : "activity";
+  const mintedKind = change.entity_type === "comms"
+    ? "comms"
+    : change.entity_type === "pnl_line"
+      ? "pnl_line"
+      : change.entity_type === "site_space"
+        ? "site_space"
+        : "activity";
   const entityId = siteKeyed
     ? change.site_id
     : change.preserve_id && change.entity_id
@@ -596,6 +611,25 @@ async function applyOne(
     });
     if (!written.ok) throw conflict(change, written.entityId, written.actual);
     payload = written.payload;
+  } else if (change.entity_type === "site_space") {
+    const space = change.payload as SiteSpacePayload;
+    payload = await storeSiteSpace(sql, {
+      siteId: change.site_id,
+      entityId,
+      actorId: actor.id,
+      version,
+      deleted: space.deleted === true,
+      box: space.deleted
+        ? undefined
+        : {
+            center: { lng: space.center_lng, lat: space.center_lat },
+            lengthFt: space.length_ft,
+            widthFt: space.width_ft,
+            rotationDeg: space.rotation_deg,
+          },
+      type: space.deleted ? undefined : space.type,
+      layout: space.deleted ? undefined : space.layout,
+    });
   } else {
     payload = await writeComms(sql, change, entityId, actor.id, version);
   }

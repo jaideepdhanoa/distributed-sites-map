@@ -9,8 +9,10 @@ import { recordAppEvent } from "@/lib/queue/events";
 import { fileLookup, type RecordLookup } from "./records";
 import { permanentSiteId } from "./suggestions";
 import { InputError, parseBody, parseTarget, stamp, type TargetKind } from "./text";
+import { isExcludedSite } from "@/lib/alerts/excluded";
+import { SPACE_ID } from "@/lib/spaces/vocab";
 
-export type ThreadKind = TargetKind | "suggestion";
+export type ThreadKind = TargetKind | "suggestion" | "site_space";
 
 export type Note = {
   id: string;
@@ -69,6 +71,12 @@ async function withMentions(sql: Sql, notes: Note[]): Promise<Note[]> {
 }
 
 async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): Promise<string> {
+  if (targetKind === "site_space") {
+    const found = await sql.query<{ site_id: string }>(`SELECT site_id FROM site_spaces WHERE id = $1`, [targetId]);
+    const siteId = found.rows[0]?.site_id || "";
+    if (!siteId || isExcludedSite(siteId)) throw new InputError("That space is not on a site.", 404);
+    return siteId;
+  }
   if (targetKind === "suggestion") {
     const found = await sql.query<{ target_kind: "site" | "deal"; target_id: string }>(
       `SELECT target_kind, target_id FROM suggestions WHERE id = $1`,
@@ -110,6 +118,12 @@ export async function createNote(
     const found = await sql.query(`SELECT id FROM suggestions WHERE id = $1`, [target]);
     if (!found.rows.length) throw new InputError("That proposal is not in the queue.", 404);
     if (parentId) throw new InputError("Replies on a proposal stay one level deep.");
+    targetId = target;
+  } else if (targetKind === "site_space") {
+    const target = String(targetId || "").trim();
+    if (!SPACE_ID.test(target)) throw new InputError("That record id is not valid.");
+    const found = await sql.query(`SELECT id FROM site_spaces WHERE id = $1`, [target]);
+    if (!found.rows.length) throw new InputError("That space is not on the map.", 404);
     targetId = target;
   } else {
     const target = parseTarget(targetKind, targetId);

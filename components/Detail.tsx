@@ -494,7 +494,7 @@ export default function Detail({
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
-      <SitePhotos card={photos} />
+      <SitePhotos card={photos} siteId={site.site_id} lat={lat} lng={lng} signedIn={signedIn} />
       <NextStepCard
         kind="site"
         id={site.site_id}
@@ -774,7 +774,7 @@ export function DealDetail({
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
-      <SitePhotos card={photos} />
+      <SitePhotos card={photos} siteId={deal.deal_id} lat={lat} lng={lng} signedIn={signedIn} />
       <NextStepCard
         kind="deal"
         id={deal.deal_id}

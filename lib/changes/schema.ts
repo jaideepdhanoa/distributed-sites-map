@@ -22,6 +22,7 @@ import {
   type SiteField,
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
+import { SPACE_LAYOUT_IDS, SPACE_TYPE_IDS, spaceSiteAllowed, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
 import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
 import {
@@ -112,6 +113,19 @@ export type PnlLinePayload = {
   captured_at: string;
 };
 
+export type SiteSpacePayload =
+  | { deleted: true }
+  | {
+      deleted?: false;
+      center_lng: number;
+      center_lat: number;
+      length_ft: number;
+      width_ft: number;
+      rotation_deg: number;
+      type: SpaceType;
+      layout: SpaceLayout;
+    };
+
 export type ParsedChange = {
   entity_type: EntityType;
   site_id: string;
@@ -120,7 +134,7 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | SiteSpacePayload;
 };
 
 const stagePayload = z
@@ -259,9 +273,22 @@ function guardKey(key: string): boolean {
   return GUARD_KEYS.has(norm);
 }
 
+const siteSpacePayload = z
+  .object({
+    center_lng: z.number().finite().optional(),
+    center_lat: z.number().finite().optional(),
+    length_ft: z.number().finite().optional(),
+    width_ft: z.number().finite().optional(),
+    rotation_deg: z.number().finite().optional(),
+    type: z.enum(SPACE_TYPE_IDS).optional(),
+    layout: z.enum(SPACE_LAYOUT_IDS).optional(),
+    deleted: z.literal(true).optional(),
+  })
+  .strict();
+
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space"]),
     site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -384,7 +411,14 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_id && row.entity_type === "pnl_line" && !/^PL-\d{4,}$/.test(row.entity_id)) {
       throw new InputError(`Change ${index + 1}: That record id is not valid.`);
     }
-    const siteAllowed = row.entity_type === "comms" ? commsSiteAllowed(row.site_id) : SITE_ID.test(row.site_id);
+    if (row.entity_id && row.entity_type === "site_space" && !/^SS-\d{4,}$/.test(row.entity_id)) {
+      throw new InputError(`Change ${index + 1}: That record id is not valid.`);
+    }
+    const siteAllowed = row.entity_type === "comms"
+      ? commsSiteAllowed(row.site_id)
+      : row.entity_type === "site_space"
+        ? spaceSiteAllowed(row.site_id)
+        : SITE_ID.test(row.site_id);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
     if (row.entity_type === "site") {
@@ -426,6 +460,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     }
     if (row.entity_type === "pnl_line") {
       return { ...row, payload: parsePnlLine(actor, index, row.site_id, row.payload) };
+    }
+    if (row.entity_type === "site_space") {
+      return { ...row, payload: parseSiteSpace(actor, index, row.site_id, row.expected_version, row.payload) };
     }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
@@ -484,6 +521,53 @@ function parsePnlLine(actor: Actor, index: number, siteId: string, payload: unkn
   cleanText(data.source_href);
   cleanText(data.amount);
   return { ...data, captured_at: zoned.iso, source_href: data.source_href || "" };
+}
+
+function assertSpaceActor(actor: Actor, index: number): void {
+  if (actor.kind !== "human" || !actor.role) {
+    throw new InputError(`Change ${index + 1}: A person marks a space.`, 403);
+  }
+}
+
+function parseSiteSpace(actor: Actor, index: number, siteId: string, expectedVersion: number, payload: unknown): SiteSpacePayload {
+  if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
+  assertSpaceActor(actor, index);
+  const parsedPayload = siteSpacePayload.safeParse(payload);
+  if (!parsedPayload.success) {
+    const issue = parsedPayload.error.issues[0];
+    fail(index, issue.path.map(String).join("."), issue.code);
+  }
+  const data = parsedPayload.data;
+  if (data.deleted) {
+    if (expectedVersion === 0) throw new InputError(`Change ${index + 1}: A new space cannot be deleted.`);
+    return { deleted: true };
+  }
+  const centerLng = data.center_lng;
+  const centerLat = data.center_lat;
+  const lengthFt = data.length_ft;
+  const widthFt = data.width_ft;
+  const rotation = data.rotation_deg;
+  if (centerLng == null || centerLat == null || lengthFt == null || widthFt == null || rotation == null || !data.type || !data.layout) {
+    throw new InputError(`Change ${index + 1}: A marked space needs a rectangle, a type, and a layout.`);
+  }
+  if (centerLat < 24 || centerLat > 42 || centerLng < -125 || centerLng > -70) {
+    throw new InputError(`Change ${index + 1}: That rectangle is outside the mapped markets.`);
+  }
+  if (lengthFt < 4 || lengthFt > 2000 || widthFt < 4 || widthFt > 2000) {
+    throw new InputError(`Change ${index + 1}: Each side must be between 4 and 2,000 feet.`);
+  }
+  if (rotation < -360 || rotation > 360) {
+    throw new InputError(`Change ${index + 1}: Rotation is degrees, from -360 to 360.`);
+  }
+  return {
+    center_lng: centerLng,
+    center_lat: centerLat,
+    length_ft: lengthFt,
+    width_ft: widthFt,
+    rotation_deg: rotation,
+    type: data.type,
+    layout: data.layout,
+  };
 }
 
 function assertStageActor(actor: Actor, index: number, stage: string, reason: string | undefined): void {

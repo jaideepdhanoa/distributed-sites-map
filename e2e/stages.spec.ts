@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { isProtectedId } from "../lib/protectedSite";
 
 const username = process.env.E2E_USERNAME || "";
 const password = process.env.E2E_PASSWORD || "";
@@ -25,7 +26,9 @@ test("API stage counts match the workbook", async ({ page }) => {
     rows: { deal_id: string; stage: string }[];
   };
   const features = deals.features as { properties: { deal_id: string; kind: string; stage: string } }[];
-  const expected = new Map(index.rows.map((row) => [row.deal_id, row.stage]));
+  const rows = (index.rows as { deal_id: string; kind?: string; stage: string }[]).filter((row) => !isProtectedId(row.deal_id));
+  const expected = new Map(rows.map((row) => [row.deal_id, row.stage]));
+  expect(features.some((feature) => isProtectedId(feature.properties.deal_id))).toBe(false);
   for (const feature of features) {
     expect(feature.properties.stage).toBe(expected.get(feature.properties.deal_id));
   }
@@ -37,7 +40,15 @@ test("API stage counts match the workbook", async ({ page }) => {
     }
     return totals;
   };
-  expect(count("pipeline")).toEqual(index.pipeline);
-  expect(count("land")).toEqual(index.land);
+  const workbookCount = (kind: string) => {
+    const totals: Record<string, number> = {};
+    for (const row of rows) {
+      if (row.kind !== kind) continue;
+      totals[row.stage] = (totals[row.stage] || 0) + 1;
+    }
+    return totals;
+  };
+  expect(count("pipeline")).toEqual(workbookCount("pipeline"));
+  expect(count("land")).toEqual(workbookCount("land"));
   await expect(page.locator("body")).toContainText(`Data as of ${JSON.parse(readFileSync("data/generated/funnel.json", "utf8")).workbook_as_of}`);
 });

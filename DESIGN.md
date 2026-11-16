@@ -43,9 +43,9 @@ A `<select>` uses class `secondary`: fill `#fffdf8`, 1px `#d6cebe`, radius 999, 
 
 A text field uses class `field`: fill `#fffdf8`, 1px `#d6cebe`, radius 8px, and the focus ring. Search keeps class `search`.
 
-The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. The phone pipeline list also has a Sort `secondary` select, because the table headers are not on screen. Each phone row has a Show on map `text-link`.
+The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click cycles ascending, descending, then list order. The same header holds a reorder grip, a resize edge, a filter field, and a pin control, each a `sort-header` or a `check` / `field` inside the column menu. The phone list keeps the Sort `secondary` select and a Show on map `text-link`. On a phone the sheet shows fewer columns, scrolls sideways, and keeps the first column pinned.
 
-Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle.
+Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle. On a desktop the list sits beside the map, and panning that map filters the rows. On a phone, Search this area applies the map the person was just looking at.
 
 ## Panel header
 

@@ -45,6 +45,7 @@ import * as timelineSummary from "@/lib/api/handlers/data/timeline-summary";
 import * as unscreened from "@/lib/api/handlers/data/unscreened";
 import * as login from "@/lib/api/handlers/login";
 import * as logout from "@/lib/api/handlers/logout";
+import * as listLayout from "@/lib/api/handlers/list/layout";
 import * as me from "@/lib/api/handlers/me";
 import * as queue from "@/lib/api/handlers/queue";
 import * as queueFlag from "@/lib/api/handlers/queue/flag";
@@ -118,6 +119,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/ask/status", { GET: askStatus.GET as Handler }),
   route("/api/ask", { POST: ask.POST as Handler }),
   route("/api/changes", { POST: changes.POST as Handler }),
+  route("/api/list/layout", { GET: listLayout.GET as Handler, PUT: listLayout.PUT as Handler }),
   route("/api/login", { POST: login.POST as Handler }),
   route("/api/logout", { POST: logout.POST as Handler }),
   route("/api/me", { GET: me.GET as Handler }),

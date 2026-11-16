@@ -58,6 +58,8 @@ const expected = [
   "GET /api/data/timeline/summary",
   "GET /api/data/timeline",
   "GET /api/data/unscreened",
+  "GET /api/list/layout",
+  "PUT /api/list/layout",
   "POST /api/login",
   "POST /api/logout",
   "GET /api/me",

@@ -139,8 +139,9 @@ test("a statement shows captured lines only, gaps, and add-backs apart from the 
   assert.equal(year?.annual?.addbacks[0]?.status, "estimated");
   assert.equal(year?.annual?.addbacks[0]?.flag, null);
   assert.match(year?.coverage || "", /On file: January/);
-  assert.match(year?.coverage || "", /Missing: February/);
+  assert.doesNotMatch(year?.coverage || "", /Missing/);
   assert.equal(year?.months[1], null);
+  assert.deepEqual(year?.missingMonths, []);
   assert.equal(JSON.stringify(statement).includes("ebitda"), false);
 });
 

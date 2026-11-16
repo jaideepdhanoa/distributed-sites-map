@@ -98,15 +98,24 @@ export type SitePayload = {
   photos?: import("./site").PhotoRef[];
 };
 
+export type PnlLineStatus = "reported" | "estimated" | "normalized" | "missing";
+
 export type PnlLinePayload = {
   grain: "annual" | "monthly";
   year: number;
   month?: number;
+  /** First month of an annual period. Omit for January. */
+  start_month?: number;
+  /** Last month of an annual period that is not a full 12 months. */
   through_month?: number;
   business_type: PnlBusiness;
-  line: PnlLineCode;
-  amount: string;
-  status: "reported" | "estimated";
+  line?: PnlLineCode;
+  /** Omitted when missing is true. Stored text, never a JSON number. */
+  amount?: string;
+  /** `stated` is accepted and stored as `reported`. */
+  status: PnlLineStatus;
+  /** A month the package should have but does not. No amount and no line. */
+  missing?: boolean;
   source_document: string;
   source_page: string;
   source_href?: string;
@@ -175,11 +184,13 @@ const pnlLinePayload = z
     grain: z.enum(["annual", "monthly"]),
     year: z.number().int().min(1990).max(2100),
     month: z.number().int().min(1).max(12).optional(),
+    start_month: z.number().int().min(1).max(12).optional(),
     through_month: z.number().int().min(1).max(12).optional(),
     business_type: z.enum(PNL_BUSINESSES),
-    line: z.enum(PNL_LINE_CODES),
-    amount: z.string().trim().min(1).max(20),
-    status: z.enum(["reported", "estimated"]),
+    line: z.enum(PNL_LINE_CODES).optional(),
+    amount: z.string().trim().min(1).max(20).optional(),
+    status: z.enum(["stated", "reported", "normalized", "estimated"]).optional(),
+    missing: z.literal(true).optional(),
     source_document: z.string().trim().min(1).max(200),
     source_page: z.string().trim().min(1).max(80),
     source_href: z.string().trim().max(500).optional(),
@@ -321,7 +332,7 @@ function issueMessage(path: string, code: string): string {
   if (path.endsWith("grain")) return "Period grain must be annual or monthly.";
   if (path.endsWith("business_type")) return "Business type must be car_wash or auto_service.";
   if (path.endsWith("line")) return "That line is not in the chart of accounts.";
-  if (path.endsWith("amount")) return "Amount must be the captured number, with no rounding added.";
+  if (path.endsWith("amount")) return "amount must be a string such as \"12345\" or \"12345.00\".";
   if (path.endsWith("status")) return "Status must be reported or estimated.";
   if (path.endsWith("summary")) return "Add a summary.";
   return "That change is not valid.";
@@ -487,40 +498,102 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
   return { key, changes };
 }
 
+const AMOUNT_FORM = "amount must be a string such as \"12345\" or \"12345.00\"";
+
+function pnlError(index: number, field: string, message: string, status = 400): never {
+  throw new InputError(`Change ${index + 1}: ${message}`, status, field);
+}
+
+function pnlField(path: PropertyKey[]): string {
+  const field = path.length ? String(path[path.length - 1]) : "payload";
+  if (field === "start_month" || field === "through_month" || field === "business_type" || field === "source_document" || field === "source_page" || field === "source_href" || field === "captured_at") {
+    return field;
+  }
+  return field;
+}
+
+function pnlZodMessage(field: string): string {
+  if (field === "amount") return AMOUNT_FORM;
+  if (field === "status") return "status must be stated, reported, normalized, or estimated";
+  if (field === "grain") return "grain must be annual or monthly";
+  if (field === "year") return "year must be a whole number from 1990 to 2100";
+  if (field === "month" || field === "start_month" || field === "through_month") return `${field} must be a whole number from 1 to 12`;
+  if (field === "business_type") return "business_type must be car_wash or auto_service";
+  if (field === "line") return "line must be one of the chart of accounts";
+  if (field === "missing") return "missing must be true";
+  if (field === "captured_at") return "captured_at must be an ISO-8601 time with a zone offset";
+  if (field === "source_document") return "source_document is required";
+  if (field === "source_page") return "source_page is required";
+  if (field === "source_href") return "source_href must be an https URL";
+  return `${field} is not a field on a P&L line`;
+}
+
 function parsePnlLine(actor: Actor, index: number, siteId: string, payload: unknown): PnlLinePayload {
   if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
   if (actor.kind === "agent" && actor.id.trim().toLowerCase() !== "muse") {
     throw new InputError(`Change ${index + 1}: Only Muse can write a P&L line.`, 403);
   }
   assertContentActor(actor, index);
+  if (payload && typeof payload === "object" && !Array.isArray(payload) && "amount" in payload) {
+    const amount = (payload as { amount?: unknown }).amount;
+    if (typeof amount === "number") pnlError(index, "amount", `${AMOUNT_FORM}, not a number`);
+  }
   const parsedPayload = pnlLinePayload.safeParse(payload);
   if (!parsedPayload.success) {
     const issue = parsedPayload.error.issues[0];
-    fail(index, issue.path.map(String).join("."), issue.code);
+    const field = pnlField(issue.path);
+    pnlError(index, field, pnlZodMessage(field));
   }
   const data = parsedPayload.data;
-  if (data.grain === "monthly" && data.month == null) {
-    throw new InputError(`Change ${index + 1}: A monthly period needs a month.`);
-  }
-  if (data.grain === "annual" && data.month != null) {
-    throw new InputError(`Change ${index + 1}: An annual period has no month.`);
-  }
-  if (data.grain === "monthly" && data.through_month != null) {
-    throw new InputError(`Change ${index + 1}: A monthly period has no through month.`);
-  }
-  if (!parseAmount(data.amount)) {
-    throw new InputError(`Change ${index + 1}: Amount must be the captured number, with no rounding added.`);
+  if (data.missing) {
+    if (data.grain !== "monthly") pnlError(index, "missing", "missing is only for a monthly period");
+    if (data.month == null) pnlError(index, "month", "month must be a whole number from 1 to 12");
+    if (data.amount != null) pnlError(index, "amount", "amount must be omitted when missing is true");
+    if (data.line != null) pnlError(index, "line", "line must be omitted when missing is true");
+    if (data.status != null) pnlError(index, "status", "status must be omitted when missing is true");
+    if (data.through_month != null) pnlError(index, "through_month", "through_month is only for an annual period");
+    if (data.start_month != null) pnlError(index, "start_month", "start_month is only for an annual period");
+  } else {
+    if (data.grain === "monthly" && data.month == null) pnlError(index, "month", "month must be a whole number from 1 to 12");
+    if (data.grain === "annual" && data.month != null) pnlError(index, "month", "month is only for a monthly period");
+    if (data.grain === "monthly" && data.through_month != null) pnlError(index, "through_month", "through_month is only for an annual period");
+    if (data.grain === "monthly" && data.start_month != null) pnlError(index, "start_month", "start_month is only for an annual period");
+    if (data.line == null) pnlError(index, "line", "line must be one of the chart of accounts");
+    if (data.status == null) pnlError(index, "status", "status must be stated, reported, normalized, or estimated");
+    if (data.amount == null) pnlError(index, "amount", AMOUNT_FORM);
+    else if (!parseAmount(data.amount)) pnlError(index, "amount", `${AMOUNT_FORM}, with no commas, symbols, or words`);
+    const start = data.start_month ?? 1;
+    const end = data.through_month;
+    if (data.grain === "annual" && end != null && end === start) {
+      pnlError(index, "through_month", "through_month must cover more than one month. A single month uses grain monthly");
+    }
   }
   const zoned = parseZonedTimestamp(data.captured_at);
-  if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+  if (!zoned) pnlError(index, "captured_at", "captured_at must be an ISO-8601 time with a zone offset");
   if (data.source_href && !/^https:\/\/\S+$/.test(data.source_href)) {
-    throw new InputError(`Change ${index + 1}: The source link must be an https URL.`);
+    pnlError(index, "source_href", "source_href must be an https URL");
   }
   cleanText(data.source_document);
   cleanText(data.source_page);
   cleanText(data.source_href);
-  cleanText(data.amount);
-  return { ...data, captured_at: zoned.iso, source_href: data.source_href || "" };
+  if (data.amount) cleanText(data.amount);
+  const status = data.missing ? "missing" : data.status === "stated" ? "reported" : data.status || "reported";
+  return {
+    grain: data.grain,
+    year: data.year,
+    month: data.month,
+    start_month: data.start_month,
+    through_month: data.through_month,
+    business_type: data.business_type,
+    line: data.line,
+    amount: data.amount,
+    status,
+    missing: data.missing === true,
+    source_document: data.source_document,
+    source_page: data.source_page,
+    source_href: data.source_href || "",
+    captured_at: zoned.iso,
+  };
 }
 
 function assertSpaceActor(actor: Actor, index: number): void {

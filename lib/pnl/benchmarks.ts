@@ -91,8 +91,8 @@ export function flagLine(input: {
   cents: bigint;
   business: PnlBusiness;
   revenueCents: bigint | null;
-  revenueStatus: "reported" | "estimated" | null;
-  status: "reported" | "estimated";
+  revenueStatus: "reported" | "estimated" | "normalized" | null;
+  status: "reported" | "estimated" | "normalized";
 }): LineFlag | null {
   const label = LINE_LABELS[input.code];
   if (input.code.startsWith("revenue_") && input.revenueCents != null && input.revenueCents > BigInt(0)) {

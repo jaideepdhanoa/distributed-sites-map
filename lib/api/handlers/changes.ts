@@ -57,7 +57,12 @@ export async function POST(request: Request) {
       );
     }
     if (error instanceof PolicyError) return jsonError(error.message, 400);
-    if (error instanceof InputError) return jsonError(error.message, error.status);
+    if (error instanceof InputError) {
+      return NextResponse.json(
+        error.field ? { error: error.message, field: error.field } : { error: error.message },
+        { status: error.status, headers: privateHeaders },
+      );
+    }
     if (error instanceof ProductionWriteRefused) return jsonError(error.message, 403);
     if (missingRelation(error)) {
       return jsonError(

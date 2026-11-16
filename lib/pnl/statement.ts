@@ -10,8 +10,9 @@ import {
   type PnlSection,
 } from "./lines";
 import { formatAmount, percentOf, type CapturedAmount } from "./money";
+import { coverageOf, periodLabels, spanMonths } from "./period";
 
-export type PnlStatus = "reported" | "estimated";
+export type PnlStatus = "reported" | "estimated" | "normalized";
 
 export type CapturedLine = {
   id: string;
@@ -20,6 +21,9 @@ export type CapturedLine = {
   year: number;
   month: number | null;
   throughMonth: number | null;
+  startMonth?: number | null;
+  periodStart?: string;
+  periodEnd?: string;
   business: PnlBusiness;
   code: PnlLineCode;
   amount: CapturedAmount;
@@ -28,6 +32,19 @@ export type CapturedLine = {
   sourcePage: string;
   sourceHref: string;
   capturedAt: string;
+};
+
+export type MissingMonth = {
+  year: number;
+  month: number;
+  business: PnlBusiness;
+  periodId: string;
+};
+
+export type NormalizedMark = {
+  id: string;
+  amount: string;
+  raw: string;
 };
 
 export type PnlLineView = {
@@ -43,6 +60,8 @@ export type PnlLineView = {
   sourceHref: string;
   capturedAt: string;
   flag: LineFlag | null;
+  /** Present when a normalized line is stored beside this stated line. */
+  normalized: NormalizedMark | null;
 };
 
 export type PnlPeriodView = {
@@ -51,7 +70,12 @@ export type PnlPeriodView = {
   year: number;
   month: number | null;
   label: string;
+  columnLabel: string;
+  title: string;
   throughMonth: number | null;
+  startMonth: number | null;
+  periodStart: string;
+  periodEnd: string;
   business: PnlBusiness;
   businessLabel: string;
   revenue: PnlLineView[];
@@ -63,8 +87,13 @@ export type PnlPeriodView = {
 
 export type PnlYearView = {
   year: number;
+  columnLabel: string;
   annual: PnlPeriodView | null;
+  /** Partial years, and a fiscal year when a calendar year is already the annual column. */
+  ranges: PnlPeriodView[];
   months: Array<PnlPeriodView | null>;
+  /** Months the package should have included and did not. Other empty months stay blank. */
+  missingMonths: number[];
   coverage: string;
   flagCount: number;
   businessLabel: string;
@@ -74,43 +103,42 @@ export type PnlStatement = {
   status: "empty" | "ready" | "unavailable";
   message: string;
   years: PnlYearView[];
+  normalizedYears: PnlYearView[];
+  hasNormalized: boolean;
 };
 
 export function emptyStatement(): PnlStatement {
-  return { status: "empty", message: "No P&L captured yet. A broker package still needs to be broken into line items.", years: [] };
+  return { status: "empty", message: "No P&L captured yet. A broker package still needs to be broken into line items.", years: [], normalizedYears: [], hasNormalized: false };
 }
 
 export function unavailableStatement(): PnlStatement {
-  return { status: "unavailable", message: "Profit and loss is not on this database yet.", years: [] };
+  return { status: "unavailable", message: "Profit and loss is not on this database yet.", years: [], normalizedYears: [], hasNormalized: false };
 }
 
-function periodLabel(grain: "annual" | "monthly", year: number, month: number | null, throughMonth: number | null): string {
-  if (grain === "monthly" && month) return `${MONTH_NAMES[month - 1]} ${year}`;
-  if (throughMonth) return `${year} through ${MONTH_NAMES[throughMonth - 1]}`;
-  return String(year);
-}
-
-function coverage(months: Array<PnlPeriodView | null>, throughMonth: number | null): string {
+function coverage(months: Array<PnlPeriodView | null>, missingMonths: number[], throughMonth: number | null): string {
   const present = months.flatMap((period, index) => (period ? [MONTH_NAMES[index]] : []));
+  const missing = missingMonths.map((month) => MONTH_NAMES[month - 1]);
   if (!present.length) {
+    if (missing.length) return `Missing: ${missing.join(", ")}.`;
     return throughMonth
       ? `No monthly statements. The annual statement runs through ${MONTH_NAMES[throughMonth - 1]}.`
       : "No monthly statements captured.";
   }
-  const missing = months.flatMap((period, index) => (period ? [] : [MONTH_NAMES[index]]));
   const onFile = `On file: ${present.join(", ")}.`;
-  if (!missing.length) return `${onFile} All twelve months are on file.`;
-  return `${onFile} Missing: ${missing.join(", ")}.`;
+  if (missing.length) return `${onFile} Missing: ${missing.join(", ")}.`;
+  if (!months.some((period) => !period)) return `${onFile} All twelve months are on file.`;
+  return onFile;
 }
 
-function viewLine(line: CapturedLine, revenue: CapturedLine | null): PnlLineView {
+function viewLine(line: CapturedLine, revenue: CapturedLine | null, normalized: CapturedLine | null): PnlLineView {
   const revenueCents = revenue && revenue.code === "revenue" ? revenue.amount.cents : null;
   const share = revenueCents == null ? null : percentOf(line.amount.cents, revenueCents);
+  const basis = revenue?.status === "normalized" ? "normalized revenue" : "stated revenue";
   const shareLabel = share == null
     ? null
     : revenue?.status === "estimated"
       ? `${share} of stated revenue (estimated)`
-      : `${share} of stated revenue`;
+      : `${share} of ${basis}`;
   return {
     id: line.id,
     code: line.code,
@@ -123,6 +151,9 @@ function viewLine(line: CapturedLine, revenue: CapturedLine | null): PnlLineView
     sourcePage: line.sourcePage,
     sourceHref: line.sourceHref,
     capturedAt: line.capturedAt,
+    normalized: normalized
+      ? { id: normalized.id, amount: formatAmount(normalized.amount.raw), raw: normalized.amount.raw }
+      : null,
     flag: flagLine({
       code: line.code,
       cents: line.amount.cents,
@@ -142,8 +173,36 @@ function periodNote(lines: CapturedLine[]): string {
   return "";
 }
 
-function buildPeriod(lines: CapturedLine[]): PnlPeriodView {
+function lineCoverage(line: CapturedLine) {
+  if (line.periodStart && line.periodEnd) {
+    return {
+      periodStart: line.periodStart,
+      periodEnd: line.periodEnd,
+      startMonth: line.startMonth ?? null,
+      throughMonth: line.throughMonth,
+    };
+  }
+  return coverageOf({
+    grain: line.grain,
+    year: line.year,
+    month: line.month,
+    startMonth: line.startMonth,
+    throughMonth: line.throughMonth,
+  });
+}
+
+function buildPeriod(lines: CapturedLine[], normalizedIndex: Map<string, CapturedLine> | null): PnlPeriodView {
   const first = lines[0];
+  const bounds = lineCoverage(first);
+  const labels = periodLabels({
+    grain: first.grain,
+    year: first.year,
+    month: first.month,
+    startMonth: bounds.startMonth,
+    throughMonth: bounds.throughMonth,
+    periodStart: bounds.periodStart,
+    periodEnd: bounds.periodEnd,
+  });
   const revenueLine = lines.find((line) => line.code === "revenue") ?? null;
   const grouped: Record<PnlSection, PnlLineView[]> = { revenue: [], costs: [], results: [], addbacks: [] };
   const sectionRank: Record<PnlSection, number> = { revenue: 0, costs: 1, results: 2, addbacks: 3 };
@@ -153,14 +212,22 @@ function buildPeriod(lines: CapturedLine[]): PnlPeriodView {
     if (sectionA !== sectionB) return sectionRank[sectionA] - sectionRank[sectionB];
     return sectionOrder(sectionA).indexOf(a.code) - sectionOrder(sectionB).indexOf(b.code);
   });
-  for (const line of ordered) grouped[lineSection(line.code)].push(viewLine(line, revenueLine));
+  for (const line of ordered) {
+    const normalized = normalizedIndex?.get(`${line.periodId}:${line.code}`) ?? null;
+    grouped[lineSection(line.code)].push(viewLine(line, revenueLine, normalized));
+  }
   return {
     id: first.periodId,
     grain: first.grain,
     year: first.year,
     month: first.month,
-    label: periodLabel(first.grain, first.year, first.month, first.throughMonth),
-    throughMonth: first.throughMonth,
+    label: labels.label,
+    columnLabel: labels.columnLabel,
+    title: labels.title,
+    throughMonth: bounds.throughMonth,
+    startMonth: bounds.startMonth,
+    periodStart: bounds.periodStart,
+    periodEnd: bounds.periodEnd,
     business: first.business,
     businessLabel: BUSINESS_LABELS[first.business],
     revenue: grouped.revenue,
@@ -182,35 +249,71 @@ function countFlags(periods: Array<PnlPeriodView | null>): number {
   return count;
 }
 
-/** Group captured lines into years. Months that were not captured stay empty. Totals are not summed. */
-export function buildStatement(lines: CapturedLine[]): PnlStatement {
-  if (!lines.length) return emptyStatement();
+function isFullYear(period: PnlPeriodView): boolean {
+  return spanMonths(period.periodStart, period.periodEnd) === 12;
+}
+
+function buildYears(lines: CapturedLine[], missing: MissingMonth[], normalizedIndex: Map<string, CapturedLine> | null): PnlYearView[] {
   const byPeriod = new Map<string, CapturedLine[]>();
   for (const line of lines) {
     const bucket = byPeriod.get(line.periodId) || [];
     bucket.push(line);
     byPeriod.set(line.periodId, bucket);
   }
-  const periods = [...byPeriod.values()].map(buildPeriod);
-  const years = [...new Set(periods.map((period) => period.year))].sort((a, b) => b - a);
-  const views: PnlYearView[] = years.map((year) => {
-    const annual = periods.find((period) => period.year === year && period.grain === "annual") ?? null;
+  const periods = [...byPeriod.values()].map((group) => buildPeriod(group, normalizedIndex));
+  const years = [...new Set([
+    ...periods.map((period) => period.year),
+    ...missing.map((month) => month.year),
+  ])].sort((a, b) => b - a);
+  return years.map((year) => {
+    const annuals = periods.filter((period) => period.year === year && period.grain === "annual");
+    const full = annuals.filter(isFullYear);
+    const annual = full.find((period) => (period.startMonth ?? 1) === 1) ?? full[0] ?? null;
+    const ranges = annuals.filter((period) => period !== annual);
     const months = Array.from({ length: 12 }, (_, index) => (
       periods.find((period) => period.year === year && period.grain === "monthly" && period.month === index + 1) ?? null
     ));
-    const businessLabel = annual?.businessLabel || months.find((period) => period)?.businessLabel || "";
+    const missingMonths = [...new Set(
+      missing.filter((month) => month.year === year && !months[month.month - 1]).map((month) => month.month),
+    )].sort((a, b) => a - b);
+    const businessLabel = annual?.businessLabel || ranges[0]?.businessLabel || months.find((period) => period)?.businessLabel || "";
     return {
       year,
+      columnLabel: annual?.columnLabel || String(year),
       annual,
+      ranges,
       months,
-      coverage: coverage(months, annual?.throughMonth ?? null),
-      flagCount: countFlags([annual, ...months]),
+      missingMonths,
+      coverage: coverage(months, missingMonths, annual?.throughMonth ?? ranges[0]?.throughMonth ?? null),
+      flagCount: countFlags([annual, ...ranges, ...months]),
       businessLabel,
     };
   });
-  return { status: "ready", message: "", years: views };
+}
+
+/** Group captured lines into years. Stated lines are the default. Normalized lines sit beside them. */
+export function buildStatement(lines: CapturedLine[], missing: MissingMonth[] = []): PnlStatement {
+  const stated = lines.filter((line) => line.status !== "normalized");
+  const normalized = lines.filter((line) => line.status === "normalized");
+  if (!stated.length && !normalized.length && !missing.length) return emptyStatement();
+  const normalizedIndex = new Map(normalized.map((line) => [`${line.periodId}:${line.code}`, line]));
+  const years = buildYears(stated, missing, normalizedIndex);
+  const normalizedYears = buildYears(normalized, missing, null);
+  return {
+    status: "ready",
+    message: "",
+    years,
+    normalizedYears,
+    hasNormalized: normalized.length > 0,
+  };
 }
 
 export function statedRevenue(period: PnlPeriodView | null): PnlLineView | null {
   return period?.revenue.find((line) => line.code === "revenue") ?? null;
+}
+
+export function statusLabel(status: PnlStatus): string {
+  if (status === "estimated") return "Estimated";
+  if (status === "normalized") return "Normalized";
+  return "Stated";
 }

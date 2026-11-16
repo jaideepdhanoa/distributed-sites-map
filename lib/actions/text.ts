@@ -33,9 +33,11 @@ const ID_OK = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
 
 export class InputError extends Error {
   readonly status: number;
-  constructor(message: string, status = 400) {
+  readonly field?: string;
+  constructor(message: string, status = 400, field?: string) {
     super(message);
     this.status = status;
+    this.field = field;
   }
 }
 

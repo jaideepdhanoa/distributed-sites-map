@@ -837,9 +837,9 @@ export function DealDetail({
               <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}
-              {signedIn && !cash.hidden ? <div title={revenue.title}>{[revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? <div title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
               {signedIn && !cash.hidden ? <span>Cash flow</span> : null}
-              {signedIn && !cash.hidden ? <div>{[cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? <div title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div> : null}
             </div>
           </>
         }

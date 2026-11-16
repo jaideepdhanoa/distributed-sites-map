@@ -109,7 +109,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   });
   const mobile = (page.viewportSize()?.width ?? 1440) < 768;
   if (mobile) await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011&panel=numbers${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
   const numbers = page.getByTestId("card-numbers");
   await numbers.scrollIntoViewIfNeeded();
   const revenue = numbers.locator("div").filter({ hasText: "Revenue" }).first();
@@ -126,7 +126,17 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   await expect(entry).toContainText("$1,000,000 revenue");
   await expect(entry).toContainText("SDE $520,000");
   await expect(entry).toContainText("FY2024 · 2 of 12 months · Sample package");
-  await numbers.scrollIntoViewIfNeeded();
-  await numbers.screenshot({ path: `review-shots/pnl-sample-tiles-${mobile ? "phone" : "desktop"}.png`, animations: "disabled" });
+  const numbersList = page.locator("#panel-numbers .kv");
+  await expect(numbersList).toContainText("$1,000,000");
+  await expect(numbersList).toContainText("$520,000");
+  await expect(numbersList).toContainText("2 of 12 months");
+  await expect(numbersList).not.toContainText("Not on file");
+  await page.goto(`/?funnel=pipeline&site=LAS-U858${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  const siteDrawer = page.locator("aside.drawer[data-record='LAS-U858']");
+  await siteDrawer.waitFor({ state: "attached", timeout: 45_000 });
+  const siteNumbers = siteDrawer.getByTestId("card-numbers");
+  await expect(siteNumbers.locator("div").filter({ hasText: "Revenue" }).first().locator("strong")).toHaveText("$1,000,000");
+  await expect(siteNumbers.locator("div").filter({ hasText: "Cash flow" }).first().locator("strong")).toHaveText("$520,000");
+  await expect(page.getByTestId("financials-entry")).toContainText("SDE $520,000");
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });

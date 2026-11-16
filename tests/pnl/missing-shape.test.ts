@@ -117,3 +117,35 @@ test("a missing period stays missing when another line on it has an amount", asy
   assert.equal(grid.rows.find((row) => row.id === "total-revenue")?.cells[4]?.kind, "missing");
   assert.deepEqual(statement.years.find((year) => year.year === 2026)?.missingMonths, [5]);
 });
+
+test("a linked site does not hide the other site's missing month", async () => {
+  const sql = await memorySql();
+  await migrate(sql);
+  const captured = "2026-11-16T12:00:00Z";
+  await sql.query(
+    `INSERT INTO pnl_periods (
+       entity_id, site_id, grain, period_start, period_end, year, month, through_month, start_month, missing, business_type, version, updated_by
+     ) VALUES
+       ('PP-S-U1', 'PIPE-LAS-9002', 'monthly', '2026-01-01', '2026-01-31', 2026, 1, NULL, NULL, false, 'car_wash', 1, 'fixture'),
+       ('PP-S-U6', 'PIPE-LAS-9002', 'monthly', '2026-06-01', '2026-06-30', 2026, 6, NULL, NULL, false, 'car_wash', 1, 'fixture'),
+       ('PP-S-D5', 'PIPE-LAS-9001', 'monthly', '2026-05-01', '2026-05-31', 2026, 5, NULL, NULL, true, 'car_wash', 1, 'fixture'),
+       ('PP-S-RANGE', 'PIPE-LAS-9002', 'annual', '2026-01-01', '2026-07-31', 2026, NULL, 7, NULL, false, 'car_wash', 1, 'fixture')`,
+  );
+  await sql.query(
+    `INSERT INTO pnl_lines (
+       entity_id, period_id, site_id, line_code, amount, amount_text, status,
+       source_document, source_page, source_href, captured_at, captured_at_iso, version, updated_by
+     ) VALUES
+       ('PL-S-U1', 'PP-S-U1', 'PIPE-LAS-9002', 'revenue', 10000, '10000', 'reported', 'Sample package', '1', '', $1::timestamptz, $2, 1, 'fixture'),
+       ('PL-S-U6', 'PP-S-U6', 'PIPE-LAS-9002', 'revenue', 10000, '10000', 'reported', 'Sample package', '6', '', $1::timestamptz, $2, 1, 'fixture'),
+       ('PL-S-D5', 'PP-S-D5', 'PIPE-LAS-9001', NULL, NULL, NULL, 'missing', 'Sample package', 'Month index', '', $1::timestamptz, $2, 1, 'fixture')`,
+    [captured, captured],
+  );
+  const statement = await loadPnlStatement(sql, ["PIPE-LAS-9001", "PIPE-LAS-9002"]);
+  const year = statement.years.find((item) => item.year === 2026);
+  assert.deepEqual(year?.missingMonths, [5]);
+  assert.equal(year?.coverage.includes("Missing: May"), true);
+  const grid = buildPnlGrid(statement, "months", 2026);
+  assert.equal(grid.rows.find((row) => row.id === "total-revenue")?.cells[4]?.kind, "missing");
+  assert.equal(financialsCard(statement)?.coverage.includes("(May missing)"), true);
+});

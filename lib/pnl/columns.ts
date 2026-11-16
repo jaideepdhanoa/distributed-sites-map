@@ -7,16 +7,53 @@
  * Import this module rather than folding the labels into the grid component.
  */
 
+import { MONTH_NAMES, MONTH_SHORT } from "./lines";
 import type { PnlPeriodView, PnlYearView } from "./statement";
 
 export type MonthColumnState = "present" | "missing" | "blank";
 
-/** Months named by either list. A detail without `missingMonths` still counts. */
+function asMonth(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 12) return value;
+  const text = String(value ?? "").trim();
+  const iso = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(text);
+  if (iso) {
+    const month = Number(iso[2]);
+    return month >= 1 && month <= 12 ? month : null;
+  }
+  const lower = text.toLowerCase();
+  const full = MONTH_NAMES.findIndex((name) => name.toLowerCase() === lower);
+  if (full >= 0) return full + 1;
+  const short = MONTH_SHORT.findIndex((name) => name.toLowerCase() === lower.replace(/\.$/, ""));
+  if (short >= 0) return short + 1;
+  const plain = Number(text);
+  return Number.isInteger(plain) && plain >= 1 && plain <= 12 ? plain : null;
+}
+
+function monthsInCoverage(coverage: string): number[] {
+  const match = /Missing:\s*([^.]+)/i.exec(coverage || "");
+  if (!match) return [];
+  return match[1].split(",").map((part) => asMonth(part)).filter((month): month is number => month != null);
+}
+
+function listedMonths(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value == null || value === "") return [];
+  return [value];
+}
+
+/**
+ * Months the statement calls missing. Accepts the year lists, a YYYY-MM
+ * string, and the coverage sentence ("Missing: May") when the lists are empty.
+ */
 export function markedMonths(year: PnlYearView): number[] {
-  const months = [
-    ...(year.missingMonths ?? []),
-    ...(year.missingDetails ?? []).map((item) => item.month),
-  ].map((month) => Number(month)).filter((month) => month >= 1 && month <= 12);
+  const raw = [
+    ...listedMonths(year.missingMonths),
+    ...listedMonths(year.missingDetails).map((item) => (
+      item && typeof item === "object" && "month" in item ? (item as { month: unknown }).month : item
+    )),
+    ...monthsInCoverage(year.coverage || ""),
+  ];
+  const months = raw.map(asMonth).filter((month): month is number => month != null);
   return [...new Set(months)].sort((a, b) => a - b);
 }
 

@@ -12,14 +12,14 @@ test("the measured statement shape names the missing month on the card and both 
   const year2025 = statement.years.find((year) => year.year === 2025);
   assert.equal(year2026?.annual, null);
   assert.equal(year2026?.ranges.length, 1);
-  assert.equal(year2026?.ranges[0]?.id, "PP-000003");
+  assert.equal(year2026?.ranges[0]?.id, "PP-S-RANGE");
   assert.equal(year2026?.ranges[0]?.columnLabel, "Jan–Jul 2026");
   assert.deepEqual(year2026?.months.map((period) => period?.month ?? null), [1, 2, 3, 4, null, 6, 7, null, null, null, null, null]);
   assert.deepEqual(year2026?.missingMonths, [5]);
   assert.equal(year2026?.missingDetails[0]?.sourcePage, "Month index");
   assert.equal(year2026?.missingDetails[0]?.sourceDocument.length, 47);
   assert.equal(year2026?.coverage, "On file: January, February, March, April, June, July. Missing: May.");
-  assert.equal(year2025?.annual?.id, "PP-000002");
+  assert.equal(year2025?.annual?.id, "PP-S-2025");
   assert.deepEqual(year2025?.ranges, []);
   assert.deepEqual(year2025?.missingMonths, [4]);
   assert.equal(year2025?.missingDetails[0]?.sourcePage, "Month index");
@@ -56,4 +56,24 @@ test("the measured statement shape names the missing month on the card and both 
   detailsOnly.missingMonths = [];
   assert.equal(monthColumnState(detailsOnly, 4), "missing");
   assert.equal(windowCoverage(detailsOnly), "Jan–Jul 2026 · 6 of 7 months (May missing)");
+
+  const coverageOnly = structuredClone(year2026);
+  if (!coverageOnly) return;
+  coverageOnly.missingDetails = [];
+  coverageOnly.coverage = "";
+  (coverageOnly as { missingMonths: unknown }).missingMonths = ["2026-05"];
+  assert.equal(monthColumnState(coverageOnly, 4), "missing");
+  coverageOnly.missingMonths = [];
+  coverageOnly.coverage = "On file: January, February, March, April, June, July. Missing: May.";
+  const coverageStatement = {
+    ...carried,
+    years: carried.years.map((item) => item.year === 2026 ? coverageOnly : { ...item, missingMonths: [], missingDetails: [], coverage: "Missing: April." }),
+  };
+  assert.equal(financialsCard(coverageStatement)?.coverage, "Jan–Jul 2026 · 6 of 7 months (May missing)");
+  const fromCoverage = buildPnlGrid(coverageStatement, "months", 2026);
+  assert.equal(fromCoverage.rows.find((row) => row.id === "total-revenue")?.cells[4]?.kind, "missing");
+  assert.equal(columnSummary(fromCoverage, 4).revenue, "Missing");
+  const aprilFromCoverage = buildPnlGrid(coverageStatement, "months", 2025);
+  assert.equal(aprilFromCoverage.rows.find((row) => row.id === "labor")?.cells[3]?.kind, "missing");
+  assert.equal(columnSummary(aprilFromCoverage, 3).revenue, "Missing");
 });

@@ -176,16 +176,16 @@ export function measuredStatement(): PnlStatement {
     add(`PL-m-${month}-r`, `PP-m-${month}`, 2026, "monthly", month, null, "revenue", "10000", String(month));
     add(`PL-m-${month}-l`, `PP-m-${month}`, 2026, "monthly", month, null, "labor", "2000", String(month));
   }
-  add("PL-range-r", "PP-000003", 2026, "annual", null, 7, "revenue", "90000", "Range");
-  add("PL-range-l", "PP-000003", 2026, "annual", null, 7, "labor", "30000", "Range");
-  add("PL-2025-r", "PP-000002", 2025, "annual", null, null, "revenue", "80000", "2025");
-  add("PL-2025-l", "PP-000002", 2025, "annual", null, null, "labor", "24000", "2025");
+  add("PL-range-r", "PP-S-RANGE", 2026, "annual", null, 7, "revenue", "90000", "Range");
+  add("PL-range-l", "PP-S-RANGE", 2026, "annual", null, 7, "labor", "30000", "Range");
+  add("PL-2025-r", "PP-S-2025", 2025, "annual", null, null, "revenue", "80000", "2025");
+  add("PL-2025-l", "PP-S-2025", 2025, "annual", null, null, "labor", "24000", "2025");
   return buildStatement(lines, [
     {
       year: 2026,
       month: 5,
       business: "car_wash",
-      periodId: "PP-000096",
+      periodId: "PP-S-MAY",
       sourceDocument: MEASURED_DOCUMENT,
       sourcePage: "Month index",
       capturedAt: captured,
@@ -195,7 +195,7 @@ export function measuredStatement(): PnlStatement {
       year: 2025,
       month: 4,
       business: "car_wash",
-      periodId: "PP-000095",
+      periodId: "PP-S-APR",
       sourceDocument: MEASURED_DOCUMENT,
       sourcePage: "Month index",
       capturedAt: captured,

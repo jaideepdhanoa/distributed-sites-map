@@ -42,6 +42,8 @@ export type MissingMonth = {
   sourceDocument?: string;
   sourcePage?: string;
   capturedAt?: string;
+  /** Change-level source, such as "Not in package". It is not the line's document. */
+  markerSource?: string;
 };
 
 export type MissingDetail = {
@@ -49,6 +51,7 @@ export type MissingDetail = {
   sourceDocument: string;
   sourcePage: string;
   capturedAt: string;
+  markerSource: string;
 };
 
 export type NormalizedMark = {
@@ -293,6 +296,7 @@ function buildYears(lines: CapturedLine[], missing: MissingMonth[], normalizedIn
         sourceDocument: row?.sourceDocument || "",
         sourcePage: row?.sourcePage || "",
         capturedAt: row?.capturedAt || "",
+        markerSource: row?.markerSource || "",
       };
     });
     const businessLabel = annual?.businessLabel || ranges[0]?.businessLabel || months.find((period) => period)?.businessLabel || "";

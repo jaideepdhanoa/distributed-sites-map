@@ -135,7 +135,7 @@ function ConflictDetail({ cell }: { cell: GridCell }) {
 
 function Detail({ cell }: { cell: GridCell | undefined }) {
   if (!cell || cell.kind === "missing") {
-    const source = cell?.kind === "missing" ? [cell.sourceDocument, cell.sourcePage].filter(Boolean).join(" · ") : "";
+    const source = cell?.kind === "missing" ? [cell.markerSource, cell.sourceDocument, cell.sourcePage].filter(Boolean).join(" · ") : "";
     return (
       <div className="pnl-expand" data-testid="pnl-missing-source">
         <p>Missing</p>

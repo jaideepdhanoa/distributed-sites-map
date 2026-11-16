@@ -35,6 +35,7 @@ export type MissingCell = {
   sourceDocument: string;
   sourcePage: string;
   capturedLabel: string;
+  markerSource: string;
 };
 
 export type GridCell = (ValueCell | MissingCell | { kind: "blank" }) & {
@@ -188,7 +189,7 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
 
 function emptyCell(bucket: Bucket): GridCell | null {
   if (bucket.missing) {
-    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", capturedLabel: "" };
+    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", capturedLabel: "", markerSource: "" };
   }
   if (!bucket.period) return { kind: "blank" };
   return null;
@@ -204,6 +205,7 @@ function missingBucket(year: PnlYearView | undefined, month: number): Bucket {
       sourceDocument: detail?.sourceDocument || "",
       sourcePage: detail?.sourcePage || "",
       capturedLabel: detail?.capturedAt ? formatCapturedDate(detail.capturedAt) : "",
+      markerSource: detail?.markerSource || "",
     },
   };
 }

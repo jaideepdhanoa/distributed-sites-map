@@ -133,9 +133,84 @@ export async function loadPnlStatement(sql: Sql, siteId: string | string[]): Pro
         capturedAt: row.captured_at_iso,
       });
     }
+    await addChangeMarkers(sql, requested, lines, missing);
     return buildStatement(lines, missing);
   } catch (error) {
     if (missingRelation(error)) return unavailableStatement();
     throw error;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  return null;
+}
+
+function eventSaysMissing(source: string, payload: Record<string, unknown> | null): boolean {
+  if (source.trim().toLowerCase() === "not in package") return true;
+  if (!payload) return false;
+  if (payload.missing === true || payload.missing === "true") return true;
+  return String(payload.status || "").trim().toLowerCase() === "missing";
+}
+
+/**
+ * Muse records a missing month with `missing: true` and no line, amount, or status.
+ * "Not in package" is the change's source, not the line's document. The line row can
+ * fail the status check and still be named here from that event.
+ */
+async function addChangeMarkers(sql: Sql, siteIds: string[], lines: CapturedLine[], missing: MissingMonth[]): Promise<void> {
+  let rows: { site_id: string; source: string; payload: unknown }[] = [];
+  try {
+    const result = await sql.query<{ site_id: string; source: string; payload: unknown }>(
+      `SELECT DISTINCT ON (entity_id) site_id, source, payload
+       FROM events
+       WHERE entity_type = 'pnl_line' AND site_id = ANY($1::text[])
+         AND (
+           lower(btrim(source)) = 'not in package'
+           OR coalesce(payload->>'missing', '') IN ('true', 't')
+           OR lower(coalesce(payload->>'status', '')) = 'missing'
+         )
+       ORDER BY entity_id, created_at DESC`,
+      [siteIds],
+    );
+    rows = result.rows;
+  } catch (error) {
+    if (missingRelation(error)) return;
+    const code = (error as { code?: string }).code;
+    if (code === "42P01" || code === "42703") return;
+    throw error;
+  }
+  for (const row of rows) {
+    const payload = asRecord(row.payload);
+    if (!eventSaysMissing(row.source || "", payload)) continue;
+    const year = Number(payload?.year);
+    const month = Number(payload?.month);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) continue;
+    const hasLine = lines.some((line) => line.grain === "monthly" && line.year === year && line.month === month);
+    if (hasLine) continue;
+    const markerSource = String(row.source || "").trim();
+    const existing = missing.find((item) => item.year === year && item.month === month);
+    if (existing) {
+      if (!existing.markerSource && markerSource) existing.markerSource = markerSource;
+      continue;
+    }
+    const business = payload?.business_type === "auto_service" ? "auto_service" : "car_wash";
+    missing.push({
+      year,
+      month,
+      business,
+      periodId: String(payload?.period_id || ""),
+      sourceDocument: String(payload?.source_document || ""),
+      sourcePage: String(payload?.source_page || ""),
+      capturedAt: String(payload?.captured_at || ""),
+      markerSource,
+    });
   }
 }

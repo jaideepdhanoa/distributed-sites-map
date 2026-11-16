@@ -13,7 +13,8 @@ export type MonthColumnState = "present" | "missing" | "blank";
 
 export function monthColumnState(year: PnlYearView, monthIndex: number): MonthColumnState {
   if (year.months[monthIndex]) return "present";
-  if ((year.missingMonths ?? []).includes(monthIndex + 1)) return "missing";
+  const missing = (year.missingMonths ?? []).map((month) => Number(month));
+  if (missing.includes(monthIndex + 1)) return "missing";
   return "blank";
 }
 

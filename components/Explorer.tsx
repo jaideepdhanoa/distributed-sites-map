@@ -38,6 +38,7 @@ import type { SpaceShape } from "./spaces/SpacePopover";
 import type { GroundBox } from "@/lib/spaces/measure";
 import type { SpaceLayout, SpaceType } from "@/lib/spaces/vocab";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
+import { linkedPnlIds, linksFromRecords } from "@/lib/pnl/ids";
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
@@ -345,11 +346,6 @@ export default function Explorer() {
   const visibleFeed = feed.filter((site) => site.status !== "snoozed");
   // /?view=review&site=ID opens that site. After the link lands, review=1 follows the queue cursor.
   const reviewDeepSite = params.get("view") === "review" ? params.get("site") : null;
-  const reviewDeepIndex = reviewDeepSite ? visibleFeed.findIndex((site) => site.siteId === reviewDeepSite) : -1;
-  const reviewIndex = reviewDeepIndex >= 0
-    ? reviewDeepIndex
-    : Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(visibleFeed.length - 1, 0));
-  const reviewCurrent = visibleFeed[reviewIndex];
   const caughtUp = reviewing && feedLoaded && !feed.some((site) => site.status === "open");
   const ranges = rangesFromSearch(params);
   const pipelineColumns = parseColumns(params.get("cols"));
@@ -456,7 +452,7 @@ export default function Explorer() {
   function stopReview(next: Record<string, string | null> = {}) {
     wantedReview.current = "";
     leaveSite.current = "";
-    write({ review: null, view: null, i: null, nda: null, loops: null, ...next });
+    write({ review: null, view: null, i: null, rsite: null, nda: null, loops: null, ...next });
   }
 
   function replaceSearch(base: string, next: Record<string, string | null>, history = false) {
@@ -873,6 +869,28 @@ export default function Explorer() {
     : 0;
   const universeWide = funnel !== "pipeline" && query.trim().length >= 2 && localSiteMatches === 0;
   const catalogSites = (catalog ?? []).filter((feature) => feature.properties.origin !== "off-market").map((feature) => presentSite(feature.properties));
+  const reviewScopeId = params.get("rsite") || "";
+  const reviewScopeIds = reviewScopeId ? linkedPnlIds(reviewScopeId, linksFromRecords([
+    ...dealRows.map((deal) => ({ dealId: deal.deal_id, siteId: deal.universe_id })),
+    ...sites.map((site) => ({ dealId: site.linked_deal_id, siteId: site.site_id })),
+    ...catalogSites.map((site) => ({ dealId: site.linked_deal_id, siteId: site.site_id })),
+  ])) : [];
+  const reviewQueueReady = feedLoaded && loadedQueueKey === queueKey;
+  const reviewScoped = Boolean(reviewScopeId);
+  const reviewList = reviewScoped ? visibleFeed.filter((site) => reviewScopeIds.includes(site.siteId)) : visibleFeed;
+  const reviewDeepIndex = reviewDeepSite ? reviewList.findIndex((site) => site.siteId === reviewDeepSite) : -1;
+  const reviewIndex = reviewDeepIndex >= 0
+    ? reviewDeepIndex
+    : Math.min(Math.max(Number(params.get("i") || "1") - 1, 0), Math.max(reviewList.length - 1, 0));
+  const reviewCurrent = reviewList[reviewIndex];
+  const reviewMiss = reviewScoped && reviewQueueReady && reviewList.length === 0;
+  const reviewScopeName = (() => {
+    if (!reviewScopeId) return "";
+    const deal = dealRows.find((row) => row.deal_id === reviewScopeId);
+    if (deal?.name?.trim()) return deal.name.trim();
+    const site = sites.find((row) => row.site_id === reviewScopeId) || catalogSites.find((row) => row.site_id === reviewScopeId);
+    return site?.name?.trim() || reviewScopeId;
+  })();
   const sitePool = (universeWide || allCities) && catalogSites.length ? catalogSites : sites;
   const poolById = useMemo(() => {
     const map = new Map(featureById);
@@ -982,8 +1000,18 @@ export default function Explorer() {
   });
 
   function openInReview(id: string) {
-    const at = visibleFeed.findIndex((site) => site.siteId === id);
-    write({ review: "1", i: String(at >= 0 ? at + 1 : 1), view: null, table: null, funnel: "pipeline", q: null, qmarket: "all", qstage: "any" });
+    write({
+      review: "1",
+      rsite: id,
+      i: "1",
+      site: id,
+      view: null,
+      table: null,
+      funnel: "pipeline",
+      q: null,
+      qmarket: "all",
+      qstage: "any",
+    });
   }
 
   function setCompared(id: string, on?: boolean) {
@@ -1287,7 +1315,7 @@ export default function Explorer() {
   else if (leaveLinkedReview && linkedReviewSite) leaveSite.current = linkedReviewSite;
   const inReview = reviewing && !leaveLinkedReview;
 
-  const reviewSiteId = inReview && !caughtUp ? reviewCurrent?.siteId : undefined;
+  const reviewSiteId = inReview && !caughtUp && !reviewMiss ? reviewCurrent?.siteId : undefined;
   useEffect(() => {
     const id = leaveSite.current;
     if (!id) return;
@@ -1317,7 +1345,7 @@ export default function Explorer() {
       replaceSearch(search.toString(), {
         ...patch,
         site: id,
-        ...(stillReview ? { view: null, review: null, i: null } : {}),
+        ...(stillReview ? { view: null, review: null, i: null, rsite: null } : {}),
       });
       return false;
     };
@@ -1366,6 +1394,27 @@ export default function Explorer() {
       return;
     }
     if (!reviewing || !feedLoaded) return;
+    if (reviewScoped && !reviewQueueReady) return;
+    if (reviewMiss) {
+      setSelected(reviewScopeId);
+      const aligned = params.get("site") === reviewScopeId
+        && params.get("review") === "1"
+        && params.get("rsite") === reviewScopeId
+        && !params.get("i");
+      if (!aligned) {
+        write({
+          review: "1",
+          rsite: reviewScopeId,
+          site: reviewScopeId,
+          i: null,
+          view: null,
+          funnel: "pipeline",
+          tab: "pipeline",
+          table: null,
+        });
+      }
+      return;
+    }
     if (reviewDeepSite && reviewDeepIndex < 0) return;
     if (!reviewSiteId) {
       setSelected(null);
@@ -1385,7 +1434,7 @@ export default function Explorer() {
       && (params.get("city") || null) === (patch.city ?? null)
       && (params.get("pstage") || null) === (patch.pstage ?? null);
     if (!aligned) write(patch);
-  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, reviewDeepSite, reviewDeepIndex, dealFeatures.length, params, droppedReviewLink, linkedReviewSite, reviewQueueSettled, linkedInQueue, data, feed]);
+  }, [reviewing, feedLoaded, reviewSiteId, reviewIndex, reviewDeepSite, reviewDeepIndex, dealFeatures.length, params, droppedReviewLink, linkedReviewSite, reviewQueueSettled, linkedInQueue, data, feed, reviewScoped, reviewQueueReady, reviewMiss, reviewScopeId]);
 
   function relatedPanel(current: { id: string; kind: "site" | "deal"; name?: string | null; address?: string | null; apn?: string | null }) {
     const records = [
@@ -1642,7 +1691,7 @@ export default function Explorer() {
   }
 
   function goReview(index: number) {
-    const count = Math.max(visibleFeed.length, 1);
+    const count = Math.max(reviewList.length, 1);
     const next = Math.min(Math.max(index, 0), count - 1);
     write({ review: "1", i: String(next + 1), view: null, q: null });
   }
@@ -1660,7 +1709,7 @@ export default function Explorer() {
     const siteId = reviewCurrent.siteId;
     setFeed((items) => items.map((item) => item.siteId === siteId ? { ...item, status: "reviewed", previous } : item));
     setUndo({ siteId, previous, index: reviewIndex });
-    const upcoming = visibleFeed.map((item) => item.siteId === siteId ? { ...item, status: "reviewed" as const } : item);
+    const upcoming = reviewList.map((item) => item.siteId === siteId ? { ...item, status: "reviewed" as const } : item);
     let next = -1;
     for (let cursor = reviewIndex + 1; cursor < upcoming.length; cursor += 1) {
       if (upcoming[cursor]?.status === "open") { next = cursor; break; }
@@ -1721,7 +1770,7 @@ export default function Explorer() {
   });
   const hiddenDropped = showDroppedRows ? 0 : allMarketDeals.filter((deal) => deal.stage_group === "dropped").length;
   const allCount = pipelineAllCount(allMarketDeals.length - hiddenDropped, hiddenDropped);
-  const reviewMarkers = inReview ? visibleFeed.flatMap((site, index) => {
+  const reviewMarkers = inReview && !reviewMiss ? reviewList.flatMap((site, index) => {
     const deal = dealRows.find((row) => row.deal_id === site.siteId);
     const point = (deal ? dealPoint(deal) : null) || (site.lng != null && site.lat != null ? [site.lng, site.lat] as [number, number] : null);
     if (!point) return [];
@@ -1835,7 +1884,7 @@ export default function Explorer() {
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any" })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any" })}>
               Review{queueCount ? <span className="count-badge" data-testid="queue-count">{queueCount}</span> : null}
             </button>
           ) : null}
@@ -2236,10 +2285,16 @@ export default function Explorer() {
         ) : null}
       </header>
       <ActionsQuietNotice />
-      {inReview && me?.actionsEnabled ? (
+      {inReview && reviewMiss ? (
+        <div className="review-bar review-site-empty" data-testid="review-site-empty" role="status">
+          <p>No review items for {reviewScopeName}</p>
+          <button type="button" className="review-exit" onClick={() => stopReview()}>Back to map</button>
+        </div>
+      ) : null}
+      {inReview && me?.actionsEnabled && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
         <ReviewBar
           index={reviewIndex}
-          total={visibleFeed.length}
+          total={reviewList.length}
           reviewed={feed.filter((site) => site.status === "reviewed").length}
           summary={filterSummary}
           siteId={reviewCurrent?.siteId || ""}
@@ -2278,10 +2333,15 @@ export default function Explorer() {
 
       <div className="map-stage">
         <ActionsDialogs />
-        {inReview && !caughtUp ? (
-          <ReviewRail sites={visibleFeed.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
+        {inReview && !caughtUp && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
+          <ReviewRail sites={reviewList.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
         ) : null}
-        {inReview && caughtUp ? (
+        {inReview && reviewMiss ? (
+          <aside className="review-rail" data-testid="review-rail" aria-label="Review inbox">
+            <p className="review-empty">No review items for {reviewScopeName}</p>
+          </aside>
+        ) : null}
+        {inReview && caughtUp && !reviewMiss ? (
           <div className="review-done" data-testid="queue-empty">
             <p>All caught up</p>
             <button type="button" onClick={() => stopReview()} className="menu-item">Back to map</button>
@@ -2295,7 +2355,7 @@ export default function Explorer() {
           </div>
         ) : null}
         {feedSheet ? (
-          <ReviewFeedSheet sites={visibleFeed.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
+          <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
         <PanelBoundary name="Map">
         <MapView
@@ -2339,7 +2399,7 @@ export default function Explorer() {
           registerFrameRings={registerFrameRings}
           onSelect={(id) => {
             if (inReview) {
-              const at = visibleFeed.findIndex((site) => site.siteId === id);
+              const at = reviewList.findIndex((site) => site.siteId === id);
               if (at >= 0) {
                 goReview(at);
                 return;

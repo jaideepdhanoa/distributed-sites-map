@@ -4,6 +4,8 @@ import { isPnlLineCode, type PnlBusiness } from "./lines";
 import { parseAmount } from "./money";
 import { buildStatement, emptyStatement, unavailableStatement, type CapturedLine, type MissingMonth, type PnlStatement } from "./statement";
 
+export { linkedPnlIds } from "./ids";
+
 type Row = {
   site_id?: string;
   period_id: string;
@@ -42,26 +44,6 @@ function day(value: string | Date | null | undefined): string {
   if (value == null || value === "") return "";
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
-}
-
-/** The requested record plus its linked deal or universe site, requested id first. */
-export function linkedPnlIds(requested: string, links: { dealId: string; siteId: string }[]): string[] {
-  const seen = new Set<string>();
-  const ids: string[] = [];
-  const add = (value: string) => {
-    const text = value.trim();
-    if (!text || seen.has(text)) return;
-    seen.add(text);
-    ids.push(text);
-  };
-  add(requested);
-  for (const link of links) {
-    if (link.dealId === requested || link.siteId === requested) {
-      add(link.dealId);
-      add(link.siteId);
-    }
-  }
-  return ids;
 }
 
 export async function loadPnlStatement(sql: Sql, siteId: string | string[]): Promise<PnlStatement> {

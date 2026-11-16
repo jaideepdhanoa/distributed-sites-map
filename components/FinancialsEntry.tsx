@@ -15,10 +15,32 @@ function readStatement(value: unknown): PnlStatement {
   return emptyStatement();
 }
 
+export function PendingFigure({ lines = 2 }: { lines?: number }) {
+  const notes = Math.max(0, lines - 1);
+  return (
+    <>
+      <strong className="figure-hold" data-testid="figure-loading" aria-busy="true">
+        <span className="skeleton" />
+        <span className="sr">Loading figures</span>
+      </strong>
+      {Array.from({ length: notes }, (_, index) => (
+        <small key={index} className="figure-hold" aria-hidden="true"><span className="skeleton" /></small>
+      ))}
+    </>
+  );
+}
+
 export function usePnlTiles(dealId: string) {
   const [statement, setStatement] = useState<PnlStatement | null>(null);
   const [sample, setSample] = useState(false);
   const [settled, setSettled] = useState(!dealId);
+  const [loadedFor, setLoadedFor] = useState(dealId);
+  if (loadedFor !== dealId) {
+    setLoadedFor(dealId);
+    setStatement(null);
+    setSample(false);
+    setSettled(!dealId);
+  }
   useEffect(() => {
     if (!dealId) {
       setStatement(null);
@@ -30,7 +52,7 @@ export function usePnlTiles(dealId: string) {
     setStatement(null);
     setSample(false);
     setSettled(false);
-    fetch(`/api/data/financials/${encodeURIComponent(dealId)}`)
+    fetch(`/api/data/financials/${encodeURIComponent(dealId)}`, { cache: "no-store" })
       .then(async (response) => (response.ok ? await response.json() as { pnl?: unknown; pnlDemo?: boolean } : null))
       .then((body) => {
         if (cancel) return;
@@ -68,6 +90,16 @@ export default function FinancialsEntry({
     setOpen(false);
   }, [dealId]);
   const card = settled && statement ? financialsCard(statement, sample) : null;
+  if (!settled) {
+    return (
+      <article className="fin-entry" data-testid="financials-loading" aria-busy="true">
+        <div className="fin-tile">
+          <span>Financials</span>
+          <PendingFigure lines={3} />
+        </div>
+      </article>
+    );
+  }
   return (
     <>
       {card ? (

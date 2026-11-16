@@ -9,7 +9,7 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
-import FinancialsEntry, { usePnlTiles, type PnlTiles } from "./FinancialsEntry";
+import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, sheetSnapHeights, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
@@ -144,16 +144,22 @@ function FigureSkeleton() {
   );
 }
 
+function HeldNote({ note }: { note: string }) {
+  return <small className="figure-hold" aria-hidden={note ? undefined : true}>{note}</small>;
+}
+
 function DealHeadline({
   deal,
   censusAcres,
   signedIn = false,
   tiles = null,
+  pending = false,
 }: {
   deal: DealProps;
   censusAcres?: number | null;
   signedIn?: boolean;
   tiles?: PnlTiles | null;
+  pending?: boolean;
 }) {
   const cash = cashTile(deal);
   const revenue = revenueTile(deal);
@@ -175,17 +181,25 @@ function DealHeadline({
   return (
     <div className="headline" data-testid="card-numbers">
       {showMoney ? (
-        <div>
+        <div data-testid="overview-revenue">
           <span>Revenue</span>
-          <strong className={phrase(shownRevenue.text)} title={shownRevenue.title}>{shownRevenue.text}</strong>
-          {shownRevenue.note ? <small>{shownRevenue.note}</small> : null}
+          {pending ? <PendingFigure /> : (
+            <>
+              <strong className={phrase(shownRevenue.text)} title={shownRevenue.title}>{shownRevenue.text}</strong>
+              <HeldNote note={shownRevenue.note} />
+            </>
+          )}
         </div>
       ) : null}
       {showMoney ? (
-        <div>
+        <div data-testid="overview-cash">
           <span>Cash flow</span>
-          <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
-          {shownCash.note ? <small>{shownCash.note}</small> : null}
+          {pending ? <PendingFigure /> : (
+            <>
+              <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
+              <HeldNote note={shownCash.note} />
+            </>
+          )}
         </div>
       ) : null}
       <div>
@@ -211,8 +225,8 @@ function DealHeadline({
   );
 }
 
-function SiteNumbers({ site, deal, signedIn = false, tiles = null }: { site: SiteProps; deal?: DealProps | null; signedIn?: boolean; tiles?: PnlTiles | null }) {
-  if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} signedIn={signedIn} tiles={tiles} />;
+function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = false }: { site: SiteProps; deal?: DealProps | null; signedIn?: boolean; tiles?: PnlTiles | null; pending?: boolean }) {
+  if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} signedIn={signedIn} tiles={tiles} pending={pending} />;
   const spare = spareLandSqft(null, site.spare_ac_own);
   const traffic = site.aadt_count != null && site.aadt_count !== "" ? site.aadt_count : "—";
   const year = countYear(site.aadt_year);
@@ -327,7 +341,7 @@ function usePackageHref(id: string, signedIn: boolean) {
       return undefined;
     }
     let cancel = false;
-    fetch(`/api/data/financials/${encodeURIComponent(id)}`)
+    fetch(`/api/data/financials/${encodeURIComponent(id)}`, { cache: "no-store" })
       .then(async (response) => (response.ok ? await response.json() as { packageHref?: string } : null))
       .then((body) => {
         if (!cancel) setHref(safePackageHref(body?.packageHref, true));
@@ -442,6 +456,7 @@ export default function Detail({
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
   const pnl = usePnlTiles(signedIn && linkedDeal && linkedDeal.kind !== "land" ? linkedDeal.deal_id : "");
+  const figuresPending = !pnl.settled;
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
   const street = photos.frontageUrl || site.street_view_url;
@@ -508,7 +523,7 @@ export default function Detail({
         />
       </div>
       <ScoreTile score={linkedDeal?.score} />
-      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} /> : <FigureSkeleton />}
+      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
@@ -646,7 +661,7 @@ export default function Detail({
         }
         numbers={figuresReady ? (
           <>
-            <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} />
+            <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
             <div className="kv">
               <span>Asking price</span>
               <div>
@@ -744,6 +759,7 @@ export function DealDetail({
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
   const pnl = usePnlTiles(signedIn && deal.kind !== "land" ? deal.deal_id : "");
+  const figuresPending = !pnl.settled;
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
   const cash = cashTile(deal);
@@ -803,7 +819,7 @@ export function DealDetail({
         />
       </div>
       <ScoreTile score={deal.score} />
-      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} /> : <FigureSkeleton />}
+      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
@@ -867,7 +883,7 @@ export function DealDetail({
         }
         numbers={
           <>
-            {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} /> : null}
+            {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">
               <span>Asking price</span>
@@ -882,9 +898,9 @@ export function DealDetail({
               <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}
-              {signedIn && !cash.hidden ? <div title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-revenue" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-revenue" title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div>) : null}
               {signedIn && !cash.hidden ? <span>Cash flow</span> : null}
-              {signedIn && !cash.hidden ? <div title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-cash" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-cash" title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div>) : null}
             </div>
           </>
         }

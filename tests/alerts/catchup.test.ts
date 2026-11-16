@@ -244,12 +244,13 @@ test("catch-up keeps unresolved items from before Nov 9 and lists each open prop
 
 test("preview is refused in CI", () => {
   const previous = process.env.GITHUB_ACTIONS;
-  process.env.GITHUB_ACTIONS = "true";
   try {
+    process.env.GITHUB_ACTIONS = "true";
     assert.equal(catchUpPreviewAllowed(), false);
+    delete process.env.GITHUB_ACTIONS;
+    assert.equal(catchUpPreviewAllowed(), true);
   } finally {
     if (previous == null) delete process.env.GITHUB_ACTIONS;
     else process.env.GITHUB_ACTIONS = previous;
   }
-  assert.equal(catchUpPreviewAllowed(), true);
 });

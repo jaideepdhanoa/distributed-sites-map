@@ -80,7 +80,7 @@ test("Dropped still needs a human actor and a reason in the database", async () 
   assert.equal(row.rows[0]?.stage, "Dropped");
 });
 
-test("015 still adds tag after 017 is already recorded", async () => {
+test("015 still adds tag after 016 through 020 are already recorded", async () => {
   const sql = await memorySql();
   const files = readdirSync(migrationDir()).filter((name) => name.endsWith(".sql") && name !== "015_tags.sql").sort();
   await sql.exec(`
@@ -93,6 +93,9 @@ test("015 still adds tag after 017 is already recorded", async () => {
     const body = readFileSync(join(migrationDir(), file), "utf8");
     await sql.exec(`BEGIN;\n${body}\nINSERT INTO schema_migrations (id) VALUES ('${file}');\nCOMMIT;`);
   }
+  const recorded = await sql.query<{ id: string }>("SELECT id FROM schema_migrations ORDER BY id");
+  assert.ok(recorded.rows.some((row) => row.id === "016_search.sql"));
+  assert.ok(recorded.rows.some((row) => row.id === "020_proposal_close.sql"));
   assert.deepEqual(await migrate(sql), ["015_tags.sql"]);
   const check = await sql.query<{ def: string }>(
     `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'events_entity_type_check'`,
@@ -100,4 +103,12 @@ test("015 still adds tag after 017 is already recorded", async () => {
   const def = check.rows[0]?.def || "";
   assert.match(def, /'tag'/);
   assert.match(def, /'site_space'/);
+  const search = await sql.query<{ name: string }>(
+    "SELECT relname AS name FROM pg_class WHERE relname = 'search_docs'",
+  );
+  assert.equal(search.rows[0]?.name, "search_docs");
+  const closed = await sql.query<{ def: string }>(
+    "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'suggestions_status_check'",
+  );
+  assert.match(closed.rows[0]?.def || "", /superseded/);
 });

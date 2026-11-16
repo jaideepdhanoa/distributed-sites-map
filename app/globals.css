@@ -980,14 +980,15 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .stage-cell { display: flex; flex-wrap: nowrap; gap: 4px 6px; align-items: center; min-width: 0; overflow: hidden; }
 .list-table .stage-cell { flex-wrap: wrap; align-items: flex-start; overflow: visible; white-space: normal; }
 .suggested-inline {
-  flex: 1 1 12rem;
+  flex: 1 1 16rem;
   display: inline-block;
-  max-width: 100%;
+  max-width: 24rem;
   color: var(--ink-3);
   font-size: var(--type-cap);
   line-height: 1.3;
-  white-space: normal;
-  overflow: visible;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   vertical-align: bottom;
 }
 .nda-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }

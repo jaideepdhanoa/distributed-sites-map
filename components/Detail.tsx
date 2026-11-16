@@ -39,18 +39,24 @@ type SheetControl = {
 };
 
 function SheetHandle({ sheet }: { sheet?: SheetControl }) {
-  const drag = useRef<{ y: number; height: number } | null>(null);
+  const drag = useRef<{ y: number; height: number; moved: boolean } | null>(null);
+  const ignoreClick = useRef(false);
+  function step(direction: "more" | "less") {
+    sheet?.onSnap?.(stepSheet(sheet.snap ?? "peek", direction));
+  }
   return (
     <div className="sheet-handle" data-testid="sheet-handle">
       <button
         type="button"
         className="sheet-grab"
         aria-label="Drag sheet"
+        aria-keyshortcuts="ArrowUp ArrowDown"
         onPointerDown={(event) => {
           if (!sheet?.onSnap) return;
           const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
           if (!drawer) return;
-          drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height };
+          ignoreClick.current = false;
+          drag.current = { y: event.clientY, height: drawer.getBoundingClientRect().height, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
@@ -58,7 +64,10 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           if (!info) return;
           const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
           if (!drawer) return;
-          const next = Math.min(window.innerHeight * 0.92, Math.max(140, info.height + (info.y - event.clientY)));
+          const delta = info.y - event.clientY;
+          if (Math.abs(delta) > 8) info.moved = true;
+          if (!info.moved) return;
+          const next = Math.min(window.innerHeight * 0.92, Math.max(140, info.height + delta));
           drawer.style.height = `${Math.round(next)}px`;
         }}
         onPointerUp={(event) => {
@@ -66,20 +75,36 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           drag.current = null;
           const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
           if (!info || !drawer || !sheet?.onSnap) return;
-          if (Math.abs(info.y - event.clientY) < 10) {
+          if (!info.moved) {
             drawer.style.height = "";
-            sheet.onSnap(stepSheet(sheet.snap ?? "peek", "more"));
             return;
           }
-          sheet.onSnap(nearestSheetSnap(drawer.getBoundingClientRect().height, window.innerHeight));
-          window.requestAnimationFrame(() => {
-            drawer.style.height = "";
-          });
+          ignoreClick.current = true;
+          const height = drawer.getBoundingClientRect().height;
+          drawer.style.height = "";
+          sheet.onSnap(nearestSheetSnap(height, window.innerHeight));
         }}
         onPointerCancel={() => {
           drag.current = null;
           const drawer = document.querySelector(".drawer") as HTMLElement | null;
           if (drawer) drawer.style.height = "";
+        }}
+        onClick={() => {
+          if (ignoreClick.current) {
+            ignoreClick.current = false;
+            return;
+          }
+          step("more");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+            event.preventDefault();
+            step("more");
+          }
+          if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+            event.preventDefault();
+            step("less");
+          }
         }}
       />
     </div>

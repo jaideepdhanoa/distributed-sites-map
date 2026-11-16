@@ -62,6 +62,27 @@ test("dragging the grab bar steps through half and full", async ({ page }, info)
   await expect(drawer).toHaveClass(/snap-peek/);
 });
 
+test("a tap and the keyboard change the phone sheet detent", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone sheet");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?funnel=pipeline&site=PIPE-PHX-0014", { waitUntil: "domcontentloaded" });
+  const drawer = page.locator("aside.drawer");
+  const grab = page.getByRole("button", { name: "Drag sheet" });
+  await expect(drawer).toHaveClass(/snap-peek/);
+  const peek = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+  await grab.click();
+  await expect(drawer).toHaveClass(/snap-half/);
+  const half = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+  expect(half).toBeGreaterThan(peek + 40);
+  await grab.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(drawer).toHaveClass(/snap-full/);
+  const full = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+  expect(full).toBeGreaterThan(half + 40);
+  await page.keyboard.press("ArrowDown");
+  await expect(drawer).toHaveClass(/snap-half/);
+});
+
 test("dragging the grab bar releases on half", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.goto(SONORAN);

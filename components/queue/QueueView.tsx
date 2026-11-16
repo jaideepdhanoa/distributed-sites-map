@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { RowLinks } from "../RowLinks";
 import { stageMoveLabel } from "@/lib/actions/nextStepTypes";
+import { quietActionsFetch } from "@/lib/actions/quiet";
 import { formatPacific } from "@/lib/actions/time";
 import { reviewSentence } from "@/lib/queue/since";
 import "./queue.css";
@@ -229,7 +230,7 @@ function ReviewMenu({ mode, siteId, followed, moveLabel, onClose, onShowSnooze, 
   const [error, setError] = useState("");
   useEffect(() => {
     let cancel = false;
-    fetch("/api/actions/accounts").then(async (response) => {
+    quietActionsFetch("/api/actions/accounts").then(async (response) => {
       if (cancel || !response.ok) return;
       setAccounts(((await response.json()) as { accounts: { id: string; name: string }[] }).accounts || []);
     }).catch(() => undefined);

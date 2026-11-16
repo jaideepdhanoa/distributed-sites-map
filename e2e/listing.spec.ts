@@ -30,7 +30,12 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(page.getByTestId("card-numbers")).toContainText("Spare land");
   await expect(page.getByTestId("card-numbers")).toContainText("Bays that fit");
   await expect(page.getByTestId("card-numbers")).toContainText("Traffic");
-  await expect(page.getByTestId("workbook-step")).toContainText("POS/car counts");
+  const step = page.getByTestId("workbook-step");
+  await expect(step).toBeVisible();
+  await expect(step).not.toContainText(/\b[RT]-\d{2,4}\b/);
+  const more = step.getByRole("button", { name: "Full next step" });
+  if (await more.count()) await more.click();
+  await expect(step).toContainText("POS/car counts");
   await expect(page.locator("aside.drawer")).not.toContainText("Broker contacted");
   await expect(page.locator("aside.drawer")).not.toContainText("Not a fit");
   await expect(page.locator("aside.drawer")).not.toContainText("Not required");

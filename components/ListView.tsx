@@ -29,15 +29,11 @@ export type ListRow = {
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id">; label: string }[] = [
   { id: "site", label: "Site" },
   { id: "type", label: "Type" },
-  { id: "city", label: "City" },
   { id: "stage", label: "Stage" },
-  { id: "tier", label: "Size tier" },
   { id: "spare", label: "Spare land" },
-  { id: "grade", label: "Site capacity" },
-  { id: "zoning", label: "Zoning" },
-  { id: "traffic", label: "Traffic count" },
-  { id: "listed", label: "Listed" },
-  { id: "lead", label: "Lead source" },
+  { id: "grade", label: "Power" },
+  { id: "traffic", label: "Traffic" },
+  { id: "listed", label: "Asking" },
 ];
 
 export function listCsv(rows: ListRow[]) {
@@ -115,12 +111,12 @@ export default function ListView({
             {rows.map((row) => (
               <tr key={row.id} className={row.id === selectedId ? "list-row on" : "list-row"} onClick={() => onOpen(row.id)}>
                 {LIST_COLUMNS.map((column) => (
-                  <td key={column.id} title={column.id === "site" ? row.site : (row[column.id] || "")}>
+                  <td key={column.id} title={column.id === "site" ? row.site : (row[column.id] || "—")}>
                     {column.id === "site" ? (
                       <span className="site-name">
                         <span className="site-title">
                           <span className="site-name-text">{row.site || "—"}</span>
-                          {row.address && row.address !== row.site ? <span className="site-address">{row.address}</span> : null}
+                          {row.address && row.address !== row.site ? <span className="site-address">{row.address}{row.city && !row.address.toLowerCase().includes(row.city.toLowerCase()) ? `, ${row.city}` : ""}</span> : row.city ? <span className="site-address">{row.city}</span> : null}
                         </span>
                         {row.near ? <span className="badge quiet near-chip" data-testid="near-chip" data-short={row.nearShort || row.near} title="Near means outside the service area, within the miles shown. More than 10 miles is a knock-out.">{row.near}</span> : null}
                         <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
@@ -145,8 +141,8 @@ export default function ListView({
                 <strong>{row.site}</strong>
                 {row.address && row.address !== row.site ? <span className="site-address">{row.address}</span> : null}
                 {row.near ? <span className="badge quiet near-chip" data-testid="near-chip" data-short={row.nearShort || row.near} title="Near means outside the service area, within the miles shown. More than 10 miles is a knock-out.">{row.near}</span> : null}
-                <span>{[row.city, row.stage, row.tier, row.grade ? `Site capacity ${row.grade}` : ""].filter(Boolean).join(" · ")}</span>
-                <span>{row.traffic || "—"}</span>
+                <span className="list-card-line">{[row.city, row.stage, row.type].filter(Boolean).join(" · ")}</span>
+                <span className="list-card-line" title={[row.spare, row.grade, row.traffic].filter(Boolean).join(" · ")}>{[row.spare, row.grade, row.traffic, row.listed].filter(Boolean).join(" · ") || "—"}</span>
               </button>
               <span className="list-card-actions">
                 <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />

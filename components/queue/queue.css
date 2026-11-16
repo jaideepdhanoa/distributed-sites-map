@@ -208,13 +208,22 @@
   .review-exit { grid-area: exit; margin-left: 0; justify-self: end; }
   .review-nav { grid-area: nav; }
   .review-since-wrap, .review-since-text { grid-area: since; max-width: none; }
-  .review-since-wrap .review-step { white-space: normal; text-align: left; }
+  .review-since-wrap .review-step { white-space: nowrap; text-align: left; }
   .review-bar .primary { grid-area: reviewed; justify-self: start; }
   .review-more { grid-area: more; justify-self: end; }
-  .review-bar button.review-step { min-width: 36px; width: 36px; padding: 0; font-size: 0; }
-  .review-bar button.review-step::after { font-size: 18px; line-height: 1; }
-  .review-bar .review-step[aria-label="Previous"]::after { content: "‹"; }
-  .review-bar .review-step[aria-label="Next"]::after { content: "›"; }
+  .review-bar .review-nav button.review-step { min-width: 44px; width: 44px; padding: 0; font-size: 0; }
+  .review-bar .review-nav button.review-step::after { font-size: 18px; line-height: 1; }
+  .review-bar .review-nav .review-step[aria-label="Previous"]::after { content: "‹"; }
+  .review-bar .review-nav .review-step[aria-label="Next"]::after { content: "›"; }
+  .review-since-wrap button.review-step {
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 12px;
+    font-size: 13px;
+    line-height: 1.2;
+    min-height: 44px;
+  }
   .review-filters { position: static; }
   .queue-pop {
     position: absolute;

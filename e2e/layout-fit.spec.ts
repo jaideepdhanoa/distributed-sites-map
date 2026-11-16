@@ -61,7 +61,9 @@ test("the desk list keeps the location note out of the stage tabs", async ({ pag
   const lines = await mark.evaluate((el) => {
     const range = document.createRange();
     range.selectNodeContents(el);
-    return range.getClientRects().length;
+    // A clipped one-line label can report two rects on the same top. Count lines, not fragments.
+    const tops = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+    return tops.size;
   });
   expect(lines).toBe(1);
 });

@@ -169,6 +169,17 @@ export function photoStatusLine(status: string, diligenceCount: number | null, l
   return counts;
 }
 
+/** Counts the tiles the gallery actually shows, including a spare-land image the workbook total leaves out. */
+export function photoSetSummary(status: string, slides: { role: string }[]) {
+  let site = 0;
+  let listing = 0;
+  for (const slide of slides) {
+    if (slide.role === "listing") listing += 1;
+    else site += 1;
+  }
+  return photoStatusLine(status, site > 0 ? site : null, listing > 0 ? listing : null);
+}
+
 export function cardPhotos(primary?: PhotoCarrier | null, secondary?: PhotoCarrier | null): PhotoCard {
   const primaryPhotos = primary?.photos || [];
   const photos = primaryPhotos.length ? primaryPhotos : secondary?.photos || [];
@@ -186,9 +197,9 @@ export function cardPhotos(primary?: PhotoCarrier | null, secondary?: PhotoCarri
 }
 
 export function galleryModel(card: PhotoCard): GalleryModel {
-  const statusLine = photoStatusLine(card.status, card.diligenceCount, card.listingCount);
   const deferred = card.status === "Deferred";
   const slides = deferred ? [] : orderedImages(card.photos);
+  const statusLine = photoSetSummary(card.status, slides);
   const diligence = slides.filter((photo) => photo.role !== "listing");
   const listing = slides.filter((photo) => photo.role === "listing");
   const listingThumbs = listing.slice(0, LISTING_THUMB_CAP);

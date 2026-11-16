@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { publicDeal } from "../lib/keyNumbers.ts";
+import { MAX_PHOTO_BYTES, looksLikeImage, referencedPhotoNames, resolvePhoto } from "../lib/photos/bytes.ts";
 import {
   cardPhotos,
   galleryModel,
   imageCandidates,
   isDirectImageUrl,
+  photoSetSummary,
   photoStatusLine,
   streetViewEmbedSrc,
 } from "../lib/photos.ts";
@@ -56,7 +58,8 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
   ];
   const card = cardPhotos({ photos, photo_status: "Partial", photo_diligence_count: 2, photo_listing_count: 4 });
   const model = galleryModel(card);
-  assert.equal(model.statusLine, "Photo set: partial · 2 site photos · 4 listing photos");
+  assert.equal(model.statusLine, "Photo set: partial · 5 site photos · 7 listing photos");
+  assert.equal(model.slides.length, 12);
   assert.deepEqual(model.slides.map((item) => item.role), [
     "spare_land_annotated",
     "lot_aerial",
@@ -86,4 +89,34 @@ test("gallery order, listing cap, deferred, and frontage embed", () => {
   const pin = publicDeal({ photos, name: "A", cap_a_line_ft: 12 });
   assert.equal("photos" in pin, false);
   assert.equal(pin.name, "A");
+});
+
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xd9]);
+
+test("a missing deploy file can be filled from a later source, and a bad file is skipped", async () => {
+  const name = "0123456789abcdef0123.jpg";
+  assert.equal(looksLikeImage(JPEG), true);
+  assert.equal(looksLikeImage(Buffer.alloc(MAX_PHOTO_BYTES + 1, 0xff)), false);
+  assert.deepEqual(referencedPhotoNames([
+    { name: "deals.geojson", body: `{"view_url":"/api/data/photos/${name}"}` },
+    { name: "notes.txt", body: `/api/data/photos/${name}` },
+  ]), [name]);
+  let fetched = false;
+  const local = await resolvePhoto(name, [
+    async () => JPEG,
+    async () => { fetched = true; return null; },
+  ]);
+  assert.equal(fetched, false);
+  assert.equal(local?.contentType, "image/jpeg");
+  assert.equal(local?.body.equals(JPEG), true);
+  const fromMain = await resolvePhoto(name, [
+    async () => null,
+    async () => JPEG,
+  ]);
+  assert.equal(fromMain?.body.equals(JPEG), true);
+  const missed = await resolvePhoto(name, [
+    async () => null,
+    async () => Buffer.from("not an image, really"),
+  ]);
+  assert.equal(missed, null);
 });

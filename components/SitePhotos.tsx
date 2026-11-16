@@ -1,55 +1,85 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { esriCredit, galleryModel, imageCandidates, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
+import { LISTING_THUMB_CAP, esriCredit, galleryModel, imageCandidates, photoSetSummary, roleLabel, streetViewEmbedSrc, type PhotoCard } from "@/lib/photos";
 import type { SitePhoto } from "@/lib/types";
 
 function altFor(photo: SitePhoto) {
   return photo.caption || roleLabel(photo.role);
 }
 
-function Frame({ photo, size }: { photo: SitePhoto; size: "thumb" | "full" }) {
+function Frame({ photo, size, onMissing }: { photo: SitePhoto; size: "thumb" | "full"; onMissing: () => void }) {
   const sources = imageCandidates(photo, size);
   const [index, setIndex] = useState(0);
   const [ready, setReady] = useState(false);
-  const alt = altFor(photo);
+  const missing = useRef(onMissing);
+  missing.current = onMissing;
   const src = sources[index] || "";
-  if (!src) {
-    return (
-      <span className={`photo-fallback ${size}`}>
-        <span>{alt}</span>
-      </span>
-    );
-  }
+  useEffect(() => {
+    if (!src) missing.current();
+  }, [src]);
+  if (!src) return null;
   return (
     <img
       src={src}
-      alt={alt}
+      alt={altFor(photo)}
       referrerPolicy="no-referrer"
       style={{ opacity: ready ? 1 : 0 }}
       onLoad={() => setReady(true)}
       onError={() => {
         setReady(false);
+        if (index + 1 >= sources.length) {
+          missing.current();
+          return;
+        }
         setIndex((current) => current + 1);
       }}
     />
   );
 }
 
-function Thumb({ photo, onOpen }: { photo: SitePhoto; onOpen: () => void }) {
+function Thumb({ photo, onOpen, onMissing }: { photo: SitePhoto; onOpen: () => void; onMissing: () => void }) {
+  const [gone, setGone] = useState(false);
+  if (gone) return null;
   return (
     <figure className={photo.role === "listing" ? "listing" : "diligence"}>
       <button type="button" className="photo-shot" data-testid="photo-thumb" onClick={onOpen}>
-        <Frame photo={photo} size="thumb" />
+        <Frame photo={photo} size="thumb" onMissing={() => { setGone(true); onMissing(); }} />
         <span className="photo-tag">{roleLabel(photo.role)}</span>
       </button>
     </figure>
   );
 }
 
+function photoKey(photo: SitePhoto, index: number) {
+  return `${index}:${photo.role}:${photo.view_url || photo.file_id || ""}`;
+}
+
 export default function SitePhotos({ card, between }: { card: PhotoCard; between?: ReactNode }) {
   const model = galleryModel(card);
   const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const slideKey = model.slides.map((photo, index) => photoKey(photo, index)).join("|");
+  useEffect(() => {
+    setHidden(new Set());
+  }, [slideKey]);
+  function hide(key: string) {
+    setHidden((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
+  const slides = model.slides.flatMap((photo, index) => {
+    const key = photoKey(photo, index);
+    return hidden.has(key) ? [] : [{ photo, index, key }];
+  });
+  const statusLine = photoSetSummary(card.status, slides.map((item) => item.photo));
+  const diligence = slides.filter((item) => item.photo.role !== "listing");
+  const listing = slides.filter((item) => item.photo.role === "listing");
+  const listingThumbs = listing.slice(0, LISTING_THUMB_CAP);
+  const hiddenListing = Math.max(0, listing.length - listingThumbs.length);
   const [open, setOpen] = useState<number | null>(null);
   const [streetOpen, setStreetOpen] = useState(false);
   const [hero, setHero] = useState<"street" | "photos">(model.showGallery ? "photos" : embed ? "street" : "photos");
@@ -66,6 +96,9 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
     if (!dialog.open) dialog.showModal();
   }, [open]);
   useEffect(() => {
+    if (!slides.length && embed) setHero("street");
+  }, [slides.length, embed]);
+  useEffect(() => {
     const dialog = streetRef.current;
     if (!dialog) return;
     if (!streetOpen) {
@@ -75,7 +108,7 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
     if (!dialog.open) dialog.showModal();
   }, [streetOpen]);
 
-  const credits = Array.from(new Set(model.slides.map((photo) => photo.attribution || esriCredit(photo)).filter(Boolean)));
+  const credits = Array.from(new Set(slides.map((item) => item.photo.attribution || esriCredit(item.photo)).filter(Boolean)));
   if (!model.visible) {
     return (
       <section className="site-photos">
@@ -87,31 +120,27 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
       </section>
     );
   }
-  const slide = open != null ? model.slides[open] : null;
+  const slide = open != null ? slides[open]?.photo : null;
   const slideCredit = slide ? (slide.attribution || esriCredit(slide)) : "";
-  const both = model.diligence.length > 0 && (model.listingThumbs.length > 0 || model.hiddenListing > 0);
+  const both = diligence.length > 0 && (listingThumbs.length > 0 || hiddenListing > 0);
 
   function step(delta: number) {
     setOpen((current) => {
       if (current == null) return current;
       const next = current + delta;
-      if (next < 0 || next >= model.slides.length) return current;
+      if (next < 0 || next >= slides.length) return current;
       return next;
     });
   }
 
-  function openAt(photo: SitePhoto) {
-    const index = model.slides.indexOf(photo);
+  function openAt(key: string) {
+    const index = slides.findIndex((item) => item.key === key);
     if (index >= 0) setOpen(index);
   }
 
   function openGallery() {
-    if (!model.slides.length) {
-      setHero("photos");
-      return;
-    }
     setHero("photos");
-    setOpen(0);
+    if (slides.length) setOpen(0);
   }
 
   function expandHero() {
@@ -136,12 +165,12 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
               allowFullScreen
             />
           ) : null}
-          {hero === "photos" && model.slides[0] ? (
-            <button type="button" className="hero-still" onClick={() => openAt(model.slides[0])}>
-              <Frame photo={model.slides[0]} size="full" />
+          {hero === "photos" && slides[0] ? (
+            <button type="button" className="hero-still" onClick={() => openAt(slides[0].key)}>
+              <Frame photo={slides[0].photo} size="full" onMissing={() => hide(slides[0].key)} />
             </button>
           ) : null}
-          {!embed && !model.slides.length ? (
+          {!embed && !slides.length ? (
             <div className="empty-hero">
               <p>No street view or photos on file</p>
             </div>
@@ -150,13 +179,13 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
         <div className="hero-chrome">
           <div className="hero-tabs" role="tablist" aria-label="Site view">
             {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
-            {model.showGallery ? (
+            {slides.length ? (
               <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "chip on" : "chip"} data-testid="photo-tab" onClick={openGallery}>
-                Photos{model.slides.length ? ` · ${model.slides.length}` : ""}
+                Photos · {slides.length}
               </button>
             ) : null}
           </div>
-          {embed || model.slides.length ? (
+          {embed || slides.length ? (
             <button type="button" className="hero-expand" data-testid="hero-expand" aria-label={hero === "street" && embed ? "Expand Street View" : "Expand photos"} onClick={expandHero}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" /></svg>
             </button>
@@ -197,34 +226,34 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
       ) : null}
       {between}
       <div className="photo-rest">
-      {model.statusLine ? <p className="photo-status" data-testid="photo-status" title="Photo set on file: site photos, then listing photos.">{model.statusLine}</p> : null}
-      {model.showGallery ? (
+      {statusLine ? <p className="photo-status" data-testid="photo-status" title="Photo set on file: the site photos and listing photos shown below.">{statusLine}</p> : null}
+      {slides.length ? (
         <>
-          {model.diligence.length ? (
+          {diligence.length ? (
             <div className="photo-group">
               {both ? <h3>Site photos</h3> : null}
               <div className="photo-grid">
-                {model.diligence.map((photo, index) => (
-                  <Thumb key={`${photo.role}-${photo.file_id || photo.view_url}-${index}`} photo={photo} onOpen={() => openAt(photo)} />
+                {diligence.map((item) => (
+                  <Thumb key={item.key} photo={item.photo} onOpen={() => openAt(item.key)} onMissing={() => hide(item.key)} />
                 ))}
               </div>
             </div>
           ) : null}
-          {model.listingThumbs.length || model.hiddenListing ? (
+          {listingThumbs.length || hiddenListing ? (
             <div className="photo-group listing">
               <h3>Listing</h3>
               <div className="photo-grid">
-                {model.listingThumbs.map((photo, index) => (
-                  <Thumb key={`${photo.role}-${photo.file_id || photo.view_url}-${index}`} photo={photo} onOpen={() => openAt(photo)} />
+                {listingThumbs.map((item) => (
+                  <Thumb key={item.key} photo={item.photo} onOpen={() => openAt(item.key)} onMissing={() => hide(item.key)} />
                 ))}
-                {model.hiddenListing > 0 ? (
+                {hiddenListing > 0 ? (
                   <button
                     type="button"
                     className="photo-more"
                     data-testid="photo-more"
-                    onClick={() => setOpen(model.diligence.length + model.listingThumbs.length)}
+                    onClick={() => setOpen(diligence.length + listingThumbs.length)}
                   >
-                    +{model.hiddenListing} more
+                    +{hiddenListing} more
                   </button>
                 ) : null}
               </div>
@@ -250,15 +279,15 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
           >
             {slide ? (
               <div className="photo-stage">
-                <Frame key={`${slide.role}-${slide.file_id || slide.view_url}-full`} photo={slide} size="full" />
+                <Frame key={`${slide.role}-${slide.file_id || slide.view_url}-full`} photo={slide} size="full" onMissing={() => { if (open != null) hide(slides[open]?.key || ""); }} />
                 <figcaption>
                   <span className={`photo-tag ${slide.role === "listing" ? "listing" : "diligence"}`}>{roleLabel(slide.role)}</span>
                   <p data-testid="photo-caption">{slide.caption || roleLabel(slide.role)}</p>
                   {slideCredit && slideCredit !== slide.caption ? <p className="photo-credit" data-testid="photo-attribution">{slideCredit}</p> : null}
                   <div className="photo-nav">
                     <button type="button" onClick={() => step(-1)} disabled={open === 0} className="menu-item">Previous</button>
-                    <span>{(open ?? 0) + 1} of {model.slides.length}</span>
-                    <button type="button" onClick={() => step(1)} disabled={open === model.slides.length - 1} className="menu-item">Next</button>
+                    <span>{(open ?? 0) + 1} of {slides.length}</span>
+                    <button type="button" onClick={() => step(1)} disabled={open === slides.length - 1} className="menu-item">Next</button>
                     <button type="button" className="close" aria-label="Close photos" onClick={() => setOpen(null)}><span aria-hidden="true">×</span></button>
                   </div>
                 </figcaption>

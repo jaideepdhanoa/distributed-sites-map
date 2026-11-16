@@ -50,6 +50,7 @@ async function main(): Promise<void> {
   summary(`## Snapshot live\n\n${line}\n`);
   // The shadow import is a later step in workbook-sync.yml. It runs only
   // after this publish succeeds, and a hash match never reaches this script.
+  // Photo bytes stay out of this database. The referenced set is about 241 MiB.
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `snapshot_id=${published.id}\n`);
   }

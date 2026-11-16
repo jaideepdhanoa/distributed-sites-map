@@ -180,23 +180,28 @@ export function ReviewBar({
         <button type="button" className="review-step" aria-label="Previous" onClick={onPrev}>Previous</button>
         <button type="button" className="review-step" aria-label="Next" onClick={onNext}>Next</button>
       </div>
-      {siteId && since.lines.length ? (
-        <span className="review-since-wrap">
-          <button type="button" className="review-step" data-testid="review-since" aria-expanded={sinceOpen} onClick={() => setSinceOpen((value) => !value)}>{since.sentence}</button>
-          {sinceOpen ? (
-            <ul className="review-since-list" data-testid="review-since-list">
-              {since.lines.map((line) => (
-                <li key={`${line.at}-${line.text}`}>
-                  <span>{line.text}</span>
-                  <time dateTime={line.at}>{line.when}</time>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </span>
-      ) : (
-        siteId ? <span className="review-since-text" data-testid="review-since">{since.sentence}</span> : null
-      )}
+      <span className="review-since-wrap">
+        <button
+          type="button"
+          className="review-step"
+          data-testid="review-since"
+          aria-expanded={since.lines.length ? sinceOpen : undefined}
+          aria-disabled={!siteId || undefined}
+          onClick={() => { if (siteId && since.lines.length) setSinceOpen((value) => !value); }}
+        >
+          {siteId ? since.sentence : "Since: nothing in this review"}
+        </button>
+        {sinceOpen && since.lines.length ? (
+          <ul className="review-since-list" data-testid="review-since-list">
+            {since.lines.map((line) => (
+              <li key={`${line.at}-${line.text}`}>
+                <span>{line.text}</span>
+                <time dateTime={line.at}>{line.when}</time>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </span>
       <button type="button" className="primary" data-testid="queue-reviewed" onClick={onReviewed}>
         <span className="review-long">Mark reviewed</span>
         <span className="review-short">Mark reviewed</span>

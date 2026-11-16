@@ -7,6 +7,9 @@ import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 import { loadFinancialPanel } from "@/lib/financialsLoad";
 import { listAppEvents } from "@/lib/queue/events";
+import { canonicalUrl } from "@/lib/agent/links";
+import { visibilityFor } from "@/lib/search/access";
+import { groupHits, searchDocs } from "@/lib/search/query";
 import { dealSearchParts, matchesQuery, siteSearchParts } from "@/lib/search";
 import { presentCard } from "@/lib/timeline/filter";
 import { suggestedDropHistory, suggestedReason } from "@/lib/suggestedDrop";
@@ -28,6 +31,9 @@ export const ASK_TOOLS = [
   "financials",
   "timeline",
   "activity",
+  "searchAll",
+  "getBroker",
+  "siteIntel",
 ] as const;
 
 export type AskToolName = (typeof ASK_TOOLS)[number];
@@ -316,17 +322,59 @@ async function activity(id: string) {
   };
 }
 
+async function searchAll(query: string, userId: string) {
+  const needle = query.trim();
+  if (needle.length < 2) return { results: [], groups: { sites: [], brokers: [], conversations: [] } };
+  if (!actionsEnabled()) return { mode: "fallback", results: [], groups: { sites: [], brokers: [], conversations: [] } };
+  return withSql(async (sql) => {
+    const hits = await searchDocs(sql, { query: needle, visibility: visibilityFor({ id: userId, kind: "human" }) });
+    const groups = groupHits(hits);
+    return {
+      mode: "index",
+      groups: {
+        sites: groups.sites.map((hit) => ({ id: hit.entityId, title: hit.title, url: hit.url })),
+        brokers: groups.brokers.map((hit) => ({ id: hit.entityId, title: hit.title, url: hit.url })),
+        conversations: groups.conversations.map((hit) => ({ id: hit.entityId, title: hit.title, url: hit.url })),
+      },
+    };
+  });
+}
+
+async function getBroker() {
+  return { status: "not_yet_available" as const };
+}
+
+async function siteIntel(id: string, userId: string) {
+  if (isQuarantined(id)) return quarantinedRecord(id);
+  const url = canonicalUrl({ siteId: id, panel: "intel" });
+  if (!actionsEnabled()) return { id, url, items: [] };
+  return withSql(async (sql) => {
+    const hits = await searchDocs(sql, {
+      query: id,
+      visibility: visibilityFor({ id: userId, kind: "human" }),
+      types: ["intel"],
+      siteId: id,
+      limit: 8,
+    });
+    return { id, url, items: hits.map((hit) => ({ id: hit.entityId, title: hit.title, url: hit.url })) };
+  });
+}
+
 export async function runAskTool(
   name: string,
   args: Record<string, unknown>,
   role: ActionRole | string,
+  userId = "",
 ): Promise<unknown> {
   if (!(ASK_TOOLS as readonly string[]).includes(name)) return { error: "unknown_tool" };
   if (!roleAllows(role as ActionRole, "viewer")) return { error: "not_allowed" };
   if (name === "financials" && !canReadFinancials(role)) return { error: "not_allowed" };
   const id = String(args.id || args.siteId || "").trim();
   let raw: unknown;
-  if (name === "searchSites") raw = await searchSites(String(args.query || ""));
+  if (name === "searchAll") raw = await searchAll(String(args.query || ""), userId);
+  else if (name === "getBroker") raw = await getBroker();
+  else if (name === "siteIntel") raw = await siteIntel(id, userId);
+  else if (name === "searchSites") raw = await searchSites(String(args.query || ""));
   else if (name === "getSite") raw = await getSite(id);
   else if (name === "funnel") raw = funnel();
   else if (name === "portfolio") raw = await portfolio();

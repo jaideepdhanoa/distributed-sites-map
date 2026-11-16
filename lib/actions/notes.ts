@@ -193,6 +193,12 @@ export async function createNote(
     actorId: input.authorId,
     refId: id,
   });
+  try {
+    const { indexRecord } = await import("@/lib/search/docs");
+    await indexRecord(sql, { entityType: "note", entityId: id, siteId, payload: { body } });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));
+  }
   await notifyNote(sql, {
     noteId: id,
     siteId,

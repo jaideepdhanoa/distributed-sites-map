@@ -40,6 +40,7 @@ import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRe
 import { placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
+import CommandSearch from "./CommandSearch";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
@@ -236,6 +237,8 @@ export default function Explorer() {
   }, [selected, stepsOpen, menuOpen]);
   const [queryDraft, setQueryDraft] = useState(params.get("q") || "");
   const [hitsOpen, setHitsOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [indexedIds, setIndexedIds] = useState<Set<string> | null>(null);
   const searchTimer = useRef<number | null>(null);
   const searchFocused = useRef(false);
   const [catalog, setCatalog] = useState<SiteFeature[] | null>(null);
@@ -700,7 +703,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal";
+      const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -734,12 +737,18 @@ export default function Explorer() {
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen(true);
+        return;
+      }
       if (event.key === "/" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
         event.preventDefault();
         document.querySelector<HTMLInputElement>(".search")?.focus();
         return;
       }
       if (event.key !== "Escape") return;
+      setCommandOpen(false);
       setFiltersOpen(false);
       setMoreOpen(false);
       setUserOpen(false);
@@ -749,6 +758,31 @@ export default function Explorer() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    const q = (params.get("q") || "").trim();
+    if (q.length < 2) {
+      setIndexedIds(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(q)}&scope=grid`, { signal: ctrl.signal })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body: { mode?: string; ids?: string[] } | null) => {
+          if (!body || body.mode !== "index" || !Array.isArray(body.ids)) {
+            setIndexedIds(null);
+            return;
+          }
+          setIndexedIds(new Set(body.ids));
+        })
+        .catch(() => setIndexedIds(null));
+    }, 200);
+    return () => {
+      ctrl.abort();
+      window.clearTimeout(timer);
+    };
+  }, [params]);
 
   const features = data?.sites.features ?? [];
   const featureById = useMemo(() => {
@@ -785,7 +819,7 @@ export default function Explorer() {
   function passesChips(site: SiteProps, loose: boolean, anyMarket = false) {
     if (!anyMarket && !allCities && site.city !== city) return false;
     if (!siteInCategories(site, links, categories)) return false;
-    if (query && !matchesQuery(query, siteSearchParts(site))) return false;
+    if (query && !matchesQuery(query, siteSearchParts(site)) && !indexedIds?.has(site.site_id) && !(site.linked_deal_id && indexedIds?.has(site.linked_deal_id))) return false;
     if (loose) return true;
     if (siteCategory(site, links) === "wash" && !matchesLandTier(site, landTier)) return false;
     if (verdict !== "any" && (site.verdict || "none") !== verdict) return false;
@@ -842,7 +876,7 @@ export default function Explorer() {
     return [...byId.values()].sort(compareSites);
     // passesChips closes over the chip state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, categories, who, data?.deals, links, reach]);
+  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, categories, who, data?.deals, links, reach, indexedIds]);
 
   const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
     const feature = poolById.get(site.site_id);
@@ -855,6 +889,7 @@ export default function Explorer() {
   });
 
   function dealQueryHit(deal: DealProps) {
+    if (indexedIds?.has(deal.deal_id) || (deal.universe_id && indexedIds?.has(deal.universe_id))) return true;
     return matchesQuery(query, dealSearchParts(deal));
   }
 
@@ -1795,6 +1830,7 @@ export default function Explorer() {
       {askOpen && me?.u ? (
         <AskPanel open site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
+      <CommandSearch open={commandOpen} onClose={() => setCommandOpen(false)} />
       <header className="bar">
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
@@ -1806,9 +1842,10 @@ export default function Explorer() {
             ))}
           </div>
           <div className="search-wrap only-desktop">
-            <input className="search" aria-label="Search" placeholder="Search name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} />
+            <input className="search" aria-label="Search" placeholder="Search name, address, broker, APN, id" value={queryDraft} onFocus={() => { searchFocused.current = true; }} onBlur={() => { searchFocused.current = false; }} onChange={(event) => onSearchInput(event.target.value)} onKeyDown={onSearchKey} data-testid="grid-search" />
             <kbd aria-hidden="true">/</kbd>
           </div>
+          <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>⌘K</button>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>

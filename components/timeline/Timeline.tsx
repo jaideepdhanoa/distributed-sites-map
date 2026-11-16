@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { formatActivityWhen } from "@/lib/actions/time";
 import {
   counterparty,
@@ -78,13 +79,14 @@ function activityLine(item: MergedLine, index: number) {
   );
 }
 
-function commsLine(item: MergedLine, index: number) {
+function commsLine(item: MergedLine, index: number, msg: string) {
   const party = counterparty(item);
   const internal = item.direction.trim().toLowerCase() === "internal";
   return (
     <li
       key={`${item.commsId}-${index}`}
-      className={internal ? "tl-internal" : undefined}
+      className={[internal ? "tl-internal" : "", msg && item.commsId === msg ? "tl-highlight" : ""].filter(Boolean).join(" ") || undefined}
+      ref={msg && item.commsId === msg ? (node) => node?.scrollIntoView({ block: "center" }) : undefined}
       data-testid={`comms-${item.commsId}`}
       data-direction={item.direction}
     >
@@ -120,6 +122,8 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
   const [showInternal, setShowInternal] = useState(false);
   const [pending, setPending] = useState(true);
   const [timelineError, setTimelineError] = useState(false);
+  const params = useSearchParams();
+  const msg = params.get("msg") || "";
   const [commsError, setCommsError] = useState(false);
 
   useEffect(() => {
@@ -213,7 +217,7 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
       {lastTouched ? <p className="note">Last touched {lastTouched}</p> : null}
       {merged.length ? (
         <ol className="tl-list">
-          {merged.map((item, index) => (item.kind === "comms" ? commsLine(item, index) : activityLine(item, index)))}
+          {merged.map((item, index) => (item.kind === "comms" ? commsLine(item, index, msg) : activityLine(item, index)))}
         </ol>
       ) : null}
     </section>

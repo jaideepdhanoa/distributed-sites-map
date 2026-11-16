@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { approvesWorkbookStage } from "@/lib/agent/access";
-import { absoluteSiteUrl, feedOrigin } from "@/lib/agent/links";
+import { entityUrl, feedOrigin, feedSitePath, type FeedKind } from "@/lib/agent/links";
 import type { Sql } from "@/lib/actions/db";
 import { fileLookup, recordField, type RecordLookup } from "@/lib/actions/records";
 import { stamp, type TargetKind } from "@/lib/actions/text";
 import { stageTitle } from "@/lib/labels";
 import { workbookInstruction } from "@/lib/stageOverlay";
 
-export type InboxKind = "note" | "reply" | "mention" | "suggestion" | "flag" | "decision" | "ask_gap" | "proposal_ready" | "proposal_overtaken" | "proposal_closed";
+export type InboxKind = FeedKind;
 
 export type FeedBlocker = {
   id: string;
@@ -41,6 +41,10 @@ export type InboxItem = {
   proposalOutcome: string | null;
   openBlockers: FeedBlocker[];
   stale: boolean;
+  audience?: string;
+  before?: string;
+  after?: string;
+  runId?: string;
 };
 
 type InboxRow = {
@@ -60,6 +64,10 @@ type InboxRow = {
   workbook_stage: boolean;
   status: InboxStatus;
   created_at: Date | string;
+  audience?: string | null;
+  before_text?: string | null;
+  after_text?: string | null;
+  run_id?: string | null;
 };
 
 export class FeedError extends Error {
@@ -70,7 +78,7 @@ export class FeedError extends Error {
   }
 }
 
-const SELECT = `id, kind, subtype, ref_id, site_id, record_id, actor, body, thread_key, thread_context, proposal_id, proposal_status, stage, workbook_stage, status, created_at`;
+const SELECT = `id, kind, subtype, ref_id, site_id, record_id, actor, body, thread_key, thread_context, proposal_id, proposal_status, stage, workbook_stage, status, created_at, audience, before_text, after_text, run_id`;
 
 export function encodeCursor(createdAt: string, id: string): string {
   return Buffer.from(`${createdAt}|${id}`, "utf8").toString("base64url");
@@ -116,6 +124,10 @@ function present(row: InboxRow): InboxItem {
     proposalOutcome: null,
     openBlockers: [],
     stale: false,
+    audience: row.audience || "muse",
+    before: row.before_text || "",
+    after: row.after_text || "",
+    runId: row.run_id || "",
   };
 }
 
@@ -134,6 +146,11 @@ export type FeedInsert = {
   stage?: string | null;
   workbookStage?: boolean;
   createdAt?: string | null;
+  audience?: "muse" | "indie" | "both";
+  before?: string;
+  after?: string;
+  runId?: string;
+  idempotencyKey?: string;
 };
 
 export function feedKey(kind: string, refId: string): string {
@@ -145,8 +162,9 @@ export async function insertFeedRow(sql: Sql, input: FeedInsert): Promise<string
   const saved = await sql.query<{ id: string }>(
     `INSERT INTO agent_inbox (
       id, kind, subtype, ref_id, site_id, record_id, actor, body, thread_key, thread_context,
-      proposal_id, proposal_status, stage, workbook_stage, idempotency_key, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16::timestamptz, now()))
+      proposal_id, proposal_status, stage, workbook_stage, idempotency_key, created_at,
+      audience, before_text, after_text, run_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16::timestamptz, now()), $17, $18, $19, $20)
     ON CONFLICT (idempotency_key) DO NOTHING
     RETURNING id`,
     [
@@ -164,8 +182,12 @@ export async function insertFeedRow(sql: Sql, input: FeedInsert): Promise<string
       input.proposalStatus || null,
       input.stage || null,
       Boolean(input.workbookStage),
-      feedKey(input.kind, input.refId),
+      input.idempotencyKey || feedKey(input.kind, input.refId),
       input.createdAt || null,
+      input.audience || (input.kind === "mention" ? "both" : "muse"),
+      input.before || "",
+      input.after || "",
+      input.runId || "",
     ],
   );
   return saved.rows[0]?.id || null;
@@ -593,9 +615,16 @@ async function enrichProposals(sql: Sql, items: InboxItem[], lookup: RecordLooku
 
 export async function listInbox(
   sql: Sql,
-  input: { after?: string | null; limit?: number; lookup?: RecordLookup } = {},
+  input: { after?: string | null; limit?: number; lookup?: RecordLookup; audience?: "all" | "muse" | "indie" } = {},
 ): Promise<{ items: InboxItem[]; next: string | null }> {
+  try {
+    const { syncEventFeed } = await import("@/lib/agent/eventFeed");
+    await syncEventFeed(sql);
+  } catch (error) {
+    console.error(JSON.stringify({ event: "agent_feed_sync_error", name: error instanceof Error ? error.name : "error" }));
+  }
   const lookup = input.lookup || (await fileLookup());
+  const audience = input.audience || "all";
   const { refreshProposalReadiness } = await import("@/lib/actions/blockers");
   await refreshProposalReadiness(sql, lookup);
   const limit = input.limit && input.limit > 0 ? Math.min(100, Math.floor(input.limit)) : 50;
@@ -605,13 +634,17 @@ export async function listInbox(
     ? await sql.query<InboxRow>(
       `SELECT ${SELECT} FROM agent_inbox
        WHERE (created_at, id) > ($1::timestamptz, $2)
+         AND ($4 = 'all' OR audience = $4 OR audience = 'both')
        ORDER BY created_at ASC, id ASC
        LIMIT $3`,
-      [cursor.createdAt, cursor.id, limit],
+      [cursor.createdAt, cursor.id, limit, audience],
     )
     : await sql.query<InboxRow>(
-      `SELECT ${SELECT} FROM agent_inbox ORDER BY created_at ASC, id ASC LIMIT $1`,
-      [limit],
+      `SELECT ${SELECT} FROM agent_inbox
+       WHERE ($2 = 'all' OR audience = $2 OR audience = 'both')
+       ORDER BY created_at ASC, id ASC
+       LIMIT $1`,
+      [limit, audience],
     );
   const items = await enrichProposals(sql, rows.rows.map(present), lookup);
   return { items, next: items.length === limit ? items[items.length - 1].cursor : null };
@@ -636,14 +669,19 @@ export async function ackInbox(sql: Sql, input: { ids: string[]; status: "picked
   return count;
 }
 
-export function toFeedItem(item: InboxItem, origin = feedOrigin()) {
+export function toFeedItem(item: InboxItem, _origin = feedOrigin()) {
   return {
     id: item.id,
     kind: item.kind,
     subtype: item.subtype,
     ref_id: item.refId,
     site_id: item.siteId,
-    site_url: absoluteSiteUrl(origin, item.kind, item.siteId),
+    site_url: feedSitePath(item.kind, item.siteId),
+    entity_url: entityUrl({ kind: item.kind, siteId: item.siteId, refId: item.refId, subtype: item.subtype }),
+    before: item.before || "",
+    after: item.after || "",
+    run_id: item.runId || "",
+    audience: item.audience || "muse",
     actor: item.actor,
     text: item.text,
     thread: { key: item.threadKey, context: item.threadContext },

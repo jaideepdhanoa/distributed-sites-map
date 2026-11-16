@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
@@ -144,14 +145,17 @@ export default function KeyStrip({
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
+  const params = useSearchParams();
+  const deepFinancials = params.get("panel") === "financials";
+  const grain = params.get("pl") === "monthly" ? "monthly" : params.get("pl") === "annual" ? "annual" : null;
   const [financialsOpen, setFinancialsOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
-    setFinancialsOpen(false);
+    setFinancialsOpen(deepFinancials && signedIn === true && showFinancials);
     setFinancials(null);
-  }, [deal.deal_id]);
+  }, [deal.deal_id, deepFinancials, signedIn, showFinancials]);
   useEffect(() => {
     if (!signedIn || !showFinancials) return undefined;
     let cancel = false;
@@ -223,7 +227,7 @@ export default function KeyStrip({
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
       {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
-        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} initialGrain={grain} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
         document.body,
       ) : null}
       {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (

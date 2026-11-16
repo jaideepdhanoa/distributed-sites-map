@@ -67,8 +67,15 @@ export default function PanelSections({
     };
   }, [site, panel, tab]);
   const panels = { overview, numbers, activity, discussion };
+  const intel = panel === "intel";
   return (
     <div className="panel-sections" ref={sections}>
+      {intel ? (
+        <section id="panel-intel" data-testid="intel-panel">
+          <p className="eyebrow">Intel</p>
+          <p className="layer-meta">No intel is recorded for this site.</p>
+        </section>
+      ) : null}
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
         {TABS.map(([id, label]) => (
           <button

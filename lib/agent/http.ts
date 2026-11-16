@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeInbox } from "@/lib/agent/auth";
+import { authorizeAgent, authorizeInbox, type AgentCaller } from "@/lib/agent/auth";
 import { FeedError } from "@/lib/agent/inbox";
 import { actionsEnabled, withSql, type Sql } from "@/lib/actions/db";
 import { jsonError, jsonOk } from "@/lib/actions/http";
@@ -14,6 +14,16 @@ export function agentUnauthorized() {
 export function requireInbox(request: Request): NextResponse | null {
   if (!authorizeInbox(request)) return agentUnauthorized();
   return null;
+}
+
+export function requireAgent(request: Request): AgentCaller | NextResponse {
+  const caller = authorizeAgent(request);
+  if (!caller) return agentUnauthorized();
+  return caller;
+}
+
+export function isAgentCaller(value: AgentCaller | NextResponse): value is AgentCaller {
+  return !(value instanceof NextResponse);
 }
 
 export async function withAgentDb<T>(fn: (sql: Sql) => Promise<T>): Promise<T | NextResponse> {

@@ -354,7 +354,7 @@ test("a feed item links to the site and panel for that kind", () => {
       toFeedItem(note, feedOrigin(new Request("http://internal/api/agent/inbox", {
         headers: { "x-forwarded-host": "preview.distributedsites.com", "x-forwarded-proto": "https" },
       }))).site_url,
-      "https://preview.distributedsites.com/?site=PIPE-PHX-0008&panel=discussion",
+      "https://distributedsites.com/?site=PIPE-PHX-0008&panel=discussion",
     );
     process.env.APP_URL = "https://configured.example/";
     assert.equal(feedOrigin(), "https://configured.example");

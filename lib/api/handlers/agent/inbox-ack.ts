@@ -1,10 +1,11 @@
-import { agentOk, requireInbox, withAgentDb } from "@/lib/agent/http";
+import { agentOk, isAgentCaller, requireAgent, withAgentDb } from "@/lib/agent/http";
 import { ackInbox, FeedError } from "@/lib/agent/inbox";
 import { isResponse, jsonError } from "@/lib/actions/http";
 
 export async function POST(request: Request) {
-  const denied = requireInbox(request);
-  if (denied) return denied;
+  const caller = requireAgent(request);
+  if (!isAgentCaller(caller)) return caller;
+  if (!caller.canAck) return jsonError("Indie does not acknowledge feed rows.", 403);
   let body: { ids?: unknown; status?: unknown };
   try {
     body = (await request.json()) as typeof body;

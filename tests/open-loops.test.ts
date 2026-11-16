@@ -280,6 +280,8 @@ test("the open-loops API is signed in the same way as the NDA queue", () => {
     { path: "/api/alerts/digest", schedule: "0 15 * * *" },
     { path: "/api/cron/workbook-sync", schedule: "*/15 * * * *" },
     { path: "/api/cron/alert-flush", schedule: "*/5 * * * *" },
+    { path: "/api/cron/search", schedule: "*/15 * * * *" },
+    { path: "/api/cron/stale", schedule: "15 13 * * *" },
   ]);
   const raw = readFileSync("data/fixtures/open-loops.json", "utf8");
   assert.equal(/\bcharging\b/i.test(raw), false);

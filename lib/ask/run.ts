@@ -94,6 +94,7 @@ export async function answerQuestion(input: {
         system: await askPrefix(),
         prompt: `${audience}\n${scopeLine}\nQuestion: ${question}`,
         role: input.role,
+        userId: input.userId,
         signal: input.signal,
       });
     } catch (error) {

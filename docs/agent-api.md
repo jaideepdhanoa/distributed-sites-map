@@ -324,3 +324,30 @@ An agent cannot delete a line. Muse, the owner of the lines, can retract one thr
 ```
 
 Tables: `pnl_periods` and `pnl_lines`, created in `db/migrations/014_pnl.sql` and extended in `db/migrations/018_pnl_basis.sql` and `db/migrations/019_pnl_retract.sql`. Production does not apply those files until the Production migrations workflow runs.
+
+### Data conflict
+
+When two sources disagree about one site field or one P&L line for the same period, log a conflict instead of picking one quietly. Muse writes it through `POST /api/changes`. Send exactly two sources. Each source has a string `value`, a `document`, and a `page`. `value_in_use` must be one of those two values. `status` is `open`, `asked_broker`, or `resolved`. A resolved conflict needs `resolution_note`. `at` is required and must be an ISO-8601 time with a numeric offset or `Z`. A bad timestamp is rejected. The row keeps `created_by`, `updated_by`, and both times. Each write appends an event. A second open conflict for the same site, field, and period is rejected so the first record is updated. Signed-in financials show a marker on the matching P&L cell. The popover lists both sources and the status. The site's open loops gain one entry, and the morning brief counts open conflicts. Neither of those surfaces includes the source values.
+
+```json
+{
+  "entity_type": "data_conflict",
+  "site_id": "PIPE-LAS-9001",
+  "expected_version": 0,
+  "source": "Sample notes",
+  "payload": {
+    "subject": "pnl_line",
+    "field": "ebitda",
+    "period": "2026-01-01/2026-06-14",
+    "sources": [
+      { "value": "100000", "document": "Sample package", "page": "1" },
+      { "value": "90000", "document": "Sample notes", "page": "2" }
+    ],
+    "value_in_use": "100000",
+    "status": "open",
+    "at": "2026-03-01T15:00:00-07:00"
+  }
+}
+```
+
+Table: `data_conflicts` in `db/migrations/021_data_conflicts.sql`. `020` is reserved. Production does not apply this file until the Production migrations workflow runs.

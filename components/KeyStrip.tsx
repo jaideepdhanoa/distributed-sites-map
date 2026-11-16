@@ -10,6 +10,7 @@ import { basisBadge } from "@/lib/pricing";
 import { stripGmailIds } from "@/lib/displayText";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
+import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
@@ -157,18 +158,22 @@ export default function KeyStrip({
   const [financialsOpen, setFinancialsOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
+  const [conflicts, setConflicts] = useState<DataConflict[]>([]);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
     setFinancialsOpen(deepFinancials && signedIn === true && showFinancials);
     setFinancials(null);
+    setConflicts([]);
   }, [deal.deal_id, deepFinancials, signedIn, showFinancials]);
   useEffect(() => {
     if (!signedIn || !showFinancials) return undefined;
     let cancel = false;
     fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`, { cache: "no-store" })
-      .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel : null))
+      .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel & { conflicts?: unknown } : null))
       .then((panel) => {
-        if (!cancel && panel) setFinancials({ ...panel, pnl: readPnl(panel.pnl) });
+        if (cancel || !panel) return;
+        setFinancials({ ...panel, pnl: readPnl(panel.pnl) });
+        setConflicts(conflictList(panel.conflicts));
       })
       .catch(() => undefined);
     return () => {
@@ -247,7 +252,7 @@ export default function KeyStrip({
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
       {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
-        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} initialGrain={grain} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} conflicts={conflicts} initialGrain={grain} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
         document.body,
       ) : null}
       {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (

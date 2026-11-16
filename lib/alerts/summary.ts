@@ -1,4 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
+import { countOpenConflicts } from "@/lib/conflicts/record";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { publicSnippet, type MailItem } from "./compose";
 import { EXCLUDED_SITE_ID, isExcludedSite } from "./excluded";
@@ -23,12 +24,13 @@ export type SummaryCounts = {
   comms: number;
   sites: number;
   asks: number;
+  conflicts: number;
 };
 
 export type SummaryResult = { items: MailItem[]; counts: SummaryCounts };
 
 export function emptyCounts(): SummaryCounts {
-  return { recommendations: 0, proposals: 0, decisions: 0, stages: 0, activity: 0, comms: 0, sites: 0, asks: 0 };
+  return { recommendations: 0, proposals: 0, decisions: 0, stages: 0, activity: 0, comms: 0, sites: 0, asks: 0, conflicts: 0 };
 }
 
 export function emptyBrief(): SummaryResult {
@@ -331,6 +333,11 @@ async function collect(
     return true;
   });
   counts.sites = unique.length;
+  const openConflicts = await countOpenConflicts(sql);
+  counts.conflicts = openConflicts;
+  if (openConflicts) {
+    items.push(line(countLine(openConflicts, "open data conflict", "open data conflicts"), input.userId, "brief"));
+  }
   if (unique.length) {
     const byMarket = new Map<string, number>();
     for (const row of unique) {

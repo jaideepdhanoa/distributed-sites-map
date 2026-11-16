@@ -5,6 +5,7 @@ import { EXCLUDED_SITE_ID } from "../../lib/alerts/excluded";
 import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { InputError } from "../../lib/actions/text";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
+import { buildPnlGrid } from "../../lib/pnl/grid";
 import { loadPnlStatement } from "../../lib/pnl/read";
 import { memorySql } from "../helpers/sql";
 
@@ -240,6 +241,14 @@ test("an explicit missing month is labeled Missing and an unmarked month stays b
   assert.doesNotMatch(statement.years[0]?.coverage || "", /March/);
   assert.equal(statement.years[0]?.months[0]?.revenue[0]?.amount, "$80,000");
   assert.equal(statement.years[0]?.months[1], null);
+  const grid = buildPnlGrid(statement, "months", 2024);
+  const february = grid.rows.find((row) => row.id === "total-revenue")?.cells[1];
+  assert.equal(february?.kind, "missing");
+  if (february?.kind === "missing") {
+    assert.equal(february.sourceDocument, "Sample package");
+    assert.equal(february.sourcePage, "Month index");
+  }
+  assert.equal(grid.rows.find((row) => row.id === "total-revenue")?.cells[2]?.kind, "blank");
 });
 
 test("one decimal place is stored as written, and a mid-month end can sit beside the full year", async () => {

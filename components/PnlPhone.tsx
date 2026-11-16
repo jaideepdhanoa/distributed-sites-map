@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { statusLabel, type DataConflict } from "@/lib/conflicts/view";
 import { MONTH_SHORT } from "@/lib/pnl/lines";
 import { buildPnlGrid, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
 
 function textOf(cell: GridCell | undefined, percent: boolean): string {
-  if (!cell || cell.kind === "missing" || cell.kind === "blank") return "Not in package";
+  if (!cell || cell.kind === "blank") return "Not in package";
+  if (cell.kind === "missing") return "Missing";
   if (percent) return cell.share || "—";
   return cell.amount;
 }
 
-export default function PnlPhone({ statement }: { statement: PnlStatement }) {
+export default function PnlPhone({ statement, conflicts = [] }: { statement: PnlStatement; conflicts?: DataConflict[] }) {
   const years = statement.years.map((item) => item.year);
   const [grain, setGrain] = useState<"month" | "year">("month");
   const [year, setYear] = useState(years[0] || 0);
@@ -21,8 +23,8 @@ export default function PnlPhone({ statement }: { statement: PnlStatement }) {
   const [open, setOpen] = useState<string | null>(null);
   const touch = useRef(0);
   const grid = useMemo(
-    () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year),
-    [statement, grain, year],
+    () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts),
+    [statement, grain, year, conflicts],
   );
   const index = grain === "month" ? month : yearIndex;
   const summary = columnSummary(grid, index);
@@ -118,15 +120,46 @@ export default function PnlPhone({ statement }: { statement: PnlStatement }) {
   );
 }
 
+function ConflictDetail({ cell }: { cell: GridCell }) {
+  if (!cell.conflict) return null;
+  return (
+    <div data-testid="pnl-conflict">
+      <p>Conflict · {statusLabel(cell.conflict.status)}</p>
+      {cell.conflict.sources.map((source) => (
+        <p key={`${source.document}-${source.page}`}>{source.value} · {source.document} · {source.page}</p>
+      ))}
+      <p>In use: {cell.conflict.valueInUse}</p>
+    </div>
+  );
+}
+
 function Detail({ cell }: { cell: GridCell | undefined }) {
-  if (!cell || cell.kind === "missing") return <p className="pnl-expand">This month is not in the package.</p>;
-  if (cell.kind === "blank") return <p className="pnl-expand">Not in this statement.</p>;
+  if (!cell || cell.kind === "missing") {
+    const source = cell?.kind === "missing" ? [cell.sourceDocument, cell.sourcePage, cell.markerSource].filter(Boolean).join(" · ") : "";
+    return (
+      <div className="pnl-expand" data-testid="pnl-missing-source">
+        <p>Missing</p>
+        {source ? <p>{source}</p> : null}
+        {cell?.kind === "missing" && cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
+        {cell ? <ConflictDetail cell={cell} /> : null}
+      </div>
+    );
+  }
+  if (cell.kind === "blank") {
+    return (
+      <div className="pnl-expand">
+        <p>Not in this statement.</p>
+        <ConflictDetail cell={cell} />
+      </div>
+    );
+  }
   return (
     <div className="pnl-expand" data-testid="pnl-expand">
-      <p>{cell.status === "calculated" ? "Calculated" : cell.status === "estimated" ? "Estimated" : "Reported"}</p>
+      <p>{cell.status === "calculated" ? "Calculated" : cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"}</p>
       <p>{cell.sourceDocument}{cell.sourcePage ? ` · ${cell.sourcePage}` : ""}</p>
       {cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
       {cell.flag ? <p>{cell.flag}</p> : null}
+      <ConflictDetail cell={cell} />
     </div>
   );
 }

@@ -39,6 +39,19 @@ export type MissingMonth = {
   month: number;
   business: PnlBusiness;
   periodId: string;
+  sourceDocument?: string;
+  sourcePage?: string;
+  capturedAt?: string;
+  /** Change-level source, such as "Not in package". It is not the line's document. */
+  markerSource?: string;
+};
+
+export type MissingDetail = {
+  month: number;
+  sourceDocument: string;
+  sourcePage: string;
+  capturedAt: string;
+  markerSource: string;
 };
 
 export type NormalizedMark = {
@@ -94,6 +107,7 @@ export type PnlYearView = {
   months: Array<PnlPeriodView | null>;
   /** Months the package should have included and did not. Other empty months stay blank. */
   missingMonths: number[];
+  missingDetails: MissingDetail[];
   coverage: string;
   flagCount: number;
   businessLabel: string;
@@ -270,12 +284,24 @@ function buildYears(lines: CapturedLine[], missing: MissingMonth[], normalizedIn
     const full = annuals.filter(isFullYear);
     const annual = full.find((period) => (period.startMonth ?? 1) === 1) ?? full[0] ?? null;
     const ranges = annuals.filter((period) => period !== annual);
-    const months = Array.from({ length: 12 }, (_, index) => (
-      periods.find((period) => period.year === year && period.grain === "monthly" && period.month === index + 1) ?? null
-    ));
-    const missingMonths = [...new Set(
-      missing.filter((month) => month.year === year && !months[month.month - 1]).map((month) => month.month),
-    )].sort((a, b) => a - b);
+    const months = Array.from({ length: 12 }, (_, index) => {
+      const period = periods.find((item) => item.year === year && item.grain === "monthly" && item.month === index + 1) ?? null;
+      if (!period) return null;
+      const marked = missing.some((month) => month.year === year && month.month === index + 1 && month.periodId === period.id);
+      return marked ? null : period;
+    });
+    const missingRows = missing.filter((month) => month.year === year && month.month >= 1 && month.month <= 12 && !months[month.month - 1]);
+    const missingMonths = [...new Set(missingRows.map((month) => month.month))].sort((a, b) => a - b);
+    const missingDetails = missingMonths.map((month) => {
+      const row = missingRows.find((item) => item.month === month);
+      return {
+        month,
+        sourceDocument: row?.sourceDocument || "",
+        sourcePage: row?.sourcePage || "",
+        capturedAt: row?.capturedAt || "",
+        markerSource: row?.markerSource || "",
+      };
+    });
     const businessLabel = annual?.businessLabel || ranges[0]?.businessLabel || months.find((period) => period)?.businessLabel || "";
     return {
       year,
@@ -284,6 +310,7 @@ function buildYears(lines: CapturedLine[], missing: MissingMonth[], normalizedIn
       ranges,
       months,
       missingMonths,
+      missingDetails,
       coverage: coverage(months, missingMonths, annual?.throughMonth ?? ranges[0]?.throughMonth ?? null),
       flagCount: countFlags([annual, ...ranges, ...months]),
       businessLabel,

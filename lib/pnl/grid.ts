@@ -1,5 +1,7 @@
+import { monthColumnState } from "./columns";
 import { formatCapturedDate } from "./dateLabel";
 import { LINE_LABELS, MONTH_SHORT, lineSection, sectionOrder, type PnlLineCode } from "./lines";
+import { spanMonths } from "./period";
 import { centsToRaw, formatAmount, parseAmount, percentOf, signedPercent } from "./money";
 import type { PnlLineView, PnlPeriodView, PnlStatement } from "./statement";
 
@@ -135,6 +137,7 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
       sourceHref: "",
       capturedAt: "",
       flag: null,
+      normalized: null,
     });
   }
   const grouped = { revenue: [] as PnlLineView[], costs: [] as PnlLineView[], results: [] as PnlLineView[], addbacks: [] as PnlLineView[] };
@@ -145,7 +148,12 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
     year,
     month: null,
     label: String(year),
+    columnLabel: String(year),
+    title: String(year),
     throughMonth: null,
+    startMonth: null,
+    periodStart: `${year}-01-01`,
+    periodEnd: `${year}-12-31`,
     business: periods[0].business,
     businessLabel: periods[0].businessLabel,
     ...grouped,
@@ -153,10 +161,20 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
   };
 }
 
+function emptyCell(bucket: Bucket): GridCell | null {
+  if (bucket.missing) return { kind: "missing" };
+  if (!bucket.period) return { kind: "blank" };
+  return null;
+}
+
 function monthBuckets(statement: PnlStatement, year: number): Bucket[] {
   const row = statement.years.find((item) => item.year === year);
   const months = row?.months ?? Array.from({ length: 12 }, () => null);
-  const buckets: Bucket[] = months.map((period) => ({ missing: !period, period }));
+  const buckets: Bucket[] = months.map((period, index) => {
+    const state = row ? monthColumnState(row, index) : period ? "present" : "blank";
+    if (state === "missing") return { missing: true, period: null };
+    return { missing: false, period };
+  });
   if (row?.annual) buckets.push({ missing: false, period: row.annual });
   else {
     const present = months.filter((period): period is PnlPeriodView => Boolean(period));
@@ -165,13 +183,36 @@ function monthBuckets(statement: PnlStatement, year: number): Bucket[] {
   return buckets;
 }
 
-function annualBuckets(statement: PnlStatement): Bucket[] {
-  return statement.years.map((year) => {
-    if (year.annual) return { missing: false, period: year.annual };
-    const present = year.months.filter((period): period is PnlPeriodView => Boolean(period));
-    if (!present.length) return { missing: true, period: null };
-    return { missing: false, period: mergeMonths(present, year.year) };
-  });
+function annualLayout(statement: PnlStatement): { column: GridColumn; bucket: Bucket }[] {
+  const layout: { column: GridColumn; bucket: Bucket }[] = [];
+  for (const year of statement.years) {
+    const periods = [year.annual, ...(year.ranges ?? [])].filter((period): period is PnlPeriodView => Boolean(period));
+    if (!periods.length) {
+      const present = year.months.filter((period): period is PnlPeriodView => Boolean(period));
+      layout.push(present.length
+        ? {
+            column: { id: `year-${year.year}`, label: year.columnLabel || String(year.year), missing: false, statement: false },
+            bucket: { missing: false, period: mergeMonths(present, year.year) },
+          }
+        : {
+            column: { id: `year-${year.year}`, label: year.columnLabel || String(year.year), missing: true, statement: false },
+            bucket: { missing: true, period: null },
+          });
+      continue;
+    }
+    for (const period of periods) {
+      layout.push({
+        column: {
+          id: period.id,
+          label: period.columnLabel,
+          missing: false,
+          statement: spanMonths(period.periodStart, period.periodEnd) === 12,
+        },
+        bucket: { missing: false, period },
+      });
+    }
+  }
+  return layout;
 }
 
 function usedCodes(buckets: Bucket[], section: "revenue" | "costs" | "addbacks"): PnlLineCode[] {
@@ -190,22 +231,18 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
   const years = statement.years.map((item) => item.year);
   if (statement.status !== "ready" || !years.length) return { columns: [], rows: [], years, note: "" };
   const selected = year && years.includes(year) ? year : years[0];
-  const buckets = mode === "years" ? annualBuckets(statement) : monthBuckets(statement, selected);
+  const yearLayout = mode === "years" ? annualLayout(statement) : [];
+  const buckets = mode === "years" ? yearLayout.map((item) => item.bucket) : monthBuckets(statement, selected);
   const selectedYear = statement.years.find((item) => item.year === selected);
   const capturedMonths = selectedYear?.months.filter(Boolean).length ?? 0;
   const annualIsStatement = Boolean(selectedYear?.annual);
   const columns: GridColumn[] = mode === "years"
-    ? statement.years.map((item) => ({
-        id: String(item.year),
-        label: String(item.year),
-        missing: !item.annual && item.months.every((period) => !period),
-        statement: Boolean(item.annual),
-      }))
+    ? yearLayout.map((item) => item.column)
     : [
         ...MONTH_SHORT.map((label, index) => ({
           id: label.toLowerCase(),
           label,
-          missing: !selectedYear?.months[index],
+          missing: selectedYear ? monthColumnState(selectedYear, index) === "missing" : false,
         })),
         {
           id: "ytd",
@@ -228,7 +265,8 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
   });
 
   function cellFor(code: PnlLineCode, bucket: Bucket, revenue: bigint | null): GridCell {
-    if (bucket.missing || !bucket.period) return { kind: "missing" };
+    const gap = emptyCell(bucket);
+    if (gap) return gap;
     const line = findCode(bucket.period, code);
     const cents = lineCents(line);
     if (!line || cents == null) return { kind: "blank" };
@@ -237,7 +275,8 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
   }
 
   function revenueCell(bucket: Bucket): GridCell {
-    if (bucket.missing || !bucket.period) return { kind: "missing" };
+    const gap = emptyCell(bucket);
+    if (gap) return gap;
     const revenue = revenueOf(bucket.period);
     if (!revenue) return { kind: "blank" };
     if (revenue.line && !revenue.summed) return fromLine(revenue.line, revenue.cents, ofRevenue(revenue.cents, revenue.cents), false);
@@ -245,7 +284,8 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
   }
 
   function costCell(bucket: Bucket, costs: bigint | null, revenue: bigint | null): GridCell {
-    if (bucket.missing || !bucket.period) return { kind: "missing" };
+    const gap = emptyCell(bucket);
+    if (gap) return gap;
     if (costs == null) return { kind: "blank" };
     return fromMath(costs, ofRevenue(costs, revenue), "Sum of captured cost lines.");
   }
@@ -278,7 +318,8 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
   });
 
   const ebitdaCells: GridCell[] = contexts.map(({ bucket, revenue, costs }) => {
-    if (bucket.missing || !bucket.period) return { kind: "missing" };
+    const gap = emptyCell(bucket);
+    if (gap) return gap;
     const stated = findCode(bucket.period, "ebitda");
     const statedCents = lineCents(stated);
     if (stated && statedCents != null) return fromLine(stated, statedCents, ofRevenue(statedCents, revenue, true), stated.sourceDocument === "Sum of captured months");
@@ -315,7 +356,8 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
       });
     }
     const sdeCells = contexts.map(({ bucket, revenue }, index) => {
-      if (bucket.missing || !bucket.period) return { kind: "missing" } as GridCell;
+      const gap = emptyCell(bucket);
+      if (gap) return gap;
       const extra = added(bucket.period);
       const base = ebitdaCells[index];
       if (extra == null || base.kind !== "value") return { kind: "blank" } as GridCell;

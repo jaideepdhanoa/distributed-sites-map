@@ -26,10 +26,10 @@ export default function PnlPhone({ statement }: { statement: PnlStatement }) {
   );
   const index = grain === "month" ? month : yearIndex;
   const summary = columnSummary(grid, index);
-  const periods = grain === "month" ? [...MONTH_SHORT, grid.columns[12]?.label || "YTD"] : years.map(String);
+  const periods = grain === "month" ? [...MONTH_SHORT, grid.columns[12]?.label || "YTD"] : grid.columns.map((column) => column.label);
   const periodTitle = grain === "month"
     ? (month >= 12 ? periods[12] : `${MONTH_SHORT[month]} ${year}`)
-    : String(years[yearIndex] || "");
+    : periods[yearIndex] || "";
 
   function step(delta: number) {
     const next = Math.min(Math.max(index + delta, 0), periods.length - 1);

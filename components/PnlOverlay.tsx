@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildPnlGrid } from "@/lib/pnl/grid";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import PnlBasis from "./PnlBasis";
 import PnlGrid from "./PnlGrid";
 import PnlPhone from "./PnlPhone";
 
@@ -17,10 +18,14 @@ export default function PnlOverlay({
 }) {
   const [mode, setMode] = useState<"months" | "years">("months");
   const [percent, setPercent] = useState(false);
-  const years = statement.years.map((item) => item.year);
+  const [basis, setBasis] = useState<"stated" | "normalized">("stated");
+  const shown: PnlStatement = basis === "normalized"
+    ? { ...statement, years: statement.normalizedYears ?? [] }
+    : statement;
+  const years = shown.years.map((item) => item.year);
   const [year, setYear] = useState(years[0] || 0);
-  const grid = useMemo(() => buildPnlGrid(statement, mode, year), [statement, mode, year]);
-  const business = statement.years.find((item) => item.year === year)?.businessLabel || statement.years[0]?.businessLabel || "";
+  const grid = useMemo(() => buildPnlGrid(shown, mode, year), [shown, mode, year]);
+  const business = shown.years.find((item) => item.year === year)?.businessLabel || shown.years[0]?.businessLabel || "";
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -48,9 +53,13 @@ export default function PnlOverlay({
             <button type="button" className={percent ? "segmented" : "segmented on"} onClick={() => setPercent(false)}>Dollars</button>
             <button type="button" className={percent ? "segmented on" : "segmented"} onClick={() => setPercent(true)}>% of revenue</button>
           </div>
+          {statement.hasNormalized ? <PnlBasis basis={basis} onChange={setBasis} /> : null}
           {mode === "months" && years.length > 1 ? (
             <select className="secondary" aria-label="Year" value={year} onChange={(event) => setYear(Number(event.target.value))}>
-              {years.map((item) => <option key={item} value={item}>{item}</option>)}
+              {years.map((item) => {
+                const label = shown.years.find((view) => view.year === item)?.columnLabel || String(item);
+                return <option key={item} value={item}>{label}</option>;
+              })}
             </select>
           ) : null}
         </div>
@@ -60,7 +69,7 @@ export default function PnlOverlay({
       {statement.status !== "ready" ? <p className="pnl-empty" data-testid="pnl-empty">{statement.message}</p> : (
         <>
           <div className="pnl-desktop"><PnlGrid grid={grid} percent={percent} /></div>
-          <PnlPhone statement={statement} />
+          <PnlPhone statement={shown} />
         </>
       )}
     </section>

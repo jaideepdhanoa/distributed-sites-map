@@ -102,7 +102,37 @@ Preview deployments get their own Neon branch from the Vercel Neon integration, 
 
 Stage, activity, comms, and the core site record are stored in Neon. Write them through `POST /api/changes` or the signed-in site. The Pipeline workbook is a read-only mirror of that database. The scheduled sync does not copy sheet edits into Neon, and nothing except the workbook mirror writes the sheet. Production schema changes still go through the Production migrations workflow. Pull-request jobs and preview deployments do not migrate production.
 
-`POST /api/changes` accepts one batch. Send `Idempotency-Key`. Each change has `entity_type` (`stage`, `activity`, `comms`, or `site`), `site_id`, `expected_version`, `source`, and `payload`. A new row uses `expected_version: 0` and omits `entity_id`. The server assigns `A-` activity ids, `CM-` comms ids, and `EV-` event ids. A site id is the `PIPE-` or `LAND-` id, not a minted id. An update sends the id the server already assigned and the `version` from the previous response. A mismatch is `409` with `conflicts`, and the whole batch is rolled back. The same key and the same body returns the original ids and does not write again.
+`POST /api/changes` accepts one batch. Send `Idempotency-Key`. Each change has `entity_type` (`stage`, `activity`, `comms`, `site`, or `pnl_line`), `site_id`, `expected_version`, `source`, and `payload`. A new row uses `expected_version: 0` and omits `entity_id`. The server assigns `A-` activity ids, `CM-` comms ids, `PL-` P&L line ids, and `EV-` event ids. A site id is the `PIPE-` or `LAND-` id, not a minted id. An update sends the id the server already assigned and the `version` from the previous response. A mismatch is `409` with `conflicts`, and the whole batch is rolled back. The same key and the same body returns the original ids and does not write again.
+
+A `pnl_line` change stores one captured profit-and-loss line. The first line for a period creates that period. Later lines for the same site, grain, and period must use the same business type and coverage. The server does not sum lines, does not fill a missing month, and does not calculate EBITDA. Send only figures the package states. `amount` is a string of the captured number (`1000000` or `1000000.50`), not a JSON number. `captured_at` is an ISO-8601 time with a numeric offset or `Z`, stored exactly. `status` is `reported` or `estimated`. Muse sends `Authorization: Bearer` with `AGENT_WRITE_TOKEN_MUSE`. A contributor or reviewer session can write a line. Indie cannot. The line is not mirrored to the workbook.
+
+```json
+{
+  "changes": [
+    {
+      "entity_type": "pnl_line",
+      "site_id": "PIPE-LAS-9001",
+      "expected_version": 0,
+      "source": "Sample package",
+      "payload": {
+        "grain": "annual",
+        "year": 2024,
+        "business_type": "car_wash",
+        "line": "labor",
+        "amount": "500000",
+        "status": "reported",
+        "source_document": "Sample package",
+        "source_page": "Sheet 2024",
+        "captured_at": "2026-03-01T15:00:00-07:00"
+      }
+    }
+  ]
+}
+```
+
+`grain` is `annual` or `monthly`. A monthly line also sends `month` (1–12). An annual line may send `through_month` when the statement stops before December. `business_type` is `car_wash` or `auto_service`. `line` is one of `revenue_wash`, `revenue_membership`, `revenue_retail`, `revenue_service`, `revenue_parts`, `revenue_other`, `revenue`, `cogs`, `labor`, `utilities`, `chemicals`, `occupancy`, `repairs`, `marketing`, `ga`, `other`, `ebitda`, `noi`, `addback_owner_pay`, `addback_personal`, `addback_one_time`, `addback_other`. `source_page` is the page or sheet. `source_href` is optional and must be an `https` URL. The figures above are an example of the shape. They are not a site.
+
+The tables are `pnl_periods` and `pnl_lines` in `db/migrations/014_pnl.sql`. Production does not apply that file until the Production migrations workflow runs. Until then, a signed-in financials panel says the profit and loss is not on the database yet. A signed-out request never receives it.
 
 A session cookie is a person. Activity, comms, and site content need contributor access. Stage changes need a reviewer. A viewer gets 403. `Dropped` needs a reviewer and a `reason`; the event records who dropped it and why. Moving a row off `Dropped` also needs a reason. Cookie writes must be same-origin (`Sec-Fetch-Site: same-origin`, or an `Origin` on the same host). Indie and Muse send `Authorization: Bearer` with `AGENT_WRITE_TOKEN_INDIE` or `AGENT_WRITE_TOKEN_MUSE`. An agent can write activity, comms, and site content. An agent cannot change a stage. A site change cannot set Stage. A new site does not accept Folder, photos, land evidence or land notes, typed power, check statuses, or financial claims. Every numeric site fact needs its own source. Do not invent token values and do not print them.
 

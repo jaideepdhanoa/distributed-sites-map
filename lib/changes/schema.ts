@@ -21,6 +21,9 @@ import {
   type PhotoRef,
   type SiteField,
 } from "./site";
+import { isExcludedSite } from "@/lib/alerts/excluded";
+import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
+import { parseAmount } from "@/lib/pnl/money";
 import {
   ACTIVITY_TYPES,
   BUSINESS_TYPES,
@@ -90,6 +93,21 @@ export type SitePayload = {
   photos?: import("./site").PhotoRef[];
 };
 
+export type PnlLinePayload = {
+  grain: "annual" | "monthly";
+  year: number;
+  month?: number;
+  through_month?: number;
+  business_type: PnlBusiness;
+  line: PnlLineCode;
+  amount: string;
+  status: "reported" | "estimated";
+  source_document: string;
+  source_page: string;
+  source_href?: string;
+  captured_at: string;
+};
+
 export type ParsedChange = {
   entity_type: EntityType;
   site_id: string;
@@ -98,7 +116,7 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload;
 };
 
 const stagePayload = z
@@ -129,6 +147,23 @@ const commsPayload = z
     channel: z.string().trim().max(80).optional(),
     summary: z.string().trim().max(50000).optional(),
     subject: z.string().trim().max(2000).optional(),
+  })
+  .strict();
+
+const pnlLinePayload = z
+  .object({
+    grain: z.enum(["annual", "monthly"]),
+    year: z.number().int().min(1990).max(2100),
+    month: z.number().int().min(1).max(12).optional(),
+    through_month: z.number().int().min(1).max(12).optional(),
+    business_type: z.enum(PNL_BUSINESSES),
+    line: z.enum(PNL_LINE_CODES),
+    amount: z.string().trim().min(1).max(20),
+    status: z.enum(["reported", "estimated"]),
+    source_document: z.string().trim().min(1).max(200),
+    source_page: z.string().trim().min(1).max(80),
+    source_href: z.string().trim().max(500).optional(),
+    captured_at: z.string().trim().min(1).max(40),
   })
   .strict();
 
@@ -220,7 +255,7 @@ function guardKey(key: string): boolean {
 
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line"]),
     site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -249,7 +284,12 @@ function issueMessage(path: string, code: string): string {
   if (path.endsWith("site_id")) return "That site id is not valid.";
   if (path.endsWith("expected_version")) return "Version must be a whole number.";
   if (path === "changes" || path.endsWith("changes")) return "Add at least one change.";
-  if (path.endsWith("date") || path.endsWith("at")) return "Use an ISO-8601 time with a zone offset.";
+  if (path.endsWith("date") || path.endsWith("at") || path.endsWith("captured_at")) return "Use an ISO-8601 time with a zone offset.";
+  if (path.endsWith("grain")) return "Period grain must be annual or monthly.";
+  if (path.endsWith("business_type")) return "Business type must be car_wash or auto_service.";
+  if (path.endsWith("line")) return "That line is not in the chart of accounts.";
+  if (path.endsWith("amount")) return "Amount must be the captured number, with no rounding added.";
+  if (path.endsWith("status")) return "Status must be reported or estimated.";
   if (path.endsWith("summary")) return "Add a summary.";
   return "That change is not valid.";
 }
@@ -326,6 +366,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_id && row.entity_type === "comms" && !/^CM-\d{4,}$/.test(row.entity_id)) {
       throw new InputError(`Change ${index + 1}: That record id is not valid.`);
     }
+    if (row.entity_id && row.entity_type === "pnl_line" && !/^PL-\d{4,}$/.test(row.entity_id)) {
+      throw new InputError(`Change ${index + 1}: That record id is not valid.`);
+    }
     const siteAllowed = row.entity_type === "comms" ? commsSiteAllowed(row.site_id) : SITE_ID.test(row.site_id);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
@@ -357,6 +400,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       assertContentActor(actor, index);
       return { ...row, payload: { ...data, date: zoned.date, date_iso: zoned.iso } };
     }
+    if (row.entity_type === "pnl_line") {
+      return { ...row, payload: parsePnlLine(actor, index, row.site_id, row.payload) };
+    }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
       const issue = parsedPayload.error.issues[0];
@@ -378,6 +424,42 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     return { ...row, payload: data };
   });
   return { key, changes };
+}
+
+function parsePnlLine(actor: Actor, index: number, siteId: string, payload: unknown): PnlLinePayload {
+  if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
+  if (actor.kind === "agent" && actor.id.trim().toLowerCase() !== "muse") {
+    throw new InputError(`Change ${index + 1}: Only Muse can write a P&L line.`, 403);
+  }
+  assertContentActor(actor, index);
+  const parsedPayload = pnlLinePayload.safeParse(payload);
+  if (!parsedPayload.success) {
+    const issue = parsedPayload.error.issues[0];
+    fail(index, issue.path.map(String).join("."), issue.code);
+  }
+  const data = parsedPayload.data;
+  if (data.grain === "monthly" && data.month == null) {
+    throw new InputError(`Change ${index + 1}: A monthly period needs a month.`);
+  }
+  if (data.grain === "annual" && data.month != null) {
+    throw new InputError(`Change ${index + 1}: An annual period has no month.`);
+  }
+  if (data.grain === "monthly" && data.through_month != null) {
+    throw new InputError(`Change ${index + 1}: A monthly period has no through month.`);
+  }
+  if (!parseAmount(data.amount)) {
+    throw new InputError(`Change ${index + 1}: Amount must be the captured number, with no rounding added.`);
+  }
+  const zoned = parseZonedTimestamp(data.captured_at);
+  if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
+  if (data.source_href && !/^https:\/\/\S+$/.test(data.source_href)) {
+    throw new InputError(`Change ${index + 1}: The source link must be an https URL.`);
+  }
+  cleanText(data.source_document);
+  cleanText(data.source_page);
+  cleanText(data.source_href);
+  cleanText(data.amount);
+  return { ...data, captured_at: zoned.iso, source_href: data.source_href || "" };
 }
 
 function assertStageActor(actor: Actor, index: number, stage: string, reason: string | undefined): void {

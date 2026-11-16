@@ -1,3 +1,4 @@
+import type { PnlStatement } from "./pnl/statement";
 import { claimWord, packageLine, showsFinancials } from "./keyNumbers";
 import type { DealProps } from "./types";
 
@@ -76,6 +77,8 @@ export type FinancialPanel = {
   claims: ClaimRow[];
   checklist: ChecklistRow[];
   listed: { name: string; href: string }[];
+  /** Captured P&L. Absent on the workbook snapshot. The signed-in read adds it. */
+  pnl?: PnlStatement;
 };
 
 export type DocumentDecision = {

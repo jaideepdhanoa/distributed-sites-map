@@ -84,6 +84,7 @@ test("preview writes refuse the production host and other hosts stay open", asyn
     );
     assert.equal(digestResponse.status, 503);
     assert.equal(blocksPreviewWrite("GET", ["data", "deals"]), false);
+    assert.equal(blocksPreviewWrite("GET", ["cron", "workbook-sync"]), true);
     assert.equal(blocksPreviewWrite("POST", ["changes"]), true);
     assert.equal(blocksPreviewWrite("PUT", ["alerts", "preferences"]), true);
 

@@ -180,7 +180,9 @@ function methodNotAllowed(): Response {
 export function blocksPreviewWrite(method: string, parts: string[]): boolean {
   if (!previewPointsAtProduction()) return false;
   if (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") return true;
-  return method === "GET" && parts[0] === "alerts" && (parts[1] === "digest" || parts[1] === "flush");
+  if (method !== "GET") return false;
+  if (parts[0] === "cron") return true;
+  return parts[0] === "alerts" && (parts[1] === "digest" || parts[1] === "flush");
 }
 
 export async function dispatch(method: string, request: NextRequest, parts: string[]): Promise<Response> {

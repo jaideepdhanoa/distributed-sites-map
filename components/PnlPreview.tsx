@@ -2,40 +2,10 @@
 
 import { useState } from "react";
 import { Banknote } from "lucide-react";
-import FinancialsPanel from "./FinancialsPanel";
+import PnlOverlay from "./PnlOverlay";
 import { sampleStatement } from "@/lib/pnl/fixture";
-import type { FinancialPanel } from "@/lib/financials";
 
 const statement = sampleStatement();
-
-const panel: FinancialPanel = {
-  open: true,
-  packageStatus: "Received",
-  packageLine: "Sample package",
-  packageHref: "",
-  headline: { text: "$1,000,000", metric: "Revenue", claim: "Reported", packageLine: "Sample package" },
-  figures: [{
-    figure: "Revenue",
-    period: "Latest",
-    periodLabel: "2024",
-    text: "$1,000,000",
-    metric: "Revenue",
-    claim: "Reported",
-    sourceName: "Sample package",
-    sourceHref: "",
-    page: "4",
-    recast: "Reported",
-    state: "On file",
-    since: "",
-    why: "",
-  }],
-  bridge: [],
-  ending: null,
-  claims: [],
-  checklist: [],
-  listed: [],
-  pnl: statement,
-};
 
 export default function PnlPreview() {
   const [open, setOpen] = useState(false);
@@ -55,8 +25,8 @@ export default function PnlPreview() {
           </article>
         </div>
         <p className="pnl-note">Sample wash. These figures are not a site.</p>
-        {open ? <FinancialsPanel dealId="PIPE-LAS-9001" initial={panel} onClose={() => setOpen(false)} /> : null}
       </section>
+      {open ? <PnlOverlay statement={statement} onClose={() => setOpen(false)} /> : null}
     </main>
   );
 }

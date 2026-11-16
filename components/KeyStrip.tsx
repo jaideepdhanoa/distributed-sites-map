@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
+import type { PnlTiles } from "./FinancialsEntry";
 
 export function CapacityFacts({ facts }: { facts: CapacityFact[] }) {
   if (!facts.length) return <strong title="Not on file">—</strong>;
@@ -113,12 +116,14 @@ export default function KeyStrip({
   hasPin,
   universeSite,
   signedIn = false,
+  tiles = null,
 }: {
   deal: DealProps;
   hasPin: boolean;
   peers?: DealProps[];
   universeSite?: SiteProps | null;
   signedIn?: boolean;
+  tiles?: PnlTiles | null;
 }) {
   const cash = cashTile(deal);
   const acres = deal.land_acres != null ? `${deal.land_acres} ac` : "—";
@@ -126,13 +131,14 @@ export default function KeyStrip({
   const cashView = deal.stated_cash_flow != null || deal.stated_cash_flow_display
     ? { text: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display), title: sheetMoney(deal.stated_cash_flow, deal.stated_cash_flow_display) }
     : { text: cash.value || "—", title: cash.value || "—" };
-  const revenueText = deal.stated_revenue_display || (deal.stated_revenue != null ? sheetMoney(deal.stated_revenue, null) : "—");
+  const revenue = revenueTile(deal);
   const revenueBasis = deal.stated_revenue != null ? basisBadge(deal.revenue_basis) : "";
   const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
   const [financialsOpen, setFinancialsOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
@@ -187,9 +193,9 @@ export default function KeyStrip({
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
               <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-              <strong title={revenueText}>{revenueText}</strong>
-              {deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
-              {revenueBasis ? <em>{revenueBasis}</em> : deal.stated_revenue == null ? <small title="Not on file">—</small> : null}
+              <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
+              {tiles ? (tiles.revenue.note ? <small>{tiles.revenue.note}</small> : null) : deal.revenue_period ? <small>{deal.revenue_period}</small> : null}
+              {tiles ? null : revenueBasis ? <em>{revenueBasis}</em> : null}
             </button>
           </article>
         ) : null}
@@ -197,9 +203,9 @@ export default function KeyStrip({
           <article className="wide">
             <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
               <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
-              <strong title={cashView.title}>{cashView.text}</strong>
-              {cashNote ? <small>{cashNote}</small> : null}
-              {cashBasis ? <em>{cashBasis}</em> : null}
+              <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
+              {tiles ? (tiles.cash.note ? <small>{tiles.cash.note}</small> : null) : cashNote ? <small>{cashNote}</small> : null}
+              {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
             </button>
           </article>
         ) : null}
@@ -209,8 +215,12 @@ export default function KeyStrip({
         {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
-      {signedIn && showFinancials && financialsOpen && shownPanel?.open ? (
-        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setFinancialsOpen(false)} />
+      {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+        document.body,
+      ) : null}
+      {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (
+        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setChecklistOpen(false)} />
       ) : null}
       {signedIn && deal.kind !== "land" ? <PricingSection deal={deal} /> : null}
       <div className="supporting">

@@ -14,6 +14,18 @@ export function parseAmount(value: string): CapturedAmount | null {
   return { raw: text, cents: negative ? -cents : cents };
 }
 
+const ZERO = BigInt(0);
+const HUNDRED = BigInt(100);
+
+export function centsToRaw(cents: bigint): string {
+  const negative = cents < ZERO;
+  const abs = negative ? -cents : cents;
+  const whole = abs / HUNDRED;
+  const frac = abs % HUNDRED;
+  const raw = frac === ZERO ? `${whole}` : `${whole}.${String(frac).padStart(2, "0")}`;
+  return negative ? `-${raw}` : raw;
+}
+
 export function formatAmount(raw: string): string {
   const negative = raw.startsWith("-");
   const body = negative ? raw.slice(1) : raw;
@@ -22,16 +34,23 @@ export function formatAmount(raw: string): string {
   return `${negative ? "-" : ""}$${grouped}${frac ? `.${frac}` : ""}`;
 }
 
-/** Truncated percent of two captured amounts. Not a stored P&L line. */
+/** Truncated percent. A negative part keeps its sign. Not a stored P&L line. */
+export function signedPercent(part: bigint, whole: bigint): string | null {
+  if (whole <= ZERO) return null;
+  const negative = part < ZERO;
+  const text = percentOf(negative ? -part : part, whole);
+  if (!text) return null;
+  return negative ? `-${text}` : text;
+}
+
+/** Percent rounded to one decimal. Not a stored P&L line. */
 export function percentOf(lineCents: bigint, revenueCents: bigint): string | null {
   if (revenueCents <= BigInt(0)) return null;
   const abs = lineCents < BigInt(0) ? -lineCents : lineCents;
-  const bps = (abs * BigInt(10000)) / revenueCents;
-  const whole = bps / BigInt(100);
-  const frac = bps % BigInt(100);
-  if (frac === BigInt(0)) return `${whole}%`;
-  if (frac % BigInt(10) === BigInt(0)) return `${whole}.${frac / BigInt(10)}%`;
-  return `${whole}.${String(frac).padStart(2, "0")}%`;
+  const tenths = (abs * BigInt(1000) + revenueCents / BigInt(2)) / revenueCents;
+  const whole = tenths / BigInt(10);
+  const dec = tenths % BigInt(10);
+  return `${whole}.${dec}%`;
 }
 
 export function outsideBand(lineCents: bigint, revenueCents: bigint, low: number, high: number): boolean {

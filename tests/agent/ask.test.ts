@@ -230,7 +230,7 @@ test("getSite returns the card facts for 3520 N 16th St without restaging it", a
   assert.equal(result.card?.acres, props.land_acres);
   assert.equal(result.card?.baysThatFit, props.bays_that_fit);
   assert.equal(result.card?.packageStatus, "Package on file");
-  assert.equal(result.card?.cashFlow, "—");
+  assert.equal(result.card?.cashFlow, "Not in package");
   assert.match(String(result.card?.spareLand), /9,000 sq ft/);
   assert.match(String(result.card?.photoSet), /Photo set: complete/);
   assert.match(String(result.card?.photoSet), /6 site photos/);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { listingCue } from "../lib/format.ts";
 import { matchesLandTier, spareTier } from "../lib/filter.ts";
-import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, countYear, dealLabelFeatures, defaultColumnIds, displayScore, growthText, pillText, inRange, openLandText, parseColumns, peerNote, publicDeal, rangesFromSearch, sheetMoney, summaryOf, tileAmount, universeTrafficLine, vehiclesPerDay, workbookTrafficLine } from "../lib/keyNumbers.ts";
+import { DEAL_LABEL_FIELD, capacityFacts, cashTile, cleanFactText, countYear, dealLabelFeatures, defaultColumnIds, displayScore, growthText, pillText, inRange, openLandText, parseColumns, peerNote, publicDeal, rangesFromSearch, revenueTile, sheetMoney, summaryOf, tileAmount, universeTrafficLine, vehiclesPerDay, workbookTrafficLine } from "../lib/keyNumbers.ts";
 import { overlayFeatures } from "../lib/overlays.ts";
 import { inSelectedMarket, matchesOpenLandTier } from "../lib/filter.ts";
 import { inMapArea, parseMapArea } from "../lib/geoFilter.ts";
@@ -59,6 +59,13 @@ const note = peerNote(rows[1], rows);
 assert.equal(note?.label, "1st lowest of 2 Phoenix pipeline");
 
 assert.equal(cashTile(deal({ figures_status: "withheld" })).value, "Package figures not shown");
+assert.equal(cashTile(deal({ figures_status: "absent", package_status: "Received", package_line: "Package on file" })).value, "Not in package");
+assert.equal(cashTile(deal({ figures_status: "absent", package_status: "Received", package_line: "Package on file" })).note, "");
+assert.equal(cashTile(deal({ figures_status: "absent", package_status: "None" })).value, "—");
+assert.equal(cashTile(deal({ figures_status: "absent", package_status: "None" })).note, "Not on file");
+assert.deepEqual(revenueTile(deal({ figures_status: "absent", package_status: "Received", package_line: "Package on file" })), { text: "Not in package", title: "Not in package" });
+assert.deepEqual(revenueTile(deal({ figures_status: "absent", stated_revenue_display: "$337,000", package_status: "Received" })), { text: "$337,000", title: "$337,000" });
+assert.deepEqual(revenueTile(deal({ figures_status: "absent", package_status: "None" })), { text: "—", title: "Not on file" });
 assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received", figures_status: "shown" })).value, "-$121,000");
 assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).note, "EBITDA · Package on file");
 assert.equal(cashTile(deal({ stated_cash_flow: -121000, stated_cash_flow_display: "-$121,000", cash_flow_label: "EBITDA", figures_basis: "Documented", package_status: "Received" })).basis, "Documented");

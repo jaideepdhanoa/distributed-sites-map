@@ -13,8 +13,6 @@ import {
   type DocumentDecision,
   type FinancialPanel,
 } from "@/lib/financials";
-import { emptyStatement } from "@/lib/pnl/statement";
-import PnlDrill from "./PnlDrill";
 
 type Account = { id: string; name: string };
 
@@ -177,7 +175,6 @@ export default function FinancialsPanel({
         {panel.headline.claim ? <em className="fin-claim">{panel.headline.claim}</em> : null}
       </p>
       {panel.packageLine ? <p>{panel.packageLine}{panel.packageHref ? <> · <a href={panel.packageHref} target="_blank" rel="noopener noreferrer">Open package</a></> : null}</p> : null}
-      <PnlDrill statement={panel.pnl ?? emptyStatement()} />
       <div className="fin-switch" role="group" aria-label="Period">
         {PERIODS.map((item) => (
           <button key={item} type="button" className={item === period ? "chip on" : "chip"} onClick={() => setPeriod(item)}>{item}</button>

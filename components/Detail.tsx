@@ -8,7 +8,9 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import FinancialsEntry, { usePnlTiles, type PnlTiles } from "./FinancialsEntry";
+import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
@@ -135,30 +137,48 @@ function FigureSkeleton() {
   );
 }
 
-function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps; censusAcres?: number | null; signedIn?: boolean }) {
+function DealHeadline({
+  deal,
+  censusAcres,
+  signedIn = false,
+  tiles = null,
+}: {
+  deal: DealProps;
+  censusAcres?: number | null;
+  signedIn?: boolean;
+  tiles?: PnlTiles | null;
+}) {
   const cash = cashTile(deal);
+  const revenue = revenueTile(deal);
+  const shownRevenue = tiles?.revenue ?? { text: revenue.text, title: revenue.title, note: deal.revenue_basis || "" };
+  const shownCash = tiles?.cash ?? {
+    text: cash.value || "—",
+    title: cash.value === "—" ? "Not on file" : (cash.value || "Not on file"),
+    note: [cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · "),
+  };
   const spare = spareLandSqft(deal.open_land_sqft, censusAcres);
   const bays = deal.bays_that_fit == null ? "—" : String(Math.round(deal.bays_that_fit));
   const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
-  const negative = deal.stated_cash_flow != null && deal.stated_cash_flow < 0;
+  const negative = shownCash.text.startsWith("-");
   const showMoney = signedIn && !cash.hidden;
   const traffic = deal.trade_aadt != null ? Math.round(deal.trade_aadt).toLocaleString() : "—";
   const facts = factsForDeal(deal);
   const power = powerSummary(facts);
+  const phrase = (text: string) => (text === "Not in package" ? "phrase" : undefined);
   return (
     <div className="headline" data-testid="card-numbers">
       {showMoney ? (
         <div>
           <span>Revenue</span>
-          <strong>{deal.stated_revenue_display || "—"}</strong>
-          {deal.revenue_basis ? <small>{deal.revenue_basis}</small> : null}
+          <strong className={phrase(shownRevenue.text)} title={shownRevenue.title}>{shownRevenue.text}</strong>
+          {shownRevenue.note ? <small>{shownRevenue.note}</small> : null}
         </div>
       ) : null}
       {showMoney ? (
         <div>
           <span>Cash flow</span>
-          <strong className={negative ? "neg" : ""}>{cash.value || "—"}</strong>
-          {[cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).length ? <small>{[cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</small> : null}
+          <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
+          {shownCash.note ? <small>{shownCash.note}</small> : null}
         </div>
       ) : null}
       <div>
@@ -184,8 +204,8 @@ function DealHeadline({ deal, censusAcres, signedIn = false }: { deal: DealProps
   );
 }
 
-function SiteNumbers({ site, deal, signedIn = false }: { site: SiteProps; deal?: DealProps | null; signedIn?: boolean }) {
-  if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} signedIn={signedIn} />;
+function SiteNumbers({ site, deal, signedIn = false, tiles = null }: { site: SiteProps; deal?: DealProps | null; signedIn?: boolean; tiles?: PnlTiles | null }) {
+  if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} signedIn={signedIn} tiles={tiles} />;
   const spare = spareLandSqft(null, site.spare_ac_own);
   const traffic = site.aadt_count != null && site.aadt_count !== "" ? site.aadt_count : "—";
   const year = countYear(site.aadt_year);
@@ -400,6 +420,7 @@ export default function Detail({
   signedIn?: boolean;
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
+  const pnl = usePnlTiles(signedIn && linkedDeal && linkedDeal.kind !== "land" ? linkedDeal.deal_id : "");
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
   const street = photos.frontageUrl || site.street_view_url;
@@ -465,7 +486,10 @@ export default function Detail({
         />
       </div>
       <ScoreTile score={linkedDeal?.score} />
-      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} /> : <FigureSkeleton />}
+      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} /> : <FigureSkeleton />}
+      {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
+        <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
+      ) : null}
       <SitePhotos card={photos} />
       <NextStepCard
         kind="site"
@@ -686,9 +710,11 @@ export function DealDetail({
   related?: ReactNode;
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
+  const pnl = usePnlTiles(signedIn && deal.kind !== "land" ? deal.deal_id : "");
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
   const cash = cashTile(deal);
+  const revenue = revenueTile(deal);
   const cue = listingCue(deal);
   return (
     <aside
@@ -737,7 +763,10 @@ export function DealDetail({
         />
       </div>
       <ScoreTile score={deal.score} />
-      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} /> : <FigureSkeleton />}
+      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} /> : <FigureSkeleton />}
+      {signedIn && deal.kind !== "land" ? (
+        <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
+      ) : null}
       <SitePhotos card={photos} />
       <NextStepCard
         kind="deal"
@@ -794,7 +823,7 @@ export function DealDetail({
         }
         numbers={
           <>
-            {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} /> : null}
+            {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} /> : null}
             <div className="kv">
               <span>Asking price</span>
               <div>
@@ -808,9 +837,9 @@ export function DealDetail({
               <span>Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
               {signedIn && !cash.hidden ? <span>Revenue</span> : null}
-              {signedIn && !cash.hidden ? <div>{[deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? <div title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div> : null}
               {signedIn && !cash.hidden ? <span>Cash flow</span> : null}
-              {signedIn && !cash.hidden ? <div>{[cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div> : null}
+              {signedIn && !cash.hidden ? <div title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div> : null}
             </div>
           </>
         }

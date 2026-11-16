@@ -33,20 +33,43 @@ function numberOrNull(value: number | string | null): number | null {
   return Number(value);
 }
 
-export async function loadPnlStatement(sql: Sql, siteId: string): Promise<PnlStatement> {
-  if (isExcludedSite(siteId)) return emptyStatement();
+/** The requested record plus its linked deal or universe site, requested id first. */
+export function linkedPnlIds(requested: string, links: { dealId: string; siteId: string }[]): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  const add = (value: string) => {
+    const text = value.trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    ids.push(text);
+  };
+  add(requested);
+  for (const link of links) {
+    if (link.dealId === requested || link.siteId === requested) {
+      add(link.dealId);
+      add(link.siteId);
+    }
+  }
+  return ids;
+}
+
+export async function loadPnlStatement(sql: Sql, siteId: string | string[]): Promise<PnlStatement> {
+  const requested = (Array.isArray(siteId) ? siteId : [siteId]).map((id) => id.trim()).filter((id) => id && !isExcludedSite(id));
+  if (!requested.length) return emptyStatement();
   try {
-    const result = await sql.query<Row>(
-      `SELECT p.entity_id AS period_id, p.grain, p.year, p.month, p.through_month, p.business_type,
+    const result = await sql.query<Row & { site_id: string }>(
+      `SELECT l.site_id, p.entity_id AS period_id, p.grain, p.year, p.month, p.through_month, p.business_type,
               l.entity_id AS line_id, l.line_code, l.amount_text, l.status,
               l.source_document, l.source_page, l.source_href, l.captured_at_iso
        FROM pnl_lines l
        JOIN pnl_periods p ON p.entity_id = l.period_id
-       WHERE l.site_id = $1`,
-      [siteId],
+       WHERE l.site_id = ANY($1::text[])`,
+      [requested],
     );
+    const keyed = requested.find((id) => result.rows.some((row) => row.site_id === id));
+    const rows = keyed ? result.rows.filter((row) => row.site_id === keyed) : [];
     const lines: CapturedLine[] = [];
-    for (const row of result.rows) {
+    for (const row of rows) {
       if (!isPnlLineCode(row.line_code)) continue;
       if (row.business_type !== "car_wash" && row.business_type !== "auto_service") continue;
       if (row.grain !== "annual" && row.grain !== "monthly") continue;

@@ -111,29 +111,31 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
   await page.getByTestId("mark-space").click();
   await expect(page.getByTestId("space-done")).toBeVisible();
   await expect(page.locator("aside.drawer")).toBeHidden();
-  await page.waitForFunction(() => {
-    const map = (window as unknown as {
-      __sitesMap?: {
-        getZoom: () => number;
-        getLayer: (id: string) => unknown;
-        project: (lnglat: [number, number]) => { x: number; y: number };
-        queryRenderedFeatures: (point: [number, number], options: { layers: string[] }) => unknown[];
-      };
-    }).__sitesMap;
-    if (!map || map.getZoom() <= 17 || !map.getLayer("space-fill")) return false;
-    const projected = map.project([-112.070527, 33.407157]);
-    return map.queryRenderedFeatures([projected.x, projected.y], { layers: ["space-fill"] }).length > 0;
-  }, undefined, { timeout: 15_000 });
-  const point = await page.evaluate(() => {
-    const map = (window as unknown as { __sitesMap?: { project: (lnglat: [number, number]) => { x: number; y: number } } }).__sitesMap;
-    const projected = map?.project([-112.070527, 33.407157]);
-    return projected ? { x: projected.x, y: projected.y } : null;
-  });
-  if (!point) throw new Error("map has no point");
-  const mapBox = await page.locator(".stage-map .map").boundingBox();
-  if (!mapBox) throw new Error("map has no box");
-  await page.mouse.click(mapBox.x + point.x, mapBox.y + point.y);
-  await expect(page.getByTestId("space-popover")).toBeVisible();
+  await expect(async () => {
+    const point = await page.evaluate(() => {
+      const map = (window as unknown as {
+        __sitesMap?: {
+          getZoom: () => number;
+          project: (lnglat: [number, number]) => { x: number; y: number };
+          queryRenderedFeatures: (point: [number, number], options: { layers: string[] }) => unknown[];
+        };
+      }).__sitesMap;
+      if (!map || map.getZoom() <= 17) return null;
+      const projected = map.project([-112.070527, 33.407157]);
+      if (!projected || !map?.queryRenderedFeatures([projected.x, projected.y], { layers: ["space-fill"] }).length) return null;
+      return { x: projected.x, y: projected.y };
+    });
+    if (!point) throw new Error("marked space is not under the site yet");
+    const mapBox = await page.locator(".stage-map .map").boundingBox();
+    if (!mapBox) throw new Error("map has no box");
+    const hit = await page.evaluate(({ x, y }) => {
+      const node = document.elementFromPoint(x, y);
+      return node ? `${node.tagName}.${String(node.className)}` : "none";
+    }, { x: mapBox.x + point.x, y: mapBox.y + point.y });
+    if (!hit.includes("canvas")) throw new Error(`click landed on ${hit}`);
+    await page.mouse.click(mapBox.x + point.x, mapBox.y + point.y);
+    await expect(page.getByTestId("space-popover")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(page.getByTestId("space-measure")).toContainText("ft");
   const thread = page.getByTestId("space-thread");
   await thread.getByTestId("space-note-body").fill("The row looks usable from the aerial.");

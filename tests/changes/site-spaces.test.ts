@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { EXCLUDED_SITE_ID } from "../../lib/alerts/excluded";
 import { applyBatch, VersionConflictError } from "../../lib/changes/apply";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
-import { listSiteSpaces } from "../../lib/spaces/store";
+import { listAllSiteSpaces, listSiteSpaces } from "../../lib/spaces/store";
 import { memorySql } from "../helpers/sql";
 
 const contributor: Actor = { id: "contributor", kind: "human", role: "contributor" };
@@ -114,4 +115,17 @@ test("a space stores geodesic size, an estimated count, the author, and an offse
   );
   assert.equal(kept.rows[0]?.author, "viewer");
   assert.equal(Number(kept.rows[0]?.version), 3);
+});
+
+test("a database without the spaces table is an empty layer, not a crash", async () => {
+  const sql = await memorySql();
+  await assert.rejects(() => listAllSiteSpaces(sql), (error: unknown) => {
+    assert.equal((error as { code?: string }).code, "42P01");
+    return true;
+  });
+  const route = readFileSync("lib/api/handlers/data/spaces.ts", "utf8");
+  assert.match(route, /code === "42P01"/);
+  assert.match(route, /return NextResponse\.json\(\{ spaces: \[\] \}/);
+  const explorer = readFileSync("components/Explorer.tsx", "utf8");
+  assert.match(explorer, /response\.ok \? response\.json\(\) : \{ spaces: \[\] \}/);
 });

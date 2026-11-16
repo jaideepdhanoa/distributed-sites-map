@@ -17,10 +17,10 @@ import {
   type SiteField,
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
-import { storePnlLine } from "@/lib/pnl/store";
+import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
 import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload } from "./schema";
-import { formatZonedTimestamp, parseZonedTimestamp, validateBatch } from "./schema";
+import { formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, validateBatch } from "./schema";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import type { EntityType, Market, ServiceAreaClass } from "./vocab";
 
@@ -604,6 +604,16 @@ async function applyOne(
     payload = await writeSite(sql, change, actor.id, version, mode);
   } else if (change.entity_type === "activity") {
     payload = await writeActivity(sql, change, entityId, actor.id, version);
+  } else if (change.entity_type === "pnl_line" && isPnlRetract(change.payload)) {
+    const written = await retractPnlLine(sql, {
+      siteId: change.site_id,
+      entityId,
+      actorId: actor.id,
+      version,
+      payload: change.payload,
+    });
+    if (!written.ok) throw conflict(change, written.entityId, written.actual);
+    payload = written.payload;
   } else if (change.entity_type === "pnl_line") {
     const written = await storePnlLine(sql, {
       siteId: change.site_id,

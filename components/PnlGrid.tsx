@@ -26,7 +26,7 @@ function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
   return (
     <span className="pnl-figure">
       <span className="pnl-amount">
-        {cell.status === "calculated" ? null : <i className={`pnl-mark ${cell.status}`} aria-label={cell.status === "estimated" ? "Estimated" : "Reported"} />}
+        {cell.status === "calculated" ? null : <i className={`pnl-mark ${cell.status}`} aria-label={cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"} />}
         <strong>{shown.primary}</strong>
       </span>
       {shown.secondary ? <small>{shown.secondary}</small> : null}
@@ -168,7 +168,7 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
         <div className="pnl-pop" role="dialog" aria-label="Line source" data-testid="pnl-popover" style={{ top: open.top, left: open.left }}>
           <strong>{focusable[open.row]?.label}</strong>
           <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>
-          <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : "Reported"}</p>
+          <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : popover.status === "normalized" ? "Normalized" : "Reported"}</p>
           <p>{popover.sourceDocument}{popover.sourcePage ? ` · ${popover.sourcePage}` : ""}</p>
           {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
           {popover.sourceHref ? <a className="text-link" href={popover.sourceHref} target="_blank" rel="noopener noreferrer">Open source ↗</a> : null}

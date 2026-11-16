@@ -58,7 +58,13 @@ function readPnl(value: unknown): PnlStatement {
   if (!value || typeof value !== "object") return emptyStatement();
   const row = value as PnlStatement;
   if (row.status === "empty" || row.status === "unavailable") {
-    return { status: row.status, message: typeof row.message === "string" && row.message ? row.message : emptyStatement().message, years: [] };
+    return {
+      status: row.status,
+      message: typeof row.message === "string" && row.message ? row.message : emptyStatement().message,
+      years: [],
+      normalizedYears: [],
+      hasNormalized: false,
+    };
   }
   if (row.status !== "ready" || !Array.isArray(row.years)) return emptyStatement();
   return row;

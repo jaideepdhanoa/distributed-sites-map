@@ -22,10 +22,11 @@ export function sampleStatement(): PnlStatement {
     line({ id: "PL-900002", periodId: "PP-900001", grain: "annual", year: 2024, month: null, throughMonth: null, business: "car_wash", code: "labor", amount: "500000", status: "reported", sourcePage: "Sheet 2024" }),
     line({ id: "PL-900003", periodId: "PP-900001", grain: "annual", year: 2024, month: null, throughMonth: null, business: "car_wash", code: "chemicals", amount: "60000", status: "reported", sourcePage: "Sheet 2024" }),
     line({ id: "PL-900004", periodId: "PP-900001", grain: "annual", year: 2024, month: null, throughMonth: null, business: "car_wash", code: "addback_owner_pay", amount: "80000", status: "estimated", sourceDocument: "Sample notes", sourcePage: "Note 2" }),
+    line({ id: "PL-900009", periodId: "PP-900001", grain: "annual", year: 2024, month: null, throughMonth: null, business: "car_wash", code: "labor", amount: "450000", status: "normalized", sourcePage: "Sheet 2024 normalized" }),
     line({ id: "PL-900005", periodId: "PP-900002", grain: "monthly", year: 2024, month: 1, throughMonth: null, business: "car_wash", code: "revenue", amount: "80000", status: "reported", sourcePage: "Jan" }),
     line({ id: "PL-900006", periodId: "PP-900002", grain: "monthly", year: 2024, month: 1, throughMonth: null, business: "car_wash", code: "labor", amount: "10000", status: "reported", sourcePage: "Jan" }),
     line({ id: "PL-900007", periodId: "PP-900003", grain: "monthly", year: 2024, month: 3, throughMonth: null, business: "car_wash", code: "revenue", amount: "90000", status: "reported", sourcePage: "Mar" }),
     line({ id: "PL-900008", periodId: "PP-900003", grain: "monthly", year: 2024, month: 3, throughMonth: null, business: "car_wash", code: "chemicals", amount: "12000", status: "reported", sourcePage: "Mar" }),
   ];
-  return buildStatement(lines);
+  return buildStatement(lines, [{ year: 2024, month: 2, business: "car_wash", periodId: "PP-900009" }]);
 }

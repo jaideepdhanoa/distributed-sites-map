@@ -14,7 +14,10 @@ export type FinancialsCard = {
 
 function amount(statement: PnlStatement, year: number, id: string): string {
   const grid = buildPnlGrid(statement, "years");
-  const index = statement.years.findIndex((item) => item.year === year);
+  const view = statement.years.find((item) => item.year === year);
+  const columnId = view?.annual?.id || `year-${year}`;
+  const index = grid.columns.findIndex((column) => column.id === columnId);
+  if (index < 0) return "";
   const cell = grid.rows.find((row) => row.id === id)?.cells[index];
   return cell?.kind === "value" ? cell.amount : "";
 }

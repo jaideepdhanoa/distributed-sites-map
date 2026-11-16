@@ -56,6 +56,27 @@ test("the month sheet keeps missing months empty and calculates EBITDA from capt
   assert.equal(columnSummary(grid, 1).revenue, "Missing");
 });
 
+test("a fiscal year and a mid-month partial keep their column labels", () => {
+  const statement = sampleStatement();
+  const mid = {
+    ...statement,
+    years: statement.years.map((year) => year.year === 2024 ? {
+      ...year,
+      ranges: [{
+        ...(year.annual as NonNullable<typeof year.annual>),
+        id: "PP-mid",
+        columnLabel: "Jan 1 - Jun 14 2026",
+        title: "Jan 1 - Jun 14 2026",
+        periodStart: "2026-01-01",
+        periodEnd: "2026-06-14",
+        year: 2026,
+      }],
+    } : year),
+  };
+  const grid = buildPnlGrid(mid, "years");
+  assert.deepEqual(grid.columns.map((column) => column.label), ["2024", "Jan 1 - Jun 14 2026"]);
+});
+
 test("years view uses one column per year and does not invent a second year", () => {
   const { grid } = row("total-revenue", "years");
   assert.deepEqual(grid.columns.map((column) => column.label), ["2024"]);

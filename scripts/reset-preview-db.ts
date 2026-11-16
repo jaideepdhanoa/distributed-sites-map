@@ -81,14 +81,17 @@ async function main(): Promise<void> {
     onSecret: mask,
   };
   const records = await listProjectEnv(vercel);
-  const written = await applyPreviewEnv(vercel, records, values);
+  const applied = await applyPreviewEnv(vercel, records, values);
   const name = await projectName(vercel);
   const deployment = await latestPreviewDeployment(vercel);
   if (deployment) await redeployPreview(vercel, name, deployment);
   const redeployed = deployment ? "Redeployed the latest preview." : "No ready preview deployment. The Preview env applies on the next preview build.";
+  const narrowed = applied.narrowed.length ? applied.narrowed.join(", ") : "none";
+  const wrote = applied.written.length ? applied.written.join(", ") : "none";
   const message = [
     `The Neon branch named preview was ${preview.action} from the production branch.`,
-    `Updated Preview env keys: ${written.join(", ")}.`,
+    `Narrowed shared env keys: ${narrowed}.`,
+    `Wrote Preview env keys: ${wrote}.`,
     "Production and Development were not changed.",
     redeployed,
   ].join(" ");

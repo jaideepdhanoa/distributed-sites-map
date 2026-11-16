@@ -24,6 +24,8 @@ import { createPreviewBody, ensurePreviewBranch, planPreviewBranch, restorePrevi
 import { redactSecrets } from "../../lib/preview/redact";
 import {
   applyPreviewEnv,
+  latestPreviewDeployment,
+  previewDeploymentsQuery,
   PUBLIC_VERCEL_PROJECT_ID,
   PUBLIC_VERCEL_TEAM_ID,
   redeployBody,
@@ -137,9 +139,10 @@ test("the preview env plan never writes production", () => {
     { id: "mail", key: "RESEND_API_KEY", target: ["production", "preview"] },
   ];
   const keys = keysForPreviewSplit(records);
-  assert.ok(keys.includes("DATABASE_URL"));
-  assert.ok(keys.includes("NEON_PRODUCTION_HOST"));
-  assert.ok(keys.includes("PREVIEW_DATABASE_BRANCH"));
+  assert.equal(keys[0], "DATABASE_URL");
+  assert.ok(keys.indexOf("NEON_PRODUCTION_HOST") > 0);
+  assert.ok(keys.indexOf("NEON_PRODUCTION_HOST") < keys.indexOf("PREVIEW_DATABASE_BRANCH"));
+  assert.equal(keys.at(-1), "PREVIEW_DATABASE_BRANCH");
   assert.equal(keys.includes("RESEND_API_KEY"), false);
   assert.equal(keys.includes("CHANGES_API_ENABLED"), false);
   const plan = planPreviewEnv(records, keys);
@@ -222,12 +225,15 @@ test("vercel preview writes do not include production", async () => {
     calls.push({ method: init?.method || "GET", body });
     return new Response("{}", { status: 200 });
   };
-  const written = await applyPreviewEnv(
+  const applied = await applyPreviewEnv(
     { token: "vercel-test-token", projectId: "prj_test", teamId: "team_test", fetchImpl },
     records,
     values,
   );
-  assert.ok(written.includes("DATABASE_URL"));
+  assert.deepEqual(applied.narrowed, ["DATABASE_URL"]);
+  assert.equal(applied.written[0], "DATABASE_URL");
+  assert.ok(applied.written.indexOf("NEON_PRODUCTION_HOST") < applied.written.indexOf("PREVIEW_DATABASE_BRANCH"));
+  assert.equal(applied.written.at(-1), "PREVIEW_DATABASE_BRANCH");
   const patch = calls.find((call) => call.method === "PATCH");
   assert.ok(patch);
   assert.deepEqual(JSON.parse(patch.body), { target: ["production"] });
@@ -244,6 +250,35 @@ test("vercel preview writes do not include production", async () => {
     { uid: "dpl_preview", target: null, readyState: "READY" },
   ])?.uid, "dpl_preview");
   assert.equal(redeployBody("sites", "dpl_preview").target, "preview");
+});
+
+test("the deployments query does not send target=preview", async () => {
+  const query = previewDeploymentsQuery("prj_test", "team_test");
+  assert.equal(query.searchParams.has("target"), false);
+  assert.equal(query.searchParams.get("state"), "READY");
+  let requested = "";
+  const fetchImpl: typeof fetch = async (input) => {
+    requested = String(input);
+    return new Response(JSON.stringify({
+      deployments: [
+        { uid: "dpl_prod", target: "production", readyState: "READY" },
+        { uid: "dpl_staging", target: "staging", readyState: "READY" },
+        { uid: "dpl_preview", target: null, readyState: "READY" },
+      ],
+    }), { status: 200 });
+  };
+  const found = await latestPreviewDeployment({
+    token: "vercel-test-token",
+    projectId: "prj_test",
+    teamId: "team_test",
+    fetchImpl,
+  });
+  assert.equal(found?.uid, "dpl_preview");
+  assert.equal(found?.target == null || found?.target === "preview", true);
+  const url = new URL(requested);
+  assert.equal(url.searchParams.has("target"), false);
+  assert.equal(url.search.includes("target=preview"), false);
+  assert.equal(url.searchParams.get("projectId"), "prj_test");
 });
 
 test("preview fails closed until the reset marker says the host is not production", () => {

@@ -80,7 +80,10 @@
   background: #fffdf8;
   display: grid;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
+.next-card > * { min-width: 0; max-width: 100%; }
 .next-card.empty {
   margin-top: 8px;
   padding: 4px 0 0;

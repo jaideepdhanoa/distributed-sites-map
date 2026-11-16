@@ -67,3 +67,84 @@ test("the desk list keeps the location note out of the stage tabs", async ({ pag
   });
   expect(lines).toBe(1);
 });
+
+test("phone chrome stays inside the viewport and the map pill sits in its track", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone widths");
+  for (const width of [390, 560]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/?funnel=pipeline&site=PIPE-PHX-0014", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".shell");
+    await page.waitForSelector(".drawer-scroll");
+    await page.waitForSelector(".phone-view-row .map-switch button.on");
+    const fit = await page.evaluate(() => {
+      const doc = document.documentElement;
+      const track = document.querySelector(".phone-view-row .funnel-switch.map-switch");
+      const pill = track?.querySelector("button.on");
+      const neighbor = document.querySelector(".phone-view-row select.secondary");
+      const sheet = document.querySelector(".drawer-scroll");
+      if (!track || !pill || !neighbor || !sheet) {
+        return { missing: true, overflow: 0, sheet: 0, past: 0, top: 0, bottom: 0, left: 0, gap: 0, trackH: 0, neighborH: 0 };
+      }
+      const trackBox = track.getBoundingClientRect();
+      const pillBox = pill.getBoundingClientRect();
+      const neighborBox = neighbor.getBoundingClientRect();
+      const list = track.querySelectorAll("button")[1]?.getBoundingClientRect();
+      const past = [...document.querySelectorAll(".top > *, .phone-view-row > *")].filter((el) => {
+        const box = el.getBoundingClientRect();
+        if (box.width < 2 || box.height < 2) return false;
+        return box.right > doc.clientWidth + 1 || box.left < -1;
+      }).length;
+      return {
+        missing: false,
+        overflow: doc.scrollWidth - doc.clientWidth,
+        sheet: sheet.scrollWidth - sheet.clientWidth,
+        past,
+        top: pillBox.top - trackBox.top,
+        bottom: trackBox.bottom - pillBox.bottom,
+        left: pillBox.left - trackBox.left,
+        gap: list ? list.left - pillBox.right : -1,
+        trackH: trackBox.height,
+        neighborH: neighborBox.height,
+      };
+    });
+    expect(fit.missing, `${width}px layout`).toBe(false);
+    expect(fit.overflow, `${width}px document overflow`).toBeLessThanOrEqual(0);
+    expect(fit.sheet, `${width}px sheet overflow`).toBeLessThanOrEqual(1);
+    expect(fit.past, `${width}px chrome past the edge`).toBe(0);
+    expect(fit.top).toBeGreaterThanOrEqual(2);
+    expect(Math.abs((fit.top ?? 0) - (fit.bottom ?? 0))).toBeLessThanOrEqual(1);
+    expect(Math.abs((fit.top ?? 0) - (fit.left ?? 0))).toBeLessThanOrEqual(1);
+    expect(Math.abs((fit.top ?? 0) - (fit.gap ?? 0))).toBeLessThanOrEqual(1);
+    expect(Math.abs((fit.trackH ?? 0) - (fit.neighborH ?? 0))).toBeLessThanOrEqual(1);
+  }
+});
+
+test("the desktop map pill sits inside its track", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop chrome");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".top .map-switch button.on");
+  const fit = await page.evaluate(() => {
+    const doc = document.documentElement;
+    const track = document.querySelector(".top .funnel-switch.map-switch");
+    const pill = track?.querySelector("button.on");
+    if (!track || !pill) return { missing: true, overflow: 0, top: 0, bottom: 0, left: 0, gap: 0 };
+    const trackBox = track.getBoundingClientRect();
+    const pillBox = pill.getBoundingClientRect();
+    const list = track.querySelectorAll("button")[1]?.getBoundingClientRect();
+    return {
+      missing: false,
+      overflow: doc.scrollWidth - doc.clientWidth,
+      top: pillBox.top - trackBox.top,
+      bottom: trackBox.bottom - pillBox.bottom,
+      left: pillBox.left - trackBox.left,
+      gap: list ? list.left - pillBox.right : -1,
+    };
+  });
+  expect(fit.missing).toBe(false);
+  expect(fit.overflow).toBeLessThanOrEqual(0);
+  expect(fit.top).toBeGreaterThanOrEqual(1);
+  expect(Math.abs((fit.top ?? 0) - (fit.bottom ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((fit.top ?? 0) - (fit.left ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((fit.top ?? 0) - (fit.gap ?? 0))).toBeLessThanOrEqual(1);
+});

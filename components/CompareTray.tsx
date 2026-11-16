@@ -10,8 +10,8 @@ const MISSING = "—";
 
 type CompareRow = { label: string; value: string };
 
-function shown(value?: string | null) {
-  const text = (value || "").trim();
+function shown(value?: unknown) {
+  const text = (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
   return text || MISSING;
 }
 

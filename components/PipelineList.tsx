@@ -88,7 +88,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "area") return serviceAreaColumn(deal) || "—";
   if (id === "nda") return cardNdaLabel(deal, signedIn) || "—";
   if (id === "lastContact") return contactDate(deal.last_broker_contact) || "—";
-  if (id === "nextStep") return (deal.next_step || "").trim() || "—";
+  if (id === "nextStep") return String(deal.next_step || "").trim() || "—";
   if (id === "type") return typeLabel(deal) || "—";
   return checkedShort(deal.checked_live) || "—";
 }
@@ -445,7 +445,7 @@ export default function PipelineList({
                               {cell(row, column, signedIn)}
                               {row.noPin ? <span className="no-pin"> No pin</span> : null}
                             </span>
-                            {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? (
+                            {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
                               <span className="site-address">{displayAddress(row.deal.address)}</span>
                             ) : null}
                             <NearMark deal={row.deal} />
@@ -496,7 +496,7 @@ export default function PipelineList({
                 }}
               >
                 <strong>{unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}{row.deal.name || row.deal.address}</strong>
-                {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== (row.deal.name || "").trim() ? <span className="site-address">{displayAddress(row.deal.address)}</span> : null}
+                {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? <span className="site-address">{displayAddress(row.deal.address)}</span> : null}
                 <NearMark deal={row.deal} />
                 <span className="list-card-line">
                   {[stageDetail(row.deal.stage, row.deal.stage_group), signedIn ? dealAsking(row) : "—", row.deal.open_land_sqft != null ? openLandText(row.deal.open_land_sqft) : "—"].join(" · ")}
@@ -581,7 +581,7 @@ function NearMark({ deal }: { deal: DealProps }) {
 
 function phoneRank(row: PipelineRow, strips: { askingRevenue: StripStats | null; perAcre: StripStats | null }, signedIn: boolean) {
   if (!signedIn) return null;
-  const place = (row.deal.city || "").trim();
+  const place = String(row.deal.city || "").trim();
   if (!place) return null;
   const choices: Array<{ value: number | null | undefined; stats: StripStats | null }> = [
     { value: row.deal.revenue_multiple, stats: strips.askingRevenue },

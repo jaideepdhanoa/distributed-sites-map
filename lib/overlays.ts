@@ -12,8 +12,9 @@ function growthLabel(value?: number | null) {
   return `${text}%`;
 }
 
-function roadLabel(value?: string | null) {
-  let text = (value || "").trim().replace(/\s+/g, " ").replace(/^07\s+/, "");
+function roadLabel(value?: unknown) {
+  const raw = typeof value === "string" ? value : typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+  let text = raw.trim().replace(/\s+/g, " ").replace(/^07\s+/, "");
   text = text.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
   text = text.replace(/\bI\s+0*(\d+)\b/i, (_, number: string) => `I-${Number(number)}`);
   if (!text || /^\d{5,}$/.test(text)) return { name: "", freeway: false };

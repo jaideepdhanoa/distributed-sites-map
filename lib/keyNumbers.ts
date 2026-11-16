@@ -1,7 +1,13 @@
 import type { DealProps, SiteProps } from "./types";
 
-function shortRoad(value?: string | null) {
-  let text = (value || "").trim().replace(/\s+/g, " ").replace(/^07\s+/, "");
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+function shortRoad(value?: unknown) {
+  let text = asText(value).trim().replace(/\s+/g, " ").replace(/^07\s+/, "");
   if (!text) return "";
   text = text.replace(/\(([^)]*)\)/g, (_, inner: string) => {
     const parts = inner.split(/\s+to\s+/i);
@@ -122,14 +128,15 @@ const SCRIPT_SOURCE = /\.(?:py|js|mjs|ts|tsx|json|csv|xlsx|xls)\b|[/\\]|diligenc
 const SHEET_ERROR = /#(?:REF|N\/A|VALUE|DIV\/0|NAME|NULL|NUM|ERROR)!?/i;
 
 /** Drop script names, file paths, and spreadsheet errors. A blank source stays blank. */
-export function cleanFactText(value?: string | null): string {
-  const text = (value || "").trim();
+export function cleanFactText(value?: unknown): string {
+  const text = asText(value).trim();
   if (!text || SHEET_ERROR.test(text) || SCRIPT_SOURCE.test(text)) return "";
   return text;
 }
 
 function factText(value: unknown): string {
-  return cleanFactText(typeof value === "string" ? value : "");
+  if (typeof value !== "string" && typeof value !== "number") return "";
+  return cleanFactText(value);
 }
 
 /** A workbook score is shown only when it is a real number. Formula errors stay off the card. */
@@ -254,8 +261,8 @@ export function sheetMoney(amount?: number | null, exact?: string | null) {
 }
 
 /** Short figure for a tile. The exact text stays in the tooltip and the overview. */
-export function tileAmount(amount?: number | null, exact?: string | null) {
-  const full = (exact || "").trim();
+export function tileAmount(amount?: number | null, exact?: unknown) {
+  const full = asText(exact).trim();
   if (amount == null || !Number.isFinite(amount) || !full) {
     return { text: UNKNOWN, title: UNKNOWN_TITLE };
   }
@@ -288,15 +295,17 @@ export function spareLandSqft(sqft?: number | null, acres?: number | null) {
   return { value: UNKNOWN, note: "" };
 }
 
-function daySpan(iso: string, today: Date) {
-  const then = new Date(`${iso.slice(0, 10)}T00:00:00`);
+function daySpan(iso: unknown, today: Date) {
+  if (typeof iso !== "string" && typeof iso !== "number") return null;
+  const then = new Date(`${String(iso).slice(0, 10)}T00:00:00`);
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   if (Number.isNaN(then.getTime())) return null;
   return Math.round((start.getTime() - then.getTime()) / 86_400_000);
 }
 
-export function checkedPhrase(iso?: string | null, today = new Date()) {
-  if (!iso) return "";
+export function checkedPhrase(iso?: unknown, today = new Date()) {
+  if (typeof iso !== "string" && typeof iso !== "number") return "";
+  if (iso === "") return "";
   const days = daySpan(iso, today);
   if (days == null) return "";
   if (days <= 0) return "Checked live today";
@@ -304,8 +313,9 @@ export function checkedPhrase(iso?: string | null, today = new Date()) {
   return `Checked live ${days} days ago`;
 }
 
-export function checkedShort(iso?: string | null, today = new Date()) {
-  if (!iso) return "";
+export function checkedShort(iso?: unknown, today = new Date()) {
+  if (typeof iso !== "string" && typeof iso !== "number") return "";
+  if (iso === "") return "";
   const days = daySpan(iso, today);
   if (days == null) return "";
   if (days <= 0) return "today";
@@ -454,7 +464,7 @@ export function showsFinancials(deal: Pick<DealProps, "kind" | "figures_status" 
 }
 
 export function claimWord(deal: Pick<DealProps, "claim_word" | "figures_basis" | "cash_flow_label">): string {
-  const typed = (deal.claim_word || "").trim();
+  const typed = asText(deal.claim_word).trim();
   if (typed) return typed;
   if (deal.cash_flow_label === "Normalized EBITDA") return "Normalized";
   if (deal.figures_basis === "Claimed") return "Broker-stated";
@@ -463,9 +473,9 @@ export function claimWord(deal: Pick<DealProps, "claim_word" | "figures_basis" |
 }
 
 export function packageLine(deal: Pick<DealProps, "package_line" | "package_status">, askedOn = ""): string {
-  const typed = (deal.package_line || "").trim();
+  const typed = asText(deal.package_line).trim();
   if (typed) return typed;
-  const status = (deal.package_status || "").trim().toLowerCase();
+  const status = asText(deal.package_status).trim().toLowerCase();
   if (!status || status === "none" || status.includes("refus")) return "";
   if (status.includes("partial")) return "Partial package";
   if (status === "received") return "Package on file";
@@ -566,8 +576,8 @@ export function universeTrafficLine(site?: Pick<SiteProps, "aadt_count" | "aadt_
   return road ? `${base} on ${road}` : base;
 }
 
-export function acreUnit(value?: number | null, text?: string | null) {
-  const raw = (text || "").trim();
+export function acreUnit(value?: number | null, text?: unknown) {
+  const raw = asText(text).trim();
   if (raw && /\b(ac|acre|sq)/i.test(raw)) return raw;
   if (value == null && !raw) return "";
   if (value == null) return raw;

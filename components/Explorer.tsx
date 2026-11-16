@@ -9,6 +9,7 @@ import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, typ
 import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
+import { PanelBoundary } from "./PanelBoundary";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
@@ -1380,7 +1381,7 @@ export default function Explorer() {
   function siteTypeLabel(site: SiteProps): string {
     if (siteCategory(site, links) !== "land") return site.business_type || "Car wash";
     const deal = dealRows.find((row) => row.deal_id === site.linked_deal_id || row.universe_id === site.site_id);
-    const typed = deal?.business_type?.trim();
+    const typed = String(deal?.business_type || "").trim();
     if (typed && typed.toLowerCase() !== "car wash") return typed;
     return "Land";
   }
@@ -2164,6 +2165,7 @@ export default function Explorer() {
         {feedSheet ? (
           <ReviewFeedSheet sites={visibleFeed.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
+        <PanelBoundary name="Map">
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? shownFeatures : [])}
           coverage={funnel !== "pipeline" && showUniverse ? {
@@ -2215,6 +2217,7 @@ export default function Explorer() {
           }}
           onBounds={() => undefined}
         />
+        </PanelBoundary>
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
@@ -2239,6 +2242,7 @@ export default function Explorer() {
         ) : null}
         {ndaVisible ? <NdaQueue onOpen={choose} onClose={() => write({ nda: null })} /> : null}
         {loopsVisible ? <OpenLoops onOpen={choose} onClose={() => write({ loops: null })} /> : null}
+        <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
             rows={pipelineRows}
@@ -2289,6 +2293,7 @@ export default function Explorer() {
             note={handoffCopy}
           />
         ) : null}
+        </PanelBoundary>
         <aside className={`layers ${layersOpen ? "open" : ""}`} data-testid="layers-panel">
           {layersOpen ? (
             <>
@@ -2406,6 +2411,7 @@ export default function Explorer() {
             </ul>
           </aside>
         ) : null}
+        <PanelBoundary name="Record">
         {selectedDeal ? (
           <DealDetail
             deal={selectedDeal}
@@ -2462,6 +2468,8 @@ export default function Explorer() {
             related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}
           />
         ) : null}
+        </PanelBoundary>
+        <PanelBoundary name="Compare">
         {compareIds.length ? (
           <CompareTray
             deals={compareIds.flatMap((id) => {
@@ -2487,8 +2495,10 @@ export default function Explorer() {
             ) : null}
           </CompareTray>
         ) : null}
+        </PanelBoundary>
       </div>
       {tableOpen ? (
+        <PanelBoundary name="Table">
         <section className="dock">
           <div className="dock-tabs">
             <button className="paper-btn only-mobile" type="button" onClick={() => write({ table: null })}>Map</button>
@@ -2502,6 +2512,7 @@ export default function Explorer() {
           {tableTab === "pipeline" ? <DealTable rows={pipelineDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
           {tableTab === "land" ? <DealTable rows={landDeals} selectedId={selected} onSelect={choose} activity={activity} /> : null}
         </section>
+        </PanelBoundary>
       ) : null}
       {ringCursor ? createPortal(
         <div ref={ringNoteRef} className="map-tip-fixed" data-hidden="1">{LAYER_TITLES.rings}</div>,

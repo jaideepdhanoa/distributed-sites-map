@@ -1,5 +1,12 @@
 import type { DealProps, SiteProps } from "./types";
 
+/** A site field is a string on the snapshot. A number must not throw on .trim. */
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
 const LISTING_SITES = /\b(bizbuysell|loopnet|crexi|realmo|carwashbrokers|matthews)\b/i;
 
 const LISTING_HOSTS: Array<[string, string]> = [
@@ -15,9 +22,9 @@ const LISTING_HOSTS: Array<[string, string]> = [
   ["ppirfl.com", "Listing"],
 ];
 
-export function listingHost(url: string) {
+export function listingHost(url: unknown) {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    const host = new URL(asText(url)).hostname.replace(/^www\./, "").toLowerCase();
     return LISTING_HOSTS.find(([name]) => host === name || host.endsWith(`.${name}`))?.[1] || host;
   } catch {
     return "the listing";
@@ -27,50 +34,52 @@ export function listingHost(url: string) {
 const FOLDER_URL = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/;
 
 /** A Drive folder link, or blank when the cell is not one. */
-export function folderHref(value?: string | null) {
-  const url = (value || "").trim().split("?")[0];
+export function folderHref(value?: unknown) {
+  const url = asText(value).trim().split("?")[0];
   return FOLDER_URL.test(url) ? url : "";
 }
 
 /** An http listing page, or blank. */
-export function listingHref(value?: string | null) {
-  const url = (value || "").trim();
+export function listingHref(value?: unknown) {
+  const url = asText(value).trim();
   return /^https?:\/\//i.test(url) ? url : "";
 }
 
 /** Host label for the original listing, or a muted note when none is on file. */
-export function listingCue(record: { listing_url?: string | null; listing_removed?: boolean | null }) {
-  const url = (record.listing_url || "").trim();
+export function listingCue(record: { listing_url?: unknown; listing_removed?: boolean | null }) {
+  const url = asText(record.listing_url).trim();
   const note = record.listing_removed ? " (may be removed)" : "";
   if (!url) return { url: "", label: `No listing page on file${note}` };
   return { url, label: `View on ${listingHost(url)} ↗${note}` };
 }
 
-export function formatRecordedDate(value?: string | null) {
-  const text = (value || "").trim();
+export function formatRecordedDate(value?: unknown) {
+  const text = asText(value).trim();
   const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
   return text;
 }
 
 /** A removed name can leave a bare "'s" in a note. */
-export function cleanNote(value?: string | null) {
-  return (value || "").replace(/(?<![A-Za-z])'s\b/g, "").replace(/\s{2,}/g, " ").trim();
+export function cleanNote(value?: unknown) {
+  return asText(value).replace(/(?<![A-Za-z])'s\b/g, "").replace(/\s{2,}/g, " ").trim();
 }
 
-export function isListingSite(value?: string | null) {
-  return LISTING_SITES.test(value || "");
+export function isListingSite(value?: unknown) {
+  return LISTING_SITES.test(asText(value));
 }
 
 export function shownBroker(deal: DealProps) {
-  if (!deal.broker || isListingSite(deal.broker)) return "";
-  return deal.broker;
+  const broker = asText(deal.broker);
+  if (!broker || isListingSite(broker)) return "";
+  return broker;
 }
 
 export function shownFirm(deal: DealProps) {
-  if (!deal.firm || /^not shown$/i.test(deal.firm)) return "";
-  if (isListingSite(deal.firm) && !deal.broker) return "";
-  return deal.firm;
+  const firm = asText(deal.firm);
+  if (!firm || /^not shown$/i.test(firm)) return "";
+  if (isListingSite(firm) && !asText(deal.broker)) return "";
+  return firm;
 }
 
 const ROAD_SUFFIX: Record<string, string> = {
@@ -98,15 +107,15 @@ function roadWord(word: string, index: number) {
 }
 
 /** Show an address in title case without dropping or inventing any part of it. */
-export function displayAddress(value?: string | null) {
-  const text = (value || "").trim().replace(/\s+/g, " ");
+export function displayAddress(value?: unknown) {
+  const text = asText(value).trim().replace(/\s+/g, " ");
   if (!text) return "";
   return text.split(" ").map((word, index) => (/^\d+$/.test(word) ? word : roadWord(word, index))).join(" ");
 }
 
 /** Turn a traffic-count label such as "07 MCDOWELL RD" or "S 101" into a plain road name. */
-export function plainRoad(value?: string | null) {
-  let text = (value || "").trim().replace(/\s+/g, " ");
+export function plainRoad(value?: unknown) {
+  let text = asText(value).trim().replace(/\s+/g, " ");
   if (!text) return "";
   text = text.replace(/^07\s+/, "");
   text = text.replace(/^\d{5,}\s+/, "");
@@ -129,21 +138,21 @@ const SOURCE_HOSTS: Record<string, string> = {
   "ppirfl.com": "Listing",
 };
 
-function hostLabel(url?: string | null) {
-  const host = (url || "").replace(/^https?:\/\/(?:www\.)?/i, "").split("/")[0].toLowerCase();
+function hostLabel(url?: unknown) {
+  const host = asText(url).replace(/^https?:\/\/(?:www\.)?/i, "").split("/")[0].toLowerCase();
   return SOURCE_HOSTS[host] || "";
 }
 
 /** A public listing name. Internal scan labels are not a source. */
-export function publicListingSource(value?: string | null) {
-  const text = (value || "").trim();
+export function publicListingSource(value?: unknown) {
+  const text = asText(value).trim();
   if (!text) return "";
   if (/listings_v2|fresh scan|re-scan|signed-in|not shown|our own research|^broker$/i.test(text)) return "";
   return text.split("—")[0].trim();
 }
 
-function offMarketLead(value?: string | null) {
-  return /off[\s-]*market|own research|no lead/i.test(value || "");
+function offMarketLead(value?: unknown) {
+  return /off[\s-]*market|own research|no lead/i.test(asText(value));
 }
 
 /**
@@ -151,8 +160,8 @@ function offMarketLead(value?: string | null) {
  * Otherwise a listing source, a broker whose name is hidden, or the census.
  */
 export function leadSourceLine(site: SiteProps, deal?: DealProps | null) {
-  const kind = (deal?.source_kind || "").toLowerCase();
-  const dealLead = deal?.lead_source || "";
+  const kind = asText(deal?.source_kind).toLowerCase();
+  const dealLead = asText(deal?.lead_source);
   if (kind === "off-market" || offMarketLead(dealLead)) return "Off-market";
   if (deal && (kind.includes("broker") || kind.includes("listing") || /^(broker|listing)$/i.test(dealLead))) {
     const firm = shownFirm(deal);
@@ -172,10 +181,12 @@ export function leadSourceLine(site: SiteProps, deal?: DealProps | null) {
 }
 
 export function shownPriceSource(deal: DealProps) {
-  const source = (deal.asking_price_source || "").trim();
+  const source = asText(deal.asking_price_source).trim();
   if (source && !/^not shown$/i.test(source)) return source;
-  if (deal.source_line && !/^not shown$/i.test(deal.source_line)) return deal.source_line;
-  if (isListingSite(deal.broker)) return deal.broker;
+  const line = asText(deal.source_line).trim();
+  if (line && !/^not shown$/i.test(line)) return line;
+  const broker = asText(deal.broker);
+  if (isListingSite(broker)) return broker;
   if (shownFirm(deal)) return shownFirm(deal);
   return "";
 }

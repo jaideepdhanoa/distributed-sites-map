@@ -64,7 +64,7 @@ export async function notifyAppliedChanges(
   const actorId = actor.id.trim().toLowerCase();
   for (const result of results) {
     if (!result.site_id || isExcludedSite(result.site_id)) continue;
-    if (result.entity_type === "activity" || result.entity_type === "comms" || result.entity_type === "site") continue;
+    if (result.entity_type === "activity" || result.entity_type === "comms" || result.entity_type === "site" || result.entity_type === "pnl_line") continue;
     if (result.entity_type !== "stage") continue;
     const event = await sql.query<{ payload: unknown; source: string; actor: string }>(
       `SELECT payload, source, actor FROM events WHERE id = $1`,

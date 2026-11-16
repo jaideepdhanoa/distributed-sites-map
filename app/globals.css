@@ -1991,13 +1991,28 @@ tr { cursor: pointer; }
 .list-dialog {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 60;
   display: grid;
-  place-items: end center;
+  place-items: center;
   padding: 16px;
   background: rgba(28, 25, 20, 0.28);
 }
-.list-dialog .popover { width: min(440px, 100%); max-height: 80vh; overflow: auto; }
+.list-dialog .type-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.list-dialog .type-chips .chip {
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  box-shadow: var(--shadow-1);
+  min-height: 36px;
+  padding: 4px 12px;
+}
+.list-dialog .popover {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: min(440px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+}
 .pick-list { margin: 8px 0; padding-left: 18px; font-size: var(--type-body); }
 .list-table th .row-check { margin-right: 6px; vertical-align: middle; }
 .review-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px; }
@@ -2761,7 +2776,11 @@ span.listing-link.muted { text-decoration: none; }
   min-width: 0;
   max-width: 100%;
 }
-.card-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.card-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; align-items: center; }
+.tag-pair { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 100%; }
+.tag-since { margin-left: 4px; font-weight: 550; }
+.chip-filter { display: grid; gap: 4px; }
+.chip-filter label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .card-links { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin: 8px 0 4px; }
 .card-links .text-link, .card-link.missing { min-height: 44px; display: inline-flex; align-items: center; }
 .card-link.missing { color: var(--ink-3); }

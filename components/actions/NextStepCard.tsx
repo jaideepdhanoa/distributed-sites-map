@@ -13,6 +13,10 @@ import type { DealProps } from "@/lib/types";
 import { blockerSentenceForDeal } from "@/lib/nda";
 import { pacificToday } from "@/lib/queue/today";
 import { BlockerLine } from "../NdaChip";
+import { ReasonPicker } from "../ReasonPicker";
+import { TagChip } from "../TagChip";
+import type { TagView } from "@/lib/tags/map";
+import { tagFamily } from "@/lib/tags/vocab";
 import { SuggestedDropMark } from "../SuggestedDrop";
 import { approvedStage, publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { quietActionsFetch } from "@/lib/actions/quiet";
@@ -118,6 +122,7 @@ export function NextStepCard({
   workbookId = "",
   suggestedDrop,
   blocker,
+  chips,
 }: {
   kind: "site" | "deal";
   id: string;
@@ -127,6 +132,7 @@ export function NextStepCard({
   workbookId?: string;
   suggestedDrop?: string | null;
   blocker?: (Pick<DealProps, "stage" | "stage_group"> & Partial<Pick<DealProps, "stage_blocker" | "stage_blocker_since">>) | null;
+  chips?: TagView[];
 }) {
   const params = useSearchParams();
   const proposal = params.get("panel") === "proposal";
@@ -144,6 +150,7 @@ export function NextStepCard({
   const [type, setType] = useState<NextStepTypeId | "">("");
   const [title, setTitle] = useState("");
   const [reason, setReason] = useState("");
+  const [reasonCode, setReasonCode] = useState("");
   const [stage, setStage] = useState("");
   const [survivor, setSurvivor] = useState("");
   const [sameParcel, setSameParcel] = useState(false);
@@ -314,10 +321,13 @@ export function NextStepCard({
 
   const workbookDue = workbook?.due ? contactDate(workbook.due) : "";
   const workbookBlock = signedIn && workbook ? <WorkbookLine text={workbook.text} owner={workbook.owner} due={workbookDue} /> : null;
+  const nextAction = chips?.find((chip) => chip.family === "next_action");
+  const waiting = chips?.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
   const context = (
     <>
       <SuggestedDropMark reason={suggestedDrop} stageGroup={stageGroup} stage={recordStage} />
-      {blocker ? <BlockerLine deal={blocker} /> : null}
+      {nextAction ? <TagChip chip={nextAction} compact={Boolean(workbook?.text)} /> : null}
+      {waiting ? <TagChip chip={{ ...waiting, note: waiting.note || blockerSentenceForDeal(blocker || { stage: recordStage || "", stage_group: "desk" }, pacificToday()) }} /> : blocker ? <BlockerLine deal={blocker} /> : null}
     </>
   );
   if (!status.enabled) {
@@ -336,6 +346,7 @@ export function NextStepCard({
     setType("");
     setTitle("");
     setReason("");
+    setReasonCode("");
     setStage("");
     setSurvivor("");
     setSameParcel(false);
@@ -381,6 +392,7 @@ export function NextStepCard({
     setType(item.detail ? stepType : "work_item");
     setTitle(item.title || "");
     setReason(item.reason || "");
+    setReasonCode(tagFamily(item.detail === "knock_off" ? "drop_reason" : "advance_reason")?.codes.find((code) => item.reason === code.label)?.code || "");
     setStage(item.detail === "bring_back" || item.detail === "stage_move" ? item.proposedValue : "");
     setSurvivor(item.detail === "mark_duplicate" ? item.proposedValue : "");
     setSameParcel(item.detail === "mark_duplicate");
@@ -388,15 +400,20 @@ export function NextStepCard({
     setDue(item.targetOn || "");
   }
 
+  function reasonLabel(family: "drop_reason" | "advance_reason") {
+    return tagFamily(family)?.codes.find((item) => item.code === reasonCode)?.label || "";
+  }
+
   function payloadFor(stepType: NextStepTypeId) {
+    const picked = stepType === "knock_off" ? reasonLabel("drop_reason") : stepType === "stage_move" ? reasonLabel("advance_reason") : "";
     return {
       targetKind: kind,
       targetId: id,
       field: "proposed_next_step",
       detail: stepType,
-      title: stepType === "work_item" ? title : undefined,
+      title: stepType === "work_item" ? title : stepType === "knock_off" ? reason.trim() : undefined,
       proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : stepType === "mark_duplicate" ? survivor : title,
-      reason: stepType === "knock_off" || stepType === "mark_duplicate" || stepType === "bring_back" ? reason : "",
+      reason: picked || (stepType === "mark_duplicate" || stepType === "bring_back" ? reason : ""),
       ownerId: allowsAssignee(stepType) ? ownerId : "",
       targetOn: allowsDate(stepType) ? due : "",
     };
@@ -429,7 +446,16 @@ export function NextStepCard({
           <input className="field" aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
         </label>
       ) : null}
-      {type === "knock_off" || type === "mark_duplicate" || type === "bring_back" ? (
+      {type === "knock_off" ? (
+        <>
+          <ReasonPicker label="Drop reason" testId="drop-reason" options={tagFamily("drop_reason")?.codes || []} value={reasonCode} onChange={setReasonCode} />
+          <label>
+            Note
+            <textarea className="field" aria-label="Note" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={400} />
+          </label>
+        </>
+      ) : null}
+      {type === "mark_duplicate" || type === "bring_back" ? (
         <label>
           Reason
           <textarea className="field" aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={2000} required />
@@ -457,7 +483,12 @@ export function NextStepCard({
           </select>
         </label>
       ) : null}
-      {type === "stage_move" ? <NeedList items={needs} /> : null}
+      {type === "stage_move" ? (
+        <>
+          <ReasonPicker label="Advance reason" testId="advance-reason" options={tagFamily("advance_reason")?.codes || []} value={reasonCode} onChange={setReasonCode} />
+          <NeedList items={needs} />
+        </>
+      ) : null}
       {type && allowsAssignee(type) ? (
         <div className="split">
           <label>
@@ -474,7 +505,7 @@ export function NextStepCard({
         </div>
       ) : null}
       <div className="proposal-send">
-        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || ((type === "knock_off" || type === "bring_back") && !reason.trim())} className="propose">Submit for approval</button>
+        <button type="submit" disabled={pending || !type || (type === "mark_duplicate" && !sameParcel) || (type === "knock_off" && !reasonLabel("drop_reason")) || (type === "stage_move" && !reasonLabel("advance_reason")) || (type === "bring_back" && !reason.trim())} className="propose">Submit for approval</button>
         <button type="button" onClick={resetForm} className="text-link">Cancel</button>
       </div>
     </form>

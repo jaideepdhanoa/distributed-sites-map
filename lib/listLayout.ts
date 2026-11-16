@@ -21,6 +21,9 @@ export type SheetColumn<Row> = {
   label: string;
   text: (row: Row) => string;
   sortValue?: (row: Row) => number | null;
+  /** Chip-set filter. The saved value is the selected codes joined with |. */
+  choices?: { code: string; label: string }[];
+  code?: (row: Row) => string;
   private?: boolean;
   className?: string;
 };
@@ -291,6 +294,13 @@ export function prepareRows<Row>(
     for (const [id, query] of Object.entries(layout.filters)) {
       const column = byId.get(id);
       if (!column || !visible.includes(id)) continue;
+      if (column.choices) {
+        const selected = query.split("|").map((item) => item.trim()).filter(Boolean);
+        if (!selected.length) continue;
+        const code = column.code ? column.code(row) : column.text(row);
+        if (!selected.includes(code)) return false;
+        continue;
+      }
       const hay = column.text(row).toLowerCase();
       if (!hay.includes(query.toLowerCase())) return false;
     }

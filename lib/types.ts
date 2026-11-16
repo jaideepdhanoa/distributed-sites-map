@@ -309,6 +309,19 @@ export type DealProps = {
   /** Typed stage blocker. "—" means the stage is not blocked. */
   stage_blocker?: string;
   stage_blocker_since?: string;
+  /** Structured chips. Database rows win over the derived reading of today's cells. */
+  chips?: {
+    family: string;
+    code: string;
+    label: string;
+    tone: "pine" | "brass" | "sky" | "sand";
+    help: string;
+    since: string;
+    note: string;
+    owner: string;
+    due: string;
+    source: string;
+  }[];
 };
 
 export type UnscreenedProps = {

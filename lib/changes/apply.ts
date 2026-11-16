@@ -19,7 +19,7 @@ import {
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
-import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload } from "./schema";
+import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
 import { formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, validateBatch } from "./schema";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import type { EntityType, Market, ServiceAreaClass } from "./vocab";
@@ -143,6 +143,14 @@ export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_perio
 }
 
 async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
+  if (change.entity_type === "tag") {
+    const family = (change.payload as TagPayload).family;
+    const result = await sql.query<{ version: number | string }>(
+      `SELECT version FROM site_tags WHERE site_id = $1 AND family = $2`,
+      [change.site_id, family],
+    );
+    return result.rows[0] ? Number(result.rows[0].version) : 0;
+  }
   if (change.entity_type === "stage" || change.entity_type === "site") {
     const table = change.entity_type === "stage" ? "site_stages" : "sites";
     const result = await sql.query<{ version: number | string }>(
@@ -597,6 +605,37 @@ function conflict(change: ParsedChange, entityId: string, actual: number): Versi
   ]);
 }
 
+async function writeTag(sql: Sql, change: ParsedChange, actorId: string, version: number): Promise<Record<string, unknown>> {
+  const payload = change.payload as TagPayload;
+  const stored = {
+    family: payload.family,
+    code: payload.code,
+    since_iso: payload.since || "",
+    source_ref: payload.source_ref || "",
+    note: payload.note || "",
+    owner: payload.owner || "",
+    due_on: payload.due_on || "",
+    actor: actorId,
+  };
+  await sql.query(
+    `INSERT INTO site_tags (site_id, family, code, since, since_iso, source_ref, note, owner, due_on, actor, version)
+     VALUES ($1, $2, $3, CASE WHEN $4 = '' THEN NULL ELSE $4::timestamptz END, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (site_id, family) DO UPDATE SET
+       code = EXCLUDED.code,
+       since = EXCLUDED.since,
+       since_iso = EXCLUDED.since_iso,
+       source_ref = EXCLUDED.source_ref,
+       note = EXCLUDED.note,
+       owner = EXCLUDED.owner,
+       due_on = EXCLUDED.due_on,
+       actor = EXCLUDED.actor,
+       version = EXCLUDED.version,
+       updated_at = clock_timestamp()`,
+    [change.site_id, stored.family, stored.code, stored.since_iso, stored.source_ref, stored.note, stored.owner, stored.due_on, stored.actor, version],
+  );
+  return stored;
+}
+
 async function applyOne(
   sql: Sql,
   actor: Actor,
@@ -605,8 +644,10 @@ async function applyOne(
   runId: string,
   mode: "api" | "workbook",
 ): Promise<ChangeResult> {
+  const tag = change.entity_type === "tag";
+  const family = tag ? (change.payload as TagPayload).family : "";
   const siteKeyed = change.entity_type === "stage" || change.entity_type === "site";
-  const lock = siteKeyed ? `${change.entity_type}:${change.site_id}` : `${change.entity_type}:${change.entity_id || "new"}`;
+  const lock = tag ? `tag:${change.site_id}:${family}` : siteKeyed ? `${change.entity_type}:${change.site_id}` : `${change.entity_type}:${change.entity_id || "new"}`;
   await lockKey(sql, lock);
   const mintedKind = change.entity_type === "comms"
     ? "comms"
@@ -615,7 +656,9 @@ async function applyOne(
       : change.entity_type === "site_space"
         ? "site_space"
         : "activity";
-  const entityId = siteKeyed
+  const entityId = tag
+    ? `${change.site_id}:${family}`
+    : siteKeyed
     ? change.site_id
     : change.preserve_id && change.entity_id
       ? change.entity_id
@@ -644,6 +687,8 @@ async function applyOne(
     });
     if (!written.ok) throw conflict(change, written.entityId, written.actual);
     payload = written.payload;
+  } else if (change.entity_type === "tag") {
+    payload = await writeTag(sql, change, actor.id, version);
   } else if (change.entity_type === "pnl_line") {
     const written = await storePnlLine(sql, {
       siteId: change.site_id,

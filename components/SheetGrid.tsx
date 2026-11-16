@@ -331,6 +331,31 @@ export default function SheetGrid<Row>({
                           Hide
                         </button>
                       )}
+                      {column.choices ? (
+                        <div className="chip-filter" role="group" aria-label={`Filter ${column.label}`}>
+                          {column.choices.map((choice) => {
+                            const selected = (layout.filters[column.id] || "").split("|").filter(Boolean);
+                            const on = selected.includes(choice.code);
+                            return (
+                              <label key={choice.code}>
+                                <input
+                                  className="check"
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={() => {
+                                    const next = on ? selected.filter((code) => code !== choice.code) : [...selected, choice.code];
+                                    const filters = { ...layout.filters };
+                                    if (next.length) filters[column.id] = next.join("|");
+                                    else delete filters[column.id];
+                                    onLayout({ ...layout, filters, touched: true });
+                                  }}
+                                />
+                                {choice.label}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
                       <label>
                         Filter
                         <input
@@ -347,6 +372,7 @@ export default function SheetGrid<Row>({
                           }}
                         />
                       </label>
+                      )}
                       {filtered ? (
                         <button
                           type="button"

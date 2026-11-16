@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
 import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { allowedIds, defaultLayout, displayIds, phoneColumns, prepareRows, sortFromParam, type ListLayout, type SheetColumn } from "@/lib/listLayout";
@@ -36,8 +37,11 @@ import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { stageDetail, stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
+import { columnFamily, tagFamily } from "@/lib/tags/vocab";
+import { ReasonPicker } from "./ReasonPicker";
 import { NdaChip } from "./NdaChip";
 import { PhoneCards } from "./PhoneCards";
+import { TagChip } from "./TagChip";
 import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 import { SuggestedDropMark } from "./SuggestedDrop";
@@ -115,11 +119,34 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "zoning") return row.zoning || "—";
   if (id === "broker") return [shownBroker(deal), shownFirm(deal)].filter(Boolean).join(" · ") || "—";
   if (id === "area") return serviceAreaColumn(deal) || "—";
-  if (id === "nda") return cardNdaLabel(deal, signedIn) || "—";
+  if (id === "nda") {
+    if (!signedIn) return "—";
+    return deal.chips?.find((chip) => chip.family === "nda")?.label || cardNdaLabel(deal, signedIn) || "—";
+  }
   if (id === "lastContact") return contactDate(deal.last_broker_contact) || "—";
   if (id === "nextStep") return stripGmailIds(String(deal.next_step || "").trim()) || "—";
   if (id === "type") return typeLabel(deal) || "—";
+  const family = columnFamily(id);
+  if (family) {
+    if (!signedIn && family.signedIn) return "—";
+    return deal.chips?.find((chip) => chip.family === family.family)?.label || "—";
+  }
   return checkedShort(deal.checked_live) || "—";
+}
+
+const STAGE_CHOICES = [
+  { code: "desk", label: "Desk screen" },
+  { code: "financial", label: "Financial screen" },
+  { code: "checks", label: "Site checks" },
+  { code: "close", label: "Offer and close" },
+  { code: "dropped", label: "Dropped" },
+];
+
+function stageFilterCode(deal: DealProps): string {
+  if (deal.stage_group === "contacted") return "financial";
+  if (deal.stage_group === "later") return "close";
+  if (deal.stage_group === "sourced") return "desk";
+  return deal.stage_group || "";
 }
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
@@ -236,16 +263,25 @@ export default function PipelineList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const visible = displayIds(activeLayout, allowed, phone, phoneColumns("pipeline"));
-  const sheetColumns: SheetColumn<PipelineRow>[] = visible.map((id) => ({
-    id,
-    label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
-    className: id === "capacity" ? "power-col" : undefined,
-    text: (row) => cell(row, id as PipelineColumnId, signedIn),
-    sortValue: (row) => {
-      const value = sortValue(row, id as PipelineColumnId, signedIn);
-      return typeof value === "number" ? value : null;
-    },
-  }));
+  const sheetColumns: SheetColumn<PipelineRow>[] = visible.map((id) => {
+    const family = columnFamily(id);
+    const choices = id === "stage" ? STAGE_CHOICES : family?.codes.map((item) => ({ code: item.code, label: item.label }));
+    return {
+      id,
+      label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
+      className: id === "capacity" ? "power-col" : undefined,
+      text: (row) => cell(row, id as PipelineColumnId, signedIn),
+      choices,
+      code: (row) => {
+        if (id === "stage") return stageFilterCode(row.deal);
+        return row.deal.chips?.find((chip) => chip.family === family?.family)?.code || "";
+      },
+      sortValue: (row) => {
+        const value = sortValue(row, id as PipelineColumnId, signedIn);
+        return typeof value === "number" ? value : null;
+      },
+    };
+  });
   const summary = useMemo(() => summaryOf(rows.map((row) => row.deal)), [rows]);
   const compMedian = useMemo(() => compMedianOf(rows.map((row) => row.deal)), [rows]);
   const ordered = useMemo(() => {
@@ -353,11 +389,12 @@ export default function PipelineList({
   }
 
   async function submitDrop() {
-    if (!onDrop || !reason.trim() || !pickedRows.length) return;
+    const label = tagFamily("drop_reason")?.codes.find((item) => item.code === reason)?.label || "";
+    if (!onDrop || !label || !pickedRows.length) return;
     setPending(true);
     setActionError("");
     try {
-      await onDrop(pickedRows.map((row) => row.deal.deal_id), reason.trim());
+      await onDrop(pickedRows.map((row) => row.deal.deal_id), label);
       setDropOpen(false);
       setReason("");
       setPicked([]);
@@ -521,6 +558,12 @@ export default function PipelineList({
           if (column === "landEstimate") return <NumberCell label={cell(row, "landEstimate", signedIn)} value={signedIn ? row.deal.land_estimate : null} stats={strips.landEstimate} format={fullMoney} labelTitle={row.deal.land_estimate_tip || row.deal.land_estimate_reason || undefined} />;
           if (column === "countyValue") return <NumberCell label={cell(row, "countyValue", signedIn)} badge={signedIn && row.deal.county_value != null ? "County" : ""} value={signedIn ? row.deal.county_value : null} stats={strips.county} format={fullMoney} labelTitle={row.deal.county_value_basis || undefined} />;
           if (column === "capacity") return <NumberCell label={cell(row, "capacity", signedIn)} value={row.deal.cap_a_substation_mi} stats={strips.capacity} direction="lower" format={mileText} labelTitle={capacitySummary(factsForDeal(row.deal)) || "Not on file"} />;
+          const family = columnFamily(column);
+          if (family) {
+            const chip = row.deal.chips?.find((item) => item.family === family.family);
+            if (chip && (signedIn || !family.signedIn)) return <TagChip chip={chip} compact />;
+            if (column !== "nda") return "—";
+          }
           if (column === "stage") return (
             <span className="stage-cell">
               <span className={`stage-pill tone-${stageTone(row.deal)}`} title={String(cell(row, "stage", signedIn))}>{cell(row, "stage", signedIn)}</span>
@@ -570,7 +613,7 @@ export default function PipelineList({
           {canAct && onDrop ? <button type="button" className="paper-btn" onClick={() => { setActionError(""); setDropOpen(true); }}>Drop with reason</button> : null}
         </div>
       ) : null}
-      {commentOpen ? (
+      {commentOpen ? createPortal(
         <div className="list-dialog">
           <div className="popover" role="dialog" aria-label="Comment">
             <div className="popover-head">
@@ -586,9 +629,10 @@ export default function PipelineList({
             {actionError ? <p className="err">{actionError}</p> : null}
             <button type="button" className="primary" disabled={pending || !note.trim()} onClick={() => void submitComment()}>Add note</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
-      {dropOpen ? (
+      {dropOpen ? createPortal(
         <div className="list-dialog">
           <div className="popover" role="dialog" aria-label="Drop with a reason">
             <div className="popover-head">
@@ -597,14 +641,12 @@ export default function PipelineList({
             </div>
             <p className="filter-note">Each site is submitted for approval with this reason. Nothing is dropped until someone approves it.</p>
             <ul className="pick-list">{pickedRows.map((row) => <li key={row.deal.deal_id}>{row.deal.name || row.deal.deal_id}</li>)}</ul>
-            <label>
-              Reason
-              <textarea className="field" aria-label="Reason" value={reason} rows={3} maxLength={2000} onChange={(event) => setReason(event.target.value)} />
-            </label>
+            <ReasonPicker label="Drop reason" testId="drop-reason" options={tagFamily("drop_reason")?.codes || []} value={reason} onChange={setReason} />
             {actionError ? <p className="err">{actionError}</p> : null}
-            <button type="button" className="primary" disabled={pending || !reason.trim()} onClick={() => void submitDrop()}>Submit for approval</button>
+            <button type="button" className="primary" disabled={pending || !tagFamily("drop_reason")?.codes.some((item) => item.code === reason)} onClick={() => void submitDrop()}>Submit for approval</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

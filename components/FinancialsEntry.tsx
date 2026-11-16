@@ -19,9 +19,8 @@ export function PendingFigure({ lines = 2 }: { lines?: number }) {
   const notes = Math.max(0, lines - 1);
   return (
     <>
-      <strong className="figure-hold" data-testid="figure-loading" aria-busy="true">
+      <strong className="figure-hold" data-testid="figure-loading" aria-busy="true" aria-label="Loading figures">
         <span className="skeleton" />
-        <span className="sr">Loading figures</span>
       </strong>
       {Array.from({ length: notes }, (_, index) => (
         <small key={index} className="figure-hold" aria-hidden="true"><span className="skeleton" /></small>

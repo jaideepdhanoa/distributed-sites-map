@@ -2818,7 +2818,7 @@ span.listing-link.muted { text-decoration: none; }
 }
 .skeleton.short { width: 55%; }
 .headline strong.figure-hold { min-height: 24px; }
-.headline strong.figure-hold .skeleton { height: 24px; width: 8em; max-width: 100%; }
+.headline strong.figure-hold .skeleton { height: 24px; width: 72%; max-width: 100%; }
 .headline small.figure-hold { display: block; min-height: 32px; }
 .headline small.figure-hold .skeleton { height: 32px; width: 72%; max-width: 100%; margin: 0; }
 .metrics article.wide strong.figure-hold { min-height: calc(var(--type-num) * 1.15); }

@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { withoutGmail } from "@/lib/displayText";
 import { rememberSearch } from "@/lib/navSearch";
-import type { PaletteGroups, PaletteHit } from "@/lib/search/palette";
+import { filledSections, type PaletteGroups, type PaletteHit } from "@/lib/search/palette";
+import { commandSheetBox } from "@/lib/search/sheet";
 
 type Groups = PaletteGroups;
 
@@ -20,6 +22,10 @@ function filled(remote: Groups, local: Groups): Groups {
     brokers: remote.brokers.length ? remote.brokers : local.brokers,
     conversations: remote.conversations.length ? remote.conversations : local.conversations,
   };
+}
+
+function shown(value: string | undefined): string {
+  return withoutGmail(value || "");
 }
 
 function openPath(hit: PaletteHit): string {
@@ -48,6 +54,7 @@ export default function CommandSearch({
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<Groups>(EMPTY);
   const input = useRef<HTMLInputElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
   const fallbackRef = useRef(fallback);
   fallbackRef.current = fallback;
@@ -68,6 +75,30 @@ export default function CommandSearch({
     if (!open) return;
     const frame = window.requestAnimationFrame(() => input.current?.focus());
     return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const node = panel.current;
+    const view = window.visualViewport;
+    if (!node || !view) return;
+    const place = () => {
+      const box = commandSheetBox(window.innerHeight, { height: view.height, offsetTop: view.offsetTop });
+      if (!box) {
+        node.style.removeProperty("--command-bottom");
+        node.style.removeProperty("--command-max");
+        return;
+      }
+      node.style.setProperty("--command-bottom", `${box.bottom}px`);
+      node.style.setProperty("--command-max", `${box.maxHeight}px`);
+    };
+    place();
+    view.addEventListener("resize", place);
+    view.addEventListener("scroll", place);
+    return () => {
+      view.removeEventListener("resize", place);
+      view.removeEventListener("scroll", place);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -112,17 +143,13 @@ export default function CommandSearch({
   }, [open, onClose]);
 
   if (!open || typeof document === "undefined") return null;
-  const sections = [
-    ["Sites", groups.sites],
-    ["Brokers", groups.brokers],
-    ["Conversations", groups.conversations],
-  ] as const;
+  const sections = filledSections(groups);
   const any = count(groups);
   const first = groups.sites[0] || groups.brokers[0] || groups.conversations[0];
   return createPortal(
     <>
     <button type="button" className="backdrop command-backdrop" aria-label="Close search" onClick={onClose} />
-    <div className="command-search" role="dialog" aria-label="Search everything" data-testid="command-search">
+    <div ref={panel} className="command-search" role="dialog" aria-label="Search everything" data-testid="command-search">
       <header className="command-head">
         <p className="eyebrow">Search</p>
         <button type="button" className="close" aria-label="Close search" onClick={onClose}><span aria-hidden="true">×</span></button>
@@ -140,13 +167,17 @@ export default function CommandSearch({
           choose(first);
         }}
       />
+      <div className="command-results">
       {query.trim().length >= 2 && any === 0 ? <p className="layer-meta" data-testid="command-empty">No matches.</p> : null}
-      {any > 0 ? sections.map(([label, hits]) => (
-        <section key={label} data-testid={`command-group-${label.toLowerCase()}`}>
-          <p className="eyebrow">{label}</p>
-          {hits.map((item) => (
+      {sections.map((section) => (
+        <section key={section.label} data-testid={`command-group-${section.label.toLowerCase()}`}>
+          <p className="eyebrow">{section.label}</p>
+          {section.hits.map((item) => {
+            const title = shown(item.title) || item.id;
+            const meta = [shown(item.site), shown(item.when)].filter(Boolean).join(" · ");
+            return (
             <button
-              key={`${label}-${item.id}`}
+              key={`${section.label}-${item.id}`}
               type="button"
               className="menu-item"
               data-testid="command-hit"
@@ -155,11 +186,14 @@ export default function CommandSearch({
                 choose(item);
               }}
             >
-              <span className="hit-title">{item.title}</span>
+              <span className="hit-title">{title}</span>
+              {meta ? <span className="hit-meta">{meta}</span> : null}
             </button>
-          ))}
+            );
+          })}
         </section>
-      )) : null}
+      ))}
+      </div>
     </div>
     </>,
     document.body,

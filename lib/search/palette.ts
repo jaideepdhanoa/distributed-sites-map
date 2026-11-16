@@ -1,9 +1,17 @@
 import { isAutoBusinessType, isPipelineStore } from "@/lib/labels";
 import { isProtectedId } from "@/lib/protectedSite";
-import { collectSearchHits, foldSearch, type SearchHit, type SearchOptions } from "@/lib/search";
+import { citySearchText, collectSearchHits, foldSearch, tokensMatch, type SearchHit, type SearchOptions } from "@/lib/search";
 
-export type PaletteHit = { id: string; title: string; path: string; url: string };
+export type PaletteHit = { id: string; title: string; path: string; url: string; site?: string; when?: string };
 export type PaletteGroups = { sites: PaletteHit[]; brokers: PaletteHit[]; conversations: PaletteHit[] };
+
+export function filledSections(groups: PaletteGroups): Array<{ label: string; hits: PaletteHit[] }> {
+  return [
+    { label: "Sites", hits: groups.sites },
+    { label: "Brokers", hits: groups.brokers },
+    { label: "Conversations", hits: groups.conversations },
+  ].filter((section) => section.hits.length > 0);
+}
 
 type DealSource = Parameters<typeof collectSearchHits>[1][number];
 type SiteSource = Parameters<typeof collectSearchHits>[2][number];
@@ -42,6 +50,14 @@ export function paletteGroups(query: string, deals: DealSource[], sites: SiteSou
   const sitesGroup = collectSearchHits(needle, deals, sites, () => "", options)
     .filter((item: SearchHit) => !isProtectedId(item.id))
     .map((item) => hit(item.id, item.title || item.id));
+  const seen = new Set(sitesGroup.map((item) => item.id));
+  for (const deal of deals) {
+    if (sitesGroup.length >= 8) break;
+    if (hiddenDeal(deal, options) || seen.has(deal.deal_id)) continue;
+    if (!tokensMatch(needle, [deal.name, deal.address, citySearchText(deal.city), deal.business_type])) continue;
+    sitesGroup.push(hit(deal.deal_id, String(deal.name || deal.deal_id)));
+    seen.add(deal.deal_id);
+  }
   const brokers = new Map<string, PaletteHit>();
   for (const deal of deals) {
     if (hiddenDeal(deal, options)) continue;

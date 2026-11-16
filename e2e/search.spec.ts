@@ -3,7 +3,20 @@ import { expect, test } from "@playwright/test";
 const GROUPS = {
   sites: [{ id: "PIPE-PHX-0008", title: "North Sample Wash", path: "/?site=PIPE-PHX-0008&sheet=full", url: "https://distributedsites.com/?site=PIPE-PHX-0008" }],
   brokers: [{ id: "sample-broker", title: "Sample Broker", path: "/?site=PIPE-PHX-0008", url: "https://distributedsites.com/?site=PIPE-PHX-0008" }],
-  conversations: [{ id: "CM-0123", title: "Sample thread", path: "/?site=PIPE-PHX-0008&panel=activity&msg=CM-0123&sheet=full", url: "https://distributedsites.com/?site=PIPE-PHX-0008&panel=activity&msg=CM-0123" }],
+  conversations: [{
+    id: "CM-0123",
+    title: "Sample note",
+    site: "North Sample Wash",
+    when: "Jan 2",
+    path: "/?site=PIPE-PHX-0008&panel=activity&msg=CM-0123&sheet=full",
+    url: "https://distributedsites.com/?site=PIPE-PHX-0008&panel=activity&msg=CM-0123",
+  }],
+};
+
+const SITES_ONLY = {
+  sites: [{ id: "PIPE-PHX-0008", title: "North Sample Wash", path: "/?site=PIPE-PHX-0008", url: "https://distributedsites.com/?site=PIPE-PHX-0008" }],
+  brokers: [],
+  conversations: [],
 };
 
 const COMMS = {
@@ -25,7 +38,11 @@ const COMMS = {
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/search?**", (route) => {
     const url = new URL(route.request().url());
-    if ((url.searchParams.get("q") || "").toLowerCase().includes("sample")) {
+    const query = (url.searchParams.get("q") || "").toLowerCase();
+    if (query.includes("siteonly")) {
+      return route.fulfill({ json: { mode: "records", groups: SITES_ONLY, ids: ["PIPE-PHX-0008"] } });
+    }
+    if (query.includes("sample")) {
       return route.fulfill({ json: { mode: "records", groups: GROUPS, ids: ["PIPE-PHX-0008"] } });
     }
     return route.fulfill({ json: { mode: "fallback", groups: { sites: [], brokers: [], conversations: [] }, ids: [] } });
@@ -81,7 +98,24 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
   expect(Math.abs((after?.height || 0) - (before?.height || 0))).toBeLessThan(4);
   await expect(palette.getByTestId("command-group-sites")).toContainText("North Sample Wash");
   await expect(palette.getByTestId("command-group-brokers")).toContainText("Sample Broker");
-  await expect(palette.getByTestId("command-group-conversations")).toContainText("Sample thread");
+  const threads = palette.getByTestId("command-group-conversations");
+  await expect(threads).toContainText("Sample note");
+  await expect(threads).toContainText("North Sample Wash");
+  await expect(threads).toContainText("Jan 2");
+  if (info.project.name === "mobile") {
+    const inputBox = await palette.getByLabel("Search everything").boundingBox();
+    const groupBox = await palette.getByTestId("command-group-sites").boundingBox();
+    const viewport = page.viewportSize();
+    expect(inputBox && groupBox && viewport).toBeTruthy();
+    expect(groupBox!.y).toBeGreaterThan(inputBox!.y + inputBox!.height - 4);
+    expect(groupBox!.y - (inputBox!.y + inputBox!.height)).toBeLessThan(48);
+    expect(groupBox!.y + 24).toBeLessThan(viewport!.height);
+  }
+  await palette.getByLabel("Search everything").fill("siteonly");
+  await expect(palette.getByTestId("command-group-sites")).toContainText("North Sample Wash");
+  await expect(palette.getByTestId("command-group-brokers")).toHaveCount(0);
+  await expect(palette.getByTestId("command-group-conversations")).toHaveCount(0);
+  await palette.getByLabel("Search everything").fill("sample");
   await page.screenshot({ path: `e2e/output/command-search-${info.project.name}.png`, fullPage: false });
   await palette.getByLabel("Search everything").fill("zzzzzz");
   await expect(palette.getByTestId("command-empty")).toHaveText("No matches.");
@@ -104,8 +138,9 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
   await page.goto("/?q=PIPE-PHX-0084&funnel=universe", { waitUntil: "domcontentloaded" });
   await page.getByTestId("scope-search").locator("visible=true").first().click();
   await palette.getByLabel("Search everything").fill("sample");
-  await expect(palette.getByRole("button", { name: "North Sample Wash" })).toBeVisible();
-  await palette.getByRole("button", { name: "North Sample Wash" }).click();
+  const siteHit = palette.getByTestId("command-group-sites").getByRole("button", { name: "North Sample Wash" });
+  await expect(siteHit).toBeVisible();
+  await siteHit.click();
   await expect(page).toHaveURL(/site=PIPE-PHX-0008/);
   await expect(page).not.toHaveURL(/[?&]q=/);
 

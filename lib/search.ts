@@ -17,6 +17,29 @@ export function matchesQuery(query: string, parts: Array<string | null | undefin
   return foldSearch(parts.filter(Boolean).join(" ")).includes(needle);
 }
 
+const CITY_SEARCH: Record<string, string> = {
+  phx: "phoenix",
+  las: "las vegas",
+  mia: "miami",
+};
+
+/** City code plus the name a person types. PHX also matches "phoenix". */
+export function citySearchText(city: string | null | undefined): string {
+  const folded = foldSearch(city);
+  if (!folded) return "";
+  const alias = CITY_SEARCH[folded];
+  return alias && alias !== folded ? `${folded} ${alias}` : folded;
+}
+
+/** Every word of the query must appear somewhere in the parts. Words do not have to be adjacent. */
+export function tokensMatch(query: string, parts: Array<string | null | undefined>): boolean {
+  const needles = foldSearch(query).split(" ").filter((token) => token.length >= 2);
+  if (!needles.length) return false;
+  const hay = foldSearch(parts.filter(Boolean).join(" "));
+  if (!hay) return false;
+  return needles.every((token) => hay.includes(token));
+}
+
 export function siteSearchParts(site: {
   site_id?: string;
   name?: string;

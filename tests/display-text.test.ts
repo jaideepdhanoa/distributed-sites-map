@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { previewAtWord, redactGmailPayload, stripGmailIds } from "../lib/displayText.ts";
+import { previewAtWord, redactGmailPayload, stripGmailIds, withoutGmail } from "../lib/displayText.ts";
 import { plainNextStep } from "../lib/nextStepLine.ts";
 
 const HEX = "abcdef0123456789";
@@ -26,6 +26,10 @@ test("gmail ids are stripped from displayed next-step text and the rest stays", 
 
   const link = `https://mail.google.com/mail/u/0/#inbox/${HEX}`;
   assert.equal(stripGmailIds(link), link);
+  const hidden = withoutGmail(`Rent roll ${link} ${HEX}`);
+  assert.equal(hidden, "Rent roll");
+  assert.equal(hidden.includes("mail.google.com"), false);
+  assert.equal(/\b[0-9a-f]{16}\b/i.test(hidden), false);
 
   const payload = redactGmailPayload({
     summary: `Inquiry sent. Gmail message ${HEX}.`,

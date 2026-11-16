@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { paletteGroups } from "../../lib/search/palette.ts";
+import { filledSections, paletteGroups } from "../../lib/search/palette.ts";
 
 const deals = [
   { deal_id: "PIPE-PHX-0008", kind: "pipeline", name: "North Wash", address: "1 Main", broker: "Ada Broker", firm: "Ada Co", city: "PHX", stage_group: "desk", business_type: "Car wash" },
@@ -18,6 +18,12 @@ test("palette groups sites and brokers without the search index", () => {
   const hidden = paletteGroups("hidden", deals, []);
   assert.equal(hidden.sites.some((item) => item.id === "PIPE-PHX-0006"), false);
   assert.equal(hidden.brokers.some((item) => item.title === "Hidden Broker"), false);
+});
+
+test("palette fallback matches city and type words that are not one phrase", () => {
+  const groups = paletteGroups("car wash phoenix", deals, []);
+  assert.equal(groups.sites.some((item) => item.id === "PIPE-PHX-0008"), true);
+  assert.equal(filledSections(groups).some((section) => section.label === "Brokers"), false);
 });
 
 test("palette fallback keeps c-stores out until that category is on", () => {

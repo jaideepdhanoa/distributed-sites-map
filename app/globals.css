@@ -711,17 +711,22 @@ button.backdrop.command-backdrop { z-index: 500; background: rgba(28, 25, 20, 0.
   top: 72px;
   max-width: 560px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
   background: var(--paper-card);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 12px;
   max-height: 70vh;
-  overflow: auto;
+  overflow: hidden;
   box-shadow: 0 12px 40px rgba(28, 25, 20, 0.12);
 }
-.command-head { display: flex; align-items: center; justify-content: space-between; }
-.command-search .search { width: 100%; margin: 8px 0; }
-.command-search .menu-item { display: block; width: 100%; min-height: 44px; text-decoration: none; }
+.command-head { display: flex; align-items: center; justify-content: space-between; flex: none; }
+.command-search .search { width: 100%; margin: 8px 0; flex: none; }
+.command-results { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.command-search .menu-item { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; width: 100%; min-height: 44px; text-decoration: none; }
+.command-search .hit-title { font-weight: 650; }
+.command-search .hit-meta { color: var(--muted); font-size: var(--type-cap); }
 .command-search .layer-meta { margin: 4px 10px 10px; }
 body:has(.command-search) .map-corner,
 body:has(.command-search) .map-key,
@@ -729,7 +734,15 @@ body:has(.command-search) .maplibregl-ctrl-bottom-left,
 body:has(.command-search) .maplibregl-ctrl-bottom-right { display: none; }
 .tl-highlight { background: #e7f0ea; outline: 2px solid #1e4636; outline-offset: 2px; }
 @media (max-width: 767px) {
-  .command-search { top: auto; bottom: 0; left: 0; right: 0; max-width: none; max-height: 50vh; border-radius: 16px 16px 0 0; }
+  .command-search {
+    top: auto;
+    bottom: var(--command-bottom, 0px);
+    left: 0;
+    right: 0;
+    max-width: none;
+    max-height: var(--command-max, 50vh);
+    border-radius: 16px 16px 0 0;
+  }
 }
 .search-note { margin: 2px 8px; color: var(--muted); font-size: var(--type-body); }
 .trade-area { margin-top: 8px; display: grid; gap: 2px; }

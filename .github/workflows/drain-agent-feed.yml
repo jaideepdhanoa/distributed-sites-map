@@ -1,0 +1,50 @@
+name: Drain agent feed
+
+# One-off. Dry run is the default and writes nothing. It prints counts only.
+# Apply needs dry_run false, apply true, and the confirm phrase. It is not on
+# a schedule and it does not run from a pull request. It projects events that
+# have no feed key, marks events with no route so they leave the window, and
+# sets the 2026-11-16 19:00:37–48Z feed rows back to their event times.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print counts. Do not write.
+        type: boolean
+        default: true
+      apply:
+        description: Project the feed and reset flood timestamps. Also set dry_run to false and type the confirm phrase.
+        type: boolean
+        default: false
+      confirm:
+        description: To apply, type drain-agent-feed. Leave blank on a dry run.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  drain:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse an apply that is still a dry run or missing the phrase
+        if: ${{ (inputs.apply == true || inputs.apply == 'true') && ((inputs.dry_run == true || inputs.dry_run == 'true') || inputs.confirm != 'drain-agent-feed') }}
+        run: |
+          echo "Refusing to drain the agent feed. Set dry_run to false, set apply to true, and type drain-agent-feed." >&2
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Plan or drain
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          ALLOW_DRAIN_AGENT_FEED: ${{ (inputs.apply == true || inputs.apply == 'true') && (inputs.dry_run == false || inputs.dry_run == 'false') && '1' || '0' }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+        run: npx tsx scripts/drain-agent-feed.ts ${{ (inputs.apply == true || inputs.apply == 'true') && (inputs.dry_run == false || inputs.dry_run == 'false') && '--apply' || '' }}

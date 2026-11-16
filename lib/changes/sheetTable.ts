@@ -1,10 +1,13 @@
-import { columnLetters, sheetValueRender, type SheetRender, type SheetTable } from "./mirror";
+import { a1, columnLetters, sheetValueRender, type SheetRender, type SheetTable } from "./mirror";
 
 /** One values:batchGet per render option. A site tab is the header, the unformatted columns, and the formulas. */
 export const SHEET_READS_PER_SITE_TAB = 3;
 
 /** Bounded retry for Sheets 429 and 5xx. The wait never grows past the cap. */
 export const SHEETS_RETRY_ATTEMPTS = 6;
+
+/** Read-back ranges per values:batchGet. One request covers a page of cells. */
+export const READ_BACK_BATCH = 100;
 export const SHEETS_RETRY_BASE_MS = 1000;
 export const SHEETS_RETRY_MAX_DELAY_MS = 16_000;
 
@@ -205,4 +208,42 @@ export async function readSheetRanges(
   const groups = payload.valueRanges || [];
   if (groups.length !== ranges.length) throw new Error("Sheets read returned a different number of ranges than requested.");
   return groups.map((group) => gridFrom(group));
+}
+
+export function isSheetsRateLimit(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return /\(429\)/.test(message);
+}
+
+/** A finished write stays succeeded when read-back is still rate limited. A mismatch fails. */
+export function readBackOutcome(error: unknown): { status: "succeeded" | "failed"; note: string; rethrow: boolean } {
+  if (isSheetsRateLimit(error)) {
+    return { status: "succeeded", note: "wrote cells; read-back rate limited", rethrow: false };
+  }
+  return { status: "failed", note: "read-back mismatch", rethrow: true };
+}
+
+/** Read written cells with values:batchGet. 429 and 5xx retry inside readSheetRanges. */
+export async function readBackCells(
+  token: string,
+  spreadsheetId: string,
+  changes: { sheet: string; row: number; column: number }[],
+  deps?: SheetsRetryDeps,
+): Promise<{ sheet: string; row: number; column: number; value: string }[]> {
+  const out: { sheet: string; row: number; column: number; value: string }[] = [];
+  for (let start = 0; start < changes.length; start += READ_BACK_BATCH) {
+    const chunk = changes.slice(start, start + READ_BACK_BATCH);
+    const ranges = chunk.map((change) => a1(change.sheet, change.row, change.column));
+    const grids = await readSheetRanges(token, spreadsheetId, ranges, "formatted", deps);
+    chunk.forEach((change, index) => {
+      const cell = grids[index]?.[0]?.[0];
+      out.push({
+        sheet: change.sheet,
+        row: change.row,
+        column: change.column,
+        value: cell == null ? "" : cell,
+      });
+    });
+  }
+  return out;
 }

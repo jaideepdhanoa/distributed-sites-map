@@ -1,6 +1,7 @@
 import { NOT_IN_PACKAGE } from "../keyNumbers";
 import { buildPnlGrid } from "./grid";
-import type { PnlStatement } from "./statement";
+import type { PnlStatement, PnlYearView } from "./statement";
+import { windowCoverage } from "./window";
 
 export { packageOnFile } from "./package.ts";
 
@@ -12,12 +13,16 @@ export type FinancialsCard = {
   coverage: string;
 };
 
-function amount(statement: PnlStatement, columnId: string, id: string): string {
-  const grid = buildPnlGrid(statement, "years");
+function amount(statement: PnlStatement, mode: "months" | "years", year: number, columnId: string, id: string): string {
+  const grid = buildPnlGrid(statement, mode, mode === "months" ? year : undefined);
   const index = grid.columns.findIndex((column) => column.id === columnId);
   if (index < 0) return "";
   const cell = grid.rows.find((row) => row.id === id)?.cells[index];
   return cell?.kind === "value" ? cell.amount : "";
+}
+
+function shownYear(statement: PnlStatement): PnlYearView | null {
+  return statement.years.find((year) => year.annual || year.ranges?.length || year.months.some(Boolean) || year.missingMonths?.length) ?? null;
 }
 
 function calendarYearLabel(period: { year: number; columnLabel: string; periodStart: string; periodEnd: string }): string {
@@ -34,37 +39,30 @@ function calendarYearLabel(period: { year: number; columnLabel: string; periodSt
 }
 
 /**
- * The newest captured period. A full year on that year wins over an earlier
- * partial of the same year. An older full year is not summed in, and the
- * label names this period rather than a span across years.
+ * Figures from the same column the sheet shows for this period.
+ * A full year uses that statement. A partial uses the year-to-date sum of
+ * its months, which leaves missing months out. A stored range statement is
+ * used only when that window has no monthly lines.
  */
-function cardPeriod(statement: PnlStatement): { columnId: string; label: string; months: number } | null {
-  for (const year of statement.years) {
-    const months = year.months.filter(Boolean).length;
-    if (year.annual) return { columnId: year.annual.id, label: calendarYearLabel(year.annual), months };
-    const ranges = [...(year.ranges ?? [])].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
-    if (ranges[0]) return { columnId: ranges[0].id, label: ranges[0].columnLabel, months };
-    if (months) {
-      const label = year.columnLabel && year.columnLabel !== String(year.year) ? year.columnLabel : `FY${year.year}`;
-      return { columnId: `year-${year.year}`, label, months };
-    }
-  }
-  return null;
-}
-
-/** Compact figures for the latest period, labeled as that period. */
 export function financialsCard(statement: PnlStatement, sample = false): FinancialsCard | null {
   if (statement.status !== "ready" || !statement.years.length) return null;
-  const period = cardPeriod(statement);
-  if (!period) return null;
-  const sde = amount(statement, period.columnId, "sde");
-  const ebitda = amount(statement, period.columnId, "ebitda");
-  const coverage = `${period.label} · ${period.months} of 12 months${sample ? " · Sample package" : ""}`;
+  const year = shownYear(statement);
+  if (!year) return null;
+  const statementColumn = Boolean(year.annual);
+  const mode = statementColumn ? "years" : "months";
+  const columnId = statementColumn ? year.annual!.id : "ytd";
+  const read = (id: string) => amount(statement, mode, year.year, columnId, id);
+  const sde = read("sde");
+  const ebitda = read("ebitda");
+  const periodLabel = statementColumn
+    ? `${calendarYearLabel(year.annual!)} · ${year.months.filter(Boolean).length} of 12 months`
+    : (year.months.some(Boolean) || year.missingMonths?.length ? windowCoverage(year) : year.ranges?.[0]?.columnLabel) || `FY${year.year}`;
+  const coverage = `${periodLabel}${sample ? " · Sample package" : ""}`;
   return {
-    revenue: amount(statement, period.columnId, "total-revenue") || "—",
+    revenue: read("total-revenue") || "—",
     cash: sde || ebitda || "—",
     cashLabel: sde ? "SDE" : "EBITDA",
-    margin: (sde ? amount(statement, period.columnId, "sde-margin") : "") || amount(statement, period.columnId, "margin") || "—",
+    margin: (sde ? read("sde-margin") : "") || read("margin") || "—",
     coverage,
   };
 }

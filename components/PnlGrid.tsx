@@ -25,8 +25,14 @@ function ConflictMark({ cell }: { cell: GridCell }) {
   return <i className="pnl-mark conflict" data-testid="pnl-conflict-mark" aria-label="Sources disagree" />;
 }
 
+function missingTitle(cell: GridCell): string | undefined {
+  if (cell.kind !== "missing") return undefined;
+  const source = [cell.sourceDocument, cell.sourcePage].filter(Boolean).join(" · ");
+  return source ? `Missing · ${source}` : "Missing";
+}
+
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
-  if (cell.kind === "missing") return <span className="pnl-missing"><ConflictMark cell={cell} /></span>;
+  if (cell.kind === "missing") return <span className="pnl-missing">Missing<ConflictMark cell={cell} /></span>;
   if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} />—</span>;
   const shown = figure(cell, percent);
   return (
@@ -74,7 +80,7 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
 
   function reveal(row: number, col: number, target: HTMLElement) {
     const cell = focusable[row]?.cells[col];
-    if (!cell || (cell.kind !== "value" && !cell.conflict)) {
+    if (!cell || (cell.kind !== "value" && cell.kind !== "missing" && !cell.conflict)) {
       setOpen(null);
       return;
     }
@@ -158,7 +164,7 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
                       data-col={grid.columns[col]?.id}
                       tabIndex={focused || (!focus && index === 0 && col === 0) ? 0 : -1}
                       className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${cell.conflict && cell.conflict.status !== "resolved" ? "is-conflict" : ""} ${focused ? "cell-focus" : ""}`.trim()}
-                      title={cell.kind === "missing" ? "Month not in the package" : cell.kind === "value" && cell.flag ? cell.flag : undefined}
+                      title={missingTitle(cell) || (cell.kind === "value" && cell.flag ? cell.flag : undefined)}
                       onFocus={() => setFocus({ row: index, col })}
                       onClick={(event) => reveal(index, col, event.currentTarget)}
                     >
@@ -171,9 +177,16 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           })}
         </tbody>
       </table>
-      {open && popover && (popover.kind === "value" || popover.conflict) ? (
+      {open && popover && (popover.kind === "value" || popover.kind === "missing" || popover.conflict) ? (
         <div className="pnl-pop" role="dialog" aria-label="Line source" data-testid="pnl-popover" style={{ top: open.top, left: open.left }}>
           <strong>{focusable[open.row]?.label}</strong>
+          {popover.kind === "missing" ? (
+            <div data-testid="pnl-missing-source">
+              <p>Missing</p>
+              <p>{[popover.sourceDocument, popover.sourcePage].filter(Boolean).join(" · ")}</p>
+              {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
+            </div>
+          ) : null}
           {popover.kind === "value" ? (
             <>
               <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>

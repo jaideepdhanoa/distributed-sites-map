@@ -7,7 +7,8 @@ import { buildPnlGrid, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
 
 function textOf(cell: GridCell | undefined, percent: boolean): string {
-  if (!cell || cell.kind === "missing" || cell.kind === "blank") return "Not in package";
+  if (!cell || cell.kind === "blank") return "Not in package";
+  if (cell.kind === "missing") return "Missing";
   if (percent) return cell.share || "—";
   return cell.amount;
 }
@@ -134,9 +135,12 @@ function ConflictDetail({ cell }: { cell: GridCell }) {
 
 function Detail({ cell }: { cell: GridCell | undefined }) {
   if (!cell || cell.kind === "missing") {
+    const source = cell?.kind === "missing" ? [cell.sourceDocument, cell.sourcePage].filter(Boolean).join(" · ") : "";
     return (
-      <div className="pnl-expand">
-        <p>This month is not in the package.</p>
+      <div className="pnl-expand" data-testid="pnl-missing-source">
+        <p>Missing</p>
+        {source ? <p>{source}</p> : null}
+        {cell?.kind === "missing" && cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
         {cell ? <ConflictDetail cell={cell} /> : null}
       </div>
     );

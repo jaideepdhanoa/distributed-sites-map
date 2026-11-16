@@ -42,8 +42,32 @@ function numberOrNull(value: number | string | null | undefined): number | null 
 
 function day(value: string | Date | null | undefined): string {
   if (value == null || value === "") return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const date = String(value.getUTCDate()).padStart(2, "0");
+    return `${value.getUTCFullYear()}-${month}-${date}`;
+  }
   return String(value).slice(0, 10);
+}
+
+function flagged(value: unknown): boolean {
+  return value === true || value === "t" || value === "true" || value === 1;
+}
+
+function markerMonth(row: Row): number | null {
+  const month = numberOrNull(row.month);
+  if (month) return month;
+  if (row.grain !== "monthly") return null;
+  const start = day(row.period_start);
+  const parsed = Number(start.slice(5, 7));
+  return parsed >= 1 && parsed <= 12 ? parsed : null;
+}
+
+function isMissingMarker(row: Row): boolean {
+  const status = String(row.status || "").trim().toLowerCase();
+  if (status === "missing") return true;
+  const noLine = row.line_code == null || String(row.line_code).trim() === "";
+  return flagged(row.missing) && noLine && !row.amount_text;
 }
 
 export async function loadPnlStatement(sql: Sql, siteId: string | string[]): Promise<PnlStatement> {
@@ -60,25 +84,30 @@ export async function loadPnlStatement(sql: Sql, siteId: string | string[]): Pro
        WHERE l.site_id = ANY($1::text[]) AND l.deleted_at IS NULL`,
       [requested],
     );
-    const keyed = requested.find((id) => result.rows.some((row) => row.site_id === id));
-    const rows = keyed ? result.rows.filter((row) => row.site_id === keyed) : [];
+    const valueSite = requested.find((id) => result.rows.some((row) => row.site_id === id && !isMissingMarker(row) && row.amount_text));
+    const keyed = valueSite || requested.find((id) => result.rows.some((row) => row.site_id === id));
+    const rows = keyed ? result.rows.filter((row) => row.site_id === keyed || isMissingMarker(row)) : [];
     const lines: CapturedLine[] = [];
     const missing: MissingMonth[] = [];
     for (const row of rows) {
       if (row.business_type !== "car_wash" && row.business_type !== "auto_service") continue;
       if (row.grain !== "annual" && row.grain !== "monthly") continue;
-      if (row.status === "missing" || (row.missing && row.line_code == null)) {
-        const month = numberOrNull(row.month);
+      if (isMissingMarker(row)) {
+        const month = markerMonth(row);
         if (row.grain === "monthly" && month) {
           missing.push({
             year: Number(row.year),
             month,
             business: row.business_type,
             periodId: row.period_id,
+            sourceDocument: row.source_document,
+            sourcePage: row.source_page,
+            capturedAt: row.captured_at_iso,
           });
         }
         continue;
       }
+      if (row.site_id !== keyed) continue;
       if (row.status !== "reported" && row.status !== "estimated" && row.status !== "normalized") continue;
       if (!row.line_code || !isPnlLineCode(row.line_code)) continue;
       const amount = parseAmount(row.amount_text || "");

@@ -24,6 +24,10 @@ test("the month sheet keeps missing months empty and calculates EBITDA from capt
   assert.match(grid.note, /2 of 12 months captured; annual from statement/);
   assert.equal(grid.columns[1]?.missing, true);
   assert.equal(found.cells[1]?.kind, "missing");
+  if (found.cells[1]?.kind === "missing") {
+    assert.equal(found.cells[1].sourceDocument, "Sample package");
+    assert.equal(found.cells[1].sourcePage, "Month index");
+  }
   assert.equal(found.cells[0]?.kind, "value");
   if (found.cells[0]?.kind === "value") {
     assert.equal(found.cells[0].amount, "$10,000");

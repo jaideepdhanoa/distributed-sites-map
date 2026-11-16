@@ -4,7 +4,8 @@ import { formatCapturedDate } from "./dateLabel";
 import { LINE_LABELS, MONTH_SHORT, lineSection, sectionOrder, type PnlLineCode } from "./lines";
 import { spanMonths } from "./period";
 import { centsToRaw, formatAmount, parseAmount, percentOf, signedPercent } from "./money";
-import type { PnlLineView, PnlPeriodView, PnlStatement } from "./statement";
+import type { PnlLineView, PnlPeriodView, PnlStatement, PnlYearView } from "./statement";
+import { monthsInWindow, monthWindow } from "./window";
 
 const ZERO = BigInt(0);
 
@@ -29,7 +30,14 @@ export type CellConflict = {
   sources: DataConflict["sources"];
 };
 
-export type GridCell = (ValueCell | { kind: "missing" } | { kind: "blank" }) & {
+export type MissingCell = {
+  kind: "missing";
+  sourceDocument: string;
+  sourcePage: string;
+  capturedLabel: string;
+};
+
+export type GridCell = (ValueCell | MissingCell | { kind: "blank" }) & {
   conflict?: CellConflict;
 };
 
@@ -52,7 +60,7 @@ export type GridColumn = {
 
 export type PnlGrid = { columns: GridColumn[]; rows: GridRow[]; years: number[]; note: string };
 
-type Bucket = { missing: boolean; period: PnlPeriodView | null };
+type Bucket = { missing: boolean; period: PnlPeriodView | null; missingSource?: MissingCell };
 
 function allLines(period: PnlPeriodView | null): PnlLineView[] {
   if (!period) return [];
@@ -179,9 +187,32 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
 }
 
 function emptyCell(bucket: Bucket): GridCell | null {
-  if (bucket.missing) return { kind: "missing" };
+  if (bucket.missing) {
+    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", capturedLabel: "" };
+  }
   if (!bucket.period) return { kind: "blank" };
   return null;
+}
+
+function missingBucket(year: PnlYearView | undefined, month: number): Bucket {
+  const detail = year?.missingDetails?.find((item) => item.month === month);
+  return {
+    missing: true,
+    period: null,
+    missingSource: {
+      kind: "missing",
+      sourceDocument: detail?.sourceDocument || "",
+      sourcePage: detail?.sourcePage || "",
+      capturedLabel: detail?.capturedAt ? formatCapturedDate(detail.capturedAt) : "",
+    },
+  };
+}
+
+function partialTotal(year: PnlYearView): PnlPeriodView | null {
+  const window = monthWindow(year);
+  const present = window ? monthsInWindow(year, window) : year.months.filter((period): period is PnlPeriodView => Boolean(period));
+  if (present.length) return mergeMonths(present, year.year);
+  return year.ranges?.[0] ?? null;
 }
 
 function monthBuckets(statement: PnlStatement, year: number): Bucket[] {
@@ -189,13 +220,13 @@ function monthBuckets(statement: PnlStatement, year: number): Bucket[] {
   const months = row?.months ?? Array.from({ length: 12 }, () => null);
   const buckets: Bucket[] = months.map((period, index) => {
     const state = row ? monthColumnState(row, index) : period ? "present" : "blank";
-    if (state === "missing") return { missing: true, period: null };
+    if (state === "missing") return missingBucket(row, index + 1);
     return { missing: false, period };
   });
   if (row?.annual) buckets.push({ missing: false, period: row.annual });
   else {
-    const present = months.filter((period): period is PnlPeriodView => Boolean(period));
-    buckets.push(present.length ? { missing: false, period: mergeMonths(present, year) } : { missing: true, period: null });
+    const total = row ? partialTotal(row) : null;
+    buckets.push(total ? { missing: false, period: total } : missingBucket(row, 0));
   }
   return buckets;
 }
@@ -249,22 +280,23 @@ function annualLayout(statement: PnlStatement): { column: GridColumn; bucket: Bu
   for (const year of statement.years) {
     const periods = [year.annual, ...(year.ranges ?? [])].filter((period): period is PnlPeriodView => Boolean(period));
     if (!periods.length) {
-      const present = year.months.filter((period): period is PnlPeriodView => Boolean(period));
-      layout.push(present.length
+      const total = partialTotal(year);
+      layout.push(total
         ? {
             column: withPeriod(
               { id: `year-${year.year}`, label: year.columnLabel || String(year.year), missing: false, statement: false },
-              mergeMonths(present, year.year),
+              total,
             ),
-            bucket: { missing: false, period: mergeMonths(present, year.year) },
+            bucket: { missing: false, period: total },
           }
         : {
             column: { id: `year-${year.year}`, label: year.columnLabel || String(year.year), missing: true, statement: false },
-            bucket: { missing: true, period: null },
+            bucket: missingBucket(year, 0),
           });
       continue;
     }
     for (const period of periods) {
+      const shown = period === year.annual ? period : (partialTotal(year) ?? period);
       layout.push({
         column: withPeriod({
           id: period.id,
@@ -272,7 +304,7 @@ function annualLayout(statement: PnlStatement): { column: GridColumn; bucket: Bu
           missing: false,
           statement: spanMonths(period.periodStart, period.periodEnd) === 12,
         }, period),
-        bucket: { missing: false, period },
+        bucket: { missing: false, period: shown },
       });
     }
   }

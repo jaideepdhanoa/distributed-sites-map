@@ -3,8 +3,9 @@ import test from "node:test";
 import { financialsCard, packageOnFile, statementTiles } from "../../lib/pnl/cue.ts";
 import { DEMO_PNL_SITE_ID, demoStatement } from "../../lib/pnl/demo.ts";
 import { sampleStatement } from "../../lib/pnl/fixture.ts";
+import { buildPnlGrid, columnSummary } from "../../lib/pnl/grid.ts";
 import { parseAmount } from "../../lib/pnl/money.ts";
-import { buildStatement, emptyStatement, type CapturedLine } from "../../lib/pnl/statement.ts";
+import { buildStatement, emptyStatement, type CapturedLine, type MissingMonth } from "../../lib/pnl/statement.ts";
 
 test("a package on file is not the same as a captured P&L", () => {
   assert.equal(packageOnFile("Received", "Package on file"), true);
@@ -92,6 +93,64 @@ test("the card names the latest period instead of summing older years into the l
   assert.equal(card?.cashLabel, "EBITDA");
   assert.equal(card?.cash, "$150,000");
   assert.equal(card?.revenue, "$200,000");
-  assert.match(card?.coverage || "", /^Jan–Jun 2026 · 0 of 12 months$/);
+  assert.equal(card?.coverage, "Jan–Jun 2026");
   assert.equal((card?.coverage || "").includes("2024"), false);
+});
+
+test("the card matches the sheet total for a partial and leaves a missing month out", () => {
+  const captured = "2026-03-01T15:00:00-07:00";
+  const lines: CapturedLine[] = [];
+  function add(id: string, periodId: string, grain: "annual" | "monthly", month: number | null, throughMonth: number | null, code: "revenue" | "labor", raw: string) {
+    const amount = parseAmount(raw);
+    if (!amount) throw new Error("amount");
+    lines.push({
+      id,
+      periodId,
+      grain,
+      year: 2026,
+      month,
+      throughMonth,
+      business: "car_wash",
+      code,
+      amount,
+      status: "reported",
+      sourceDocument: "Sample package",
+      sourcePage: "1",
+      sourceHref: "",
+      capturedAt: captured,
+    });
+  }
+  for (const month of [1, 2, 3, 4, 6, 7]) {
+    add(`PL-r-${month}`, `PP-m-${month}`, "monthly", month, null, "revenue", "10000");
+    add(`PL-l-${month}`, `PP-m-${month}`, "monthly", month, null, "labor", "2000");
+  }
+  add("PL-range-r", "PP-range", "annual", null, 7, "revenue", "90000");
+  add("PL-range-l", "PP-range", "annual", null, 7, "labor", "30000");
+  const missing: MissingMonth[] = [{
+    year: 2026,
+    month: 5,
+    business: "car_wash",
+    periodId: "PP-missing",
+    sourceDocument: "Sample package",
+    sourcePage: "May",
+    capturedAt: captured,
+  }];
+  const statement = buildStatement(lines, missing);
+  const card = financialsCard(statement);
+  const grid = buildPnlGrid(statement, "months", 2026);
+  const summary = columnSummary(grid, 12);
+  assert.equal(card?.revenue, summary.revenue);
+  assert.equal(card?.cash, summary.ebitda);
+  assert.equal(card?.revenue, "$60,000");
+  assert.equal(card?.revenue.includes("90,000"), false);
+  assert.equal(card?.coverage, "Jan–Jul 2026 · 6 of 7 months (May missing)");
+  const may = grid.rows.find((row) => row.id === "labor")?.cells[4];
+  assert.equal(may?.kind, "missing");
+  if (may?.kind === "missing") {
+    assert.equal(may.sourceDocument, "Sample package");
+    assert.equal(may.sourcePage, "May");
+  }
+  const years = buildPnlGrid(statement, "years");
+  const rangeIndex = years.columns.findIndex((column) => column.label === "Jan–Jul 2026");
+  assert.equal(columnSummary(years, rangeIndex).revenue, summary.revenue);
 });

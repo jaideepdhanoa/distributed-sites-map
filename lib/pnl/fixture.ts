@@ -28,5 +28,13 @@ export function sampleStatement(): PnlStatement {
     line({ id: "PL-900007", periodId: "PP-900003", grain: "monthly", year: 2024, month: 3, throughMonth: null, business: "car_wash", code: "revenue", amount: "90000", status: "reported", sourcePage: "Mar" }),
     line({ id: "PL-900008", periodId: "PP-900003", grain: "monthly", year: 2024, month: 3, throughMonth: null, business: "car_wash", code: "chemicals", amount: "12000", status: "reported", sourcePage: "Mar" }),
   ];
-  return buildStatement(lines, [{ year: 2024, month: 2, business: "car_wash", periodId: "PP-900009" }]);
+  return buildStatement(lines, [{
+    year: 2024,
+    month: 2,
+    business: "car_wash",
+    periodId: "PP-900009",
+    sourceDocument: "Sample package",
+    sourcePage: "Month index",
+    capturedAt: CAPTURED,
+  }]);
 }

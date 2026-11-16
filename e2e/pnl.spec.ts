@@ -37,7 +37,8 @@ test("desktop profit and loss is a full-width sheet", async ({ page }, info) => 
   expect(headerFit.text.replace(/\s/g, "")).toBe("FY2024statement");
   expect(headerFit.text.includes("…")).toBe(false);
   await sheet.locator("thead").screenshot({ path: "review-shots/pnl-statement-header.png" });
-  await expect(sheet.locator("td.is-missing").first()).toHaveAttribute("title", "Month not in the package");
+  await expect(sheet.locator("td.is-missing").first()).toHaveAttribute("title", "Missing · Sample package · Month index");
+  await expect(sheet.locator("td.is-missing").first()).toContainText("Missing");
   await expect(overlay).not.toContainText("T15:00:00");
   await sheet.getByRole("row", { name: /^Labor/ }).getByText("$10,000").click();
   const popover = page.getByTestId("pnl-popover");

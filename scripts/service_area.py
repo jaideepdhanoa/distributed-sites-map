@@ -83,7 +83,7 @@ SERVICE_AREA_NOTE = (
     "Service area comes from the Universe tab. Inside, Near 0-5, and Near 5-10 pass. "
     "Outside, more than 10.0 miles from the polygon, is a knock-out. "
     "Legacy In and Yes count as Inside. Legacy No and Out count as Outside. "
-    f    "Legacy Edge stays its own class, {EDGE_LABEL}, and passes, because those rows were not measured again under the four-class rule. "
+    f"Legacy Edge stays its own class, {EDGE_LABEL}, and passes, because those rows were not measured again under the four-class rule. "
     "A blank cell is not a class. The word Unknown stays out of the working set. "
     "The step is split by class so Near is not counted as Inside. "
     "Las Vegas rings 200 and 300 stay on the expansion horizon when they do not pass."

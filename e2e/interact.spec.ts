@@ -72,7 +72,7 @@ test("Back returns to the previous city and step", async ({ page }, info) => {
   await expect(page.locator(".shell")).toHaveAttribute("data-stage", "land");
   await page.goBack();
   await page.waitForFunction(() => !location.search.includes("city=MIA"));
-  await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "all");
 });
 
 test("a shared link restores the city, step, filter, card, and table", async ({ page }, info) => {

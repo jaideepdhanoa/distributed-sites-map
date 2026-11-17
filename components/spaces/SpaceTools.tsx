@@ -13,6 +13,7 @@ import {
   type GroundBox,
   type LngLat,
 } from "@/lib/spaces/measure";
+import { applyDrawCommand, draftFromDrag, emptyDraft, type DrawDraft } from "@/lib/spaces/draw";
 import { estimateSlots } from "@/lib/spaces/slots";
 import { spaceMapLabel } from "@/lib/spaces/slots";
 import type { SpaceShape } from "./SpacePopover";
@@ -58,6 +59,10 @@ export default function SpaceTools({
   onSelect,
   onCreate,
   onChange,
+  onDelete,
+  onCloseDraw,
+  drawCommand,
+  onDraftPoints,
 }: {
   map: Map;
   spaces: SpaceShape[];
@@ -68,18 +73,30 @@ export default function SpaceTools({
   onSelect: (id: string) => void;
   onCreate: (box: GroundBox) => void;
   onChange: (space: SpaceShape) => void;
+  onDelete: (space: SpaceShape) => void;
+  onCloseDraw: () => void;
+  drawCommand: { id: number; type: "undo" | "cancel" | "finish" } | null;
+  onDraftPoints: (count: number) => void;
 }) {
   const spacesRef = useRef(spaces);
   const drawingRef = useRef(drawing);
   const dragRef = useRef<Drag | null>(null);
+  const draftState = useRef<DrawDraft>(emptyDraft());
   const [draft, setDraft] = useState<GroundBox | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
   const [handles, setHandles] = useState<{ corners: { sx: number; sy: number; x: number; y: number }[]; rotate: { x: number; y: number } | null }>({ corners: [], rotate: null });
   const onSelectRef = useRef(onSelect);
   const onCreateRef = useRef(onCreate);
   const onChangeRef = useRef(onChange);
+  const onDeleteRef = useRef(onDelete);
+  const onCloseDrawRef = useRef(onCloseDraw);
+  const onDraftPointsRef = useRef(onDraftPoints);
   onSelectRef.current = onSelect;
   onCreateRef.current = onCreate;
   onChangeRef.current = onChange;
+  onDeleteRef.current = onDelete;
+  onCloseDrawRef.current = onCloseDraw;
+  onDraftPointsRef.current = onDraftPoints;
   spacesRef.current = spaces;
   drawingRef.current = drawing;
   const selected = spaces.find((space) => space.id === selectedId) || null;
@@ -123,9 +140,10 @@ export default function SpaceTools({
       if (!drag) return;
       const cursor = point(event);
       if (drag.kind === "draw") {
-        const box = axisAlignedBox(drag.start, cursor);
-        setDraft(null);
-        if (box.lengthFt >= 4 && box.widthFt >= 4) onCreateRef.current(box);
+        const next = draftFromDrag(drag.start, cursor);
+        draftState.current = next;
+        setDraft(next.box);
+        onDraftPointsRef.current(next.points.length);
         return;
       }
       if (drag.kind === "move") {
@@ -151,6 +169,21 @@ export default function SpaceTools({
       map.off("touchend", onTouchEnd);
     };
   }, [map]);
+
+  useEffect(() => {
+    setAdjusting(false);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!drawCommand) return;
+    dragRef.current = null;
+    const result = applyDrawCommand(draftState.current, drawCommand.type === "cancel" ? "cancel" : drawCommand.type);
+    draftState.current = result.draft;
+    setDraft(result.draft.box);
+    onDraftPointsRef.current(result.draft.points.length);
+    if (result.commit) onCreateRef.current(result.commit);
+    if (result.close) onCloseDrawRef.current();
+  }, [drawCommand]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,9 +308,10 @@ export default function SpaceTools({
   }
 
   if (!visible && !drawing) return null;
+  const showHandles = Boolean(adjusting && selected);
   return (
     <>
-      {handles.rotate && selected ? (
+      {showHandles && handles.rotate && selected ? (
         <button
           type="button"
           className="icon-btn space-handle"
@@ -289,7 +323,7 @@ export default function SpaceTools({
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7a6 6 0 1 0 1.5 4" /><path d="M16 3v4h4" /></svg>
         </button>
       ) : null}
-      {selected ? handles.corners.map((corner) => (
+      {showHandles && selected ? handles.corners.map((corner) => (
         <button
           key={`${corner.sx}-${corner.sy}`}
           type="button"
@@ -302,7 +336,14 @@ export default function SpaceTools({
         </button>
       )) : null}
       {selected ? (
-        <SpacePopover space={selected} names={names} onChange={onChange} onClose={() => onSelect("")} />
+        <SpacePopover
+          space={selected}
+          names={names}
+          onChange={onChange}
+          onClose={() => onSelect("")}
+          onEdit={() => setAdjusting(true)}
+          onDelete={() => onDeleteRef.current(selected)}
+        />
       ) : null}
     </>
   );

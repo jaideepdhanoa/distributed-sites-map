@@ -24,6 +24,6 @@ export async function GET(request: Request) {
   } catch (error) {
     if (missingRelation(error)) return NextResponse.json({ spaces: [] }, { headers: privateHeaders });
     console.error(JSON.stringify({ event: "spaces_read_error", name: error instanceof Error ? error.name : "error" }));
-    return NextResponse.json({ error: "Marked spaces could not be loaded." }, { status: 503, headers: privateHeaders });
+    return NextResponse.json({ error: "Available lots could not be loaded." }, { status: 503, headers: privateHeaders });
   }
 }

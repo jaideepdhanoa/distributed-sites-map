@@ -14,7 +14,7 @@ test("list rows match map pins for each city, step, and filter", async ({ page }
   await page.fill('input[name="password"]', password);
   await page.click('button[type="submit"]');
   await page.waitForSelector(".shell");
-  const cities = ["", "city=LAS&", "city=MIA&"];
+  const cities = ["city=PHX&", "city=LAS&", "city=MIA&"];
   const steps = ["universe", "in_area", "land", "county", "cleared"];
   const filters = ["", "tier=L4", "listed=yes", "q=wash"];
   for (const city of cities) {
@@ -37,6 +37,6 @@ test("list rows match map pins for each city, step, and filter", async ({ page }
     await page.waitForSelector(".shell.list-open");
     const rows = Number(await page.locator(".shell").getAttribute("data-list-count"));
     expect(rows).toBeGreaterThanOrEqual(pins);
-    if (!city) expect(rows).toBe(cityPipelineCounts("PHX").deskTotal);
+    if (city.startsWith("city=PHX")) expect(rows).toBe(cityPipelineCounts("PHX").deskTotal);
   }
 });

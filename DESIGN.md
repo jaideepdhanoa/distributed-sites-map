@@ -81,7 +81,9 @@ Satellite is the default basemap. The choice is remembered in `localStorage` und
 
 On desktop the switch is one segmented control under the zoom buttons, always visible while the map is the view. On a phone it is only at the top of the Layers sheet. List view hides the map controls, including Measure.
 
-Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, and Measure. They stay inside the screen, clear of the zoom control.
+A first visit, and the saved market when none was chosen, fits the map to every site in Phoenix, Las Vegas, and Miami. The market switcher is All markets / Phoenix / Las Vegas / Miami. A shared link that names a site or a market still opens there, and choosing a site still flies to it.
+
+Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, Measure, and, when a site is selected, Draw available lots. That button sits in the map stack next to Measure, in the accent fill, and only then. Its tooltip is “Outline open land or parking a charger could use.” The record keeps a one-line lot summary whose link opens the same tool. While drawing, a floating toolbar offers Undo point, Cancel, and Finish. Escape cancels and discards the shape that is not finished yet. A finished lot’s popover has Edit and Delete; Delete asks before it removes the lot. On a phone the button stays in the map controls, and drawing uses the full map with the toolbar at the bottom. They stay inside the screen, clear of the zoom control.
 
 ## One home for each control
 
@@ -89,7 +91,7 @@ Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo
 - A single choice is a segmented control on one row. If it will not fit, use a secondary select. Do not wrap pills onto a second row.
 - On/off switches and single choices never share one chip row.
 - A control has one home. A new entry point replaces the old one.
-- Map chrome is only zoom, the basemap switch, Layers, and Measure. Anything else goes in Layers or More.
+- Map chrome is zoom, the basemap switch, Layers, Measure, and Draw available lots when a site is selected. Anything else goes in Layers or More.
 - A filter shows as an active-filter chip and changes the counts, or it does not ship.
 
 ## CI guards

@@ -1206,7 +1206,7 @@ tr { cursor: pointer; }
   justify-content: center;
   line-height: 1;
 }
-.cities button { padding: 4px 10px; height: 32px; }
+.cities button { padding: 4px 10px; height: 32px; white-space: nowrap; }
 .avatar, .tool, .icon-btn {
   border: 1px solid var(--line);
   background: var(--cream-0);
@@ -2696,11 +2696,39 @@ span.listing-link.muted { text-decoration: none; }
 }
 .space-popover-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .space-handle { position: absolute; z-index: 4; width: 36px; height: 36px; transform: translate(-50%, -50%); }
+.space-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.space-actions .note { flex-basis: 100%; margin: 0; }
+.space-actions .primary, .space-actions .paper-btn { min-height: 36px; }
 @media (max-width: 767px) {
-  .shell.space-marking .drawer { display: none; }
-  .shell.space-marking .map-float { display: flex !important; }
-  .space-popover { top: 316px; left: 8px; width: min(100% - 16px, 360px); max-height: min(42vh, 360px); }
+  .shell.space-marking .drawer,
+  .shell.space-marking .phone-peek { display: none; }
+  .shell.space-marking .map-float {
+    display: flex !important;
+    top: auto;
+    bottom: 12px;
+    left: 52px;
+    right: 8px;
+    align-items: stretch;
+  }
+  .shell.space-marking .maplibregl-ctrl-bottom-left { bottom: 72px; }
+  .shell.space-marking .measure-row { width: 100%; }
+  .shell.space-marking .measure-bar {
+    flex: 1;
+    max-width: none;
+    justify-content: space-between;
+  }
+  .shell.space-marking .measure-bar .paper-btn,
+  .shell.space-marking .measure-bar .primary {
+    min-height: 44px;
+    flex: 1 0 auto;
+    white-space: nowrap;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .map-float button.primary { min-height: 44px; }
+  .space-popover { top: auto; bottom: 72px; left: 8px; width: min(100% - 16px, 360px); max-height: min(42vh, 360px); }
   .space-handle { width: 44px; height: 44px; }
+  .space-actions .primary, .space-actions .paper-btn { min-height: 44px; }
 }
 .space-stage { position: absolute; inset: 0; }
 .space-map { width: 100%; height: 100%; }

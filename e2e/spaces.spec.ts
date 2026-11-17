@@ -56,12 +56,14 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAs(page, `/?funnel=universe&site=${site}`);
-  await expect(page.getByTestId("space-summary")).toContainText("No spaces marked yet");
+  await expect(page.getByTestId("space-summary")).toContainText("No lots drawn yet");
   await expect(page.getByTestId("mark-space")).toBeVisible();
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
-  await expect(page.getByTestId("space-summary")).toContainText("1 space · ~20 slots est.");
+  await expect(page.getByTestId("space-summary")).toContainText("1 lot");
+  await expect(page.getByTestId("space-summary")).toContainText("sq ft");
+  await expect(page.getByTestId("space-summary")).toContainText("slots");
   await expect(page.getByTestId("spaces-layer")).toBeChecked();
   await closeLayers(page);
   await page.getByTestId("mark-space").click();
@@ -85,7 +87,8 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
   await page.mouse.move(box.x + point.x + 250, box.y + point.y + 170, { steps: 14 });
   await page.screenshot({ path: `${shots}/space-desktop-draw.png`, animations: "disabled" });
   await page.mouse.up();
-  await expect(page.getByTestId("space-summary")).toContainText("2 spaces");
+  await page.getByTestId("space-finish").click();
+  await expect(page.getByTestId("space-summary")).toContainText("2 lots");
   await expect(page.getByTestId("space-popover")).toBeVisible();
   await expect(page.getByTestId("space-estimate")).toContainText("Estimated");
   await page.getByTestId("space-layout").selectOption("pull_through");
@@ -96,8 +99,14 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
   await thread.getByRole("button", { name: "Comment" }).click();
   await expect(thread.getByTestId("space-note")).toContainText("east row");
   await page.screenshot({ path: `${shots}/space-desktop-selected.png`, animations: "disabled" });
-  await page.getByTestId("space-done").click();
   await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
+  await page.getByTestId("space-edit").click();
+  await expect(page.getByTestId("space-rotate")).toBeVisible();
+  await page.getByTestId("space-delete").click();
+  await expect(page.getByTestId("space-delete-ask")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("space-delete-ask")).toHaveCount(0);
+  await expect(page.getByTestId("space-summary")).toContainText("2 lots");
 });
 
 test("phone mark space uses the full map and can comment", async ({ page }) => {
@@ -107,9 +116,10 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
-  await expect(page.getByTestId("space-summary")).toContainText("slots est.");
+  await expect(page.getByTestId("space-summary")).toContainText("slots");
   await page.getByTestId("mark-space").click();
-  await expect(page.getByTestId("space-done")).toBeVisible();
+  await expect(page.getByTestId("space-finish")).toBeVisible();
+  await expect(page.getByTestId("space-cancel")).toBeVisible();
   await expect(page.locator("aside.drawer")).toBeHidden();
   await expect(async () => {
     const point = await page.evaluate(() => {
@@ -142,6 +152,26 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
   await thread.getByRole("button", { name: "Comment" }).click();
   await expect(thread.getByTestId("space-note")).toContainText("usable from the aerial");
   await page.screenshot({ path: `${shots}/space-phone-selected.png`, animations: "disabled" });
-  await page.getByTestId("space-done").click();
+  await page.getByTestId("space-cancel").click();
   await expect(page.locator("aside.drawer")).toBeVisible();
+});
+
+test("cancel and Escape discard an unfinished lot", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openAs(page, `/?funnel=universe&site=${site}`);
+  const seeded = await markSample(page);
+  expect(seeded.status, seeded.error).toBe(200);
+  await page.reload();
+  await expect(page.getByTestId("space-summary")).toContainText("1 lot");
+  await closeLayers(page);
+  await page.getByTestId("mark-space").click();
+  await expect(page.getByTestId("space-draw-bar")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
+  await expect(page.getByTestId("space-summary")).toContainText("1 lot");
+  await page.getByTestId("mark-space").click();
+  await page.getByTestId("space-cancel").click();
+  await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
+  await expect(page.getByTestId("space-summary")).toContainText("1 lot");
 });

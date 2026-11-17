@@ -426,6 +426,7 @@ export default function Detail({
   outsideFilter = false,
   spaceCount = 0,
   spaceSlots = 0,
+  spaceSqft = 0,
   onMarkSpace,
   spaceNote,
 }: {
@@ -451,6 +452,7 @@ export default function Detail({
   outsideFilter?: boolean;
   spaceCount?: number;
   spaceSlots?: number;
+  spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
 }) {
@@ -527,7 +529,7 @@ export default function Detail({
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
-      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} note={spaceNote} onMark={onMarkSpace} /> : null}
+      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       <SitePhotos card={photos} />
       <NextStepCard
         kind="site"
@@ -728,6 +730,7 @@ export function DealDetail({
   outsideFilter = false,
   spaceCount = 0,
   spaceSlots = 0,
+  spaceSqft = 0,
   onMarkSpace,
   spaceNote,
 }: {
@@ -754,6 +757,7 @@ export function DealDetail({
   outsideFilter?: boolean;
   spaceCount?: number;
   spaceSlots?: number;
+  spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
 }) {
@@ -823,7 +827,7 @@ export function DealDetail({
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
-      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} note={spaceNote} onMark={onMarkSpace} /> : null}
+      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       <SitePhotos card={photos} />
       <NextStepCard
         kind="deal"

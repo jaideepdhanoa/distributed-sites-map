@@ -69,7 +69,11 @@ type Props = {
   onSpaceSelect?: (id: string) => void;
   onSpaceCreate?: (box: GroundBox) => void;
   onSpaceChange?: (space: SpaceShape) => void;
+  onSpaceDelete?: (space: SpaceShape) => void;
   onSpaceDone?: () => void;
+  fitAll?: boolean;
+  canDrawLots?: boolean;
+  onDrawLots?: () => void;
   onMapFailed?: (message: string) => void;
 };
 
@@ -152,6 +156,25 @@ function fitMap(
   map.fitBounds(bounds, fitted);
 }
 
+function frameSites(map: Map, points: [number, number][], phone: boolean) {
+  const finite = points.filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+  if (!finite.length) return false;
+  const lngs = finite.map((point) => point[0]);
+  const lats = finite.map((point) => point[1]);
+  fitMap(
+    map,
+    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+    {
+      padding: phone
+        ? { top: 176, bottom: 120, left: 28, right: 28 }
+        : { top: 72, bottom: 64, left: 48, right: 260 },
+      maxZoom: 10.5,
+      duration: 0,
+    },
+  );
+  return true;
+}
+
 function acresOf(coords: [number, number][]) {
   const radius = 6378137;
   let area = 0;
@@ -217,6 +240,9 @@ export default function MapView(props: Props) {
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
+  const [draftPoints, setDraftPoints] = useState(0);
+  const [drawCommand, setDrawCommand] = useState<{ id: number; type: "undo" | "cancel" | "finish" } | null>(null);
+  const drawSeq = useRef(0);
   const measureRef = useRef(false);
   measureRef.current = measure;
   const measureDoneRef = useRef(false);
@@ -1361,7 +1387,12 @@ export default function MapView(props: Props) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
-      } else if (!propsRef.current.spaceDrawing && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
+      } else if (!propsRef.current.spaceDrawing && !props.selectedId && props.fitAll && fitKey && appliedFit.current !== `all:${fitKey}:${padKey}`) {
+        appliedFit.current = `all:${fitKey}:${padKey}`;
+        appliedPad.current = padKey;
+        appliedFocus.current = focusToken;
+        if (!frameSites(map, finiteFit, phone)) glide(map, [props.focusLng, props.focusLat], props.focusZoom);
+      } else if (!propsRef.current.spaceDrawing && !props.selectedId && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
@@ -1372,7 +1403,7 @@ export default function MapView(props: Props) {
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
-      } else if (!propsRef.current.spaceDrawing && appliedFocus.current !== focusToken) {
+      } else if (!propsRef.current.spaceDrawing && !props.selectedId && appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
@@ -1384,7 +1415,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.fitAll, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1507,6 +1538,7 @@ export default function MapView(props: Props) {
         return;
       }
       if (!props.selectedId) {
+        if (props.fitAll && frameSites(map, props.fitPoints || [], window.matchMedia("(max-width: 767px)").matches)) return;
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
         return;
       }
@@ -1533,14 +1565,17 @@ export default function MapView(props: Props) {
       );
     };
     if (props.reviewFocus) return;
-    if (props.selectedId && !selectedOnMap) return;
+    if (props.selectedId && !selectedOnMap) {
+      glide(map, [props.focusLng, props.focusLat], props.focusZoom);
+      return;
+    }
     go();
     if (props.selectedId) map.once("idle", go);
     return () => {
       cancel = true;
       map.off("idle", go);
     };
-  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, gridToken]);
+  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.fitPoints, props.reviewFocus, gridToken]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1653,10 +1688,22 @@ export default function MapView(props: Props) {
     source?.setData({ type: "FeatureCollection", features: [] });
   }, [measure]);
 
+  function sendDraw(type: "undo" | "cancel" | "finish") {
+    drawSeq.current += 1;
+    setDrawCommand({ id: drawSeq.current, type });
+  }
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (!measureRef.current) return;
-      if (event.key === "Escape") setMeasure(false);
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select")) return;
+      if (propsRef.current.spaceDrawing) {
+        event.preventDefault();
+        sendDraw("cancel");
+        return;
+      }
+      if (measureRef.current) setMeasure(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1713,6 +1760,10 @@ export default function MapView(props: Props) {
           onSelect={(id) => props.onSpaceSelect?.(id)}
           onCreate={(box) => props.onSpaceCreate?.(box)}
           onChange={(space) => props.onSpaceChange?.(space)}
+          onDelete={(space) => props.onSpaceDelete?.(space)}
+          onCloseDraw={() => props.onSpaceDone?.()}
+          drawCommand={drawCommand}
+          onDraftPoints={setDraftPoints}
         />
       ) : null}
       {mapFailed ? (
@@ -1728,10 +1779,13 @@ export default function MapView(props: Props) {
         </div>
         <div className="measure-row">
           {props.spaceDrawing ? (
-            <div className="measure-bar" data-testid="space-draw-bar">
-              <span>Drag a rectangle, then rotate it to the rows</span>
-              <button type="button" className="paper-btn" data-testid="space-done" onClick={() => props.onSpaceDone?.()}>Done</button>
+            <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
+              <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>
+              <button type="button" className="paper-btn" data-testid="space-cancel" onClick={() => sendDraw("cancel")}>Cancel</button>
+              <button type="button" className="primary" data-testid="space-finish" onClick={() => sendDraw("finish")}>Finish</button>
             </div>
+          ) : props.canDrawLots ? (
+            <button type="button" className="primary" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}>Draw available lots</button>
           ) : null}
           {measure ? (
             <div className="measure-bar">

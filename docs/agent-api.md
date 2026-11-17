@@ -380,4 +380,4 @@ Signed-in financials show a marker on a cell or line with an open thread. A mark
 }
 ```
 
-Table: `notes`, extended in `db/migrations/022_anchored_comments.sql`. Production does not apply this file until the Production migrations workflow runs.
+Table: `notes`, extended in `db/migrations/022_anchored_comments.sql`. A preview database that is not production applies this file when the comment is posted. Production does not apply this file until the Production migrations workflow runs.

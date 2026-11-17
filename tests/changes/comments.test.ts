@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { migrate } from "../../lib/actions/migrate";
+import { PGlite } from "@electric-sql/pglite";
+import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import { POST } from "../../lib/api/handlers/changes";
+import { closePool, withSql } from "../../lib/actions/db";
+import { migrate, resetReady, whenReady } from "../../lib/actions/migrate";
 import { listNotes } from "../../lib/actions/notes";
 import { InputError } from "../../lib/actions/text";
 import { defaultPreferences } from "../../lib/alerts/preferences";
@@ -219,4 +223,87 @@ test("open threads mark the cell, the lot, the open loops, and the brief count",
     `SELECT anchor_label FROM notes WHERE anchor_type = 'space'`,
   );
   assert.equal(lot.rows[0]?.anchor_label, "Excess parking");
+});
+
+test("a preview read that skipped migrations does not block a P&L line comment", { timeout: 60_000 }, async () => {
+  const saved = {
+    database: process.env.DATABASE_URL,
+    vercel: process.env.VERCEL_ENV,
+    branch: process.env.PREVIEW_DATABASE_BRANCH,
+    host: process.env.NEON_PRODUCTION_HOST,
+    neon: process.env.NEON_DATABASE_URL,
+    muse: process.env.AGENT_WRITE_TOKEN_MUSE,
+    enabled: process.env.CHANGES_API_ENABLED,
+  };
+  const db = new PGlite();
+  const server = new PGLiteSocketServer({ db, host: "127.0.0.1", port: 0, maxConnections: 4 });
+  await server.start();
+  const address = server.getServerConn();
+  process.env.DATABASE_URL = `postgres://postgres:postgres@${address}/postgres`;
+  process.env.VERCEL_ENV = "preview";
+  process.env.PREVIEW_DATABASE_BRANCH = "preview";
+  process.env.NEON_PRODUCTION_HOST = "prod.example.test";
+  delete process.env.NEON_DATABASE_URL;
+  process.env.AGENT_WRITE_TOKEN_MUSE = "comment-line-token";
+  delete process.env.CHANGES_API_ENABLED;
+  await closePool();
+  resetReady();
+  try {
+    await whenReady(() => withSql(async (sql) => {
+      assert.deepEqual(await migrate(sql, { onPreview: "skip", onProduction: "skip" }), []);
+    }));
+    const response = await POST(new Request("http://localhost/api/changes", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer comment-line-token",
+        "content-type": "application/json",
+        "idempotency-key": "pnl-line-cogs",
+      },
+      body: JSON.stringify({
+        changes: [{
+          entity_type: "comment",
+          site_id: "PIPE-LAS-9001",
+          expected_version: 0,
+          source: "Sample notes",
+          payload: {
+            anchor: { type: "pnl_line", line: "cogs" },
+            body: "The sample cost line needs a second look.",
+            tag: "investigate",
+            at: AT,
+          },
+        }],
+      }),
+    }));
+    const body = await response.json() as { error?: string; results?: { entity_id?: string }[] };
+    assert.equal(response.status, 200, body.error || "");
+    const id = body.results?.[0]?.entity_id || "";
+    assert.match(id, /^NT-\d{6}$/);
+    const notes = await withSql((sql) => listNotes(sql, "deal", "PIPE-LAS-9001"));
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0]?.id, id);
+    assert.equal(notes[0]?.anchor?.type, "pnl_line");
+    assert.equal(notes[0]?.anchor?.line, "cogs");
+    assert.equal(notes[0]?.body, "The sample cost line needs a second look.");
+    const onSite = await withSql((sql) => listNotes(sql, "site", "PIPE-LAS-9001"));
+    assert.equal(onSite[0]?.id, id);
+  } finally {
+    resetReady();
+    await closePool();
+    await server.stop();
+    await db.close();
+    if (saved.database === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = saved.database;
+    if (saved.vercel === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = saved.vercel;
+    if (saved.branch === undefined) delete process.env.PREVIEW_DATABASE_BRANCH;
+    else process.env.PREVIEW_DATABASE_BRANCH = saved.branch;
+    if (saved.host === undefined) delete process.env.NEON_PRODUCTION_HOST;
+    else process.env.NEON_PRODUCTION_HOST = saved.host;
+    if (saved.neon === undefined) delete process.env.NEON_DATABASE_URL;
+    else process.env.NEON_DATABASE_URL = saved.neon;
+    if (saved.muse === undefined) delete process.env.AGENT_WRITE_TOKEN_MUSE;
+    else process.env.AGENT_WRITE_TOKEN_MUSE = saved.muse;
+    if (saved.enabled === undefined) delete process.env.CHANGES_API_ENABLED;
+    else process.env.CHANGES_API_ENABLED = saved.enabled;
+  }
 });

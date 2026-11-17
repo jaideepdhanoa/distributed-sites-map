@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, jsonOk } from "@/lib/actions/http";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
-import { migrate, whenReady } from "@/lib/actions/migrate";
+import { migrate } from "@/lib/actions/migrate";
 import { InputError } from "@/lib/actions/text";
 import { privateHeaders } from "@/lib/guard";
 import { PolicyError } from "@/lib/policy/banned";
@@ -13,8 +13,9 @@ import { changesApiEnabled } from "@/lib/changes/flags";
 import { assertEventsWritable, ProductionWriteRefused } from "@/lib/changes/guard";
 import { previewDatabaseWriteResponse } from "@/lib/preview/block";
 
-function missingRelation(error: unknown): boolean {
-  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
+function pgCode(error: unknown): string {
+  if (!error || typeof error !== "object" || !("code" in error)) return "";
+  return String((error as { code?: unknown }).code || "");
 }
 
 /** Shadow write path. Production stays off until CHANGES_API_ENABLED is set. */
@@ -36,9 +37,12 @@ export async function POST(request: Request) {
   }
   try {
     assertEventsWritable();
-    await whenReady(() => withSql(async (sql) => {
+    // Apply pending files on this database. Production skips. A preview
+    // pointed at production is refused above. A safe preview database gets
+    // the comment columns before the insert.
+    await withSql(async (sql) => {
       await migrate(sql);
-    }));
+    });
     const result = await withSql(async (sql) => {
       const applied = await applyBatch(sql, actor, request.headers.get("idempotency-key") || "", body);
       if (!applied.replayed) {
@@ -67,13 +71,14 @@ export async function POST(request: Request) {
       );
     }
     if (error instanceof ProductionWriteRefused) return jsonError(error.message, 403);
-    if (missingRelation(error)) {
+    const code = pgCode(error);
+    if (code === "42P01" || code === "42703") {
       return jsonError(
-        "The events tables are not on this database. Production migrations run from the Production migrations workflow.",
+        "The database is missing a pending migration. Preview applies it on a non-production database. Production migrations run from the Production migrations workflow.",
         503,
       );
     }
-    console.error(JSON.stringify({ event: "changes_error", name: error instanceof Error ? error.name : "error" }));
+    console.error(JSON.stringify({ event: "changes_error", name: error instanceof Error ? error.name : "error", code }));
     return jsonError("The change could not be saved.", 500);
   }
 }

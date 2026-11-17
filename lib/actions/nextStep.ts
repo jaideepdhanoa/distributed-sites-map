@@ -136,3 +136,21 @@ export function recommendedDropSummary(reason: string): string {
   const why = reason.trim();
   return why ? `Recommended drop. ${why}` : "Recommended drop.";
 }
+
+/**
+ * Accept on a suggested drop opens the human drop flow.
+ * There is no status here, so Stage is not written until a person accepts the proposal. R-097.
+ */
+export function suggestedDropProposal(reason: string): {
+  field: "proposed_next_step";
+  detail: "knock_off";
+  proposedValue: "Dropped";
+  reason: string;
+} {
+  return {
+    field: "proposed_next_step",
+    detail: "knock_off",
+    proposedValue: "Dropped",
+    reason: reason.trim(),
+  };
+}

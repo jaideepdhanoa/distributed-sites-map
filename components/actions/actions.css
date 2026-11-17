@@ -190,6 +190,37 @@
 .next-card .proposal-needs .hint { display: block; margin-top: 2px; }
 .next-card .proposal-notes p { margin: 0; }
 .next-card .step-actions { display: grid; gap: 8px; justify-items: start; }
+.next-card .decision-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+.next-card .decision-actions button.primary,
+.next-card .decision-actions button.paper-btn {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+.next-card .decision-actions button.primary { border: 1px solid #1e4636; }
+.next-card .decision-actions button.primary:hover { background: #245443; }
+.next-card .suggested-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px 12px;
+}
+.next-card .suggested-row p { margin: 0; flex: 1 1 12rem; min-width: 0; }
+.next-card .suggested-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .next-card .next-step-row {
   display: flex;
   flex-wrap: wrap;
@@ -299,6 +330,7 @@
 @media (max-width: 767px) {
   .next-card select.secondary,
   .next-card button.propose,
+  .next-card button.primary,
   .next-card button.paper-btn,
   .next-card button.text-link,
   .next-card .type-chips .chip,

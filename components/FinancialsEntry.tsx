@@ -114,6 +114,7 @@ export default function FinancialsEntry({
             <strong>{card.revenue} revenue</strong>
             <small>{card.cashLabel} {card.cash} · {card.margin} margin</small>
             <small>{card.coverage}</small>
+            <span className="fin-open">Open P&L <span aria-hidden="true">→</span></span>
           </button>
         </article>
       ) : packageOnFile ? (

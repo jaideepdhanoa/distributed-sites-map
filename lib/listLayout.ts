@@ -98,12 +98,6 @@ const COLUMN_WIDTH: Record<string, number> = {
 export function columnWidth(id: string): number {
   return COLUMN_WIDTH[id] || 148;
 }
-
-/** Width that keeps the header label readable beside the grip, filter, and pin. */
-export function headerFloor(label: string): number {
-  const text = Math.max(48, Math.ceil(label.trim().length * 8) + 16);
-  return 28 + 22 + 22 + 8 + text;
-}
 const FILTER_LIMIT = 80;
 
 export function isLayoutSurface(value: string | null | undefined): value is LayoutSurface {

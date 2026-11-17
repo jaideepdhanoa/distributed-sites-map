@@ -1084,16 +1084,39 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   box-shadow: 8px 0 12px -8px rgba(28, 25, 20, 0.28), inset -1px 0 0 var(--line);
 }
 .list-table thead th { position: sticky; top: 0; background: #faf7f1; z-index: 3; }
-.col-head { display: flex; align-items: center; min-width: 0; position: relative; min-height: 32px; gap: 2px; }
-.col-head > .sort-header:not(.col-grip):not(.col-resize) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-filter, .col-pin { width: 22px; min-height: 28px; color: var(--ink-3); flex: none; }
+.col-head {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 2px;
+  position: relative;
+  min-width: 0;
+  min-height: 32px;
+  padding-right: 8px;
+}
+.col-head > .row-check { grid-column: 1; grid-row: 1; }
+.col-head:has(.row-check) { grid-template-columns: auto 28px minmax(0, 1fr); }
+.col-head:has(.row-check) > .col-grip { grid-column: 2; }
+.col-head:has(.row-check) > .sort-header:not(.col-grip):not(.col-resize),
+.col-head:has(.row-check) > .col-tools { grid-column: 3; }
+.col-head > .sort-header:not(.col-grip):not(.col-resize) {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.col-filter, .col-pin { width: 22px; min-height: 22px; color: var(--ink-3); flex: none; }
 .col-grip svg, .col-filter svg, .col-pin svg { width: 14px; height: 14px; }
 .col-head > .col-grip {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: none;
   width: 28px;
   min-width: 28px;
   height: 28px;
@@ -1106,7 +1129,17 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   pointer-events: auto;
   z-index: auto;
 }
-.col-tools { position: static; display: inline-flex; align-items: center; flex: none; background: transparent; opacity: 0; pointer-events: none; }
+.col-tools {
+  grid-column: 2;
+  grid-row: 2;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
 th:hover .col-grip, th:focus-within .col-grip,
 th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity: 1; pointer-events: auto; }
 @media (hover: none), (pointer: coarse) {

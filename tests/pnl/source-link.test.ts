@@ -13,7 +13,6 @@ import {
   siteFolderId,
   sourceView,
 } from "../../lib/pnl/sourceLink.ts";
-import { headerFloor } from "../../lib/listLayout.ts";
 import { buildStatement, type CapturedLine } from "../../lib/pnl/statement.ts";
 
 const PARENT = "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk";
@@ -320,14 +319,11 @@ test("a package zip links when that file has an id, otherwise the citation says 
   assert.equal(missing.href, "");
   assert.equal(missing.hint, NO_DRIVE_LINK);
   assert.equal(missing.label.includes("/"), true);
-  assert.equal(headerFloor("Score") > headerFloor("S"), true);
-  assert.equal(headerFloor("Score") >= 28 + 22 + 22 + 8 + 48, true);
-  assert.equal(headerFloor("Open land") > headerFloor("Score"), true);
 });
 
 test("the column grip keeps its own slot", () => {
   const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
-  const block = css.slice(css.indexOf(".col-head > .col-grip {"), css.indexOf(".col-tools {"));
+  const block = css.match(/\.col-head > \.col-grip \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(block, /position:\s*static/);
   assert.match(block, /min-width:\s*28px/);
   assert.match(block, /min-height:\s*28px/);

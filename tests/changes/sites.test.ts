@@ -8,7 +8,7 @@ import { importChanged } from "../../lib/changes/backfill";
 import { buildReport, diffDatabase, publicDiffReport, renderReport } from "../../lib/changes/diff";
 import { importEntityFromWorkbook, readEntityFromDb } from "../../lib/changes/flags";
 import { PROTECTED_ROW, PROTECTED_SITE_ID, formatPlan, planSiteMirror, sheetValueRender, type SheetTable } from "../../lib/changes/mirror";
-import { applySiteRows } from "../../lib/changes/read";
+import { applySiteRows, applyStageRows } from "../../lib/changes/read";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
 import { loadScorecard, recordedLocationPoints, recordedScore, scorecardTotal } from "../../lib/changes/scorecard";
 import { brokerMirrorCell, displayNote, emptySiteFields, listingFlags, listingKnown, mirrorCellInput, mirrorHeaderAllowed, mirrorWrites, pricePerAcre, shortHash, siteIssues, splitBroker, type SiteRow } from "../../lib/changes/site";
@@ -663,6 +663,45 @@ test("per-acre copies the snapshot figure from the unrounded acres", async () =>
     assert.equal(props?.price_per_acre, Number(row.perAcre), row.id);
     assert.notEqual(props?.price_per_acre, Number(pricePerAcre(row.asking, row.rounded)), row.id);
   }
+});
+
+test("a database site missing from the snapshot is added and a protected id is not", () => {
+  const painted = applySiteRows(
+    {
+      features: [
+        {
+          type: "Feature",
+          properties: { deal_id: "PIPE-PHX-0001", name: "Snapshot", city: "PHX", kind: "pipeline", stated_revenue: 10 },
+          geometry: null,
+        },
+      ],
+    },
+    [
+      { site_id: "PIPE-PHX-0001", ...emptySiteFields(), name: "Database", market: "PHX", photo_refs: "[]" },
+      { site_id: "LAND-LAS-0099", ...emptySiteFields(), name: "Minted parcel", market: "LAS", category: "Land", lat: "36.17", lng: "-115.14", kind: "land", photo_refs: "[]" },
+      { site_id: "PIPE-MIA-0099", ...emptySiteFields(), name: "Minted wash", market: "MIA", category: "Car wash", photo_refs: "[]" },
+      { site_id: "PIPE-PHX-0006", ...emptySiteFields(), name: "Quarantine", market: "PHX", kind: "pipeline", photo_refs: "[]" },
+      { site_id: "WB-PHX-0099", ...emptySiteFields(), name: "Universe only", market: "PHX", photo_refs: "[]" },
+    ],
+  );
+  const ids = (painted.features || []).map((feature) => feature.properties?.deal_id);
+  assert.deepEqual(ids, ["PIPE-PHX-0001", "LAND-LAS-0099", "PIPE-MIA-0099"]);
+  const kept = painted.features?.[0];
+  assert.equal(kept?.properties?.name, "Database");
+  assert.equal(kept?.properties?.stated_revenue, 10);
+  assert.equal(kept?.properties?.kind, "pipeline");
+  const land = painted.features?.find((feature) => feature.properties?.deal_id === "LAND-LAS-0099");
+  assert.equal(land?.properties?.kind, "land");
+  assert.equal(land?.properties?.city, "LAS");
+  assert.equal(land?.geometry?.type, "Point");
+  assert.deepEqual(land?.geometry?.coordinates, [-115.14, 36.17]);
+  const wash = painted.features?.find((feature) => feature.properties?.deal_id === "PIPE-MIA-0099");
+  assert.equal(wash?.properties?.kind, "pipeline");
+  assert.equal(wash?.geometry, null);
+  const staged = applyStageRows(painted, [{ site_id: "LAND-LAS-0099", stage: "Financial screen" }]);
+  const stagedLand = staged.features?.find((feature) => feature.properties?.deal_id === "LAND-LAS-0099");
+  assert.equal(stagedLand?.properties?.stage, "Financial screen");
+  assert.equal(stagedLand?.properties?.stage_group, "financial");
 });
 
 type ScorePoints = { Inside: number; "Near 0-5": number; "Near 5-10": number; Outside: number };

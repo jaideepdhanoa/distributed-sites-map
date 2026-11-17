@@ -190,8 +190,10 @@ export type DealProps = {
   coord_status: string;
   miles_to_depot: number | null;
   /** Passes the location gate: inside, either Near band, or legacy edge. */
-  in_area?: boolean;
-  service_area_class?: "inside" | "near_0_5" | "near_5_10" | "outside" | "edge_legacy" | "unknown";
+  in_area?: boolean | null;
+  service_area_class?: "inside" | "near_0_5" | "near_5_10" | "outside" | "edge_legacy" | "unknown" | null;
+  /** blank, label, or unrecognized. Absent when a blank cell was stored as unknown. */
+  service_area_source?: "blank" | "label" | "unrecognized" | "" | null;
   service_area_distance_mi?: number | null;
   service_area_polygon?: string;
   listed: boolean;

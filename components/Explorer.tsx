@@ -54,7 +54,7 @@ import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
-import { inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "@/lib/reach";
+import { dealOnPipeStep, inReach, parseReach, reachLabel, serviceAreaSplit, workingSetKnockout, type Reach } from "@/lib/reach";
 import { NdaChip } from "./NdaChip";
 import NdaQueue from "./NdaQueue";
 import OpenLoops from "./OpenLoops";
@@ -992,10 +992,6 @@ export default function Explorer() {
     return dealInCategories(deal, categories);
   }
 
-  function viewDeal(deal: DealProps): boolean {
-    return inReach(deal, reach);
-  }
-
   function inDealMarket(deal: DealProps, wide: boolean) {
     if (wide || allCities) return true;
     const feature = dealFeatures.find((item) => item.properties.deal_id === deal.deal_id);
@@ -1006,7 +1002,7 @@ export default function Explorer() {
   const localDealMatches = query
     ? dealRows.filter((deal) => {
         if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-        if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+        if (!inReach(deal, reach) || !dealAllowed(deal)) return false;
         if (!inDealMarket(deal, false)) return false;
         if (!allPipes && !who && deal.stage_group !== pipeStage) return false;
         if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
@@ -1021,6 +1017,11 @@ export default function Explorer() {
     droppedLayer: showDroppedDeals,
     searchWide: pipelineWide || Boolean(who),
   });
+  function viewDeal(deal: DealProps): boolean {
+    if (!allPipes && !dealWide) return dealOnPipeStep(deal, pipeStage, reach);
+    if (inReach(deal, reach)) return true;
+    return showDroppedRows && deal.stage_group === "dropped" && workingSetKnockout(deal);
+  }
   function includeDropped(group: string) {
     if (group !== "dropped") return true;
     return showDroppedRows;
@@ -1032,7 +1033,6 @@ export default function Explorer() {
     if (!dealAllowed(deal)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
-    if (!dealWide && deal.stage_group !== pipeStage) return false;
     if (!includeDropped(deal.stage_group)) return false;
     if (query && !dealQueryHit(deal)) return false;
     return true;
@@ -1091,7 +1091,7 @@ export default function Explorer() {
 
   const pipelineStepRows = pipelineDeals;
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
-  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage);
+  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || dealOnPipeStep(deal, pipeStage, reach));
   const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const landSiteDrawn = new Set(
     visibleFeatures
@@ -1294,7 +1294,7 @@ export default function Explorer() {
   function countLiveContactedDeals() {
     return dealRows.filter((deal) => {
       if (!isLiveContactedDeal(deal) || (!allCities && deal.city !== city)) return false;
-      if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+      if (!inReach(deal, reach) || !dealAllowed(deal)) return false;
       if (!query) return true;
       return dealQueryHit(deal);
     }).length;
@@ -1545,7 +1545,7 @@ export default function Explorer() {
     onSnap: setSheetSnap,
     onStep: (direction: "more" | "less") => setSheetSnap((snap) => stepSheet(snap, direction)),
   };
-  const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !dealPoint(deal) && viewDeal(deal) && dealAllowed(deal));
+  const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !dealPoint(deal) && inReach(deal, reach) && dealAllowed(deal));
   const offMarketPool = (universeWide || allCities) && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
     if (!feature.geometry) return false;
@@ -1731,7 +1731,7 @@ export default function Explorer() {
   }
 
   const stageUnmapped = funnel === "pipeline" && !allPipes && !pipelineWide
-    ? [...pipelineDeals, ...stageLandRows].filter((deal) => deal.stage_group === pipeStage && !dealPoint(deal)).length
+    ? [...pipelineDeals, ...stageLandRows].filter((deal) => !dealPoint(deal)).length
     : 0;
 
   function summaryText() {
@@ -1739,7 +1739,7 @@ export default function Explorer() {
     const stageView = !allPipes && !pipelineWide && !who;
     const rows = stageView
       ? [...pipelineDeals, ...stageLandRows]
-      : dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && viewDeal(deal) && dealAllowed(deal));
+      : dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && inReach(deal, reach) && dealAllowed(deal));
     const droppedRows = rows.filter((deal) => deal.stage_group === "dropped");
     return pipelineMapSummary({
       placed: rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length,
@@ -1822,7 +1822,7 @@ export default function Explorer() {
   const openQueueIds = feed.filter((site) => site.status === "open").map((site) => site.siteId);
   const allMarketDeals = dealRows.filter((deal) => {
     if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-    if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+    if (!inReach(deal, reach) || !dealAllowed(deal)) return false;
     if (!allCities && deal.city !== city) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (query && !dealQueryHit(deal)) return false;
@@ -2051,16 +2051,16 @@ export default function Explorer() {
               );
             }) : PIPE_STEPS.map((step, index) => {
               const rows = dealRows.filter((deal) => {
-                if (deal.kind !== "pipeline" || deal.stage_group !== step.id) return false;
-                if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+                if (deal.kind !== "pipeline" || !dealOnPipeStep(deal, step.id, reach)) return false;
+                if (!dealAllowed(deal)) return false;
                 if (!allCities && deal.city !== city) return false;
                 if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
                 if (!query) return true;
                 return dealQueryHit(deal);
               });
               const landHere = dealRows.filter((deal) => {
-                if (deal.kind !== "land" || deal.stage_group !== step.id) return false;
-                if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+                if (deal.kind !== "land" || !dealOnPipeStep(deal, step.id, reach)) return false;
+                if (!dealAllowed(deal)) return false;
                 if (!allCities && deal.city !== city) return false;
                 if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
                 if (!query) return true;

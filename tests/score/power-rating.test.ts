@@ -164,6 +164,29 @@ test("nearby hosting covers a lower frontage, including a blank frontage", () =>
   assert.equal(blank.rating, "OK");
 });
 
+test("a blank hosting cell stays missing, and a stored zero stays a reading", () => {
+  for (const blank of [undefined, null, "", "  "]) {
+    const derived = derivePowerRating({
+      market: "LAS",
+      cap_b_frontage: blank,
+      cap_b_nearby: blank,
+      cap_b_source: "utility hosting map",
+      cap_b_confidence: "Estimated",
+      cap_b_as_of: "2026-11-05",
+    });
+    assert.equal(derived.rating, "Unknown");
+    assert.match(derived.reason, /no Layer B hosting/);
+  }
+  const oneSide = derivePowerRating({
+    market: "LAS",
+    cap_b_frontage: 0,
+    cap_b_nearby: "",
+    cap_b_source: "utility hosting map",
+    cap_b_confidence: "Estimated",
+  });
+  assert.equal(oneSide.rating, "Unknown");
+});
+
 test("both hosting reads under 1 MW are Weak, and a valid zero counts", () => {
   const zeros = derivePowerRating({
     market: "LAS",

@@ -1393,7 +1393,7 @@ export default function MapView(props: Props) {
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
         if (!frameSites(map, finiteFit, phone)) glide(map, [props.focusLng, props.focusLat], props.focusZoom);
-      } else if (!propsRef.current.spaceDrawing && !props.selectedId && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
+      } else if (!props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
@@ -1404,7 +1404,7 @@ export default function MapView(props: Props) {
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
-      } else if (!propsRef.current.spaceDrawing && !props.selectedId && appliedFocus.current !== focusToken) {
+      } else if (!props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);

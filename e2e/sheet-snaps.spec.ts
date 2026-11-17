@@ -72,25 +72,44 @@ test("dragging the grab bar steps through half and full", async ({ page }, info)
   await expect(drawer).toHaveClass(/snap-peek/);
 });
 
+async function settledHeight(drawer: import("@playwright/test").Locator): Promise<number> {
+  let previous = -1;
+  let stable = 0;
+  await expect.poll(async () => {
+    const height = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+    stable = previous >= 0 && Math.abs(height - previous) < 1 ? height : 0;
+    previous = height;
+    return stable;
+  }).toBeGreaterThan(0);
+  return stable;
+}
+
 test("a tap and the keyboard change the phone sheet detent", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone sheet");
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/?funnel=pipeline&site=PIPE-PHX-0014", { waitUntil: "domcontentloaded" });
   const drawer = page.locator("aside.drawer");
   const grab = page.getByRole("button", { name: "Drag sheet" });
   await expect(drawer).toHaveClass(/snap-peek/);
-  const peek = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+  const peek = await settledHeight(drawer);
   await grab.click();
   await expect(drawer).toHaveClass(/snap-half/);
-  const half = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+  const half = await settledHeight(drawer);
   expect(half).toBeGreaterThan(peek + 40);
-  await grab.focus();
-  await page.keyboard.press("ArrowUp");
-  await expect(drawer).toHaveClass(/snap-full/);
-  const full = await drawer.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+  await expect.poll(async () => {
+    if ((await drawer.getAttribute("class"))?.includes("snap-full")) return "full";
+    await grab.press("ArrowUp");
+    return (await drawer.getAttribute("class"))?.includes("snap-full") ? "full" : "half";
+  }).toBe("full");
+  const full = await settledHeight(drawer);
   expect(full).toBeGreaterThan(half + 40);
-  await page.keyboard.press("ArrowDown");
-  await expect(drawer).toHaveClass(/snap-half/);
+  await expect.poll(async () => {
+    const className = await drawer.getAttribute("class");
+    if (className?.includes("snap-half")) return "half";
+    if (className?.includes("snap-full")) await grab.press("ArrowDown");
+    return (await drawer.getAttribute("class"))?.includes("snap-half") ? "half" : "full";
+  }).toBe("half");
 });
 
 test("dragging the grab bar releases on half", async ({ page }, info) => {

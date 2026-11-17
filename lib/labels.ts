@@ -27,7 +27,8 @@ export const FUNNEL_NOTES: Record<string, string> = {
   checks: "The workbook's site checks.",
   close: "The workbook's offer and close work.",
   later: "The workbook's offer and close work.",
-  dropped: "The deal is no longer being pursued.",
+  dropped: "The workbook stage is Dropped, including a drop that is also Outside or Unknown.",
+  outside: "Active sites marked Outside or Unknown in the service-area column.",
 };
 
 const STORE_TYPE = new Set(["gas station", "convenience store", "fuel", "service station"]);

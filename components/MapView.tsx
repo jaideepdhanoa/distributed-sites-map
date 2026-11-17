@@ -1136,6 +1136,7 @@ export default function MapView(props: Props) {
       markCentered(map, id, pin[0], pin[1]);
       if (preserveView || !map.isStyleLoaded()) return;
       map.resize();
+      if (propsRef.current.spaceDrawing) return;
       const center = map.getCenter();
       const pad = pointPadding(map);
       const padded = Math.abs((map.getPadding().right ?? 0) - pad.right) < 1;
@@ -1369,9 +1370,10 @@ export default function MapView(props: Props) {
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
-      const phonePad = phone && !reviewing;
+      const drawing = Boolean(propsRef.current.spaceDrawing);
+      const phonePad = phone && !reviewing && !drawing;
       const padKey = phonePad ? "clear" : "flush";
-      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : { top: 0, bottom: 0, left: 0, right: 0 });
+      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
       if ((props.basemap || "satellite") === "satellite") {
         if (map.getLayer("areas-current")) map.setPaintProperty("areas-current", "fill-opacity", phone ? 0.1 : 0.18);
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);

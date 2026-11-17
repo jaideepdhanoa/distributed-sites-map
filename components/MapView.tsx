@@ -1384,6 +1384,10 @@ export default function MapView(props: Props) {
       const phonePad = phone && !reviewing && !drawing;
       const padKey = phonePad ? "clear" : "flush";
       map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
+      const drawFly = propsRef.current.spaceFly;
+      if (drawing && drawFly && map.getZoom() < 17) {
+        map.jumpTo({ center: [drawFly.lng, drawFly.lat], zoom: 18, padding: pointPadding(map) });
+      }
       if ((props.basemap || "satellite") === "satellite") {
         if (map.getLayer("areas-current")) map.setPaintProperty("areas-current", "fill-opacity", phone ? 0.1 : 0.18);
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);

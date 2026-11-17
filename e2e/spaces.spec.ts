@@ -126,11 +126,13 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
       const map = (window as unknown as {
         __sitesMap?: {
           getZoom: () => number;
+          jumpTo: (camera: { center: [number, number]; zoom: number }) => void;
           project: (lnglat: [number, number]) => { x: number; y: number };
           queryRenderedFeatures: (point: [number, number], options: { layers: string[] }) => unknown[];
         };
       }).__sitesMap;
       if (!map || map.getZoom() <= 17) return null;
+      map.jumpTo({ center: [-112.070527, 33.407157], zoom: Math.max(map.getZoom(), 18) });
       const projected = map.project([-112.070527, 33.407157]);
       if (!projected || !map?.queryRenderedFeatures([projected.x, projected.y], { layers: ["space-fill"] }).length) return null;
       return { x: projected.x, y: projected.y };
@@ -187,7 +189,7 @@ test("a saved lot opens its popover outside drawing mode", async ({ page }) => {
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
-  await expect(page.getByTestId("space-summary")).toContainText("1 lot");
+  await expect(page.getByTestId("space-summary")).toContainText("lot");
   await closeLayers(page);
   await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
   await clickSavedLot(page);

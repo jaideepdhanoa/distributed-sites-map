@@ -8,10 +8,12 @@ import {
   driveFileIdFromHref,
   fileNameOf,
   matchDriveFile,
+  NO_DRIVE_LINK,
   pageNumber,
   siteFolderId,
   sourceView,
 } from "../../lib/pnl/sourceLink.ts";
+import { headerFloor } from "../../lib/listLayout.ts";
 import { buildStatement, type CapturedLine } from "../../lib/pnl/statement.ts";
 
 const PARENT = "1_oIqMjBJqOj-WApM7xOUz1EWydW3Fydk";
@@ -290,6 +292,37 @@ test("lines keep a stored file id, and a filename link never uses the parent fol
   assert.equal(mail?.sourceDocument, "Email, Mar 1, 2026");
   assert.equal(mail?.gmailHref?.startsWith("https://mail.google.com/"), true);
   assert.equal(mail?.sourceHref, "");
+});
+
+test("a package zip links when that file has an id, otherwise the citation says there is no Drive link", () => {
+  const zip = "FixtureZipFileId00000000001";
+  const linked = sourceView({
+    document: "Sample-package.zip / Sample-member.pdf",
+    page: "1",
+    href: "",
+    capturedLabel: "",
+    fileId: zip,
+    mime: "application/zip",
+    linkPart: "zip",
+  });
+  assert.equal(linked.label, "Sample-package.zip");
+  assert.equal(linked.beside, "Sample-member.pdf");
+  assert.equal(linked.pageAside, "p. 1");
+  assert.equal(linked.href, `https://drive.google.com/file/d/${zip}/view`);
+  assert.equal(linked.href.includes("#page="), false);
+  assert.equal(linked.hint, "");
+  const missing = sourceView({
+    document: "Sample-package.zip / Sample-member.pdf",
+    page: "1",
+    href: "",
+    capturedLabel: "",
+  });
+  assert.equal(missing.href, "");
+  assert.equal(missing.hint, NO_DRIVE_LINK);
+  assert.equal(missing.label.includes("/"), true);
+  assert.equal(headerFloor("Score") > headerFloor("S"), true);
+  assert.equal(headerFloor("Score") >= 28 + 22 + 22 + 8 + 48, true);
+  assert.equal(headerFloor("Open land") > headerFloor("Score"), true);
 });
 
 test("the column grip keeps its own slot", () => {

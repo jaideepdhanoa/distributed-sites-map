@@ -71,6 +71,10 @@ test("desktop profit and loss is a full-width sheet", async ({ page }, info) => 
   await page.getByRole("button", { name: "Years" }).click();
   await expect(sheet.getByRole("columnheader", { name: "2024" })).toBeVisible();
   await expect(sheet.getByRole("columnheader", { name: "Jan" })).toHaveCount(0);
+  await sheet.getByRole("row", { name: /^Labor/ }).locator("td").first().click();
+  await expect(page.getByTestId("pnl-popover")).toBeVisible();
+  await overlay.getByRole("button", { name: "Close profit and loss" }).click();
+  await expect(overlay).toBeHidden();
 });
 
 test("a phone profit and loss stays a compact period list", async ({ page }, info) => {

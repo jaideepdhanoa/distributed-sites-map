@@ -1102,11 +1102,11 @@ select, .field input { border: 1px solid var(--line); background: white; border-
   padding: 0;
   color: var(--ink-3);
   background: transparent;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 0.45;
+  pointer-events: auto;
   z-index: auto;
 }
-.col-tools { position: absolute; right: 8px; top: 0; bottom: 0; display: inline-flex; align-items: center; background: #faf7f1; z-index: 1; opacity: 0; pointer-events: none; }
+.col-tools { position: static; display: inline-flex; align-items: center; flex: none; background: transparent; opacity: 0; pointer-events: none; }
 th:hover .col-grip, th:focus-within .col-grip,
 th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity: 1; pointer-events: auto; }
 @media (hover: none), (pointer: coarse) {
@@ -2469,6 +2469,7 @@ td.is-conflict { box-shadow: inset 3px 0 0 #8a3b2a; }
   padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 .pnl-pop p { margin: 4px 0; font-size: var(--type-body); }
+.pnl-pop .pnl-no-link { margin: 2px 0 0; color: var(--ink-3); font-size: var(--type-cap); }
 .pnl-year-pick { display: flex; align-items: center; gap: 8px; margin: 0 12px; }
 .pnl-phone-body { display: none; }
 .pnl-expand { margin: 0 12px 8px; color: var(--ink-2); font-size: var(--type-body); }

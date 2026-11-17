@@ -14,6 +14,8 @@ const EMAIL_LABEL = /^(?:e-?mail|gmail)\b/i;
 
 export type DriveFile = { id: string; name: string; mime: string };
 
+export type SourceLinkPart = "" | "zip" | "member";
+
 export type SourceView = {
   kind: "file" | "email" | "text";
   label: string;
@@ -23,9 +25,41 @@ export type SourceView = {
   pageAside: string;
   /** A non-numeric page note, such as a month name. */
   pageNote: string;
+  /** Member file shown beside a linked package zip. */
+  beside: string;
+  /** Set when the citation names a file and neither the package nor the member has a Drive id. */
+  hint: string;
+  linkPart: SourceLinkPart;
   /** Open in Gmail, only when the caller already decided the viewer may see it. */
   gmailHref: string;
 };
+
+export const NO_DRIVE_LINK = "No Drive link on file";
+
+export type PackageParts = { zip: string; member: string };
+
+/** `package.zip / member.pdf`. A slash anywhere else is not this shape. */
+export function packageParts(document: string): PackageParts | null {
+  const text = document.trim();
+  const match = /^(.+?\.zip)\s*\/\s*(\S.*)$/i.exec(text);
+  if (!match) return null;
+  const zip = match[1].trim();
+  const member = match[2].trim();
+  if (!zip || !member || member.includes("/") || member.includes("\\")) return null;
+  if (HEX_ID.test(text) || GMAIL_URL.test(text)) return null;
+  return { zip, member };
+}
+
+export function lookupNames(document: string): string[] {
+  const parts = packageParts(document);
+  if (parts) {
+    const names = [parts.zip];
+    if (fileNameOf(parts.member)) names.push(parts.member);
+    return names;
+  }
+  const single = fileNameOf(document);
+  return single ? [single] : [];
+}
 
 export function isSafeFileId(id: string): boolean {
   return FILE_ID.test(id) && !BLOCKED_IDS.has(id);
@@ -156,6 +190,7 @@ export function sourceView(input: {
   fileId?: string;
   mime?: string;
   gmailHref?: string;
+  linkPart?: SourceLinkPart;
 }): SourceView {
   const document = input.document || "";
   const page = input.page || "";
@@ -167,15 +202,34 @@ export function sourceView(input: {
   const numeric = pageNumber(page);
   const pageAside = numeric ? `p. ${numeric}` : "";
   const pageNote = numeric ? "" : safePageNote(page);
+  const parts = packageParts(document);
+  const blank = { beside: "", hint: "", linkPart: "" as SourceLinkPart, gmailHref: "" };
   if (!id && isEmailCitation(document, href, page)) {
     const gmail = input.gmailHref && input.gmailHref.startsWith("https://mail.google.com/") && !input.gmailHref.includes("@") && !/authuser=/i.test(input.gmailHref)
       ? input.gmailHref
       : "";
-    return { kind: "email", label: emailLabel(document, input.capturedLabel), href: "", pageAside: "", pageNote: "", gmailHref: gmail };
+    return { kind: "email", label: emailLabel(document, input.capturedLabel), href: "", pageAside: "", pageNote: "", ...blank, gmailHref: gmail };
   }
   if (!id) {
     const label = withoutGmail(document) || document.trim();
-    return { kind: "text", label, href: "", pageAside, pageNote, gmailHref: "" };
+    const hint = parts || fileNameOf(document) ? NO_DRIVE_LINK : "";
+    return { kind: "text", label, href: "", pageAside, pageNote, ...blank, hint };
+  }
+  if (parts) {
+    const linkPart: SourceLinkPart = input.linkPart === "member" ? "member" : "zip";
+    const label = linkPart === "member" ? parts.member : parts.zip;
+    const pdf = linkPart === "member" && isPdf(parts.member, input.mime || "", href);
+    return {
+      kind: "file",
+      label,
+      href: driveFileHref(id, { pdf, page: pdf ? numeric : null, original: href }),
+      pageAside,
+      pageNote,
+      beside: linkPart === "zip" ? parts.member : "",
+      hint: "",
+      linkPart,
+      gmailHref: "",
+    };
   }
   let label = document.trim();
   if (!label || label === id || bareFileId(label) === id) label = "Source file";
@@ -187,6 +241,6 @@ export function sourceView(input: {
     href: driveFileHref(id, { pdf, page: pdf ? numeric : null, original: href }),
     pageAside,
     pageNote,
-    gmailHref: "",
+    ...blank,
   };
 }

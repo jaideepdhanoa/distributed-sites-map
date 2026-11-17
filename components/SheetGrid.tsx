@@ -7,6 +7,7 @@ import { GripVertical, ListFilter, Pin } from "lucide-react";
 import {
   clampWidth,
   columnWidth,
+  headerFloor,
   cycleSort,
   fitColumnWidths,
   moveColumn,
@@ -246,7 +247,9 @@ export default function SheetGrid<Row>({
   }
 
   function widthOf(id: string) {
-    return widthById.get(id) || layout.widths[id] || columnWidth(id);
+    const column = columns.find((item) => item.id === id);
+    const base = widthById.get(id) || layout.widths[id] || columnWidth(id);
+    return Math.max(base, column ? headerFloor(column.label) : 0);
   }
 
   let pinnedLeft = 0;
@@ -258,7 +261,7 @@ export default function SheetGrid<Row>({
   }
 
   const span = colCount || 1;
-  const tableWidth = fitted.reduce((sum, width) => sum + width, 0) + trailingWidth;
+  const tableWidth = columns.reduce((sum, column) => sum + widthOf(column.id), 0) + trailingWidth;
 
   return (
     <div className="list-scroll" ref={scrollRef} data-testid="sheet-grid" data-pane-width={paneWidth} onKeyDown={onGridKey}>

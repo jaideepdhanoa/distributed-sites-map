@@ -5,8 +5,11 @@ import {
   driveFileIdFromHref,
   fileNameOf,
   gmailLinkFor,
+  lookupNames,
   normalizeFileName,
+  packageParts,
   sourceView,
+  type SourceLinkPart,
 } from "@/lib/pnl/sourceLink";
 import type { MissingDetail, PnlLineView, PnlPeriodView, PnlStatement, PnlYearView } from "@/lib/pnl/statement";
 
@@ -16,48 +19,70 @@ export type SourceLinkOptions = {
   lister: DriveLister | null;
 };
 
-function needsLookup(line: { sourceDocument: string; sourceHref?: string }): string {
-  if (driveFileIdFromHref(line.sourceHref || "") || bareFileId(line.sourceDocument)) return "";
-  return fileNameOf(line.sourceDocument);
+function hit(found: Map<string, { id: string; mime: string } | null>, name: string): { id: string; mime: string } | null {
+  return name ? found.get(normalizeFileName(name)) || null : null;
+}
+
+function chosenFile(
+  document: string,
+  href: string,
+  found: Map<string, { id: string; mime: string } | null>,
+): { fileId: string; mime: string; linkPart: SourceLinkPart } {
+  const stored = driveFileIdFromHref(href) || bareFileId(document);
+  const parts = packageParts(document);
+  if (stored) return { fileId: stored, mime: "", linkPart: parts ? "zip" : "" };
+  if (parts) {
+    const zip = hit(found, parts.zip);
+    if (zip?.id) return { fileId: zip.id, mime: zip.mime, linkPart: "zip" };
+    const memberName = fileNameOf(parts.member);
+    const member = hit(found, memberName);
+    if (member?.id) return { fileId: member.id, mime: member.mime, linkPart: "member" };
+    return { fileId: "", mime: "", linkPart: "" };
+  }
+  const single = hit(found, fileNameOf(document));
+  if (single?.id) return { fileId: single.id, mime: single.mime, linkPart: "" };
+  return { fileId: "", mime: "", linkPart: "" };
 }
 
 function presentLine(line: PnlLineView, found: Map<string, { id: string; mime: string } | null>, gmailAllowed: boolean): PnlLineView {
-  const filename = needsLookup(line);
-  const resolved = filename ? found.get(normalizeFileName(filename)) : null;
+  const chosen = chosenFile(line.sourceDocument, line.sourceHref, found);
   const view = sourceView({
     document: line.sourceDocument,
     page: line.sourcePage,
     href: line.sourceHref,
     capturedLabel: formatCapturedDate(line.capturedAt),
-    fileId: resolved?.id || "",
-    mime: resolved?.mime || "",
-    gmailHref: gmailLinkFor(line.sourceDocument, line.sourceHref, line.sourcePage, gmailAllowed && !resolved?.id && !driveFileIdFromHref(line.sourceHref)),
+    fileId: chosen.fileId,
+    mime: chosen.mime,
+    linkPart: chosen.linkPart,
+    gmailHref: gmailLinkFor(line.sourceDocument, line.sourceHref, line.sourcePage, gmailAllowed && !chosen.fileId),
   });
   return {
     ...line,
-    sourceDocument: view.label,
+    sourceDocument: packageParts(line.sourceDocument) ? line.sourceDocument : view.label,
     sourceHref: view.href,
     gmailHref: view.gmailHref,
+    sourceLinkPart: view.linkPart,
   };
 }
 
 function presentMissing(detail: MissingDetail, found: Map<string, { id: string; mime: string } | null>, gmailAllowed: boolean): MissingDetail {
-  const filename = needsLookup(detail);
-  const resolved = filename ? found.get(normalizeFileName(filename)) : null;
+  const chosen = chosenFile(detail.sourceDocument, detail.sourceHref || "", found);
   const view = sourceView({
     document: detail.sourceDocument,
     page: detail.sourcePage,
     href: detail.sourceHref || "",
     capturedLabel: formatCapturedDate(detail.capturedAt),
-    fileId: resolved?.id || "",
-    mime: resolved?.mime || "",
-    gmailHref: gmailLinkFor(detail.sourceDocument, detail.sourceHref || "", detail.sourcePage, gmailAllowed && !resolved?.id && !driveFileIdFromHref(detail.sourceHref || "")),
+    fileId: chosen.fileId,
+    mime: chosen.mime,
+    linkPart: chosen.linkPart,
+    gmailHref: gmailLinkFor(detail.sourceDocument, detail.sourceHref || "", detail.sourcePage, gmailAllowed && !chosen.fileId),
   });
   return {
     ...detail,
-    sourceDocument: view.label,
+    sourceDocument: packageParts(detail.sourceDocument) ? detail.sourceDocument : view.label,
     sourceHref: view.href,
     gmailHref: view.gmailHref,
+    sourceLinkPart: view.linkPart,
   };
 }
 
@@ -85,21 +110,19 @@ function mapYear(year: PnlYearView, found: Map<string, { id: string; mime: strin
 
 function collect(statement: PnlStatement): string[] {
   const names: string[] = [];
-  const takeLine = (line: PnlLineView) => {
-    const name = needsLookup(line);
-    if (name) names.push(name);
+  const take = (document: string, href: string) => {
+    if (driveFileIdFromHref(href) || bareFileId(document)) return;
+    names.push(...lookupNames(document));
   };
   const takePeriod = (period: PnlPeriodView | null) => {
     if (!period) return;
-    for (const line of [...period.revenue, ...period.costs, ...period.results, ...period.addbacks]) takeLine(line);
+    for (const line of [...period.revenue, ...period.costs, ...period.results, ...period.addbacks]) take(line.sourceDocument, line.sourceHref);
   };
   for (const year of [...statement.years, ...statement.normalizedYears]) {
     takePeriod(year.annual);
     for (const period of year.ranges) takePeriod(period);
     for (const period of year.months) takePeriod(period);
-    for (const detail of year.missingDetails) {
-      if (needsLookup(detail)) names.push(needsLookup(detail));
-    }
+    for (const detail of year.missingDetails) take(detail.sourceDocument, detail.sourceHref || "");
   }
   return names;
 }

@@ -13,6 +13,7 @@ function SourceLine({ cell }: { cell: Extract<GridCell, { kind: "value" | "missi
     href: cell.sourceHref || "",
     capturedLabel: cell.capturedLabel,
     gmailHref: cell.gmailHref || "",
+    linkPart: cell.sourceLinkPart,
   });
   const page = view.pageAside || (view.pageNote ? `· ${view.pageNote}` : "");
   return (
@@ -21,8 +22,10 @@ function SourceLine({ cell }: { cell: Extract<GridCell, { kind: "value" | "missi
         {view.href ? (
           <a className="text-link" href={view.href} target="_blank" rel="noopener noreferrer">{view.label} ↗</a>
         ) : view.label}
+        {view.beside ? <span className="pnl-page">{view.beside}</span> : null}
         {page ? <span className="pnl-page">{page}</span> : null}
       </p>
+      {view.hint ? <p className="pnl-no-link">{view.hint}</p> : null}
       {view.gmailHref ? (
         <p><a className="text-link" href={view.gmailHref} target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a></p>
       ) : null}
@@ -68,6 +71,7 @@ export default function PnlLinePopover({
       if (!(target instanceof Node)) return;
       if (ref.current?.contains(target)) return;
       if (target instanceof Element && target.closest("[data-pnl-anchor='open']")) return;
+      if (target instanceof Element && target.closest("[data-overlay-dismiss]")) return;
       closeRef.current();
     }
     window.addEventListener("keydown", onKey, true);

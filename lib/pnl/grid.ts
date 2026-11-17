@@ -22,6 +22,7 @@ export type ValueCell = {
   sourceHref: string;
   capturedLabel: string;
   gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   flag: string | null;
 };
 
@@ -38,6 +39,7 @@ export type MissingCell = {
   sourceHref?: string;
   capturedLabel: string;
   gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   markerSource: string;
 };
 
@@ -96,6 +98,7 @@ function fromLine(line: PnlLineView, cents: bigint, share: string | null, summed
     sourceHref: summed ? "" : line.sourceHref,
     capturedLabel: summed ? "" : formatCapturedDate(line.capturedAt),
     gmailHref: summed ? "" : line.gmailHref || "",
+    sourceLinkPart: summed ? "" : line.sourceLinkPart || "",
     flag: summed ? null : line.flag?.reason ?? null,
   };
 }
@@ -211,6 +214,7 @@ function missingBucket(year: PnlYearView | undefined, month: number): Bucket {
       sourceHref: detail?.sourceHref || "",
       capturedLabel: detail?.capturedAt ? formatCapturedDate(detail.capturedAt) : "",
       gmailHref: detail?.gmailHref || "",
+      sourceLinkPart: detail?.sourceLinkPart || "",
       markerSource: detail?.markerSource || "",
     },
   };

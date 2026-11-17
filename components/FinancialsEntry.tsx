@@ -101,6 +101,7 @@ export default function FinancialsEntry({
         <div className="fin-tile">
           <span>Financials</span>
           <PendingFigure lines={3} />
+          <span className="fin-open is-hold" aria-hidden="true">Open P&L <span aria-hidden="true">→</span></span>
         </div>
       </article>
     );

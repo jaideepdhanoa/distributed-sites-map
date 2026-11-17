@@ -2359,6 +2359,7 @@ tr { cursor: pointer; }
   text-underline-offset: 3px;
 }
 .fin-entry .fin-tile:hover .fin-open { text-decoration-color: #1e4636; }
+.fin-entry .fin-open.is-hold { visibility: hidden; }
 .fin-entry .fin-open span { display: inline; color: inherit; font-size: inherit; letter-spacing: 0; text-transform: none; }
 @media (max-width: 767px) {
   .fin-entry .fin-tile { min-height: 44px; width: 100%; }

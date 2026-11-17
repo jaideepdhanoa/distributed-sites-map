@@ -47,6 +47,14 @@ export function applyStageRows<T extends DealFile>(file: T, rows: StageRecord[])
 
 type SiteRead = Record<SiteField, string> & { site_id: string; sheet?: string; facts?: Record<string, string>; coord_status?: string };
 
+function copiedPoint(key: string, stored: string | undefined, snapshot: unknown): Record<string, number | null> {
+  const fromDb = stored ? numberOrNull(stored) : null;
+  if (stored && fromDb != null) return { [key]: fromDb };
+  if (snapshot == null || snapshot === "") return {};
+  const fromSnapshot = typeof snapshot === "number" ? snapshot : numberOrNull(String(snapshot));
+  return fromSnapshot == null ? {} : { [key]: fromSnapshot };
+}
+
 function numberOrNull(value: string): number | null {
   return parseMeasure(value);
 }
@@ -109,10 +117,10 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
       service_area_polygon: row.service_area_polygon || props.service_area_polygon,
       score: row.score ? numberOrNull(row.score) : props.score,
       location_points: row.location_points ? numberOrNull(row.location_points) : props.location_points,
-      economics_points: row.economics_points ? numberOrNull(row.economics_points) : props.economics_points,
-      land_points: row.land_points ? numberOrNull(row.land_points) : props.land_points,
-      power_points: row.power_points ? numberOrNull(row.power_points) : props.power_points,
-      deal_points: row.deal_points ? numberOrNull(row.deal_points) : props.deal_points,
+      ...copiedPoint("economics_points", row.economics_points, props.economics_points),
+      ...copiedPoint("land_points", row.land_points, props.land_points),
+      ...copiedPoint("power_points", row.power_points, props.power_points),
+      ...copiedPoint("deal_points", row.deal_points, props.deal_points),
       photos: photos.map((photo) => {
         const item: Record<string, string> = {};
         for (const [key, value] of Object.entries(photo)) if (value) item[key] = value;

@@ -13,7 +13,7 @@
  * the Outside service area group. The quarantined site is in neither group.
  */
 
-import { isProtectedId } from "./protectedSite.ts";
+import { isExcludedSite } from "./alerts/excluded.ts";
 
 export type Reach = "inside" | "within5" | "within10";
 
@@ -89,7 +89,7 @@ export function inReach(record: AreaInput | null | undefined, reach: Reach = REA
  * working step. A blank class uses its stage.
  */
 export function dealOnPipeStep(record: AreaInput | null | undefined, step: string, reach: Reach = REACH_DEFAULT): boolean {
-  if (!record || isProtectedId(record.deal_id)) return false;
+  if (!record || isExcludedSite(record.deal_id)) return false;
   if (step === "dropped") return record.stage_group === "dropped";
   if (record.stage_group !== step) return false;
   return inReach(record, reach);
@@ -97,7 +97,7 @@ export function dealOnPipeStep(record: AreaInput | null | undefined, step: strin
 
 /** Active Outside or explicit Unknown. Stage Dropped stays on the Dropped step. */
 export function outsideServiceArea(record: AreaInput | null | undefined): boolean {
-  if (!record || isProtectedId(record.deal_id)) return false;
+  if (!record || isExcludedSite(record.deal_id)) return false;
   return workingSetKnockout(record) && record.stage_group !== "dropped";
 }
 

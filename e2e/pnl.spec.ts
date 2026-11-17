@@ -176,7 +176,11 @@ test("a P&L comment is a cell pin, not a row link", async ({ page }, info) => {
   await sheet.getByRole("button", { name: "Comment", exact: true }).click();
   await sheet.getByRole("button", { name: "Close comment thread" }).click();
   await expect(sheet).toBeHidden();
-  const pin = overlay.getByTestId("pnl-cell-pin").first();
+  if (mobile && await popover.isVisible()) {
+    await popover.getByRole("button", { name: "Close line source" }).click();
+  }
+  const surface = mobile ? page.getByTestId("pnl-phone") : overlay.locator(".pnl-desktop");
+  const pin = surface.getByTestId("pnl-cell-pin").first();
   await expect(pin).toBeVisible();
   await pin.click();
   await expect(page.getByTestId("comment-sheet")).toBeVisible();

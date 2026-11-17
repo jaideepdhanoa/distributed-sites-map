@@ -1,5 +1,6 @@
 import { dealInCategories, defaultCategories, landLinks, siteInCategories, type Categories } from "../lib/categories";
 import { inReach } from "../lib/reach";
+import { stageKey } from "../lib/stageOverlay";
 
 export const CITIES = ["PHX", "LAS", "MIA"] as const;
 export const STEPS = ["universe", "in_area", "land", "county", "cleared"] as const;
@@ -74,16 +75,7 @@ export type Catalog = {
 };
 
 export function stageGroupFromText(stage: string | undefined): string {
-  const text = String(stage || "").trim().toLowerCase();
-  if (text.startsWith("dropped")) return "dropped";
-  const match = /^\s*(\d+)\b/.exec(String(stage || ""));
-  if (!match) return "sourced";
-  const number = Number(match[1]);
-  if (number <= 0) return "sourced";
-  if (number === 1) return "desk";
-  if (number === 2) return "financial";
-  if (number === 3) return "checks";
-  return "close";
+  return stageKey(stage) || "sourced";
 }
 
 function present(site: Site): Site {

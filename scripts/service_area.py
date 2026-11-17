@@ -5,7 +5,7 @@ Near 5-10 pass the location gate. Outside means more than 10.0 miles from
 the operative polygon and is a location knock-out.
 
 Legacy workbook values keep working. In and Yes are Inside. No and Out are
-Outside. Unknown stays out.
+Outside. The word Unknown is the unknown class. A blank cell is not a class.
 
 Edge is not folded into Inside or a Near band. Those rows were not measured
 again under R-099, so the class stays edge_legacy, "edge (not re-measured)",
@@ -83,8 +83,9 @@ SERVICE_AREA_NOTE = (
     "Service area comes from the Universe tab. Inside, Near 0-5, and Near 5-10 pass. "
     "Outside, more than 10.0 miles from the polygon, is a knock-out. "
     "Legacy In and Yes count as Inside. Legacy No and Out count as Outside. "
-    f"Legacy Edge stays its own class, {EDGE_LABEL}, and passes, because those rows were not measured again under the four-class rule. "
-    "Unknown stays out. The step is split by class so Near is not counted as Inside. "
+    f    "Legacy Edge stays its own class, {EDGE_LABEL}, and passes, because those rows were not measured again under the four-class rule. "
+    "A blank cell is not a class. The word Unknown stays out of the working set. "
+    "The step is split by class so Near is not counted as Inside. "
     "Las Vegas rings 200 and 300 stay on the expansion horizon when they do not pass."
 )
 
@@ -104,24 +105,24 @@ def _polygon_key(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
 
 
-def classify_service_area(value) -> tuple[str, bool]:
+def classify_service_area(value) -> tuple[str | None, bool]:
     """Return the enum and whether the cell was a known class.
 
-    A blank cell and a sheet error such as #N/A are missing. They become
-    unknown and are not flagged. Any other unrecognized text becomes unknown
-    and is flagged by the caller.
+    A blank cell and a sheet error such as #N/A are missing. They stay unset
+    and are not flagged. Only the word Unknown becomes the unknown class.
+    Any other unrecognized text stays unset and is flagged by the caller.
     """
     if isinstance(value, bool):
         return ("inside" if value else "outside"), True
     if value is None:
-        return "unknown", True
+        return None, True
     text = str(value).strip()
     if not text or _SHEET_ERROR.search(text):
-        return "unknown", True
+        return None, True
     found = _ALIASES.get(_normalize(text))
     if found:
         return found, True
-    return "unknown", False
+    return None, False
 
 
 def _cell(row: dict, header: str):
@@ -200,15 +201,23 @@ def service_area_fields(row: dict, *, where: str = "") -> tuple[dict, str | None
 
     Distance and polygon columns win when the header is present and the cell
     parses. A missing header, a blank cell, or #N/A falls back to the row
-    notes. A value that cannot be parsed stays blank. An unrecognized class
-    becomes unknown, does not pass, and returns a warning instead of raising.
+    notes. A value that cannot be parsed stays blank. A blank class stays
+    unset, with service_area_source "blank", and does not set the gate.
+    The word Unknown is service_area_source "label". Any other unrecognized
+    text stays unset, is source "unrecognized", and returns a warning instead
+    of raising.
     """
     raw = _class_cell(row)
     class_id, recognized = classify_service_area(raw)
     warning = None
     if not recognized:
+        source = "unrecognized"
         place = f"{where} " if where else ""
         warning = f"{place}service area {str(raw).strip()!r} is not a known class"
+    elif class_id is None:
+        source = "blank"
+    else:
+        source = "label"
 
     distance_cell, has_distance = _cell(row, DISTANCE_HEADER)
     polygon_cell, has_polygon = _cell(row, POLYGON_HEADER)
@@ -222,9 +231,10 @@ def service_area_fields(row: dict, *, where: str = "") -> tuple[dict, str | None
             polygon = noted_polygon
     return {
         "service_area_class": class_id,
+        "service_area_source": source,
         "service_area_distance_mi": distance,
         "service_area_polygon": polygon,
-        "in_area": passes_service_area(class_id),
+        "in_area": None if class_id is None else passes_service_area(class_id),
     }, warning
 
 
@@ -334,12 +344,20 @@ def service_area_breakdown(sites: list[dict]) -> dict:
 
 
 def service_area_record_problems(label: str, props: dict) -> list[str]:
-    """Stored classes have to be the enum. A missing field is an older build."""
+    """Stored classes have to be the enum. A missing field is an older build.
+
+    A null class is a blank cell. It is not the unknown class.
+    """
     if "service_area_class" not in props:
         return []
     class_id = props.get("service_area_class")
+    if class_id in (None, ""):
+        return []
     if class_id not in SERVICE_AREA_CLASSES:
         return [f"{label} service area class {class_id!r} is not a known class"]
     if bool(props.get("in_area")) != passes_service_area(str(class_id)):
         return [f"{label} in_area does not match service area class {class_id}"]
+    source = props.get("service_area_source")
+    if source not in (None, "", "blank", "label", "unrecognized"):
+        return [f"{label} service area source {source!r} is not a known source"]
     return []

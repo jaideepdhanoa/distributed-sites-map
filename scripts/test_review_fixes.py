@@ -31,6 +31,14 @@ class StageBuckets(unittest.TestCase):
         self.assertEqual(stage_group("3 Site checks"), "checks")
         self.assertEqual(stage_group("4 Offer and close"), "close")
         self.assertEqual(stage_group("Dropped"), "dropped")
+        self.assertEqual(stage_group("Financial screen"), "financial")
+        self.assertEqual(stage_group("Desk screen"), "desk")
+        self.assertEqual(stage_group("Site checks"), "checks")
+        self.assertEqual(stage_group("Offer and close"), "close")
+        self.assertEqual(stage_group("later"), "close")
+        self.assertEqual(stage_group("Sourced"), "sourced")
+        self.assertEqual(stage_group(""), "sourced")
+        self.assertEqual(stage_group("Off market (no lead)"), "sourced")
         self.assertNotEqual(stage_group("2 Financial screen"), "contacted")
 
     def test_knockout_stays_a_suggestion(self):

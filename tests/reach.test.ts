@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { attachPackageHrefs } from "../lib/financials.ts";
 import { buildQueue } from "../lib/queue/order.ts";
-import { areaCounts, inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "../lib/reach.ts";
+import { areaCounts, dealOnPipeStep, inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "../lib/reach.ts";
 
 const rows = [
   { id: "in", service_area_class: "inside", in_area: true },
@@ -24,8 +24,25 @@ test("each reach keeps the matching classes and leaves outside out", () => {
   assert.deepEqual(ids("inside"), ["in", "edge", "legacy", "open"]);
   assert.deepEqual(ids("within5"), ["in", "near5", "edge", "legacy", "open"]);
   assert.deepEqual(ids("within10"), ["in", "near5", "near10", "edge", "legacy", "open"]);
-  assert.equal(inReach({ service_area_class: "unknown" }, "within10"), false);
+  assert.equal(inReach({ service_area_class: "unknown" }, "within10"), true);
+  assert.equal(inReach({ service_area_class: "unknown", service_area_source: "blank" }, "within10"), true);
+  assert.equal(inReach({ service_area_class: null }, "within10"), true);
+  assert.equal(inReach({ service_area_class: "unknown", service_area_source: "label" }, "within10"), false);
+  assert.equal(inReach({ service_area_class: "outside", service_area_source: "label" }, "within10"), false);
   assert.equal(inReach({ in_area: false }, "within10"), false);
+});
+
+test("explicit unknown and outside stay on the Dropped step", () => {
+  const outside = { service_area_class: "outside", service_area_source: "label", stage_group: "desk" };
+  const named = { service_area_class: "unknown", service_area_source: "label", stage_group: "financial" };
+  const blank = { service_area_class: "unknown", stage_group: "desk" };
+  assert.equal(dealOnPipeStep(outside, "desk"), false);
+  assert.equal(dealOnPipeStep(outside, "dropped"), true);
+  assert.equal(dealOnPipeStep(named, "financial"), false);
+  assert.equal(dealOnPipeStep(named, "dropped"), true);
+  assert.equal(dealOnPipeStep(blank, "desk"), true);
+  assert.equal(dealOnPipeStep(blank, "dropped"), false);
+  assert.equal(dealOnPipeStep({ stage_group: "dropped", service_area_class: "inside" }, "dropped"), true);
 });
 
 test("service-area counts follow the reach and split by class", () => {

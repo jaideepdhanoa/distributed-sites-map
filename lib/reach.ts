@@ -1,9 +1,15 @@
 /**
  * R-099 reach is a view. It does not drop or hide a site in the workbook.
- * Outside (more than 10 miles) is a knock-out and stays out of every option.
- * Legacy edge still passes the location gate, so it stays in every option.
- * A row with no class yet stays in view, except a universe row whose stored
- * gate is already false. Those were outside before the four classes existed.
+ * A blank class stays in every view. Legacy edge still passes the location gate.
+ * A universe row with no class and a stored false gate stays out. Those were
+ * outside before the four classes existed.
+ *
+ * The snapshot published before this change stamped a blank cell as "unknown"
+ * and did not record where that class came from. A class of "unknown" with no
+ * source, or with source "blank", stays in view. Source "label" is the word
+ * Unknown. Outside, and that explicit Unknown, stay out of the working set.
+ * The Dropped step still lists them. Unrecognized text is left unset, so it
+ * stays in view and the build warning names it.
  */
 
 export type Reach = "inside" | "within5" | "within10";
@@ -16,7 +22,10 @@ const CLASSES = new Set<ServiceClass>(["inside", "near_0_5", "near_5_10", "outsi
 
 export type AreaInput = {
   service_area_class?: string | null;
+  /** blank, label, or unrecognized. Absent on a snapshot that stamped blanks as unknown. */
+  service_area_source?: string | null;
   in_area?: boolean | null;
+  stage_group?: string | null;
 };
 
 export function parseReach(value: string | null | undefined): Reach {
@@ -50,14 +59,36 @@ export function shownClass(record: AreaInput | null | undefined): ServiceClass |
   return "unclassified";
 }
 
+/** Explicit Outside, or Unknown that a build marked as a real label or unrecognized text. */
+export function workingSetKnockout(record: AreaInput | null | undefined): boolean {
+  const kind = explicitClass(record);
+  if (kind === "outside") return true;
+  if (kind !== "unknown") return false;
+  const source = record?.service_area_source;
+  return source === "label" || source === "unrecognized";
+}
+
 export function inReach(record: AreaInput | null | undefined, reach: Reach = REACH_DEFAULT): boolean {
   const kind = explicitClass(record);
   if (kind === "inside" || kind === "edge_legacy") return true;
   if (kind === "near_0_5") return reach === "within5" || reach === "within10";
   if (kind === "near_5_10") return reach === "within10";
-  if (kind === "outside" || kind === "unknown") return false;
+  if (workingSetKnockout(record)) return false;
+  if (kind === "unknown") return true;
   if (record?.in_area === false) return false;
   return true;
+}
+
+/**
+ * One pipeline step. Explicit Unknown and Outside are hidden on the working
+ * steps and listed on Dropped, including when their stage is not Dropped.
+ * A blank class uses its stage.
+ */
+export function dealOnPipeStep(record: AreaInput | null | undefined, step: string, reach: Reach = REACH_DEFAULT): boolean {
+  if (!record) return false;
+  if (step === "dropped" && workingSetKnockout(record)) return true;
+  if (record.stage_group !== step) return false;
+  return inReach(record, reach);
 }
 
 export type AreaCounts = {

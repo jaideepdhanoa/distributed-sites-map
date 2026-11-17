@@ -28,6 +28,7 @@ export function pipelineStageFilter(param: string | null | undefined): string | 
 /**
  * Dropped deals stay out of the all-stages home view.
  * They show for an explicit Dropped step, the dropped layer, or a search/broker widen.
+ * Explicit Unknown and Outside follow that Dropped step as well. See dealOnPipeStep.
  */
 export function droppedDealsShown(view: { all: boolean; stage: PipeId; droppedLayer: boolean; searchWide: boolean }): boolean {
   if (view.droppedLayer || view.searchWide) return true;

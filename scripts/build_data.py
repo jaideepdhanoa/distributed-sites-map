@@ -896,6 +896,8 @@ def apply_live_universe(
     GEOCODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
     GEOCODE_CACHE.write_text(json.dumps(geocode_cache))
     counted = [site for site in sites if site["site_id"] in yes_ids]
+    missing_point = drop_sites_without_pins(sites)
+    counted = [site for site in counted if site.get("counts_as_site")]
     county = Counter(site.get("verdict") or "" for site in counted)
     return {
         "counted": len(counted),
@@ -907,7 +909,7 @@ def apply_live_universe(
             city: sum(1 for site in counted if site["city"] == city and site["in_area"]) for city in ("LAS", "PHX", "MIA")
         },
         "county_verdicts": {key: county.get(key, 0) for key in ("PASS", "MAYBE", "FAIL", "NOT_A_WASH", "UNRESOLVED")},
-        "missing_point": [site["site_id"] for site in counted if site.get("lat") is None or site.get("lon") is None],
+        "missing_point": missing_point,
         "service_area_unrecognized": unrecognized,
         "service_area_distance": distance_flags,
     }
@@ -1782,6 +1784,7 @@ DEAL_FIELDS = (
     "miles_to_depot",
     "in_area",
     "service_area_class",
+    "service_area_source",
     "service_area_distance_mi",
     "service_area_polygon",
     "listed",
@@ -1834,10 +1837,27 @@ def deal_street_signature(value: str) -> str:
 
 
 def stage_group(stage) -> str:
-    """Workbook stages. There is no Contacted stage."""
+    """Workbook stages. Same names as lib/stageOverlay.ts stageKey.
+
+    There is no Contacted stage. A named screen such as "Financial screen"
+    uses that name. Text with no number and no known name stays sourced,
+    which is the stored group for an empty stage key.
+    """
     text = str(stage or "").strip().lower()
+    if not text:
+        return "sourced"
     if text.startswith("dropped"):
         return "dropped"
+    if text in {"desk", "desk screen"}:
+        return "desk"
+    if text in {"financial", "financial screen"}:
+        return "financial"
+    if text in {"checks", "site checks"}:
+        return "checks"
+    if text in {"close", "offer and close", "later"}:
+        return "close"
+    if text == "sourced":
+        return "sourced"
     number = stage_number(stage)
     if number is None or number <= 0:
         return "sourced"
@@ -2007,6 +2027,41 @@ def enforce_universe_gap(features: list[dict] | None = None) -> None:
     problems = universe_gap_problems(features)
     if problems:
         raise SystemExit("Universe gap check failed.\n" + "\n".join(problems))
+
+
+def drop_sites_without_pins(sites: list[dict]) -> list[str]:
+    """Leave a counted universe row with no coordinate out of both totals.
+
+    Geocoding has already run when the row had an address. This does not
+    invent a coordinate. The unique-site total and the pin check then see
+    the same rows.
+    """
+    missing = []
+    for site in sites:
+        if site.get("origin") != "universe" or not site.get("counts_as_site"):
+            continue
+        if site.get("lat") is not None and site.get("lon") is not None:
+            continue
+        site["counts_as_site"] = False
+        site["in_area"] = False
+        missing.append(site["site_id"])
+    return missing
+
+
+def match_deal_universe(row: dict, sites: list[dict], by_apn: dict, by_street: dict) -> str | None:
+    """A counted WB- id on the deal row wins. Parcel and street are the fallback.
+
+    The id has to be on a counted universe row. A blank id, an id that is not
+    in the universe, or a row that does not count falls through to the parcel
+    and street matcher. The gate stays on either way.
+    """
+    given = sheet_universe_id(row)
+    if given:
+        site = next((item for item in sites if item.get("site_id") == given), None)
+        if site and site.get("origin") == "universe" and site.get("counts_as_site"):
+            return given
+    city = str(row.get("Market") or "").strip()
+    return match_workbook_site(city, row.get("APN or folio") or row.get("APN"), deal_place_label(row), by_apn, by_street)
 
 
 def match_workbook_site(city: str, apn_value, address_text: str, by_apn: dict, by_street: dict) -> str | None:
@@ -2763,8 +2818,7 @@ def build_deal_layer(
     photo_index = index_photos(photo_rows)
 
     def match_row(row: dict) -> str | None:
-        city = str(row.get("Market") or "").strip()
-        return match_workbook_site(city, row.get("APN or folio"), deal_place_label(row), by_apn, by_street)
+        return match_deal_universe(row, sites, by_apn, by_street)
 
     features = []
     failed = []
@@ -5111,7 +5165,10 @@ def build(write: bool, refresh_parcels: bool, muse_file: str | None = None) -> d
     if len(cleared) != 10:
         warnings.append(f"Cleared on the map is {len(cleared)} ({[site['site_id'] for site in cleared]}). The two holds should leave 10.")
     if live_universe.get("missing_point"):
-        warnings.append("Counted sites with no pin: " + ", ".join(live_universe["missing_point"][:12]))
+        warnings.append(
+            "Universe rows with no pin are left out of the unique total and the pin check: "
+            + ", ".join(live_universe["missing_point"][:12])
+        )
     if screening["conflicts"]:
         warnings.append(f"Screening rows with more than one aerial verdict for the same parcel: {len(screening['conflicts'])}.")
     if len(contacted_any) and not any(site.get("contacted") for site in sites):

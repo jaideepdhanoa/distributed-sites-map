@@ -163,7 +163,7 @@ test("cancel and Escape discard an unfinished lot", async ({ page }) => {
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
-  await expect(page.getByTestId("space-summary")).toContainText("lot");
+  await expect(page.getByTestId("space-summary")).toContainText("sq ft");
   const before = await page.getByTestId("space-summary").innerText();
   await closeLayers(page);
   await page.getByTestId("mark-space").click();

@@ -1385,7 +1385,7 @@ export default function MapView(props: Props) {
         const held = heldView.current;
         heldView.current = null;
         if (held) map.jumpTo({ center: held.center, zoom: held.zoom });
-        appliedFit.current = fitKey;
+        appliedFit.current = props.fitAll ? `all:${fitKey}:${padKey}` : fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
       } else if (!propsRef.current.spaceDrawing && !props.selectedId && props.fitAll && fitKey && appliedFit.current !== `all:${fitKey}:${padKey}`) {

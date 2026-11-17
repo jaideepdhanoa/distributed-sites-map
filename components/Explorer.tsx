@@ -356,6 +356,8 @@ export default function Explorer() {
   const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [basemap, setBasemap] = useState<"positron" | "satellite">("satellite");
   const [marketPref, setMarketPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
+  const [marketReady, setMarketReady] = useState(false);
+  const appliedMarket = useRef(false);
   const pinLabel: PinLabel = resolvePinLabel(pillParam, pinPref);
   const pipelineSortId = (PIPELINE_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as PipelineColumnId;
 
@@ -414,13 +416,16 @@ export default function Explorer() {
       version: window.localStorage.getItem(MARKET_VERSION_KEY),
       value: window.localStorage.getItem(MARKET_STORAGE),
     });
+    setMarketReady(true);
   }, []);
   useEffect(() => {
+    if (!marketReady || appliedMarket.current) return;
+    appliedMarket.current = true;
     if (params.get("city") || params.get("site") || params.get("review") === "1" || params.get("view") === "review") return;
     if (marketPref.version !== MARKET_VERSION) return;
     if (marketPref.value !== "PHX" && marketPref.value !== "LAS" && marketPref.value !== "MIA") return;
     write({ city: marketPref.value });
-  }, [params, marketPref]);
+  }, [marketReady, params, marketPref]);
   useEffect(() => {
     if (params.get("funnel")) return;
     if (funnelPref.version !== FUNNEL_VERSION || funnelPref.value !== "universe") return;

@@ -246,10 +246,26 @@ export default function SheetGrid<Row>({
     window.addEventListener("pointerup", up);
   }
 
+  const floors = columns.map((column) => headerFloor(column.label));
+  const raised = ids.map((id, index) => Math.max(widthById.get(id) || columnWidth(id), floors[index] || 0));
+  if (paneWidth > 0) {
+    let extra = raised.reduce((sum, width) => sum + width, 0) + trailingWidth - paneWidth;
+    const flexSet = new Set(flex);
+    const donors = ids
+      .map((id, index) => ({ index, room: raised[index] - (floors[index] || 0), flex: flexSet.has(id) }))
+      .filter((item) => item.room > 0)
+      .sort((a, b) => Number(b.flex) - Number(a.flex));
+    for (const donor of donors) {
+      if (extra <= 0) break;
+      const cut = Math.min(donor.room, extra);
+      raised[donor.index] -= cut;
+      extra -= cut;
+    }
+  }
+  const laidWidth = new Map(ids.map((id, index) => [id, raised[index]]));
+
   function widthOf(id: string) {
-    const column = columns.find((item) => item.id === id);
-    const base = widthById.get(id) || layout.widths[id] || columnWidth(id);
-    return Math.max(base, column ? headerFloor(column.label) : 0);
+    return laidWidth.get(id) || columnWidth(id);
   }
 
   let pinnedLeft = 0;

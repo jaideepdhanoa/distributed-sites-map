@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { statusLabel } from "@/lib/conflicts/view";
+import { withoutGmail } from "@/lib/displayText";
 import type { GridCell, GridColumn, PnlGrid, ValueCell } from "@/lib/pnl/grid";
+import { sourceView } from "@/lib/pnl/sourceLink";
+import PnlLinePopover from "./PnlLinePopover";
 
 function figure(cell: ValueCell, percent: boolean): { primary: string; secondary: string } {
   if (percent) return { primary: cell.share || "—", secondary: cell.amount === cell.share ? "" : cell.amount };
@@ -27,7 +29,13 @@ function ConflictMark({ cell }: { cell: GridCell }) {
 
 function missingTitle(cell: GridCell): string | undefined {
   if (cell.kind !== "missing") return undefined;
-  const source = [cell.sourceDocument, cell.sourcePage, cell.markerSource].filter(Boolean).join(" · ");
+  const view = sourceView({
+    document: cell.sourceDocument,
+    page: cell.sourcePage,
+    href: cell.sourceHref || "",
+    capturedLabel: "",
+  });
+  const source = [view.label, view.pageAside || view.pageNote, withoutGmail(cell.markerSource)].filter(Boolean).join(" · ");
   return source ? `Missing · ${source}` : "Missing";
 }
 
@@ -49,6 +57,7 @@ function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
 
 export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const [focus, setFocus] = useState<{ row: number; col: number } | null>(null);
   const [open, setOpen] = useState<{ row: number; col: number; top: number; left: number } | null>(null);
   const focusable = grid.rows.filter((row) => row.kind !== "group");
@@ -95,7 +104,14 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
       if (left + width > window.innerWidth - 8) left = Math.max(8, rect.left - width - 8);
     }
     if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+    opener.current = target;
     setOpen({ row, col, top, left });
+  }
+
+  function closePopover() {
+    const node = opener.current;
+    setOpen(null);
+    node?.focus();
   }
 
   function onKey(event: React.KeyboardEvent) {
@@ -114,9 +130,6 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
     } else if (event.key === "Enter" && focus) {
       const target = event.target;
       if (target instanceof HTMLElement) reveal(focus.row, focus.col, target);
-    } else if (event.key === "Escape" && open) {
-      event.stopPropagation();
-      setOpen(null);
     }
   }
 
@@ -165,8 +178,12 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
                       tabIndex={focused || (!focus && index === 0 && col === 0) ? 0 : -1}
                       className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${cell.conflict && cell.conflict.status !== "resolved" ? "is-conflict" : ""} ${focused ? "cell-focus" : ""}`.trim()}
                       title={missingTitle(cell) || (cell.kind === "value" && cell.flag ? cell.flag : undefined)}
+                      data-pnl-anchor={open?.row === index && open?.col === col ? "open" : undefined}
                       onFocus={() => setFocus({ row: index, col })}
-                      onClick={(event) => reveal(index, col, event.currentTarget)}
+                      onClick={(event) => {
+                        if (open?.row === index && open?.col === col) return;
+                        reveal(index, col, event.currentTarget);
+                      }}
                     >
                       <CellBody cell={cell} percent={percent} />
                     </td>
@@ -178,36 +195,12 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
         </tbody>
       </table>
       {open && popover && (popover.kind === "value" || popover.kind === "missing" || popover.conflict) ? (
-        <div className="pnl-pop" role="dialog" aria-label="Line source" data-testid="pnl-popover" style={{ top: open.top, left: open.left }}>
-          <strong>{focusable[open.row]?.label}</strong>
-          {popover.kind === "missing" ? (
-            <div data-testid="pnl-missing-source">
-              <p>Missing</p>
-              <p>{[popover.sourceDocument, popover.sourcePage].filter(Boolean).join(" · ")}</p>
-              {popover.markerSource ? <p>{popover.markerSource}</p> : null}
-              {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
-            </div>
-          ) : null}
-          {popover.kind === "value" ? (
-            <>
-              <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>
-              <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : popover.status === "normalized" ? "Normalized" : "Reported"}</p>
-              <p>{popover.sourceDocument}{popover.sourcePage ? ` · ${popover.sourcePage}` : ""}</p>
-              {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
-              {popover.sourceHref ? <a className="text-link" href={popover.sourceHref} target="_blank" rel="noopener noreferrer">Open source ↗</a> : null}
-              {popover.flag ? <p className="pnl-flag">{popover.flag}</p> : null}
-            </>
-          ) : null}
-          {popover.conflict ? (
-            <div data-testid="pnl-conflict">
-              <p>Conflict · {statusLabel(popover.conflict.status)}</p>
-              {popover.conflict.sources.map((source) => (
-                <p key={`${source.document}-${source.page}`}>{source.value} · {source.document} · {source.page}</p>
-              ))}
-              <p>In use: {popover.conflict.valueInUse}</p>
-            </div>
-          ) : null}
-        </div>
+        <PnlLinePopover
+          label={focusable[open.row]?.label || "Line"}
+          cell={popover}
+          style={{ top: open.top, left: open.left }}
+          onClose={closePopover}
+        />
       ) : null}
     </div>
     </div>

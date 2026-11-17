@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { canReadFinancials } from "@/lib/agent/access";
 import { actionsEnabled, withSql, type Sql } from "@/lib/actions/db";
+import { canSeeGmailLinks } from "@/lib/comms";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { loadFinancialPanel } from "@/lib/financialsLoad";
+import { attachPnlSourceLinks } from "@/lib/pnl/attachSources";
 import { demoStatement } from "@/lib/pnl/demo";
+import { serviceDriveLister } from "@/lib/pnl/driveFiles";
+import { siteFolderId } from "@/lib/pnl/sourceLink";
 import { loadConflicts } from "@/lib/conflicts/record";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { linkedPnlIds, loadPnlStatement } from "@/lib/pnl/read";
@@ -67,6 +71,17 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       return { pnl: unavailableStatement(), conflicts: [] as DataConflict[], pnlDemo: false };
     })
     : { pnl: emptyStatement(), conflicts: [] as DataConflict[], pnlDemo: false };
+  let pnl = loaded.pnl;
+  try {
+    const lister = loaded.pnlDemo ? null : await serviceDriveLister();
+    pnl = await attachPnlSourceLinks(pnl, {
+      folderId: siteFolderId(deal.folder_url),
+      gmailAllowed: canSeeGmailLinks(session.u),
+      lister,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "pnl_source_link", name: error instanceof Error ? error.name : "error" }));
+  }
   console.info(JSON.stringify({ event: "data", user: session.u, part: "financials", id }));
-  return NextResponse.json({ ...panel, workbookStep, ...loaded }, { headers: financialsHeaders() });
+  return NextResponse.json({ ...panel, workbookStep, ...loaded, pnl }, { headers: financialsHeaders() });
 }

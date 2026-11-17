@@ -21,6 +21,8 @@ export type ValueCell = {
   sourcePage: string;
   sourceHref: string;
   capturedLabel: string;
+  gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   flag: string | null;
 };
 
@@ -34,7 +36,10 @@ export type MissingCell = {
   kind: "missing";
   sourceDocument: string;
   sourcePage: string;
+  sourceHref?: string;
   capturedLabel: string;
+  gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   markerSource: string;
 };
 
@@ -92,6 +97,8 @@ function fromLine(line: PnlLineView, cents: bigint, share: string | null, summed
     sourcePage: summed ? "" : line.sourcePage,
     sourceHref: summed ? "" : line.sourceHref,
     capturedLabel: summed ? "" : formatCapturedDate(line.capturedAt),
+    gmailHref: summed ? "" : line.gmailHref || "",
+    sourceLinkPart: summed ? "" : line.sourceLinkPart || "",
     flag: summed ? null : line.flag?.reason ?? null,
   };
 }
@@ -189,7 +196,7 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
 
 function emptyCell(bucket: Bucket): GridCell | null {
   if (bucket.missing) {
-    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", capturedLabel: "", markerSource: "" };
+    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", sourceHref: "", capturedLabel: "", markerSource: "" };
   }
   if (!bucket.period) return { kind: "blank" };
   return null;
@@ -204,7 +211,10 @@ function missingBucket(year: PnlYearView | undefined, month: number): Bucket {
       kind: "missing",
       sourceDocument: detail?.sourceDocument || "",
       sourcePage: detail?.sourcePage || "",
+      sourceHref: detail?.sourceHref || "",
       capturedLabel: detail?.capturedAt ? formatCapturedDate(detail.capturedAt) : "",
+      gmailHref: detail?.gmailHref || "",
+      sourceLinkPart: detail?.sourceLinkPart || "",
       markerSource: detail?.markerSource || "",
     },
   };

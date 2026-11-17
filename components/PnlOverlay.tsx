@@ -73,7 +73,7 @@ export default function PnlOverlay({
           ) : null}
         </div>
         {onChecklist ? <button type="button" className="text-link" onClick={onChecklist}>Package checklist</button> : null}
-        <button type="button" className="close" aria-label="Close profit and loss" onClick={onClose}><span aria-hidden="true">×</span></button>
+        <button type="button" className="close" data-overlay-dismiss="true" aria-label="Close profit and loss" onClick={onClose}><span aria-hidden="true">×</span></button>
       </header>
       {statement.status !== "ready" ? <p className="pnl-empty" data-testid="pnl-empty">{statement.message}</p> : (
         <>

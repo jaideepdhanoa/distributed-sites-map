@@ -53,6 +53,23 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   const grip = land.getByRole("button", { name: "Reorder Open land" });
   await expect(grip).toBeVisible();
   const from = await grip.boundingBox();
+  const label = sortButton(land);
+  const labelBox = await label.boundingBox();
+  const filter = land.getByRole("button", { name: "Filter Open land" });
+  const pin = land.getByRole("button", { name: "Pin Open land" });
+  const filterBox = await filter.boundingBox();
+  const pinBox = await pin.boundingBox();
+  expect(from && labelBox && filterBox && pinBox).toBeTruthy();
+  if (from && labelBox && filterBox && pinBox) {
+    expect(from.width).toBeGreaterThanOrEqual(24);
+    expect(from.height).toBeGreaterThanOrEqual(24);
+    expect(from.x + from.width).toBeLessThanOrEqual(labelBox.x + 1);
+    expect(from.x + from.width).toBeLessThanOrEqual(filterBox.x + 1);
+    expect(from.x + from.width).toBeLessThanOrEqual(pinBox.x + 1);
+  }
+  const slot = await grip.evaluate((el) => getComputedStyle(el).position);
+  expect(slot).not.toBe("absolute");
+  await page.locator("[data-testid=sheet-grid] thead").screenshot({ path: "review-shots/column-grip-desktop.png" });
   const target = await stage.boundingBox();
   expect(from && target).toBeTruthy();
   if (from && target) {
@@ -87,8 +104,15 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   await page.waitForSelector("[data-testid=sheet-grid]");
   await expect(page.locator('th[data-col="traffic"]')).toHaveCount(0);
   await expect(page.locator('th[data-col="score"]')).toHaveAttribute("data-pinned", "true");
-  const stored = await page.evaluate(() => Object.keys(window.localStorage).some((key) => key.startsWith("list-layout:v1:") && key.endsWith(":pipeline")));
-  expect(stored).toBe(true);
+  const storedOrder = await page.evaluate(() => {
+    const key = Object.keys(window.localStorage).find((item) => item.startsWith("list-layout:v1:") && item.endsWith(":pipeline"));
+    if (!key) return null;
+    const layout = JSON.parse(window.localStorage.getItem(key) || "{}") as { order?: string[] };
+    return layout.order || null;
+  });
+  expect(storedOrder).toBeTruthy();
+  expect(storedOrder!.indexOf("openLand")).toBeGreaterThan(-1);
+  expect(storedOrder!.indexOf("openLand")).toBeLessThan(storedOrder!.indexOf("stage"));
 });
 
 test("a phone list is cards and does not offer search this area", async ({ page }, info) => {

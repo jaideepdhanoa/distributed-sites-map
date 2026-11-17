@@ -174,10 +174,10 @@ test("a P&L comment is a cell pin, not a row link", async ({ page }, info) => {
   await expect(sheet.getByRole("button", { name: "Investigate" })).toHaveAttribute("aria-pressed", "true");
   await sheet.getByTestId("comment-body").fill("The labor cell needs a second look.");
   await sheet.getByRole("button", { name: "Comment", exact: true }).click();
-  const pin = overlay.getByTestId("pnl-cell-pin").first();
-  await expect(pin).toBeVisible();
   await sheet.getByRole("button", { name: "Close comment thread" }).click();
   await expect(sheet).toBeHidden();
+  const pin = overlay.getByTestId("pnl-cell-pin").first();
+  await expect(pin).toBeVisible();
   await pin.click();
   await expect(page.getByTestId("comment-sheet")).toBeVisible();
 });

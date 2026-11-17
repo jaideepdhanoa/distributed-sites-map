@@ -121,8 +121,11 @@ export default function PnlPhone({
         {grid.rows.filter((row) => row.kind === "line" || row.id === "sde" || (Boolean(onComment) && (row.kind === "total" || row.kind === "margin"))).map((row) => {
           const cell = row.cells[index];
           const value = cell?.kind === "value" ? cell : null;
+          const period = grid.columns[index] ? columnPeriodKey(grid.columns[index]) : "";
+          const cellCount = cell?.commentCount || 0;
+          const lineCount = row.commentCount || 0;
           return (
-            <div key={row.id}>
+            <div key={row.id} className="pnl-phone-line">
               <button
                 type="button"
                 className="list-row"
@@ -134,11 +137,22 @@ export default function PnlPhone({
                   setOpen(row.id);
                 }}
               >
-                <span>{row.label}{row.commentOpen || cell?.commentOpen ? <i className="pnl-mark comment" data-testid="pnl-comment-mark" aria-label="Open comment" /> : null}</span>
+                <span>{row.label}</span>
                 <strong className={value ? undefined : "pnl-muted"}>{textOf(cell, false)}</strong>
                 <small>{value?.share || ""}</small>
                 {value?.flag ? <i className="pnl-dot" data-testid="pnl-flag-dot" aria-label="Outside the band" /> : null}
               </button>
+              {onComment && cellCount ? (
+                <button type="button" className="icon-btn pnl-pin" data-testid="pnl-cell-pin" aria-label={cellCount > 1 ? `${cellCount} comments` : "Open comment"} title={cellCount > 1 ? `${cellCount} comments` : "Open comment"} onClick={() => onComment({ type: "pnl_cell", line: row.id, period })}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v9H8l-3 3V6z" /></svg>
+                  {cellCount > 1 ? <span>{cellCount}</span> : null}
+                </button>
+              ) : null}
+              {onComment && lineCount ? (
+                <button type="button" className="icon-btn pnl-pin" data-testid="pnl-line-pin" aria-label={lineCount > 1 ? `${lineCount} comments on line` : "Comment on line"} title="Comment on line" onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v9H8l-3 3V6z" /></svg>
+                </button>
+              ) : null}
             </div>
           );
         })}
@@ -150,9 +164,27 @@ export default function PnlPhone({
           sheet
           onClose={closeLine}
           actions={onComment ? (
-            <div className="act-row">
-              <button type="button" className="menu-item" data-testid="pnl-cell-comment" onClick={() => onComment({ type: "pnl_cell", line: open, period: grid.columns[index] ? columnPeriodKey(grid.columns[index]) : "" })}>Comment</button>
-              <button type="button" className="menu-item" data-testid="pnl-line-comment" onClick={() => onComment({ type: "pnl_line", line: open, period: "" })}>Comment on line</button>
+            <div className="pnl-comment-actions">
+              <button
+                type="button"
+                className="icon-btn pnl-pin pnl-comment-btn"
+                data-testid="pnl-cell-comment"
+                aria-label="Comment"
+                title="Comment"
+                onClick={() => onComment({ type: "pnl_cell", line: open, period: grid.columns[index] ? columnPeriodKey(grid.columns[index]) : "" })}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v9H8l-3 3V6z" /></svg>
+              </button>
+              <button
+                type="button"
+                className="icon-btn pnl-pin pnl-comment-btn"
+                data-testid="pnl-line-comment"
+                aria-label="Comment on line"
+                title="Comment on line"
+                onClick={() => onComment({ type: "pnl_line", line: open, period: "" })}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v9H8l-3 3V6z" /></svg>
+              </button>
             </div>
           ) : null}
         />

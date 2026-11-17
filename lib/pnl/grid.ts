@@ -47,6 +47,7 @@ export type MissingCell = {
 export type GridCell = (ValueCell | MissingCell | { kind: "blank" }) & {
   conflict?: CellConflict;
   commentOpen?: boolean;
+  commentCount?: number;
 };
 
 export type GridRow = {
@@ -55,6 +56,7 @@ export type GridRow = {
   kind: "group" | "line" | "total" | "margin";
   cells: GridCell[];
   commentOpen?: boolean;
+  commentCount?: number;
 };
 
 export type GridColumn = {
@@ -347,16 +349,16 @@ function attachComments(grid: PnlGrid, comments: OpenPnlComment[]): PnlGrid {
   return {
     ...grid,
     rows: grid.rows.map((row) => {
-      const lineOpen = comments.some((mark) => mark.type === "pnl_line" && mark.line === row.id);
+      const lineCount = comments.filter((mark) => mark.type === "pnl_line" && mark.line === row.id).length;
       return {
         ...row,
-        ...(lineOpen ? { commentOpen: true } : {}),
+        ...(lineCount ? { commentOpen: true, commentCount: lineCount } : {}),
         cells: row.cells.map((cell, index) => {
           const column = grid.columns[index];
           if (!column) return cell;
           const keys = periodKeys(column);
-          const open = comments.some((mark) => mark.type === "pnl_cell" && mark.line === row.id && keys.includes(mark.period));
-          return open ? { ...cell, commentOpen: true } : cell;
+          const count = comments.filter((mark) => mark.type === "pnl_cell" && mark.line === row.id && keys.includes(mark.period)).length;
+          return count ? { ...cell, commentOpen: true, commentCount: count } : cell;
         }),
       };
     }),

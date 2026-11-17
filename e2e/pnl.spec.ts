@@ -131,6 +131,57 @@ test("phone overview tiles name a missing line when a package is on file", async
   await expect(emptyCash).toContainText("Not on file");
 });
 
+test("a P&L comment is a cell pin, not a row link", async ({ page }, info) => {
+  const comments: { type: "pnl_cell"; line: string; period: string }[] = [];
+  await page.route("**/api/data/financials/PIPE-LAS-0011", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ pnl: sampleStatement(), pnlDemo: false, comments }),
+    });
+  });
+  await page.route("**/api/changes", async (route) => {
+    const body = route.request().postDataJSON() as {
+      changes?: { entity_type?: string; payload?: { anchor?: { type?: string; line?: string; period?: string } } }[];
+    };
+    const change = body.changes?.[0];
+    const anchor = change?.payload?.anchor;
+    if (change?.entity_type === "comment" && anchor?.type === "pnl_cell" && anchor.line) {
+      comments.push({ type: "pnl_cell", line: anchor.line, period: anchor.period || "" });
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, results: [{ entity_id: "NT-000001", version: 1 }] }),
+    });
+  });
+  const mobile = info.project.name === "mobile";
+  if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011&panel=numbers${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  await page.getByTestId("financials-entry").click();
+  const overlay = page.getByTestId("pnl-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator(".text-link", { hasText: "Comment" })).toHaveCount(0);
+  if (mobile) await page.getByRole("button", { name: /Labor/ }).click();
+  else await overlay.getByRole("row", { name: /^Labor/ }).locator("td", { hasText: "$10,000" }).click();
+  const popover = page.getByTestId("pnl-popover");
+  const icon = popover.getByTestId("pnl-cell-comment");
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveAttribute("title", "Comment");
+  await icon.click();
+  const sheet = page.getByTestId("comment-sheet");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Investigate" })).toHaveAttribute("aria-pressed", "true");
+  await sheet.getByTestId("comment-body").fill("The labor cell needs a second look.");
+  await sheet.getByRole("button", { name: "Comment" }).click();
+  const pin = overlay.getByTestId("pnl-cell-pin").first();
+  await expect(pin).toBeVisible();
+  await sheet.getByRole("button", { name: "Close comment thread" }).click();
+  await expect(sheet).toBeHidden();
+  await pin.click();
+  await expect(page.getByTestId("comment-sheet")).toBeVisible();
+});
+
 test("the sample site overview uses the same P&L as the Financials card", async ({ page }) => {
   await page.route("**/api/data/financials/PIPE-LAS-0011", async (route) => {
     await route.fulfill({

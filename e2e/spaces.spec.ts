@@ -156,6 +156,62 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
   await expect(page.locator("aside.drawer")).toBeVisible();
 });
 
+async function clickSavedLot(page: Page) {
+  await expect(async () => {
+    const point = await page.evaluate(() => {
+      const map = (window as unknown as {
+        __sitesMap?: {
+          jumpTo: (camera: { center: [number, number]; zoom: number }) => void;
+          project: (lnglat: [number, number]) => { x: number; y: number };
+          queryRenderedFeatures: (point: [number, number], options: { layers: string[] }) => unknown[];
+        };
+      }).__sitesMap;
+      if (!map) return null;
+      map.jumpTo({ center: [-112.070527, 33.407157], zoom: 18 });
+      const projected = map.project([-112.070527, 33.407157]);
+      if (!map.queryRenderedFeatures([projected.x, projected.y], { layers: ["space-fill"] }).length) return null;
+      return { x: projected.x, y: projected.y };
+    });
+    if (!point) throw new Error("saved lot is not on the map");
+    const mapBox = await page.locator(".stage-map .map").boundingBox();
+    if (!mapBox) throw new Error("map has no box");
+    await page.mouse.click(mapBox.x + point.x, mapBox.y + point.y);
+    await expect(page.getByTestId("space-popover")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+}
+
+test("a saved lot opens its popover outside drawing mode", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openAs(page, `/?funnel=universe&site=${site}`);
+  const seeded = await markSample(page);
+  expect(seeded.status, seeded.error).toBe(200);
+  await page.reload();
+  await expect(page.getByTestId("space-summary")).toContainText("1 lot");
+  await closeLayers(page);
+  await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
+  await clickSavedLot(page);
+  const popover = page.getByTestId("space-popover");
+  await expect(popover.getByTestId("space-comment")).toBeVisible();
+  await expect(popover.getByTestId("space-delete")).toBeVisible();
+  await popover.getByRole("button", { name: "Close available lot" }).click();
+  await expect(popover).toBeHidden();
+  await page.getByTestId("mark-space").click();
+  await expect(page.getByTestId("space-draw-bar")).toBeVisible();
+  await clickSavedLot(page);
+  await expect(page.getByTestId("space-draw-delete")).toBeVisible();
+  await expect(page.getByTestId("space-delete")).toBeVisible();
+  await page.getByTestId("space-cancel").click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByTestId("space-summary")).toContainText("slots");
+  await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
+  await clickSavedLot(page);
+  await expect(page.getByTestId("space-popover").getByTestId("space-comment")).toBeVisible();
+  await expect(page.getByTestId("space-popover").getByTestId("space-delete")).toBeVisible();
+});
+
 test("cancel and Escape discard an unfinished lot", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });

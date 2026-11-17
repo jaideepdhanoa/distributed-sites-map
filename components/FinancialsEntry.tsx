@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
+import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { financialsCard, statementTiles, type StatementTile } from "@/lib/pnl/cue";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
@@ -38,6 +39,12 @@ export function usePnlTiles(dealId: string) {
   const [sample, setSample] = useState(false);
   const [settled, setSettled] = useState(!dealId);
   const [loadedFor, setLoadedFor] = useState(dealId);
+  const [commentTick, setCommentTick] = useState(0);
+  useEffect(() => {
+    const refresh = () => setCommentTick((value) => value + 1);
+    window.addEventListener(COMMENT_CHANGED, refresh);
+    return () => window.removeEventListener(COMMENT_CHANGED, refresh);
+  }, []);
   if (loadedFor !== dealId) {
     setLoadedFor(dealId);
     setStatement(null);
@@ -54,11 +61,13 @@ export function usePnlTiles(dealId: string) {
       return undefined;
     }
     let cancel = false;
-    setStatement(null);
-    setConflicts([]);
-    setComments([]);
-    setSample(false);
-    setSettled(false);
+    if (commentTick === 0) {
+      setStatement(null);
+      setConflicts([]);
+      setComments([]);
+      setSample(false);
+      setSettled(false);
+    }
     fetch(`/api/data/financials/${encodeURIComponent(dealId)}`, { cache: "no-store" })
       .then(async (response) => (response.ok ? await response.json() as { pnl?: unknown; pnlDemo?: boolean; conflicts?: unknown; comments?: unknown } : null))
       .then((body) => {
@@ -77,7 +86,7 @@ export function usePnlTiles(dealId: string) {
     return () => {
       cancel = true;
     };
-  }, [dealId]);
+  }, [dealId, commentTick]);
   return { statement, conflicts, comments, sample, settled, tiles: statement ? statementTiles(statement, sample) : null };
 }
 

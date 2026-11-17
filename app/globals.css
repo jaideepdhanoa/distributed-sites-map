@@ -2499,6 +2499,39 @@ tr { cursor: pointer; }
 .pnl-mark.estimated, .pnl-dot { background: #a67c2d; }
 .pnl-mark.conflict { background: #8a3b2a; }
 .pnl-mark.comment { background: #1e4636; box-shadow: 0 0 0 2px #fffdf8; }
+.pnl-table td { position: relative; }
+button.icon-btn.pnl-pin {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 999px;
+}
+button.icon-btn.pnl-pin svg { width: 14px; height: 14px; }
+button.icon-btn.pnl-pin span {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 99px;
+  background: #1e4636;
+  color: #fffdf8;
+  font-size: 10px;
+  line-height: 14px;
+}
+.pnl-table button.icon-btn.pnl-pin { position: absolute; top: 2px; right: 2px; z-index: 1; }
+button.icon-btn.pnl-row-pin { position: static; margin-left: 6px; opacity: 0; }
+.list-row:hover > button.icon-btn.pnl-row-pin,
+.list-row:focus-within > button.icon-btn.pnl-row-pin,
+tr:hover button.icon-btn.pnl-row-pin,
+tr:focus-within button.icon-btn.pnl-row-pin,
+button.icon-btn.pnl-row-pin.has-comments { opacity: 1; }
+button.icon-btn.pnl-comment-btn { position: static; width: 32px; height: 32px; min-width: 32px; min-height: 32px; }
+.pnl-comment-actions { display: flex; gap: 8px; }
+.pnl-phone-line { display: flex; align-items: center; gap: 4px; }
+.pnl-phone-line > .list-row { flex: 1; }
 .pnl-table .is-pinned .text-link { margin-left: 8px; }
 .space-comment-mark {
   position: absolute;
@@ -2810,8 +2843,8 @@ span.listing-link.muted { text-decoration: none; }
 }
 .space-summary .note { flex-basis: 100%; margin: 0; }
 .space-popover {
-  position: absolute;
-  z-index: 5;
+  position: fixed;
+  z-index: 40;
   top: 72px;
   left: 12px;
   width: min(320px, calc(100vw - 24px));

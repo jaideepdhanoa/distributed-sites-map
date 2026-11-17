@@ -1,5 +1,5 @@
 import { withoutGmail } from "@/lib/displayText";
-import { LINE_LABELS, isPnlLineCode, type PnlLineCode } from "@/lib/pnl/lines";
+import { LINE_LABELS, MONTH_NAMES, MONTH_SHORT, isPnlLineCode, type PnlLineCode } from "@/lib/pnl/lines";
 
 /** Where a discussion thread is attached. One note row, shown in two places. */
 export type CommentAnchorType = "pnl_cell" | "pnl_line" | "space";
@@ -57,10 +57,30 @@ export function commentList(value: unknown): OpenPnlComment[] {
   });
 }
 
-/** Year columns read as the year. Anything else stays as written. */
+const MONTH_INDEX = new Map<string, number>([
+  ...MONTH_NAMES.map((name, index) => [name.toLowerCase(), index] as const),
+  ...MONTH_SHORT.map((name, index) => [name.toLowerCase(), index] as const),
+]);
+
+/** A year stays a year. A month reads as Mar 2026. */
 export function periodChip(period: string): string {
   const text = period.trim();
   if (!text) return "";
+  const named = /^([A-Za-z]+)\s+(\d{4})$/.exec(text);
+  if (named) {
+    const month = MONTH_INDEX.get(named[1].toLowerCase());
+    if (month != null) return `${MONTH_SHORT[month]} ${named[2]}`;
+  }
+  const isoMonth = /^(\d{4})-(\d{2})$/.exec(text);
+  if (isoMonth) {
+    const month = Number(isoMonth[2]) - 1;
+    if (month >= 0 && month < 12) return `${MONTH_SHORT[month]} ${isoMonth[1]}`;
+  }
+  const monthSpan = /^(\d{4})-(\d{2})-\d{2}\/\1-\2-\d{2}$/.exec(text);
+  if (monthSpan) {
+    const month = Number(monthSpan[2]) - 1;
+    if (month >= 0 && month < 12) return `${MONTH_SHORT[month]} ${monthSpan[1]}`;
+  }
   const bare = /^(?:FY|year-)?(\d{4})$/.exec(text);
   if (bare) return bare[1];
   const full = /^(\d{4})-01-01\/\1-12-31$/.exec(text);
@@ -95,7 +115,7 @@ export function chipLabel(anchor: CommentAnchor): string {
   if (anchor.type === "space") return `on lot, ${cleanLabel(anchor.label, "marked lot")}`;
   const line = cleanLabel(lineChip(anchor.line), "line");
   const period = periodChip(anchor.period);
-  if (anchor.type === "pnl_cell" && period) return `on P&L, ${line} ${period}`;
+  if (anchor.type === "pnl_cell" && period) return `on P&L, ${line}, ${period}`;
   return `on P&L, ${line}`;
 }
 

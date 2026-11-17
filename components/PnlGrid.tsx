@@ -27,9 +27,45 @@ function ConflictMark({ cell }: { cell: GridCell }) {
   return <i className="pnl-mark conflict" data-testid="pnl-conflict-mark" aria-label="Sources disagree" />;
 }
 
-function CommentMark({ open }: { open?: boolean }) {
-  if (!open) return null;
-  return <i className="pnl-mark comment" data-testid="pnl-comment-mark" aria-label="Open comment" />;
+function CommentGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 6h14v9H8l-3 3V6z" />
+    </svg>
+  );
+}
+
+function CommentPin({
+  count,
+  label,
+  testId,
+  className = "",
+  onClick,
+}: {
+  count: number;
+  label: string;
+  testId: string;
+  className?: string;
+  onClick: () => void;
+}) {
+  if (count < 1) return null;
+  const name = count > 1 ? `${count} comments` : label;
+  return (
+    <button
+      type="button"
+      className={`icon-btn pnl-pin ${className}`.trim()}
+      data-testid={testId}
+      aria-label={name}
+      title={name}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <CommentGlyph />
+      {count > 1 ? <span>{count}</span> : null}
+    </button>
+  );
 }
 
 function missingTitle(cell: GridCell): string | undefined {
@@ -45,15 +81,14 @@ function missingTitle(cell: GridCell): string | undefined {
 }
 
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
-  if (cell.kind === "missing") return <span className="pnl-missing">Missing<ConflictMark cell={cell} /><CommentMark open={cell.commentOpen} /></span>;
-  if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} /><CommentMark open={cell.commentOpen} />—</span>;
+  if (cell.kind === "missing") return <span className="pnl-missing">Missing<ConflictMark cell={cell} /></span>;
+  if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} />—</span>;
   const shown = figure(cell, percent);
   return (
     <span className="pnl-figure">
       <span className="pnl-amount">
         {cell.status === "calculated" ? null : <i className={`pnl-mark ${cell.status}`} aria-label={cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"} />}
         <ConflictMark cell={cell} />
-        <CommentMark open={cell.commentOpen} />
         <strong>{shown.primary}</strong>
       </span>
       {shown.secondary ? <small>{shown.secondary}</small> : null}
@@ -195,8 +230,20 @@ export default function PnlGrid({
               <tr key={row.id} role="row" className="list-row">
                 <th scope="row" className="is-pinned" data-col="line">
                   {row.label}
-                  <CommentMark open={row.commentOpen} />
-                  {onComment ? <button type="button" className="text-link" data-testid="pnl-line-comment" data-row={row.id} onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}>Comment</button> : null}
+                  {onComment ? (
+                    <button
+                      type="button"
+                      className={`icon-btn pnl-pin pnl-row-pin${row.commentCount ? " has-comments" : ""}`}
+                      data-testid="pnl-line-comment"
+                      data-row={row.id}
+                      aria-label={row.commentCount && row.commentCount > 1 ? `${row.commentCount} comments on line` : "Comment on line"}
+                      title="Comment on line"
+                      onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}
+                    >
+                      <CommentGlyph />
+                      {row.commentCount && row.commentCount > 1 ? <span>{row.commentCount}</span> : null}
+                    </button>
+                  ) : null}
                 </th>
                 {row.cells.map((cell, col) => {
                   const flagged = cell.kind === "value" && Boolean(cell.flag);
@@ -223,6 +270,14 @@ export default function PnlGrid({
                       }}
                     >
                       <CellBody cell={cell} percent={percent} />
+                      {onComment ? (
+                        <CommentPin
+                          count={cell.commentCount || 0}
+                          label="Open comment"
+                          testId="pnl-cell-pin"
+                          onClick={() => onComment({ type: "pnl_cell", line: row.id, period: grid.columns[col] ? columnPeriodKey(grid.columns[col]) : "" })}
+                        />
+                      ) : null}
                     </td>
                   );
                 })}
@@ -231,14 +286,23 @@ export default function PnlGrid({
           })}
         </tbody>
       </table>
-      {open && popover && (popover.kind === "value" || popover.kind === "missing" || popover.conflict) ? (
+      {open && popover ? (
         <PnlLinePopover
           label={focusable[open.row]?.label || "Line"}
           cell={popover}
           style={{ top: open.top, left: open.left }}
           onClose={closePopover}
           actions={onComment && popoverRow && popoverColumn ? (
-            <button type="button" className="menu-item" data-testid="pnl-cell-comment" onClick={() => onComment({ type: "pnl_cell", line: popoverRow.id, period: columnPeriodKey(popoverColumn) })}>Comment</button>
+            <button
+              type="button"
+              className="icon-btn pnl-pin pnl-comment-btn"
+              data-testid="pnl-cell-comment"
+              aria-label="Comment"
+              title="Comment"
+              onClick={() => onComment({ type: "pnl_cell", line: popoverRow.id, period: columnPeriodKey(popoverColumn) })}
+            >
+              <CommentGlyph />
+            </button>
           ) : null}
         />
       ) : null}

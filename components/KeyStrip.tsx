@@ -11,6 +11,7 @@ import { stripGmailIds } from "@/lib/displayText";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
+import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
@@ -161,6 +162,12 @@ export default function KeyStrip({
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
   const [conflicts, setConflicts] = useState<DataConflict[]>([]);
   const [comments, setComments] = useState<OpenPnlComment[]>([]);
+  const [commentTick, setCommentTick] = useState(0);
+  useEffect(() => {
+    const refresh = () => setCommentTick((value) => value + 1);
+    window.addEventListener(COMMENT_CHANGED, refresh);
+    return () => window.removeEventListener(COMMENT_CHANGED, refresh);
+  }, []);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
     setFinancialsOpen(deepFinancials && signedIn === true && showFinancials);
@@ -171,6 +178,11 @@ export default function KeyStrip({
   useEffect(() => {
     if (!signedIn || !showFinancials) return undefined;
     let cancel = false;
+    if (commentTick === 0) {
+      setFinancials(null);
+      setConflicts([]);
+      setComments([]);
+    }
     fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`, { cache: "no-store" })
       .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel & { conflicts?: unknown; comments?: unknown } : null))
       .then((panel) => {
@@ -183,7 +195,7 @@ export default function KeyStrip({
     return () => {
       cancel = true;
     };
-  }, [signedIn, showFinancials, deal.deal_id]);
+  }, [signedIn, showFinancials, deal.deal_id, commentTick]);
   const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
   const shownPanel = showFinancials ? (financials ?? fallbackPanel) : null;
   const population = trade.find((line) => line.startsWith("3-mile population"));

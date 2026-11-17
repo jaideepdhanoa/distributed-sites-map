@@ -34,6 +34,7 @@ export default function SpacePopover({
   onEdit,
   onDelete,
   onThreadClose,
+  requestDelete = 0,
 }: {
   space: SpaceShape;
   names: Record<string, string>;
@@ -43,6 +44,7 @@ export default function SpacePopover({
   onEdit: () => void;
   onDelete: () => void;
   onThreadClose?: () => void;
+  requestDelete?: number;
 }) {
   const [confirming, setConfirming] = useState(false);
   const count = estimateSlots(space.box.lengthFt, space.box.widthFt, space.layout);
@@ -51,6 +53,9 @@ export default function SpacePopover({
   useEffect(() => {
     setConfirming(false);
   }, [space.id]);
+  useEffect(() => {
+    if (requestDelete > 0) setConfirming(true);
+  }, [requestDelete]);
   useEffect(() => {
     if (!confirming) return;
     function onKey(event: KeyboardEvent) {

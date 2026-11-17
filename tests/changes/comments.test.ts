@@ -102,10 +102,11 @@ test("the broker suggestion is a review draft and never uses the blocked wording
     assert.equal(brokerQuestionHasForbidden(text), false);
     assert.equal(/send|gmail|@/.test(text), false);
   }
-  assert.equal(chipLabel(anchors[0]), "on P&L, G&A 2023");
+  assert.equal(chipLabel(anchors[0]), "on P&L, G&A, 2023");
+  assert.equal(chipLabel({ type: "pnl_cell", siteId: "PIPE-LAS-9001", line: "cogs", period: "March 2026", spaceId: "", label: "" }), "on P&L, COGS, Mar 2026");
   assert.equal(chipLabel(anchors[1]), "on P&L, Utilities");
   assert.equal(chipLabel({ type: "pnl_line", siteId: "PIPE-LAS-9001", line: "total-revenue", period: "", spaceId: "", label: "" }), "on P&L, Total revenue");
-  assert.equal(chipLabel({ type: "pnl_cell", siteId: "PIPE-LAS-9001", line: "margin", period: "2024", spaceId: "", label: "" }), "on P&L, EBITDA margin 2024");
+  assert.equal(chipLabel({ type: "pnl_cell", siteId: "PIPE-LAS-9001", line: "margin", period: "2024", spaceId: "", label: "" }), "on P&L, EBITDA margin, 2024");
   assert.equal(chipLabel(anchors[2]), "on lot, Excess parking");
   assert.equal(chipLabel(anchors[3]), "on lot, marked lot");
 });
@@ -205,7 +206,7 @@ test("open threads mark the cell, the lot, the open loops, and the brief count",
   const loops = await commentLoops(sql);
   assert.equal(loops.length, 3);
   assert.equal(loops.some((loop) => loop.detail.includes("The sample")), false);
-  assert.equal(loops.some((loop) => loop.detail.includes("on P&L, Labor 2024")), true);
+  assert.equal(loops.some((loop) => loop.detail.includes("on P&L, Labor, 2024")), true);
   assert.equal(loops.some((loop) => loop.detail.includes("on lot, Excess parking")), true);
   assert.equal(loops.some((loop) => /[0-9a-f]{16}/i.test(loop.detail)), false);
 

@@ -13,7 +13,7 @@ import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBo
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 import type { GroundBox } from "@/lib/spaces/measure";
-import SpaceTools from "./spaces/SpaceTools";
+import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
@@ -245,6 +245,7 @@ export default function MapView(props: Props) {
   const [measureDone, setMeasureDone] = useState(false);
   const [draftPoints, setDraftPoints] = useState(0);
   const [drawCommand, setDrawCommand] = useState<{ id: number; type: "undo" | "cancel" | "finish" } | null>(null);
+  const [deleteAsk, setDeleteAsk] = useState(0);
   const drawSeq = useRef(0);
   const measureRef = useRef(false);
   measureRef.current = measure;
@@ -832,14 +833,22 @@ export default function MapView(props: Props) {
           map.easeTo({ center, zoom });
         }).catch(() => undefined);
       });
+      const lotAt = (event: MapLayerMouseEvent | MapMouseEvent) => {
+        const id = spaceIdAt(map, event.point, event.lngLat, propsRef.current.spaceShapes || []);
+        if (!id) return false;
+        propsRef.current.onSpaceSelect?.(id);
+        return true;
+      };
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
+        if (lotAt(event)) return;
         const feature = event.features?.[0];
         const id = feature?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "offmarket", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
+        if (lotAt(event)) return;
         const id = event.features?.[0]?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
@@ -999,6 +1008,7 @@ export default function MapView(props: Props) {
       map.on("mouseout", hideTip);
       map.on("dragstart", hideTip);
       map.on("click", (event: MapMouseEvent) => {
+        if (!propsRef.current.spaceDrawing && !measureRef.current && lotAt(event)) return;
         if (propsRef.current.spaceDrawing || event.originalEvent.defaultPrevented) return;
         if (!measureRef.current || measureDoneRef.current) return;
         points.current = [...points.current, [event.lngLat.lng, event.lngLat.lat]];
@@ -1777,6 +1787,7 @@ export default function MapView(props: Props) {
           onCloseDraw={() => props.onSpaceDone?.()}
           drawCommand={drawCommand}
           onDraftPoints={setDraftPoints}
+          requestDelete={deleteAsk}
         />
       ) : null}
       {mapFailed ? (
@@ -1796,6 +1807,7 @@ export default function MapView(props: Props) {
               <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>
               <button type="button" className="paper-btn" data-testid="space-cancel" onClick={() => sendDraw("cancel")}>Cancel</button>
               <button type="button" className="primary" data-testid="space-finish" onClick={() => sendDraw("finish")}>Finish</button>
+              {props.selectedSpaceId ? <button type="button" className="paper-btn" data-testid="space-draw-delete" onClick={() => setDeleteAsk((value) => value + 1)}>Delete</button> : null}
             </div>
           ) : props.canDrawLots ? (
             <button type="button" className="primary" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}>Draw available lots</button>

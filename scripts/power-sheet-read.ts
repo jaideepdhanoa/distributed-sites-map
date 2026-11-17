@@ -1,7 +1,7 @@
 import { columnLetters, SPREADSHEET_ID } from "../lib/changes/mirror";
 import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
 import { readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
-import { POWER_HEADER_ROW } from "../lib/score/power-sheet";
+import { POWER_HEADER_ROW, sheetsFailureText, type SheetGrid } from "../lib/score/power-sheet";
 
 export const SITE_TABS = ["Pipeline", "Land Sites"] as const;
 
@@ -49,23 +49,33 @@ export async function readColumn(token: string, title: string, column: number, k
   return (grids[0] || []).map((row) => String(row[0] ?? ""));
 }
 
-export async function writeCells(
-  token: string,
-  cells: { sheet: string; row: number; column: number; value: string }[],
-): Promise<void> {
-  for (let start = 0; start < cells.length; start += 400) {
-    const chunk = cells.slice(start, start + 400);
-    const response = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        valueInputOption: "USER_ENTERED",
-        data: chunk.map((cell) => ({
-          range: `${quote(cell.sheet)}!${columnLetters(cell.column)}${cell.row}`,
-          values: [[cell.value]],
-        })),
-      }),
-    });
-    if (!response.ok) throw new Error(`Sheets write failed (${response.status}).`);
-  }
+export async function readGrids(token: string): Promise<SheetGrid[]> {
+  const response = await sheetsFetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const body = await response.text();
+  if (!response.ok) throw new Error(sheetsFailureText(response.status, body));
+  const payload = JSON.parse(body) as {
+    sheets?: { properties?: { sheetId?: number; title?: string; gridProperties?: { rowCount?: number; columnCount?: number } } }[];
+  };
+  return (payload.sheets || []).flatMap((sheet) => {
+    const title = String(sheet.properties?.title || "");
+    const sheetId = sheet.properties?.sheetId;
+    const rowCount = sheet.properties?.gridProperties?.rowCount;
+    const columnCount = sheet.properties?.gridProperties?.columnCount;
+    if (!title || typeof sheetId !== "number" || typeof rowCount !== "number" || typeof columnCount !== "number") return [];
+    return [{ title, sheetId, rowCount, columnCount }];
+  });
+}
+
+/** One spreadsheets.batchUpdate. It grows the grid and writes the cells together. */
+export async function writeFormulaBatch(token: string, requests: object[]): Promise<void> {
+  if (!requests.length) return;
+  const response = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests }),
+  });
+  if (!response.ok) throw new Error(sheetsFailureText(response.status, await response.text()));
 }

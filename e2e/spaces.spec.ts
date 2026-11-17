@@ -126,12 +126,18 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
       const map = (window as unknown as {
         __sitesMap?: {
           getZoom: () => number;
+          resize: () => void;
           jumpTo: (camera: { center: [number, number]; zoom: number }) => void;
           project: (lnglat: [number, number]) => { x: number; y: number };
           queryRenderedFeatures: (point: [number, number], options: { layers: string[] }) => unknown[];
         };
       }).__sitesMap;
-      if (!map || map.getZoom() <= 17) return null;
+      if (!map) return null;
+      if (map.getZoom() <= 17) {
+        map.jumpTo({ center: [-112.070527, 33.407157], zoom: 18 });
+        return null;
+      }
+      map.resize();
       map.jumpTo({ center: [-112.070527, 33.407157], zoom: Math.max(map.getZoom(), 18) });
       const projected = map.project([-112.070527, 33.407157]);
       if (!projected || !map?.queryRenderedFeatures([projected.x, projected.y], { layers: ["space-fill"] }).length) return null;

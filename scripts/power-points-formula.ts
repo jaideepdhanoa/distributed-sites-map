@@ -1,12 +1,12 @@
 import { appendFileSync } from "node:fs";
 import {
   POWER_POINTS_HEADER,
-  POWER_PROTECTED_ROW,
   formatFormulaPlan,
   formulaMode,
+  formulaWriteRequests,
   planPowerPointsFormulas,
 } from "../lib/score/power-sheet";
-import { SITE_TABS, assertSheetScript, readColumn, readHeaders, redact, sheetToken, writeCells } from "./power-sheet-read";
+import { SITE_TABS, assertSheetScript, readColumn, readGrids, readHeaders, redact, sheetToken, writeFormulaBatch } from "./power-sheet-read";
 
 /**
  * Point Power points at the derived rating column.
@@ -57,16 +57,8 @@ async function main(): Promise<void> {
     throw new Error(`Power points header is missing on ${plan.missingPowerPoints.join(", ")}.`);
   }
   if (mode !== "apply") return;
-  const cells = [
-    ...plan.headers.map((header) => ({ ...header, value: header.value })),
-    ...plan.formulas.map((formula) => ({
-      sheet: formula.sheet,
-      row: formula.row,
-      column: formula.column,
-      value: formula.formula,
-    })),
-  ].filter((cell) => cell.row !== POWER_PROTECTED_ROW);
-  await writeCells(token, cells);
+  const requests = formulaWriteRequests({ headers: plan.headers, formulas: plan.formulas, grids: await readGrids(token) }).requests;
+  await writeFormulaBatch(token, requests);
   console.log(`Wrote ${plan.headers.length} headers and ${plan.formulas.length} formulas.`);
 }
 

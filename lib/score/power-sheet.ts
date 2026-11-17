@@ -102,6 +102,104 @@ export function formulaMode(input: { apply?: string; dry?: string; confirm?: str
   return "apply";
 }
 
+export type SheetGrid = {
+  title: string;
+  sheetId: number;
+  columnCount: number;
+  rowCount: number;
+};
+
+/** Columns past the current grid. A values write cannot create them. */
+export function columnsToAppend(column: number, columnCount: number): number {
+  if (!Number.isFinite(column) || !Number.isFinite(columnCount)) return 0;
+  return Math.max(0, Math.floor(column) - Math.floor(columnCount));
+}
+
+export function rowsToAppend(row: number, rowCount: number): number {
+  if (!Number.isFinite(row) || !Number.isFinite(rowCount)) return 0;
+  return Math.max(0, Math.floor(row) - Math.floor(rowCount));
+}
+
+type BatchRequest = Record<string, unknown>;
+
+/**
+ * One spreadsheets.batchUpdate body. appendDimension runs before the cell
+ * writes, and the request is atomic: a rejected range writes nothing.
+ * Row 10 is omitted.
+ */
+export function formulaWriteRequests(input: {
+  headers: FormulaPlan["headers"];
+  formulas: FormulaPlan["formulas"];
+  grids: SheetGrid[];
+}): { requests: BatchRequest[] } {
+  const grids = new Map(input.grids.map((grid) => [grid.title, grid]));
+  const requests: BatchRequest[] = [];
+  const cells: { sheet: string; row: number; column: number; value: string }[] = [];
+  for (const header of input.headers) {
+    if (header.row === POWER_PROTECTED_ROW) continue;
+    cells.push(header);
+  }
+  for (const formula of input.formulas) {
+    if (formula.row === POWER_PROTECTED_ROW) continue;
+    cells.push({ sheet: formula.sheet, row: formula.row, column: formula.column, value: formula.formula });
+  }
+  const extraColumns = new Map<string, number>();
+  const extraRows = new Map<string, number>();
+  for (const cell of cells) {
+    const grid = grids.get(cell.sheet);
+    if (!grid) throw new Error(`Missing a grid for ${cell.sheet}.`);
+    extraColumns.set(cell.sheet, Math.max(extraColumns.get(cell.sheet) || 0, columnsToAppend(cell.column, grid.columnCount)));
+    extraRows.set(cell.sheet, Math.max(extraRows.get(cell.sheet) || 0, rowsToAppend(cell.row, grid.rowCount)));
+  }
+  for (const [title, length] of extraColumns) {
+    if (length <= 0) continue;
+    const grid = grids.get(title);
+    if (!grid) continue;
+    requests.push({ appendDimension: { sheetId: grid.sheetId, dimension: "COLUMNS", length } });
+  }
+  for (const [title, length] of extraRows) {
+    if (length <= 0) continue;
+    const grid = grids.get(title);
+    if (!grid) continue;
+    requests.push({ appendDimension: { sheetId: grid.sheetId, dimension: "ROWS", length } });
+  }
+  for (const cell of cells) {
+    const grid = grids.get(cell.sheet);
+    if (!grid) throw new Error(`Missing a grid for ${cell.sheet}.`);
+    const entered = cell.value.startsWith("=") ? { formulaValue: cell.value } : { stringValue: cell.value };
+    requests.push({
+      updateCells: {
+        start: { sheetId: grid.sheetId, rowIndex: cell.row - 1, columnIndex: cell.column - 1 },
+        rows: [{ values: [{ userEnteredValue: entered }] }],
+        fields: "userEnteredValue",
+      },
+    });
+  }
+  return { requests };
+}
+
+/** Status and Sheets message only. Request bodies and secrets stay out. */
+export function sheetsFailureText(status: number, body: string): string {
+  let message = "";
+  let statusText = "";
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: unknown; status?: unknown } };
+    if (typeof parsed.error?.message === "string") message = parsed.error.message;
+    if (typeof parsed.error?.status === "string") statusText = parsed.error.status;
+  } catch {
+    message = "";
+  }
+  const text = [`Sheets write failed (${status}${statusText ? ` ${statusText}` : ""}).`, message].filter(Boolean).join(" ");
+  return text
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
+    .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
+    .replace(/ya29\.[A-Za-z0-9._-]+/g, "[redacted-token]")
+    .replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, "[redacted-key]")
+    .replace(/"private_key"\s*:\s*"(?:\\.|[^"\\])*"/g, '"private_key":"[redacted]"')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .slice(0, 500);
+}
+
 export function formatFormulaPlan(plan: FormulaPlan, mode: "dry-run" | "apply"): string {
   return [
     `mode ${mode}`,

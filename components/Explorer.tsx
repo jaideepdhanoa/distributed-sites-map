@@ -17,7 +17,7 @@ import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
 import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/actions/quiet";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
-import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
+import { initialSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { areaQuery, inMapArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
 import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
@@ -1543,6 +1543,7 @@ export default function Explorer() {
     snap: sheetSnap,
     onToggle: () => setSheetSnap((snap) => (snap === "full" ? "half" : snap === "peek" ? "half" : "full")),
     onSnap: setSheetSnap,
+    onStep: (direction: "more" | "less") => setSheetSnap((snap) => stepSheet(snap, direction)),
   };
   const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !dealPoint(deal) && viewDeal(deal) && dealAllowed(deal));
   const offMarketPool = (universeWide || allCities) && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;

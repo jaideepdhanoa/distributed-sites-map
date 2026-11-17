@@ -45,12 +45,17 @@ type SheetControl = {
   snap?: SheetSnap;
   onToggle: () => void;
   onSnap?: (snap: SheetSnap) => void;
+  onStep?: (direction: "more" | "less") => void;
 };
 
 function SheetHandle({ sheet }: { sheet?: SheetControl }) {
   const drag = useRef<{ y: number; height: number; moved: boolean } | null>(null);
   const ignoreClick = useRef(false);
   function step(direction: "more" | "less") {
+    if (sheet?.onStep) {
+      sheet.onStep(direction);
+      return;
+    }
     sheet?.onSnap?.(stepSheet(sheet.snap ?? "peek", direction));
   }
   return (

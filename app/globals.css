@@ -2817,9 +2817,25 @@ span.listing-link.muted { text-decoration: none; }
 .headline > div.headline-wide:not(:first-child) { border-top: 1px solid var(--line); }
 .headline span, .headline small { display: block; font-size: var(--type-cap); line-height: 16px; color: var(--ink-3); overflow-wrap: normal; word-break: normal; }
 .score-tile { display: grid; gap: 2px; margin: 8px 0 12px; }
-.score-tile span { font-size: var(--type-cap); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.score-tile > span { font-size: var(--type-cap); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
 .score-tile strong { font-size: var(--type-num); line-height: 1.2; font-variant-numeric: tabular-nums; }
 .score-tile p { margin: 0; color: var(--ink-3); font-size: var(--type-cap); line-height: 1.35; }
+.power-points-line { margin: 2px 0 4px; }
+button.power-points { min-height: 44px; justify-content: flex-start; font-size: var(--type-cap); letter-spacing: 0.02em; text-transform: none; }
+.power-points-tip {
+  display: none;
+  margin-top: 4px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1c1914;
+  color: #fffdf8;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.power-points-line:hover .power-points-tip,
+.power-points-line:focus-within .power-points-tip,
+.power-points-tip[data-open="true"] { display: block; }
 .headline strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--type-lead); line-height: 24px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .headline strong.phrase { font-size: var(--type-body); letter-spacing: -0.02em; font-variant-numeric: normal; }
 .headline strong.neg { color: #7a3a2f; }

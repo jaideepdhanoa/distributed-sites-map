@@ -1,0 +1,48 @@
+name: Power points formula
+
+# Manual. Dry run is the default and writes nothing. A real change needs
+# dry_run false, apply true, and the confirm phrase. It does not run from
+# a pull request. Row 10 on Pipeline and Land Sites stays untouched.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the plan and do not change the workbook
+        type: boolean
+        default: true
+      apply:
+        description: Write the Power points formula. Also set dry_run to false and type the confirm phrase.
+        type: boolean
+        default: false
+      confirm:
+        description: To apply, type power-points-derived. Leave blank on a dry run.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  formula:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse an apply that is still a dry run or missing the phrase
+        if: ${{ (inputs.apply == true || inputs.apply == 'true') && ((inputs.dry_run == true || inputs.dry_run == 'true') || inputs.confirm != 'power-points-derived') }}
+        run: |
+          echo "Refusing to change Power points. Set dry_run to false, set apply to true, and type power-points-derived." >&2
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Plan or write the formula
+        env:
+          POWER_POINTS_DRY_RUN: ${{ (inputs.dry_run == false || inputs.dry_run == 'false') && '0' || '1' }}
+          POWER_POINTS_APPLY: ${{ (inputs.apply == true || inputs.apply == 'true') && (inputs.dry_run == false || inputs.dry_run == 'false') && '1' || '0' }}
+          CONFIRM: ${{ inputs.confirm }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: npx tsx scripts/power-points-formula.ts

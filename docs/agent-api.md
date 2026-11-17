@@ -351,3 +351,11 @@ When two sources disagree about one site field or one P&L line for the same peri
 ```
 
 Table: `data_conflicts` in `db/migrations/021_data_conflicts.sql`. `020` is reserved. Production does not apply this file until the Production migrations workflow runs.
+
+## Power rating
+
+Power points are 15 of the score. The workbook formula looks up a share on `Assumptions!A88:B98` and multiplies by the power weight in `Assumptions!B79`. The shares stay Strong 100% (15), OK 60% (9), Weak 20% (3), and Unknown 50% (7.5).
+
+Do not send a power grade. `Power rating` was removed. Typed layers are the source: `cap_a_*` through `cap_d_*` on a site fact, with `source`, `as_of`, and `confidence` of `Estimated`, `Claimed`, or `Verified`. The server derives `Strong`, `OK`, `Weak`, or `Unknown` and stores `power_rating` and `power_rating_reason`. A fact key named `power_rating` is rejected.
+
+The rubric is in `docs/scoring.md`. Layer A, the substation and high-voltage distance, does not change the points. Phoenix and Miami cap at OK. A blank or incomplete service stays Unknown, which is still 7.5 points.

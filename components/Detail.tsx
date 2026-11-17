@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, folderHref, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
@@ -9,6 +9,7 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { derivePowerRating, powerPoints, powerPointsLabel, type PowerRatingInput } from "@/lib/score/power-rating";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
@@ -122,12 +123,42 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
 
 const SCORE_SCALE = "Workbook score out of 100. Economics 40, land 25, power 15, location 10, deal 10. Location: Inside 10, near under 5 miles 5, near 5 to 10 miles 2.5, outside 0.";
 
-function ScoreTile({ score }: { score?: number | null }) {
+function powerInput(deal?: DealProps | null, site?: SiteProps | null): PowerRatingInput {
+  return { ...(deal || site || {}), market: deal?.city || site?.city || "" };
+}
+
+function PowerPoints({ input }: { input: PowerRatingInput }) {
+  const derived = derivePowerRating(input);
+  const [open, setOpen] = useState(false);
+  const tipId = useId();
+  const label = powerPointsLabel(derived.rating);
+  return (
+    <div className="power-points-line">
+      <button
+        type="button"
+        className="text-link power-points"
+        data-testid="power-points"
+        aria-expanded={open}
+        aria-describedby={tipId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {label}
+        <span className="sr"> {derived.reason}. {powerPoints(derived.rating)} of 15.</span>
+      </button>
+      <span id={tipId} className="power-points-tip" role="tooltip" data-testid="power-tooltip" data-open={open ? "true" : "false"}>
+        {derived.reason}
+      </span>
+    </div>
+  );
+}
+
+function ScoreTile({ score, power }: { score?: number | null; power: PowerRatingInput }) {
   const text = displayScore(score);
   return (
     <section className="score-tile" data-testid="score-tile">
       <span>Score</span>
       <strong title={text ? SCORE_SCALE : "No score on file"}>{text || "—"}</strong>
+      <PowerPoints input={power} />
       <p>{text ? SCORE_SCALE : "No score on file. A score is not estimated here."}</p>
     </section>
   );
@@ -522,7 +553,7 @@ export default function Detail({
           listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
         />
       </div>
-      <ScoreTile score={linkedDeal?.score} />
+      <ScoreTile score={linkedDeal?.score} power={powerInput(linkedDeal, site)} />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
@@ -818,7 +849,7 @@ export function DealDetail({
           listingTitle={deal.listing_removed ? "May be removed" : undefined}
         />
       </div>
-      <ScoreTile score={deal.score} />
+      <ScoreTile score={deal.score} power={powerInput(deal, universeSite)} />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />

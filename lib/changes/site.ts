@@ -38,6 +38,10 @@ export const SITE_FIELDS = [
   "listing_status",
   "score",
   "location_points",
+  "economics_points",
+  "land_points",
+  "power_points",
+  "deal_points",
 ] as const;
 
 export type SiteField = (typeof SITE_FIELDS)[number];
@@ -150,8 +154,11 @@ export const NUMERIC_FACT_FIELDS = [
 
 export type NumericFactField = (typeof NUMERIC_FACT_FIELDS)[number];
 
-/** Identity fields. Agents do not write these. */
+/** Identity fields. Agents do not write these after a site exists. */
 export const SCHEMA_FIELDS = ["name", "address", "market", "category", "apn", "universe_id", "lat", "lng", "folder_url"] as const;
+
+/** Identity an agent may set on create, each with its own source. universe_id and folder_url stay server-side. */
+export const CREATE_IDENTITY_FIELDS = ["name", "address", "market", "category", "apn", "lat", "lng", "listing_url", "broker"] as const;
 
 export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes"] as const;
 
@@ -350,7 +357,7 @@ const CLASS_LABEL: Record<string, string> = {
 
 /**
  * Headers an API change may write back. Column order is not assumed.
- * Score, Location points, Stalls that fit, and Segment group are formulas and are absent.
+ * Score, Economics points, Land points, Power points, Location points, Deal points, Stalls that fit, and Segment group are formulas and are absent.
  * Site, Segment, Stage, and Folder are absent.
  * Broker edits replace the person or the firm inside the current cell. The cell's own order stays. A cell that does not split is left unchanged.
  *
@@ -363,6 +370,7 @@ const CLASS_LABEL: Record<string, string> = {
  * parcel_acres and parcel_match come from the parcel layer.
  * source_line and source_kind are built from the listing URL.
  * bays_that_fit is the formula column Stalls that fit, which is never overwritten.
+ * Power rating (derived) is the mirror of the derived grade. An API change cannot type it.
  */
 export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "broker", headers: ["Broker"] },
@@ -396,6 +404,7 @@ export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "photo_notes", headers: ["Photo notes"] },
   { field: "checked_live", headers: ["Last checked live"] },
   { field: POWER_RATING, headers: ["Power rating"] },
+  { field: "power_rating", headers: ["Power rating (derived)"] },
   { field: "cap_a_substation_mi", headers: ["pwr_a_substation_mi"] },
   { field: "cap_a_line_ft", headers: ["pwr_a_hv_line_ft"] },
   { field: "cap_a_source", headers: ["pwr_a_source_type"] },
@@ -972,6 +981,10 @@ export function sitesFromFiles(dealsJson: string, pricingJson = "", sheetJson = 
       listing_status: raw("Listing status") || listingStatus(props),
       score: canonicalFact(props.score),
       location_points: canonicalFact(props.location_points),
+      economics_points: canonicalFact(props.economics_points),
+      land_points: canonicalFact(props.land_points),
+      power_points: canonicalFact(props.power_points),
+      deal_points: canonicalFact(props.deal_points),
     };
     map.set(siteId, row);
   }

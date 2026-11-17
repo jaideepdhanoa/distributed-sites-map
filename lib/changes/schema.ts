@@ -1,10 +1,13 @@
 import { z } from "zod";
 import type { ActionRole } from "@/lib/actions/roles";
 import { canDecide, canWriteContent } from "@/lib/actions/roles";
+import { parseMentionIds } from "@/lib/actions/mentions";
+import { isCommentLine, type CommentTag } from "@/lib/comments/anchor";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 import {
   CHECK_FIELDS,
+  CREATE_IDENTITY_FIELDS,
   CREATE_MARKETS,
   FACT_FIELDS,
   LISTING_STATUSES,
@@ -35,6 +38,7 @@ import {
   COMMS_DIRECTIONS,
   MARKETS,
   SERVICE_AREA_CLASSES,
+  LISTING_ID,
   SITE_ID,
   commsSiteAllowed,
   type ActivityType,
@@ -47,6 +51,18 @@ import {
 
 export type Actor = { id: string; kind: "human" | "agent"; role?: ActionRole };
 
+/** Package receipt that cites a Drive file and a comms id or an email date. Never a Gmail id. */
+export type PackageReceipt = {
+  document: string;
+  /** Exact ISO-8601 time with a numeric zone offset. R-101. */
+  received_at: string;
+  comms_id?: string;
+  email_date?: string;
+};
+
+export const AGENT_STAGE_DECISION_SOURCE = "Agent stage decision";
+export const RECEIPT_ACTIVITY_SUMMARY = "Moved to Financial screen on package receipt";
+
 export type StagePayload = {
   stage: StageName;
   market: Market;
@@ -54,6 +70,10 @@ export type StagePayload = {
   reason?: string;
   /** Exact ISO-8601 time with a numeric zone offset. R-101. */
   at?: string;
+  receipt?: PackageReceipt;
+  /** Set by the server for the one agent stage move. */
+  decision_source?: "agent";
+  cited_source?: string;
 };
 
 export type ActivityPayload = {
@@ -88,12 +108,23 @@ export type CommsPayload = {
   link?: string;
   gmail_message_id?: string;
   gmail_thread_id?: string;
+  /** The row's current site id when an agent attaches it to a new site. Blank or L-*. */
+  relink_from?: string;
+  /** Previous site id, stored by the server. */
+  relinked_from?: string;
+  /** Agent id that attached the row, stored by the server. */
+  relinked_by?: string;
   asks_made?: string;
   asks_answered?: string;
   attachments?: string;
   state_changes?: string;
   workbook_source?: string;
   message_id?: string;
+};
+
+export type SiteMint = {
+  kind: "pipeline" | "land";
+  listing_id: string;
 };
 
 export type SitePayload = {
@@ -103,6 +134,8 @@ export type SitePayload = {
   facts?: Record<string, string>;
   coord_status?: string;
   photos?: import("./site").PhotoRef[];
+  /** Present only on an agent create. The server mints the site and universe ids. */
+  mint?: SiteMint;
 };
 
 export type PnlLineStatus = "reported" | "estimated" | "normalized" | "missing";
@@ -158,6 +191,18 @@ export type SiteSpacePayload =
 
 export type { TagPayload } from "@/lib/tags/parse";
 
+/** A discussion note anchored to a P&L cell, a P&L line, or a marked lot. */
+export type CommentPayload = {
+  anchor?: { type: "pnl_cell" | "pnl_line" | "space"; line: string; period: string; space_id: string };
+  parent_id?: string;
+  body?: string;
+  tag?: CommentTag;
+  mentions?: string[];
+  resolved?: boolean;
+  /** ISO-8601 time with a numeric offset or Z, stored exactly. */
+  at: string;
+};
+
 export type ConflictSourcePayload = { value: string; document: string; page: string };
 
 /** Two sources that disagree. Muse writes it. The values stay on the signed-in read. */
@@ -180,7 +225,9 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload;
+  /** The listing id was already minted. Apply returns the stored ids and does not write again. */
+  listing_replay?: boolean;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload | CommentPayload;
 };
 
 const stagePayload = z
@@ -190,6 +237,15 @@ const stagePayload = z
     service_area_class: z.enum(SERVICE_AREA_CLASSES).optional(),
     reason: z.string().trim().max(500).optional(),
     at: z.string().trim().min(1).max(40).optional(),
+    receipt: z
+      .object({
+        document: z.string().trim().min(1).max(200),
+        received_at: z.string().trim().min(1).max(40),
+        comms_id: z.string().trim().min(1).max(40).optional(),
+        email_date: z.string().trim().min(1).max(40).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -218,6 +274,7 @@ const commsPayload = z
     link: z.string().trim().max(500).optional(),
     gmail_message_id: z.string().trim().max(64).optional(),
     gmail_thread_id: z.string().trim().max(64).optional(),
+    relink_from: z.string().trim().max(40).optional(),
   })
   .strict();
 
@@ -273,6 +330,8 @@ const sitePayload = z
     miles_to_depot: z.number().finite().nullable().optional(),
     notes: z.string().trim().max(400).optional(),
     universe_id: z.string().trim().max(40).optional(),
+    kind: z.enum(["pipeline", "land"]).optional(),
+    listing_id: z.string().trim().max(40).optional(),
     listing_status: z.union([z.enum(LISTING_STATUSES), z.literal("")]).optional(),
     folder_url: z.string().trim().max(500).optional(),
     photo_status: z.string().trim().max(40).optional(),
@@ -369,10 +428,31 @@ const conflictPayload = z
   })
   .strict();
 
+const commentAnchorPayload = z
+  .object({
+    type: z.enum(["pnl_cell", "pnl_line", "space"]),
+    line: z.string().trim().max(40).optional(),
+    period: z.string().trim().max(80).optional(),
+    space_id: z.string().trim().max(40).optional(),
+  })
+  .strict();
+
+const commentPayload = z
+  .object({
+    anchor: commentAnchorPayload.optional(),
+    parent_id: z.string().trim().min(1).max(40).optional(),
+    body: z.string().trim().max(2000).optional(),
+    tag: z.enum(["investigate", "ask_broker", "normalize", "explained", "verified"]).optional(),
+    mentions: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+    resolved: z.boolean().optional(),
+    at: z.string().trim().min(1).max(40),
+  })
+  .strict();
+
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict"]),
-    site_id: z.string().trim().max(40),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict", "comment"]),
+    site_id: z.string().trim().max(40).optional(),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
     source: z.string().trim().min(1).max(200),
@@ -475,6 +555,13 @@ function commsToken(index: number, label: string, value: string | undefined): st
   return /^[0-9a-f]{16}$/i.test(value) ? value.toLowerCase() : value;
 }
 
+const GMAIL_ID = /^[0-9a-f]{16}$/i;
+const COMMS_ID = /^CM-\d{4,}$/;
+
+function gmailId(value: string): boolean {
+  return GMAIL_ID.test(value.trim());
+}
+
 function gmailToken(index: number, label: string, value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   if (!value) return "";
@@ -513,7 +600,8 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     fail(typeof index === "number" ? index : null, path, issue.code);
   }
 
-  const changes: ParsedChange[] = parsed.data.changes.map((row, index) => {
+  const changes: ParsedChange[] = parsed.data.changes.map((input, index) => {
+    const row = { ...input, site_id: (input.site_id || "").trim() };
     const siteKeyed = row.entity_type === "stage" || row.entity_type === "site";
     const tagKeyed = row.entity_type === "tag";
     if (row.entity_id && (row.expected_version === 0 || siteKeyed || tagKeyed)) {
@@ -537,15 +625,25 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_id && row.entity_type === "data_conflict" && !/^CF-\d{4,}$/.test(row.entity_id)) {
       throw new InputError(`Change ${index + 1}: That record id is not valid.`);
     }
-    const siteAllowed = row.entity_type === "comms"
-      ? commsSiteAllowed(row.site_id)
-      : row.entity_type === "site_space"
-        ? spaceSiteAllowed(row.site_id)
-        : SITE_ID.test(row.site_id);
+    if (row.entity_id && row.entity_type === "comment" && !/^NT-\d{4,}$/.test(row.entity_id)) {
+      throw new InputError(`Change ${index + 1}: That record id is not valid.`);
+    }
+    const agentMint = row.entity_type === "site" && row.expected_version === 0 && actor.kind === "agent" && !row.site_id;
+    if (row.entity_type === "site" && row.expected_version === 0 && actor.kind === "agent" && row.site_id) {
+      throw new InputError(`Change ${index + 1}: The server assigns site ids.`);
+    }
+    const siteId = row.site_id || "";
+    const siteAllowed = agentMint
+      ? true
+      : row.entity_type === "comms"
+        ? commsSiteAllowed(siteId)
+        : row.entity_type === "site_space" || row.entity_type === "comment"
+          ? spaceSiteAllowed(siteId)
+          : SITE_ID.test(siteId);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
     if (row.entity_type === "site") {
-      return { ...row, payload: parseSite(actor, index, row.expected_version, row.payload) };
+      return { ...row, payload: parseSite(actor, index, row.expected_version, row.payload, agentMint) };
     }
     if (row.entity_type === "stage") {
       const parsedPayload = stagePayload.safeParse(row.payload);
@@ -555,16 +653,22 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       }
       const data = parsedPayload.data;
       cleanText(data.reason);
-      assertStageActor(actor, index, data.stage, data.reason);
+      const receipt = assertStageActor(actor, index, data.stage, data.reason, data.receipt);
       let at: string | undefined;
       if (data.at) {
         const zoned = parseZonedTimestamp(data.at);
         if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`);
         at = zoned.iso;
       }
-      const payload = { ...data };
+      const payload: StagePayload = { ...data };
       if (at) payload.at = at;
       else delete payload.at;
+      if (receipt) {
+        payload.receipt = receipt;
+        payload.decision_source = "agent";
+      } else {
+        delete payload.receipt;
+      }
       return { ...row, payload };
     }
     if (row.entity_type === "activity") {
@@ -611,6 +715,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_type === "data_conflict") {
       return { ...row, payload: parseDataConflict(actor, index, row.site_id, row.payload) };
     }
+    if (row.entity_type === "comment") {
+      return { ...row, payload: parseComment(actor, index, row.site_id, row.expected_version, row.payload) };
+    }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
       const issue = parsedPayload.error.issues[0];
@@ -634,6 +741,12 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     const link = commsLink(index, data.link);
     const gmailMessageId = gmailToken(index, "gmail_message_id", data.gmail_message_id);
     const gmailThreadId = gmailToken(index, "gmail_thread_id", data.gmail_thread_id);
+    if (data.relink_from !== undefined && data.relink_from !== "" && !LISTING_ID.test(data.relink_from)) {
+      throw new InputError(`Change ${index + 1}: A comms relink starts from a blank site or a listing id (L-).`);
+    }
+    if (data.relink_from && gmailId(data.relink_from)) {
+      throw new InputError(`Change ${index + 1}: A Gmail id cannot relink a comms row.`);
+    }
     return {
       ...row,
       payload: {
@@ -875,6 +988,87 @@ function parseDataConflict(actor: Actor, index: number, siteId: string, payload:
   };
 }
 
+function assertCommentActor(actor: Actor, index: number, resolved: boolean | undefined): void {
+  if (actor.kind === "agent") return;
+  if (!actor.role || !canWriteContent(actor.role)) {
+    throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
+  }
+  if (resolved !== undefined && !canDecide(actor.role)) {
+    throw new InputError(`Change ${index + 1}: Resolve needs a reviewer.`, 403);
+  }
+}
+
+function parseComment(actor: Actor, index: number, siteId: string, expectedVersion: number, payload: unknown): CommentPayload {
+  if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
+  }
+  const raw = payload as Record<string, unknown>;
+  if (!("at" in raw) || raw.at == null || raw.at === "") {
+    throw new InputError(`Change ${index + 1}: at is required`, 400, "at");
+  }
+  const parsed = commentPayload.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.length ? String(issue.path[issue.path.length - 1]) : "payload";
+    throw new InputError(`Change ${index + 1}: ${field} is not valid`, 400, field);
+  }
+  const zoned = parseZonedTimestamp(parsed.data.at);
+  if (!zoned) throw new InputError(`Change ${index + 1}: at must be an ISO-8601 time with a zone offset`, 400, "at");
+  const creating = expectedVersion === 0;
+  if (creating && parsed.data.resolved) throw new InputError(`Change ${index + 1}: Resolve the thread after it exists.`, 400, "resolved");
+  assertCommentActor(actor, index, parsed.data.resolved);
+  if (parsed.data.parent_id && parsed.data.anchor) {
+    throw new InputError(`Change ${index + 1}: A reply stays on the thread it answers.`, 400, "parent_id");
+  }
+  if (parsed.data.parent_id && !/^NT-\d{4,}$/.test(parsed.data.parent_id)) {
+    throw new InputError(`Change ${index + 1}: That thread id is not valid.`, 400, "parent_id");
+  }
+  if (creating && !parsed.data.parent_id && !parsed.data.anchor) {
+    throw new InputError(`Change ${index + 1}: A comment needs a P&L cell, a P&L line, or a lot.`, 400, "anchor");
+  }
+  if (!creating && (parsed.data.anchor || parsed.data.parent_id)) {
+    throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "anchor");
+  }
+  const anchor = parsed.data.anchor;
+  if (anchor?.type === "space" && !anchor.space_id) throw new InputError(`Change ${index + 1}: A lot comment needs the lot id.`, 400, "space_id");
+  if (anchor && anchor.type !== "space" && !isCommentLine(anchor.line || "")) {
+    throw new InputError(`Change ${index + 1}: That line is not in the chart of accounts.`, 400, "line");
+  }
+  if (anchor?.type === "pnl_cell" && !anchor.period) throw new InputError(`Change ${index + 1}: A cell comment needs a period.`, 400, "period");
+  if (anchor?.type === "pnl_line" && anchor.period) throw new InputError(`Change ${index + 1}: A line comment does not take a period.`, 400, "period");
+  let mentions: string[] | undefined;
+  if (parsed.data.mentions) {
+    try {
+      mentions = parseMentionIds(parsed.data.mentions);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Choose an account from the list.";
+      throw new InputError(`Change ${index + 1}: ${message}`, 400, "mentions");
+    }
+  }
+  if (parsed.data.body !== undefined) cleanText(parsed.data.body);
+  const body = parsed.data.body?.trim();
+  if (creating && !body) throw new InputError(`Change ${index + 1}: Add a comment.`, 400, "body");
+  return {
+    ...(anchor
+      ? {
+          anchor: {
+            type: anchor.type,
+            line: anchor.type === "space" ? "" : anchor.line || "",
+            period: anchor.type === "pnl_cell" ? anchor.period || "" : "",
+            space_id: anchor.type === "space" ? anchor.space_id || "" : "",
+          },
+        }
+      : {}),
+    ...(parsed.data.parent_id ? { parent_id: parsed.data.parent_id } : {}),
+    ...(body ? { body } : {}),
+    ...(parsed.data.tag ? { tag: parsed.data.tag } : {}),
+    ...(mentions ? { mentions } : {}),
+    ...(parsed.data.resolved === undefined ? {} : { resolved: parsed.data.resolved }),
+    at: zoned.iso,
+  };
+}
+
 function assertSpaceActor(actor: Actor, index: number): void {
   if (actor.kind !== "human" || !actor.role) {
     throw new InputError(`Change ${index + 1}: A person marks a space.`, 403);
@@ -922,19 +1116,75 @@ function parseSiteSpace(actor: Actor, index: number, siteId: string, expectedVer
   };
 }
 
-function assertStageActor(actor: Actor, index: number, stage: string, reason: string | undefined): void {
+function assertStageActor(
+  actor: Actor,
+  index: number,
+  stage: string,
+  reason: string | undefined,
+  receipt: { document: string; received_at: string; comms_id?: string; email_date?: string } | undefined,
+): PackageReceipt | undefined {
   // R-097. A drop is a reviewer decision with a reason. Agents cannot make it,
   // and nothing in the capture path may set Dropped on its own.
   if (stage === "Dropped" && (actor.kind !== "human" || actor.id === "system")) {
-    throw new InputError(`Change ${index + 1}: An agent cannot set Stage to Dropped.`);
+    throw new InputError(`Change ${index + 1}: An agent cannot set Stage to Dropped.`, 403);
   }
   if (stage === "Dropped" && !reason?.trim()) {
     throw new InputError(`Change ${index + 1}: Stage Dropped needs a reason.`);
   }
-  if (actor.id === "system") return;
+  if (actor.id === "system") return undefined;
+  if (actor.kind === "agent") return normalizeAgentReceipt(index, stage, receipt);
   if (actor.kind !== "human" || !actor.role || !canDecide(actor.role)) {
     throw new InputError(`Change ${index + 1}: Stage changes need a reviewer.`, 403);
   }
+  return undefined;
+}
+
+/** The only agent stage write: Desk screen to Financial screen, with a package receipt. */
+function normalizeAgentReceipt(
+  index: number,
+  stage: string,
+  receipt: { document: string; received_at: string; comms_id?: string; email_date?: string } | undefined,
+): PackageReceipt {
+  if (stage !== "2 Financial screen") {
+    throw new InputError(`Change ${index + 1}: An agent can only move a site from Desk screen to Financial screen.`, 403);
+  }
+  if (!receipt?.document?.trim() || !receipt.received_at?.trim() || (!receipt.comms_id?.trim() && !receipt.email_date?.trim())) {
+    throw new InputError(
+      `Change ${index + 1}: A package receipt needs a document, the time it was received, and a comms id or an email date.`,
+      400,
+    );
+  }
+  const document = receipt.document.trim();
+  if (gmailId(document) || /mail\.google\.com/i.test(document)) {
+    throw new InputError(`Change ${index + 1}: A package receipt cites a Drive file id or a file name, not a Gmail id.`, 400);
+  }
+  const zoned = parseZonedTimestamp(receipt.received_at);
+  if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`, 400);
+  const comms = receipt.comms_id?.trim() || "";
+  const email = receipt.email_date?.trim() || "";
+  if (comms && (gmailId(comms) || !COMMS_ID.test(comms))) {
+    throw new InputError(`Change ${index + 1}: The comms id is a CM- id, not a Gmail id.`, 400);
+  }
+  if (email && (gmailId(email) || !realDate(email))) {
+    throw new InputError(`Change ${index + 1}: The email date is a YYYY-MM-DD label, not a Gmail id.`, 400);
+  }
+  return {
+    document,
+    received_at: zoned.iso,
+    ...(comms ? { comms_id: comms } : {}),
+    ...(email ? { email_date: email } : {}),
+  };
+}
+
+export function receiptCitation(receipt: PackageReceipt): string {
+  const parts = [receipt.document, receipt.received_at];
+  if (receipt.comms_id) parts.push(receipt.comms_id);
+  if (receipt.email_date) parts.push(receipt.email_date);
+  return parts.join("; ").slice(0, 500);
+}
+
+export function isAgentStageDecision(payload: Record<string, unknown>): boolean {
+  return payload.decision_source === "agent" && String(payload.stage || "") === "2 Financial screen";
 }
 
 function assertActivityActor(actor: Actor, index: number, type: string): void {
@@ -952,7 +1202,7 @@ function assertContentActor(actor: Actor, index: number): void {
   }
 }
 
-function parseSite(actor: Actor, index: number, expectedVersion: number, payload: unknown): SitePayload {
+function parseSite(actor: Actor, index: number, expectedVersion: number, payload: unknown, mint = false): SitePayload {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new InputError(`Change ${index + 1}: That change is not valid.`);
   }
@@ -1027,7 +1277,8 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   if (data.folder_url !== undefined) facts.folder_url = data.folder_url;
   if (!Object.keys(fields).length && !Object.keys(facts).length) throw new InputError(`Change ${index + 1}: Add a field to change.`);
   for (const key of Object.keys(data.sources || {})) {
-    if (!NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    const identitySource = mint && (CREATE_IDENTITY_FIELDS as readonly string[]).includes(key);
+    if (!identitySource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1063,17 +1314,37 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     cleanText(photo.caption);
     cleanText(photo.attribution);
   }
-  assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class);
-  return { fields, sources, facts, photos: data.photo_refs ? photos : undefined };
+  let siteMint: SiteMint | undefined;
+  if (mint) {
+    if (data.kind !== "pipeline" && data.kind !== "land") {
+      throw new InputError(`Change ${index + 1}: A new site needs a kind of pipeline or land.`);
+    }
+    const listing = (data.listing_id || "").trim();
+    if (!LISTING_ID.test(listing)) throw new InputError(`Change ${index + 1}: A new site needs a listing id (L-).`);
+    if (gmailId(listing)) throw new InputError(`Change ${index + 1}: A Gmail id cannot be a listing id.`);
+    for (const field of CREATE_IDENTITY_FIELDS) {
+      const value = fields[field as SiteField];
+      if (value === undefined || value === "") continue;
+      const source = data.sources?.[field]?.trim() || "";
+      if (!source) throw new InputError(`Change ${index + 1}: ${field} needs a source.`);
+      cleanText(source);
+      sources[field] = source;
+    }
+    siteMint = { kind: data.kind, listing_id: listing };
+  }
+  assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class, mint);
+  return { fields, sources, facts, photos: data.photo_refs ? photos : undefined, ...(siteMint ? { mint: siteMint } : {}) };
 }
 
-function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, serviceArea: string | undefined): void {
+function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, serviceArea: string | undefined, mint: boolean): void {
   if (actor.kind !== "agent") return;
   if (serviceArea === "edge_legacy" || serviceArea === "unknown") {
     throw new InputError(`Change ${index + 1}: An agent cannot set that service area.`);
   }
   const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
+  const createAllowed = mint ? new Set<string>(CREATE_IDENTITY_FIELDS) : new Set<string>();
   for (const key of touched) {
+    if (createAllowed.has(key)) continue;
     if ((SCHEMA_FIELDS as readonly string[]).includes(key) || !allowed.has(key)) {
       throw new InputError(`Change ${index + 1}: An agent cannot write that field.`);
     }

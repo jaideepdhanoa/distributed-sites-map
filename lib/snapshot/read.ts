@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
-import { migrate, whenReady } from "@/lib/actions/migrate";
+import { migrate } from "@/lib/actions/migrate";
 import { unpackFile } from "./pack";
 import { selectLiveBundle, type SnapshotBundle } from "./store";
 
@@ -154,9 +154,11 @@ export async function primeSnapshot(): Promise<void> {
   }
   if (!actionsEnabled()) return;
   try {
-    await whenReady(() => withSql(async (sql) => {
+    // A skipped read must not count as the write schema being ready. Preview
+    // writes apply pending files themselves, and only on a non-production database.
+    await withSql(async (sql) => {
       await migrate(sql, { onPreview: "skip", onProduction: "skip" });
-    }));
+    });
     remember(await loadCachedBundle());
   } catch {
     console.error(JSON.stringify({ event: "snapshot_read_fallback" }));

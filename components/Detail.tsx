@@ -8,7 +8,9 @@ import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, displayScore, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { derivePowerRating, type PowerRatingInput } from "@/lib/score/power-rating";
+import { storedScoreView } from "@/lib/scoreDisplay";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
@@ -120,15 +122,75 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
   );
 }
 
-const SCORE_SCALE = "Workbook score out of 100. Economics 40, land 25, power 15, location 10, deal 10. Location: Inside 10, near under 5 miles 5, near 5 to 10 miles 2.5, outside 0.";
+function brokerReplyChip(chip: TagView): TagView {
+  if (chip.code !== "broker_reply") return chip;
+  const since = chip.since.trim();
+  return since ? { ...chip, label: `Broker reply since ${since}`, since: "" } : chip;
+}
 
-function ScoreTile({ score }: { score?: number | null }) {
-  const text = displayScore(score);
+function DecisionChips({
+  deal,
+  waiting,
+  extras = [],
+  testId,
+}: {
+  deal?: DealProps | null;
+  waiting?: TagView | null;
+  extras?: TagView[];
+  testId?: string;
+}) {
+  if (!deal && !waiting && !extras.length) return null;
   return (
-    <section className="score-tile" data-testid="score-tile">
+    <div className="card-chips decision-chips" data-testid={testId}>
+      {deal ? <StageChip deal={deal} /> : null}
+      {waiting ? <TagChip chip={brokerReplyChip(waiting)} compact /> : null}
+      {extras.map((chip) => <TagChip key={chip.family} chip={chip} compact />)}
+    </div>
+  );
+}
+
+function powerInput(deal?: DealProps | null, site?: SiteProps | null): PowerRatingInput {
+  return { ...(deal || site || {}), market: deal?.city || site?.city || "" };
+}
+
+function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps | null }) {
+  const reason = derivePowerRating(powerInput(deal, site)).reason;
+  const view = storedScoreView({
+    score: deal?.score,
+    economics: deal?.economics_points,
+    land: deal?.land_points,
+    power: deal?.power_points,
+    location: deal?.location_points,
+    deal: deal?.deal_points,
+    savingVsHub: deal?.saving_vs_hub,
+    stalls: deal?.bays_that_fit,
+    serviceArea: deal?.service_area_class,
+    dealRating: deal?.deal_rating,
+    powerDetail: reason,
+  });
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hover || pinned;
+  return (
+    <section className="score-tile" data-testid="score-tile" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <span>Score</span>
-      <strong title={text ? SCORE_SCALE : "No score on file"}>{text || "—"}</strong>
-      <p>{text ? SCORE_SCALE : "No score on file. A score is not estimated here."}</p>
+      <strong>{view.total || "—"}</strong>
+      <p className="score-parts" data-testid="score-parts">{view.line}</p>
+      {view.total ? null : <p className="score-parts">No score on file.</p>}
+      {view.mismatch ? <p className="score-flag" data-testid="score-mismatch">doesn't add up</p> : null}
+      <button type="button" className="text-link" data-testid="score-breakdown" aria-expanded={open} onClick={() => setPinned((value) => !value)}>
+        {pinned ? "Hide breakdown" : "Breakdown"}
+      </button>
+      {open ? (
+        <div className="score-pop" role="tooltip" data-testid="score-popover">
+          {view.parts.map((part) => (
+            <p key={part.id}>
+              <strong>{part.label} {part.shown}/{part.max}</strong>
+              <span>{part.detail}</span>
+            </p>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -426,6 +488,7 @@ export default function Detail({
   outsideFilter = false,
   spaceCount = 0,
   spaceSlots = 0,
+  spaceSqft = 0,
   onMarkSpace,
   spaceNote,
 }: {
@@ -451,6 +514,7 @@ export default function Detail({
   outsideFilter?: boolean;
   spaceCount?: number;
   spaceSlots?: number;
+  spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
 }) {
@@ -464,6 +528,7 @@ export default function Detail({
   const why = site.summary_why || "Not screened yet.";
   const next = nextStepText(site);
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
+  const waitingChip = linkedDeal ? visibleChips(linkedDeal, signedIn).find((chip) => chip.family === "waiting_on" && chip.code !== "nothing") || null : null;
   return (
     <aside
       data-record={site.site_id}
@@ -491,54 +556,57 @@ export default function Detail({
       </div>
       {banner}
       <div className="drawer-scroll">
-      <div className="card-top">
+      <div className="card-top" data-testid="panel-top">
         <h2>{site.name || site.address || site.site_id}</h2>
-        <div className="card-chips">
-          {linkedDeal ? <StageChip deal={linkedDeal} /> : null}
-          <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
-          <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
-          {linkedDeal ? <NdaChip deal={linkedDeal} signedIn={signedIn} /> : null}
-        </div>
         {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
         <p className="note">{site.address || "—"}</p>
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
-        {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
-        {site.linked_deal_id ? (
-          <p>
-            <button className="text-link" type="button" data-testid="pipeline-deal-link" title={site.linked_deal_id} onClick={onOpenDeal}>
-              Open the pipeline deal
-            </button>
-          </p>
-        ) : null}
-        <CardLinks
-          listing={linkedDeal?.listing_url || site.listing_url || ""}
-          folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
-          packageHref={packageHref}
-          map={mapHref(lat, lng)}
-          street={streetHref(lat, lng, photos.frontageUrl || site.street_view_url)}
-          signedIn={signedIn}
-          listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
-        />
       </div>
-      <ScoreTile score={linkedDeal?.score} />
+      <SitePhotos card={photos} />
+      <section className="decision-block" data-testid="decision-block">
+        <DecisionChips deal={linkedDeal} waiting={waitingChip} />
+        <NextStepCard
+          kind="site"
+          id={site.site_id}
+          stageGroup={linkedDeal?.stage_group}
+          stage={linkedDeal?.stage || site.pipeline_stage}
+          signedIn={signedIn}
+          workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
+          suggestedDrop={linkedDeal?.suggested_drop}
+          blocker={linkedDeal}
+          waitingShown={Boolean(waitingChip)}
+        />
+      </section>
+      <div className="card-chips">
+        <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
+        <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
+        {linkedDeal ? <NdaChip deal={linkedDeal} signedIn={signedIn} /> : null}
+      </div>
+      {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
+      {site.linked_deal_id ? (
+        <p>
+          <button className="text-link" type="button" data-testid="pipeline-deal-link" title={site.linked_deal_id} onClick={onOpenDeal}>
+            Open the pipeline deal
+          </button>
+        </p>
+      ) : null}
+      <CardLinks
+        listing={linkedDeal?.listing_url || site.listing_url || ""}
+        folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
+        packageHref={packageHref}
+        map={mapHref(lat, lng)}
+        street={streetHref(lat, lng, photos.frontageUrl || site.street_view_url)}
+        signedIn={signedIn}
+        listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
+      />
+      <ScoreTile deal={linkedDeal} site={site} />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
-      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} note={spaceNote} onMark={onMarkSpace} /> : null}
-      <SitePhotos card={photos} />
-      <NextStepCard
-        kind="site"
-        id={site.site_id}
-        stageGroup={linkedDeal?.stage_group}
-        stage={linkedDeal?.stage || site.pipeline_stage}
-        signedIn={signedIn}
-        workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
-        suggestedDrop={linkedDeal?.suggested_drop}
-        blocker={linkedDeal}
-      />
+      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
         overview={
@@ -728,6 +796,7 @@ export function DealDetail({
   outsideFilter = false,
   spaceCount = 0,
   spaceSlots = 0,
+  spaceSqft = 0,
   onMarkSpace,
   spaceNote,
 }: {
@@ -754,6 +823,7 @@ export function DealDetail({
   outsideFilter?: boolean;
   spaceCount?: number;
   spaceSlots?: number;
+  spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
 }) {
@@ -766,7 +836,7 @@ export function DealDetail({
   const revenue = revenueTile(deal);
   const cue = listingCue(deal);
   const chips = visibleChips(deal, signedIn);
-  const waiting = chips.find((chip) => chip.family === "waiting_on");
+  const waiting = chips.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing") || null;
   const gap = chips.find((chip) => chip.family === "biggest_gap");
   const recordChips = sectionChips(chips, ["drop_reason", "advance_reason", "package", "listing", "lead_source", "business_check", "photos", "nda"]);
   const diligence = sectionChips(chips, DILIGENCE_FAMILIES);
@@ -797,44 +867,43 @@ export function DealDetail({
       </div>
       {banner}
       <div className="drawer-scroll">
-      <div className="card-top">
+      <div className="card-top" data-testid="panel-top">
         <h2>{deal.name || deal.address}</h2>
-        <div className="card-chips" data-testid="header-chips">
-          <StageChip deal={deal} />
-          {waiting ? <TagChip chip={waiting} compact /> : null}
-          {gap ? <TagChip chip={gap} compact /> : null}
-        </div>
-        <ChipRow chips={diligence} testId="diligence-home" titled />
         <p className="note">{deal.address}</p>
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
-        {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
-        <CardLinks
-          listing={cue.url}
-          folder={folderHref(deal.folder_url)}
-          packageHref={packageHref}
-          map={mapHref(lat, lng)}
-          street={streetHref(lat, lng, photos.frontageUrl || deal.street_view_url)}
-          signedIn={signedIn}
-          listingTitle={deal.listing_removed ? "May be removed" : undefined}
-        />
       </div>
-      <ScoreTile score={deal.score} />
+      <SitePhotos card={photos} />
+      <section className="decision-block" data-testid="decision-block">
+        <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
+        <NextStepCard
+          kind="deal"
+          id={deal.deal_id}
+          stageGroup={deal.stage_group}
+          stage={deal.stage}
+          signedIn={signedIn}
+          suggestedDrop={deal.suggested_drop}
+          blocker={deal}
+          chips={chips}
+          waitingShown={Boolean(waiting)}
+        />
+      </section>
+      <ChipRow chips={diligence} testId="diligence-home" titled />
+      {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
+      <CardLinks
+        listing={cue.url}
+        folder={folderHref(deal.folder_url)}
+        packageHref={packageHref}
+        map={mapHref(lat, lng)}
+        street={streetHref(lat, lng, photos.frontageUrl || deal.street_view_url)}
+        signedIn={signedIn}
+        listingTitle={deal.listing_removed ? "May be removed" : undefined}
+      />
+      <ScoreTile deal={deal} site={universeSite} />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
-      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} note={spaceNote} onMark={onMarkSpace} /> : null}
-      <SitePhotos card={photos} />
-      <NextStepCard
-        kind="deal"
-        id={deal.deal_id}
-        stageGroup={deal.stage_group}
-        stage={deal.stage}
-        signedIn={signedIn}
-        suggestedDrop={deal.suggested_drop}
-        blocker={deal}
-        chips={chips}
-      />
+      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
         overview={

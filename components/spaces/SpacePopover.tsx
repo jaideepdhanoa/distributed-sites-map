@@ -6,7 +6,9 @@ import "../actions/actions.css";
 import { formatPacific } from "@/lib/actions/time";
 import { formatArea, formatFeet } from "@/lib/spaces/measure";
 import { estimateLabel, estimateSlots } from "@/lib/spaces/slots";
-import { SPACE_LAYOUTS, SPACE_TYPES, spaceLayout, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import { requestCommentAnchor } from "@/lib/comments/nav";
+import { SPACE_LAYOUTS, SPACE_TYPES, spaceLayout, spaceTypeLabel, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import CommentThread from "../comments/CommentThread";
 import type { GroundBox } from "@/lib/spaces/measure";
 
 export type SpaceShape = {
@@ -26,22 +28,50 @@ const CAUTION = "Aerial imagery can be months old and slightly skewed. Counts st
 export default function SpacePopover({
   space,
   names,
+  threadOpen = false,
   onChange,
   onClose,
+  onEdit,
+  onDelete,
+  onThreadClose,
+  requestDelete = 0,
 }: {
   space: SpaceShape;
   names: Record<string, string>;
+  threadOpen?: boolean;
   onChange: (next: SpaceShape) => void;
   onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onThreadClose?: () => void;
+  requestDelete?: number;
 }) {
+  const [confirming, setConfirming] = useState(false);
   const count = estimateSlots(space.box.lengthFt, space.box.widthFt, space.layout);
   const unit = spaceLayout(space.layout).unit;
   const status = space.status === "verified" ? "Verified" : "Estimated";
+  useEffect(() => {
+    setConfirming(false);
+  }, [space.id]);
+  useEffect(() => {
+    if (requestDelete > 0) setConfirming(true);
+  }, [requestDelete]);
+  useEffect(() => {
+    if (!confirming) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setConfirming(false);
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [confirming]);
   return (
-    <div className="space-popover" data-testid="space-popover" role="dialog" aria-label="Marked space">
+    <div className="space-popover" data-testid="space-popover" role="dialog" aria-label="Available lot">
       <div className="space-popover-bar">
-        <p className="eyebrow">Marked space</p>
-        <button type="button" className="close" aria-label="Close marked space" onClick={onClose}><span aria-hidden="true">×</span></button>
+        <p className="eyebrow">Available lot</p>
+        <button type="button" className="close" aria-label="Close available lot" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <div className="space-types" role="group" aria-label="Space type">
         {SPACE_TYPES.map((item) => (
@@ -72,9 +102,47 @@ export default function SpacePopover({
         </select>
       </label>
       <p className="space-estimate" data-testid="space-estimate">{status === "Verified" ? "Verified" : estimateLabel(count, unit)}</p>
-      <p className="note">Marked by {names[space.author] || space.author || "you"}</p>
+      <p className="note">Drawn by {names[space.author] || space.author || "you"}</p>
       <p className="note" data-testid="space-caution">{CAUTION}</p>
+      <div className="space-actions">
+        {confirming ? (
+          <>
+            <p className="note" data-testid="space-delete-ask">Delete this lot?</p>
+            <button type="button" className="paper-btn" data-testid="space-delete-cancel" onClick={() => setConfirming(false)}>Keep</button>
+            <button type="button" className="primary" data-testid="space-delete-confirm" onClick={() => { setConfirming(false); onDelete(); }}>Delete</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="paper-btn" data-testid="space-edit" onClick={onEdit}>Edit</button>
+            <button type="button" className="paper-btn" data-testid="space-delete" onClick={() => setConfirming(true)}>Delete</button>
+            <button
+              type="button"
+              className="menu-item"
+              data-testid="space-comment"
+              onClick={() => requestCommentAnchor({
+                type: "space",
+                siteId: space.siteId,
+                line: "",
+                period: "",
+                spaceId: space.id,
+                label: spaceTypeLabel(space.type),
+              })}
+            >
+              Comment
+            </button>
+          </>
+        )}
+      </div>
       <SpaceThread spaceId={space.id} />
+      {threadOpen ? (
+        <CommentThread
+          siteId={space.siteId}
+          anchor={{ type: "space", siteId: space.siteId, line: "", period: "", spaceId: space.id, label: spaceTypeLabel(space.type) }}
+          variant="sheet"
+          source="Map"
+          onClose={onThreadClose}
+        />
+      ) : null}
     </div>
   );
 }

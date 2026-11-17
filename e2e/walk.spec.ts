@@ -169,10 +169,10 @@ test("activity times use the short date and keep the raw stamp on the title", as
 test("a land deeplink does not turn the land filter on", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "deeplink filters");
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=pipeline-list]");
   const before = Number(await page.locator(".shell").getAttribute("data-list-count"));
-  await page.goto("/?funnel=pipeline&view=list&site=LAND-PHX-0002", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=pipeline&city=PHX&view=list&site=LAND-PHX-0002", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=outside-filter]");
   await expect(page).not.toHaveURL(/[?&]cats=/);
   await expect(page).not.toHaveURL(/[?&]landlayer=/);

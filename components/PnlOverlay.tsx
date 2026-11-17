@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { focusMode, focusYear, type CommentAnchor, type OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { buildPnlGrid } from "@/lib/pnl/grid";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import CommentThread, { type ThreadNote } from "./comments/CommentThread";
 import PnlBasis from "./PnlBasis";
 import PnlGrid from "./PnlGrid";
 import PnlPhone from "./PnlPhone";
@@ -12,12 +14,20 @@ export default function PnlOverlay({
   statement = emptyStatement(),
   initialGrain = null,
   conflicts = [],
+  comments = [],
+  siteId = "",
+  focus = null,
+  previewNotes,
   onClose,
   onChecklist,
 }: {
   statement?: PnlStatement;
   initialGrain?: "annual" | "monthly" | null;
   conflicts?: DataConflict[];
+  comments?: OpenPnlComment[];
+  siteId?: string;
+  focus?: { type: "pnl_cell" | "pnl_line"; line: string; period: string } | null;
+  previewNotes?: ThreadNote[];
   onClose: () => void;
   onChecklist?: () => void;
 }) {
@@ -33,8 +43,32 @@ export default function PnlOverlay({
     if (initialGrain === "monthly") setMode("months");
   }, [initialGrain]);
   const [year, setYear] = useState(years[0] || 0);
-  const grid = useMemo(() => buildPnlGrid(shown, mode, year, conflicts), [shown, mode, year, conflicts]);
+  const [thread, setThread] = useState<CommentAnchor | null>(null);
+  const grid = useMemo(() => buildPnlGrid(shown, mode, year, conflicts, comments), [shown, mode, year, conflicts, comments]);
   const business = shown.years.find((item) => item.year === year)?.businessLabel || shown.years[0]?.businessLabel || "";
+
+  const focusType = focus?.type || "";
+  const focusLine = focus?.line || "";
+  const focusPeriod = focus?.period || "";
+  useEffect(() => {
+    if (!focusType || !siteId) return;
+    const nextYear = focusYear(focusPeriod);
+    if (nextYear) setYear(nextYear);
+    setMode(focusType === "pnl_line" ? "years" : focusMode(focusPeriod));
+    setThread({
+      type: focusType,
+      siteId,
+      line: focusLine,
+      period: focusType === "pnl_line" ? "" : focusPeriod,
+      spaceId: "",
+      label: "",
+    });
+  }, [focusType, focusLine, focusPeriod, siteId]);
+
+  function openThread(anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) {
+    if (!siteId) return;
+    setThread({ type: anchor.type, siteId, line: anchor.line, period: anchor.period, spaceId: "", label: "" });
+  }
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -73,14 +107,19 @@ export default function PnlOverlay({
           ) : null}
         </div>
         {onChecklist ? <button type="button" className="text-link" onClick={onChecklist}>Package checklist</button> : null}
-        <button type="button" className="close" aria-label="Close profit and loss" onClick={onClose}><span aria-hidden="true">×</span></button>
+        <button type="button" className="close" data-overlay-dismiss="true" aria-label="Close profit and loss" onClick={onClose}><span aria-hidden="true">×</span></button>
       </header>
       {statement.status !== "ready" ? <p className="pnl-empty" data-testid="pnl-empty">{statement.message}</p> : (
         <>
-          <div className="pnl-desktop"><PnlGrid grid={grid} percent={percent} /></div>
-          <PnlPhone statement={shown} conflicts={conflicts} />
+          <div className="pnl-desktop">
+            <PnlGrid grid={grid} percent={percent} onComment={siteId ? openThread : undefined} focusLine={focus?.line} focusPeriod={focus?.type === "pnl_line" ? "" : focus?.period} />
+          </div>
+          <PnlPhone statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
         </>
       )}
+      {thread ? (
+        <CommentThread siteId={thread.siteId} anchor={thread} notes={previewNotes} variant="sheet" source="Financials" preview={Boolean(previewNotes)} onClose={() => setThread(null)} />
+      ) : null}
     </section>
   );
 }

@@ -55,7 +55,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await waitForBasemap(page);
   await expect(page.locator("nav.funnel")).toContainText("Universe");
   await page.screenshot({ path: `review-shots/${name}-universe-bar.png`, fullPage: false });
-  await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=pipeline&city=PHX", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   await showFunnel(page, name);
   await waitForBasemap(page);
@@ -67,7 +67,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect.poll(chipText).toContain("on the map ·");
   await expect.poll(chipText).toContain("dropped, hidden");
   await page.screenshot({ path: `review-shots/${name}-pipeline.png`, fullPage: false });
-  await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".pipeline-list");
   if (name !== "mobile") {
     await expect(page.locator(".pipeline-list thead th")).toHaveCount(9);
@@ -92,14 +92,14 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     expect(cardGaps.bareMissing).toBe(false);
   }
   await page.screenshot({ path: `review-shots/${name}-list.png`, fullPage: false });
-  await page.goto("/?newlist=1&site=L-239", { waitUntil: "domcontentloaded" });
+  await page.goto("/?newlist=1&city=PHX&site=L-239", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
   await waitForBasemap(page);
   await expect(page.locator("aside.drawer")).toContainText("Listed, not yet screened");
   await expect(page.locator("aside.drawer")).toContainText("Crexi");
   await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
   await page.screenshot({ path: `review-shots/${name}-unscreened.png`, fullPage: false });
-  await page.goto("/?funnel=pipeline&pstage=desk", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=pipeline&city=PHX&pstage=desk", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   if (name === "mobile") {
     await page.getByRole("button", { name: "Layers", exact: true }).click();

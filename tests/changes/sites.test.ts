@@ -48,7 +48,7 @@ test("a contributor or agent can update site content, and stage stays off this p
     /Stage is not written on a site/,
   );
   assert.throws(
-    () => validateBatch(agent, "agent-stage", { changes: [siteChange({ Stage: "1 Desk screen", notes: "Hello" })] }),
+    () => validateBatch(agent, "agent-stage", { changes: [siteChange({ Stage: "1 Desk screen", notes: "Hello" }, 1)] }),
     /Stage is not written on a site/,
   );
   assert.throws(
@@ -76,6 +76,10 @@ test("a contributor or agent can update site content, and stage stays off this p
   }
   assert.throws(
     () => validateBatch(reviewer, "score", { changes: [siteChange({ score: 10, name: "Sonoran" })] }),
+    /That field is not accepted/,
+  );
+  assert.throws(
+    () => validateBatch(reviewer, "points", { changes: [siteChange({ economics_points: "12.5", name: "Sonoran" })] }),
     /That field is not accepted/,
   );
   assert.doesNotThrow(() =>
@@ -379,6 +383,10 @@ test("the raw site sheet is not a snapshot file and is not served", () => {
   assert.equal(mirrorHeaderAllowed("Folder"), false);
   assert.equal(mirrorHeaderAllowed("Broker"), true);
   assert.equal(mirrorHeaderAllowed("Score (of 100)"), false);
+  assert.equal(mirrorHeaderAllowed("Economics points"), false);
+  assert.equal(mirrorHeaderAllowed("Land points"), false);
+  assert.equal(mirrorHeaderAllowed("Power points"), false);
+  assert.equal(mirrorHeaderAllowed("Deal points"), false);
   assert.equal(mirrorHeaderAllowed("Stalls that fit"), false);
   const writes = mirrorWrites(
     { county_value: "2236814", service_area_class: "inside", broker: "Ada Broker", miles_to_depot: "3.2" },

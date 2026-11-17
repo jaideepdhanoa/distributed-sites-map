@@ -619,6 +619,45 @@ def _universe_geocode_query(address: str, city_name: str, market: str) -> str:
     return f"{text}, {local}, {state}".strip(", ")
 
 
+_WB_ID = re.compile(r"^WB-([A-Z]{2,4})-(\d+)$")
+
+
+def universe_id_floors(sites: list[dict]) -> Counter:
+    """Highest WB suffix already stored for each market. A later id starts above this."""
+    floors: Counter = Counter()
+    for site in sites:
+        match = _WB_ID.fullmatch(str(site.get("site_id") or "").strip())
+        if not match:
+            continue
+        city, number = match.group(1), int(match.group(2))
+        if number > floors[city]:
+            floors[city] = number
+    return floors
+
+
+def sheet_universe_id(row: dict) -> str:
+    for key in ("Universe ID", "Site ID", "site_id", "Lead ID"):
+        value = str(row.get(key) or "").strip()
+        if _WB_ID.fullmatch(value):
+            return value
+    return ""
+
+
+def next_universe_id(floors: Counter, city: str, used: set[str], sheet_id: str = "") -> str:
+    """Keep a sheet WB id when it is free. Otherwise take the next suffix above the floor."""
+    given = sheet_id.strip()
+    if _WB_ID.fullmatch(given) and given.startswith(f"WB-{city}-") and given not in used:
+        number = int(given.rsplit("-", 1)[1])
+        if number > floors[city]:
+            floors[city] = number
+        return given
+    while True:
+        floors[city] += 1
+        sid = f"WB-{city}-{floors[city]:04d}"
+        if sid not in used:
+            return sid
+
+
 def apply_live_universe(
     rows: list[dict],
     sites: list[dict],
@@ -647,7 +686,8 @@ def apply_live_universe(
 
     claimed: set[str] = set()
     yes_ids: set[str] = set()
-    seq: Counter = Counter()
+    seq = universe_id_floors(sites)
+    used_ids = {str(site.get("site_id") or "") for site in sites}
     fresh = 0
     matched = 0
     unrecognized: list[str] = []
@@ -811,8 +851,8 @@ def apply_live_universe(
         sid, twin = claim(city, row.get("APN"), str(row.get("Address") or ""))
         is_new = sid is None
         if is_new:
-            seq[city] += 1
-            sid = f"WB-{city}-{seq[city]:04d}"
+            sid = next_universe_id(seq, city, used_ids, sheet_universe_id(row))
+            used_ids.add(sid)
             site = blank_site(sid, city)
             sites.append(site)
             by_id[sid] = site
@@ -3006,7 +3046,13 @@ _SHEET_KEEP = {
     "Photos checked",
     "Photo notes",
     "Score (of 100)",
+    "Economics points",
+    "Land points",
+    "Power points",
     "Location points",
+    "Deal points",
+    "Saving vs. hub at screening price %",
+    "Deal rating",
     "Folder",
     "County value ($)",
     "Value basis",

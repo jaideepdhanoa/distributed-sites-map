@@ -298,6 +298,18 @@ export type DealProps = {
   score?: number | null;
   /** Workbook Location points cell. Not recomputed from the service-area class. */
   location_points?: number | null;
+  /** Workbook Economics points cell. Not recomputed from the saving figure. */
+  economics_points?: number | null;
+  /** Workbook Land points cell. Not recomputed from stalls. */
+  land_points?: number | null;
+  /** Workbook Power points cell. Not recomputed from the power rating. */
+  power_points?: number | null;
+  /** Workbook Deal points cell. Not recomputed from the deal rating. */
+  deal_points?: number | null;
+  /** Workbook Saving vs. hub at screening price % cell, as written. */
+  saving_vs_hub?: string | null;
+  /** Workbook Deal rating cell, as written. */
+  deal_rating?: string | null;
   apn?: string;
   /** Site mirror of NDA Register. Blank ID means Not required. */
   nda_id?: string;

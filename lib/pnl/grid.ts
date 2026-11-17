@@ -1,3 +1,4 @@
+import type { OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { monthColumnState } from "./columns";
 import { formatCapturedDate } from "./dateLabel";
@@ -21,6 +22,8 @@ export type ValueCell = {
   sourcePage: string;
   sourceHref: string;
   capturedLabel: string;
+  gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   flag: string | null;
 };
 
@@ -34,12 +37,17 @@ export type MissingCell = {
   kind: "missing";
   sourceDocument: string;
   sourcePage: string;
+  sourceHref?: string;
   capturedLabel: string;
+  gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   markerSource: string;
 };
 
 export type GridCell = (ValueCell | MissingCell | { kind: "blank" }) & {
   conflict?: CellConflict;
+  commentOpen?: boolean;
+  commentCount?: number;
 };
 
 export type GridRow = {
@@ -47,6 +55,8 @@ export type GridRow = {
   label: string;
   kind: "group" | "line" | "total" | "margin";
   cells: GridCell[];
+  commentOpen?: boolean;
+  commentCount?: number;
 };
 
 export type GridColumn = {
@@ -92,6 +102,8 @@ function fromLine(line: PnlLineView, cents: bigint, share: string | null, summed
     sourcePage: summed ? "" : line.sourcePage,
     sourceHref: summed ? "" : line.sourceHref,
     capturedLabel: summed ? "" : formatCapturedDate(line.capturedAt),
+    gmailHref: summed ? "" : line.gmailHref || "",
+    sourceLinkPart: summed ? "" : line.sourceLinkPart || "",
     flag: summed ? null : line.flag?.reason ?? null,
   };
 }
@@ -189,7 +201,7 @@ function mergeMonths(periods: PnlPeriodView[], year: number): PnlPeriodView {
 
 function emptyCell(bucket: Bucket): GridCell | null {
   if (bucket.missing) {
-    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", capturedLabel: "", markerSource: "" };
+    return bucket.missingSource ?? { kind: "missing", sourceDocument: "", sourcePage: "", sourceHref: "", capturedLabel: "", markerSource: "" };
   }
   if (!bucket.period) return { kind: "blank" };
   return null;
@@ -204,7 +216,10 @@ function missingBucket(year: PnlYearView | undefined, month: number): Bucket {
       kind: "missing",
       sourceDocument: detail?.sourceDocument || "",
       sourcePage: detail?.sourcePage || "",
+      sourceHref: detail?.sourceHref || "",
       capturedLabel: detail?.capturedAt ? formatCapturedDate(detail.capturedAt) : "",
+      gmailHref: detail?.gmailHref || "",
+      sourceLinkPart: detail?.sourceLinkPart || "",
       markerSource: detail?.markerSource || "",
     },
   };
@@ -241,6 +256,10 @@ function withPeriod(column: GridColumn, period: PnlPeriodView | null | undefined
     periodEnd: period.periodEnd,
     periodLabel: period.label,
   };
+}
+
+export function columnPeriodKey(column: GridColumn): string {
+  return column.periodLabel || column.label;
 }
 
 function periodKeys(column: GridColumn): string[] {
@@ -325,7 +344,28 @@ function usedCodes(buckets: Bucket[], section: "revenue" | "costs" | "addbacks")
   return sectionOrder(section).filter((code) => found.has(code));
 }
 
-export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number, conflicts: DataConflict[] = []): PnlGrid {
+function attachComments(grid: PnlGrid, comments: OpenPnlComment[]): PnlGrid {
+  if (!comments.length) return grid;
+  return {
+    ...grid,
+    rows: grid.rows.map((row) => {
+      const lineCount = comments.filter((mark) => mark.type === "pnl_line" && mark.line === row.id).length;
+      return {
+        ...row,
+        ...(lineCount ? { commentOpen: true, commentCount: lineCount } : {}),
+        cells: row.cells.map((cell, index) => {
+          const column = grid.columns[index];
+          if (!column) return cell;
+          const keys = periodKeys(column);
+          const count = comments.filter((mark) => mark.type === "pnl_cell" && mark.line === row.id && keys.includes(mark.period)).length;
+          return count ? { ...cell, commentOpen: true, commentCount: count } : cell;
+        }),
+      };
+    }),
+  };
+}
+
+export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number, conflicts: DataConflict[] = [], comments: OpenPnlComment[] = []): PnlGrid {
   const years = statement.years.map((item) => item.year);
   if (statement.status !== "ready" || !years.length) return { columns: [], rows: [], years, note: "" };
   const selected = year && years.includes(year) ? year : years[0];
@@ -470,7 +510,7 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
       cells: sdeCells.map((cell) => (cell.kind === "value" && cell.share ? fromMath(cell.cents, cell.share, "SDE divided by revenue for this column.", cell.share) : cell.kind === "missing" ? cell : { kind: "blank" })),
     });
   }
-  return attachConflicts({ columns, rows, years, note }, conflicts);
+  return attachComments(attachConflicts({ columns, rows, years, note }, conflicts), comments);
 }
 
 export function columnSummary(grid: PnlGrid, index: number): { revenue: string; costs: string; ebitda: string; margin: string } {

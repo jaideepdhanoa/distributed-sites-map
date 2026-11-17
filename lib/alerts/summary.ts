@@ -1,4 +1,6 @@
 import type { Sql } from "@/lib/actions/db";
+import { countOpenThreads } from "@/lib/comments/record";
+import { isAgentStageDecision } from "@/lib/changes/schema";
 import { countOpenConflicts } from "@/lib/conflicts/record";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { publicSnippet, type MailItem } from "./compose";
@@ -25,12 +27,13 @@ export type SummaryCounts = {
   sites: number;
   asks: number;
   conflicts: number;
+  threads: number;
 };
 
 export type SummaryResult = { items: MailItem[]; counts: SummaryCounts };
 
 export function emptyCounts(): SummaryCounts {
-  return { recommendations: 0, proposals: 0, decisions: 0, stages: 0, activity: 0, comms: 0, sites: 0, asks: 0, conflicts: 0 };
+  return { recommendations: 0, proposals: 0, decisions: 0, stages: 0, activity: 0, comms: 0, sites: 0, asks: 0, conflicts: 0, threads: 0 };
 }
 
 export function emptyBrief(): SummaryResult {
@@ -279,6 +282,7 @@ async function collect(
     if (row.entity_type !== "stage" || !kept(row.site_id)) return false;
     const payload = asObject(row.payload);
     if (!isRealStageChange(payload, row.source, row.actor)) return false;
+    if (isAgentStageDecision(payload)) return true;
     return agentStageIsApproved(row.actor, row.site_id, String(payload.stage || ""), approved);
   });
   if (shown(input.prefs, "stages") && stages.length) {
@@ -289,7 +293,7 @@ async function collect(
         category: "stages",
         siteId: row.site_id,
         siteLabel: siteLabel(map, row.site_id),
-        summary: "Stage updated.",
+        summary: isAgentStageDecision(asObject(row.payload)) ? "Moved to Financial screen on package receipt." : "Stage updated.",
         authorId: row.actor,
         href: siteHref(row.site_id),
       });
@@ -337,6 +341,11 @@ async function collect(
   counts.conflicts = openConflicts;
   if (openConflicts) {
     items.push(line(countLine(openConflicts, "open data conflict", "open data conflicts"), input.userId, "brief"));
+  }
+  const openThreads = await countOpenThreads(sql);
+  counts.threads = openThreads;
+  if (openThreads) {
+    items.push(line(countLine(openThreads, "open comment thread", "open comment threads"), input.userId, "brief"));
   }
   if (unique.length) {
     const byMarket = new Map<string, number>();

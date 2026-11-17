@@ -72,6 +72,7 @@ function rememberMissing(missing: MissingMonth[], item: MissingMonth): void {
   if (!existing.periodId && item.periodId) existing.periodId = item.periodId;
   if (!existing.sourceDocument && item.sourceDocument) existing.sourceDocument = item.sourceDocument;
   if (!existing.sourcePage && item.sourcePage) existing.sourcePage = item.sourcePage;
+  if (!existing.sourceHref && item.sourceHref) existing.sourceHref = item.sourceHref;
   if (!existing.capturedAt && item.capturedAt) existing.capturedAt = item.capturedAt;
   if (!existing.markerSource && item.markerSource) existing.markerSource = item.markerSource;
 }
@@ -93,6 +94,7 @@ type MissingPeriodRow = {
   line_status: string | null;
   source_document: string | null;
   source_page: string | null;
+  source_href: string | null;
   captured_at_iso: string | null;
 };
 
@@ -105,7 +107,7 @@ async function collectMissingPeriods(sql: Sql, siteIds: string[]): Promise<Missi
   const result = await sql.query<MissingPeriodRow>(
     `SELECT p.entity_id AS period_id, p.grain, p.year, p.month, p.period_start, p.business_type,
             lower(btrim(coalesce(l.status, ''))) AS line_status,
-            l.source_document, l.source_page, l.captured_at_iso
+            l.source_document, l.source_page, l.source_href, l.captured_at_iso
      FROM pnl_periods p
      LEFT JOIN pnl_lines l ON l.period_id = p.entity_id AND l.deleted_at IS NULL
      WHERE (
@@ -150,6 +152,7 @@ async function collectMissingPeriods(sql: Sql, siteIds: string[]): Promise<Missi
       periodId,
       sourceDocument: source?.source_document || "",
       sourcePage: source?.source_page || "",
+      sourceHref: source?.source_href || "",
       capturedAt: source?.captured_at_iso || "",
     });
   }
@@ -191,6 +194,7 @@ export async function loadPnlStatement(sql: Sql, siteId: string | string[]): Pro
             periodId: row.period_id,
             sourceDocument: row.source_document || "",
             sourcePage: row.source_page || "",
+            sourceHref: row.source_href || "",
             capturedAt: row.captured_at_iso || "",
           });
         }
@@ -293,6 +297,7 @@ async function addChangeMarkers(sql: Sql, siteIds: string[], lines: CapturedLine
       if (!existing.markerSource && markerSource) existing.markerSource = markerSource;
       if (!existing.sourceDocument) existing.sourceDocument = String(payload?.source_document || "");
       if (!existing.sourcePage) existing.sourcePage = String(payload?.source_page || "");
+      if (!existing.sourceHref) existing.sourceHref = String(payload?.source_href || "");
       if (!existing.capturedAt) existing.capturedAt = String(payload?.captured_at || "");
       if (!existing.periodId) existing.periodId = String(payload?.period_id || "");
       continue;
@@ -305,6 +310,7 @@ async function addChangeMarkers(sql: Sql, siteIds: string[], lines: CapturedLine
       periodId: String(payload?.period_id || ""),
       sourceDocument: String(payload?.source_document || ""),
       sourcePage: String(payload?.source_page || ""),
+      sourceHref: String(payload?.source_href || ""),
       capturedAt: String(payload?.captured_at || ""),
       markerSource,
     });

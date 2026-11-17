@@ -89,6 +89,12 @@ FIGURE_FIELDS = (
     "access_notes",
     "score",
     "location_points",
+    "economics_points",
+    "land_points",
+    "power_points",
+    "deal_points",
+    "saving_vs_hub",
+    "deal_rating",
 )
 
 
@@ -168,6 +174,16 @@ def _access_note(value) -> str:
     if not text or _SHEET_ERROR.search(text) or _SCRIPT_SOURCE.search(text):
         return ""
     return text[:500]
+
+
+def _copied_text(value):
+    """A workbook cell kept as written. Blank and formula errors stay empty."""
+    if value is None or isinstance(value, bool):
+        return ""
+    text = str(value).strip()
+    if not text or _SHEET_ERROR.search(text):
+        return ""
+    return text
 
 
 def _score(value):
@@ -487,9 +503,15 @@ def key_figures(row: dict, kind: str) -> dict:
         "cash_multiple": multiple,
         "cash_multiple_display": multiple_text,
         "access_notes": _access_note(row.get("Access and visibility notes")),
-        # Copied from the workbook. The service-area class does not recompute either number.
+        # Copied from the workbook by header name. These cells are not recomputed.
         "score": _score(row.get("Score (of 100)")),
         "location_points": _score(row.get("Location points")),
+        "economics_points": _score(row.get("Economics points")),
+        "land_points": _score(row.get("Land points")),
+        "power_points": _score(row.get("Power points")),
+        "deal_points": _score(row.get("Deal points")),
+        "saving_vs_hub": _copied_text(row.get("Saving vs. hub at screening price %")),
+        "deal_rating": _copied_text(row.get("Deal rating")),
     }
 
 

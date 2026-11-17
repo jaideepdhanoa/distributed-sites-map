@@ -41,6 +41,7 @@ export type MissingMonth = {
   periodId: string;
   sourceDocument?: string;
   sourcePage?: string;
+  sourceHref?: string;
   capturedAt?: string;
   /** Change-level source, such as "Not in package". It is not the line's document. */
   markerSource?: string;
@@ -50,6 +51,9 @@ export type MissingDetail = {
   month: number;
   sourceDocument: string;
   sourcePage: string;
+  sourceHref?: string;
+  gmailHref?: string;
+  sourceLinkPart?: "" | "zip" | "member";
   capturedAt: string;
   markerSource: string;
 };
@@ -72,6 +76,10 @@ export type PnlLineView = {
   sourcePage: string;
   sourceHref: string;
   capturedAt: string;
+  /** Open in Gmail. Empty unless this viewer is allowed to see it. */
+  gmailHref?: string;
+  /** Which file a package citation links. `zip` shows the member name beside the link. */
+  sourceLinkPart?: "" | "zip" | "member";
   flag: LineFlag | null;
   /** Present when a normalized line is stored beside this stated line. */
   normalized: NormalizedMark | null;
@@ -298,6 +306,7 @@ function buildYears(lines: CapturedLine[], missing: MissingMonth[], normalizedIn
         month,
         sourceDocument: row?.sourceDocument || "",
         sourcePage: row?.sourcePage || "",
+        sourceHref: row?.sourceHref || "",
         capturedAt: row?.capturedAt || "",
         markerSource: row?.markerSource || "",
       };

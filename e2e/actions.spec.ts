@@ -504,10 +504,10 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   expect(summary && controls).toBeTruthy();
   if (summary && controls) expect(controls.y).toBeGreaterThanOrEqual(summary.y + summary.height - 1);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?funnel=pipeline&pstage=desk");
+  await page.goto("/?funnel=pipeline&city=PHX&pstage=desk");
   await page.waitForSelector("[data-pin-count]");
   const pins = await page.locator(".shell").getAttribute("data-pin-count");
-  await page.goto("/?funnel=pipeline&pstage=desk&cstore=1");
+  await page.goto("/?funnel=pipeline&city=PHX&pstage=desk&cstore=1");
   await expect(page.locator(".shell")).toHaveAttribute("data-pin-count", pins || "");
   await page.waitForFunction(() => {
     const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean; getSource: (id: string) => { serialize: () => { data?: { features?: unknown[] } } } } }).__sitesMap;

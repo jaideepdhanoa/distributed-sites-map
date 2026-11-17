@@ -1,6 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { withConnectionString } from "../lib/actions/db";
 import { assertProductionDiff } from "../lib/changes/guard";
+import { raiseIdFloor } from "../lib/changes/apply";
 import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
 import { MIRROR_FIELD_HEADERS } from "../lib/changes/site";
 import {
@@ -21,14 +22,19 @@ import {
   formatMirrorDrift,
   formatPlan,
   formatPlanSummary,
+  labeledFloorsFromTable,
   loadMirrorRows,
   mirrorDrift,
   mirrorDryRun,
   planActivityMirror,
   planCommsMirror,
+  planCreatedSiteMirror,
   planSiteMirror,
+  planUniverseMirror,
   newMirrorRunId,
   planStageMirror,
+  UNIVERSE_HEADER_ROW,
+  UNIVERSE_SHEET,
   saveMirrorRun,
   sheetIdFloor,
   watchMirrorCancel,
@@ -143,10 +149,38 @@ async function main(): Promise<void> {
       tables.push(await loadTable(token, tab.title, tab.headerRow, headers, true));
     }
     const plan = planSiteMirror(tables, rows.sites);
-    changes.push(...plan.changes);
-    skippedProtected += plan.skippedProtected;
-    appended += plan.appended;
-    unmatched += plan.unmatched.length;
+    const created = planCreatedSiteMirror(tables, rows.createdSites);
+    changes.push(...plan.changes, ...created.changes);
+    skippedProtected += plan.skippedProtected + created.skippedProtected;
+    appended += plan.appended + created.appended;
+    unmatched += plan.unmatched.length + created.unmatched.length;
+    const floors = [...tables.flatMap((table) => labeledFloorsFromTable(table, ["site id"]))];
+    try {
+      const universe = await loadTable(token, UNIVERSE_SHEET, UNIVERSE_HEADER_ROW, [
+        ["universe id", "site id", "lead id"],
+        ["business name", "name"],
+        ["address"],
+        ["market"],
+        ["apn", "apn or folio"],
+        ["lat"],
+        ["lon", "lng"],
+        ["segment group", "category"],
+        ["listing link"],
+        ["broker"],
+        ["counted in funnel"],
+      ]);
+      const universePlan = planUniverseMirror(universe, rows.universeRows);
+      changes.push(...universePlan.changes);
+      appended += universePlan.appended;
+      unmatched += universePlan.unmatched.length;
+      floors.push(...labeledFloorsFromTable(universe, ["universe id", "site id", "lead id"]));
+    } catch (error) {
+      if (rows.universeRows.length) throw error;
+      console.error(JSON.stringify({ event: "universe_sheet_skipped" }));
+    }
+    await withConnectionString(url, async (sql) => {
+      for (const floor of floors) await raiseIdFloor(sql, floor.name, floor.value);
+    });
   }
   if (selected.includes("activity")) {
     const table = await loadTable(token, ACTIVITY_SHEET, ACTIVITY_HEADER_ROW, [

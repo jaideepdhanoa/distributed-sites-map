@@ -72,7 +72,7 @@ test("Back returns to the previous city and step", async ({ page }, info) => {
   await expect(page.locator(".shell")).toHaveAttribute("data-stage", "land");
   await page.goBack();
   await page.waitForFunction(() => !location.search.includes("city=MIA"));
-  await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
+  await expect(page.locator(".shell")).toHaveAttribute("data-city", "all");
 });
 
 test("a shared link restores the city, step, filter, card, and table", async ({ page }, info) => {
@@ -89,7 +89,7 @@ test("a shared link restores the city, step, filter, card, and table", async ({ 
 });
 
 test("export matches the rows and columns on screen", async ({ page }, info) => {
-  await page.goto("/?funnel=universe&stage=cleared&view=list", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=universe&city=PHX&stage=cleared&view=list", { waitUntil: "domcontentloaded" });
   const phone = info.project.name === "mobile";
   if (phone) await page.waitForSelector("[data-testid=phone-cards] button.list-row");
   else await page.waitForSelector(".list-pane tbody tr", { state: "attached" });

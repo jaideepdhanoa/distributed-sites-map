@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { attachPackageHrefs } from "../lib/financials.ts";
 import { buildQueue } from "../lib/queue/order.ts";
-import { areaCounts, dealOnPipeStep, inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "../lib/reach.ts";
+import { FUNNEL_NOTES } from "../lib/labels.ts";
+import { areaCounts, countDroppedDeals, countOutsideServiceArea, dealOnPipeStep, inReach, outsideServiceArea, parseReach, reachLabel, serviceAreaSplit, type Reach } from "../lib/reach.ts";
 
 const rows = [
   { id: "in", service_area_class: "inside", in_area: true },
@@ -32,17 +33,58 @@ test("each reach keeps the matching classes and leaves outside out", () => {
   assert.equal(inReach({ in_area: false }, "within10"), false);
 });
 
-test("explicit unknown and outside stay on the Dropped step", () => {
-  const outside = { service_area_class: "outside", service_area_source: "label", stage_group: "desk" };
-  const named = { service_area_class: "unknown", service_area_source: "label", stage_group: "financial" };
-  const blank = { service_area_class: "unknown", stage_group: "desk" };
+test("explicit unknown and outside are their own group, and Dropped is the stage", () => {
+  const outside = { deal_id: "PIPE-A", kind: "pipeline", service_area_class: "outside", service_area_source: "label", stage_group: "desk" };
+  const named = { deal_id: "PIPE-B", kind: "pipeline", service_area_class: "unknown", service_area_source: "label", stage_group: "financial" };
+  const unrecognized = { deal_id: "PIPE-C", kind: "pipeline", service_area_class: "unknown", service_area_source: "unrecognized", stage_group: "desk" };
+  const blank = { deal_id: "PIPE-D", kind: "pipeline", service_area_class: "unknown", stage_group: "desk" };
+  const droppedOutside = { deal_id: "PIPE-E", kind: "pipeline", service_area_class: "outside", service_area_source: "label", stage_group: "dropped" };
+  const droppedInside = { deal_id: "PIPE-F", kind: "pipeline", service_area_class: "inside", stage_group: "dropped" };
+  const droppedNear = { deal_id: "PIPE-G", kind: "pipeline", service_area_class: "near_5_10", stage_group: "dropped" };
+  const landDrop = { deal_id: "LAND-A", kind: "land", service_area_class: "inside", stage_group: "dropped" };
+  const landOutside = { deal_id: "LAND-B", kind: "land", service_area_class: "outside", service_area_source: "label", stage_group: "financial" };
+  const protectedDrop = { deal_id: "PIPE-PHX-0006", kind: "pipeline", service_area_class: "outside", service_area_source: "label", stage_group: "dropped" };
+  const protectedActive = { deal_id: "PIPE-PHX-0006", kind: "pipeline", service_area_class: "outside", service_area_source: "label", stage_group: "desk" };
+
   assert.equal(dealOnPipeStep(outside, "desk"), false);
-  assert.equal(dealOnPipeStep(outside, "dropped"), true);
+  assert.equal(dealOnPipeStep(outside, "dropped"), false);
+  assert.equal(outsideServiceArea(outside), true);
   assert.equal(dealOnPipeStep(named, "financial"), false);
-  assert.equal(dealOnPipeStep(named, "dropped"), true);
+  assert.equal(dealOnPipeStep(named, "dropped"), false);
+  assert.equal(outsideServiceArea(named), true);
+  assert.equal(dealOnPipeStep(unrecognized, "desk"), false);
+  assert.equal(outsideServiceArea(unrecognized), true);
   assert.equal(dealOnPipeStep(blank, "desk"), true);
   assert.equal(dealOnPipeStep(blank, "dropped"), false);
-  assert.equal(dealOnPipeStep({ stage_group: "dropped", service_area_class: "inside" }, "dropped"), true);
+  assert.equal(outsideServiceArea(blank), false);
+  assert.equal(dealOnPipeStep(droppedOutside, "dropped"), true);
+  assert.equal(dealOnPipeStep(droppedOutside, "desk"), false);
+  assert.equal(outsideServiceArea(droppedOutside), false);
+  assert.equal(dealOnPipeStep(droppedInside, "dropped"), true);
+  assert.equal(dealOnPipeStep(droppedNear, "dropped", "inside"), true);
+  assert.equal(dealOnPipeStep(protectedDrop, "dropped"), false);
+  assert.equal(outsideServiceArea(protectedDrop), false);
+  assert.equal(outsideServiceArea(protectedActive), false);
+  assert.equal(dealOnPipeStep(protectedActive, "desk"), false);
+
+  const rows = [outside, named, unrecognized, blank, droppedOutside, droppedInside, droppedNear, landDrop, landOutside, protectedDrop, protectedActive];
+  function badge(land: boolean) {
+    return rows.filter((row) => (land || row.kind !== "land") && dealOnPipeStep(row, "dropped")).length;
+  }
+  function header(land: boolean) {
+    return countDroppedDeals(rows.filter((row) => land || row.kind !== "land"));
+  }
+  assert.equal(header(false), badge(false));
+  assert.equal(header(true), badge(true));
+  assert.equal(badge(false), 3);
+  assert.equal(badge(true), 4);
+  assert.equal(countOutsideServiceArea(rows.filter((row) => row.kind !== "land")), 3);
+  assert.equal(countOutsideServiceArea(rows), 4);
+  assert.equal(rows.filter((row) => row.deal_id === "PIPE-PHX-0006" && (dealOnPipeStep(row, "dropped") || outsideServiceArea(row) || dealOnPipeStep(row, "desk"))).length, 0);
+
+  assert.match(FUNNEL_NOTES.dropped, /Dropped/);
+  assert.match(FUNNEL_NOTES.dropped, /Outside or Unknown/);
+  assert.equal(FUNNEL_NOTES.outside, "Active sites marked Outside or Unknown in the service-area column.");
 });
 
 test("service-area counts follow the reach and split by class", () => {

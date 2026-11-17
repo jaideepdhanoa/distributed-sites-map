@@ -8,9 +8,12 @@
  * and did not record where that class came from. A class of "unknown" with no
  * source, or with source "blank", stays in view. Source "label" is the word
  * Unknown. Outside, and that explicit Unknown, stay out of the working set.
- * The Dropped step still lists them. Unrecognized text is left unset, so it
- * stays in view and the build warning names it.
+ * They are not the Dropped step. Dropped is the stage only, including a drop
+ * that is also Outside or Unknown. Active Outside and explicit Unknown are
+ * the Outside service area group. The quarantined site is in neither group.
  */
+
+import { isExcludedSite } from "./alerts/excluded.ts";
 
 export type Reach = "inside" | "within5" | "within10";
 
@@ -21,6 +24,7 @@ export type ServiceClass = "inside" | "near_0_5" | "near_5_10" | "outside" | "ed
 const CLASSES = new Set<ServiceClass>(["inside", "near_0_5", "near_5_10", "outside", "edge_legacy", "unknown"]);
 
 export type AreaInput = {
+  deal_id?: string | null;
   service_area_class?: string | null;
   /** blank, label, or unrecognized. Absent on a snapshot that stamped blanks as unknown. */
   service_area_source?: string | null;
@@ -80,15 +84,31 @@ export function inReach(record: AreaInput | null | undefined, reach: Reach = REA
 }
 
 /**
- * One pipeline step. Explicit Unknown and Outside are hidden on the working
- * steps and listed on Dropped, including when their stage is not Dropped.
- * A blank class uses its stage.
+ * One pipeline step. Dropped is the stage only, including a drop that is also
+ * Outside or Unknown. Active Outside and explicit Unknown stay off every
+ * working step. A blank class uses its stage.
  */
 export function dealOnPipeStep(record: AreaInput | null | undefined, step: string, reach: Reach = REACH_DEFAULT): boolean {
-  if (!record) return false;
-  if (step === "dropped" && workingSetKnockout(record)) return true;
+  if (!record || isExcludedSite(record.deal_id)) return false;
+  if (step === "dropped") return record.stage_group === "dropped";
   if (record.stage_group !== step) return false;
   return inReach(record, reach);
+}
+
+/** Active Outside or explicit Unknown. Stage Dropped stays on the Dropped step. */
+export function outsideServiceArea(record: AreaInput | null | undefined): boolean {
+  if (!record || isExcludedSite(record.deal_id)) return false;
+  return workingSetKnockout(record) && record.stage_group !== "dropped";
+}
+
+/** Rows the Dropped badge and the All-chip dropped sidecar both count. */
+export function countDroppedDeals(records: readonly AreaInput[]): number {
+  return records.filter((record) => dealOnPipeStep(record, "dropped")).length;
+}
+
+/** Rows in the Outside service area group. */
+export function countOutsideServiceArea(records: readonly AreaInput[]): number {
+  return records.filter((record) => outsideServiceArea(record)).length;
 }
 
 export type AreaCounts = {

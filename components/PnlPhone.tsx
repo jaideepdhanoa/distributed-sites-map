@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { statusLabel, type DataConflict } from "@/lib/conflicts/view";
+import type { DataConflict } from "@/lib/conflicts/view";
 import { MONTH_SHORT } from "@/lib/pnl/lines";
 import { buildPnlGrid, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
+import PnlLinePopover from "./PnlLinePopover";
 
 function textOf(cell: GridCell | undefined, percent: boolean): string {
   if (!cell || cell.kind === "blank") return "Not in package";
@@ -21,6 +22,7 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
   const [month, setMonth] = useState(initialMonth < 0 ? 0 : initialMonth);
   const [yearIndex, setYearIndex] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
+  const anchor = useRef<HTMLElement | null>(null);
   const touch = useRef(0);
   const grid = useMemo(
     () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts),
@@ -32,6 +34,16 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
   const periodTitle = grain === "month"
     ? (month >= 12 ? periods[12] : `${MONTH_SHORT[month]} ${year}`)
     : periods[yearIndex] || "";
+
+  function closeLine() {
+    const node = anchor.current;
+    setOpen(null);
+    node?.focus();
+  }
+
+  const openRow = grid.rows.find((row) => row.id === open);
+  const openCell: GridCell | undefined = openRow?.cells[index];
+  const openLabel = openRow?.label || "Line";
 
   function step(delta: number) {
     const next = Math.min(Math.max(index + delta, 0), periods.length - 1);
@@ -104,62 +116,25 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
                 type="button"
                 className="list-row"
                 aria-expanded={open === row.id}
-                onClick={() => setOpen((current) => (current === row.id ? null : row.id))}
+                data-pnl-anchor={open === row.id ? "open" : undefined}
+                onClick={(event) => {
+                  if (open === row.id) return;
+                  anchor.current = event.currentTarget;
+                  setOpen(row.id);
+                }}
               >
                 <span>{row.label}</span>
                 <strong className={value ? undefined : "pnl-muted"}>{textOf(cell, false)}</strong>
                 <small>{value?.share || ""}</small>
                 {value?.flag ? <i className="pnl-dot" data-testid="pnl-flag-dot" aria-label="Outside the band" /> : null}
               </button>
-              {open === row.id ? <Detail cell={cell} /> : null}
             </div>
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function ConflictDetail({ cell }: { cell: GridCell }) {
-  if (!cell.conflict) return null;
-  return (
-    <div data-testid="pnl-conflict">
-      <p>Conflict · {statusLabel(cell.conflict.status)}</p>
-      {cell.conflict.sources.map((source) => (
-        <p key={`${source.document}-${source.page}`}>{source.value} · {source.document} · {source.page}</p>
-      ))}
-      <p>In use: {cell.conflict.valueInUse}</p>
-    </div>
-  );
-}
-
-function Detail({ cell }: { cell: GridCell | undefined }) {
-  if (!cell || cell.kind === "missing") {
-    const source = cell?.kind === "missing" ? [cell.sourceDocument, cell.sourcePage, cell.markerSource].filter(Boolean).join(" · ") : "";
-    return (
-      <div className="pnl-expand" data-testid="pnl-missing-source">
-        <p>Missing</p>
-        {source ? <p>{source}</p> : null}
-        {cell?.kind === "missing" && cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
-        {cell ? <ConflictDetail cell={cell} /> : null}
-      </div>
-    );
-  }
-  if (cell.kind === "blank") {
-    return (
-      <div className="pnl-expand">
-        <p>Not in this statement.</p>
-        <ConflictDetail cell={cell} />
-      </div>
-    );
-  }
-  return (
-    <div className="pnl-expand" data-testid="pnl-expand">
-      <p>{cell.status === "calculated" ? "Calculated" : cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"}</p>
-      <p>{cell.sourceDocument}{cell.sourcePage ? ` · ${cell.sourcePage}` : ""}</p>
-      {cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
-      {cell.flag ? <p>{cell.flag}</p> : null}
-      <ConflictDetail cell={cell} />
+      {openCell ? (
+        <PnlLinePopover label={openLabel} cell={openCell} sheet onClose={closeLine} />
+      ) : null}
     </div>
   );
 }

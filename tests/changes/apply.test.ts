@@ -86,7 +86,15 @@ test("validation rejects a bad market, class, source, agent drop, and a caller-c
   assert.throws(() => validateBatch(contributor, "k1", { changes: [stage("1 Desk screen")] }), /Stage changes need a reviewer/);
   assert.doesNotThrow(() => validateBatch(contributor, "k1", { changes: [activity()] }));
   assert.throws(() => validateBatch(human, "k1", { changes: [stage("Financial screen")] }), /not a known stage/);
-  assert.throws(() => validateBatch(agent, "k1", { changes: [stage("2 Financial screen")] }), /Stage changes need a reviewer/);
+  assert.throws(() => validateBatch(agent, "k1", { changes: [stage("2 Financial screen")] }), /package receipt/);
+  assert.throws(
+    () => validateBatch(agent, "k1", { changes: [stage("3 Site checks")] }),
+    (error: unknown) => {
+      assert.equal((error as { status?: number }).status, 403);
+      assert.match(String(error), /only move a site from Desk screen to Financial screen/);
+      return true;
+    },
+  );
 });
 
 test("version conflict rolls the batch back, replay is idempotent, and ids are server-minted", async () => {

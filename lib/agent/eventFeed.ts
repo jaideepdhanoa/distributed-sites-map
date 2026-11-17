@@ -1,6 +1,7 @@
 import type { Sql } from "@/lib/actions/db";
 import { EVENT_FEED_LIMIT, eventSkipKey } from "@/lib/agent/feedKeys";
 import { isExcludedSite } from "@/lib/alerts/excluded";
+import { RECEIPT_ACTIVITY_SUMMARY } from "@/lib/changes/schema";
 import { CHECK_FIELDS, PHOTO_FIELDS, SCHEMA_FIELDS } from "@/lib/changes/site";
 import { insertFeedRow, type FeedInsert } from "@/lib/agent/inbox";
 
@@ -55,6 +56,25 @@ export function routesForEvent(input: {
   if (input.entityType === "comms") routes.push({ audience: "muse", kind: "data_change", text: "Comms recorded.", after: "direction" });
   if (input.entityType === "activity" && input.payload.type === "capture") {
     routes.push({ audience: "muse", kind: "data_change", text: "Capture recorded.", after: "capture" });
+  }
+  if (input.entityType === "activity" && input.payload.summary === RECEIPT_ACTIVITY_SUMMARY) {
+    routes.push({
+      audience: "muse",
+      kind: "data_change",
+      text: "Moved to Financial screen on package receipt.",
+      after: String(input.payload.source_link || "receipt"),
+    });
+  }
+  if (input.entityType === "stage" && input.payload.decision_source === "agent") {
+    const receipt = input.payload.receipt;
+    const row = receipt && typeof receipt === "object" ? (receipt as Record<string, unknown>) : {};
+    const cite = [row.document, row.received_at, row.comms_id, row.email_date].map((part) => String(part || "").trim()).filter(Boolean).join("; ");
+    routes.push({
+      audience: "muse",
+      kind: "data_change",
+      text: "Moved to Financial screen on package receipt.",
+      after: cite || "receipt",
+    });
   }
   if (input.entityType === "activity" && input.payload.type === "photos") {
     routes.push({ audience: "indie", kind: "data_change", text: "Photo updated.", after: "photos" });

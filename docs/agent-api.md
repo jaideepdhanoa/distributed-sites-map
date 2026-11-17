@@ -351,3 +351,114 @@ When two sources disagree about one site field or one P&L line for the same peri
 ```
 
 Table: `data_conflicts` in `db/migrations/021_data_conflicts.sql`. `020` is reserved. Production does not apply this file until the Production migrations workflow runs.
+
+## Stage move on a package receipt
+
+An agent token may make one stage change. The site must already be `1 Desk screen`, and the only destination is `2 Financial screen`. Every other agent stage write is `403`, including `Dropped`. A reviewer still accepts a stage through the proposal. This path does not create or accept a proposal.
+
+The payload cites the package receipt:
+
+- `document` is a Drive file id or a file name. A 16-character hex Gmail id is rejected.
+- `received_at` is an exact ISO-8601 time with a numeric offset or `Z`. It is stored as sent.
+- `comms_id` is the receipt's `CM-` id, or `email_date` is the source email's `YYYY-MM-DD` label. Send at least one. Neither is a Gmail id.
+
+The server writes `site_stages` with decision source `agent` and event source `Agent stage decision`. It also records an activity whose summary is `Moved to Financial screen on package receipt`, with the citation on `source_link`. That line is in the agent feed and in the morning brief.
+
+```json
+{
+  "entity_type": "stage",
+  "site_id": "PIPE-LAS-9001",
+  "expected_version": 1,
+  "source": "Sample package",
+  "payload": {
+    "stage": "2 Financial screen",
+    "market": "LAS",
+    "receipt": {
+      "document": "sample-package.pdf",
+      "received_at": "2026-03-01T15:04:00-07:00",
+      "comms_id": "CM-9001"
+    }
+  }
+}
+```
+
+The same move can cite the email date instead of a comms id:
+
+```json
+{
+  "document": "sample-drive-file",
+  "received_at": "2026-03-01T15:04:00-07:00",
+  "email_date": "2026-03-01"
+}
+```
+
+A move with no receipt is `400`. A move to any other stage is `403` with `An agent can only move a site from Desk screen to Financial screen.` A drop is `403` with `An agent cannot set Stage to Dropped.`
+
+## One-pass site create
+
+On create, an agent omits `site_id`. The server mints the next `PIPE-{MKT}-NNNN` or `LAND-{MKT}-NNNN` and, in the same transaction, the next Universe id `WB-{MKT}-NNNN`. `kind` is `pipeline` or `land`. `market` is `PHX`, `LAS`, or `MIA`. The numbers stay above ids already stored and above the workbook counters those sheets report. `PIPE-PHX-0006` is never minted.
+
+`listing_id` is an `L-` id. The same listing id returns the same site id and universe id. A different body for that listing id is `409`. The batch `Idempotency-Key` still replays the whole response when the body is unchanged.
+
+On this create, the agent may set `name`, `address`, `market`, `category`, `apn`, `lat`, `lng`, `listing_url`, and `broker`. Each one that is sent needs `sources.<field>`. After create, those identity fields stay owner-locked. Folder, photos, land evidence, typed power, check statuses, and financial claims are still rejected on a new row.
+
+The create still opens at `1 Desk screen` and records a `Site added` capture activity. The mirror appends the new Pipeline or Land Sites row and the Universe row. It does not copy the guarded fields.
+
+```json
+{
+  "entity_type": "site",
+  "expected_version": 0,
+  "source": "Sample listing",
+  "payload": {
+    "kind": "pipeline",
+    "market": "PHX",
+    "listing_id": "L-9001",
+    "name": "Sample Wash",
+    "category": "Car wash",
+    "listing_url": "https://example.com/listing/9001",
+    "broker": "Sample Broker",
+    "sources": {
+      "name": "Sample listing",
+      "market": "Sample listing",
+      "category": "Sample listing",
+      "listing_url": "Sample listing",
+      "broker": "Sample listing"
+    }
+  }
+}
+```
+
+The response result for that change includes the minted ids:
+
+```json
+{
+  "entity_type": "site",
+  "entity_id": "PIPE-PHX-0001",
+  "site_id": "PIPE-PHX-0001",
+  "universe_id": "WB-PHX-0001",
+  "listing_id": "L-9001",
+  "version": 1
+}
+```
+
+A human create still sends the site id. This mint path is the agent create.
+
+### Comms relink
+
+An agent can attach an existing comms row whose site id is blank or an `L-` listing id to the new site. Send the comms id, the new site id, the version, and `relink_from` equal to the current value (`""` or the `L-` id). The row stores `relinked_from` and `relinked_by`. A row that already has a `PIPE-` or `LAND-` id is not moved.
+
+```json
+{
+  "entity_type": "comms",
+  "site_id": "PIPE-PHX-0001",
+  "entity_id": "CM-9001",
+  "expected_version": 1,
+  "source": "Sample listing",
+  "payload": {
+    "direction": "in",
+    "relink_from": "L-9001"
+  }
+}
+```
+
+Tables: `site_mints` and `universe_rows` in `db/migrations/025_site_mint.sql`. Production does not apply this file until the Production migrations workflow runs.

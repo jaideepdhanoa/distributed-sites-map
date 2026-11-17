@@ -150,8 +150,11 @@ export const NUMERIC_FACT_FIELDS = [
 
 export type NumericFactField = (typeof NUMERIC_FACT_FIELDS)[number];
 
-/** Identity fields. Agents do not write these. */
+/** Identity fields. Agents do not write these after a site exists. */
 export const SCHEMA_FIELDS = ["name", "address", "market", "category", "apn", "universe_id", "lat", "lng", "folder_url"] as const;
+
+/** Identity an agent may set on create, each with its own source. universe_id and folder_url stay server-side. */
+export const CREATE_IDENTITY_FIELDS = ["name", "address", "market", "category", "apn", "lat", "lng", "listing_url", "broker"] as const;
 
 export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes"] as const;
 

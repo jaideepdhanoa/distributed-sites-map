@@ -1,5 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
-import type { Actor } from "@/lib/changes/schema";
+import { isAgentStageDecision, type Actor } from "@/lib/changes/schema";
 import { isExcludedSite } from "./excluded";
 import { discussionHref, homeHref, proposalHref, reviewHref } from "./links";
 import { queueAgentAlert, reviewerRecipients } from "./notify";
@@ -75,7 +75,8 @@ export async function notifyAppliedChanges(
     const payload = asObject(row.payload);
     if (stageWriteKind(payload) === "skip") continue;
     const stage = String(payload.stage || "");
-    const approved = await tiedToApprovedDecision(sql, result.site_id, stage);
+    const agentReceipt = isAgentStageDecision(payload);
+    const approved = agentReceipt || (await tiedToApprovedDecision(sql, result.site_id, stage));
     if (!approved) {
       await queueAgentAlert(sql, {
         actorId,
@@ -95,7 +96,7 @@ export async function notifyAppliedChanges(
       userIds: reviewerRecipients(),
       category: "stages",
       siteId: result.site_id,
-      summary: "A stage change from an approved decision.",
+      summary: agentReceipt ? "Moved to Financial screen on package receipt." : "A stage change from an approved decision.",
       href: reviewHref(result.site_id),
       refId: result.event_id,
     });

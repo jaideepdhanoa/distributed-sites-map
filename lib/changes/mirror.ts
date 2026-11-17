@@ -4,7 +4,7 @@ import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
 import { labeledIdFloors, numericSuffix } from "./apply";
 import { derivePowerRating, type PowerRatingName } from "@/lib/score/power-rating";
-import { DERIVED_POWER_HEADER, isPowerRatingName } from "@/lib/score/power-sheet";
+import { DERIVED_POWER_HEADER, columnsToAppend, isPowerRatingName, rowsToAppend } from "@/lib/score/power-sheet";
 import { MIRROR_FIELD_HEADERS, isDateField, isTruncatedCell, losesSheetDate, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameCommsStamp, sameSheetDate, sameWorkbookCell, sheetAllowsApprox, shortHash, withSheetStamp } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
@@ -479,20 +479,131 @@ export function planCreatedSiteMirror(tables: SheetTable[], rows: CreatedSiteMir
   return combined;
 }
 
-/** Append a minted Universe row. The id is the WB- id already stored, not a new sequence. */
+function lastUsedHeader(headers: string[]): number {
+  let last = 0;
+  headers.forEach((header, index) => {
+    if (header.trim()) last = index + 1;
+  });
+  return last;
+}
+
+/** Market, business name, and address. A blank part cannot identify a row. */
+export function universeMatchKey(market: string, name: string, address: string): string {
+  const norm = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const parts = [norm(market), norm(name), norm(address)];
+  if (parts.some((part) => !part)) return "";
+  return parts.join("|");
+}
+
+function columnText(headers: string[], cells: string[], names: string[]): string {
+  const index = headerIndex(headers, names);
+  if (index < 0) return "";
+  return cellText(cells[index]);
+}
+
+/**
+ * Append a minted Universe row. The id is the WB- id already stored.
+ * A missing id column is added. Existing legacy cells are not rewritten:
+ * a blank id is filled only when one sheet row and one database row share
+ * the same market, name, and address.
+ */
 export function planUniverseMirror(table: SheetTable, rows: UniverseMirrorRow[]): MirrorPlan {
-  const plan = planTable({
+  const plan = emptyPlan();
+  let idAt = headerIndex(table.headers, ["universe id", "site id", "lead id"]);
+  if (idAt < 0) {
+    const column = lastUsedHeader(table.headers) + 1;
+    while (table.headers.length < column) table.headers.push("");
+    table.headers[column - 1] = "Universe ID";
+    idAt = column - 1;
+    plan.changes.push({
+      sheet: table.title,
+      row: table.headerRow,
+      column,
+      header: "Universe ID",
+      id: "",
+      before: "",
+      after: "Universe ID",
+    });
+  }
+  const idHeader = table.headers[idAt] || "Universe ID";
+  let skippedProtected = 0;
+  const incoming = rows.filter((row) => {
+    if (row.universe_id !== PROTECTED_SITE_ID) return true;
+    skippedProtected += 1;
+    return false;
+  });
+  const rowById = new Map<string, { row: number; cells: string[] }>();
+  for (const row of table.rows) {
+    const id = cellText(row.cells[idAt]);
+    if (id && !rowById.has(id)) rowById.set(id, row);
+  }
+  const blankByKey = new Map<string, { row: number; cells: string[] }[]>();
+  for (const row of table.rows) {
+    if (cellText(row.cells[idAt])) continue;
+    const key = universeMatchKey(
+      columnText(table.headers, row.cells, ["market"]),
+      columnText(table.headers, row.cells, ["business name", "name"]),
+      columnText(table.headers, row.cells, ["address"]),
+    );
+    if (!key) continue;
+    const list = blankByKey.get(key) || [];
+    list.push(row);
+    blankByKey.set(key, list);
+  }
+  const pending = incoming.filter((row) => !rowById.has(row.universe_id));
+  const dbByKey = new Map<string, UniverseMirrorRow[]>();
+  for (const row of pending) {
+    const key = universeMatchKey(row.values.market || "", row.values.name || "", row.values.address || "");
+    if (!key) continue;
+    const list = dbByKey.get(key) || [];
+    list.push(row);
+    dbByKey.set(key, list);
+  }
+  const claimed = new Set<string>();
+  for (const row of pending) {
+    const key = universeMatchKey(row.values.market || "", row.values.name || "", row.values.address || "");
+    if (!key) continue;
+    const sheets = blankByKey.get(key) || [];
+    const dbs = dbByKey.get(key) || [];
+    if (sheets.length !== 1 || dbs.length !== 1) {
+      if (sheets.length > 0) {
+        claimed.add(row.universe_id);
+        plan.unmatched.push(row.universe_id);
+      }
+      continue;
+    }
+    const target = sheets[0];
+    while (target.cells.length <= idAt) target.cells.push("");
+    target.cells[idAt] = row.universe_id;
+    plan.changes.push({
+      sheet: table.title,
+      row: target.row,
+      column: idAt + 1,
+      header: idHeader,
+      id: row.universe_id,
+      before: "",
+      after: row.universe_id,
+    });
+    claimed.add(row.universe_id);
+  }
+  const appended = planTable({
     table,
     idHeaders: ["universe id", "site id", "lead id"],
     fields: UNIVERSE_FIELDS,
-    records: rows
-      .filter((row) => row.universe_id !== PROTECTED_SITE_ID)
+    records: pending
+      .filter((row) => !claimed.has(row.universe_id))
       .map((row) => ({ id: row.universe_id, values: { ...row.values, id: row.universe_id } })),
     append: true,
     protectRow: false,
     idPattern: /^WB-[A-Z]{2,4}-\d{4,}$/,
     skipBlank: true,
   });
+  plan.changes.push(...appended.changes);
+  plan.skippedProtected += skippedProtected + appended.skippedProtected;
+  plan.unmatched.push(...appended.unmatched);
+  plan.appended += appended.appended;
+  plan.refused.push(...appended.refused);
+  plan.held.push(...appended.held);
   return plan;
 }
 
@@ -648,6 +759,112 @@ export function entityChangeCounts(changes: CellChange[]): { site: number; stage
 export function formatPlanSummary(changes: CellChange[]): string {
   const counts = entityChangeCounts(changes);
   return `site ${counts.site}\nstage ${counts.stage}\nactivity ${counts.activity}\ncomms ${counts.comms}`;
+}
+
+/** Cell counts by sheet title. Values are not included. */
+export function formatTabCounts(changes: CellChange[]): string {
+  const counts = new Map<string, number>();
+  for (const change of changes) counts.set(change.sheet, (counts.get(change.sheet) || 0) + 1);
+  if (!counts.size) return "tabs 0";
+  return [...counts.entries()].map(([sheet, count]) => `${sheet} ${count}`).join("\n");
+}
+
+/** Status text safe for a public log. Tokens, keys, hosts, and emails are removed. */
+export function redactMirrorError(error: unknown): string {
+  const text = error instanceof Error ? error.message : "workbook mirror failed";
+  return text
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
+    .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
+    .replace(/ya29\.[A-Za-z0-9._-]+/g, "[redacted-token]")
+    .replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, "[redacted-key]")
+    .replace(/"private_key"\s*:\s*"(?:\\.|[^"\\])*"/g, '"private_key":"[redacted]"')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .slice(0, 500);
+}
+
+export type MirrorTabTask = {
+  tab: string;
+  run: () => Promise<MirrorPlan>;
+};
+
+export type PlannedMirrorTab = {
+  tab: string;
+  plan: MirrorPlan;
+};
+
+export type FailedMirrorTab = {
+  tab: string;
+  message: string;
+};
+
+/** Plan each tab on its own. A thrown tab is recorded and the rest still plan. */
+export async function planMirrorTabs(tasks: MirrorTabTask[]): Promise<{ planned: PlannedMirrorTab[]; failed: FailedMirrorTab[] }> {
+  const planned: PlannedMirrorTab[] = [];
+  const failed: FailedMirrorTab[] = [];
+  for (const task of tasks) {
+    try {
+      planned.push({ tab: task.tab, plan: await task.run() });
+    } catch (error) {
+      failed.push({ tab: task.tab, message: redactMirrorError(error) });
+    }
+  }
+  return { planned, failed };
+}
+
+/** Write each planned tab on its own. A thrown write is recorded and the rest still write. */
+export async function writeMirrorTabs(
+  planned: PlannedMirrorTab[],
+  write: (tab: string, changes: CellChange[]) => Promise<void>,
+): Promise<{ written: CellChange[]; failed: FailedMirrorTab[] }> {
+  const written: CellChange[] = [];
+  const failed: FailedMirrorTab[] = [];
+  for (const tab of planned) {
+    try {
+      await write(tab.tab, tab.plan.changes);
+      written.push(...tab.plan.changes);
+    } catch (error) {
+      failed.push({ tab: tab.tab, message: redactMirrorError(error) });
+    }
+  }
+  return { written, failed };
+}
+
+export type MirrorSheetGrid = {
+  sheetId: number;
+  columnCount: number;
+  rowCount: number;
+};
+
+/** True when a values write would land outside the current grid. */
+export function mirrorGridNeedsGrowth(changes: CellChange[], grid: Pick<MirrorSheetGrid, "columnCount" | "rowCount">): boolean {
+  return changes.some((change) => columnsToAppend(change.column, grid.columnCount) > 0 || rowsToAppend(change.row, grid.rowCount) > 0);
+}
+
+/**
+ * One spreadsheets.batchUpdate body. appendDimension runs before updateCells.
+ * The request is atomic: a rejected range writes nothing.
+ * Cell text is stored as a string, so a leading "=" is not a formula.
+ */
+export function mirrorGridRequests(changes: CellChange[], grid: MirrorSheetGrid): { requests: Record<string, unknown>[] } {
+  const requests: Record<string, unknown>[] = [];
+  let extraColumns = 0;
+  let extraRows = 0;
+  for (const change of changes) {
+    extraColumns = Math.max(extraColumns, columnsToAppend(change.column, grid.columnCount));
+    extraRows = Math.max(extraRows, rowsToAppend(change.row, grid.rowCount));
+  }
+  if (extraColumns > 0) requests.push({ appendDimension: { sheetId: grid.sheetId, dimension: "COLUMNS", length: extraColumns } });
+  if (extraRows > 0) requests.push({ appendDimension: { sheetId: grid.sheetId, dimension: "ROWS", length: extraRows } });
+  for (const change of changes) {
+    requests.push({
+      updateCells: {
+        start: { sheetId: grid.sheetId, rowIndex: change.row - 1, columnIndex: change.column - 1 },
+        rows: [{ values: [{ userEnteredValue: { stringValue: change.after } }] }],
+        fields: "userEnteredValue",
+      },
+    });
+  }
+  return { requests };
 }
 
 function planValue(_change: CellChange, value: string): string {

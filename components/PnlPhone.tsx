@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import type { OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { MONTH_SHORT } from "@/lib/pnl/lines";
-import { buildPnlGrid, columnSummary, type GridCell } from "@/lib/pnl/grid";
+import { buildPnlGrid, columnPeriodKey, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
 import PnlLinePopover from "./PnlLinePopover";
 
@@ -14,7 +15,17 @@ function textOf(cell: GridCell | undefined, percent: boolean): string {
   return cell.amount;
 }
 
-export default function PnlPhone({ statement, conflicts = [] }: { statement: PnlStatement; conflicts?: DataConflict[] }) {
+export default function PnlPhone({
+  statement,
+  conflicts = [],
+  comments = [],
+  onComment,
+}: {
+  statement: PnlStatement;
+  conflicts?: DataConflict[];
+  comments?: OpenPnlComment[];
+  onComment?: (anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) => void;
+}) {
   const years = statement.years.map((item) => item.year);
   const [grain, setGrain] = useState<"month" | "year">("month");
   const [year, setYear] = useState(years[0] || 0);
@@ -25,8 +36,8 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
   const anchor = useRef<HTMLElement | null>(null);
   const touch = useRef(0);
   const grid = useMemo(
-    () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts),
-    [statement, grain, year, conflicts],
+    () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts, comments),
+    [statement, grain, year, conflicts, comments],
   );
   const index = grain === "month" ? month : yearIndex;
   const summary = columnSummary(grid, index);
@@ -107,7 +118,7 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
         <article><span>Margin</span><strong>{summary.margin}</strong></article>
       </div>
       <div className="pnl-lines">
-        {grid.rows.filter((row) => row.kind === "line" || row.id === "sde").map((row) => {
+        {grid.rows.filter((row) => row.kind === "line" || row.id === "sde" || (Boolean(onComment) && (row.kind === "total" || row.kind === "margin"))).map((row) => {
           const cell = row.cells[index];
           const value = cell?.kind === "value" ? cell : null;
           return (
@@ -123,7 +134,7 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
                   setOpen(row.id);
                 }}
               >
-                <span>{row.label}</span>
+                <span>{row.label}{row.commentOpen || cell?.commentOpen ? <i className="pnl-mark comment" data-testid="pnl-comment-mark" aria-label="Open comment" /> : null}</span>
                 <strong className={value ? undefined : "pnl-muted"}>{textOf(cell, false)}</strong>
                 <small>{value?.share || ""}</small>
                 {value?.flag ? <i className="pnl-dot" data-testid="pnl-flag-dot" aria-label="Outside the band" /> : null}
@@ -132,8 +143,19 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
           );
         })}
       </div>
-      {openCell ? (
-        <PnlLinePopover label={openLabel} cell={openCell} sheet onClose={closeLine} />
+      {openCell && open ? (
+        <PnlLinePopover
+          label={openLabel}
+          cell={openCell}
+          sheet
+          onClose={closeLine}
+          actions={onComment ? (
+            <div className="act-row">
+              <button type="button" className="menu-item" data-testid="pnl-cell-comment" onClick={() => onComment({ type: "pnl_cell", line: open, period: grid.columns[index] ? columnPeriodKey(grid.columns[index]) : "" })}>Comment</button>
+              <button type="button" className="menu-item" data-testid="pnl-line-comment" onClick={() => onComment({ type: "pnl_line", line: open, period: "" })}>Comment on line</button>
+            </div>
+          ) : null}
+        />
       ) : null}
     </div>
   );

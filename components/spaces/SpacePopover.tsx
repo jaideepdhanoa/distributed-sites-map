@@ -6,7 +6,9 @@ import "../actions/actions.css";
 import { formatPacific } from "@/lib/actions/time";
 import { formatArea, formatFeet } from "@/lib/spaces/measure";
 import { estimateLabel, estimateSlots } from "@/lib/spaces/slots";
-import { SPACE_LAYOUTS, SPACE_TYPES, spaceLayout, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import { requestCommentAnchor } from "@/lib/comments/nav";
+import { SPACE_LAYOUTS, SPACE_TYPES, spaceLayout, spaceTypeLabel, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import CommentThread from "../comments/CommentThread";
 import type { GroundBox } from "@/lib/spaces/measure";
 
 export type SpaceShape = {
@@ -26,17 +28,21 @@ const CAUTION = "Aerial imagery can be months old and slightly skewed. Counts st
 export default function SpacePopover({
   space,
   names,
+  threadOpen = false,
   onChange,
   onClose,
   onEdit,
   onDelete,
+  onThreadClose,
 }: {
   space: SpaceShape;
   names: Record<string, string>;
+  threadOpen?: boolean;
   onChange: (next: SpaceShape) => void;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onThreadClose?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const count = estimateSlots(space.box.lengthFt, space.box.widthFt, space.layout);
@@ -104,10 +110,34 @@ export default function SpacePopover({
           <>
             <button type="button" className="paper-btn" data-testid="space-edit" onClick={onEdit}>Edit</button>
             <button type="button" className="paper-btn" data-testid="space-delete" onClick={() => setConfirming(true)}>Delete</button>
+            <button
+              type="button"
+              className="menu-item"
+              data-testid="space-comment"
+              onClick={() => requestCommentAnchor({
+                type: "space",
+                siteId: space.siteId,
+                line: "",
+                period: "",
+                spaceId: space.id,
+                label: spaceTypeLabel(space.type),
+              })}
+            >
+              Comment
+            </button>
           </>
         )}
       </div>
       <SpaceThread spaceId={space.id} />
+      {threadOpen ? (
+        <CommentThread
+          siteId={space.siteId}
+          anchor={{ type: "space", siteId: space.siteId, line: "", period: "", spaceId: space.id, label: spaceTypeLabel(space.type) }}
+          variant="sheet"
+          source="Map"
+          onClose={onThreadClose}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
+import { loadOpenSpaceIds } from "@/lib/comments/record";
 import { listAllSiteSpaces, listSiteSpaces } from "@/lib/spaces/store";
 import { spaceSiteAllowed } from "@/lib/spaces/vocab";
 
@@ -19,8 +20,15 @@ export async function GET(request: Request) {
   }
   if (!actionsEnabled()) return NextResponse.json({ spaces: [] }, { headers: privateHeaders });
   try {
-    const spaces = await withSql((sql) => siteId ? listSiteSpaces(sql, siteId) : listAllSiteSpaces(sql));
-    return NextResponse.json({ spaces }, { headers: privateHeaders });
+    const body = await withSql(async (sql) => {
+      const [spaces, openThreads] = await Promise.all([
+        siteId ? listSiteSpaces(sql, siteId) : listAllSiteSpaces(sql),
+        loadOpenSpaceIds(sql),
+      ]);
+      const open = new Set(openThreads);
+      return { spaces, openThreads: spaces.map((space) => space.id).filter((id) => open.has(id)) };
+    });
+    return NextResponse.json(body, { headers: privateHeaders });
   } catch (error) {
     if (missingRelation(error)) return NextResponse.json({ spaces: [] }, { headers: privateHeaders });
     console.error(JSON.stringify({ event: "spaces_read_error", name: error instanceof Error ? error.name : "error" }));

@@ -1,3 +1,4 @@
+import type { OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { monthColumnState } from "./columns";
 import { formatCapturedDate } from "./dateLabel";
@@ -45,6 +46,7 @@ export type MissingCell = {
 
 export type GridCell = (ValueCell | MissingCell | { kind: "blank" }) & {
   conflict?: CellConflict;
+  commentOpen?: boolean;
 };
 
 export type GridRow = {
@@ -52,6 +54,7 @@ export type GridRow = {
   label: string;
   kind: "group" | "line" | "total" | "margin";
   cells: GridCell[];
+  commentOpen?: boolean;
 };
 
 export type GridColumn = {
@@ -253,6 +256,10 @@ function withPeriod(column: GridColumn, period: PnlPeriodView | null | undefined
   };
 }
 
+export function columnPeriodKey(column: GridColumn): string {
+  return column.periodLabel || column.label;
+}
+
 function periodKeys(column: GridColumn): string[] {
   const keys = [column.label, column.periodLabel || ""];
   if (column.periodStart && column.periodEnd) {
@@ -335,7 +342,28 @@ function usedCodes(buckets: Bucket[], section: "revenue" | "costs" | "addbacks")
   return sectionOrder(section).filter((code) => found.has(code));
 }
 
-export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number, conflicts: DataConflict[] = []): PnlGrid {
+function attachComments(grid: PnlGrid, comments: OpenPnlComment[]): PnlGrid {
+  if (!comments.length) return grid;
+  return {
+    ...grid,
+    rows: grid.rows.map((row) => {
+      const lineOpen = comments.some((mark) => mark.type === "pnl_line" && mark.line === row.id);
+      return {
+        ...row,
+        ...(lineOpen ? { commentOpen: true } : {}),
+        cells: row.cells.map((cell, index) => {
+          const column = grid.columns[index];
+          if (!column) return cell;
+          const keys = periodKeys(column);
+          const open = comments.some((mark) => mark.type === "pnl_cell" && mark.line === row.id && keys.includes(mark.period));
+          return open ? { ...cell, commentOpen: true } : cell;
+        }),
+      };
+    }),
+  };
+}
+
+export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", year?: number, conflicts: DataConflict[] = [], comments: OpenPnlComment[] = []): PnlGrid {
   const years = statement.years.map((item) => item.year);
   if (statement.status !== "ready" || !years.length) return { columns: [], rows: [], years, note: "" };
   const selected = year && years.includes(year) ? year : years[0];
@@ -480,7 +508,7 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
       cells: sdeCells.map((cell) => (cell.kind === "value" && cell.share ? fromMath(cell.cents, cell.share, "SDE divided by revenue for this column.", cell.share) : cell.kind === "missing" ? cell : { kind: "blank" })),
     });
   }
-  return attachConflicts({ columns, rows, years, note }, conflicts);
+  return attachComments(attachConflicts({ columns, rows, years, note }, conflicts), comments);
 }
 
 export function columnSummary(grid: PnlGrid, index: number): { revenue: string; costs: string; ebitda: string; margin: string } {

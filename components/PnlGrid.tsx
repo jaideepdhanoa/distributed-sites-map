@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { withoutGmail } from "@/lib/displayText";
-import type { GridCell, GridColumn, PnlGrid, ValueCell } from "@/lib/pnl/grid";
+import { columnPeriodKey, type GridCell, type GridColumn, type PnlGrid, type ValueCell } from "@/lib/pnl/grid";
 import { sourceView } from "@/lib/pnl/sourceLink";
 import PnlLinePopover from "./PnlLinePopover";
 
@@ -27,6 +27,11 @@ function ConflictMark({ cell }: { cell: GridCell }) {
   return <i className="pnl-mark conflict" data-testid="pnl-conflict-mark" aria-label="Sources disagree" />;
 }
 
+function CommentMark({ open }: { open?: boolean }) {
+  if (!open) return null;
+  return <i className="pnl-mark comment" data-testid="pnl-comment-mark" aria-label="Open comment" />;
+}
+
 function missingTitle(cell: GridCell): string | undefined {
   if (cell.kind !== "missing") return undefined;
   const view = sourceView({
@@ -40,14 +45,15 @@ function missingTitle(cell: GridCell): string | undefined {
 }
 
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
-  if (cell.kind === "missing") return <span className="pnl-missing">Missing<ConflictMark cell={cell} /></span>;
-  if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} />—</span>;
+  if (cell.kind === "missing") return <span className="pnl-missing">Missing<ConflictMark cell={cell} /><CommentMark open={cell.commentOpen} /></span>;
+  if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} /><CommentMark open={cell.commentOpen} />—</span>;
   const shown = figure(cell, percent);
   return (
     <span className="pnl-figure">
       <span className="pnl-amount">
         {cell.status === "calculated" ? null : <i className={`pnl-mark ${cell.status}`} aria-label={cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"} />}
         <ConflictMark cell={cell} />
+        <CommentMark open={cell.commentOpen} />
         <strong>{shown.primary}</strong>
       </span>
       {shown.secondary ? <small>{shown.secondary}</small> : null}
@@ -55,7 +61,19 @@ function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
   );
 }
 
-export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boolean }) {
+export default function PnlGrid({
+  grid,
+  percent,
+  onComment,
+  focusLine,
+  focusPeriod,
+}: {
+  grid: PnlGrid;
+  percent: boolean;
+  onComment?: (anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) => void;
+  focusLine?: string;
+  focusPeriod?: string;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const [focus, setFocus] = useState<{ row: number; col: number } | null>(null);
@@ -89,7 +107,8 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
 
   function reveal(row: number, col: number, target: HTMLElement) {
     const cell = focusable[row]?.cells[col];
-    if (!cell || (cell.kind !== "value" && cell.kind !== "missing" && !cell.conflict)) {
+    const canOpen = Boolean(onComment) || cell?.kind === "value" || cell?.kind === "missing" || Boolean(cell?.conflict);
+    if (!cell || !canOpen) {
       setOpen(null);
       return;
     }
@@ -133,7 +152,17 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
     }
   }
 
+  useEffect(() => {
+    if (!focusLine) return;
+    const period = focusPeriod || "";
+    const cell = scrollRef.current?.querySelector<HTMLElement>(`[data-line="${CSS.escape(focusLine)}"][data-period="${CSS.escape(period)}"]`);
+    if (!cell) return;
+    reveal(Number(cell.dataset.row || 0), Number(cell.dataset.colindex || 0), cell);
+  }, [focusLine, focusPeriod, grid.columns.length, grid.rows.length]);
+
   const popover = open ? focusable[open.row]?.cells[open.col] : null;
+  const popoverRow = open ? focusable[open.row] : null;
+  const popoverColumn = open ? grid.columns[open.col] : null;
   let cursor = 0;
 
   return (
@@ -164,7 +193,11 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
             cursor += 1;
             return (
               <tr key={row.id} role="row" className="list-row">
-                <th scope="row" className="is-pinned" data-col="line">{row.label}</th>
+                <th scope="row" className="is-pinned" data-col="line">
+                  {row.label}
+                  <CommentMark open={row.commentOpen} />
+                  {onComment ? <button type="button" className="text-link" data-testid="pnl-line-comment" data-row={row.id} onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}>Comment</button> : null}
+                </th>
                 {row.cells.map((cell, col) => {
                   const flagged = cell.kind === "value" && Boolean(cell.flag);
                   const missing = cell.kind === "missing";
@@ -174,6 +207,10 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
                       key={grid.columns[col]?.id || col}
                       role="gridcell"
                       data-cell={`${index}:${col}`}
+                      data-line={row.id}
+                      data-row={index}
+                      data-colindex={col}
+                      data-period={grid.columns[col] ? columnPeriodKey(grid.columns[col]) : ""}
                       data-col={grid.columns[col]?.id}
                       tabIndex={focused || (!focus && index === 0 && col === 0) ? 0 : -1}
                       className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${cell.conflict && cell.conflict.status !== "resolved" ? "is-conflict" : ""} ${focused ? "cell-focus" : ""}`.trim()}
@@ -200,6 +237,9 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           cell={popover}
           style={{ top: open.top, left: open.left }}
           onClose={closePopover}
+          actions={onComment && popoverRow && popoverColumn ? (
+            <button type="button" className="menu-item" data-testid="pnl-cell-comment" onClick={() => onComment({ type: "pnl_cell", line: popoverRow.id, period: columnPeriodKey(popoverColumn) })}>Comment</button>
+          ) : null}
         />
       ) : null}
     </div>

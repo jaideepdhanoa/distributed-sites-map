@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { statusLabel } from "@/lib/conflicts/view";
 import { withoutGmail } from "@/lib/displayText";
 import type { GridCell } from "@/lib/pnl/grid";
@@ -47,12 +47,14 @@ export default function PnlLinePopover({
   sheet = false,
   style,
   onClose,
+  actions = null,
 }: {
   label: string;
   cell: GridCell;
   sheet?: boolean;
   style?: React.CSSProperties;
   onClose: () => void;
+  actions?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -126,6 +128,7 @@ export default function PnlLinePopover({
           <p>In use: {withoutGmail(cell.conflict.valueInUse)}</p>
         </div>
       ) : null}
+      {actions}
     </div>
   );
 }

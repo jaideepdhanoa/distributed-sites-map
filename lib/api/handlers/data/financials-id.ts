@@ -6,6 +6,8 @@ import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { loadFinancialPanel } from "@/lib/financialsLoad";
 import { attachPnlSourceLinks } from "@/lib/pnl/attachSources";
 import { demoStatement } from "@/lib/pnl/demo";
+import type { OpenPnlComment } from "@/lib/comments/anchor";
+import { loadOpenPnlComments } from "@/lib/comments/record";
 import { serviceDriveLister } from "@/lib/pnl/driveFiles";
 import { siteFolderId } from "@/lib/pnl/sourceLink";
 import { loadConflicts } from "@/lib/conflicts/record";
@@ -33,9 +35,9 @@ export async function loadFinancialsPayload(
   sql: Sql,
   id: string,
   links: { dealId: string; siteId: string }[],
-): Promise<{ pnl: PnlStatement; conflicts: DataConflict[]; pnlDemo: boolean }> {
+): Promise<{ pnl: PnlStatement; conflicts: DataConflict[]; comments: OpenPnlComment[]; pnlDemo: boolean }> {
   const ids = linkedPnlIds(id, links);
-  const [pnlResult, conflictResult] = await Promise.all([
+  const [pnlResult, conflictResult, commentResult] = await Promise.all([
     loadPnlStatement(sql, ids).then(
       (value) => ({ ok: true as const, value }),
       (error: unknown) => ({ ok: false as const, error }),
@@ -44,12 +46,17 @@ export async function loadFinancialsPayload(
       (value) => ({ ok: true as const, value }),
       (error: unknown) => ({ ok: false as const, error }),
     ),
+    loadOpenPnlComments(sql, ids).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    ),
   ]);
   let pnl = pnlResult.ok ? pnlResult.value : unavailableStatement();
   const conflicts = conflictResult.ok ? conflictResult.value : [];
+  const comments = commentResult.ok ? commentResult.value : [];
   const demo = pnl.status === "ready" ? null : ids.reduce<ReturnType<typeof demoStatement>>((found, item) => found || demoStatement(item), null);
   if (demo) pnl = demo;
-  return { pnl, conflicts, pnlDemo: Boolean(demo) };
+  return { pnl, conflicts, comments, pnlDemo: Boolean(demo) };
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -68,9 +75,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const loaded = actionsEnabled()
     ? await withSql((sql) => loadFinancialsPayload(sql, id, links)).catch((error: unknown) => {
       console.error(JSON.stringify({ event: "pnl_read_error", name: error instanceof Error ? error.name : "error" }));
-      return { pnl: unavailableStatement(), conflicts: [] as DataConflict[], pnlDemo: false };
+      return { pnl: unavailableStatement(), conflicts: [] as DataConflict[], comments: [] as OpenPnlComment[], pnlDemo: false };
     })
-    : { pnl: emptyStatement(), conflicts: [] as DataConflict[], pnlDemo: false };
+    : { pnl: emptyStatement(), conflicts: [] as DataConflict[], comments: [] as OpenPnlComment[], pnlDemo: false };
   let pnl = loaded.pnl;
   try {
     const lister = loaded.pnlDemo ? null : await serviceDriveLister();

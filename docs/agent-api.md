@@ -358,4 +358,34 @@ Power points are 15 of the score. The workbook formula looks up a share on `Assu
 
 Do not send a power grade. `Power rating` was removed. Typed layers are the source: `cap_a_*` through `cap_d_*` on a site fact, with `source`, `as_of`, and `confidence` of `Estimated`, `Claimed`, or `Verified`. The server derives `Strong`, `OK`, `Weak`, or `Unknown` and stores `power_rating` and `power_rating_reason`. A fact key named `power_rating` is rejected.
 
-The rubric is in `docs/scoring.md`. Layer A, the substation and high-voltage distance, does not change the points. Phoenix and Miami cap at OK. A blank or incomplete service stays Unknown, which is still 7.5 points.
+The rubric is in `docs/scoring.md`. Layer A, the substation and high-voltage distance, does not change the points. Phoenix and Miami cap at OK. A blank or incomplete service stays Unknown, which is still 7.5 points. A sourced 3-phase service rates OK with no size threshold. A blank hosting cell stays missing. A stored 0 counts as a reading.
+
+### Comment
+
+A comment is a note on the site discussion, anchored to one target. The same row is the cell thread, the line thread, or the lot thread, and the reply on the discussion tab. There is no second copy.
+
+`anchor.type` is `pnl_cell`, `pnl_line`, or `space`. A cell sends `line` and `period`. A line sends `line` and no period. `line` is a chart-of-accounts code, or `total-revenue`, `total-costs`, `ebitda`, or `margin` for the computed rows. A lot sends `space_id`. The server stores the lot's type label. `tag` is `investigate`, `ask_broker`, `normalize`, `explained`, or `verified`. A new thread defaults to `investigate` when `tag` is omitted. `mentions` are account ids. `at` is required and must be an ISO-8601 time with a numeric offset or `Z`. A bad timestamp is rejected. The row keeps that exact time.
+
+A reply sends `parent_id` of the thread and no anchor. Replies stay one level deep. An update sends the record id and the version from the previous response. It can change `body`, `tag`, `mentions`, or `resolved`. `resolved: true` closes the thread. `resolved: false` reopens it. Resolve and reopen need a reviewer. A contributor can comment and reply. A viewer cannot. The old note routes refuse an anchored thread so the write stays on `POST /api/changes`.
+
+`ask_broker` does not send anything. The read shows one suggested question for Jaideep to review. That question is built from the anchor. It does not mention EV charging, AVs, walk-away, max price, savings, or offers, and it is not stored as a comms row.
+
+Signed-in financials show a marker on a cell or line with an open thread. A marked lot shows a marker. The discussion shows a chip such as `on P&L, G&A 2023` or `on lot, Excess parking`. The chip opens the grid at that cell, or flies the map to that lot with its popover open. On a phone the thread opens as a bottom sheet. Open threads are open loops and a morning-brief count. Those surfaces name the anchor and the tag. They do not include the comment text. A signed-out request does not receive the financials thread.
+
+```json
+{
+  "entity_type": "comment",
+  "site_id": "PIPE-LAS-9001",
+  "expected_version": 0,
+  "source": "Sample notes",
+  "payload": {
+    "anchor": { "type": "pnl_cell", "line": "ga", "period": "2023" },
+    "body": "The sample line needs a second look.",
+    "tag": "investigate",
+    "mentions": [],
+    "at": "2026-03-01T15:00:00-07:00"
+  }
+}
+```
+
+Table: `notes`, extended in `db/migrations/022_anchored_comments.sql`. A preview database that is not production applies this file when the comment is posted. Production does not apply this file until the Production migrations workflow runs.

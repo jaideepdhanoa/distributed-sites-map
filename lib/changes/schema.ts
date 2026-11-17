@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ActionRole } from "@/lib/actions/roles";
 import { canDecide, canWriteContent } from "@/lib/actions/roles";
 import { parseMentionIds } from "@/lib/actions/mentions";
-import type { CommentTag } from "@/lib/comments/anchor";
+import { isCommentLine, type CommentTag } from "@/lib/comments/anchor";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 import {
@@ -27,7 +27,7 @@ import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_LAYOUT_IDS, SPACE_TYPE_IDS, spaceSiteAllowed, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
 import { safeGmailLink } from "@/lib/comms";
 import { parseTag, type TagPayload } from "@/lib/tags/parse";
-import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, isPnlLineCode, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
+import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
 import { coverageOf } from "@/lib/pnl/period";
 import {
@@ -960,7 +960,7 @@ function parseComment(actor: Actor, index: number, siteId: string, expectedVersi
   }
   const anchor = parsed.data.anchor;
   if (anchor?.type === "space" && !anchor.space_id) throw new InputError(`Change ${index + 1}: A lot comment needs the lot id.`, 400, "space_id");
-  if (anchor && anchor.type !== "space" && !isPnlLineCode(anchor.line || "")) {
+  if (anchor && anchor.type !== "space" && !isCommentLine(anchor.line || "")) {
     throw new InputError(`Change ${index + 1}: That line is not in the chart of accounts.`, 400, "line");
   }
   if (anchor?.type === "pnl_cell" && !anchor.period) throw new InputError(`Change ${index + 1}: A cell comment needs a period.`, 400, "period");

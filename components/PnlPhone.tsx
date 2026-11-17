@@ -106,7 +106,7 @@ export default function PnlPhone({
         <article><span>Margin</span><strong>{summary.margin}</strong></article>
       </div>
       <div className="pnl-lines">
-        {grid.rows.filter((row) => row.kind === "line" || row.id === "sde").map((row) => {
+        {grid.rows.filter((row) => row.kind === "line" || row.id === "sde" || (Boolean(onComment) && (row.kind === "total" || row.kind === "margin"))).map((row) => {
           const cell = row.cells[index];
           const value = cell?.kind === "value" ? cell : null;
           return (

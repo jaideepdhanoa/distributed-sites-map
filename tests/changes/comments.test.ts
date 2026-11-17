@@ -77,6 +77,8 @@ test("a comment needs a signed-in writer, a real anchor, and an exact timestamp"
     (error: unknown) => error instanceof InputError && error.field === "at",
   );
   assert.throws(() => validateBatch(contributor, "k1", { changes: [comment({ anchor: { type: "pnl_cell", line: "not-a-line", period: "2023" } })] }), /chart of accounts/);
+  assert.doesNotThrow(() => validateBatch(contributor, "k1", { changes: [comment({ anchor: { type: "pnl_line", line: "total-revenue" } })] }));
+  assert.doesNotThrow(() => validateBatch(contributor, "k1", { changes: [comment({ anchor: { type: "pnl_line", line: "margin" } })] }));
   assert.throws(() => validateBatch(contributor, "k1", { changes: [comment({ anchor: { type: "pnl_line", line: "ga", period: "2023" } })] }), /does not take a period/);
   assert.throws(() => validateBatch(contributor, "k1", { changes: [{ ...comment(), site_id: EXCLUDED_SITE_ID }] }), /not written here/);
   assert.throws(() => validateBatch(contributor, "k1", { changes: [comment({ resolved: true })] }), /after it exists/);
@@ -98,6 +100,8 @@ test("the broker suggestion is a review draft and never uses the blocked wording
   }
   assert.equal(chipLabel(anchors[0]), "on P&L, G&A 2023");
   assert.equal(chipLabel(anchors[1]), "on P&L, Utilities");
+  assert.equal(chipLabel({ type: "pnl_line", siteId: "PIPE-LAS-9001", line: "total-revenue", period: "", spaceId: "", label: "" }), "on P&L, Total revenue");
+  assert.equal(chipLabel({ type: "pnl_cell", siteId: "PIPE-LAS-9001", line: "margin", period: "2024", spaceId: "", label: "" }), "on P&L, EBITDA margin 2024");
   assert.equal(chipLabel(anchors[2]), "on lot, Excess parking");
   assert.equal(chipLabel(anchors[3]), "on lot, marked lot");
 });

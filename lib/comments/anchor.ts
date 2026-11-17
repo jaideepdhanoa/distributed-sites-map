@@ -68,9 +68,20 @@ export function periodChip(period: string): string {
   return text;
 }
 
+/** Computed rows people comment on, in addition to the chart of accounts. */
+export const COMMENT_ROW_LINES: Record<string, string> = {
+  "total-revenue": "Total revenue",
+  "total-costs": "Total costs",
+  margin: "EBITDA margin",
+};
+
+export function isCommentLine(value: string): boolean {
+  return isPnlLineCode(value) || Object.prototype.hasOwnProperty.call(COMMENT_ROW_LINES, value);
+}
+
 export function lineChip(line: string): string {
   if (isPnlLineCode(line)) return LINE_LABELS[line as PnlLineCode];
-  return line.trim();
+  return COMMENT_ROW_LINES[line] || line.trim();
 }
 
 function cleanLabel(value: string, fallback: string): string {

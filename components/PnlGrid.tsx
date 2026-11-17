@@ -183,7 +183,7 @@ export default function PnlGrid({
                 <th scope="row" className="is-pinned" data-col="line">
                   {row.label}
                   <CommentMark open={row.commentOpen} />
-                  {onComment && row.kind === "line" ? <button type="button" className="text-link" data-testid="pnl-line-comment" onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}>Comment</button> : null}
+                  {onComment ? <button type="button" className="text-link" data-testid="pnl-line-comment" data-row={row.id} onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}>Comment</button> : null}
                 </th>
                 {row.cells.map((cell, col) => {
                   const flagged = cell.kind === "value" && Boolean(cell.flag);

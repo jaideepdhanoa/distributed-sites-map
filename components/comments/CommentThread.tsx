@@ -58,6 +58,7 @@ export default function CommentThread({
   const status = useActionStatus();
   const [loaded, setLoaded] = useState<ThreadNote[]>(notes || []);
   const [accounts, setAccounts] = useState<MentionAccount[]>([]);
+  const [draftTag, setDraftTag] = useState<CommentTag>("investigate");
   const [body, setBody] = useState("");
   const [mentions, setMentions] = useState<MentionAccount[]>([]);
   const [replyFor, setReplyFor] = useState<string | null>(null);
@@ -236,15 +237,30 @@ export default function CommentThread({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void save({ expectedVersion: 0, anchor, body, tag: "investigate", mentions: mentions.map((item) => item.id) }).then((ok) => {
+            void save({ expectedVersion: 0, anchor, body, tag: draftTag, mentions: mentions.map((item) => item.id) }).then((ok) => {
               if (!ok) return;
               setBody("");
               setMentions([]);
+              setDraftTag("investigate");
             });
           }}
         >
           <MentionField label="" placeholder="Comment or @mention…" value={body} onChange={setBody} mentions={mentions} onMentions={setMentions} accounts={accounts} testId="comment-body" rows={3} maxLength={2000} />
           <p className="hint">Type @ to mention someone.</p>
+          <div className="act-row" role="group" aria-label="Tag" data-testid="comment-tags">
+            {COMMENT_TAGS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={draftTag === item.id ? "chip on" : "chip"}
+                aria-pressed={draftTag === item.id}
+                disabled={pending}
+                onClick={() => setDraftTag(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
           <div className="act-row">
             <button type="submit" className="menu-item" disabled={pending}>Comment</button>
           </div>

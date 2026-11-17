@@ -5,9 +5,8 @@ import { InputError, parseBody } from "@/lib/actions/text";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { notifyNote } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
-import { isPnlLineCode } from "@/lib/pnl/lines";
 import { SPACE_ID, spaceTypeLabel, type SpaceType } from "@/lib/spaces/vocab";
-import { suggestBrokerQuestion, type CommentAnchor, type CommentTag, type OpenPnlComment } from "./anchor";
+import { isCommentLine, suggestBrokerQuestion, type CommentAnchor, type CommentTag, type OpenPnlComment } from "./anchor";
 
 export type CommentWrite = {
   siteId: string;
@@ -172,7 +171,7 @@ async function checkedAnchor(sql: Sql, siteId: string, anchor: CommentAnchor): P
     const label = await spaceLabel(sql, siteId, anchor.spaceId);
     return { type: "space", siteId, line: "", period: "", spaceId: anchor.spaceId, label };
   }
-  if (!isPnlLineCode(anchor.line)) throw new InputError("That line is not in the chart of accounts.", 400, "line");
+  if (!isCommentLine(anchor.line)) throw new InputError("That line is not in the chart of accounts.", 400, "line");
   if (anchor.type === "pnl_line") return { type: "pnl_line", siteId, line: anchor.line, period: "", spaceId: "", label: "" };
   if (!anchor.period.trim()) throw new InputError("A cell comment needs a period.", 400, "period");
   return { type: "pnl_cell", siteId, line: anchor.line, period: anchor.period.trim(), spaceId: "", label: "" };

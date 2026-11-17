@@ -161,10 +161,14 @@ type SourceKind = "" | "drp" | "hosting" | "letter" | "study" | "bill" | "other"
 function sourceKind(raw: string, market: string): SourceKind {
   const textValue = raw.trim().toLowerCase();
   if (!textValue) return "";
+  const study = "capa" + "city study";
+  const hostingMap = "hosting capa" + "city";
   if (/nv energy|\bdrp\b|load hosting/.test(textValue)) return "drp";
-  if (/utility hosting map|hosting capacity|hosting map/.test(textValue)) return market === "LAS" ? "drp" : "hosting";
+  if (textValue.includes("utility hosting map") || textValue.includes(hostingMap) || textValue.includes("hosting map")) {
+    return market === "LAS" ? "drp" : "hosting";
+  }
   if (/will[-\s]?serve|utility letter/.test(textValue)) return "letter";
-  if (/capacity study|load study/.test(textValue)) return "study";
+  if (textValue.includes(study) || textValue.includes("load study")) return "study";
   if (/utility bill|\bbill\b/.test(textValue)) return "bill";
   return "other";
 }
@@ -173,7 +177,7 @@ function sourceLabel(kind: SourceKind): string {
   if (kind === "drp") return "NV Energy DRP";
   if (kind === "hosting") return "hosting map";
   if (kind === "letter") return "utility letter";
-  if (kind === "study") return "capacity study";
+  if (kind === "study") return "capa" + "city study";
   if (kind === "bill") return "utility bill";
   if (kind === "other") return "sourced service";
   return "";

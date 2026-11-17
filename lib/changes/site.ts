@@ -38,6 +38,10 @@ export const SITE_FIELDS = [
   "listing_status",
   "score",
   "location_points",
+  "economics_points",
+  "land_points",
+  "power_points",
+  "deal_points",
 ] as const;
 
 export type SiteField = (typeof SITE_FIELDS)[number];
@@ -350,7 +354,7 @@ const CLASS_LABEL: Record<string, string> = {
 
 /**
  * Headers an API change may write back. Column order is not assumed.
- * Score, Location points, Stalls that fit, and Segment group are formulas and are absent.
+ * Score, Economics points, Land points, Power points, Location points, Deal points, Stalls that fit, and Segment group are formulas and are absent.
  * Site, Segment, Stage, and Folder are absent.
  * Broker edits replace the person or the firm inside the current cell. The cell's own order stays. A cell that does not split is left unchanged.
  *
@@ -972,6 +976,10 @@ export function sitesFromFiles(dealsJson: string, pricingJson = "", sheetJson = 
       listing_status: raw("Listing status") || listingStatus(props),
       score: canonicalFact(props.score),
       location_points: canonicalFact(props.location_points),
+      economics_points: canonicalFact(props.economics_points),
+      land_points: canonicalFact(props.land_points),
+      power_points: canonicalFact(props.power_points),
+      deal_points: canonicalFact(props.deal_points),
     };
     map.set(siteId, row);
   }

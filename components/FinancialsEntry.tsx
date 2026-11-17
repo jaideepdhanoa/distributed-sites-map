@@ -101,6 +101,7 @@ export default function FinancialsEntry({
         <div className="fin-tile">
           <span>Financials</span>
           <PendingFigure lines={3} />
+          <span className="fin-open is-hold" aria-hidden="true">Open P&L <span aria-hidden="true">→</span></span>
         </div>
       </article>
     );
@@ -114,6 +115,7 @@ export default function FinancialsEntry({
             <strong>{card.revenue} revenue</strong>
             <small>{card.cashLabel} {card.cash} · {card.margin} margin</small>
             <small>{card.coverage}</small>
+            <span className="fin-open">Open P&L <span aria-hidden="true">→</span></span>
           </button>
         </article>
       ) : packageOnFile ? (

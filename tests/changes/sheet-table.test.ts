@@ -137,10 +137,10 @@ test("a tab is one values:batchGet per render option, however many columns it ha
 
   const source = readFileSync("scripts/workbook-mirror.ts", "utf8");
   const readers = [...source.matchAll(/await loadTable\([\s\S]*?\);/g)].map((hit) => hit[0]);
-  assert.equal(readers.length, 4);
+  assert.equal(readers.length, 5);
   assert.deepEqual(
     readers.map((reader) => reader.includes(", true")),
-    [false, true, false, false],
+    [false, true, false, false, false],
   );
 });
 

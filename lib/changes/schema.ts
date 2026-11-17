@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { ActionRole } from "@/lib/actions/roles";
 import { canDecide, canWriteContent } from "@/lib/actions/roles";
+import { parseMentionIds } from "@/lib/actions/mentions";
+import type { CommentTag } from "@/lib/comments/anchor";
 import { InputError } from "@/lib/actions/text";
 import { assertClean } from "@/lib/policy/banned";
 import {
@@ -25,7 +27,7 @@ import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_LAYOUT_IDS, SPACE_TYPE_IDS, spaceSiteAllowed, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
 import { safeGmailLink } from "@/lib/comms";
 import { parseTag, type TagPayload } from "@/lib/tags/parse";
-import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
+import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, isPnlLineCode, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
 import { coverageOf } from "@/lib/pnl/period";
 import {
@@ -158,6 +160,18 @@ export type SiteSpacePayload =
 
 export type { TagPayload } from "@/lib/tags/parse";
 
+/** A discussion note anchored to a P&L cell, a P&L line, or a marked lot. */
+export type CommentPayload = {
+  anchor?: { type: "pnl_cell" | "pnl_line" | "space"; line: string; period: string; space_id: string };
+  parent_id?: string;
+  body?: string;
+  tag?: CommentTag;
+  mentions?: string[];
+  resolved?: boolean;
+  /** ISO-8601 time with a numeric offset or Z, stored exactly. */
+  at: string;
+};
+
 export type ConflictSourcePayload = { value: string; document: string; page: string };
 
 /** Two sources that disagree. Muse writes it. The values stay on the signed-in read. */
@@ -180,7 +194,7 @@ export type ParsedChange = {
   source: string;
   /** Workbook import keeps the sheet's id. The HTTP API never sets this. */
   preserve_id?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload | CommentPayload;
 };
 
 const stagePayload = z
@@ -369,9 +383,30 @@ const conflictPayload = z
   })
   .strict();
 
+const commentAnchorPayload = z
+  .object({
+    type: z.enum(["pnl_cell", "pnl_line", "space"]),
+    line: z.string().trim().max(40).optional(),
+    period: z.string().trim().max(80).optional(),
+    space_id: z.string().trim().max(40).optional(),
+  })
+  .strict();
+
+const commentPayload = z
+  .object({
+    anchor: commentAnchorPayload.optional(),
+    parent_id: z.string().trim().min(1).max(40).optional(),
+    body: z.string().trim().max(2000).optional(),
+    tag: z.enum(["investigate", "ask_broker", "normalize", "explained", "verified"]).optional(),
+    mentions: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+    resolved: z.boolean().optional(),
+    at: z.string().trim().min(1).max(40),
+  })
+  .strict();
+
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict", "comment"]),
     site_id: z.string().trim().max(40),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -537,9 +572,12 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     if (row.entity_id && row.entity_type === "data_conflict" && !/^CF-\d{4,}$/.test(row.entity_id)) {
       throw new InputError(`Change ${index + 1}: That record id is not valid.`);
     }
+    if (row.entity_id && row.entity_type === "comment" && !/^NT-\d{4,}$/.test(row.entity_id)) {
+      throw new InputError(`Change ${index + 1}: That record id is not valid.`);
+    }
     const siteAllowed = row.entity_type === "comms"
       ? commsSiteAllowed(row.site_id)
-      : row.entity_type === "site_space"
+      : row.entity_type === "site_space" || row.entity_type === "comment"
         ? spaceSiteAllowed(row.site_id)
         : SITE_ID.test(row.site_id);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
@@ -610,6 +648,9 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
     }
     if (row.entity_type === "data_conflict") {
       return { ...row, payload: parseDataConflict(actor, index, row.site_id, row.payload) };
+    }
+    if (row.entity_type === "comment") {
+      return { ...row, payload: parseComment(actor, index, row.site_id, row.expected_version, row.payload) };
     }
     const parsedPayload = commsPayload.safeParse(row.payload);
     if (!parsedPayload.success) {
@@ -871,6 +912,87 @@ function parseDataConflict(actor: Actor, index: number, siteId: string, payload:
     value_in_use: parsed.data.value_in_use,
     status: parsed.data.status,
     resolution_note: note,
+    at: zoned.iso,
+  };
+}
+
+function assertCommentActor(actor: Actor, index: number, resolved: boolean | undefined): void {
+  if (actor.kind === "agent") return;
+  if (!actor.role || !canWriteContent(actor.role)) {
+    throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
+  }
+  if (resolved !== undefined && !canDecide(actor.role)) {
+    throw new InputError(`Change ${index + 1}: Resolve needs a reviewer.`, 403);
+  }
+}
+
+function parseComment(actor: Actor, index: number, siteId: string, expectedVersion: number, payload: unknown): CommentPayload {
+  if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
+  }
+  const raw = payload as Record<string, unknown>;
+  if (!("at" in raw) || raw.at == null || raw.at === "") {
+    throw new InputError(`Change ${index + 1}: at is required`, 400, "at");
+  }
+  const parsed = commentPayload.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.length ? String(issue.path[issue.path.length - 1]) : "payload";
+    throw new InputError(`Change ${index + 1}: ${field} is not valid`, 400, field);
+  }
+  const zoned = parseZonedTimestamp(parsed.data.at);
+  if (!zoned) throw new InputError(`Change ${index + 1}: at must be an ISO-8601 time with a zone offset`, 400, "at");
+  const creating = expectedVersion === 0;
+  if (creating && parsed.data.resolved) throw new InputError(`Change ${index + 1}: Resolve the thread after it exists.`, 400, "resolved");
+  assertCommentActor(actor, index, parsed.data.resolved);
+  if (parsed.data.parent_id && parsed.data.anchor) {
+    throw new InputError(`Change ${index + 1}: A reply stays on the thread it answers.`, 400, "parent_id");
+  }
+  if (parsed.data.parent_id && !/^NT-\d{4,}$/.test(parsed.data.parent_id)) {
+    throw new InputError(`Change ${index + 1}: That thread id is not valid.`, 400, "parent_id");
+  }
+  if (creating && !parsed.data.parent_id && !parsed.data.anchor) {
+    throw new InputError(`Change ${index + 1}: A comment needs a P&L cell, a P&L line, or a lot.`, 400, "anchor");
+  }
+  if (!creating && (parsed.data.anchor || parsed.data.parent_id)) {
+    throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "anchor");
+  }
+  const anchor = parsed.data.anchor;
+  if (anchor?.type === "space" && !anchor.space_id) throw new InputError(`Change ${index + 1}: A lot comment needs the lot id.`, 400, "space_id");
+  if (anchor && anchor.type !== "space" && !isPnlLineCode(anchor.line || "")) {
+    throw new InputError(`Change ${index + 1}: That line is not in the chart of accounts.`, 400, "line");
+  }
+  if (anchor?.type === "pnl_cell" && !anchor.period) throw new InputError(`Change ${index + 1}: A cell comment needs a period.`, 400, "period");
+  if (anchor?.type === "pnl_line" && anchor.period) throw new InputError(`Change ${index + 1}: A line comment does not take a period.`, 400, "period");
+  let mentions: string[] | undefined;
+  if (parsed.data.mentions) {
+    try {
+      mentions = parseMentionIds(parsed.data.mentions);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Choose an account from the list.";
+      throw new InputError(`Change ${index + 1}: ${message}`, 400, "mentions");
+    }
+  }
+  if (parsed.data.body !== undefined) cleanText(parsed.data.body);
+  const body = parsed.data.body?.trim();
+  if (creating && !body) throw new InputError(`Change ${index + 1}: Add a comment.`, 400, "body");
+  return {
+    ...(anchor
+      ? {
+          anchor: {
+            type: anchor.type,
+            line: anchor.type === "space" ? "" : anchor.line || "",
+            period: anchor.type === "pnl_cell" ? anchor.period || "" : "",
+            space_id: anchor.type === "space" ? anchor.space_id || "" : "",
+          },
+        }
+      : {}),
+    ...(parsed.data.parent_id ? { parent_id: parsed.data.parent_id } : {}),
+    ...(body ? { body } : {}),
+    ...(parsed.data.tag ? { tag: parsed.data.tag } : {}),
+    ...(mentions ? { mentions } : {}),
+    ...(parsed.data.resolved === undefined ? {} : { resolved: parsed.data.resolved }),
     at: zoned.iso,
   };
 }

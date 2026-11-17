@@ -55,6 +55,9 @@ export default function SpaceTools({
   drawing,
   selectedId,
   names,
+  commentedIds = [],
+  threadOpen = false,
+  onThreadClose,
   onSelect,
   onCreate,
   onChange,
@@ -65,6 +68,9 @@ export default function SpaceTools({
   drawing: boolean;
   selectedId: string;
   names: Record<string, string>;
+  commentedIds?: string[];
+  threadOpen?: boolean;
+  onThreadClose?: () => void;
   onSelect: (id: string) => void;
   onCreate: (box: GroundBox) => void;
   onChange: (space: SpaceShape) => void;
@@ -74,6 +80,7 @@ export default function SpaceTools({
   const dragRef = useRef<Drag | null>(null);
   const [draft, setDraft] = useState<GroundBox | null>(null);
   const [handles, setHandles] = useState<{ corners: { sx: number; sy: number; x: number; y: number }[]; rotate: { x: number; y: number } | null }>({ corners: [], rotate: null });
+  const [marks, setMarks] = useState<{ id: string; x: number; y: number }[]>([]);
   const onSelectRef = useRef(onSelect);
   const onCreateRef = useRef(onCreate);
   const onChangeRef = useRef(onChange);
@@ -244,6 +251,24 @@ export default function SpaceTools({
     };
   }, [map, selected, visible, spaces]);
 
+  useEffect(() => {
+    if (!visible) {
+      setMarks([]);
+      return undefined;
+    }
+    const place = () => {
+      setMarks(spaces.filter((space) => commentedIds.includes(space.id)).map((space) => {
+        const projected = map.project([space.box.center.lng, space.box.center.lat]);
+        return { id: space.id, x: projected.x, y: projected.y };
+      }));
+    };
+    place();
+    map.on("move", place);
+    return () => {
+      map.off("move", place);
+    };
+  }, [map, spaces, commentedIds, visible]);
+
   function onHandleDown(event: ReactPointerEvent<HTMLButtonElement>, drag: Extract<Drag, { kind: "resize" | "rotate" }>) {
     event.preventDefault();
     event.stopPropagation();
@@ -301,8 +326,11 @@ export default function SpaceTools({
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /></svg>
         </button>
       )) : null}
+      {marks.map((mark) => (
+        <i key={mark.id} className="space-comment-mark" style={{ left: mark.x, top: mark.y }} data-testid="space-comment-mark" aria-label="Open comment" />
+      ))}
       {selected ? (
-        <SpacePopover space={selected} names={names} onChange={onChange} onClose={() => onSelect("")} />
+        <SpacePopover space={selected} names={names} threadOpen={threadOpen} onChange={onChange} onClose={() => onSelect("")} onThreadClose={onThreadClose} />
       ) : null}
     </>
   );

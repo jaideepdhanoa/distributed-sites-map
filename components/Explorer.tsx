@@ -35,6 +35,8 @@ import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, 
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
 import type { SpaceShape } from "./spaces/SpacePopover";
+import CommentGridHost from "./comments/CommentGridHost";
+import { COMMENT_CHANGED, COMMENT_OPEN, readCommentAnchor } from "@/lib/comments/nav";
 import type { GroundBox } from "@/lib/spaces/measure";
 import type { SpaceLayout, SpaceType } from "@/lib/spaces/vocab";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
@@ -249,6 +251,9 @@ export default function Explorer() {
   const [spaceNames, setSpaceNames] = useState<Record<string, string>>({});
   const [marking, setMarking] = useState<{ siteId: string; lng: number; lat: number; nonce: number } | null>(null);
   const [pickedSpace, setPickedSpace] = useState("");
+  const [commentedSpaceIds, setCommentedSpaceIds] = useState<string[]>([]);
+  const [threadSpaceId, setThreadSpaceId] = useState("");
+  const [commentFly, setCommentFly] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const [mapNote, setMapNote] = useState("");
   useEffect(() => {
     if (!me?.u) return undefined;
@@ -256,8 +261,9 @@ export default function Explorer() {
     const pull = () => {
       void fetch("/api/data/spaces", { cache: "no-store" })
         .then((response) => response.ok ? response.json() : { spaces: [] })
-        .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }> }) => {
+        .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }>; openThreads?: string[] }) => {
           if (cancel) return;
+          setCommentedSpaceIds(body.openThreads || []);
           setMarkedSpaces((body.spaces || []).map((row) => ({
             id: row.id,
             siteId: row.siteId,
@@ -286,6 +292,30 @@ export default function Explorer() {
       cancel = true;
     };
   }, [me?.u]);
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const anchor = readCommentAnchor((event as CustomEvent).detail);
+      if (!anchor || anchor.type !== "space") return;
+      const space = markedSpaces.find((item) => item.id === anchor.spaceId);
+      if (!space) return;
+      setPickedSpace(space.id);
+      setThreadSpaceId(space.id);
+      setSheetSnap("peek");
+      setCommentFly({ lng: space.box.center.lng, lat: space.box.center.lat, nonce: Date.now() });
+    };
+    const onChanged = () => {
+      void fetch("/api/data/spaces", { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : { openThreads: [] }))
+        .then((body: { openThreads?: string[] }) => setCommentedSpaceIds(body.openThreads || []))
+        .catch(() => undefined);
+    };
+    window.addEventListener(COMMENT_OPEN, onOpen);
+    window.addEventListener(COMMENT_CHANGED, onChanged);
+    return () => {
+      window.removeEventListener(COMMENT_OPEN, onOpen);
+      window.removeEventListener(COMMENT_CHANGED, onChanged);
+    };
+  }, [markedSpaces]);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
@@ -1788,7 +1818,8 @@ export default function Explorer() {
   async function refreshSpaces() {
     const response = await fetch("/api/data/spaces", { cache: "no-store" });
     if (!response.ok) return;
-    const body = await response.json() as { spaces?: Array<SpaceShape & { center?: { lng: number; lat: number }; lengthFt?: number; widthFt?: number; rotationDeg?: number }> };
+    const body = await response.json() as { spaces?: Array<SpaceShape & { center?: { lng: number; lat: number }; lengthFt?: number; widthFt?: number; rotationDeg?: number }>; openThreads?: string[] };
+    setCommentedSpaceIds(body.openThreads || []);
     setMarkedSpaces((body.spaces || []).map((row) => ({
       id: row.id,
       siteId: row.siteId,
@@ -2333,6 +2364,7 @@ export default function Explorer() {
 
       <div className="map-stage">
         <ActionsDialogs />
+        <CommentGridHost />
         {inReview && !caughtUp && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
           <ReviewRail sites={reviewList.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
         ) : null}
@@ -2411,9 +2443,12 @@ export default function Explorer() {
           spaceShapes={markedSpaces}
           showSpaces={showSpaces}
           spaceDrawing={Boolean(marking)}
-          spaceFly={marking}
+          spaceFly={commentFly || marking}
           selectedSpaceId={pickedSpace}
           spaceNames={spaceNames}
+          commentedSpaceIds={commentedSpaceIds}
+          threadSpaceId={threadSpaceId}
+          onThreadClose={() => setThreadSpaceId("")}
           onSpaceSelect={setPickedSpace}
           onSpaceCreate={(box) => {
             if (!marking) return;

@@ -351,3 +351,33 @@ When two sources disagree about one site field or one P&L line for the same peri
 ```
 
 Table: `data_conflicts` in `db/migrations/021_data_conflicts.sql`. `020` is reserved. Production does not apply this file until the Production migrations workflow runs.
+
+### Comment
+
+A comment is a note on the site discussion, anchored to one target. The same row is the cell thread, the line thread, or the lot thread, and the reply on the discussion tab. There is no second copy.
+
+`anchor.type` is `pnl_cell`, `pnl_line`, or `space`. A cell sends `line` and `period`. A line sends `line` and no period. A lot sends `space_id`. The server stores the lot's type label. `tag` is `investigate`, `ask_broker`, `normalize`, `explained`, or `verified`. A new thread defaults to `investigate` when `tag` is omitted. `mentions` are account ids. `at` is required and must be an ISO-8601 time with a numeric offset or `Z`. A bad timestamp is rejected. The row keeps that exact time.
+
+A reply sends `parent_id` of the thread and no anchor. Replies stay one level deep. An update sends the record id and the version from the previous response. It can change `body`, `tag`, `mentions`, or `resolved`. `resolved: true` closes the thread. `resolved: false` reopens it. Resolve and reopen need a reviewer. A contributor can comment and reply. A viewer cannot. The old note routes refuse an anchored thread so the write stays on `POST /api/changes`.
+
+`ask_broker` does not send anything. The read shows one suggested question for Jaideep to review. That question is built from the anchor. It does not mention EV charging, AVs, walk-away, max price, savings, or offers, and it is not stored as a comms row.
+
+Signed-in financials show a marker on a cell or line with an open thread. A marked lot shows a marker. The discussion shows a chip such as `on P&L, G&A 2023` or `on lot, Excess parking`. The chip opens the grid at that cell, or flies the map to that lot with its popover open. On a phone the thread opens as a bottom sheet. Open threads are open loops and a morning-brief count. Those surfaces name the anchor and the tag. They do not include the comment text. A signed-out request does not receive the financials thread.
+
+```json
+{
+  "entity_type": "comment",
+  "site_id": "PIPE-LAS-9001",
+  "expected_version": 0,
+  "source": "Sample notes",
+  "payload": {
+    "anchor": { "type": "pnl_cell", "line": "ga", "period": "2023" },
+    "body": "The sample line needs a second look.",
+    "tag": "investigate",
+    "mentions": [],
+    "at": "2026-03-01T15:00:00-07:00"
+  }
+}
+```
+
+Table: `notes`, extended in `db/migrations/022_anchored_comments.sql`. Production does not apply this file until the Production migrations workflow runs.

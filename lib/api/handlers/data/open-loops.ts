@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
+import { commentLoops } from "@/lib/comments/loops";
 import { conflictLoops } from "@/lib/conflicts/loops";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { ndaQueueAllowed } from "@/lib/nda";
@@ -16,7 +17,10 @@ export async function GET() {
   const body = openLoopsBody(loadOpenLoops());
   if (actionsEnabled()) {
     try {
-      const extra = await withSql((sql) => conflictLoops(sql));
+      const extra = await withSql(async (sql) => {
+        const [conflicts, comments] = await Promise.all([conflictLoops(sql), commentLoops(sql)]);
+        return [...conflicts, ...comments];
+      });
       body.loops = [...body.loops, ...extra];
     } catch (error) {
       console.error(JSON.stringify({ event: "conflict_read_error", name: error instanceof Error ? error.name : "error" }));

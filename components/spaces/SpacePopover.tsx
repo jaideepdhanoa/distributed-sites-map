@@ -6,7 +6,9 @@ import "../actions/actions.css";
 import { formatPacific } from "@/lib/actions/time";
 import { formatArea, formatFeet } from "@/lib/spaces/measure";
 import { estimateLabel, estimateSlots } from "@/lib/spaces/slots";
-import { SPACE_LAYOUTS, SPACE_TYPES, spaceLayout, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import { requestCommentAnchor } from "@/lib/comments/nav";
+import { SPACE_LAYOUTS, SPACE_TYPES, spaceLayout, spaceTypeLabel, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
+import CommentThread from "../comments/CommentThread";
 import type { GroundBox } from "@/lib/spaces/measure";
 
 export type SpaceShape = {
@@ -26,13 +28,17 @@ const CAUTION = "Aerial imagery can be months old and slightly skewed. Counts st
 export default function SpacePopover({
   space,
   names,
+  threadOpen = false,
   onChange,
   onClose,
+  onThreadClose,
 }: {
   space: SpaceShape;
   names: Record<string, string>;
+  threadOpen?: boolean;
   onChange: (next: SpaceShape) => void;
   onClose: () => void;
+  onThreadClose?: () => void;
 }) {
   const count = estimateSlots(space.box.lengthFt, space.box.widthFt, space.layout);
   const unit = spaceLayout(space.layout).unit;
@@ -74,7 +80,33 @@ export default function SpacePopover({
       <p className="space-estimate" data-testid="space-estimate">{status === "Verified" ? "Verified" : estimateLabel(count, unit)}</p>
       <p className="note">Marked by {names[space.author] || space.author || "you"}</p>
       <p className="note" data-testid="space-caution">{CAUTION}</p>
+      <div className="act-row">
+        <button
+          type="button"
+          className="menu-item"
+          data-testid="space-comment"
+          onClick={() => requestCommentAnchor({
+            type: "space",
+            siteId: space.siteId,
+            line: "",
+            period: "",
+            spaceId: space.id,
+            label: spaceTypeLabel(space.type),
+          })}
+        >
+          Comment
+        </button>
+      </div>
       <SpaceThread spaceId={space.id} />
+      {threadOpen ? (
+        <CommentThread
+          siteId={space.siteId}
+          anchor={{ type: "space", siteId: space.siteId, line: "", period: "", spaceId: space.id, label: spaceTypeLabel(space.type) }}
+          variant="sheet"
+          source="Map"
+          onClose={onThreadClose}
+        />
+      ) : null}
     </div>
   );
 }

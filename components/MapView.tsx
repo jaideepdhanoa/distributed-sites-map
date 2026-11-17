@@ -70,6 +70,9 @@ type Props = {
   onSpaceCreate?: (box: GroundBox) => void;
   onSpaceChange?: (space: SpaceShape) => void;
   onSpaceDone?: () => void;
+  commentedSpaceIds?: string[];
+  threadSpaceId?: string;
+  onThreadClose?: () => void;
   onMapFailed?: (message: string) => void;
 };
 
@@ -1710,6 +1713,9 @@ export default function MapView(props: Props) {
           drawing={Boolean(props.spaceDrawing)}
           selectedId={props.selectedSpaceId || ""}
           names={props.spaceNames || {}}
+          commentedIds={props.commentedSpaceIds || []}
+          threadOpen={Boolean(props.threadSpaceId) && props.threadSpaceId === props.selectedSpaceId}
+          onThreadClose={props.onThreadClose}
           onSelect={(id) => props.onSpaceSelect?.(id)}
           onCreate={(box) => props.onSpaceCreate?.(box)}
           onChange={(space) => props.onSpaceChange?.(space)}

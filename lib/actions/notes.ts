@@ -11,6 +11,7 @@ import { permanentSiteId } from "./suggestions";
 import { InputError, parseBody, parseTarget, stamp, type TargetKind } from "./text";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_ID } from "@/lib/spaces/vocab";
+import { suggestBrokerQuestion, type CommentAnchor } from "@/lib/comments/anchor";
 
 export type ThreadKind = TargetKind | "suggestion" | "site_space";
 
@@ -27,6 +28,11 @@ export type Note = {
   resolvedAt: string | null;
   resolvedBy: string | null;
   mentions: Mention[];
+  anchor: CommentAnchor | null;
+  tag: string;
+  entityId: string | null;
+  version: number | null;
+  brokerQuestion: string | null;
 };
 
 type NoteRow = {
@@ -41,14 +47,37 @@ type NoteRow = {
   deleted_at: Date | string | null;
   resolved_at: Date | string | null;
   resolved_by: string | null;
+  entity_id?: string | null;
+  version?: number | string | null;
+  anchor_type?: string | null;
+  anchor_line?: string | null;
+  anchor_period?: string | null;
+  anchor_space_id?: string | null;
+  anchor_label?: string | null;
+  tag?: string | null;
+  created_at_iso?: string | null;
 };
 
 const SELECT = `id, target_kind, target_id, parent_id, body, author_id, created_at, updated_at, deleted_at, resolved_at, resolved_by`;
+const SELECT_ANCHOR = `${SELECT}, entity_id, version, anchor_type, anchor_line, anchor_period, anchor_space_id, anchor_label, tag, created_at_iso`;
+
+function anchorOf(row: NoteRow): CommentAnchor | null {
+  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space") return null;
+  return {
+    type: row.anchor_type,
+    siteId: row.target_id,
+    line: row.anchor_line || "",
+    period: row.anchor_period || "",
+    spaceId: row.anchor_space_id || "",
+    label: row.anchor_label || "",
+  };
+}
 
 function present(row: NoteRow): Note | null {
   const deleted = Boolean(row.deleted_at);
   const body = deleted ? "" : safeSnapshot(row.body);
   if (!deleted && !body) return null;
+  const anchor = anchorOf(row);
   return {
     id: row.id,
     targetKind: row.target_kind,
@@ -56,13 +85,23 @@ function present(row: NoteRow): Note | null {
     parentId: row.parent_id,
     body,
     authorId: row.author_id,
-    createdAt: stamp(row.created_at),
+    createdAt: row.created_at_iso || stamp(row.created_at),
     updatedAt: row.updated_at ? stamp(row.updated_at) : null,
     deleted,
     resolvedAt: row.resolved_at ? stamp(row.resolved_at) : null,
     resolvedBy: row.resolved_by,
     mentions: [],
+    anchor,
+    tag: row.tag || "",
+    entityId: row.entity_id || null,
+    version: row.version == null ? null : Number(row.version),
+    brokerQuestion: !row.parent_id && row.tag === "ask_broker" && anchor ? suggestBrokerQuestion(anchor) : null,
   };
+}
+
+function missingAnchorColumn(error: unknown): boolean {
+  const code = (error as { code?: string }).code;
+  return code === "42703" || code === "42P01";
 }
 
 async function withMentions(sql: Sql, notes: Note[]): Promise<Note[]> {
@@ -90,15 +129,43 @@ async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): 
 }
 
 async function loadNote(sql: Sql, id: string): Promise<NoteRow | null> {
-  const rows = await sql.query<NoteRow>(`SELECT ${SELECT} FROM notes WHERE id = $1`, [id]);
-  return rows.rows[0] || null;
+  try {
+    const rows = await sql.query<NoteRow>(`SELECT ${SELECT_ANCHOR} FROM notes WHERE id = $1`, [id]);
+    return rows.rows[0] || null;
+  } catch (error) {
+    if (!missingAnchorColumn(error)) throw error;
+    const rows = await sql.query<NoteRow>(`SELECT ${SELECT} FROM notes WHERE id = $1`, [id]);
+    return rows.rows[0] || null;
+  }
+}
+
+async function anchoredParent(sql: Sql, id: string): Promise<boolean> {
+  try {
+    const rows = await sql.query<{ anchor_type: string | null }>(`SELECT anchor_type FROM notes WHERE id = $1`, [id]);
+    return Boolean(rows.rows[0]?.anchor_type);
+  } catch (error) {
+    if (missingAnchorColumn(error)) return false;
+    throw error;
+  }
 }
 
 export async function listNotes(sql: Sql, targetKind: ThreadKind, targetId: string): Promise<Note[]> {
-  const rows = await sql.query<NoteRow>(
-    `SELECT ${SELECT} FROM notes WHERE target_kind = $1 AND target_id = $2 ORDER BY created_at ASC, id ASC`,
-    [targetKind, targetId],
-  );
+  let rows;
+  try {
+    rows = await sql.query<NoteRow>(
+      `SELECT ${SELECT_ANCHOR} FROM notes
+       WHERE (target_kind = $1 AND target_id = $2)
+          OR (target_id = $2 AND anchor_type IS NOT NULL)
+       ORDER BY created_at ASC, id ASC`,
+      [targetKind, targetId],
+    );
+  } catch (error) {
+    if (!missingAnchorColumn(error)) throw error;
+    rows = await sql.query<NoteRow>(
+      `SELECT ${SELECT} FROM notes WHERE target_kind = $1 AND target_id = $2 ORDER BY created_at ASC, id ASC`,
+      [targetKind, targetId],
+    );
+  }
   const notes = rows.rows.map(present).filter((row): row is Note => Boolean(row));
   return withMentions(sql, notes);
 }
@@ -132,6 +199,7 @@ export async function createNote(
     targetId = target.targetId;
   }
   if (parentId) {
+    if (await anchoredParent(sql, parentId)) throw new InputError("Reply on that thread through the comment.");
     const parent = await loadNote(sql, parentId);
     if (!parent || parent.deleted_at) throw new InputError("That note is not available.", 404);
     if (parent.parent_id) throw new InputError("Replies stay one level deep.");
@@ -217,6 +285,7 @@ export async function createNote(
 export async function editNote(sql: Sql, input: { id: string; body: string; actorId: string; mentions?: unknown }): Promise<Note> {
   const row = await loadNote(sql, input.id);
   if (!row || row.deleted_at) throw new InputError("That note is not available.", 404);
+  if (row.anchor_type) throw new InputError("Edit that thread through the comment.");
   if (row.author_id !== input.actorId) throw new InputError("You do not have permission for that.", 403);
   const body = parseBody(input.body, "note", 2000);
   assertClean(body);
@@ -252,6 +321,7 @@ export async function editNote(sql: Sql, input: { id: string; body: string; acto
 export async function deleteNote(sql: Sql, input: { id: string; actorId: string }): Promise<void> {
   const row = await loadNote(sql, input.id);
   if (!row || row.deleted_at) throw new InputError("That note is not available.", 404);
+  if (row.anchor_type) throw new InputError("That thread stays on the comment.");
   if (row.author_id !== input.actorId) throw new InputError("You do not have permission for that.", 403);
   await sql.query(`UPDATE notes SET deleted_at = now() WHERE id = $1`, [input.id]);
   await audit(sql, {
@@ -267,6 +337,7 @@ export async function deleteNote(sql: Sql, input: { id: string; actorId: string 
 export async function resolveNote(sql: Sql, input: { id: string; actorId: string }): Promise<Note> {
   const row = await loadNote(sql, input.id);
   if (!row || row.deleted_at) throw new InputError("That note is not available.", 404);
+  if (row.anchor_type) throw new InputError("Resolve that thread through the comment.");
   if (row.parent_id) throw new InputError("Resolve the thread, not a reply.");
   if (row.resolved_at) throw new InputError("That thread is already resolved.");
   await sql.query(`UPDATE notes SET resolved_at = now(), resolved_by = $2 WHERE id = $1`, [input.id, input.actorId]);
@@ -287,6 +358,7 @@ export async function resolveNote(sql: Sql, input: { id: string; actorId: string
 export async function reopenNote(sql: Sql, input: { id: string; actorId: string }): Promise<Note> {
   const row = await loadNote(sql, input.id);
   if (!row || row.deleted_at) throw new InputError("That note is not available.", 404);
+  if (row.anchor_type) throw new InputError("Reopen that thread through the comment.");
   if (row.parent_id) throw new InputError("Reopen the thread, not a reply.");
   if (!row.resolved_at) throw new InputError("That thread is already open.");
   await sql.query(`UPDATE notes SET resolved_at = NULL, resolved_by = NULL WHERE id = $1`, [input.id]);

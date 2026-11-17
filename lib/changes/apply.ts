@@ -17,10 +17,11 @@ import {
   type SiteField,
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
+import { storeComment } from "@/lib/comments/record";
 import { storeConflict } from "@/lib/conflicts/record";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
-import type { ActivityPayload, Actor, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
+import type { ActivityPayload, Actor, CommentPayload, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
 import { formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, validateBatch } from "./schema";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import type { EntityType, Market, ServiceAreaClass } from "./vocab";
@@ -110,8 +111,8 @@ async function tableIdFloor(sql: Sql, name: "activity" | "comms" | "pnl_period" 
   return max;
 }
 
-async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict"): Promise<number> {
-  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space" || name === "data_conflict") {
+async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict" | "comment"): Promise<number> {
+  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space" || name === "data_conflict" || name === "comment") {
     const result = await sql.query<{ value: number | string }>(
       `INSERT INTO id_counters (name, value)
        VALUES ($1, 1)
@@ -134,13 +135,14 @@ async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period
   return next;
 }
 
-export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict", value: number): string {
+export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict" | "comment", value: number): string {
   if (kind === "activity") return `A-${String(value).padStart(6, "0")}`;
   if (kind === "comms") return `CM-${String(value).padStart(4, "0")}`;
   if (kind === "pnl_period") return `PP-${String(value).padStart(6, "0")}`;
   if (kind === "pnl_line") return `PL-${String(value).padStart(6, "0")}`;
   if (kind === "site_space") return `SS-${String(value).padStart(6, "0")}`;
   if (kind === "data_conflict") return `CF-${String(value).padStart(6, "0")}`;
+  if (kind === "comment") return `NT-${String(value).padStart(6, "0")}`;
   return `EV-${String(value).padStart(8, "0")}`;
 }
 
@@ -152,6 +154,14 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
       [change.site_id, family],
     );
     return result.rows[0] ? Number(result.rows[0].version) : 0;
+  }
+  if (change.entity_type === "comment") {
+    const result = await sql.query<{ version: number | string | null }>(
+      `SELECT version FROM notes WHERE id = $1`,
+      [change.entity_id],
+    );
+    const version = result.rows[0]?.version;
+    return version == null ? 0 : Number(version);
   }
   if (change.entity_type === "stage" || change.entity_type === "site") {
     const table = change.entity_type === "stage" ? "site_stages" : "sites";
@@ -661,7 +671,9 @@ async function applyOne(
         ? "site_space"
         : change.entity_type === "data_conflict"
           ? "data_conflict"
-          : "activity";
+          : change.entity_type === "comment"
+            ? "comment"
+            : "activity";
   const entityId = tag
     ? `${change.site_id}:${family}`
     : siteKeyed
@@ -738,6 +750,43 @@ async function applyOne(
       actor: actor.id,
       at: body.at,
     };
+  } else if (change.entity_type === "comment") {
+    const body = change.payload as CommentPayload;
+    const written = await storeComment(sql, entityId, {
+      siteId: change.site_id,
+      parentId: body.parent_id || null,
+      anchor: body.anchor
+        ? {
+            type: body.anchor.type,
+            siteId: change.site_id,
+            line: body.anchor.line,
+            period: body.anchor.period,
+            spaceId: body.anchor.space_id,
+            label: "",
+          }
+        : null,
+      body: body.body ?? null,
+      tag: body.tag ?? null,
+      mentions: body.mentions ?? null,
+      resolved: body.resolved ?? null,
+      actor: actor.id,
+      at: body.at,
+    }, change.expected_version);
+    if (!written.ok) throw conflict(change, written.id, written.version);
+    payload = {
+      anchor: {
+        type: written.anchor.type,
+        line: written.anchor.line,
+        period: written.anchor.period,
+        space_id: written.anchor.spaceId,
+        label: written.anchor.label,
+      },
+      tag: written.tag,
+      resolved: written.resolved,
+      parent_id: body.parent_id || "",
+      actor: actor.id,
+      at: body.at,
+    };
   } else if (change.entity_type === "site_space") {
     const space = change.payload as SiteSpacePayload;
     payload = await storeSiteSpace(sql, {
@@ -772,11 +821,14 @@ async function applyOne(
   });
   try {
     const { indexRecord } = await import("@/lib/search/docs");
+    const indexPayload = change.entity_type === "comment"
+      ? { ...payload, body: (change.payload as CommentPayload).body || "" }
+      : payload;
     await indexRecord(sql, {
       entityType: change.entity_type,
       entityId,
       siteId: change.site_id,
-      payload,
+      payload: indexPayload,
     });
   } catch (error) {
     console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));

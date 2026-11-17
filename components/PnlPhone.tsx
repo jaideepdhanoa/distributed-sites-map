@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import type { OpenPnlComment } from "@/lib/comments/anchor";
 import { statusLabel, type DataConflict } from "@/lib/conflicts/view";
 import { MONTH_SHORT } from "@/lib/pnl/lines";
-import { buildPnlGrid, columnSummary, type GridCell } from "@/lib/pnl/grid";
+import { buildPnlGrid, columnPeriodKey, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
 
 function textOf(cell: GridCell | undefined, percent: boolean): string {
@@ -13,7 +14,17 @@ function textOf(cell: GridCell | undefined, percent: boolean): string {
   return cell.amount;
 }
 
-export default function PnlPhone({ statement, conflicts = [] }: { statement: PnlStatement; conflicts?: DataConflict[] }) {
+export default function PnlPhone({
+  statement,
+  conflicts = [],
+  comments = [],
+  onComment,
+}: {
+  statement: PnlStatement;
+  conflicts?: DataConflict[];
+  comments?: OpenPnlComment[];
+  onComment?: (anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) => void;
+}) {
   const years = statement.years.map((item) => item.year);
   const [grain, setGrain] = useState<"month" | "year">("month");
   const [year, setYear] = useState(years[0] || 0);
@@ -23,8 +34,8 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
   const [open, setOpen] = useState<string | null>(null);
   const touch = useRef(0);
   const grid = useMemo(
-    () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts),
-    [statement, grain, year, conflicts],
+    () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts, comments),
+    [statement, grain, year, conflicts, comments],
   );
   const index = grain === "month" ? month : yearIndex;
   const summary = columnSummary(grid, index);
@@ -106,12 +117,12 @@ export default function PnlPhone({ statement, conflicts = [] }: { statement: Pnl
                 aria-expanded={open === row.id}
                 onClick={() => setOpen((current) => (current === row.id ? null : row.id))}
               >
-                <span>{row.label}</span>
+                <span>{row.label}{row.commentOpen || cell?.commentOpen ? <i className="pnl-mark comment" data-testid="pnl-comment-mark" aria-label="Open comment" /> : null}</span>
                 <strong className={value ? undefined : "pnl-muted"}>{textOf(cell, false)}</strong>
                 <small>{value?.share || ""}</small>
                 {value?.flag ? <i className="pnl-dot" data-testid="pnl-flag-dot" aria-label="Outside the band" /> : null}
               </button>
-              {open === row.id ? <Detail cell={cell} /> : null}
+              {open === row.id ? <Detail cell={cell} onComment={onComment} line={row.id} period={grid.columns[index] ? columnPeriodKey(grid.columns[index]) : ""} /> : null}
             </div>
           );
         })}
@@ -133,7 +144,35 @@ function ConflictDetail({ cell }: { cell: GridCell }) {
   );
 }
 
-function Detail({ cell }: { cell: GridCell | undefined }) {
+function CommentActions({
+  onComment,
+  line,
+  period,
+}: {
+  onComment?: (anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) => void;
+  line: string;
+  period: string;
+}) {
+  if (!onComment) return null;
+  return (
+    <div className="act-row">
+      <button type="button" className="menu-item" data-testid="pnl-cell-comment" onClick={() => onComment({ type: "pnl_cell", line, period })}>Comment</button>
+      <button type="button" className="menu-item" data-testid="pnl-line-comment" onClick={() => onComment({ type: "pnl_line", line, period: "" })}>Comment on line</button>
+    </div>
+  );
+}
+
+function Detail({
+  cell,
+  onComment,
+  line,
+  period,
+}: {
+  cell: GridCell | undefined;
+  onComment?: (anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) => void;
+  line: string;
+  period: string;
+}) {
   if (!cell || cell.kind === "missing") {
     const source = cell?.kind === "missing" ? [cell.sourceDocument, cell.sourcePage, cell.markerSource].filter(Boolean).join(" · ") : "";
     return (
@@ -142,6 +181,7 @@ function Detail({ cell }: { cell: GridCell | undefined }) {
         {source ? <p>{source}</p> : null}
         {cell?.kind === "missing" && cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
         {cell ? <ConflictDetail cell={cell} /> : null}
+        <CommentActions onComment={onComment} line={line} period={period} />
       </div>
     );
   }
@@ -150,6 +190,7 @@ function Detail({ cell }: { cell: GridCell | undefined }) {
       <div className="pnl-expand">
         <p>Not in this statement.</p>
         <ConflictDetail cell={cell} />
+        <CommentActions onComment={onComment} line={line} period={period} />
       </div>
     );
   }
@@ -160,6 +201,7 @@ function Detail({ cell }: { cell: GridCell | undefined }) {
       {cell.capturedLabel ? <p>Captured {cell.capturedLabel}</p> : null}
       {cell.flag ? <p>{cell.flag}</p> : null}
       <ConflictDetail cell={cell} />
+      <CommentActions onComment={onComment} line={line} period={period} />
     </div>
   );
 }

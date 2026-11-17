@@ -2422,6 +2422,45 @@ tr { cursor: pointer; }
 .pnl-mark.reported { background: var(--pine-700); }
 .pnl-mark.estimated, .pnl-dot { background: #a67c2d; }
 .pnl-mark.conflict { background: #8a3b2a; }
+.pnl-mark.comment { background: #1e4636; box-shadow: 0 0 0 2px #fffdf8; }
+.pnl-table .is-pinned .text-link { margin-left: 8px; }
+.space-comment-mark {
+  position: absolute;
+  z-index: 4;
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: #1e4636;
+  box-shadow: 0 0 0 2px #fffdf8;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.comment-sheet {
+  position: fixed;
+  z-index: 60;
+  top: 72px;
+  right: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: 12px 12px 16px;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+}
+@media (max-width: 767px) {
+  .comment-sheet {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: 78vh;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: 72px;
+  }
+}
 td.is-conflict { box-shadow: inset 3px 0 0 #8a3b2a; }
 .pnl-missing, .pnl-blank { color: var(--ink-3); }
 .pnl-pop {

@@ -1376,6 +1376,7 @@ export default function MapView(props: Props) {
       }
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
+      if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
       if (reviewToken) {
         appliedReview.current = reviewToken;
         appliedPad.current = "flush";
@@ -1538,7 +1539,7 @@ export default function MapView(props: Props) {
         return;
       }
       if (!props.selectedId) {
-        if (props.fitAll && frameSites(map, props.fitPoints || [], window.matchMedia("(max-width: 767px)").matches)) return;
+        if (props.fitAll) return;
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
         return;
       }
@@ -1565,6 +1566,10 @@ export default function MapView(props: Props) {
       );
     };
     if (props.reviewFocus) return;
+    if (props.spaceDrawing && props.spaceFly) {
+      map.jumpTo({ center: [props.spaceFly.lng, props.spaceFly.lat], zoom: 18, padding: pointPadding(map) });
+      return;
+    }
     if (props.selectedId && !selectedOnMap) {
       glide(map, [props.focusLng, props.focusLat], props.focusZoom);
       return;
@@ -1575,7 +1580,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.fitPoints, props.reviewFocus, gridToken]);
+  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, gridToken]);
 
   useEffect(() => {
     const map = mapRef.current;

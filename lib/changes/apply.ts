@@ -23,9 +23,10 @@ import { storeConflict } from "@/lib/conflicts/record";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
 import type { ActivityPayload, Actor, CommentPayload, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
-import { formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, validateBatch } from "./schema";
+import { AGENT_STAGE_DECISION_SOURCE, RECEIPT_ACTIVITY_SUMMARY, formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, receiptCitation, validateBatch } from "./schema";
+import { CREATE_MARKETS } from "./site";
 import { marketCode, serviceAreaCode } from "./stageLabel";
-import type { EntityType, Market, ServiceAreaClass } from "./vocab";
+import { LISTING_ID, SITE_ID, type EntityType, type Market, type ServiceAreaClass } from "./vocab";
 
 export type { Actor } from "./schema";
 
@@ -35,6 +36,9 @@ export type ChangeResult = {
   site_id: string;
   event_id: string;
   version: number;
+  /** Set when this result minted or replayed a site. */
+  universe_id?: string;
+  listing_id?: string;
 };
 
 export type ApplyResult = {
@@ -370,6 +374,13 @@ async function writeComms(
     workbook_source: payload.workbook_source ?? textOf(prior.workbook_source),
     message_id: messageId,
   };
+  const relinkedBy = payload.relinked_by || textOf(prior.relinked_by);
+  const relinkedFrom = payload.relinked_by ? payload.relinked_from || "" : textOf(prior.relinked_from);
+  const recorded: Record<string, unknown> = { ...stored };
+  if (relinkedBy) {
+    recorded.relinked_from = relinkedFrom;
+    recorded.relinked_by = relinkedBy;
+  }
   await sql.query(
     `INSERT INTO comms_entries (
        entity_id, site_id, payload, version, updated_by, message_id, thread_id, link, gmail_message_id, gmail_thread_id
@@ -385,9 +396,9 @@ async function writeComms(
        link = EXCLUDED.link,
        gmail_message_id = EXCLUDED.gmail_message_id,
        gmail_thread_id = EXCLUDED.gmail_thread_id`,
-    [entityId, change.site_id, JSON.stringify(stored), version, actorId, messageId, threadId, link, gmailMessageId, gmailThreadId],
+    [entityId, change.site_id, JSON.stringify(recorded), version, actorId, messageId, threadId, link, gmailMessageId, gmailThreadId],
   );
-  return stored;
+  return recorded;
 }
 
 type SiteDb = Record<SiteField, string> & {
@@ -765,6 +776,23 @@ async function applyOne(
           : change.entity_type === "comment"
             ? "comment"
             : "activity";
+  if (change.listing_replay) {
+    const replayVersion = await readVersion(sql, change);
+    const event = await sql.query<{ id: string }>(
+      `SELECT id FROM events WHERE entity_type = 'site' AND site_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1`,
+      [change.site_id],
+    );
+    const minted = change.payload as SitePayload;
+    return {
+      entity_type: "site",
+      entity_id: change.site_id,
+      site_id: change.site_id,
+      event_id: event.rows[0]?.id || "",
+      version: replayVersion,
+      universe_id: minted.fields.universe_id || "",
+      listing_id: minted.mint?.listing_id,
+    };
+  }
   const entityId = tag
     ? `${change.site_id}:${family}`
     : siteKeyed
@@ -780,8 +808,19 @@ async function applyOne(
   let payload: Record<string, unknown>;
   if (change.entity_type === "stage") {
     const written = await applyStage(sql, change, actor.id, version, mode);
-    const at = (change.payload as StagePayload).at;
-    payload = { ...written.stored, previous_stage: written.previousStage, ...(at ? { at } : {}) };
+    const stageBody = change.payload as StagePayload;
+    if (stageBody.decision_source === "agent" && written.previousStage !== "1 Desk screen") {
+      throw new InputError("An agent can only move a site from Desk screen to Financial screen.", 403);
+    }
+    const at = stageBody.at;
+    payload = {
+      ...written.stored,
+      previous_stage: written.previousStage,
+      ...(at ? { at } : {}),
+      ...(stageBody.decision_source === "agent"
+        ? { decision_source: "agent", receipt: stageBody.receipt, cited_source: change.source }
+        : {}),
+    };
   } else if (change.entity_type === "site") {
     payload = await writeSite(sql, change, actor.id, version, mode);
   } else if (change.entity_type === "activity") {
@@ -898,14 +937,19 @@ async function applyOne(
       layout: space.deleted ? undefined : space.layout,
     });
   } else {
+    change.payload = await attachCommsRelink(sql, actor, change);
     payload = await writeComms(sql, change, entityId, actor.id, version);
   }
+  if (change.entity_type === "site" && (change.payload as SitePayload).mint) {
+    await rememberMint(sql, actor, change);
+  }
+  const stageBody = change.entity_type === "stage" ? (change.payload as StagePayload) : null;
   const eventId = await insertEvent(sql, {
     entityType: change.entity_type,
     entityId,
     siteId: change.site_id,
     payload,
-    source: change.source,
+    source: stageBody?.decision_source === "agent" ? AGENT_STAGE_DECISION_SOURCE : change.source,
     actor: actor.id,
     idempotencyKey,
     runId,
@@ -924,7 +968,15 @@ async function applyOne(
   } catch (error) {
     console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));
   }
-  return { entity_type: change.entity_type, entity_id: entityId, site_id: change.site_id, event_id: eventId, version };
+  const minted = change.entity_type === "site" ? (change.payload as SitePayload).mint : undefined;
+  return {
+    entity_type: change.entity_type,
+    entity_id: entityId,
+    site_id: change.site_id,
+    event_id: eventId,
+    version,
+    ...(minted ? { universe_id: (change.payload as SitePayload).fields.universe_id || "", listing_id: minted.listing_id } : {}),
+  };
 }
 
 const SYSTEM_ACTOR: Actor = { id: "system", kind: "agent" };
@@ -974,7 +1026,13 @@ async function ensureCapture(
       );
     }
     const hasActivity = changes.some((row) => row.entity_type === "activity" && row.site_id === change.site_id);
-    if (!hasActivity) {
+    const alreadyAdded = hasActivity
+      ? { rows: [{}] }
+      : await sql.query(
+          `SELECT 1 FROM activities WHERE site_id = $1 AND payload->>'summary' = 'Site added' LIMIT 1`,
+          [change.site_id],
+        );
+    if (!hasActivity && !alreadyAdded.rows.length) {
       const zoned = parseZonedTimestamp(formatZonedTimestamp());
       if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
       const payload: ActivityPayload = { date: zoned.date, date_iso: zoned.iso, type: "capture", summary: "Site added" };
@@ -995,6 +1053,54 @@ async function ensureCapture(
         ),
       );
     }
+  }
+  return extra;
+}
+
+async function ensureReceiptMoves(
+  sql: Sql,
+  actor: Actor,
+  changes: ParsedChange[],
+  idempotencyKey: string,
+  runId: string,
+  mode: "api" | "workbook",
+): Promise<ChangeResult[]> {
+  if (mode !== "api") return [];
+  const extra: ChangeResult[] = [];
+  for (const change of changes) {
+    if (change.entity_type !== "stage") continue;
+    const stage = change.payload as StagePayload;
+    if (stage.decision_source !== "agent" || !stage.receipt) continue;
+    const existing = await sql.query(
+      `SELECT 1 FROM activities WHERE site_id = $1 AND payload->>'summary' = $2 LIMIT 1`,
+      [change.site_id, RECEIPT_ACTIVITY_SUMMARY],
+    );
+    if (existing.rows.length) continue;
+    const zoned = parseZonedTimestamp(formatZonedTimestamp());
+    if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
+    const payload: ActivityPayload = {
+      date: zoned.date,
+      date_iso: zoned.iso,
+      type: "stage",
+      summary: RECEIPT_ACTIVITY_SUMMARY,
+      source_link: receiptCitation(stage.receipt),
+    };
+    extra.push(
+      await applyOne(
+        sql,
+        actor,
+        {
+          entity_type: "activity",
+          site_id: change.site_id,
+          expected_version: 0,
+          source: AGENT_STAGE_DECISION_SOURCE,
+          payload,
+        },
+        `${idempotencyKey}#receipt:${change.site_id}`,
+        runId,
+        mode,
+      ),
+    );
   }
   return extra;
 }
@@ -1030,10 +1136,12 @@ export async function applyParsedChanges(
       [runId, actor.id, notes.slice(0, 500)],
     );
     const results: ChangeResult[] = [];
-    for (let index = 0; index < changes.length; index += 1) {
-      results.push(await applyOne(sql, actor, changes[index], `${idempotencyKey}#${index}`, runId, mode));
+    const writable = await prepareMintedSites(sql, changes);
+    for (let index = 0; index < writable.length; index += 1) {
+      results.push(await applyOne(sql, actor, writable[index], `${idempotencyKey}#${index}`, runId, mode));
     }
-    results.push(...(await ensureCapture(sql, actor, changes, idempotencyKey, runId, mode)));
+    results.push(...(await ensureCapture(sql, actor, writable, idempotencyKey, runId, mode)));
+    results.push(...(await ensureReceiptMoves(sql, actor, writable, idempotencyKey, runId, mode)));
     if (results.some((row) => row.entity_type === "stage")) {
       await sql.exec("SAVEPOINT proposal_close");
       try {
@@ -1081,8 +1189,179 @@ export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string,
   return applyParsedChanges(sql, actor, key, changes, "api", "api", options);
 }
 
+const LABELED_ID = /^(PIPE|LAND|WB)-([A-Z]{2,4})-(\d+)$/;
+
+/** Highest suffix for each PIPE, LAND, or WB prefix. The name is the id_counters key. */
+export function labeledIdFloors(ids: string[]): { name: string; value: number }[] {
+  const max = new Map<string, number>();
+  for (const id of ids) {
+    const match = LABELED_ID.exec(String(id || "").trim());
+    if (!match) continue;
+    const name = `${match[1]}:${match[2]}`;
+    max.set(name, Math.max(max.get(name) || 0, Number(match[3])));
+  }
+  return [...max.entries()].map(([name, value]) => ({ name, value }));
+}
+
+function formatLabeled(prefix: string, value: number): string {
+  return `${prefix}${String(value).padStart(4, "0")}`;
+}
+
+async function nextLabeled(sql: Sql, counter: string, prefix: string, scans: string[]): Promise<string> {
+  await lockKey(sql, `mint:${counter}`);
+  let floor = 0;
+  const counterRow = await sql.query<{ value: number | string }>(`SELECT value FROM id_counters WHERE name = $1`, [counter]);
+  floor = Math.max(floor, Number(counterRow.rows[0]?.value || 0));
+  for (const scan of scans) {
+    const rows = await sql.query<{ id: string }>(scan, [`${prefix}%`]);
+    for (const row of rows.rows) floor = Math.max(floor, numericSuffix(prefix, String(row.id || "")));
+  }
+  let next = floor + 1;
+  let id = formatLabeled(prefix, next);
+  while (isExcludedSite(id)) {
+    next += 1;
+    id = formatLabeled(prefix, next);
+  }
+  await sql.query(
+    `INSERT INTO id_counters (name, value) VALUES ($1, $2)
+     ON CONFLICT (name) DO UPDATE SET value = GREATEST(id_counters.value, EXCLUDED.value)`,
+    [counter, next],
+  );
+  return id;
+}
+
+/** Next PIPE/LAND id and the next Universe id for one market. Locks each counter for the transaction. */
+export async function mintSitePair(
+  sql: Sql,
+  kind: "pipeline" | "land",
+  market: string,
+): Promise<{ siteId: string; universeId: string }> {
+  const prefix = kind === "land" ? "LAND" : "PIPE";
+  const sitePrefix = `${prefix}-${market}-`;
+  const universePrefix = `WB-${market}-`;
+  const siteId = await nextLabeled(sql, `${prefix}:${market}`, sitePrefix, [
+    `SELECT site_id AS id FROM sites WHERE site_id LIKE $1`,
+    `SELECT site_id AS id FROM site_mints WHERE site_id LIKE $1`,
+  ]);
+  const universeId = await nextLabeled(sql, `WB:${market}`, universePrefix, [
+    `SELECT universe_id AS id FROM sites WHERE universe_id LIKE $1`,
+    `SELECT universe_id AS id FROM universe_rows WHERE universe_id LIKE $1`,
+    `SELECT universe_id AS id FROM site_mints WHERE universe_id LIKE $1`,
+  ]);
+  return { siteId, universeId };
+}
+
+function listingHash(payload: SitePayload): string {
+  const mint = payload.mint;
+  const fields = { ...payload.fields };
+  delete fields.universe_id;
+  return createHash("sha256")
+    .update(
+      canonicalJson({
+        kind: mint?.kind || "",
+        listing_id: mint?.listing_id || "",
+        market: fields.market || "",
+        fields,
+        sources: payload.sources || {},
+      }),
+    )
+    .digest("hex");
+}
+
+async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<ParsedChange[]> {
+  const prepared: ParsedChange[] = [];
+  for (const change of changes) {
+    const mint = change.entity_type === "site" ? (change.payload as SitePayload).mint : undefined;
+    if (!mint || change.expected_version !== 0 || change.site_id) {
+      prepared.push(change);
+      continue;
+    }
+    const payload = change.payload as SitePayload;
+    const market = payload.fields.market || "";
+    if (!CREATE_MARKETS.includes(market as (typeof CREATE_MARKETS)[number])) {
+      throw new InputError("A new site needs a market of PHX, LAS, or MIA.");
+    }
+    const hash = listingHash(payload);
+    await lockKey(sql, `listing:${mint.listing_id}`);
+    const existing = await sql.query<{ site_id: string; universe_id: string; request_hash: string }>(
+      `SELECT site_id, universe_id, request_hash FROM site_mints WHERE listing_id = $1`,
+      [mint.listing_id],
+    );
+    const prior = existing.rows[0];
+    if (prior) {
+      if (prior.request_hash !== hash) throw new InputError("This listing id was already used for a different site.", 409);
+      prepared.push({
+        ...change,
+        site_id: prior.site_id,
+        listing_replay: true,
+        payload: { ...payload, fields: { ...payload.fields, universe_id: prior.universe_id } },
+      });
+      continue;
+    }
+    const minted = await mintSitePair(sql, mint.kind, market);
+    prepared.push({
+      ...change,
+      site_id: minted.siteId,
+      payload: { ...payload, fields: { ...payload.fields, universe_id: minted.universeId } },
+    });
+  }
+  return prepared;
+}
+
+async function rememberMint(sql: Sql, actor: Actor, change: ParsedChange): Promise<void> {
+  const payload = change.payload as SitePayload;
+  const mint = payload.mint;
+  const universeId = payload.fields.universe_id || "";
+  if (!mint || !universeId) return;
+  const fields = payload.fields;
+  await sql.query(
+    `INSERT INTO site_mints (listing_id, site_id, universe_id, kind, market, request_hash, actor)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [mint.listing_id, change.site_id, universeId, mint.kind, fields.market || "", listingHash(payload), actor.id],
+  );
+  await sql.query(
+    `INSERT INTO universe_rows (
+       universe_id, market, site_id, name, address, category, apn, lat, lng, listing_url, broker, listing_id, counted, created_by
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Yes', $13)`,
+    [
+      universeId,
+      fields.market || "",
+      change.site_id,
+      fields.name || "",
+      fields.address || "",
+      fields.category || "",
+      fields.apn || "",
+      fields.lat || "",
+      fields.lng || "",
+      fields.listing_url || "",
+      fields.broker || "",
+      mint.listing_id,
+      actor.id,
+    ],
+  );
+}
+
+async function attachCommsRelink(sql: Sql, actor: Actor, change: ParsedChange): Promise<CommsPayload> {
+  const payload: CommsPayload = { ...(change.payload as CommsPayload) };
+  if (actor.kind !== "agent" || change.expected_version === 0) return payload;
+  const prior = await sql.query<{ site_id: string }>(`SELECT site_id FROM comms_entries WHERE entity_id = $1`, [change.entity_id]);
+  const current = (prior.rows[0]?.site_id || "").trim();
+  if (current === change.site_id) return payload;
+  const open = current === "" || LISTING_ID.test(current);
+  if (!open || !SITE_ID.test(change.site_id)) {
+    throw new InputError("An agent can only attach a comms row that has no site or a listing id.", 403);
+  }
+  if (payload.relink_from === undefined || payload.relink_from !== current) {
+    throw new InputError("A comms relink names the current blank site or listing id in relink_from.");
+  }
+  payload.relinked_from = current;
+  payload.relinked_by = actor.id;
+  payload.site_ids = change.site_id;
+  return payload;
+}
+
 /** Highest numeric suffix already stored, so a later mint does not reuse a workbook id. */
-export async function raiseIdFloor(sql: Sql, name: "activity" | "comms" | "event", value: number): Promise<void> {
+export async function raiseIdFloor(sql: Sql, name: string, value: number): Promise<void> {
   if (value < 1) return;
   await sql.query(
     `INSERT INTO id_counters (name, value) VALUES ($1, $2)

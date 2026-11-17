@@ -1,5 +1,6 @@
 import type { Sql } from "@/lib/actions/db";
 import { countOpenThreads } from "@/lib/comments/record";
+import { isAgentStageDecision } from "@/lib/changes/schema";
 import { countOpenConflicts } from "@/lib/conflicts/record";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { publicSnippet, type MailItem } from "./compose";
@@ -281,6 +282,7 @@ async function collect(
     if (row.entity_type !== "stage" || !kept(row.site_id)) return false;
     const payload = asObject(row.payload);
     if (!isRealStageChange(payload, row.source, row.actor)) return false;
+    if (isAgentStageDecision(payload)) return true;
     return agentStageIsApproved(row.actor, row.site_id, String(payload.stage || ""), approved);
   });
   if (shown(input.prefs, "stages") && stages.length) {
@@ -291,7 +293,7 @@ async function collect(
         category: "stages",
         siteId: row.site_id,
         siteLabel: siteLabel(map, row.site_id),
-        summary: "Stage updated.",
+        summary: isAgentStageDecision(asObject(row.payload)) ? "Moved to Financial screen on package receipt." : "Stage updated.",
         authorId: row.actor,
         href: siteHref(row.site_id),
       });

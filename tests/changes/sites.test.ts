@@ -48,7 +48,7 @@ test("a contributor or agent can update site content, and stage stays off this p
     /Stage is not written on a site/,
   );
   assert.throws(
-    () => validateBatch(agent, "agent-stage", { changes: [siteChange({ Stage: "1 Desk screen", notes: "Hello" })] }),
+    () => validateBatch(agent, "agent-stage", { changes: [siteChange({ Stage: "1 Desk screen", notes: "Hello" }, 1)] }),
     /Stage is not written on a site/,
   );
   assert.throws(

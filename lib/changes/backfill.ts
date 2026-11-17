@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
-import { applyParsedChanges, numericSuffix, raiseIdFloor } from "./apply";
+import { applyParsedChanges, labeledIdFloors, numericSuffix, raiseIdFloor } from "./apply";
 import type { Actor, ParsedChange } from "./schema";
 import { importEntityFromWorkbook } from "./flags";
 import { SITE_COMPARE_FIELDS, fieldsOf, isTruncatedCell, parseSheet, siteComparable } from "./site";
@@ -83,6 +83,8 @@ export async function rememberSheetIdFloors(sql: Sql, slice: WorkbookSlice): Pro
     ),
   );
   await raiseIdFloor(sql, "comms", Math.max(0, ...slice.comms.map((row) => numericSuffix("CM-", row.entity_id))));
+  const labeled = (slice.sites || []).flatMap((row) => [row.site_id, row.universe_id || ""]);
+  for (const floor of labeledIdFloors(labeled)) await raiseIdFloor(sql, floor.name, floor.value);
 }
 
 /**

@@ -206,6 +206,26 @@ class KeyFiguresTest(unittest.TestCase):
         self.assertIsNone(figures["score"])
         scored = key_figures(_row(**{"Score (of 100)": 72}), "pipeline")
         self.assertEqual(scored["score"], 72)
+        points = key_figures(
+            _row(**{
+                "Economics points": 12.5,
+                "Land points": 5,
+                "Power points": 7.5,
+                "Deal points": 10,
+                "Saving vs. hub at screening price %": "18%",
+                "Deal rating": "",
+                "Stalls that fit": 99,
+            }),
+            "pipeline",
+        )
+        self.assertEqual(points["economics_points"], 12.5)
+        self.assertEqual(points["land_points"], 5)
+        self.assertEqual(points["power_points"], 7.5)
+        self.assertEqual(points["deal_points"], 10)
+        self.assertEqual(points["saving_vs_hub"], "18%")
+        self.assertEqual(points["deal_rating"], "")
+        self.assertEqual(points["bays_that_fit"], 99)
+        self.assertNotEqual(points["land_points"], 99)
         blank = key_figures(_row(**{"Access and visibility notes": ""}), "pipeline")
         self.assertEqual(blank["access_notes"], "")
 

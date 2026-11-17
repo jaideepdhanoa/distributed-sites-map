@@ -2850,7 +2850,10 @@ span.listing-link.muted { text-decoration: none; }
   border-radius: 12px;
   box-shadow: var(--shadow-2);
 }
-.score-pop p { margin: 0 0 4px; color: var(--ink); font-size: var(--type-body); line-height: 1.35; text-transform: none; letter-spacing: 0; }
+.score-pop p { display: grid; gap: 2px; margin: 0 0 8px; color: var(--ink); font-size: var(--type-body); line-height: 1.35; text-transform: none; letter-spacing: 0; }
+.score-pop p strong { font-size: var(--type-body); font-weight: 650; }
+.score-pop p span { color: var(--ink-2); font-size: var(--type-body); font-weight: 400; letter-spacing: 0; text-transform: none; }
+.score-flag { margin: 0; color: var(--ink-3); font-size: var(--type-cap); line-height: 16px; }
 .decision-block { display: grid; gap: 8px; margin: 4px 0 12px; position: relative; z-index: 1; }
 .decision-chips { margin: 0; }
 .headline strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--type-lead); line-height: 24px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }

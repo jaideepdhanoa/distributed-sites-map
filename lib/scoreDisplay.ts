@@ -1,6 +1,6 @@
 import { displayScore } from "./keyNumbers";
 
-/** Rubric maxima. These are weights, not a site's subscores. */
+/** Rubric maxima from the workbook headers. Not used to recompute a score. */
 export const SCORE_MAX = {
   economics: 40,
   land: 25,
@@ -10,13 +10,6 @@ export const SCORE_MAX = {
 } as const;
 
 export type ScoreDimension = keyof typeof SCORE_MAX;
-
-export type ScorePart = {
-  id: ScoreDimension;
-  label: string;
-  value: string;
-  max: number;
-};
 
 const ORDER: ScoreDimension[] = ["economics", "land", "power", "location", "deal"];
 
@@ -28,57 +21,119 @@ const LABELS: Record<ScoreDimension, string> = {
   deal: "Deal",
 };
 
+const AREA_LABEL: Record<string, string> = {
+  inside: "Inside",
+  near_0_5: "Near 0-5",
+  near_5_10: "Near 5-10",
+  outside: "Outside",
+  unknown: "Unknown",
+  edge_legacy: "Edge",
+};
+
+export const POWER_SCORE_NOTE = "Unknown default, power rating not yet scored";
+export const HALF_CREDIT_NOTE = "Unknown, half credit";
+
 export type StoredScoreInput = {
   score?: number | string | null;
   economics?: number | string | null;
   land?: number | string | null;
   power?: number | string | null;
-  locationPoints?: number | string | null;
+  location?: number | string | null;
   deal?: number | string | null;
+  savingVsHub?: string | null;
+  stalls?: number | string | null;
+  serviceArea?: string | null;
+  dealRating?: string | null;
+};
+
+export type ScoreLine = {
+  id: ScoreDimension;
+  label: string;
+  shown: string;
+  max: number;
+  detail: string;
 };
 
 /**
- * The total, plus only the dimension numbers that were actually stored.
- * Missing dimensions are named and left blank. Nothing is back-calculated.
+ * Display of the copied workbook cells. Missing points stay a dash.
+ * The five numbers are not changed when they disagree with the total.
  */
 export function storedScoreView(input: StoredScoreInput): {
   total: string;
-  parts: ScorePart[];
   line: string;
-  missing: string[];
+  parts: ScoreLine[];
+  mismatch: boolean;
 } {
-  const stored: Partial<Record<ScoreDimension, string>> = {
-    economics: displayScore(input.economics),
-    land: displayScore(input.land),
-    power: displayScore(input.power),
-    location: displayScore(input.locationPoints),
-    deal: displayScore(input.deal),
+  const numbers = {
+    economics: pointNumber(input.economics),
+    land: pointNumber(input.land),
+    power: pointNumber(input.power),
+    location: pointNumber(input.location),
+    deal: pointNumber(input.deal),
   };
-  const parts: ScorePart[] = [];
-  const missing: string[] = [];
-  for (const id of ORDER) {
-    const value = stored[id];
-    if (!value) {
-      missing.push(LABELS[id]);
-      continue;
-    }
-    parts.push({ id, label: LABELS[id], value, max: SCORE_MAX[id] });
-  }
+  const details: Record<ScoreDimension, string> = {
+    economics: economicsDetail(input.savingVsHub),
+    land: landDetail(input.stalls),
+    power: POWER_SCORE_NOTE,
+    location: locationDetail(input.serviceArea),
+    deal: dealDetail(input.dealRating),
+  };
+  const parts = ORDER.map((id) => {
+    const value = numbers[id];
+    return {
+      id,
+      label: LABELS[id],
+      shown: value == null ? "—" : formatPoints(value),
+      max: SCORE_MAX[id],
+      detail: details[id],
+    };
+  });
+  const totalNumber = pointNumber(input.score);
+  const present = ORDER.map((id) => numbers[id]);
+  const mismatch = totalNumber != null && present.every((value) => value != null) && Math.abs(present.reduce((sum, value) => sum + (value || 0), 0) - totalNumber) > 0.05;
   return {
     total: displayScore(input.score),
+    line: parts.map((part) => `${part.label} ${part.shown}/${part.max}`).join(" · "),
     parts,
-    line: parts.map((part) => `${part.label} ${part.value}/${part.max}`).join(", "),
-    missing,
+    mismatch,
   };
 }
 
-export function missingScoreSentence(missing: string[]): string {
-  if (!missing.length) return "";
-  const names = missing.length === 1
-    ? missing[0]
-    : missing.length === 2
-      ? `${missing[0]} and ${missing[1]}`
-      : `${missing.slice(0, -1).join(", ")}, and ${missing[missing.length - 1]}`;
-  const verb = missing.length === 1 ? "is" : "are";
-  return `${names} ${verb} not stored per site.`;
+/** One decimal, with a trailing .0 removed. The stored cell is not rewritten. */
+export function formatPoints(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  const text = Object.is(rounded, -0) ? "0.0" : rounded.toFixed(1);
+  return text.endsWith(".0") ? text.slice(0, -2) : text;
+}
+
+function pointNumber(value: unknown): number | null {
+  const text = displayScore(value);
+  if (!text) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
+function economicsDetail(value: string | null | undefined): string {
+  const text = String(value || "").trim();
+  return text ? `Saving vs. hub at screening price %: ${text}` : "Saving vs. hub at screening price %: —";
+}
+
+function landDetail(value: number | string | null | undefined): string {
+  if (value == null || String(value).trim() === "") return `Stalls that fit: ${HALF_CREDIT_NOTE}`;
+  const text = displayScore(value);
+  if (!text) return `Stalls that fit: ${HALF_CREDIT_NOTE}`;
+  const number = Number(text);
+  const shown = Number.isInteger(number) ? String(number) : formatPoints(number);
+  return `Stalls that fit: ${shown}`;
+}
+
+function locationDetail(value: string | null | undefined): string {
+  const raw = String(value || "").trim();
+  const label = AREA_LABEL[raw] || raw;
+  return label ? `Inside the service area: ${label}` : "Inside the service area: —";
+}
+
+function dealDetail(value: string | null | undefined): string {
+  const text = String(value || "").trim();
+  return text ? `Deal rating: ${text}` : `Deal rating: ${HALF_CREDIT_NOTE}`;
 }

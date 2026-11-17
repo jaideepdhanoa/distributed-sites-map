@@ -9,7 +9,7 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
-import { missingScoreSentence, storedScoreView } from "@/lib/scoreDisplay";
+import { storedScoreView } from "@/lib/scoreDisplay";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
@@ -148,8 +148,19 @@ function DecisionChips({
   );
 }
 
-function ScoreTile({ score, locationPoints }: { score?: number | null; locationPoints?: number | null }) {
-  const view = storedScoreView({ score, locationPoints });
+function ScoreTile({ deal }: { deal?: DealProps | null }) {
+  const view = storedScoreView({
+    score: deal?.score,
+    economics: deal?.economics_points,
+    land: deal?.land_points,
+    power: deal?.power_points,
+    location: deal?.location_points,
+    deal: deal?.deal_points,
+    savingVsHub: deal?.saving_vs_hub,
+    stalls: deal?.bays_that_fit,
+    serviceArea: deal?.service_area_class,
+    dealRating: deal?.deal_rating,
+  });
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
   const open = hover || pinned;
@@ -157,16 +168,20 @@ function ScoreTile({ score, locationPoints }: { score?: number | null; locationP
     <section className="score-tile" data-testid="score-tile" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <span>Score</span>
       <strong>{view.total || "—"}</strong>
-      {view.line ? <p className="score-parts" data-testid="score-parts">{view.line}</p> : null}
+      <p className="score-parts" data-testid="score-parts">{view.line}</p>
       {view.total ? null : <p className="score-parts">No score on file.</p>}
+      {view.mismatch ? <p className="score-flag" data-testid="score-mismatch">doesn't add up</p> : null}
       <button type="button" className="text-link" data-testid="score-breakdown" aria-expanded={open} onClick={() => setPinned((value) => !value)}>
         {pinned ? "Hide breakdown" : "Breakdown"}
       </button>
       {open ? (
         <div className="score-pop" role="tooltip" data-testid="score-popover">
-          {view.parts.map((part) => <p key={part.id}>{part.label} {part.value}/{part.max}</p>)}
-          {view.missing.length ? <p>{missingScoreSentence(view.missing)}</p> : null}
-          {!view.total && !view.parts.length ? <p>No score on file.</p> : null}
+          {view.parts.map((part) => (
+            <p key={part.id}>
+              <strong>{part.label} {part.shown}/{part.max}</strong>
+              <span>{part.detail}</span>
+            </p>
+          ))}
         </div>
       ) : null}
     </section>
@@ -577,7 +592,7 @@ export default function Detail({
         signedIn={signedIn}
         listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
       />
-      <ScoreTile score={linkedDeal?.score} locationPoints={linkedDeal?.location_points} />
+      <ScoreTile deal={linkedDeal} />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
@@ -872,7 +887,7 @@ export function DealDetail({
         signedIn={signedIn}
         listingTitle={deal.listing_removed ? "May be removed" : undefined}
       />
-      <ScoreTile score={deal.score} locationPoints={deal.location_points} />
+      <ScoreTile deal={deal} />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />

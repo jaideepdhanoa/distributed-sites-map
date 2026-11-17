@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { suggestedDropProposal } from "../lib/actions/nextStep.ts";
 import { formatNoteBlocks } from "../lib/noteDisplay.ts";
-import { missingScoreSentence, storedScoreView } from "../lib/scoreDisplay.ts";
+import { HALF_CREDIT_NOTE, POWER_SCORE_NOTE, storedScoreView } from "../lib/scoreDisplay.ts";
 import { suggestedDropPhrase } from "../lib/suggestedDropLine.ts";
 
 const HEX = "abcdef0123456789";
@@ -84,23 +84,43 @@ test("a decimal and an abbreviation are not a false break", () => {
   assert.match(named[0].text, /^Dr\. Adler confirmed the visit\.$/);
 });
 
-test("the score line uses stored subscores and does not invent the rest", () => {
-  const located = storedScoreView({ score: 72, locationPoints: 7.5 });
-  assert.equal(located.total, "72");
-  assert.equal(located.line, "Location 7.5/10");
-  assert.deepEqual(located.parts.map((part) => part.id), ["location"]);
-  assert.deepEqual(located.missing, ["Economics", "Land", "Power", "Deal"]);
-  assert.equal(missingScoreSentence(located.missing), "Economics, Land, Power, and Deal are not stored per site.");
-  assert.equal(located.line.includes("40"), false);
+test("the score line shows copied points, a dash when one is missing, and a flag when they disagree", () => {
+  const copied = storedScoreView({
+    score: 40,
+    economics: 12.5,
+    land: 5,
+    power: 7.5,
+    location: 10,
+    deal: 5,
+    savingVsHub: "18%",
+    stalls: 6,
+    serviceArea: "inside",
+    dealRating: "",
+  });
+  assert.equal(copied.total, "40");
+  assert.equal(copied.line, "Economics 12.5/40 · Land 5/25 · Power 7.5/15 · Location 10/10 · Deal 5/10");
+  assert.equal(copied.mismatch, false);
+  assert.equal(copied.parts[0]?.detail, "Saving vs. hub at screening price %: 18%");
+  assert.equal(copied.parts[1]?.detail, "Stalls that fit: 6");
+  assert.equal(copied.parts[2]?.detail, POWER_SCORE_NOTE);
+  assert.equal(copied.parts[3]?.detail, "Inside the service area: Inside");
+  assert.equal(copied.parts[4]?.detail, `Deal rating: ${HALF_CREDIT_NOTE}`);
+  assert.equal(copied.parts[0]?.shown, "12.5");
 
-  const totalOnly = storedScoreView({ score: "72", locationPoints: null, economics: null, land: "", power: "#REF!", deal: undefined });
-  assert.equal(totalOnly.total, "72");
-  assert.equal(totalOnly.parts.length, 0);
-  assert.equal(totalOnly.line, "");
-  assert.equal(missingScoreSentence(totalOnly.missing), "Economics, Land, Power, Location, and Deal are not stored per site.");
+  const blankLand = storedScoreView({ score: 40, economics: 12.5, land: 12.5, power: 7.5, location: 2.5, deal: 5, stalls: null, dealRating: "B" });
+  assert.equal(blankLand.parts[1]?.detail, `Stalls that fit: ${HALF_CREDIT_NOTE}`);
+  assert.equal(blankLand.parts[1]?.shown, "12.5");
+  assert.equal(blankLand.parts[4]?.detail, "Deal rating: B");
 
-  const zero = storedScoreView({ score: 10, locationPoints: 0 });
-  assert.equal(zero.line, "Location 0/10");
+  const missing = storedScoreView({ score: 72, economics: null, land: "", power: "#REF!", location: undefined, deal: null });
+  assert.equal(missing.line, "Economics —/40 · Land —/25 · Power —/15 · Location —/10 · Deal —/10");
+  assert.equal(missing.mismatch, false);
+  assert.equal(missing.total, "72");
+
+  const off = storedScoreView({ score: 72, economics: 10, land: 10, power: 7.5, location: 10, deal: 5 });
+  assert.equal(off.mismatch, true);
+  assert.equal(off.parts.map((part) => part.shown).join(","), "10,10,7.5,10,5");
+  assert.equal(off.total, "72");
 });
 
 test("accepting a suggested drop opens the human drop flow and does not set a status", () => {

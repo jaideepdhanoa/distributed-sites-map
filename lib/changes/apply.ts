@@ -450,7 +450,7 @@ async function writeSite(
         : parseSheet(JSON.stringify(previous?.sheet_writes ?? {}));
   const writes = { ...priorWrites };
   if (mode === "workbook") {
-    for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points"] as const) {
+    for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points", "economics_points", "land_points", "power_points", "deal_points"] as const) {
       if (field === "lat" || field === "lng") continue;
       if (stored[field]) sources[field] = change.source;
       else delete sources[field];
@@ -504,13 +504,13 @@ async function writeSite(
        asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
        service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
        notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
-       universe_id, listing_status, score, location_points, coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
+       universe_id, listing_status, score, location_points, economics_points, land_points, power_points, deal_points, coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11, $12, $13, $14, $15, $16, $17,
        $18, $19, $20, $21,
        $22, $23::jsonb, $24, $25, $26, $27, $28,
-       $29, $30, $31, $32, $33, $34::jsonb, $35::jsonb, $36::jsonb, $37::jsonb, $38, $39
+       $29, $30, $31, $32, $33, $34, $35, $36, $37, $38::jsonb, $39::jsonb, $40::jsonb, $41::jsonb, $42, $43
      )
      ON CONFLICT (site_id) DO UPDATE SET
        name = EXCLUDED.name,
@@ -544,6 +544,10 @@ async function writeSite(
        listing_status = EXCLUDED.listing_status,
        score = EXCLUDED.score,
        location_points = EXCLUDED.location_points,
+       economics_points = EXCLUDED.economics_points,
+       land_points = EXCLUDED.land_points,
+       power_points = EXCLUDED.power_points,
+       deal_points = EXCLUDED.deal_points,
        coord_status = EXCLUDED.coord_status,
        sheet = EXCLUDED.sheet,
        sheet_writes = EXCLUDED.sheet_writes,
@@ -585,6 +589,10 @@ async function writeSite(
       stored.listing_status,
       stored.score,
       stored.location_points,
+      stored.economics_points,
+      stored.land_points,
+      stored.power_points,
+      stored.deal_points,
       coord,
       sheetCanonical(sheet),
       writesCanonical(writes),

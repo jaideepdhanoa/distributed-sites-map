@@ -190,11 +190,16 @@
 .next-card .proposal-needs .hint { display: block; margin-top: 2px; }
 .next-card .proposal-notes p { margin: 0; }
 .next-card .step-actions { display: grid; gap: 8px; justify-items: start; }
+.next-card .stage-actions {
+  container-type: inline-size;
+  container-name: stage-actions;
+  width: 100%;
+}
 .next-card .decision-actions {
   display: flex;
   flex-wrap: nowrap;
   justify-content: flex-start;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
   width: 100%;
   position: relative;
@@ -204,14 +209,29 @@
 .next-card .decision-actions button.paper-btn {
   display: inline-flex;
   align-items: center;
-  flex: 1 1 0;
-  min-width: 0;
-  justify-content: flex-start;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 32px;
+  padding: 4px 12px;
+  line-height: 20px;
   text-align: left;
-  white-space: normal;
+  white-space: nowrap;
 }
 .next-card .decision-actions button.primary { border: 1px solid #1e4636; }
 .next-card .decision-actions button.primary:hover { background: #245443; }
+@container stage-actions (max-width: 36rem) {
+  .next-card .decision-actions { flex-wrap: wrap; }
+  .next-card .decision-actions button.primary {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .next-card .decision-actions button.paper-btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+}
 .next-card .suggested-row {
   display: flex;
   flex-wrap: wrap;
@@ -219,8 +239,15 @@
   justify-content: flex-start;
   gap: 8px 12px;
 }
-.next-card .suggested-row p { margin: 0; flex: 1 1 12rem; min-width: 0; }
-.next-card .suggested-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.next-card .suggested-row p {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--type-body);
+  font-weight: 400;
+  line-height: 20px;
+}
+.next-card .suggested-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .next-card .next-step-row {
   display: flex;
   flex-wrap: wrap;
@@ -328,6 +355,8 @@
   white-space: nowrap;
 }
 @media (max-width: 767px) {
+  .next-card .decision-actions button.primary,
+  .next-card .decision-actions button.paper-btn { min-height: 44px; }
   .next-card select.secondary,
   .next-card button.propose,
   .next-card button.primary,

@@ -713,7 +713,8 @@ export function NextStepCard({
     body = (
       <>
         {workbookBlock}
-        <div className="decision-actions" role="group" aria-label="Stage actions">
+        <div className="stage-actions" role="group" aria-label="Stage actions">
+          <div className="decision-actions">
           {emptyNextStepActions(stageGroup, recordStage).map((item) => (
             <button
               key={item.id}
@@ -729,6 +730,7 @@ export function NextStepCard({
               {item.id === "stage_move" ? moveLabel : nextStepTypeLabel(item.id)}
             </button>
           ))}
+          </div>
         </div>
       </>
     );

@@ -17,6 +17,7 @@ import {
   type SiteField,
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
+import { derivePowerRating } from "@/lib/score/power-rating";
 import { storeConflict } from "@/lib/conflicts/record";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
@@ -390,18 +391,131 @@ type SiteDb = Record<SiteField, string> & {
 };
 
 const SITE_COLUMNS = SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ");
+const SITE_POINT_FIELDS = ["economics_points", "land_points", "power_points", "deal_points"] as const;
+const SITE_LEGACY_COLUMNS = SITE_FIELDS.filter(
+  (field) => field !== "photo_refs" && !SITE_POINT_FIELDS.includes(field as (typeof SITE_POINT_FIELDS)[number]),
+).join(", ");
+const SITE_READ_TAIL = "photo_refs, fact_sources, sheet, sheet_writes, facts, coord_status, version";
+
+function undefinedColumn(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
+}
 
 async function readSite(sql: Sql, siteId: string): Promise<SiteDb | null> {
-  const result = await sql.query<SiteDb>(
-    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, sheet, sheet_writes, facts, coord_status, version FROM sites WHERE site_id = $1`,
-    [siteId],
-  );
-  return result.rows[0] || null;
+  try {
+    const result = await sql.query<SiteDb>(
+      `SELECT ${SITE_COLUMNS}, ${SITE_READ_TAIL} FROM sites WHERE site_id = $1`,
+      [siteId],
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    if (!undefinedColumn(error)) throw error;
+    const result = await sql.query<SiteDb>(
+      `SELECT ${SITE_LEGACY_COLUMNS}, ${SITE_READ_TAIL} FROM sites WHERE site_id = $1`,
+      [siteId],
+    );
+    return result.rows[0] || null;
+  }
 }
 
 function storedPhotos(value: unknown): PhotoRef[] {
   if (typeof value === "string") return photosFromCanonical(value);
   return photosFromCanonical(JSON.stringify(value ?? []));
+}
+
+
+function sitePlaceholders(includePoints: boolean, includeRating: boolean): string {
+  const lines = [
+    "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10",
+    "$11, $12, $13, $14, $15, $16, $17",
+    "$18, $19, $20, $21",
+    "$22, $23::jsonb, $24, $25, $26, $27, $28",
+    "$29, $30, $31, $32",
+  ];
+  let n = 33;
+  const take = (count: number, jsonbAt: number[] = []) => {
+    const bits: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const index = n;
+      n += 1;
+      bits.push(jsonbAt.includes(i) ? `$${index}::jsonb` : `$${index}`);
+    }
+    return bits.join(", ");
+  };
+  if (includePoints) lines.push(take(4));
+  if (includeRating) lines.push(take(3, [2]));
+  lines.push(take(1));
+  lines.push(take(4, [0, 1, 2, 3]));
+  lines.push(take(2));
+  return lines.join(",\n       ");
+}
+
+function siteUpsertSql(includePoints: boolean, includeRating: boolean): string {
+  const points = includePoints ? ", economics_points, land_points, power_points, deal_points" : "";
+  const rating = includeRating ? ", power_rating, power_rating_reason, power_rating_inputs" : "";
+  const pointAssign = includePoints
+    ? `economics_points = EXCLUDED.economics_points,
+       land_points = EXCLUDED.land_points,
+       power_points = EXCLUDED.power_points,
+       deal_points = EXCLUDED.deal_points,`
+    : "";
+  const ratingAssign = includeRating
+    ? `power_rating = EXCLUDED.power_rating,
+       power_rating_reason = EXCLUDED.power_rating_reason,
+       power_rating_inputs = EXCLUDED.power_rating_inputs,`
+    : "";
+  return `INSERT INTO sites (
+       site_id, name, address, market, lat, lng, category, broker, firm, listing_url,
+       asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
+       service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
+       notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
+       universe_id, listing_status, score, location_points${points}${rating},
+       coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
+     ) VALUES (
+       ${sitePlaceholders(includePoints, includeRating)}
+     )
+     ON CONFLICT (site_id) DO UPDATE SET
+       name = EXCLUDED.name,
+       address = EXCLUDED.address,
+       market = EXCLUDED.market,
+       lat = EXCLUDED.lat,
+       lng = EXCLUDED.lng,
+       category = EXCLUDED.category,
+       broker = EXCLUDED.broker,
+       firm = EXCLUDED.firm,
+       listing_url = EXCLUDED.listing_url,
+       asking_price = EXCLUDED.asking_price,
+       acreage = EXCLUDED.acreage,
+       apn = EXCLUDED.apn,
+       land_value = EXCLUDED.land_value,
+       improvement_value = EXCLUDED.improvement_value,
+       county_value = EXCLUDED.county_value,
+       county_value_basis = EXCLUDED.county_value_basis,
+       service_area_class = EXCLUDED.service_area_class,
+       service_area_distance_mi = EXCLUDED.service_area_distance_mi,
+       service_area_polygon = EXCLUDED.service_area_polygon,
+       miles_to_depot = EXCLUDED.miles_to_depot,
+       notes = EXCLUDED.notes,
+       photo_refs = EXCLUDED.photo_refs,
+       photo_status = EXCLUDED.photo_status,
+       photo_diligence_count = EXCLUDED.photo_diligence_count,
+       photo_listing_count = EXCLUDED.photo_listing_count,
+       photos_checked = EXCLUDED.photos_checked,
+       photo_notes = EXCLUDED.photo_notes,
+       universe_id = EXCLUDED.universe_id,
+       listing_status = EXCLUDED.listing_status,
+       score = EXCLUDED.score,
+       location_points = EXCLUDED.location_points,
+       ${pointAssign}
+       ${ratingAssign}
+       coord_status = EXCLUDED.coord_status,
+       sheet = EXCLUDED.sheet,
+       sheet_writes = EXCLUDED.sheet_writes,
+       facts = EXCLUDED.facts,
+       fact_sources = EXCLUDED.fact_sources,
+       version = EXCLUDED.version,
+       updated_at = clock_timestamp(),
+       updated_by = EXCLUDED.updated_by`;
 }
 
 async function writeSite(
@@ -498,110 +612,79 @@ async function writeSite(
   if (perAcre) facts.price_per_acre = perAcre;
   else delete facts.price_per_acre;
   const photos = storedPhotos(stored.photo_refs);
-  await sql.query(
-    `INSERT INTO sites (
-       site_id, name, address, market, lat, lng, category, broker, firm, listing_url,
-       asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
-       service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
-       notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
-       universe_id, listing_status, score, location_points, economics_points, land_points, power_points, deal_points, coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
-     ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-       $11, $12, $13, $14, $15, $16, $17,
-       $18, $19, $20, $21,
-       $22, $23::jsonb, $24, $25, $26, $27, $28,
-       $29, $30, $31, $32, $33, $34, $35, $36, $37, $38::jsonb, $39::jsonb, $40::jsonb, $41::jsonb, $42, $43
-     )
-     ON CONFLICT (site_id) DO UPDATE SET
-       name = EXCLUDED.name,
-       address = EXCLUDED.address,
-       market = EXCLUDED.market,
-       lat = EXCLUDED.lat,
-       lng = EXCLUDED.lng,
-       category = EXCLUDED.category,
-       broker = EXCLUDED.broker,
-       firm = EXCLUDED.firm,
-       listing_url = EXCLUDED.listing_url,
-       asking_price = EXCLUDED.asking_price,
-       acreage = EXCLUDED.acreage,
-       apn = EXCLUDED.apn,
-       land_value = EXCLUDED.land_value,
-       improvement_value = EXCLUDED.improvement_value,
-       county_value = EXCLUDED.county_value,
-       county_value_basis = EXCLUDED.county_value_basis,
-       service_area_class = EXCLUDED.service_area_class,
-       service_area_distance_mi = EXCLUDED.service_area_distance_mi,
-       service_area_polygon = EXCLUDED.service_area_polygon,
-       miles_to_depot = EXCLUDED.miles_to_depot,
-       notes = EXCLUDED.notes,
-       photo_refs = EXCLUDED.photo_refs,
-       photo_status = EXCLUDED.photo_status,
-       photo_diligence_count = EXCLUDED.photo_diligence_count,
-       photo_listing_count = EXCLUDED.photo_listing_count,
-       photos_checked = EXCLUDED.photos_checked,
-       photo_notes = EXCLUDED.photo_notes,
-       universe_id = EXCLUDED.universe_id,
-       listing_status = EXCLUDED.listing_status,
-       score = EXCLUDED.score,
-       location_points = EXCLUDED.location_points,
-       economics_points = EXCLUDED.economics_points,
-       land_points = EXCLUDED.land_points,
-       power_points = EXCLUDED.power_points,
-       deal_points = EXCLUDED.deal_points,
-       coord_status = EXCLUDED.coord_status,
-       sheet = EXCLUDED.sheet,
-       sheet_writes = EXCLUDED.sheet_writes,
-       facts = EXCLUDED.facts,
-       fact_sources = EXCLUDED.fact_sources,
-       version = EXCLUDED.version,
-       updated_at = clock_timestamp(),
-       updated_by = EXCLUDED.updated_by`,
-    [
-      change.site_id,
-      stored.name,
-      stored.address,
-      stored.market,
-      stored.lat,
-      stored.lng,
-      stored.category,
-      stored.broker,
-      stored.firm,
-      stored.listing_url,
-      stored.asking_price,
-      stored.acreage,
-      stored.apn,
-      stored.land_value,
-      stored.improvement_value,
-      stored.county_value,
-      stored.county_value_basis,
-      stored.service_area_class,
-      stored.service_area_distance_mi,
-      stored.service_area_polygon,
-      stored.miles_to_depot,
-      stored.notes,
-      JSON.stringify(photos),
-      stored.photo_status,
-      stored.photo_diligence_count,
-      stored.photo_listing_count,
-      stored.photos_checked,
-      stored.photo_notes,
-      stored.universe_id,
-      stored.listing_status,
-      stored.score,
-      stored.location_points,
-      stored.economics_points,
-      stored.land_points,
-      stored.power_points,
-      stored.deal_points,
-      coord,
-      sheetCanonical(sheet),
-      writesCanonical(writes),
-      JSON.stringify(facts),
-      JSON.stringify(sources),
-      version,
-      actorId,
-    ],
-  );
+  const derived = derivePowerRating({ market: stored.market, ...facts });
+  const throughLocation = [
+    change.site_id,
+    stored.name,
+    stored.address,
+    stored.market,
+    stored.lat,
+    stored.lng,
+    stored.category,
+    stored.broker,
+    stored.firm,
+    stored.listing_url,
+    stored.asking_price,
+    stored.acreage,
+    stored.apn,
+    stored.land_value,
+    stored.improvement_value,
+    stored.county_value,
+    stored.county_value_basis,
+    stored.service_area_class,
+    stored.service_area_distance_mi,
+    stored.service_area_polygon,
+    stored.miles_to_depot,
+    stored.notes,
+    JSON.stringify(photos),
+    stored.photo_status,
+    stored.photo_diligence_count,
+    stored.photo_listing_count,
+    stored.photos_checked,
+    stored.photo_notes,
+    stored.universe_id,
+    stored.listing_status,
+    stored.score,
+    stored.location_points,
+  ];
+  const pointValues = [stored.economics_points, stored.land_points, stored.power_points, stored.deal_points];
+  const ratingValues = [derived.rating, derived.reason, JSON.stringify(derived.inputs)];
+  const tail = [
+    coord,
+    sheetCanonical(sheet),
+    writesCanonical(writes),
+    JSON.stringify(facts),
+    JSON.stringify(sources),
+    version,
+    actorId,
+  ];
+  const attempts: Array<[boolean, boolean]> = [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ];
+  let saved = false;
+  let lastError: unknown;
+  for (const [includePoints, includeRating] of attempts) {
+    try {
+      await sql.query(
+        siteUpsertSql(includePoints, includeRating),
+        [
+          ...throughLocation,
+          ...(includePoints ? pointValues : []),
+          ...(includeRating ? ratingValues : []),
+          ...tail,
+        ],
+      );
+      saved = true;
+      break;
+    } catch (error) {
+      if (!undefinedColumn(error)) throw error;
+      lastError = error;
+    }
+  }
+  if (!saved) throw lastError;
   return { ...stored, photo_refs: photoCanonical(photos), sources };
 }
 

@@ -55,6 +55,7 @@ async function ready() {
     "020_proposal_close.sql",
     "021_data_conflicts.sql",
     "023_score_points.sql",
+    "024_power_rating.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

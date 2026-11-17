@@ -31,6 +31,7 @@ export const MIRRORED_TEXT_CAPS: readonly MirroredTextCap[] = [
   { sheet: "Pipeline", header: "Photo notes", field: "photo_notes", max: 400 },
   { sheet: "Pipeline", header: "Last checked live", field: "checked_live", max: 500 },
   { sheet: "Pipeline", header: "Power rating", field: POWER_RATING, max: 500 },
+  { sheet: "Pipeline", header: "Power rating (derived)", field: "power_rating", max: 20 },
   { sheet: "Pipeline", header: "pwr_a_source_type", field: "cap_a_source", max: 500 },
   { sheet: "Pipeline", header: "pwr_a_as_of", field: "cap_a_as_of", max: 500 },
   { sheet: "Pipeline", header: "pwr_a_confidence", field: "cap_a_confidence", max: 500 },

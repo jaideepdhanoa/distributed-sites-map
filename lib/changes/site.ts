@@ -367,6 +367,7 @@ const CLASS_LABEL: Record<string, string> = {
  * parcel_acres and parcel_match come from the parcel layer.
  * source_line and source_kind are built from the listing URL.
  * bays_that_fit is the formula column Stalls that fit, which is never overwritten.
+ * Power rating (derived) is the mirror of the derived grade. An API change cannot type it.
  */
 export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "broker", headers: ["Broker"] },
@@ -400,6 +401,7 @@ export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "photo_notes", headers: ["Photo notes"] },
   { field: "checked_live", headers: ["Last checked live"] },
   { field: POWER_RATING, headers: ["Power rating"] },
+  { field: "power_rating", headers: ["Power rating (derived)"] },
   { field: "cap_a_substation_mi", headers: ["pwr_a_substation_mi"] },
   { field: "cap_a_line_ft", headers: ["pwr_a_hv_line_ft"] },
   { field: "cap_a_source", headers: ["pwr_a_source_type"] },

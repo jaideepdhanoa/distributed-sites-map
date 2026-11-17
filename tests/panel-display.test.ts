@@ -103,6 +103,17 @@ test("the score line shows copied points, a dash when one is missing, and a flag
   assert.equal(copied.parts[0]?.detail, "Saving vs. hub at screening price %: 18%");
   assert.equal(copied.parts[1]?.detail, "Stalls that fit: 6");
   assert.equal(copied.parts[2]?.detail, POWER_SCORE_NOTE);
+  const reasoned = storedScoreView({
+    score: 40,
+    economics: 12.5,
+    land: 5,
+    power: 7.5,
+    location: 10,
+    deal: 5,
+    powerDetail: "OK: 3-phase service 800 A at 480 V, Claimed",
+  });
+  assert.equal(reasoned.parts[2]?.shown, "7.5");
+  assert.equal(reasoned.parts[2]?.detail, "OK: 3-phase service 800 A at 480 V, Claimed");
   assert.equal(copied.parts[3]?.detail, "Inside the service area: Inside");
   assert.equal(copied.parts[4]?.detail, `Deal rating: ${HALF_CREDIT_NOTE}`);
   assert.equal(copied.parts[0]?.shown, "12.5");

@@ -44,6 +44,8 @@ export type StoredScoreInput = {
   stalls?: number | string | null;
   serviceArea?: string | null;
   dealRating?: string | null;
+  /** Derived power reason. The copied power points stay as stored. */
+  powerDetail?: string | null;
 };
 
 export type ScoreLine = {
@@ -74,7 +76,7 @@ export function storedScoreView(input: StoredScoreInput): {
   const details: Record<ScoreDimension, string> = {
     economics: economicsDetail(input.savingVsHub),
     land: landDetail(input.stalls),
-    power: POWER_SCORE_NOTE,
+    power: powerDetail(input.powerDetail),
     location: locationDetail(input.serviceArea),
     deal: dealDetail(input.dealRating),
   };
@@ -125,6 +127,11 @@ function landDetail(value: number | string | null | undefined): string {
   const number = Number(text);
   const shown = Number.isInteger(number) ? String(number) : formatPoints(number);
   return `Stalls that fit: ${shown}`;
+}
+
+function powerDetail(value: string | null | undefined): string {
+  const text = String(value || "").trim();
+  return text || POWER_SCORE_NOTE;
 }
 
 function locationDetail(value: string | null | undefined): string {

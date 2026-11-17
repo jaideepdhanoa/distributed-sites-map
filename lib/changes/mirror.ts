@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
 import { numericSuffix } from "./apply";
+import { derivePowerRating, type PowerRatingName } from "@/lib/score/power-rating";
+import { DERIVED_POWER_HEADER, isPowerRatingName } from "@/lib/score/power-sheet";
 import { MIRROR_FIELD_HEADERS, isDateField, isTruncatedCell, losesSheetDate, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameCommsStamp, sameSheetDate, sameWorkbookCell, sheetAllowsApprox, shortHash, withSheetStamp } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
@@ -675,6 +677,23 @@ export function importedFromWorkbook(source: string | null | undefined): boolean
   return text.startsWith("workbook snapshot") || text.startsWith("workbook capture import");
 }
 
+function undefinedColumn(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
+}
+
+type SiteMirrorDb = { site_id: string; market?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
+
+async function loadSiteMirrorSources(sql: Sql): Promise<{ rows: SiteMirrorDb[] }> {
+  try {
+    return await sql.query<SiteMirrorDb>(
+      `SELECT site_id, market, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
+    );
+  } catch (error) {
+    if (!undefinedColumn(error)) throw error;
+    return sql.query<SiteMirrorDb>(`SELECT site_id, market, sheet_writes, facts FROM sites ORDER BY site_id`);
+  }
+}
+
 export async function loadMirrorRows(sql: Sql): Promise<{
   stages: { site_id: string; stage: string }[];
   activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean; date_iso?: string; at_approximate?: boolean }[];
@@ -693,7 +712,7 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   const comms = await sql.query<CommsDb>(
     `SELECT entity_id, payload, message_id, thread_id, link FROM comms_entries ORDER BY entity_id`,
   );
-  const sites = await sql.query<{ site_id: string; sheet_writes: unknown }>(`SELECT site_id, sheet_writes FROM sites ORDER BY site_id`);
+  const sites = await loadSiteMirrorSources(sql);
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
     activities: activities.rows.map((row) => {
@@ -725,10 +744,16 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       if (!values.at_text && values.at_approximate === "1" && values.at_iso) values.at = `${values.at_iso} (approx.)`;
       return { entity_id: text(row.entity_id), values };
     }),
-    sites: sites.rows.map((row) => ({
-      site_id: text(row.site_id),
-      writes: typeof row.sheet_writes === "string" ? parseSheet(row.sheet_writes) : parseSheet(JSON.stringify(row.sheet_writes ?? {})),
-    })),
+    sites: sites.rows.map((row) => {
+      const writes = typeof row.sheet_writes === "string" ? parseSheet(row.sheet_writes) : parseSheet(JSON.stringify(row.sheet_writes ?? {}));
+      const facts = asObject(row.facts);
+      const stored = text(row.power_rating);
+      const rating: PowerRatingName = isPowerRatingName(stored)
+        ? stored
+        : derivePowerRating({ market: text(row.market), ...facts }).rating;
+      writes[DERIVED_POWER_HEADER] = rating;
+      return { site_id: text(row.site_id), writes };
+    }),
   };
 }
 

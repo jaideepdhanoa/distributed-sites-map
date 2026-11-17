@@ -9,6 +9,7 @@ import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { derivePowerRating, type PowerRatingInput } from "@/lib/score/power-rating";
 import { storedScoreView } from "@/lib/scoreDisplay";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
@@ -148,7 +149,12 @@ function DecisionChips({
   );
 }
 
-function ScoreTile({ deal }: { deal?: DealProps | null }) {
+function powerInput(deal?: DealProps | null, site?: SiteProps | null): PowerRatingInput {
+  return { ...(deal || site || {}), market: deal?.city || site?.city || "" };
+}
+
+function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps | null }) {
+  const reason = derivePowerRating(powerInput(deal, site)).reason;
   const view = storedScoreView({
     score: deal?.score,
     economics: deal?.economics_points,
@@ -160,6 +166,7 @@ function ScoreTile({ deal }: { deal?: DealProps | null }) {
     stalls: deal?.bays_that_fit,
     serviceArea: deal?.service_area_class,
     dealRating: deal?.deal_rating,
+    powerDetail: reason,
   });
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -594,7 +601,7 @@ export default function Detail({
         signedIn={signedIn}
         listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
       />
-      <ScoreTile deal={linkedDeal} />
+      <ScoreTile deal={linkedDeal} site={site} />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
@@ -891,7 +898,7 @@ export function DealDetail({
         signedIn={signedIn}
         listingTitle={deal.listing_removed ? "May be removed" : undefined}
       />
-      <ScoreTile deal={deal} />
+      <ScoreTile deal={deal} site={universeSite} />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />

@@ -1,0 +1,71 @@
+import { columnLetters, SPREADSHEET_ID } from "../lib/changes/mirror";
+import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
+import { readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
+import { POWER_HEADER_ROW } from "../lib/score/power-sheet";
+
+export const SITE_TABS = ["Pipeline", "Land Sites"] as const;
+
+export function redact(error: unknown): string {
+  const text = error instanceof Error ? error.message : "power points script failed";
+  return text
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
+    .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
+    .replace(/ya29\.[A-Za-z0-9._-]+/g, "[redacted-token]")
+    .replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, "[redacted-key]")
+    .replace(/"private_key"\s*:\s*"(?:\\.|[^"\\])*"/g, '"private_key":"[redacted]"')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .slice(0, 500);
+}
+
+export function assertSheetScript(): void {
+  if (process.env.VERCEL_ENV) throw new Error("Refusing to touch the workbook from Vercel.");
+  if (process.env.GITHUB_EVENT_NAME === "pull_request") throw new Error("Refusing to touch the workbook from a pull request.");
+  const ref = process.env.GITHUB_REF?.trim();
+  if (process.env.GITHUB_ACTIONS === "true" && ref && ref !== "refs/heads/main") {
+    throw new Error("This workbook script runs only on main.");
+  }
+}
+
+export async function sheetToken(): Promise<string> {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
+  if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set.");
+  return sheetsAccessToken(raw, "https://www.googleapis.com/auth/spreadsheets");
+}
+
+function quote(title: string): string {
+  return `'${title.replaceAll("'", "''")}'`;
+}
+
+export async function readHeaders(token: string, title: string): Promise<string[]> {
+  const range = `${quote(title)}!${POWER_HEADER_ROW}:${POWER_HEADER_ROW}`;
+  const grids = await readSheetRanges(token, SPREADSHEET_ID, [range], "formatted");
+  return grids[0]?.[0] || [];
+}
+
+export async function readColumn(token: string, title: string, column: number, kind: "formulas" | "unformatted"): Promise<string[]> {
+  const letter = columnLetters(column);
+  const range = `${quote(title)}!${letter}${POWER_HEADER_ROW + 1}:${letter}`;
+  const grids = await readSheetRanges(token, SPREADSHEET_ID, [range], kind);
+  return (grids[0] || []).map((row) => String(row[0] ?? ""));
+}
+
+export async function writeCells(
+  token: string,
+  cells: { sheet: string; row: number; column: number; value: string }[],
+): Promise<void> {
+  for (let start = 0; start < cells.length; start += 400) {
+    const chunk = cells.slice(start, start + 400);
+    const response = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        valueInputOption: "USER_ENTERED",
+        data: chunk.map((cell) => ({
+          range: `${quote(cell.sheet)}!${columnLetters(cell.column)}${cell.row}`,
+          values: [[cell.value]],
+        })),
+      }),
+    });
+    if (!response.ok) throw new Error(`Sheets write failed (${response.status}).`);
+  }
+}

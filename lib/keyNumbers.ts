@@ -1,3 +1,4 @@
+import { basisBadge } from "./pricing";
 import { packageOnFile } from "./pnl/package.ts";
 import type { DealProps, SiteProps } from "./types";
 
@@ -545,6 +546,19 @@ export function packageLine(deal: Pick<DealProps, "package_line" | "package_stat
   if (status === "received") return "Package on file";
   if (status.includes("requested")) return askedOn ? `Package asked for (${askedOn})` : "Package asked for";
   return "";
+}
+
+/** List cell: the amount and the figure name. Package status stays in the title. */
+export function cashFlowListLabel(deal: DealProps): { text: string; title: string } {
+  const cash = cashTile(deal);
+  if (cash.hidden) return { text: "", title: "" };
+  const basis = basisBadge(deal.earnings_basis) || basisBadge(cash.basis);
+  const detail = [packageLine(deal), basis, deal.figures_source, cash.extra].filter(Boolean).join(". ");
+  if (!cash.value || cash.value === "—" || cash.value === "Vacant land, no business" || cash.value === "Package figures not shown" || cash.value === "Not in package") {
+    return { text: cash.value || "—", title: detail || cash.note };
+  }
+  const kind = asText(deal.cash_flow_label).trim();
+  return { text: [cash.value, kind].filter(Boolean).join(" "), title: detail };
 }
 
 export function cashTile(deal: DealProps) {

@@ -722,7 +722,7 @@ export function NextStepCard({
             <button
               key={item.id}
               type="button"
-              data-testid={`empty-step-${item.id}`}
+              data-testid={item.id === "bring_back" ? "bring-back-dropped" : `empty-step-${item.id}`}
               onClick={() => {
                 setType(item.id);
                 setStage(item.id === "stage_move" ? forward : "");
@@ -740,6 +740,7 @@ export function NextStepCard({
   }
 
   const tone = open ? "compose" : focus ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved ? "approved" : "empty";
+  const idle = !open && !focus && !approved;
   const bringBack = showCardBringBack({
     stageGroup,
     stage: recordStage,
@@ -763,7 +764,7 @@ export function NextStepCard({
       {context}
       {tone === "empty" ? null : workbookBlock}
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
-      {bringBack ? (
+      {bringBack && !idle ? (
         <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
       ) : null}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}

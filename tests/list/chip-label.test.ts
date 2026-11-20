@@ -8,6 +8,8 @@ import { NdaChip } from "../../components/NdaChip";
 import { ChipRow, TagChip } from "../../components/TagChip";
 import { serviceAreaChip } from "../../lib/cardStatus";
 import { CHIP_LABEL_MAX, chipFace, chipLabelProblem, stageChipLabel } from "../../lib/chips";
+import { cashFlowListLabel } from "../../lib/keyNumbers";
+import type { DealProps } from "../../lib/types";
 import { TAG_FAMILIES } from "../../lib/tags/vocab";
 import type { TagView } from "../../lib/tags/map";
 
@@ -104,4 +106,21 @@ test("data-driven chips stay a short label and do not join clauses", () => {
   const shortened = chipFace("Dropped · Outside service area · Proposed by Ada");
   assert.equal(shortened.label, "Dropped");
   assert.equal(chipLabelProblem(shortened.label), "");
+
+  const cash = cashFlowListLabel({
+    kind: "pipeline",
+    figures_status: "shown",
+    stated_cash_flow: 102517,
+    stated_cash_flow_display: "$102,517",
+    cash_flow_label: "EBITDA",
+    package_status: "Received",
+    package_line: "Package on file",
+    earnings_basis: "Package",
+    figures_basis: "Documented",
+  } as DealProps);
+  assert.equal(cash.text, "$102,517 EBITDA");
+  assert.equal(cash.text.includes("·"), false);
+  assert.match(cash.title, /Package on file/);
+  assert.match(cash.title, /Package/);
+  assert.doesNotMatch(cash.text, /Package/);
 });

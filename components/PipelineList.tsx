@@ -11,6 +11,7 @@ import {
   PIPELINE_COLUMNS,
   type PipelineColumnId,
   acresText,
+  cashFlowListLabel,
   cashTile,
   checkedShort,
   compactMoney,
@@ -73,6 +74,10 @@ function phoneScore(value: string): string {
   return `Score ${rounded}`;
 }
 
+function phoneFact(value: string): string {
+  return value.replace(/\s+/g, " ").replace(/^(?:·\s*)+/, "").replace(/(?:\s*·)+$/, "").trim();
+}
+
 function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
   const deal = row.deal;
   const score = phoneScore(String(cell(row, "score", signedIn)));
@@ -80,7 +85,7 @@ function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
   const party = shownFirm(deal) || shownBroker(deal) || shownPriceSource(deal);
   const land = openLandLabel(deal.open_land_sqft, deal.open_land_basis);
   const openLand = isOpenLandBlank(land) ? "" : `${land} open`;
-  return [score, asking, party, openLand];
+  return [score, asking, party, openLand].map(phoneFact).filter(Boolean);
 }
 
 function dealChips(deal: DealProps, signedIn: boolean) {
@@ -108,7 +113,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
     const cash = cashTile(deal);
     if (cash.hidden) return "";
     if (cash.value === "—" || cash.value === "Vacant land, no business") return cash.value;
-    return [cash.value, cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ");
+    return cashFlowListLabel(deal).text || "—";
   }
   if (id === "revenue" || id === "askingRevenue" || id === "askingCash" || id === "businessMultiple" || id === "landEstimate" || id === "countyValue") {
     if (!signedIn) return "—";
@@ -571,7 +576,11 @@ export default function PipelineList({
           if (column === "perAcre") return <NumberCell label={cell(row, "perAcre", signedIn)} value={signedIn ? row.deal.price_per_acre : null} stats={strips.perAcre} direction="lower" format={fullMoney} />;
           if (column === "traffic") return <NumberCell label={cell(row, "traffic", signedIn)} value={row.deal.trade_aadt} stats={strips.traffic} direction="higher" format={countText} />;
           if (column === "depot") return row.noPin ? <span className="no-pin">No pin</span> : <NumberCell label={cell(row, "depot", signedIn)} value={row.deal.miles_to_depot} stats={strips.depot} direction="lower" format={mileText} />;
-          if (column === "cashFlow") return !signedIn || cashTile(row.deal).hidden ? <span>{signedIn ? "" : "—"}</span> : <NumberCell label={cell(row, "cashFlow", signedIn)} value={row.deal.stated_cash_flow} stats={strips.cash} direction="higher" markNegative format={fullMoney} />;
+          if (column === "cashFlow") {
+            if (!signedIn || cashTile(row.deal).hidden) return <span>{signedIn ? "" : "—"}</span>;
+            const cashLabel = cashFlowListLabel(row.deal);
+            return <NumberCell label={cashLabel.text} labelTitle={cashLabel.title} value={row.deal.stated_cash_flow} stats={strips.cash} direction="higher" markNegative format={fullMoney} />;
+          }
           if (column === "revenue") return <NumberCell label={cell(row, "revenue", signedIn)} badge={signedIn && row.deal.stated_revenue != null ? basisBadge(row.deal.revenue_basis) : ""} value={signedIn ? row.deal.stated_revenue : null} stats={strips.revenue} direction="higher" format={fullMoney} labelTitle={row.deal.revenue_period || undefined} />;
           if (column === "askingRevenue") return <NumberCell label={cell(row, "askingRevenue", signedIn)} badge={signedIn && row.deal.revenue_multiple != null ? basisBadge(row.deal.revenue_multiple_basis) : ""} value={signedIn ? row.deal.revenue_multiple : null} stats={strips.askingRevenue} direction="lower" format={multipleText} labelTitle={row.deal.revenue_multiple_basis || undefined} />;
           if (column === "askingCash") return <NumberCell label={cell(row, "askingCash", signedIn)} badge={signedIn && row.deal.earnings_multiple != null ? basisBadge(row.deal.earnings_multiple_basis) : ""} value={signedIn ? row.deal.earnings_multiple : null} stats={strips.askingCash} direction="lower" format={multipleText} labelTitle={[row.deal.earnings_multiple_which ? `Asking / ${row.deal.earnings_multiple_which}` : "", row.deal.earnings_multiple_basis].filter(Boolean).join(" · ") || undefined} />;

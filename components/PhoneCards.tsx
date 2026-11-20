@@ -34,8 +34,8 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
                 <span className="phone-card-meta">
                   {facts.map((fact, index) => (
                     <span className="phone-fact" key={`${row.id}-${index}`}>
-                      {index > 0 ? <span className="phone-sep" aria-hidden="true">·</span> : null}
                       {fact}
+                      {index < facts.length - 1 ? <span className="phone-sep" aria-hidden="true">·</span> : null}
                     </span>
                   ))}
                 </span>

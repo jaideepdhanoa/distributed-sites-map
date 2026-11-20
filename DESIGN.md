@@ -93,6 +93,8 @@ The label is at most 28 characters. It does not wrap, and it does not grow the c
 
 This is a design-review requirement. A chip that holds a sentence is the wrong design.
 
+A list cell follows the same rule. The cash flow cell is the amount and the figure name on one line (`$102,517 EBITDA`). Package status and the source sit in the cell title and on the card. A phone list fact does not start a wrapped line with a middle dot.
+
 ## One home for each control
 
 - A floating control is a pill on the map. Do not put a card behind a single button.

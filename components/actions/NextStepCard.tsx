@@ -112,7 +112,7 @@ function sameIdea(title: string, kind: string) {
 function statusMark(status: string) {
   if (status === "ready") return { label: "Ready for approval", tone: "pending" };
   if (status === "agreed_waiting") return { label: "Agreed, waiting", tone: "held" };
-  return { label: "Waiting for approval", tone: "pending" };
+  return { label: "Awaiting approval", tone: "pending" };
 }
 
 export function NextStepCard({
@@ -297,7 +297,8 @@ export function NextStepCard({
     else if (nextStepType(focus.detail) === "stage_move") setOutcome("agreed_waiting");
     else setOutcome("accepted");
     setCloseReason("");
-    setDecisionNote("");
+    const stageDecision = nextStepType(focus.detail) === "knock_off" || nextStepType(focus.detail) === "stage_move" || nextStepType(focus.detail) === "bring_back";
+    setDecisionNote(stageDecision ? focus.reason || "" : "");
     setDecisionRecommendationId(null);
     setHoldLabel("");
     setHoldParty("");
@@ -643,6 +644,8 @@ export function NextStepCard({
             onHoldFollow={setHoldFollow}
             pending={pending}
             stageMove={stepType === "stage_move" || stepType === "bring_back"}
+            acceptReason={stepType === "knock_off" || stepType === "stage_move" || stepType === "bring_back"}
+            reasonRequired={stepType === "knock_off" || stepType === "bring_back"}
             needsCount={needs.length}
             onSend={() => {
               if (outcome === "reply") {
@@ -862,6 +865,8 @@ function OutcomeForm({
   onHoldFollow,
   pending,
   stageMove,
+  acceptReason,
+  reasonRequired,
   needsCount,
   onSend,
 }: {
@@ -881,6 +886,8 @@ function OutcomeForm({
   onHoldFollow: (value: string) => void;
   pending: boolean;
   stageMove: boolean;
+  acceptReason: boolean;
+  reasonRequired: boolean;
   needsCount: number;
   onSend: () => void;
 }) {
@@ -891,7 +898,9 @@ function OutcomeForm({
   const holdOptional = outcome === "agreed_waiting" && needsCount > 0;
   const holdStarted = Boolean(holdLabel.trim() || holdParty.trim() || holdAsked || holdFollow);
   const showHold = outcome === "agreed_waiting" && (!holdOptional || holdOpen || holdStarted);
-  const showReply = replyNeeded || noteOpen || Boolean(reply.trim());
+  const stageAccept = acceptReason && outcome === "accepted";
+  const showReply = stageAccept || replyNeeded || noteOpen || Boolean(reply.trim());
+  const reasonMissing = stageAccept && reasonRequired && !reply.trim();
   return (
     <form
       className="proposal-decide"
@@ -914,8 +923,8 @@ function OutcomeForm({
       {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
       {showReply ? (
         <label>
-          Reply
-          <textarea className="field" aria-label="Reply to the proposer" data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded} />
+          {stageAccept ? "Reason" : "Reply"}
+          <textarea className="field" aria-label={stageAccept ? "Reason" : "Reply to the proposer"} data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded || reasonMissing} />
         </label>
       ) : (
         <button type="button" className="text-link" aria-expanded="false" onClick={() => setNoteOpen(true)}>Add a note</button>
@@ -950,7 +959,7 @@ function OutcomeForm({
         <button type="button" className="text-link" aria-expanded="false" onClick={() => setHoldOpen(true)}>Add a hold</button>
       ) : null}
       <div className="proposal-send">
-        <button type="submit" className="propose" disabled={pending || holdNeeded || (replyNeeded && !reply.trim())}>Send</button>
+        <button type="submit" className="propose" disabled={pending || holdNeeded || reasonMissing || (replyNeeded && !reply.trim())}>Send</button>
       </div>
     </form>
   );

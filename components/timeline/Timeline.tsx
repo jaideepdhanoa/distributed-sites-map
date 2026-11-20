@@ -43,9 +43,10 @@ const LABELS: Record<string, string> = {
   bring_back: "Brought back",
   drop_suggested: "Suggested drop",
   drop: "Dropped",
+  stage_repair: "Stage",
 };
 
-const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop"]);
+const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop", "stage_repair"]);
 
 function EntryTitle({ at, approximate, title }: { at: string; approximate?: boolean; title: string }) {
   const clock = formatActivityWhen(at, approximate);

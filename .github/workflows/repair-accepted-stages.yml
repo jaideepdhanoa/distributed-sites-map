@@ -1,0 +1,48 @@
+name: Repair accepted stages
+
+# One-off. Dry run is the default and writes nothing. It lists site id,
+# proposal id, accepted at, accepted by, target stage, and current stage.
+# Apply needs mode apply and the confirm phrase. It is not on a schedule
+# and it does not run from a pull request.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry-run lists stuck decisions. apply writes the accepted stage.
+        type: choice
+        options:
+          - dry-run
+          - apply
+        default: dry-run
+      confirm:
+        description: To apply, type repair-accepted-stages. Leave blank on a dry run.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse an apply that is missing the phrase
+        if: ${{ inputs.mode == 'apply' && inputs.confirm != 'repair-accepted-stages' }}
+        run: |
+          echo "Refusing to repair stages. Set mode to apply and type repair-accepted-stages." >&2
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Plan or repair
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          ALLOW_REPAIR_ACCEPTED_STAGES: ${{ inputs.mode == 'apply' && '1' || '0' }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
+        run: npx tsx scripts/repair-accepted-stages.ts ${{ inputs.mode == 'apply' && '--apply' || '' }}

@@ -35,6 +35,7 @@ import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaS
 import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
+import { droppedDecisionLine } from "@/lib/droppedLine";
 import { stageDetail, stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
@@ -87,7 +88,11 @@ function dealChips(deal: DealProps, signedIn: boolean) {
 function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
-  if (id === "stage") return stageDetail(deal.stage, deal.stage_group);
+  if (id === "stage") {
+    const stage = stageDetail(deal.stage, deal.stage_group);
+    const decision = droppedDecisionLine(deal);
+    return decision ? `${stage} · ${decision}` : stage;
+  }
   if (id === "score") return displayScore(deal.score) || "—";
   if (id === "asking") {
     if (!signedIn) return "—";

@@ -112,24 +112,28 @@ export function normalizeNextStep(
   };
 }
 
-export function bringBackActivitySummary(actorName: string, stage: string, reason: string): string {
+export function bringBackActivitySummary(actorName: string, stage: string, reason: string, at = ""): string {
   const who = actorName.trim() || "Someone";
   const label = stageTitle(stage);
   const why = reason.trim();
+  const when = at.trim();
   const line = `${who} brought this site back to ${label}.`;
-  return why ? `${line} ${why}` : line;
+  return [line, why, when].filter(Boolean).join(" ");
 }
 
 export function dropSuggestionSummary(actorName: string, reason: string): string {
   const who = actorName.trim() || "Someone";
   const why = reason.trim();
-  return why ? `${who} recommended dropping this site. ${why}` : `${who} recommended dropping this site.`;
+  const line = `${who} proposed dropping this site. Awaiting approval.`;
+  return why ? `${line} ${why}` : line;
 }
 
-export function dropActivitySummary(actorName: string, reason: string): string {
+export function dropActivitySummary(actorName: string, reason: string, at = ""): string {
   const who = actorName.trim() || "Someone";
   const why = reason.trim();
-  return why ? `${who} dropped this site. ${why}` : `${who} dropped this site.`;
+  const when = at.trim();
+  const line = `${who} dropped this site.`;
+  return [line, why, when].filter(Boolean).join(" ");
 }
 
 export function recommendedDropSummary(reason: string): string {

@@ -6,6 +6,7 @@ import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/gua
 import { overlayDeals } from "@/lib/nda";
 import { loadNdaSnapshot } from "@/lib/ndaLoad";
 import { withPricing } from "@/lib/pricingLoad";
+import { overlayHeldStages } from "@/lib/changes/heldStage";
 import { overlayDealStages, readDeals } from "@/lib/changes/read";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { omitProtectedDeals } from "@/lib/protectedSite";
@@ -18,7 +19,7 @@ export async function GET() {
   if (!isSession(session)) return session;
   console.info(JSON.stringify({ event: "data", user: session.u, part: "deals" }));
   const deals = await readDeals();
-  const staged = await overlayDealStages(await overlayStageFile(overlayDeals(deals, loadNdaSnapshot()), "deal"));
+  const staged = await overlayHeldStages(await overlayDealStages(await overlayStageFile(overlayDeals(deals, loadNdaSnapshot()), "deal")), "deal");
   const dropped = withSuggestedDrops(staged);
   const chipped = await overlayDealChips(dropped, true);
   const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature)));

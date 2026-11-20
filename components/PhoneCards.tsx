@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { ChipFace } from "./ChipFace";
 
 export type PhoneCard = {
   id: string;
   name: string;
   address?: string;
   stage: string;
+  stageNote?: string;
   tone?: string;
   facts: string[];
   chips?: ReactNode;
@@ -25,7 +27,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
               <span className="phone-card-name" title={row.name}>{row.name}</span>
               {row.address ? <span className="site-address" title={row.address}>{row.address}</span> : null}
               <span className="phone-card-stage">
-                <span className={`stage-pill tone-${row.tone || "pine"}`}>{row.stage}</span>
+                <ChipFace className={`stage-pill tone-${row.tone || "pine"}`} testId="stage-chip" label={row.stage} detail={row.stageNote} />
                 {row.chips}
               </span>
               {facts.length ? (

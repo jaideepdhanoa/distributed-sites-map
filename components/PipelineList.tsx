@@ -35,8 +35,10 @@ import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaS
 import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
+import { ChipFace } from "./ChipFace";
+import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
-import { stageDetail, stageTone } from "@/lib/labels";
+import { stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily, tagFamily } from "@/lib/tags/vocab";
@@ -88,11 +90,7 @@ function dealChips(deal: DealProps, signedIn: boolean) {
 function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
-  if (id === "stage") {
-    const stage = stageDetail(deal.stage, deal.stage_group);
-    const decision = droppedDecisionLine(deal);
-    return decision ? `${stage} · ${decision}` : stage;
-  }
+  if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
   if (id === "score") return displayScore(deal.score) || "—";
   if (id === "asking") {
     if (!signedIn) return "—";
@@ -522,7 +520,8 @@ export default function PipelineList({
               id,
               name: String(cell(row, "site", signedIn)),
               address: address && address !== String(row.deal.name || "").trim() ? address : "",
-              stage: String(cell(row, "stage", signedIn)),
+              stage: stageChipLabel(row.deal.stage, row.deal.stage_group),
+              stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
               chips: (() => {
@@ -590,7 +589,7 @@ export default function PipelineList({
             const nda = signedIn ? dealChips(row.deal, signedIn).find((chip) => chip.family === "nda" && chip.code !== "not_required") : undefined;
             return (
               <span className="stage-cell">
-                <span className={`stage-pill tone-${stageTone(row.deal)}`} title={String(cell(row, "stage", signedIn))}>{cell(row, "stage", signedIn)}</span>
+                <ChipFace className={`stage-pill tone-${stageTone(row.deal)}`} testId="stage-chip" label={stageChipLabel(row.deal.stage, row.deal.stage_group)} detail={droppedDecisionLine(row.deal)} />
                 {nda ? <TagChip chip={nda} compact /> : null}
                 <StagePending note={row.deal.stage_pending} />
               </span>

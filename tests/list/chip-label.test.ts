@@ -49,6 +49,7 @@ test("a stage chip is the stage name only, on one line, with the decision outsid
   const css = readFileSync("app/globals.css", "utf8");
   assert.match(css, /\.list-table \.stage-pill \{[^}]*white-space:\s*nowrap/);
   assert.match(css, /\.stage-cell \.stage-pill \{[^}]*white-space:\s*nowrap/);
+  assert.doesNotMatch(css, /\.list-table \.stage-pill \{[^}]*text-overflow:\s*ellipsis/);
   assert.match(readFileSync("DESIGN.md", "utf8"), /at most 28 characters/);
 });
 

@@ -1,3 +1,4 @@
+import { ChipFace } from "./ChipFace";
 import { blockerSentenceForDeal, cardNdaLabel, type NdaMirror } from "@/lib/nda";
 import { pacificToday } from "@/lib/queue/today";
 import type { DealProps } from "@/lib/types";
@@ -16,8 +17,8 @@ export function NdaChip({
   if (!label) return null;
   const id = deal?.nda_id || "";
   return (
-    <span className="badge quiet nda-chip" data-testid="nda-chip" data-nda-id={id} title={label}>
-      {label}
+    <span data-nda-id={id || undefined}>
+      <ChipFace className="badge quiet nda-chip" testId="nda-chip" label={label} />
     </span>
   );
 }

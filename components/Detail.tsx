@@ -7,6 +7,8 @@ import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
+import { ChipFace } from "./ChipFace";
+import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
@@ -128,12 +130,6 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
   );
 }
 
-function brokerReplyChip(chip: TagView): TagView {
-  if (chip.code !== "broker_reply") return chip;
-  const since = chip.since.trim();
-  return since ? { ...chip, label: `Broker reply since ${since}`, since: "" } : chip;
-}
-
 function DecisionChips({
   deal,
   waiting,
@@ -149,7 +145,7 @@ function DecisionChips({
   return (
     <div className="card-chips decision-chips" data-testid={testId}>
       {deal ? <StageChip deal={deal} /> : null}
-      {waiting ? <TagChip chip={brokerReplyChip(waiting)} compact /> : null}
+      {waiting ? <TagChip chip={waiting} compact /> : null}
       {extras.map((chip) => <TagChip key={chip.family} chip={chip} compact />)}
     </div>
   );
@@ -336,15 +332,15 @@ function StageChip({ deal }: { deal: DealProps }) {
   const pending = String(deal.stage_pending || "").trim();
   const decision = droppedDecisionLine(deal);
   return (
-    <span className={`stage-pill tone-${stageTone(deal)}`}>
-      {stageDetail(deal.stage, deal.stage_group)}
-      {pending ? (
-        <span className="stage-wait" data-testid="stage-pending" title={pending}>
-          waiting
-          <span className="sr">{pending}</span>
-        </span>
-      ) : null}
-      {decision ? <span className="stage-wait" data-testid="dropped-decision">{decision}</span> : null}
+    <span className="stage-block">
+      <ChipFace
+        className={`stage-pill tone-${stageTone(deal)}`}
+        testId="stage-chip"
+        label={stageChipLabel(deal.stage, deal.stage_group)}
+        detail={decision}
+        pending={pending}
+      />
+      {decision ? <span className="stage-decision" data-testid="dropped-decision">{decision}</span> : null}
     </span>
   );
 }

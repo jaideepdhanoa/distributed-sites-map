@@ -1,18 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { ChipFace } from "./ChipFace";
 import type { TagView } from "@/lib/tags/map";
 import { tagFamily } from "@/lib/tags/vocab";
 
-export function TagChip({ chip, compact = false }: { chip: TagView; compact?: boolean }) {
+export function TagChip({ chip, compact = false, caption = "" }: { chip: TagView; compact?: boolean; caption?: string }) {
   const [open, setOpen] = useState(false);
-  const extra = [chip.since ? `since ${chip.since}` : "", chip.owner, chip.due ? `due ${chip.due}` : ""].filter(Boolean).join(" · ");
+  const extra = [caption, chip.since ? `since ${chip.since}` : "", chip.owner, chip.due ? `due ${chip.due}` : "", chip.help].filter(Boolean).join(". ");
   return (
     <span className="tag-pair" data-family={chip.family}>
-      <span className={`stage-pill tone-${chip.tone}`} data-testid={`chip-${chip.family}`} title={chip.help}>
-        {chip.label}
-        {extra ? <span className="tag-since">{extra}</span> : null}
-      </span>
+      <ChipFace className={`stage-pill tone-${chip.tone}`} testId={`chip-${chip.family}`} label={chip.label} detail={extra} />
       {!compact && chip.note ? (
         <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           {open ? "Hide full note" : "Show full note"}
@@ -29,8 +27,7 @@ export function ChipRow({ chips, testId, titled = false }: { chips: TagView[]; t
     <div className="card-chips" data-testid={testId}>
       {chips.map((chip) => {
         const title = titled ? tagFamily(chip.family)?.title.replace(/ check$/, "") : "";
-        const shown = title ? { ...chip, label: `${title} · ${chip.label}` } : chip;
-        return <TagChip key={chip.family} chip={shown} />;
+        return <TagChip key={chip.family} chip={chip} caption={title || ""} />;
       })}
     </div>
   );

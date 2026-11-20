@@ -1,7 +1,9 @@
 import { AREA_ROLE_MARK, areaLabel, areaRole } from "@/lib/areas";
 import { listingCue } from "@/lib/format";
 import { spareTier } from "@/lib/filter";
-import { STATUS_NOTES, stageDetail, stageTitle, statusOf, tierLabel } from "@/lib/labels";
+import { stageChipLabel } from "@/lib/chips";
+import { droppedDecisionLine } from "@/lib/droppedLine";
+import { STATUS_NOTES, stageTitle, statusOf, tierLabel } from "@/lib/labels";
 import { acresText, depotLine, openLandLabel } from "@/lib/keyNumbers";
 
 export type TipMark = { swatch: string; label: string };
@@ -52,8 +54,16 @@ export function dealTip(props: Record<string, unknown>): TipModel {
   const acres = typeof props.land_acres === "number" ? acresText(props.land_acres) : "";
   const open = openLandLabel(typeof props.open_land_sqft === "number" ? props.open_land_sqft : null, typeof props.open_land_basis === "string" ? props.open_land_basis : "");
   const miles = typeof props.miles_to_depot === "number" ? props.miles_to_depot : null;
+  const decision = droppedDecisionLine({
+    stage_group: text(props.stage_group),
+    decision_reason: text(props.decision_reason),
+    decision_proposer: text(props.decision_proposer),
+    decision_approver: text(props.decision_approver),
+    decision_at: text(props.decision_at),
+  });
   const facts: TipFact[] = [
-    { label: "Stage", value: stageDetail(text(props.stage), text(props.stage_group) || "desk") },
+    { label: "Stage", value: stageChipLabel(text(props.stage), text(props.stage_group) || "desk") },
+    ...(decision ? [{ label: "Decision", value: decision }] : []),
     ...(text(props.suggested_drop) && text(props.stage_group) !== "dropped" && !/^dropped\b/i.test(text(props.stage))
       ? [{ label: "Suggested drop", value: text(props.suggested_drop) }]
       : []),

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { applyParsedChanges, labeledIdFloors, numericSuffix, raiseIdFloor } from "./apply";
 import type { Actor, ParsedChange } from "./schema";
+import { decisionHeldSiteIds } from "./heldStage";
 import { importEntityFromWorkbook } from "./flags";
 import { SITE_COMPARE_FIELDS, fieldsOf, isTruncatedCell, parseSheet, siteComparable } from "./site";
 import { COMMS_FIELDS, type ActivityType, type Market, type ServiceAreaClass, type StageName } from "./vocab";
@@ -125,8 +126,13 @@ export async function importChanged(sql: Sql, slice: WorkbookSlice, snapshotId: 
 
   if (!importEntityFromWorkbook("stage")) counts.cut_over.push("stage");
   else {
+    const held = await decisionHeldSiteIds(sql);
     for (const row of slice.stages) {
       if (invalidStage.has(row.site_id)) continue;
+      if (held.has(row.site_id)) {
+        counts.unchanged.stage += 1;
+        continue;
+      }
       const prior = currentStage.get(row.site_id);
       if (prior && sameFields(stageFields(prior), stageFields(row), ["stage", "market", "service_area_class", "reason"])) {
         counts.unchanged.stage += 1;

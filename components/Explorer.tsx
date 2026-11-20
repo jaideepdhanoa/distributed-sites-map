@@ -162,6 +162,7 @@ export default function Explorer() {
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
+  const [queueTick, setQueueTick] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [loadedQueueKey, setLoadedQueueKey] = useState("");
@@ -679,6 +680,11 @@ export default function Explorer() {
     ...queueParams,
   }).toString();
   useEffect(() => {
+    const refresh = () => setQueueTick((value) => value + 1);
+    window.addEventListener("queue-refresh", refresh);
+    return () => window.removeEventListener("queue-refresh", refresh);
+  }, []);
+  useEffect(() => {
     if (!me?.actionsEnabled) return;
     const key = queueKey;
     let cancel = false;
@@ -724,7 +730,7 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, queueKey]);
+  }, [me?.actionsEnabled, queueKey, queueTick]);
 
   useEffect(() => {
     if (!me?.actionsEnabled) return;
@@ -744,7 +750,7 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, badgeKey]);
+  }, [me?.actionsEnabled, badgeKey, queueTick]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");

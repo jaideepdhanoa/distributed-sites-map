@@ -13,6 +13,7 @@ import { parseDocumentRequest } from "@/lib/financials";
 import { blockersBySuggestion, clearHoldBlocker, linkWaitingBlockers, parseHold, refreshProposalReadiness, stagesDiffer, type Blocker } from "./blockers";
 import { previewPointsAtProduction } from "@/lib/preview/safety";
 import { stageDecisionMatchesWorkbook } from "@/lib/stageOverlay";
+import { formatZonedTimestamp } from "@/lib/changes/schema";
 import { writeAcceptedStage } from "@/lib/changes/stageDecision";
 import { fileLookup, recordField, valuesMatch, type RecordLookup } from "./records";
 import {
@@ -442,35 +443,42 @@ export async function decideSuggestion(
   }
   if (row.field_name === "proposed_next_step" && (input.status === "accepted" || input.status === "rejected")) {
     const siteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
+    const approverReason = note || row.reason;
+    const decidedAt = formatZonedTimestamp();
     if (input.status === "accepted" && row.detail === "bring_back") {
-      const who = ownerName(row.author_id) || row.author_id;
+      const who = ownerName(input.actorId) || input.actorId;
       await recordAppEvent(sql, {
         siteId,
         type: "bring_back",
-        summary: bringBackActivitySummary(who, row.proposed_value, row.reason),
-        actorId: row.author_id,
+        summary: bringBackActivitySummary(who, row.proposed_value, approverReason, decidedAt),
+        actorId: input.actorId,
         refId: row.id,
         max: 2400,
       });
     } else if (input.status === "accepted" && row.detail === "knock_off") {
-      const who = ownerName(row.author_id) || row.author_id;
+      const who = ownerName(input.actorId) || input.actorId;
       await recordAppEvent(sql, {
         siteId,
         type: "drop",
-        summary: dropActivitySummary(who, row.reason),
-        actorId: row.author_id,
+        summary: dropActivitySummary(who, approverReason, decidedAt),
+        actorId: input.actorId,
         refId: row.id,
         max: 2400,
       });
     } else {
       const title = safeSnapshot(row.title || row.proposed_value, 120);
       if (title) {
+        const stageMove = input.status === "accepted" && row.detail === "stage_move";
+        const summary = stageMove
+          ? [`Next step approved: ${title}.`, approverReason, decidedAt].filter(Boolean).join(" ")
+          : input.status === "accepted" ? `Next step approved: ${title}` : `Next step rejected: ${title}`;
         await recordAppEvent(sql, {
           siteId,
           type: input.status === "accepted" ? "next_accepted" : "next_rejected",
-          summary: input.status === "accepted" ? `Next step approved: ${title}` : `Next step rejected: ${title}`,
+          summary,
           actorId: input.actorId,
           refId: row.id,
+          max: stageMove ? 2400 : undefined,
         });
       }
     }
@@ -482,7 +490,7 @@ export async function decideSuggestion(
       field: row.field_name,
       detail: row.detail,
       proposedValue: row.proposed_value,
-      reason: row.reason,
+      reason: note || row.reason,
       note: row.detail === "knock_off" ? row.title || "" : "",
       siteId: stageSiteId,
       actorId: input.actorId,

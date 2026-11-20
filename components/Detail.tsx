@@ -7,6 +7,7 @@ import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
+import { droppedDecisionLine } from "@/lib/droppedLine";
 import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { derivePowerRating, type PowerRatingInput } from "@/lib/score/power-rating";
@@ -333,6 +334,7 @@ function visibleChips(deal: DealProps, signedIn: boolean): TagView[] {
 
 function StageChip({ deal }: { deal: DealProps }) {
   const pending = String(deal.stage_pending || "").trim();
+  const decision = droppedDecisionLine(deal);
   return (
     <span className={`stage-pill tone-${stageTone(deal)}`}>
       {stageDetail(deal.stage, deal.stage_group)}
@@ -342,6 +344,7 @@ function StageChip({ deal }: { deal: DealProps }) {
           <span className="sr">{pending}</span>
         </span>
       ) : null}
+      {decision ? <span className="stage-wait" data-testid="dropped-decision">{decision}</span> : null}
     </span>
   );
 }

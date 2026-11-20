@@ -116,7 +116,12 @@ export function buildQueue(input: {
     if (!personal && input.filters.stage && input.filters.stage !== "any" && !samePipelineStage(input.filters.stage, site.stageGroup)) continue;
     if (!personal && input.filters.viable && !site.active) continue;
     const reviewedAt = input.reviewedAt[site.id] || "";
-    const reasons = (input.reasons[site.id] || []).filter((reason) => !reviewedAt || reason.at > reviewedAt);
+    const stageDropped = site.stageGroup === "dropped";
+    const reasons = (input.reasons[site.id] || []).filter((reason) => {
+      if (reviewedAt && reason.at <= reviewedAt) return false;
+      if (stageDropped && (reason.type === "drop" || reason.type === "drop_suggested")) return false;
+      return true;
+    });
     const flagged = input.flagged.has(site.id);
     if (site.hidden) continue;
     const firstVisit = !reviewedAt;

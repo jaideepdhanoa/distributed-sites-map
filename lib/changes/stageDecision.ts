@@ -33,7 +33,7 @@ export async function writeAcceptedStage(
     siteId: string;
     actorId: string;
   },
-  options?: ApplyOptions,
+  options?: ApplyOptions & { idempotencyKey?: string },
 ): Promise<ApplyResult | null> {
   if (!isStageDecision(input.field, input.detail)) return null;
   if (isExcludedSite(input.siteId) || !SITE_ID.test(input.siteId)) return null;
@@ -73,10 +73,11 @@ export async function writeAcceptedStage(
   if (area) payload.service_area_class = area;
   if (reason && (stage === "Dropped" || input.detail === "bring_back")) payload.reason = reason;
   try {
+    const stageKey = options?.idempotencyKey || `stage-decision-${input.id}`;
     const applied = await applyBatch(
       sql,
       actor,
-      `stage-decision-${input.id}`,
+      stageKey,
       {
         changes: [
           {
@@ -103,7 +104,7 @@ export async function writeAcceptedStage(
         await applyBatch(
           sql,
           actor,
-          `stage-decision-${input.id}-${family}`,
+          `${stageKey}-${family}`,
           {
             changes: [
               {

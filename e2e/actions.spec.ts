@@ -422,7 +422,7 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   await page.getByTestId("drop-reason").getByRole("button", { name: "Sold to another buyer" }).click();
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByTestId("proposed-next-step")).toContainText("Drop from pipeline");
-  await expect(page.getByTestId("proposed-next-step")).toContainText("Waiting for");
+  await expect(page.getByTestId("proposed-next-step")).toContainText("Awaiting approval");
 
   await openAs(page, "reviewer", `/?funnel=pipeline&site=${target}`);
   const card = page.getByTestId("proposed-next-step");

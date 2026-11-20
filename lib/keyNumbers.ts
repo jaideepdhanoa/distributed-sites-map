@@ -1,4 +1,4 @@
-import { basisBadge } from "./pricing";
+import { basisBadge } from "./pricing.ts";
 import { packageOnFile } from "./pnl/package.ts";
 import type { DealProps, SiteProps } from "./types";
 

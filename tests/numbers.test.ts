@@ -22,7 +22,7 @@ test("market chips add up to All, including Other", () => {
   assert.equal(inCountedMarket("PHX", "PHX"), true);
 });
 
-test("pipeline steps count operating businesses, and land sits beside them", () => {
+test("step parts can still separate land rows from operating rows", () => {
   const rows = [
     { kind: "pipeline", stage_group: "desk" },
     { kind: "pipeline", stage_group: "desk" },

@@ -9,8 +9,8 @@ test("pipeline counts name the set, and score issue is a filter", async ({ page 
   await expect(all).toContainText("All");
   await page.getByRole("button", { name: "Filters" }).click();
   await expect(page.getByTestId("score-issue")).toBeVisible();
-  await expect(page.getByTestId("land-beside-desk")).toBeVisible();
-  await expect(page.getByTestId("land-beside-desk")).toContainText(/\+\d+ land/);
+  await expect(page.getByTestId("land-beside-desk")).toHaveCount(0);
+  await expect(page.locator("nav.funnel")).not.toContainText("+0 land");
 });
 
 test("provisional and not scored render from a fixture", async ({ page }, info) => {

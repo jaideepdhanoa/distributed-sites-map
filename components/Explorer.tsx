@@ -30,6 +30,7 @@ import { paletteGroups } from "@/lib/search/palette";
 import { PIPELINE_COLUMNS, capacitySummary, defaultColumnIds, factsForDeal, factsForSite, inRange, listScoreText, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
 import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, QUICK_LUBE_LABEL, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { LAND_PAUSED_NOTE, UNIVERSE_STAGE_LABEL, countyCheck } from "@/lib/listLook";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
@@ -1596,14 +1597,31 @@ export default function Explorer() {
   }
 
   function siteRow(site: SiteProps): ListRow {
+    const deal = dealForSite(site);
     const price = site.listed && site.asking_price_display ? `${site.asking_price_display}${site.asking_price_source ? ` · ${site.asking_price_source}` : ""}` : "";
+    const county = countyCheck(site);
+    const pipeline = Boolean(deal && (deal.kind === "pipeline" || deal.kind === "land") && deal.stage_group);
     return {
       id: site.site_id,
       site: site.name || site.address || site.site_id,
       type: siteTypeLabel(site),
       city: site.city,
-      stage: plainVerdict(site.verdict),
-      score: listScoreText(dealForSite(site)?.score),
+      stage: pipeline && deal ? (deal.stage || "") : UNIVERSE_STAGE_LABEL,
+      stageGroup: pipeline && deal ? (deal.stage_group || "") : "",
+      universeOnly: !pipeline,
+      county: county.label,
+      countyNote: county.note,
+      landPaused: siteCategory(site, links) === "land" || deal?.kind === "land",
+      score: listScoreText(deal?.score),
+      scoreInput: deal ? {
+        score: deal.score,
+        economics: deal.economics_points,
+        land: deal.land_points,
+        power: deal.power_points,
+        location: deal.location_points,
+        deal: deal.deal_points,
+        naEconomics: deal.business_type === "Quick lube",
+      } : null,
       tier: tierLabel(spareTier(site)) || "",
       spare: site.spare_ac_own != null ? `${site.spare_ac_own} ac` : "",
       grade: capacitySummary(factsForSite(site, dealForSite(site))),
@@ -2121,11 +2139,9 @@ export default function Explorer() {
             }) : (
               <>
                 {PIPE_STEPS.map((step, index) => {
-                  const operatingRows = dealRows.filter((deal) => deal.kind !== "land" && inFunnelMarket(deal) && dealOnPipeStep(deal, step.id, reach));
-                  const landRows = dealRows.filter((deal) => deal.kind === "land" && !isProtectedId(deal.deal_id) && shownInMarket(deal.city) && dealOnPipeStep(deal, step.id, reach) && (!who || partyMatch(who, deal.broker, deal.firm)) && (!query || dealQueryHit(deal)));
-                  const parts = { operating: operatingRows.length, land: landRows.length };
-                  const brokerHere = [...operatingRows, ...landRows].filter((deal) => deal.broker_contacted).length;
-                  const note = `${FUNNEL_NOTES[step.id]} Operating ${parts.operating.toLocaleString("en-US")}. Land ${parts.land.toLocaleString("en-US")}. Land stays counted when that filter is off.${brokerHere ? ` ${brokerHere.toLocaleString("en-US")} contacted.` : ""}`;
+                  const rows = dealRows.filter((deal) => inFunnelMarket(deal) && dealOnPipeStep(deal, step.id, reach));
+                  const brokerHere = rows.filter((deal) => deal.broker_contacted).length;
+                  const note = `${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString("en-US")} contacted.` : ""}`;
                   const selected = !outsideGroup && !allPipes && !pipelineWide && pipeStage === step.id;
                   return (
                     <Fragment key={step.id}>
@@ -2133,8 +2149,7 @@ export default function Explorer() {
                       <span className="step">
                         <button className={selected ? "chip on" : "chip"} type="button" aria-current={selected ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id, outside: null }, true)}>
                           <span>{step.label}</span>
-                          <strong>{parts.operating.toLocaleString("en-US")}</strong>
-                          <span className="split land-count" data-testid={`land-beside-${step.id}`}>{parts.land ? `+${parts.land.toLocaleString("en-US")} land` : "+0 land"}</span>
+                          <strong>{rows.length.toLocaleString("en-US")}</strong>
                         </button>
                       </span>
                     </Fragment>
@@ -2224,7 +2239,7 @@ export default function Explorer() {
               </label>
               <label title={CATEGORY_NOTES.land}>
                 <input className="check" type="checkbox" data-testid="land-category" checked={categories.land} onChange={() => setCategory("land", !categories.land)} />
-                <span>Land<span className="layer-meta">{CATEGORY_NOTES.land}</span></span>
+                <span>Land <span className="stage-pill tone-sand" data-testid="land-paused-tag" title={LAND_PAUSED_NOTE}>Paused</span><span className="layer-meta">{CATEGORY_NOTES.land}</span></span>
               </label>
               <label title={CATEGORY_NOTES.store}>
                 <input className="check" type="checkbox" data-testid="cstore-category" checked={categories.store} onChange={() => setCategory("store", !categories.store)} />

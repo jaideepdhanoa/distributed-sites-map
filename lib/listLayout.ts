@@ -121,7 +121,7 @@ export function defaultLayout(ids: string[], pinned: string[] = ["site"], hidden
 
 export function phoneColumns(surface: LayoutSurface): string[] {
   if (surface === "pipeline") return ["site", "stage", "score", "openLand"];
-  return ["site", "type", "stage", "score"];
+  return ["site", "type", "stage", "county", "score"];
 }
 
 export function allowedIds(ids: string[], signedIn: boolean): string[] {

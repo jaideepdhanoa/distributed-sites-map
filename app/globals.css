@@ -2134,6 +2134,9 @@ tr { cursor: pointer; }
 .tone-pine { background: var(--pine-100); color: var(--pine-900); box-shadow: inset 0 0 0 1px #8fbfa8; }
 .tone-sand { background: #f3e4d4; color: #1c1914; box-shadow: inset 0 0 0 1px #b5835a; }
 .tone-sky { background: #e4eef6; color: #1d3f66; box-shadow: inset 0 0 0 1px #b7cfe4; }
+.tone-quiet { background: #f3f0e8; color: #5c564c; box-shadow: inset 0 0 0 1px var(--line); }
+.score-chip { cursor: pointer; }
+.stage-hold .stage-tip { max-width: 22rem; }
 .stage-pill { margin-top: 0; }
 .summary-row {
   display: grid;

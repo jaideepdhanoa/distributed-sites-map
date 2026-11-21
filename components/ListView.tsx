@@ -9,6 +9,10 @@ import SheetGrid from "./SheetGrid";
 import { useListLayout } from "./useListLayout";
 import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
+import type { StoredScoreInput } from "@/lib/scoreDisplay";
+import { CountyChip, LandPausedChip, ScoreCell, StageChip, TypeChip } from "./ListLook";
+import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
+import { stageChipLabel } from "@/lib/chips";
 import {
   allowedIds,
   defaultLayout,
@@ -27,6 +31,13 @@ export type ListRow = {
   city: string;
   stage: string;
   score: string;
+  county?: string;
+  countyNote?: string;
+  stageGroup?: string;
+  stageDetail?: string;
+  universeOnly?: boolean;
+  landPaused?: boolean;
+  scoreInput?: StoredScoreInput | null;
   tier: string;
   spare: string;
   grade: string;
@@ -50,6 +61,7 @@ export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id" | "lng" | "lat" | "nda
   { id: "site", label: "Site" },
   { id: "type", label: "Type" },
   { id: "stage", label: "Stage" },
+  { id: "county", label: "County check" },
   { id: "score", label: "Score" },
   { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
@@ -176,7 +188,15 @@ export default function ListView({
             id: row.id,
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
-            stage: shownText(row, "stage", signedIn) || "—",
+            stage: row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || ""),
+            chips: (
+              <>
+                <TypeChip value={row.type} />
+                {row.landPaused ? <LandPausedChip /> : null}
+                {row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null}
+                {row.scoreInput ? <ScoreCell input={row.scoreInput} /> : null}
+              </>
+            ),
             facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
             onOpen: () => onOpen(row.id),
@@ -204,11 +224,19 @@ export default function ListView({
             </span>
             <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
           </span>
+        ) : column === "type" ? (
+          <span className="stage-cell"><TypeChip value={row.type} />{row.landPaused ? <LandPausedChip /> : null}</span>
+        ) : column === "stage" ? (
+          <span className="stage-cell">
+            {row.universeOnly ? <StageChip stage={UNIVERSE_STAGE_LABEL} group="" quiet /> : <StageChip stage={row.stage} group={row.stageGroup || ""} detail={row.stageDetail} />}
+            {row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
+          </span>
+        ) : column === "county" ? (
+          row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : "—"
+        ) : column === "score" ? (
+          row.scoreInput ? <ScoreCell input={row.scoreInput} /> : shownText(row, "score", signedIn) || "—"
         ) : (
-          <>
-            {shownText(row, column as ListColumnId, signedIn) || "—"}
-            {column === "stage" && row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
-          </>
+          shownText(row, column as ListColumnId, signedIn) || "—"
         )}
         trailing={(row) => (
           <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
@@ -233,12 +261,14 @@ function downloadVisible(columns: SheetColumn<ListRow>[], rows: ListRow[]) {
 
 export function listCellText(row: ListRow, id: ListColumnId, signedIn: boolean) {
   if (id === "score") return listScoreText(row.score);
+  if (id === "county") return row.county || "—";
+  if (id === "stage") return row.universeOnly ? UNIVERSE_STAGE_LABEL : String(row.stage || "—");
   if (id === "listed" && !signedIn) return /^yes/i.test(row.listed) ? "Yes" : row.listed === "No" ? "No" : "—";
   return String(row[id] ?? "");
 }
 
 export function universeCardFacts(row: ListRow, signedIn: boolean): string[] {
-  return [listCellText(row, "score", signedIn), listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
+  return [listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
     .filter((fact) => fact && fact !== "—" && fact !== "Not on file");
 }
 

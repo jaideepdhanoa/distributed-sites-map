@@ -7,7 +7,7 @@ import { loadListLayout, missingLayoutTable, saveListLayout } from "@/lib/listLa
 import { previewPointsAtProduction } from "@/lib/preview/safety";
 import { isSession, requireUser } from "@/lib/guard";
 
-const UNIVERSE_IDS = ["site", "type", "stage", "score", "spare", "grade", "traffic", "listed"];
+const UNIVERSE_IDS = ["site", "type", "stage", "county", "score", "spare", "grade", "traffic", "listed"];
 
 function allowedFor(surface: LayoutSurface): string[] {
   if (surface === "pipeline") return PIPELINE_COLUMNS.map((column) => column.id);

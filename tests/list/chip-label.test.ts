@@ -8,6 +8,7 @@ import { NdaChip } from "../../components/NdaChip";
 import { ChipRow, TagChip } from "../../components/TagChip";
 import { serviceAreaChip } from "../../lib/cardStatus";
 import { CHIP_LABEL_MAX, chipFace, chipLabelProblem, stageChipLabel } from "../../lib/chips";
+import { LAND_PAUSED_NOTE, LIST_CHIP_LABELS, countyCheck } from "../../lib/listLook";
 import { cashFlowListLabel } from "../../lib/keyNumbers";
 import type { DealProps } from "../../lib/types";
 import { TAG_FAMILIES } from "../../lib/tags/vocab";
@@ -62,9 +63,18 @@ test("data-driven chips stay a short label and do not join clauses", () => {
       assert.ok(code.label.length <= CHIP_LABEL_MAX);
     }
   }
-  for (const label of ["Outside service area", "Near, 4.2 mi", "Near, under 5 mi", "Financial screen", "Offer and close", "Dropped"]) {
+  for (const label of ["Outside service area", "Near, 4.2 mi", "Near, under 5 mi", "Financial screen", "Offer and close", "Dropped", ...LIST_CHIP_LABELS]) {
     assert.equal(chipLabelProblem(label), "", label);
   }
+  const county = countyCheck({ verdict: "PASS" });
+  assert.equal(county.label, "Land OK");
+  assert.match(county.note, /County records confirm/);
+  assert.equal(countyCheck({ verdict: "MAYBE" }).label, "Land borderline");
+  assert.equal(countyCheck({ verdict: "UNRESOLVED" }).label, "Records unclear");
+  assert.equal(countyCheck({ verdict: null }).label, "Not reviewed");
+  assert.equal(countyCheck({ verdict: "FAIL" }).label, "Ruled out");
+  assert.equal(chipLabelProblem("Land paused"), "");
+  assert.match(LAND_PAUSED_NOTE, /Nov 20, 2026/);
   assert.equal(chipLabelProblem(serviceAreaChip({ service_area_class: "outside" }) || ""), "");
   assert.equal(chipLabelProblem(serviceAreaChip({ service_area_class: "near_5_10", service_area_distance_mi: 4.2 }) || ""), "");
 

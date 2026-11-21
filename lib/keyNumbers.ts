@@ -158,12 +158,15 @@ function factText(value: unknown): string {
   return cleanFactText(value);
 }
 
-/** A workbook score is shown only when it is a real number. Formula errors stay off the card. */
+/** A workbook score is shown only when it is a real number. Formula errors stay off the card. One decimal, matching the parts. */
 export function displayScore(value: unknown): string {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  const text = typeof value === "string" ? value.trim() : "";
+  const text = typeof value === "number" && Number.isFinite(value)
+    ? String(value)
+    : typeof value === "string" ? value.trim() : "";
   if (!text || SHEET_ERROR.test(text) || !/^-?\d+(?:\.\d+)?$/.test(text)) return "";
-  return text;
+  const rounded = Math.round(Number(text) * 10) / 10;
+  const shown = Object.is(rounded, -0) ? "0.0" : rounded.toFixed(1);
+  return shown.endsWith(".0") ? shown.slice(0, -2) : shown;
 }
 
 function factCount(value: number, digits = 2): string {

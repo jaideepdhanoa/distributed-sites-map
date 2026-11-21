@@ -1,5 +1,5 @@
 import { actionsEnabled, withSql } from "@/lib/actions/db";
-import { mergeQuickLubeCensus, type CensusRow } from "@/lib/quickLube";
+import { UNIVERSE_CREATE_CATEGORIES, mergeQuickLubeCensus, type CensusRow } from "@/lib/quickLube";
 import type { SiteFeature } from "@/lib/types";
 import { commsSnapshotForIds, type CommsSnapshot, type CommsRecord } from "@/lib/comms";
 import { timelineForIds } from "@/lib/timeline/filter";
@@ -206,36 +206,78 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
   return { ...file, features };
 }
 
+function undefinedColumn(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
+}
+
+function factsOf(value: unknown): Record<string, string> {
+  const source = typeof value === "string"
+    ? (() => {
+        try {
+          return JSON.parse(value) as unknown;
+        } catch {
+          return {};
+        }
+      })()
+    : value;
+  if (!source || typeof source !== "object" || Array.isArray(source)) return {};
+  const facts: Record<string, string> = {};
+  for (const [key, item] of Object.entries(source as Record<string, unknown>)) {
+    facts[key] = item == null ? "" : String(item);
+  }
+  return facts;
+}
+
+/** The census shape the Universe funnel reads. A blank site id stays a Universe id. */
+export function censusRowFromStored(row: Record<string, unknown>): CensusRow {
+  return {
+    universeId: text(row.universe_id),
+    siteId: text(row.site_id),
+    market: text(row.market),
+    name: text(row.name),
+    address: text(row.address),
+    category: text(row.category),
+    lat: text(row.lat),
+    lng: text(row.lng),
+    serviceArea: text(row.service_area_class),
+    miles: text(row.miles_to_depot),
+    listingStatus: text(row.listing_status),
+    facts: factsOf(row.facts),
+  };
+}
+
+const CENSUS_CATEGORIES = UNIVERSE_CREATE_CATEGORIES.map((category) => `'${category.replace(/'/g, "''")}'`).join(", ");
+
+const CENSUS_FROM_ROW = `SELECT u.universe_id, u.site_id, u.market, u.name, u.address, u.category, u.lat, u.lng,
+       COALESCE(NULLIF(u.service_area_class, ''), s.service_area_class, '') AS service_area_class,
+       COALESCE(NULLIF(u.miles_to_depot, ''), s.miles_to_depot, '') AS miles_to_depot,
+       COALESCE(s.listing_status, '') AS listing_status,
+       CASE
+         WHEN u.facts IS NOT NULL AND u.facts <> '{}'::jsonb THEN u.facts
+         ELSE COALESCE(s.facts, '{}'::jsonb)
+       END AS facts
+     FROM universe_rows u
+     LEFT JOIN sites s ON s.site_id = u.site_id
+     WHERE u.category IN (${CENSUS_CATEGORIES})`;
+
+const CENSUS_FROM_SITE = `SELECT u.universe_id, u.site_id, u.market, u.name, u.address, u.category, u.lat, u.lng,
+       s.service_area_class, s.miles_to_depot, s.listing_status, s.facts
+     FROM universe_rows u
+     LEFT JOIN sites s ON s.site_id = u.site_id
+     WHERE u.category IN (${CENSUS_CATEGORIES})`;
+
 export async function overlayQuickLubeCensus<T extends { features?: SiteFeature[] }>(file: T): Promise<T> {
   if (!readEntityFromDb("site") || !actionsEnabled()) return file;
   try {
-    const rows = await withSql((sql) =>
-      sql.query<Record<string, unknown>>(
-        `SELECT u.universe_id, u.site_id, u.market, u.name, u.address, u.category, u.lat, u.lng,
-                s.service_area_class, s.miles_to_depot, s.listing_status, s.facts
-         FROM universe_rows u
-         LEFT JOIN sites s ON s.site_id = u.site_id
-         WHERE u.category = 'Quick lube'`,
-      ),
-    );
-    const census: CensusRow[] = rows.rows.map((row) => {
-      const facts = row.facts && typeof row.facts === "object" ? row.facts as Record<string, string> : {};
-      return {
-        universeId: text(row.universe_id),
-        siteId: text(row.site_id),
-        market: text(row.market),
-        name: text(row.name),
-        address: text(row.address),
-        category: text(row.category),
-        lat: text(row.lat),
-        lng: text(row.lng),
-        serviceArea: text(row.service_area_class),
-        miles: text(row.miles_to_depot),
-        listingStatus: text(row.listing_status),
-        facts,
-      };
+    const rows = await withSql(async (sql) => {
+      try {
+        return await sql.query<Record<string, unknown>>(CENSUS_FROM_ROW);
+      } catch (error) {
+        if (!undefinedColumn(error)) throw error;
+        return sql.query<Record<string, unknown>>(CENSUS_FROM_SITE);
+      }
     });
-    return mergeQuickLubeCensus(file, census);
+    return mergeQuickLubeCensus(file, rows.rows.map((row) => censusRowFromStored(row)));
   } catch {
     console.error(JSON.stringify({ event: "quick_lube_census_fallback" }));
     return file;

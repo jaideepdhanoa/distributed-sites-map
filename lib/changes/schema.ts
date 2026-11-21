@@ -4,6 +4,7 @@ import { canDecide, canWriteContent } from "@/lib/actions/roles";
 import { parseMentionIds } from "@/lib/actions/mentions";
 import { isCommentLine, type CommentTag } from "@/lib/comments/anchor";
 import { InputError } from "@/lib/actions/text";
+import { LISTING_SEARCH_MESSAGE, listingSearchPage } from "@/lib/listingUrl";
 import { assertClean } from "@/lib/policy/banned";
 import {
   CHECK_FIELDS,
@@ -231,6 +232,8 @@ export type ParsedChange = {
   listing_replay?: boolean;
   /** This market and address were already minted. Apply returns the stored Universe id and does not write again. */
   universe_replay?: boolean;
+  /** A Universe-only row was given this Pipeline id. Facts and the Universe id stay. */
+  promoted?: boolean;
   payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload | CommentPayload;
 };
 
@@ -1252,6 +1255,9 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   put("category", data.category);
   put("broker", data.broker);
   put("firm", data.firm);
+  if (data.listing_url && listingSearchPage(data.listing_url)) {
+    throw new InputError(`Change ${index + 1}: ${LISTING_SEARCH_MESSAGE}`, 400, "listing_url");
+  }
   put("listing_url", data.listing_url);
   put("asking_price", data.asking_price);
   put("acreage", data.acreage);

@@ -27,6 +27,7 @@ import { AGENT_STAGE_DECISION_SOURCE, RECEIPT_ACTIVITY_SUMMARY, formatZonedTimes
 import { CREATE_MARKETS } from "./site";
 import { isQuickLube } from "@/lib/labels";
 import { addressConflict, normalizeAddress } from "@/lib/quickLube";
+import { factConflicts, normalizeApn } from "@/lib/universeMatch";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import { LISTING_ID, SITE_ID, type EntityType, type Market, type ServiceAreaClass } from "./vocab";
@@ -1039,6 +1040,33 @@ async function ensureCapture(
           `SELECT 1 FROM activities WHERE site_id = $1 AND payload->>'summary' = 'Site added' LIMIT 1`,
           [change.site_id],
         );
+    if (change.promoted) {
+      const promoted = await sql.query(
+        `SELECT 1 FROM activities WHERE site_id = $1 AND payload->>'summary' = 'Promoted from Universe' LIMIT 1`,
+        [change.site_id],
+      );
+      if (!promoted.rows.length) {
+        const zoned = parseZonedTimestamp(formatZonedTimestamp());
+        if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
+        const payload: ActivityPayload = { date: zoned.date, date_iso: zoned.iso, type: "capture", summary: "Promoted from Universe" };
+        extra.push(
+          await applyOne(
+            sql,
+            actor,
+            {
+              entity_type: "activity",
+              site_id: change.site_id,
+              expected_version: 0,
+              source: change.source,
+              payload,
+            },
+            `${idempotencyKey}#promoted:${change.site_id}`,
+            runId,
+            "api",
+          ),
+        );
+      }
+    }
     if (!hasActivity && !alreadyAdded.rows.length) {
       const zoned = parseZonedTimestamp(formatZonedTimestamp());
       if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
@@ -1396,17 +1424,40 @@ async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<Pa
       });
       continue;
     }
+    if (mint.kind !== "pipeline" && mint.kind !== "land") {
+      throw new InputError("A new site needs a kind of pipeline or land.");
+    }
+    const address = payload.fields.address || "";
+    const key = normalizeAddress(address);
+    const hit = await matchingUniverse(sql, market, address, payload.fields.apn || "");
+    if (hit && (hit.site_id.trim() !== "" || mint.kind !== "pipeline")) {
+      throw new InputError("This address matches an existing site.", 409);
+    }
+    if (hit && mint.kind === "pipeline") {
+      const conflicts = factConflicts(factBag(hit.facts), payload.facts || {});
+      if (conflicts.length) {
+        console.error(JSON.stringify({ event: "universe_promote_conflict", universe_id: hit.universe_id, fields: conflicts }));
+        throw new InputError("This address matches a universe row whose facts disagree.", 409);
+      }
+      if (key) claimed.add(key);
+      const siteId = await nextLabeled(sql, `PIPE:${market}`, `PIPE-${market}-`, [
+        `SELECT site_id AS id FROM sites WHERE site_id LIKE $1`,
+        `SELECT site_id AS id FROM site_mints WHERE site_id LIKE $1`,
+      ]);
+      prepared.push({
+        ...change,
+        site_id: siteId,
+        promoted: true,
+        payload: { ...payload, fields: { ...payload.fields, universe_id: hit.universe_id } },
+      });
+      continue;
+    }
     if (isQuickLube(payload.fields.category)) {
-      const address = payload.fields.address || "";
-      const key = normalizeAddress(address);
       const known = await knownAddresses(sql);
       if ((key && claimed.has(key)) || addressConflict(address, known)) {
         throw new InputError("This address matches an existing site.", 409);
       }
       if (key) claimed.add(key);
-    }
-    if (mint.kind !== "pipeline" && mint.kind !== "land") {
-      throw new InputError("A new site needs a kind of pipeline or land.");
     }
     const minted = await mintSitePair(sql, mint.kind, market);
     prepared.push({
@@ -1519,12 +1570,86 @@ async function applyUniverse(
   };
 }
 
+function factBag(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (item == null) continue;
+    out[key] = String(item);
+  }
+  return out;
+}
+
+async function matchingUniverse(
+  sql: Sql,
+  market: string,
+  address: string,
+  apn: string,
+): Promise<{ universe_id: string; site_id: string; facts: unknown } | null> {
+  const key = normalizeAddress(address);
+  const apnKey = normalizeApn(apn);
+  if (!key && !apnKey) return null;
+  const query = `SELECT universe_id, site_id, facts
+     FROM universe_rows
+     WHERE market = $1 AND merged_into = ''
+       AND (
+         ($2 <> '' AND address_key = $2)
+         OR ($3 <> '' AND regexp_replace(lower(apn), '[^a-z0-9]', '', 'g') = $3)
+       )`;
+  let rows: { universe_id: string; site_id: string; facts: unknown }[];
+  try {
+    rows = (await sql.query<{ universe_id: string; site_id: string; facts: unknown }>(query, [market, key, apnKey])).rows;
+  } catch (error) {
+    const missing = error instanceof Error && /merged_into|address_key/.test(error.message);
+    if (!missing) throw error;
+    return null;
+  }
+  const ids = [...new Set(rows.map((row) => row.universe_id))];
+  if (ids.length > 1) throw new InputError("This address matches more than one universe row.", 409);
+  return rows[0] || null;
+}
+
 async function rememberMint(sql: Sql, actor: Actor, change: ParsedChange): Promise<void> {
   const payload = change.payload as SitePayload;
   const mint = payload.mint;
   const universeId = payload.fields.universe_id || "";
   if (!mint || !universeId) return;
   const fields = payload.fields;
+  if (change.promoted) {
+    const updated = await sql.query(
+      `UPDATE universe_rows
+       SET site_id = $2,
+           listing_id = $3,
+           listing_url = CASE WHEN $4 = '' THEN listing_url ELSE $4 END,
+           facts = facts || (
+             SELECT COALESCE(jsonb_object_agg(key, value), '{}'::jsonb)
+             FROM jsonb_each($5::jsonb) AS incoming(key, value)
+             WHERE NOT (facts ? incoming.key)
+           ),
+           fact_sources = fact_sources || (
+             SELECT COALESCE(jsonb_object_agg(key, value), '{}'::jsonb)
+             FROM jsonb_each($6::jsonb) AS incoming(key, value)
+             WHERE NOT (fact_sources ? incoming.key)
+           )
+       WHERE universe_id = $1 AND site_id = ''
+       RETURNING universe_id`,
+      [
+        universeId,
+        change.site_id,
+        mint.listing_id,
+        fields.listing_url || "",
+        JSON.stringify(payload.facts || {}),
+        JSON.stringify(payload.sources || {}),
+      ],
+    );
+    if (!updated.rows.length) throw new InputError("This address matches an existing site.", 409);
+    await sql.query(
+      `INSERT INTO site_mints (listing_id, site_id, universe_id, kind, market, request_hash, actor)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [mint.listing_id, change.site_id, universeId, mint.kind, fields.market || "", listingHash(payload), actor.id],
+    );
+    return;
+  }
   await sql.query(
     `INSERT INTO site_mints (listing_id, site_id, universe_id, kind, market, request_hash, actor)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,

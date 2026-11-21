@@ -27,7 +27,7 @@ import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/
 import { displayAddress, folderHref, leadSourceLine, listingHref } from "@/lib/format";
 import { dealSearchParts, matchesQuery, partyMatch, siteSearchParts } from "@/lib/search";
 import { paletteGroups } from "@/lib/search/palette";
-import { PIPELINE_COLUMNS, capacitySummary, defaultColumnIds, displayScore, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
+import { PIPELINE_COLUMNS, capacitySummary, defaultColumnIds, factsForDeal, factsForSite, inRange, listScoreText, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
 import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, QUICK_LUBE_LABEL, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
@@ -1603,7 +1603,7 @@ export default function Explorer() {
       type: siteTypeLabel(site),
       city: site.city,
       stage: plainVerdict(site.verdict),
-      score: displayScore(dealForSite(site)?.score) || "—",
+      score: listScoreText(dealForSite(site)?.score),
       tier: tierLabel(spareTier(site)) || "",
       spare: site.spare_ac_own != null ? `${site.spare_ac_own} ac` : "",
       grade: capacitySummary(factsForSite(site, dealForSite(site))),
@@ -1630,7 +1630,7 @@ export default function Explorer() {
       type: deal.business_type || "Other",
       city: deal.city,
       stage: stageDetail(deal.stage, deal.stage_group),
-      score: displayScore(deal.score) || "—",
+      score: listScoreText(deal.score),
       tier: linked ? tierLabel(spareTier(linked)) || "" : "",
       spare: linked?.spare_ac_own != null ? `${linked.spare_ac_own} ac` : "",
       grade: capacitySummary(factsForDeal(deal)),
@@ -2455,7 +2455,7 @@ export default function Explorer() {
         <ActionsDialogs />
         <CommentGridHost />
         {inReview && !caughtUp && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
-          <ReviewRail sites={reviewList.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
+          <ReviewRail sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
         ) : null}
         {inReview && reviewMiss ? (
           <aside className="review-rail" data-testid="review-rail" aria-label="Review inbox">
@@ -2476,7 +2476,7 @@ export default function Explorer() {
           </div>
         ) : null}
         {feedSheet ? (
-          <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
+          <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
         <PanelBoundary name="Map">
         <MapView

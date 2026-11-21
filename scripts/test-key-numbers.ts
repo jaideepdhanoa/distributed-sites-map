@@ -99,6 +99,7 @@ assert.equal(cleanFactText("OSM via diligence_sweep.py"), "");
 assert.equal(cleanFactText("OSM proximity (Overpass)"), "OSM proximity (Overpass)");
 assert.equal(displayScore("#REF!"), "");
 assert.equal(displayScore(72), "72");
+assert.equal(displayScore(47.12), "47.1");
 assert.equal(displayScore(""), "");
 assert.equal(sheetMoney(99214, "$99,214"), "$99,214");
 assert.equal(sheetMoney(317659, "$317,659"), "$317,659");

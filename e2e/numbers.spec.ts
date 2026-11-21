@@ -17,12 +17,14 @@ test("provisional and not scored render from a fixture", async ({ page }, info) 
   test.skip(info.project.name !== "desktop", "score fixture");
   let blankId = "";
   let offId = "";
+  let evenId = "";
   await page.route("**/api/data/deals*", async (route) => {
     const response = await route.fetch();
     const body = await response.json() as { features?: { properties?: Record<string, unknown> }[] };
     const rows = (body.features || []).filter((feature) => feature.properties?.kind === "pipeline" && feature.properties.deal_id !== "PIPE-PHX-0006");
     const blank = rows[0]?.properties;
     const off = rows[1]?.properties;
+    const even = rows[2]?.properties;
     if (blank) {
       blankId = String(blank.deal_id || "");
       blank.score = 20;
@@ -43,6 +45,16 @@ test("provisional and not scored render from a fixture", async ({ page }, info) 
       off.deal_points = 10;
       off.business_type = "Car wash";
     }
+    if (even) {
+      evenId = String(even.deal_id || "");
+      even.score = 47.12;
+      even.economics_points = 4.62;
+      even.land_points = 25;
+      even.power_points = 7.5;
+      even.location_points = 5;
+      even.deal_points = 5;
+      even.business_type = "Car wash";
+    }
     await route.fulfill({ json: body });
   });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -54,6 +66,8 @@ test("provisional and not scored render from a fixture", async ({ page }, info) 
   await page.goto(`/?funnel=pipeline&site=${offId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("score-chip")).toContainText("Provisional");
   await expect(page.getByTestId("score-chip")).toContainText("50");
+  await page.goto(`/?funnel=pipeline&site=${evenId}`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("score-chip")).toHaveText("47.1");
 });
 
 test("phone pipeline keeps the All chip", async ({ page }, info) => {

@@ -158,12 +158,31 @@ function factText(value: unknown): string {
   return cleanFactText(value);
 }
 
-/** A workbook score is shown only when it is a real number. Formula errors stay off the card. */
+/** A workbook score is shown only when it is a real number. Formula errors stay off the card. One decimal, matching the parts. */
 export function displayScore(value: unknown): string {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  const text = typeof value === "string" ? value.trim() : "";
+  const text = typeof value === "number" && Number.isFinite(value)
+    ? String(value)
+    : typeof value === "string" ? value.trim() : "";
   if (!text || SHEET_ERROR.test(text) || !/^-?\d+(?:\.\d+)?$/.test(text)) return "";
-  return text;
+  const rounded = Math.round(Number(text) * 10) / 10;
+  const shown = Object.is(rounded, -0) ? "0.0" : rounded.toFixed(1);
+  return shown.endsWith(".0") ? shown.slice(0, -2) : shown;
+}
+
+/** List cells and phone cards. A numeric score is one decimal. A label such as Not scored stays. */
+export function listScoreText(value: unknown): string {
+  const shown = displayScore(value);
+  if (shown) return shown;
+  const raw = typeof value === "string" ? value.trim() : "";
+  return raw || "—";
+}
+
+/** The score number sent to the client. The stored cell is not rewritten. */
+export function scoreForFeed(value: unknown): number | null {
+  const shown = displayScore(value);
+  if (!shown) return null;
+  const number = Number(shown);
+  return Number.isFinite(number) ? number : null;
 }
 
 function factCount(value: number, digits = 2): string {

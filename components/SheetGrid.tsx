@@ -8,6 +8,7 @@ import {
   clampWidth,
   columnWidth,
   cycleSort,
+  FLEX_COLUMN_IDS,
   fitColumnWidths,
   moveColumn,
   TRAILING_COLUMN_WIDTH,
@@ -64,7 +65,7 @@ export default function SheetGrid<Row>({
   const ids = columns.map((column) => column.id);
   const colCount = ids.length + (trailing ? 1 : 0);
   const trailingWidth = trailing ? TRAILING_COLUMN_WIDTH : 0;
-  const flex = new Set(flexIds ?? ["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
+  const flex = new Set(flexIds ?? FLEX_COLUMN_IDS);
   const wrap = new Set(wrapIds ?? WRAP_COLUMNS);
   const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth, flex);
   const widthById = new Map(ids.map((id, index) => [id, fitted[index] || columnWidth(id)]));

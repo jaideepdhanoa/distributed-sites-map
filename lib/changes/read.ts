@@ -3,6 +3,7 @@ import { UNIVERSE_CREATE_CATEGORIES, mergeQuickLubeCensus, type CensusRow } from
 import type { SiteFeature } from "@/lib/types";
 import { commsSnapshotForIds, type CommsSnapshot, type CommsRecord } from "@/lib/comms";
 import { timelineForIds } from "@/lib/timeline/filter";
+import { scoreForFeed } from "@/lib/keyNumbers";
 import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
 import { isProtectedId } from "@/lib/protectedSite";
@@ -315,10 +316,18 @@ export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> 
   }
 }
 
+function roundScoreFeature<T extends { properties?: Record<string, unknown> }>(feature: T): T {
+  const props = feature.properties;
+  if (!props || props.score == null || props.score === "") return feature;
+  const score = scoreForFeed(props.score);
+  if (score === props.score) return feature;
+  return { ...feature, properties: { ...props, score } };
+}
+
 /** The deals file, with Neon site rows painted on when the site read flag is on. */
 export async function readDeals(): Promise<DealFile> {
-  const file = readGenerated("deals.geojson") as DealFile;
-  return overlayDealSites(file);
+  const file = await overlayDealSites(readGenerated("deals.geojson") as DealFile);
+  return { ...file, features: (file.features || []).map(roundScoreFeature) };
 }
 
 export async function overlayDealStages<T extends DealFile>(file: T): Promise<T> {

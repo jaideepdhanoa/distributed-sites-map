@@ -20,6 +20,7 @@ import {
   fullMoney,
   capacitySummary,
   displayScore,
+  listScoreText,
   factsForDeal,
   powerSummary,
   openLandLabel,
@@ -70,11 +71,10 @@ function typeLabel(deal: DealProps): string {
 }
 
 function phoneScore(value: string): string {
+  const shown = displayScore(value);
+  if (shown) return `Score ${shown}`;
   if (!value || value === "—") return "";
-  const number = Number(value);
-  if (!Number.isFinite(number)) return `Score ${value}`;
-  const rounded = Math.round(number * 10) / 10;
-  return `Score ${rounded}`;
+  return `Score ${value}`;
 }
 
 function phoneFact(value: string): string {
@@ -110,8 +110,8 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
       naEconomics: deal.business_type === "Quick lube",
     });
     if (view.status === "not_scored") return "Not scored";
-    if (view.status === "provisional") return `Provisional ${view.summed}`;
-    return view.chip || "—";
+    if (view.status === "provisional") return `Provisional ${listScoreText(view.summed)}`;
+    return listScoreText(view.chip);
   }
   if (id === "asking") {
     if (!signedIn) return "—";

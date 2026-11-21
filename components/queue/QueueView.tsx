@@ -5,6 +5,7 @@ import { RowLinks } from "../RowLinks";
 import { stageMoveLabel } from "@/lib/actions/nextStepTypes";
 import { quietActionsFetch } from "@/lib/actions/quiet";
 import { reviewWhen } from "@/lib/queue/when";
+import { listScoreText } from "@/lib/keyNumbers";
 import { reviewSentence } from "@/lib/queue/since";
 import "./queue.css";
 
@@ -363,7 +364,7 @@ export function ReviewRail({
       >
         <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{site.status === "reviewed" ? "✓ " : `${index + 1}. `}{site.name}</strong>
         <span>{marketLabel(site.city)}</span>
-        <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{site.score || "—"}</span>
+        <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{listScoreText(site.score)}</span>
         <span className="review-row-chips">
           {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
           {site.reasons[0] ? <time>{reasonWhen(site.reasons[0])}</time> : null}
@@ -420,7 +421,7 @@ export function ReviewFeedSheet({
               onClick={() => { onPick(index); onClose(); }}
             >
               <strong>{site.status === "open" ? <i className="queue-dot" aria-hidden="true" /> : null}{index + 1}. {site.name}</strong>
-              <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{site.score || "—"}</span>
+              <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{listScoreText(site.score)}</span>
               <span>{marketLabel(site.city)} · {chips(site.reasons).map((chip) => chip.label).join(", ")}</span>
             </button>
             <RowLinks listing={links?.[site.siteId]?.listing} folder={links?.[site.siteId]?.folder} packageHref={links?.[site.siteId]?.packageHref} />

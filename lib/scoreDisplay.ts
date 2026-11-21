@@ -127,9 +127,7 @@ export function scoreIssue(input: StoredScoreInput): boolean {
 }
 
 export function formatPoints(value: number): string {
-  const rounded = Math.round(value * 10) / 10;
-  const text = Object.is(rounded, -0) ? "0.0" : rounded.toFixed(1);
-  return text.endsWith(".0") ? text.slice(0, -2) : text;
+  return displayScore(value);
 }
 
 function pointNumber(value: unknown): number | null {

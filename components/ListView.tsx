@@ -8,6 +8,7 @@ import { RowLinks } from "./RowLinks";
 import SheetGrid from "./SheetGrid";
 import { useListLayout } from "./useListLayout";
 import { inMapArea, type MapArea } from "@/lib/geoFilter";
+import { listScoreText } from "@/lib/keyNumbers";
 import {
   allowedIds,
   defaultLayout,
@@ -176,7 +177,7 @@ export default function ListView({
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
             stage: shownText(row, "stage", signedIn) || "—",
-            facts: [shownText(row, "score", signedIn), shownText(row, "listed", signedIn), shownText(row, "spare", signedIn)].filter((fact) => fact && fact !== "—" && fact !== "Not on file"),
+            facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
             onOpen: () => onOpen(row.id),
           }))} />
@@ -230,7 +231,17 @@ function downloadVisible(columns: SheetColumn<ListRow>[], rows: ListRow[]) {
   link.click();
 }
 
-function shownText(row: ListRow, id: ListColumnId, signedIn: boolean) {
+export function listCellText(row: ListRow, id: ListColumnId, signedIn: boolean) {
+  if (id === "score") return listScoreText(row.score);
   if (id === "listed" && !signedIn) return /^yes/i.test(row.listed) ? "Yes" : row.listed === "No" ? "No" : "—";
   return String(row[id] ?? "");
+}
+
+export function universeCardFacts(row: ListRow, signedIn: boolean): string[] {
+  return [listCellText(row, "score", signedIn), listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
+    .filter((fact) => fact && fact !== "—" && fact !== "Not on file");
+}
+
+function shownText(row: ListRow, id: ListColumnId, signedIn: boolean) {
+  return listCellText(row, id, signedIn);
 }

@@ -7,11 +7,11 @@ export type CategoryId = (typeof CATEGORY_IDS)[number];
 export type Categories = Record<CategoryId, boolean>;
 
 /**
- * Car washes and auto service are the working set. Quick lube, land parcels, and
+ * Car washes, quick lube, and auto service are the working set. Land parcels and
  * c-stores stay off until a link or the Filters panel turns them on.
  *
- * `cats` is the shareable choice (`cats=wash|auto`). A missing `cats` is car washes
- * and auto service. Older links still opt in: `landlayer=1` turns Land on, and
+ * `cats` is the shareable choice (`cats=wash|lube|auto`). A missing `cats` is car washes,
+ * quick lube, and auto service. Older links still opt in: `landlayer=1` turns Land on, and
  * `cstore=1` turns C-stores on. Nothing was stored locally for the old "a chosen
  * stage includes land" rule, so there is no preference to migrate the way pin
  * labels needed.
@@ -24,7 +24,7 @@ export function parseCategories(input: {
   if (input.cats == null || input.cats === "") {
     return {
       wash: true,
-      lube: false,
+      lube: true,
       auto: true,
       land: input.landlayer === "1",
       store: input.cstore === "1",
@@ -42,7 +42,7 @@ export function parseCategories(input: {
 }
 
 export function defaultCategories(): Categories {
-  return { wash: true, lube: false, auto: true, land: false, store: false };
+  return { wash: true, lube: true, auto: true, land: false, store: false };
 }
 
 /** Null when the choice is the default, so the URL stays clean. `none` means every category is off. */

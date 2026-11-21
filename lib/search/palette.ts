@@ -51,7 +51,7 @@ function hiddenDeal(deal: DealSource, options: SearchOptions): boolean {
   if (options.cStores !== true && store) return true;
   if (options.land !== true && deal.kind === "land") return true;
   if (options.auto === false && deal.kind === "pipeline" && isAutoBusinessType(deal.business_type)) return true;
-  if (options.lube !== true && deal.kind === "pipeline" && isQuickLube(deal.business_type)) return true;
+  if (options.lube === false && deal.kind === "pipeline" && isQuickLube(deal.business_type)) return true;
   return false;
 }
 

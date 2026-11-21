@@ -1708,7 +1708,7 @@ export default function Explorer() {
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
   if (!categories.wash) activeFilters.push({ id: "wash", label: "Car washes off", clear: () => setCategory("wash", true) });
-  if (categories.lube) activeFilters.push({ id: "lube", label: QUICK_LUBE_LABEL, clear: () => setCategory("lube", false) });
+  if (!categories.lube) activeFilters.push({ id: "lube", label: "Quick lube off", clear: () => setCategory("lube", true) });
   if (!categories.auto) activeFilters.push({ id: "auto", label: "Auto service off", clear: () => setCategory("auto", true) });
   if (categories.land) activeFilters.push({ id: "landcat", label: "Land", clear: () => setCategory("land", false) });
   if (categories.store) activeFilters.push({ id: "store", label: "C-stores", clear: () => setCategory("store", false) });
@@ -2731,7 +2731,7 @@ export default function Explorer() {
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
             <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of open land. A smaller site has about 4,000. Open land is leftover land on an operating wash. It is not a vacant parcel.</p>
-            <p>Filters chooses the working set. Car washes and auto service are on. Quick lube, land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
+            <p>Filters chooses the working set. Car washes, quick lube, and auto service are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
             <p>Power sits beside open land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
             <p>Deals contacted, beside Universe, counts deals in the categories you have on, in this city, with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>

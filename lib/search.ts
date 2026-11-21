@@ -101,7 +101,7 @@ export type SearchOptions = {
   land?: boolean;
   /** Auto service deals stay in suggestions unless this is false. The category is on by default. */
   auto?: boolean;
-  /** Quick lube deals stay out of suggestions until that category is on. */
+  /** Quick lube deals stay in suggestions unless this is false. The category is on by default. */
   lube?: boolean;
 };
 
@@ -138,7 +138,7 @@ export function collectSearchHits(
   const cStores = options.cStores === true;
   const landOn = options.land === true;
   const autoOn = options.auto !== false;
-  const lubeOn = options.lube === true;
+  const lubeOn = options.lube !== false;
   const hiddenStore = (deal: DealHitSource) => deal.is_c_store === true || isPipelineStore(deal);
   const hiddenLand = (deal: DealHitSource) => deal.kind === "land";
   const hiddenAuto = (deal: DealHitSource) => deal.kind === "pipeline" && isAutoBusinessType(deal.business_type);

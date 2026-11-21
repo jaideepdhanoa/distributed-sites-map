@@ -38,11 +38,11 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await page.locator("button.tool", { hasText: "Filters" }).click();
   const panel = page.getByRole("dialog", { name: "Filters" });
   await expect(panel.getByTestId("wash-category")).toBeChecked();
-  await expect(panel.getByTestId("lube-category")).not.toBeChecked();
-  await expect(panel.getByText("Quick lube sites. Off until you turn them on.")).toBeVisible();
+  await expect(panel.getByTestId("lube-category")).toBeChecked();
+  await expect(panel.getByText("Quick lube sites. On with car washes.")).toBeVisible();
   await panel.getByTestId("lube-category").click();
-  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)lube(?:%7C|\|)auto(?:&|$)/);
-  await expect(page.locator(".active-row").getByRole("button", { name: "Quick lube" })).toBeVisible();
+  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)auto(?:&|$)/);
+  await expect(page.locator(".active-row").getByRole("button", { name: "Quick lube off" })).toBeVisible();
   await panel.getByTestId("lube-category").click();
   await expect(page).not.toHaveURL(/[?&]cats=/);
   await expect(panel.getByTestId("auto-category")).toBeChecked();
@@ -63,7 +63,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(both.deskTotal));
 
   await panel.getByTestId("auto-category").click();
-  await expect(page).toHaveURL(/[?&]cats=wash(?:&|$)/);
+  await expect(page).toHaveURL(/[?&]cats=wash(?:%7C|\|)lube(?:&|$)/);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(washes.deskTotal));
   await expect(page.locator("nav.funnel").getByRole("button", { name: /Desk screen/ })).toContainText(String(washes.deskTotal));
   await expect(list).not.toContainText("Owner-operated repair shop");
@@ -71,7 +71,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
 
   await panel.getByTestId("wash-category").click();
   await panel.getByTestId("auto-category").click();
-  await expect(page).toHaveURL(/[?&]cats=auto(?:&|$)/);
+  await expect(page).toHaveURL(/[?&]cats=lube(?:%7C|\|)auto(?:&|$)/);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(autos.deskTotal));
   await expect(list).toContainText("Owner-operated repair shop");
   await expect(list).not.toContainText("Majestic Car Wash");
@@ -104,8 +104,8 @@ test("the preview comment button stays off phone sheets and list actions", async
   await expect(button).toHaveCSS("display", "none");
   expect(await overlaps(button, filters)).toBe(false);
   await expect(filters.getByTestId("auto-category")).toBeChecked();
-  await expect(filters.getByTestId("lube-category")).not.toBeChecked();
-  await expect(filters.getByText("Quick lube sites. Off until you turn them on.")).toBeVisible();
+  await expect(filters.getByTestId("lube-category")).toBeChecked();
+  await expect(filters.getByText("Quick lube sites. On with car washes.")).toBeVisible();
   await expect(filters.getByText("Unscreened market listings")).toBeVisible();
   await page.getByRole("button", { name: "Close filters" }).click();
   await expect(button).toHaveCSS("display", "block");

@@ -73,8 +73,8 @@ test("quick lube uses the car wash census steps and a short chip", () => {
   assert.equal(inStage(site, "universe"), true);
   assert.equal(inStage(site, "in_area"), true);
   const links = landLinks([]);
-  assert.equal(siteInCategories(site, links, defaultCategories()), false);
-  assert.equal(siteInCategories(site, links, { ...defaultCategories(), lube: true }), true);
+  assert.equal(siteInCategories(site, links, defaultCategories()), true);
+  assert.equal(siteInCategories(site, links, { ...defaultCategories(), lube: false }), false);
   const outside = quickLubeCensusSite({
     universeId: "WB-PHX-9002",
     siteId: "PIPE-PHX-9002",

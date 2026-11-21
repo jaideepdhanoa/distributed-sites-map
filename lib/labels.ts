@@ -89,11 +89,11 @@ export function isQuickLube(value: string | null | undefined): boolean {
   return (value || "").trim().toLowerCase() === QUICK_LUBE_LABEL.toLowerCase();
 }
 
-export const CENSUS_NOTE = "Car washes. Auto service is on for pipeline deals. Quick lube, land parcels, and c-stores stay off until you turn those categories on.";
+export const CENSUS_NOTE = "Car washes and quick lube. Auto service is on for pipeline deals. Land parcels and c-stores stay off until you turn those categories on.";
 
 export const CATEGORY_NOTES = {
   wash: "Operating car washes. This is the usual view.",
-  lube: "Quick lube sites. Off until you turn them on.",
+  lube: "Quick lube sites. On with car washes.",
   auto: "Auto repair and tire and lube. An auto center belongs here once it is typed Auto repair.",
   land: "Vacant parcels, such as LAND-PHX. Not spare land on a wash.",
   store: "Fuel and convenience stores. Off until you turn them on.",
@@ -107,7 +107,7 @@ export const SPARE_LAND_NOTE = "Leftover land on an operating wash. This does no
 
 export const SUMMARY_NOTES = {
   universe: "Candidates have spare land inside the service area. Cleared sites passed the county check.",
-  pipeline: "Deals in the categories you have on. Car washes and auto service are the usual view. Quick lube, land parcels, and c-stores stay off until you turn them on. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
+  pipeline: "Deals in the categories you have on. Car washes, quick lube, and auto service are the usual view. Land parcels and c-stores stay off until you turn them on. Desk screen is the first step. Dropped deals are no longer pursued. Deals contacted means an outbound email or call is on file. It is not a stage.",
 };
 
 const STAGE_TITLES: Record<string, string> = {

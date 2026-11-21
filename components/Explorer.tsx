@@ -35,7 +35,7 @@ import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, 
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
-import { inCountedMarket, labeledCount, marketCounts, reviewBadge, stepParts } from "@/lib/counts";
+import { inCountedMarket, labeledCount, marketCounts, reviewBadge } from "@/lib/counts";
 import { scoreIssue } from "@/lib/scoreDisplay";
 import type { SpaceShape } from "./spaces/SpacePopover";
 import { siteSpaceChange } from "@/lib/spaces/change";
@@ -493,7 +493,7 @@ export default function Explorer() {
     window.localStorage.setItem(FUNNEL_STORAGE, next);
     window.localStorage.setItem(FUNNEL_VERSION_KEY, FUNNEL_VERSION);
     setFunnelPref({ version: FUNNEL_VERSION, value: next });
-    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null });
+    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null });
   }
 
   function chooseBasemap(next: "positron" | "satellite") {
@@ -2121,10 +2121,11 @@ export default function Explorer() {
             }) : (
               <>
                 {PIPE_STEPS.map((step, index) => {
-                  const here = dealRows.filter((deal) => inFunnelMarket(deal) && dealOnPipeStep(deal, step.id, reach));
-                  const parts = stepParts(here, step.id);
-                  const brokerHere = here.filter((deal) => deal.broker_contacted).length;
-                  const note = `${FUNNEL_NOTES[step.id]} Operating ${parts.operating.toLocaleString("en-US")}. Land ${parts.land.toLocaleString("en-US")}.${brokerHere ? ` ${brokerHere.toLocaleString("en-US")} contacted.` : ""}`;
+                  const operatingRows = dealRows.filter((deal) => deal.kind !== "land" && inFunnelMarket(deal) && dealOnPipeStep(deal, step.id, reach));
+                  const landRows = dealRows.filter((deal) => deal.kind === "land" && !isProtectedId(deal.deal_id) && shownInMarket(deal.city) && dealOnPipeStep(deal, step.id, reach) && (!who || partyMatch(who, deal.broker, deal.firm)) && (!query || dealQueryHit(deal)));
+                  const parts = { operating: operatingRows.length, land: landRows.length };
+                  const brokerHere = [...operatingRows, ...landRows].filter((deal) => deal.broker_contacted).length;
+                  const note = `${FUNNEL_NOTES[step.id]} Operating ${parts.operating.toLocaleString("en-US")}. Land ${parts.land.toLocaleString("en-US")}. Land stays counted when that filter is off.${brokerHere ? ` ${brokerHere.toLocaleString("en-US")} contacted.` : ""}`;
                   const selected = !outsideGroup && !allPipes && !pipelineWide && pipeStage === step.id;
                   return (
                     <Fragment key={step.id}>
@@ -2133,7 +2134,7 @@ export default function Explorer() {
                         <button className={selected ? "chip on" : "chip"} type="button" aria-current={selected ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id, outside: null }, true)}>
                           <span>{step.label}</span>
                           <strong>{parts.operating.toLocaleString("en-US")}</strong>
-                          {parts.land ? <span className="split">{parts.land.toLocaleString("en-US")} land</span> : null}
+                          <span className="split land-count" data-testid={`land-beside-${step.id}`}>{parts.land ? `+${parts.land.toLocaleString("en-US")} land` : "+0 land"}</span>
                         </button>
                       </span>
                     </Fragment>

@@ -111,7 +111,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
     });
     if (view.status === "not_scored") return "Not scored";
     if (view.status === "provisional") return `Provisional ${view.summed}`;
-    return view.total || "—";
+    return view.chip || "—";
   }
   if (id === "asking") {
     if (!signedIn) return "—";

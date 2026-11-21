@@ -52,6 +52,9 @@ test("a disagreeing score is provisional and a blank economics cell is not score
   const blank = storedScoreView({ score: 10, economics: null, land: 5, power: 5, location: 0, deal: 0 });
   assert.equal(blank.chip, "Not scored");
   assert.equal(scoreIssue({ score: 10, economics: null, land: 5, power: 5, location: 0, deal: 0 }), true);
+  const rounded = storedScoreView({ score: 47.12, economics: 4.62, land: 25, power: 7.5, location: 5, deal: 5 });
+  assert.equal(rounded.status, "scored");
+  assert.equal(rounded.chip, "47.1");
 });
 
 test("a snapshot change names the refresh, and a proposal names its clock", () => {

@@ -181,7 +181,7 @@ function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps |
         <strong data-testid="score-chip" title={`Stored total ${view.total}. Parts sum to ${view.summed}.`}>
           <span className="chip">Provisional</span> {view.summed}
         </strong>
-      ) : <strong data-testid="score-chip">{view.total || "—"}</strong>}
+      ) : <strong data-testid="score-chip" title={view.total && view.total !== view.chip ? `Stored total ${view.total}` : undefined}>{view.chip || "—"}</strong>}
       <p className="score-parts" data-testid="score-parts">{view.line}</p>
       <button type="button" className="text-link" data-testid="score-breakdown" aria-expanded={open} onClick={() => setPinned((value) => !value)}>
         {pinned ? "Hide breakdown" : "Breakdown"}

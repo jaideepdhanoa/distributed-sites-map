@@ -99,15 +99,19 @@ export function storedScoreView(input: StoredScoreInput): {
   const totalNumber = pointNumber(input.score);
   const economicsMissing = !input.naEconomics && numbers.economics == null;
   const present = ORDER.filter((id) => !(id === "economics" && input.naEconomics)).map((id) => numbers[id]);
-  const summedNumber = present.every((value) => value != null) ? present.reduce((sum, value) => sum + (value || 0), 0) : null;
-  const mismatch = !economicsMissing && totalNumber != null && summedNumber != null && Math.abs(summedNumber - totalNumber) > 0.05;
+  // Parts are shown to one decimal. Compare that shown sum with the total at the same decimal.
+  const shownSum = present.every((value) => value != null)
+    ? present.reduce((sum, value) => sum + Number(formatPoints(value || 0)), 0)
+    : null;
+  const shownTotal = totalNumber == null ? null : Number(formatPoints(totalNumber));
+  const mismatch = !economicsMissing && shownTotal != null && shownSum != null && Math.abs(shownSum - shownTotal) > 0.001;
   const total = displayScore(input.score);
-  const summed = summedNumber == null ? "" : formatPoints(summedNumber);
+  const summed = shownSum == null ? "" : formatPoints(shownSum);
   const status = economicsMissing ? "not_scored" : mismatch ? "provisional" : "scored";
   return {
     total,
     summed,
-    chip: status === "not_scored" ? "Not scored" : status === "provisional" ? "Provisional" : total,
+    chip: status === "not_scored" ? "Not scored" : status === "provisional" ? "Provisional" : shownTotal == null ? "" : formatPoints(totalNumber as number),
     status,
     line: parts.map((part) => `${part.label} ${part.shown}/${part.max}`).join(" · "),
     parts,

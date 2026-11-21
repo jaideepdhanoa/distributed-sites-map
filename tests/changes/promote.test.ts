@@ -190,3 +190,19 @@ test("the duplicate repair lists ids and retires the extra row", async () => {
   assert.equal(retired.rows.length, 1);
   assert.equal(site.rows[0]?.universe_id, "WB-PHX-0229");
 });
+
+test("a trailing zip on only one address still folds, and two zips do not", async () => {
+  const sql = await memorySql();
+  await migrate(sql);
+  await sql.query(
+    `INSERT INTO universe_rows (universe_id, market, site_id, name, address, apn, address_key, created_by)
+     VALUES
+       ('WB-PHX-0229', 'PHX', '', 'Sample Lube', '900 Placeholder Lane, Phoenix, AZ 85001', '', '900 placeholder lane phoenix az 85001', 'muse'),
+       ('WB-PHX-0270', 'PHX', 'PIPE-PHX-0094', 'Sample Lube', '900 Placeholder Lane, Phoenix, AZ', '111-22-333', '', 'muse')`,
+  );
+  const plan = await planUniverseFolds(sql);
+  assert.equal(formatUniverseFolds(plan), "PIPE-PHX-0094 WB-PHX-0270 -> WB-PHX-0229");
+  assert.equal(formatUniverseFolds(plan).includes("Placeholder"), false);
+  await sql.query(`UPDATE universe_rows SET address = '900 Placeholder Lane, Phoenix, AZ 85002' WHERE universe_id = 'WB-PHX-0270'`);
+  assert.equal(formatUniverseFolds(await planUniverseFolds(sql)), "No duplicate Universe rows.");
+});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { LISTING_SEARCH_MESSAGE, listingSearchPage } from "../../lib/listingUrl";
-import { factConflicts, normalizeApn } from "../../lib/universeMatch";
+import { factConflicts, normalizeApn, samePlaceAddress } from "../../lib/universeMatch";
 
 test("a search page is rejected and a property page is kept", () => {
   assert.equal(listingSearchPage("https://www.crexi.com/search?types=retail"), true);
@@ -23,4 +23,8 @@ test("facts conflict only when both sides name a different value", () => {
   assert.deepEqual(factConflicts({ bay_count: "4" }, { bay_count: "4" }), []);
   assert.deepEqual(factConflicts({}, { bay_count: "4" }), []);
   assert.equal(normalizeApn("123-45-678"), "12345678");
+  assert.equal(samePlaceAddress("900 Placeholder Lane, Phoenix, AZ", "900 Placeholder Lane, Phoenix, AZ 85001"), true);
+  assert.equal(samePlaceAddress("900 Placeholder Lane, Phoenix, AZ 85001", "900 Placeholder Lane, Phoenix, AZ 85002"), false);
+  assert.equal(samePlaceAddress("900 Placeholder Lane", "400 Other Lane, Phoenix, AZ 85001"), false);
+  assert.equal(samePlaceAddress("", "900 Placeholder Lane"), false);
 });

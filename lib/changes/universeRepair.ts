@@ -1,6 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
-import { normalizeAddress } from "@/lib/quickLube";
-import { normalizeApn } from "@/lib/universeMatch";
+import { normalizeApn, samePlaceAddress } from "@/lib/universeMatch";
 
 export const UNIVERSE_REPAIR_CONFIRM = "repair-universe-duplicates";
 
@@ -31,11 +30,10 @@ export async function planUniverseFolds(sql: Sql): Promise<UniverseFold[]> {
   const folds: UniverseFold[] = [];
   const claimed = new Set<string>();
   for (const dup of pipes) {
-    const address = normalizeAddress(dup.address);
     const apn = normalizeApn(dup.apn);
     const keep = open.find((row) => {
       if (row.market !== dup.market || row.universe_id === dup.universe_id) return false;
-      if (address && normalizeAddress(row.address) === address) return true;
+      if (samePlaceAddress(row.address, dup.address)) return true;
       return Boolean(apn) && normalizeApn(row.apn) === apn;
     });
     if (!keep || keep.site_id || claimed.has(keep.universe_id)) continue;

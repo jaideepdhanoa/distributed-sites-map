@@ -102,18 +102,25 @@ export async function listProjectEnv(options: VercelClientOptions): Promise<EnvR
   return records;
 }
 
+export type PreviewEnvApply = {
+  narrowed: string[];
+  written: string[];
+};
+
 export function planFromRecords(records: readonly EnvRecord[]): EnvPlan {
   return planPreviewEnv(records, keysForPreviewSplit(records));
 }
 
-export async function applyPreviewEnv(options: VercelClientOptions, records: readonly EnvRecord[], values: ReadonlyMap<string, PreviewValue>): Promise<string[]> {
+export async function applyPreviewEnv(options: VercelClientOptions, records: readonly EnvRecord[], values: ReadonlyMap<string, PreviewValue>): Promise<PreviewEnvApply> {
   const fetchImpl = options.fetchImpl || fetch;
   const token = assertToken(options.token);
   const secrets = [token, ...[...values.values()].map((item) => item.value)];
   for (const value of secrets) options.onSecret?.(value);
   const plan = planFromRecords(records);
+  const narrowed: string[] = [];
   const written: string[] = [];
   for (const step of plan.narrow) {
+    if (!narrowed.includes(step.key)) narrowed.push(step.key);
     const response = await fetchImpl(
       `https://api.vercel.com/v9/projects/${encodeURIComponent(options.projectId)}/env/${encodeURIComponent(step.id)}?${teamQuery(options.teamId)}`,
       {
@@ -142,7 +149,16 @@ export async function applyPreviewEnv(options: VercelClientOptions, records: rea
     await readJson(response, secrets);
     written.push(step.key);
   }
-  return written.sort();
+  const marker = written.indexOf("PREVIEW_DATABASE_BRANCH");
+  if (marker >= 0) {
+    if (!written.includes("DATABASE_URL") || written.indexOf("DATABASE_URL") > marker) {
+      throw new Error("Refusing to set PREVIEW_DATABASE_BRANCH before DATABASE_URL.");
+    }
+    if (!written.includes("NEON_PRODUCTION_HOST") || written.indexOf("NEON_PRODUCTION_HOST") > marker) {
+      throw new Error("Refusing to set PREVIEW_DATABASE_BRANCH before NEON_PRODUCTION_HOST.");
+    }
+  }
+  return { narrowed, written };
 }
 
 export async function projectName(options: VercelClientOptions): Promise<string> {
@@ -158,15 +174,21 @@ export async function projectName(options: VercelClientOptions): Promise<string>
   return name;
 }
 
+/** v6/deployments rejects target=preview. Preview rows are filtered after the response. */
+export function previewDeploymentsQuery(projectId: string, teamId: string): URL {
+  const url = new URL("https://api.vercel.com/v6/deployments");
+  url.searchParams.set("projectId", projectId);
+  url.searchParams.set("teamId", teamId);
+  url.searchParams.set("limit", "20");
+  url.searchParams.set("state", "READY");
+  return url;
+}
+
 export async function latestPreviewDeployment(options: VercelClientOptions): Promise<DeploymentRow | null> {
   const fetchImpl = options.fetchImpl || fetch;
   const token = assertToken(options.token);
-  const url = new URL("https://api.vercel.com/v6/deployments");
-  url.searchParams.set("projectId", options.projectId);
-  url.searchParams.set("teamId", options.teamId);
-  url.searchParams.set("limit", "5");
-  url.searchParams.set("target", "preview");
-  url.searchParams.set("state", "READY");
+  const url = previewDeploymentsQuery(options.projectId, options.teamId);
+  if (url.searchParams.has("target")) throw new Error("Refusing to filter deployments with a target query.");
   const response = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
   const body = (await readJson(response, [token])) as { deployments?: DeploymentRow[] };
   return selectPreviewDeployment(body.deployments || []);

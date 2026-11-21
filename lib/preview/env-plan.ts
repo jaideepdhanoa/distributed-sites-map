@@ -49,13 +49,30 @@ export const ALWAYS_PREVIEW_KEYS = ["DATABASE_URL", "NEON_PRODUCTION_HOST", "PRE
 
 const KEPT_TARGETS = new Set(["production", "development"]);
 
+const WRITE_FIRST = ["DATABASE_URL", "NEON_PRODUCTION_HOST"] as const;
+const WRITE_LAST = "PREVIEW_DATABASE_BRANCH";
+
+/** URL and production host are written before the preview marker. */
+export function orderPreviewWrites(keys: readonly string[]): string[] {
+  const present = new Set(keys);
+  const ordered: string[] = [];
+  for (const key of WRITE_FIRST) {
+    if (present.has(key)) ordered.push(key);
+  }
+  const first = new Set<string>(WRITE_FIRST);
+  const middle = [...present].filter((key) => !first.has(key) && key !== WRITE_LAST).sort();
+  ordered.push(...middle);
+  if (present.has(WRITE_LAST)) ordered.push(WRITE_LAST);
+  return ordered;
+}
+
 export function keysForPreviewSplit(records: readonly EnvRecord[]): string[] {
   const keys = new Set<string>(ALWAYS_PREVIEW_KEYS);
   for (const record of records) {
     if (!MANAGED.has(record.key)) continue;
     if (record.target.includes("preview")) keys.add(record.key);
   }
-  return [...keys].sort();
+  return orderPreviewWrites([...keys]);
 }
 
 function assertKeptTargets(key: string, targets: readonly string[]): void {

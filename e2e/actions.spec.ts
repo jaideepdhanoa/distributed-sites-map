@@ -667,6 +667,82 @@ test("the review queue omits gas stations and c-stores", async ({ request }) => 
   expect(ids).toContain("PIPE-LAS-0016");
 });
 
+test("Discussion Follow toggles and persists", async ({ page, request }) => {
+  await login(request, "contributor");
+  const reset = await request.post("/api/queue/follow", { data: { siteId: deal, follow: false } });
+  expect(reset.ok()).toBeTruthy();
+  await openAs(page, "contributor", `/?site=${deal}&panel=discussion`);
+  const follow = page.getByTestId("discussion-follow");
+  await expect(follow).toBeVisible();
+  await expect(follow).toHaveText("Follow");
+  await follow.click();
+  await expect(follow).toHaveText("Following");
+  await page.reload();
+  await expect(page.getByTestId("discussion-follow")).toHaveText("Following");
+  await page.getByTestId("discussion-follow").click();
+  await expect(page.getByTestId("discussion-follow")).toHaveText("Follow");
+});
+
+test("phone Discussion Follow toggles and persists", async ({ page, request }) => {
+  await login(request, "contributor");
+  const reset = await request.post("/api/queue/follow", { data: { siteId: deal, follow: false } });
+  expect(reset.ok()).toBeTruthy();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAs(page, "contributor", `/?site=${deal}&panel=discussion`);
+  await expect(page.locator(".shell")).toHaveClass(/sheet-full/);
+  const follow = page.getByTestId("discussion-follow");
+  await expect(follow).toBeVisible();
+  await follow.click();
+  await expect(follow).toHaveText("Following");
+  await page.reload();
+  await expect(page.getByTestId("discussion-follow")).toHaveText("Following");
+});
+
+test("a follower gets one comment email and the link opens that comment", async ({ page, request }) => {
+  const body = "Please look at the frontage without a mention.";
+  await login(request, "reviewer");
+  const earlier = await request.post("/api/actions/notes", {
+    data: { targetKind: "deal", targetId: deal, body: "Earlier note from the reviewer." },
+  });
+  expect(earlier.ok()).toBeTruthy();
+  await login(request, "contributor");
+  const posted = await request.post("/api/actions/notes", {
+    data: { targetKind: "deal", targetId: deal, body },
+  });
+  expect(posted.ok()).toBeTruthy();
+  const note = ((await posted.json()) as { note: { id: string } }).note;
+  await openAs(page, "reviewer", "/admin/alerts");
+  const cards = page.getByTestId("would-send").filter({ hasText: body });
+  await expect(cards).toHaveCount(1);
+  const text = await cards.first().innerText();
+  const link = text.match(/https:\/\/\S+/)?.[0] || "";
+  expect(link).toContain(`note=${note.id}`);
+  const target = new URL(link);
+  await page.goto(`${target.pathname}${target.search}`);
+  await expect(page.locator(`[data-note-id="${note.id}"]`)).toBeVisible();
+});
+
+test("turning Comments off stops the follower email", async ({ page, request }) => {
+  await login(request, "reviewer");
+  const current = await request.get("/api/alerts/preferences");
+  expect(current.ok()).toBeTruthy();
+  const prefs = ((await current.json()) as { preferences: Record<string, string> }).preferences;
+  const saved = await request.put("/api/alerts/preferences", { data: { ...prefs, comments: "off" } });
+  expect(saved.ok()).toBeTruthy();
+  await openAs(page, "reviewer", "/?alerts=1");
+  const row = page.getByRole("group", { name: "Comments" });
+  await expect(row).toBeVisible();
+  await expect(row.getByRole("button", { name: "Off" })).toHaveClass(/on/);
+  const quiet = "This later note should stay quiet.";
+  await login(request, "contributor");
+  const posted = await request.post("/api/actions/notes", {
+    data: { targetKind: "deal", targetId: deal, body: quiet },
+  });
+  expect(posted.ok()).toBeTruthy();
+  await openAs(page, "reviewer", "/admin/alerts");
+  await expect(page.getByTestId("would-send").filter({ hasText: quiet })).toHaveCount(0);
+});
+
 function dealProps(payload: { features?: { properties?: { deal_id?: string; stage?: string; stage_group?: string; stage_pending?: string } }[] }, id: string) {
   return payload.features?.find((item) => item.properties?.deal_id === id)?.properties;
 }

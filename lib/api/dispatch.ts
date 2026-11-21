@@ -142,7 +142,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/logout", { POST: logout.POST as Handler }),
   route("/api/me", { GET: me.GET as Handler }),
   route("/api/queue/flag", { POST: queueFlag.POST as Handler }),
-  route("/api/queue/follow", { POST: queueFollow.POST as Handler }),
+  route("/api/queue/follow", { GET: queueFollow.GET as Handler, POST: queueFollow.POST as Handler }),
   route("/api/queue/mentions", { POST: queueMentions.POST as Handler }),
   route("/api/queue/snooze", { POST: queueSnooze.POST as Handler }),
   route("/api/queue", { GET: queue.GET as Handler, POST: queue.POST as Handler }),

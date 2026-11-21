@@ -59,6 +59,8 @@ async function ready() {
     "024_power_rating.sql",
     "025_site_mint.sql",
     "026_universe_census.sql",
+    "027_alert_comments.sql",
+    "028_alert_follow_all.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

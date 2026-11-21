@@ -21,6 +21,7 @@ export type TestAlertResult = {
 const SAMPLE_NOTES: Record<MailItem["category"], string> = {
   approvals: "Please review the next step on this sample site.",
   mentions: "Please take a look at this sample note.",
+  comments: "A sample comment on a followed site.",
   replies: "Adding a sample reply on the thread.",
   flags: "Flagging this sample site for a closer look.",
   assignments: "This sample site is assigned to you.",

@@ -1,10 +1,12 @@
 import { resolveActionRole, type ActionRole } from "@/lib/actions/roles";
 import type { Sql } from "@/lib/actions/db";
 import { getUsers } from "@/lib/users";
+import { isOwnerAccount } from "./owner";
 
 export const ALERT_CATEGORIES = [
   "approvals",
   "mentions",
+  "comments",
   "replies",
   "flags",
   "assignments",
@@ -17,9 +19,13 @@ export const ALERT_CATEGORIES = [
 export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
 export type AlertMode = "instant" | "digest" | "off";
 
-export type AlertPreferences = Record<AlertCategory, AlertMode> & { followed: AlertMode };
+export type AlertPreferences = Record<AlertCategory, AlertMode> & { followed: AlertMode; followAll: boolean };
 
-const PREFERENCE_FIELDS = [...ALERT_CATEGORIES, "followed"] as const;
+const PREFERENCE_FIELDS = [
+  ...ALERT_CATEGORIES.map((key) => ({ column: key, key })),
+  { column: "followed", key: "followed" as const },
+  { column: "follow_all", key: "followAll" as const },
+];
 
 const MODES = new Set<AlertMode>(["instant", "digest", "off"]);
 
@@ -28,7 +34,8 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
     return {
       approvals: "instant",
       mentions: "instant",
-      replies: "digest",
+      comments: "instant",
+      replies: "instant",
       flags: "instant",
       assignments: "instant",
       recommendations: "digest",
@@ -37,12 +44,14 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
       stages: "digest",
       asks: "digest",
       followed: "digest",
+      followAll: false,
     };
   }
   if (role === "contributor") {
     return {
       approvals: "off",
       mentions: "instant",
+      comments: "digest",
       replies: "digest",
       flags: "instant",
       assignments: "instant",
@@ -52,11 +61,13 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
       stages: "digest",
       asks: "digest",
       followed: "digest",
+      followAll: false,
     };
   }
   return {
     approvals: "off",
     mentions: "instant",
+    comments: "off",
     replies: "off",
     flags: "off",
     assignments: "off",
@@ -66,17 +77,26 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
     stages: "off",
     asks: "off",
     followed: "off",
+    followAll: false,
   };
 }
 
 export function preferencesForRole(username: string): AlertPreferences | null {
   const user = getUsers().find((item) => item.u === username.trim().toLowerCase());
   if (!user) return null;
-  return defaultPreferences(resolveActionRole(user));
+  const prefs = defaultPreferences(resolveActionRole(user));
+  if (isOwnerAccount(user.u)) prefs.followAll = true;
+  return prefs;
 }
 
 function mode(value: unknown, fallback: AlertMode): AlertMode {
   return typeof value === "string" && MODES.has(value as AlertMode) ? (value as AlertMode) : fallback;
+}
+
+function followAllFlag(value: unknown, fallback: boolean): boolean {
+  if (value === true || value === "on") return true;
+  if (value === false || value === "off") return false;
+  return fallback;
 }
 
 export function parsePreferences(value: unknown, fallback: AlertPreferences): AlertPreferences {
@@ -84,6 +104,7 @@ export function parsePreferences(value: unknown, fallback: AlertPreferences): Al
   return {
     approvals: mode(row.approvals, fallback.approvals),
     mentions: mode(row.mentions, fallback.mentions),
+    comments: mode(row.comments, fallback.comments),
     replies: mode(row.replies, fallback.replies),
     flags: mode(row.flags, fallback.flags),
     assignments: mode(row.assignments, fallback.assignments),
@@ -93,6 +114,7 @@ export function parsePreferences(value: unknown, fallback: AlertPreferences): Al
     stages: mode(row.stages, fallback.stages),
     asks: mode(row.asks, fallback.asks),
     followed: mode(row.followed, fallback.followed),
+    followAll: followAllFlag(row.follow_all ?? row.followAll, fallback.followAll),
   };
 }
 
@@ -112,20 +134,23 @@ export async function loadPreferences(sql: Sql, userId: string): Promise<AlertPr
     [userId],
   );
   const stored = rows.rows[0];
-  return stored ? parsePreferences(stored, base) : base;
+  const prefs = stored ? parsePreferences(stored, base) : base;
+  if (!isOwnerAccount(userId)) prefs.followAll = false;
+  return prefs;
 }
 
 export async function savePreferences(sql: Sql, userId: string, value: unknown): Promise<AlertPreferences | null> {
   const base = preferencesForRole(userId);
   if (!base) return null;
   const next = parsePreferences(value, base);
+  if (!isOwnerAccount(userId)) next.followAll = false;
   const have = await storedColumns(sql);
-  const fields = PREFERENCE_FIELDS.filter((field) => have.has(field));
-  const columns = ["user_id", ...fields, "updated_at"];
-  const values: unknown[] = [userId, ...fields.map((field) => next[field])];
+  const fields = PREFERENCE_FIELDS.filter((field) => have.has(field.column));
+  const columns = ["user_id", ...fields.map((field) => field.column), "updated_at"];
+  const values: unknown[] = [userId, ...fields.map((field) => field.key === "followAll" ? (next.followAll ? "on" : "off") : next[field.key])];
   const marks = values.map((_, index) => `$${index + 1}`);
   marks.push("now()");
-  const assignments = fields.map((field) => `${field} = EXCLUDED.${field}`);
+  const assignments = fields.map((field) => `${field.column} = EXCLUDED.${field.column}`);
   assignments.push("updated_at = now()");
   await sql.query(
     `INSERT INTO alert_preferences (${columns.join(", ")})

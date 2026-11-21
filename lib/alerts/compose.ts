@@ -17,6 +17,7 @@ export type MailItem = {
 const LABELS: Record<MailItem["category"], string> = {
   approvals: "Approval",
   mentions: "Mention",
+  comments: "Comment",
   replies: "Reply",
   flags: "Flag",
   assignments: "Assignment",

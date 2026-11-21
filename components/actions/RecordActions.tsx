@@ -129,6 +129,15 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     };
   }, [status.enabled, kind, id]);
 
+  useEffect(() => {
+    const noteId = new URLSearchParams(window.location.search).get("note");
+    if (!noteId) return;
+    const node = document.querySelector(`[data-note-id="${CSS.escape(noteId)}"]`);
+    if (!(node instanceof HTMLElement)) return;
+    if (node instanceof HTMLDetailsElement) node.open = true;
+    node.scrollIntoView({ block: "center" });
+  }, [notes]);
+
   if (!status.enabled) return null;
 
   async function submit(path: string, body: unknown, clear: () => void, method = "POST") {
@@ -369,9 +378,52 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
       ) : (
         <p className="note">Notes are read only for this login.</p>
       )}
+      <FollowSite siteId={id} />
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
       <RoleLine role={status.actionRole} />
     </section>
+  );
+}
+
+function FollowSite({ siteId }: { siteId: string }) {
+  const [on, setOn] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancel = false;
+    const load = () => {
+      // A follow miss must not trip the actions circuit. That circuit would hide notes.
+      fetch(`/api/queue/follow?siteId=${encodeURIComponent(siteId)}`, { cache: "no-store" }).then(async (response) => {
+        if (cancel || !response.ok) return;
+        const body = (await response.json()) as { follow?: boolean };
+        if (!cancel) {
+          setOn(Boolean(body.follow));
+          setReady(true);
+        }
+      }).catch(() => undefined);
+    };
+    load();
+    window.addEventListener("queue-refresh", load);
+    return () => {
+      cancel = true;
+      window.removeEventListener("queue-refresh", load);
+    };
+  }, [siteId]);
+  async function toggle() {
+    const next = !on;
+    setOn(next);
+    const response = await fetch("/api/queue/follow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ siteId, follow: next }),
+    });
+    if (!response.ok) setOn(!next);
+    window.dispatchEvent(new Event("queue-refresh"));
+  }
+  if (!ready) return null;
+  return (
+    <button type="button" className="paper-btn" data-testid="discussion-follow" aria-pressed={on} onClick={() => void toggle()}>
+      {on ? "Following" : "Follow"}
+    </button>
   );
 }
 
@@ -423,6 +475,7 @@ function NoteThread({
       className="act-thread"
       open={!note.resolvedAt && !mentionedMe}
       data-testid="note-thread"
+      data-note-id={note.id}
       onToggle={(event) => { if (event.currentTarget.open) onOpen(note.id); }}
     >
       <summary className="disclosure">
@@ -515,7 +568,7 @@ function ReplyLine({
   const [draftMentions, setDraftMentions] = useState<Account[]>(note.mentions || []);
   const [confirming, setConfirming] = useState(false);
   return (
-    <li>
+    <li data-note-id={note.id}>
       {note.deleted ? <p className="note">Removed</p> : editing ? (
         <form onSubmit={(event) => { event.preventDefault(); onEdit(note.id, draft, draftMentions.map((item) => item.id)); setEditing(false); }}>
           <MentionField label="Edit reply" value={draft} onChange={setDraft} mentions={draftMentions} onMentions={setDraftMentions} accounts={accounts} testId={`edit-${note.id}`} rows={2} maxLength={2000} />

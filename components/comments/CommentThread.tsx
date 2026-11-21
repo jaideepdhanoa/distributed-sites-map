@@ -74,6 +74,14 @@ export default function CommentThread({
   }, [notes]);
 
   useEffect(() => {
+    const noteId = new URLSearchParams(window.location.search).get("note");
+    if (!noteId) return;
+    const node = document.querySelector(`[data-note-id="${CSS.escape(noteId)}"]`);
+    if (!(node instanceof HTMLElement)) return;
+    node.scrollIntoView({ block: "center" });
+  }, [loaded]);
+
+  useEffect(() => {
     if (preview || notes) return undefined;
     let cancel = false;
     const pull = () => {
@@ -173,7 +181,7 @@ export default function CommentThread({
         const replies = loaded.filter((item) => item.parentId === note.id && !item.deleted);
         const question = note.brokerQuestion || (note.tag === "ask_broker" ? suggestBrokerQuestion(anchor) : "");
         return (
-          <article key={note.id} className="act-thread" data-testid="comment-thread-item">
+          <article key={note.id} className="act-thread" data-testid="comment-thread-item" data-note-id={note.id}>
             <p className="note">
               <strong>{name(note.authorId)}</strong>
               {` · ${formatPacific(note.createdAt)}`}

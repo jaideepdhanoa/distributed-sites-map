@@ -1,4 +1,5 @@
 import { isResponse, jsonError, jsonOk, openActions } from "@/lib/actions/http";
+import { isOwnerAccount } from "@/lib/alerts/owner";
 import { loadPreferences, savePreferences } from "@/lib/alerts/preferences";
 import { accountEmail } from "@/lib/alerts/recipients";
 
@@ -7,7 +8,7 @@ export async function GET() {
   if (isResponse(session)) return session;
   const result = await (await import("@/lib/actions/db")).withSql((sql) => loadPreferences(sql, session.u));
   if (!result) return jsonError("That account is not available.", 404);
-  return jsonOk({ preferences: result, email: accountEmail(session.u) || "" });
+  return jsonOk({ preferences: result, email: accountEmail(session.u) || "", owner: isOwnerAccount(session.u) });
 }
 
 export async function PUT(request: Request) {
@@ -22,5 +23,5 @@ export async function PUT(request: Request) {
   const { withSql } = await import("@/lib/actions/db");
   const saved = await withSql((sql) => savePreferences(sql, session.u, body));
   if (!saved) return jsonError("That account is not available.", 404);
-  return jsonOk({ preferences: saved, email: accountEmail(session.u) || "" });
+  return jsonOk({ preferences: saved, email: accountEmail(session.u) || "", owner: isOwnerAccount(session.u) });
 }

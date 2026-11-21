@@ -9,7 +9,8 @@ test("role defaults", () => {
   assert.deepEqual(defaultPreferences("reviewer"), {
     approvals: "instant",
     mentions: "instant",
-    replies: "digest",
+    comments: "instant",
+    replies: "instant",
     flags: "instant",
     assignments: "instant",
     recommendations: "digest",
@@ -18,10 +19,12 @@ test("role defaults", () => {
     stages: "digest",
     asks: "digest",
     followed: "digest",
+    followAll: false,
   });
   assert.deepEqual(defaultPreferences("contributor"), {
     approvals: "off",
     mentions: "instant",
+    comments: "digest",
     replies: "digest",
     flags: "instant",
     assignments: "instant",
@@ -31,10 +34,12 @@ test("role defaults", () => {
     stages: "digest",
     asks: "digest",
     followed: "digest",
+    followAll: false,
   });
   assert.deepEqual(defaultPreferences("viewer"), {
     approvals: "off",
     mentions: "instant",
+    comments: "off",
     replies: "off",
     flags: "off",
     assignments: "off",
@@ -44,6 +49,7 @@ test("role defaults", () => {
     stages: "off",
     asks: "off",
     followed: "off",
+    followAll: false,
   });
 });
 
@@ -67,6 +73,8 @@ test("new categories default on and can be saved", async () => {
     assert.equal(defaults?.stages, "digest");
     assert.equal(defaults?.decisions, "instant");
     assert.equal(defaults?.asks, "digest");
+    assert.equal(defaults?.followAll, true);
+    assert.equal(defaults?.comments, "instant");
     const saved = await savePreferences(sql, "jaideep", { ...defaults, stages: "off", recommendations: "digest" });
     assert.equal(saved?.stages, "off");
     const loaded = await loadPreferences(sql, "jaideep");

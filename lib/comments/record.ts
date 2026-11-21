@@ -154,6 +154,8 @@ async function insertComment(sql: Sql, entityId: string, input: CommentWrite): P
     actorId: input.actor,
     refId: entityId,
   });
+  const { autoFollow } = await import("@/lib/queue/follow");
+  await autoFollow(sql, input.actor, input.siteId);
   await notifyNote(sql, {
     noteId: entityId,
     siteId: input.siteId,

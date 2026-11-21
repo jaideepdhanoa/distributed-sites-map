@@ -28,6 +28,8 @@ export type ChangeEvent = {
   type: "new_site" | "stage" | "verdict" | "activity" | "materials" | "price";
   at: string;
   summary: string;
+  /** A workbook refresh. The clock is the refresh, not when the cell changed. */
+  source?: "snapshot";
 };
 
 const VERDICT_LABELS: Record<string, string> = {
@@ -66,6 +68,7 @@ export function diffFeed(input: {
         siteId: site.id,
         type: "new_site",
         at: input.at,
+        source: "snapshot",
         summary: "New pipeline site.",
       });
       continue;
@@ -76,6 +79,7 @@ export function diffFeed(input: {
         siteId: site.id,
         type: "stage",
         at: input.at,
+        source: "snapshot",
         summary: `Stage is now ${site.stage}.`,
       });
     }
@@ -85,6 +89,7 @@ export function diffFeed(input: {
         siteId: site.id,
         type: "verdict",
         at: input.at,
+        source: "snapshot",
         summary: `Verdict is now ${verdictLabel(site.verdict)}.`,
       });
     }
@@ -96,6 +101,7 @@ export function diffFeed(input: {
         siteId: site.id,
         type: "price",
         at: input.at,
+        source: "snapshot",
         summary: `Asking price is ${price}, from ${source}.`,
       });
     }
@@ -109,6 +115,7 @@ export function diffFeed(input: {
         siteId: item.siteId,
         type: "activity",
         at: input.at,
+        source: "snapshot",
         summary: item.summary ? `New activity: ${item.summary}` : "New activity on file.",
       });
     }
@@ -123,6 +130,7 @@ export function diffFeed(input: {
         siteId: item.siteId,
         type: "materials",
         at: input.at,
+        source: "snapshot",
         summary: `${item.label} count is now ${item.count}.`,
       });
     }

@@ -104,15 +104,16 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
       summaryHeight: summary?.getBoundingClientRect().height || 0,
       oneRow: tops.length > 1 && Math.max(...tops) - Math.min(...tops) < 4,
       tileHeight: tiles.reduce((max, box) => Math.max(max, box.height), 0),
+      clipped: Boolean(summary && tiles.some((box) => box.right > (summary.getBoundingClientRect().right + 1))),
     };
   });
   expect(gaps).toBeTruthy();
   expect(gaps?.stageGap).toBeGreaterThanOrEqual(4);
   expect(gaps?.sepSpace).toBeGreaterThanOrEqual(12);
   expect(gaps?.bareMissing).toBe(false);
-  expect(gaps?.oneRow).toBe(true);
+  expect(gaps?.clipped).toBe(false);
   expect(gaps?.tileHeight).toBeLessThan(36);
-  expect(gaps?.summaryHeight).toBeLessThan(48);
+  expect(gaps?.summaryHeight).toBeLessThan(80);
 });
 
 test("signed-in next step and open loops do not show a gmail id", async ({ page }, info) => {

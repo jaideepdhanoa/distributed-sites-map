@@ -1,3 +1,5 @@
+import { droppedChip } from "./counts";
+
 /**
  * Market line under the funnel.
  * Dropped deals are described as hidden only while they are not drawn.
@@ -19,9 +21,7 @@ export function pipelineMapSummary(view: {
 }
 
 /** The All chip counts what the list and map show. Hidden dropped deals stay beside that count. */
-export function pipelineAllCount(shown: number, hiddenDropped: number): { count: string; dropped: string } {
-  return {
-    count: Math.max(0, shown).toLocaleString(),
-    dropped: hiddenDropped > 0 ? `${hiddenDropped.toLocaleString()} dropped` : "",
-  };
+export function pipelineAllCount(shown: number, hiddenDropped: number): { count: string; dropped: string; title: string } {
+  const chip = droppedChip(shown, hiddenDropped);
+  return { count: chip.count, dropped: chip.aside, title: chip.title };
 }

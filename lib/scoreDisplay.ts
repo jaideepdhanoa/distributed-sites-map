@@ -64,6 +64,9 @@ export type ScoreLine = {
  */
 export function storedScoreView(input: StoredScoreInput): {
   total: string;
+  summed: string;
+  chip: string;
+  status: "scored" | "provisional" | "not_scored";
   line: string;
   parts: ScoreLine[];
   mismatch: boolean;
@@ -94,10 +97,22 @@ export function storedScoreView(input: StoredScoreInput): {
     };
   });
   const totalNumber = pointNumber(input.score);
+  const economicsMissing = !input.naEconomics && numbers.economics == null;
   const present = ORDER.filter((id) => !(id === "economics" && input.naEconomics)).map((id) => numbers[id]);
-  const mismatch = totalNumber != null && present.every((value) => value != null) && Math.abs(present.reduce((sum, value) => sum + (value || 0), 0) - totalNumber) > 0.05;
+  // Parts are shown to one decimal. Compare that shown sum with the total at the same decimal.
+  const shownSum = present.every((value) => value != null)
+    ? present.reduce((sum, value) => sum + Number(formatPoints(value || 0)), 0)
+    : null;
+  const shownTotal = totalNumber == null ? null : Number(formatPoints(totalNumber));
+  const mismatch = !economicsMissing && shownTotal != null && shownSum != null && Math.abs(shownSum - shownTotal) > 0.001;
+  const total = displayScore(input.score);
+  const summed = shownSum == null ? "" : formatPoints(shownSum);
+  const status = economicsMissing ? "not_scored" : mismatch ? "provisional" : "scored";
   return {
-    total: displayScore(input.score),
+    total,
+    summed,
+    chip: status === "not_scored" ? "Not scored" : status === "provisional" ? "Provisional" : shownTotal == null ? "" : formatPoints(totalNumber as number),
+    status,
     line: parts.map((part) => `${part.label} ${part.shown}/${part.max}`).join(" · "),
     parts,
     mismatch,
@@ -105,6 +120,12 @@ export function storedScoreView(input: StoredScoreInput): {
 }
 
 /** One decimal, with a trailing .0 removed. The stored cell is not rewritten. */
+/** True when the score chip is Provisional or Not scored. */
+export function scoreIssue(input: StoredScoreInput): boolean {
+  const status = storedScoreView(input).status;
+  return status === "provisional" || status === "not_scored";
+}
+
 export function formatPoints(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   const text = Object.is(rounded, -0) ? "0.0" : rounded.toFixed(1);

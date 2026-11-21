@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { RowLinks } from "../RowLinks";
 import { stageMoveLabel } from "@/lib/actions/nextStepTypes";
 import { quietActionsFetch } from "@/lib/actions/quiet";
-import { formatPacific } from "@/lib/actions/time";
+import { reviewWhen } from "@/lib/queue/when";
 import { reviewSentence } from "@/lib/queue/since";
 import "./queue.css";
 
@@ -86,12 +86,8 @@ export function chipLabel(type: string): string {
   return "Update";
 }
 
-function reasonWhen(at: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(at)) {
-    const [year, month, day] = at.split("-").map(Number);
-    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
-  }
-  return formatPacific(at);
+function reasonWhen(reason: { type: string; at: string }): string {
+  return reviewWhen(reason);
 }
 
 function chips(reasons: QueueReason[]) {
@@ -370,7 +366,7 @@ export function ReviewRail({
         <span className="review-score" title={site.score && site.score !== "—" ? "Workbook score out of 100" : "No score on file"}>{site.score || "—"}</span>
         <span className="review-row-chips">
           {chips(site.reasons).map((chip) => <em key={chip.label}>{chip.label}</em>)}
-          {site.reasons[0] ? <time>{reasonWhen(site.reasons[0].at)}</time> : null}
+          {site.reasons[0] ? <time>{reasonWhen(site.reasons[0])}</time> : null}
         </span>
       </button>
       <RowLinks listing={links?.[site.siteId]?.listing} folder={links?.[site.siteId]?.folder} packageHref={links?.[site.siteId]?.packageHref} />

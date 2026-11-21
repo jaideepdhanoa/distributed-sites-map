@@ -1285,6 +1285,9 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   if (data.photo_refs) fields.photo_refs = photoCanonical(photos);
   const facts: Record<string, string> = {};
   for (const [key, value] of Object.entries(data.facts || {})) {
+    if (key === "score" || key.endsWith("_points")) {
+      throw new InputError(`Change ${index + 1}: Score cells stay in the workbook.`);
+    }
     if (!FACT_FIELDS.includes(key as (typeof FACT_FIELDS)[number]) && key !== POWER_RATING) {
       throw new InputError(`Change ${index + 1}: That field is not accepted.`);
     }

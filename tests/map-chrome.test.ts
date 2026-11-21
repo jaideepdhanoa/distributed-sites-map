@@ -87,8 +87,9 @@ test("the map line calls dropped deals hidden only while they are not drawn", ()
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true }), "23 on the map · 15 dropped on the map");
   assert.equal(pipelineMapSummary({ ...hidden, droppedShown: true, droppedOnly: true }), "15 dropped on the map");
   assert.equal(pipelineMapSummary({ placed: 23, dropped: 19, droppedPlaced: 19, droppedShown: true, droppedOnly: false }).includes("hidden"), false);
-  assert.deepEqual(pipelineAllCount(14, 1), { count: "14", dropped: "1 dropped" });
-  assert.deepEqual(pipelineAllCount(5, 2), { count: "5", dropped: "2 dropped" });
+  assert.equal(pipelineAllCount(14, 1).count, "14");
+  assert.equal(pipelineAllCount(14, 1).dropped, "incl. 1");
+  assert.equal(pipelineAllCount(5, 2).dropped, "incl. 2");
   assert.equal(pipelineAllCount(14, 0).dropped, "");
 });
 

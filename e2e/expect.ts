@@ -218,6 +218,15 @@ export function expectedStageTotal(catalog: Catalog, city: string, step: string,
   return stageDeals(catalog, city, step, options).length;
 }
 
+/** Operating businesses are the step total. Land is counted beside that total. */
+export function expectedStepParts(catalog: Catalog, city: string, step: string, options: { types?: string[] | null; query?: string; cstore?: boolean; land?: boolean; auto?: boolean; wash?: boolean } = {}) {
+  const rows = stageDeals(catalog, city, step, options);
+  return {
+    operating: rows.filter((feature) => feature.properties.kind !== "land").length,
+    land: rows.filter((feature) => feature.properties.kind === "land").length,
+  };
+}
+
 export function unfilteredCount(catalog: Catalog, city: string, stage: string) {
   const links = landLinks(catalog.deals.map((feature) => feature.properties));
   return catalog.sites.filter((feature) => feature.properties.city === city && inStage(present(feature.properties), stage) && siteInCategories(feature.properties, links, defaultCategories())).length;

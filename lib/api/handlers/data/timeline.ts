@@ -4,6 +4,7 @@ import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/gua
 import { listRecordedHistory } from "@/lib/queue/events";
 import { suggestedDropHistory } from "@/lib/suggestedDrop";
 import { overlayTimeline } from "@/lib/changes/read";
+import { latestTouch } from "@/lib/counts";
 import { presentCard, showActivityLines, type TimelineItem } from "@/lib/timeline/filter";
 import { redactGmailPayload } from "@/lib/displayText";
 import { mergeBringBackHistory } from "@/lib/timeline/history";
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
   const ids = [url.searchParams.get("id") || "", url.searchParams.get("related") || ""];
   const card = presentCard(await readTimeline(ids), ids);
   const items = await activityItems(card.items, ids);
-  return NextResponse.json(redactGmailPayload({ ...card, items, showActivityLines: showActivityLines() }), { headers: privateHeaders });
+  const lastTouched = latestTouch(card.lastTouched, items.map((item) => item.date));
+  return NextResponse.json(redactGmailPayload({ ...card, items, lastTouched, showActivityLines: showActivityLines() }), { headers: privateHeaders });
 }
 
 async function activityItems(items: TimelineItem[], ids: string[]): Promise<TimelineItem[]> {

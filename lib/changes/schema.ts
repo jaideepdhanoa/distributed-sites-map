@@ -30,7 +30,7 @@ import { safeGmailLink } from "@/lib/comms";
 import { parseTag, type TagPayload } from "@/lib/tags/parse";
 import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
-import { QUICK_LUBE_FIELDS, quickLubeValueProblem, serviceAreaToken } from "@/lib/quickLube";
+import { QUICK_LUBE_FIELDS, UNIVERSE_CREATE_CATEGORIES, normalizeAddress, quickLubeValueProblem, serviceAreaToken } from "@/lib/quickLube";
 import { coverageOf } from "@/lib/pnl/period";
 import {
   ACTIVITY_TYPES,
@@ -124,7 +124,8 @@ export type CommsPayload = {
 };
 
 export type SiteMint = {
-  kind: "pipeline" | "land";
+  kind: "pipeline" | "land" | "universe";
+  /** L- id for a pipeline or land create. Blank for a universe census row. */
   listing_id: string;
 };
 
@@ -135,7 +136,7 @@ export type SitePayload = {
   facts?: Record<string, string>;
   coord_status?: string;
   photos?: import("./site").PhotoRef[];
-  /** Present only on an agent create. The server mints the site and universe ids. */
+  /** Present only on an agent create. Pipeline and land mint both ids. Universe mints a Universe id. */
   mint?: SiteMint;
 };
 
@@ -228,6 +229,8 @@ export type ParsedChange = {
   preserve_id?: boolean;
   /** The listing id was already minted. Apply returns the stored ids and does not write again. */
   listing_replay?: boolean;
+  /** This market and address were already minted. Apply returns the stored Universe id and does not write again. */
+  universe_replay?: boolean;
   payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload | CommentPayload;
 };
 
@@ -331,7 +334,7 @@ const sitePayload = z
     miles_to_depot: z.number().finite().nullable().optional(),
     notes: z.string().trim().max(400).optional(),
     universe_id: z.string().trim().max(40).optional(),
-    kind: z.enum(["pipeline", "land"]).optional(),
+    kind: z.enum(["pipeline", "land", "universe"]).optional(),
     listing_id: z.string().trim().max(40).optional(),
     listing_status: z.union([z.enum(LISTING_STATUSES), z.literal("")]).optional(),
     folder_url: z.string().trim().max(500).optional(),
@@ -1348,14 +1351,7 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     cleanText(photo.caption);
     cleanText(photo.attribution);
   }
-  let siteMint: SiteMint | undefined;
-  if (mint) {
-    if (data.kind !== "pipeline" && data.kind !== "land") {
-      throw new InputError(`Change ${index + 1}: A new site needs a kind of pipeline or land.`);
-    }
-    const listing = (data.listing_id || "").trim();
-    if (!LISTING_ID.test(listing)) throw new InputError(`Change ${index + 1}: A new site needs a listing id (L-).`);
-    if (gmailId(listing)) throw new InputError(`Change ${index + 1}: A Gmail id cannot be a listing id.`);
+  const requireIdentitySources = () => {
     for (const field of CREATE_IDENTITY_FIELDS) {
       const value = fields[field as SiteField];
       if (value === undefined || value === "") continue;
@@ -1364,7 +1360,31 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
       cleanText(source);
       sources[field] = source;
     }
-    siteMint = { kind: data.kind, listing_id: listing };
+  };
+  let siteMint: SiteMint | undefined;
+  if (mint) {
+    if (data.kind === "universe") {
+      const category = fields.category || "";
+      if (!(UNIVERSE_CREATE_CATEGORIES as readonly string[]).includes(category)) {
+        throw new InputError(`Change ${index + 1}: A universe row needs a category of ${UNIVERSE_CREATE_CATEGORIES.join(" or ")}.`);
+      }
+      if (!normalizeAddress(fields.address || "")) {
+        throw new InputError(`Change ${index + 1}: A universe row needs an address.`);
+      }
+      const listing = (data.listing_id || "").trim();
+      if (listing) throw new InputError(`Change ${index + 1}: A universe row does not take a listing id.`);
+      requireIdentitySources();
+      siteMint = { kind: "universe", listing_id: "" };
+    } else {
+      if (data.kind !== "pipeline" && data.kind !== "land") {
+        throw new InputError(`Change ${index + 1}: A new site needs a kind of pipeline or land.`);
+      }
+      const listing = (data.listing_id || "").trim();
+      if (!LISTING_ID.test(listing)) throw new InputError(`Change ${index + 1}: A new site needs a listing id (L-).`);
+      if (gmailId(listing)) throw new InputError(`Change ${index + 1}: A Gmail id cannot be a listing id.`);
+      requireIdentitySources();
+      siteMint = { kind: data.kind, listing_id: listing };
+    }
   }
   assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class, mint);
   return { fields, sources, facts, photos: data.photo_refs ? photos : undefined, ...(siteMint ? { mint: siteMint } : {}) };

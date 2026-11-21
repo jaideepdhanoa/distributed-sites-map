@@ -434,11 +434,11 @@ A move with no receipt is `400`. A move to any other stage is `403` with `An age
 
 ## One-pass site create
 
-On create, an agent omits `site_id`. The server mints the next `PIPE-{MKT}-NNNN` or `LAND-{MKT}-NNNN` and, in the same transaction, the next Universe id `WB-{MKT}-NNNN`. `kind` is `pipeline` or `land`. `market` is `PHX`, `LAS`, or `MIA`. The numbers stay above ids already stored and above the workbook counters those sheets report. `PIPE-PHX-0006` is never minted.
+On create, an agent omits `site_id`. For `kind` `pipeline` or `land`, the server mints the next `PIPE-{MKT}-NNNN` or `LAND-{MKT}-NNNN` and, in the same transaction, the next Universe id `WB-{MKT}-NNNN`. `market` is `PHX`, `LAS`, or `MIA`. The numbers stay above ids already stored and above the workbook counters those sheets report. `PIPE-PHX-0006` is never minted. A census shop with no listing uses `kind` `universe` instead. That create is below.
 
-`listing_id` is an `L-` id. The same listing id returns the same site id and universe id. A different body for that listing id is `409`. The batch `Idempotency-Key` still replays the whole response when the body is unchanged.
+`listing_id` is an `L-` id on a pipeline or land create. The same listing id returns the same site id and universe id. A different body for that listing id is `409`. The batch `Idempotency-Key` still replays the whole response when the body is unchanged. A pipeline or land create without an `L-` id is `400`.
 
-On this create, the agent may set `name`, `address`, `market`, `category`, `apn`, `lat`, `lng`, `listing_url`, `broker`, and `service_area_class`. Each one that is sent needs `sources.<field>`. `category` is a map business type. `Quick lube` is accepted beside `Car wash`. `service_area_class` is an R-099 class: `inside`, `near_0_5`, `near_5_10`, `outside`, or blank for unclassified. The labels `Inside`, `Near 0-5`, `Near 5-10`, `Outside`, and `Unclassified` are accepted and stored as those tokens. A Quick lube create also writes the Universe row. The Universe funnel counts it when the Quick lube category is on, the same way a car-wash census row is counted. A Quick lube address that matches an existing site or Universe row is `409`. After create, those identity fields stay owner-locked. Folder, photos, land evidence, typed power, check statuses, and financial claims are still rejected on a new row.
+On this create, the agent may set `name`, `address`, `market`, `category`, `apn`, `lat`, `lng`, `listing_url`, `broker`, and `service_area_class`. Each one that is sent needs `sources.<field>`. `category` is a map business type. `Quick lube` is accepted beside `Car wash`. `service_area_class` is an R-099 class: `inside`, `near_0_5`, `near_5_10`, `outside`, or blank for unclassified. The labels `Inside`, `Near 0-5`, `Near 5-10`, `Outside`, and `Unclassified` are accepted and stored as those tokens. A Quick lube listing (`kind` `pipeline` with an `L-` id) also writes the Universe row and opens at Desk screen. A Quick lube address that matches an existing site or Universe row is `409`. After create, those identity fields stay owner-locked. Folder, photos, land evidence, typed power, check statuses, and financial claims are still rejected on a new row.
 
 Optional Quick lube facts live in `facts` and each one that is sent needs `sources.<field>`. A blank fact stays unknown. `brand_type` is `Independent`, `Local chain`, or `National chain`. `owner_verdict` is `Same`, `Different`, or `Unknown`. Counts are `bay_count`, `lift_count`, `lot_sqft`, and `outside_sqft`. Notes are `brand_note` and `outside_note`. `owner_of_record` is the name on the deed. `listing_source` cites the listed status. `source_tag` is the citation for the row and does not need its own source. Depot distance stays `miles_to_depot`. Wash cash flow does not score a Quick lube site.
 
@@ -483,6 +483,60 @@ The response result for that change includes the minted ids:
 
 A human create still sends the site id. This mint path is the agent create.
 
+### Universe census create
+
+A census shop is a Universe row. It is not a Pipeline site. Send `kind` `universe` and omit `site_id` and `listing_id`. The server mints only `WB-{MKT}-NNNN`. It writes `universe_rows` with the quick-lube facts and sources. It does not write `sites`, `site_mints`, a `PIPE-` id, or a Desk screen stage.
+
+`category` is `Quick lube`. Car wash uses this same create once that category is opened. `market` is `PHX`, `LAS`, or `MIA`. `address` is required. A blank address is `400` with `A universe row needs an address.` Each identity field and each quick-lube fact that is sent needs `sources.<field>`, the same as a listing create. `service_area_class` is the R-099 class. The Universe step counts the row. The in-area step counts it when that class is inside the current reach. The row is absent from the Pipeline list and from Pipeline step totals.
+
+Idempotency is the market plus the normalized address. The same body returns the same Universe id, including a retry with a new `Idempotency-Key`. A different body for that address is `409` with `This address was already used for a different universe row.` An address that already belongs to a site is `409` with `This address matches an existing site.` The batch `Idempotency-Key` still replays the whole response when the body is unchanged.
+
+This create does not promote the row into Pipeline. A Pipeline site still comes from the existing `kind` `pipeline` or `land` create, which requires an `L-` listing id.
+
+```json
+{
+  "entity_type": "site",
+  "expected_version": 0,
+  "source": "Sample map",
+  "payload": {
+    "kind": "universe",
+    "market": "PHX",
+    "name": "Sample Lube",
+    "address": "910 Placeholder Lane",
+    "category": "Quick lube",
+    "service_area_class": "Near 0-5",
+    "facts": {
+      "brand_type": "Independent",
+      "bay_count": 4,
+      "owner_verdict": "Unknown",
+      "source_tag": "Sample map, Nov 20, 2026"
+    },
+    "sources": {
+      "name": "Sample map",
+      "market": "Sample map",
+      "address": "Sample map",
+      "category": "Sample map",
+      "service_area_class": "Sample map",
+      "brand_type": "Sample map",
+      "bay_count": "Sample map",
+      "owner_verdict": "Sample map"
+    }
+  }
+}
+```
+
+The response result has the Universe id and no Pipeline id:
+
+```json
+{
+  "entity_type": "site",
+  "entity_id": "WB-PHX-0001",
+  "site_id": "",
+  "universe_id": "WB-PHX-0001",
+  "version": 1
+}
+```
+
 ### Comms relink
 
 An agent can attach an existing comms row whose site id is blank or an `L-` listing id to the new site. Send the comms id, the new site id, the version, and `relink_from` equal to the current value (`""` or the `L-` id). The row stores `relinked_from` and `relinked_by`. A row that already has a `PIPE-` or `LAND-` id is not moved.
@@ -501,4 +555,4 @@ An agent can attach an existing comms row whose site id is blank or an `L-` list
 }
 ```
 
-Tables: `site_mints` and `universe_rows` in `db/migrations/025_site_mint.sql`. Production does not apply this file until the Production migrations workflow runs.
+Tables: `site_mints` and `universe_rows` in `db/migrations/025_site_mint.sql`. Census facts and the address key are in `db/migrations/026_universe_census.sql`. Production does not apply these files until the Production migrations workflow runs.

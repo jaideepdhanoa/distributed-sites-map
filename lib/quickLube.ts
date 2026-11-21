@@ -23,6 +23,12 @@ export const QUICK_LUBE_FIELDS = [
 
 export type QuickLubeField = (typeof QUICK_LUBE_FIELDS)[number];
 
+/**
+ * Census categories a universe create may write.
+ * Quick lube is open. Add "Car wash" here to open that category on the same create.
+ */
+export const UNIVERSE_CREATE_CATEGORIES = ["Quick lube"] as const;
+
 export const QUICK_LUBE_NUMERIC = ["bay_count", "lift_count", "lot_sqft", "outside_sqft"] as const;
 
 const AREA_INPUT: Record<string, string> = {
@@ -103,9 +109,10 @@ function numberOrBlank(value: string | undefined): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-/** A Quick lube Universe row, counted the same way a car-wash census row is counted. */
+/** A census Universe row. Quick lube is counted the same way a car-wash census row is counted. */
 export function quickLubeCensusSite(row: CensusRow): SiteProps | null {
-  if (!isQuickLube(row.category)) return null;
+  const category = (row.category || "").trim();
+  if (!(UNIVERSE_CREATE_CATEGORIES as readonly string[]).includes(category)) return null;
   const id = row.universeId || row.siteId;
   if (!id) return null;
   const area = row.serviceArea || "";
@@ -169,7 +176,7 @@ export function quickLubeCensusSite(row: CensusRow): SiteProps | null {
     is_candidate: true,
     miles_to_depot: numberOrBlank(row.miles),
     linked_deal_id: row.siteId && row.siteId !== id ? row.siteId : undefined,
-    business_type: QUICK_LUBE_LABEL,
+    business_type: isQuickLube(category) ? QUICK_LUBE_LABEL : category,
     evidence: "",
     operating: "",
     agreement: "",

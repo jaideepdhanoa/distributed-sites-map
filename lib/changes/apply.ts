@@ -763,6 +763,9 @@ async function applyOne(
   runId: string,
   mode: "api" | "workbook",
 ): Promise<ChangeResult> {
+  if (change.entity_type === "site" && (change.payload as SitePayload).mint?.kind === "universe") {
+    return applyUniverse(sql, actor, change, idempotencyKey, runId);
+  }
   const tag = change.entity_type === "tag";
   const family = tag ? (change.payload as TagPayload).family : "";
   const siteKeyed = change.entity_type === "stage" || change.entity_type === "site";
@@ -998,6 +1001,7 @@ async function ensureCapture(
   const extra: ChangeResult[] = [];
   for (const change of changes) {
     if (change.entity_type !== "site" || change.expected_version !== 0) continue;
+    if ((change.payload as SitePayload).mint?.kind === "universe") continue;
     if (isExcludedSite(change.site_id)) continue;
     const staged = await sql.query<{ version: number | string }>(`SELECT version FROM site_stages WHERE site_id = $1`, [change.site_id]);
     if (!staged.rows.length) {
@@ -1233,6 +1237,16 @@ async function nextLabeled(sql: Sql, counter: string, prefix: string, scans: str
   return id;
 }
 
+/** Next Universe id for one market. Locks the counter for the transaction. */
+export async function mintUniverseId(sql: Sql, market: string): Promise<string> {
+  const universePrefix = `WB-${market}-`;
+  return nextLabeled(sql, `WB:${market}`, universePrefix, [
+    `SELECT universe_id AS id FROM sites WHERE universe_id LIKE $1`,
+    `SELECT universe_id AS id FROM universe_rows WHERE universe_id LIKE $1`,
+    `SELECT universe_id AS id FROM site_mints WHERE universe_id LIKE $1`,
+  ]);
+}
+
 /** Next PIPE/LAND id and the next Universe id for one market. Locks each counter for the transaction. */
 export async function mintSitePair(
   sql: Sql,
@@ -1241,17 +1255,29 @@ export async function mintSitePair(
 ): Promise<{ siteId: string; universeId: string }> {
   const prefix = kind === "land" ? "LAND" : "PIPE";
   const sitePrefix = `${prefix}-${market}-`;
-  const universePrefix = `WB-${market}-`;
   const siteId = await nextLabeled(sql, `${prefix}:${market}`, sitePrefix, [
     `SELECT site_id AS id FROM sites WHERE site_id LIKE $1`,
     `SELECT site_id AS id FROM site_mints WHERE site_id LIKE $1`,
   ]);
-  const universeId = await nextLabeled(sql, `WB:${market}`, universePrefix, [
-    `SELECT universe_id AS id FROM sites WHERE universe_id LIKE $1`,
-    `SELECT universe_id AS id FROM universe_rows WHERE universe_id LIKE $1`,
-    `SELECT universe_id AS id FROM site_mints WHERE universe_id LIKE $1`,
-  ]);
+  const universeId = await mintUniverseId(sql, market);
   return { siteId, universeId };
+}
+
+function universeHash(payload: SitePayload): string {
+  const fields = { ...payload.fields };
+  delete fields.universe_id;
+  return createHash("sha256")
+    .update(
+      canonicalJson({
+        kind: "universe",
+        market: fields.market || "",
+        address_key: normalizeAddress(fields.address || ""),
+        fields,
+        facts: payload.facts || {},
+        sources: payload.sources || {},
+      }),
+    )
+    .digest("hex");
 }
 
 function listingHash(payload: SitePayload): string {
@@ -1286,9 +1312,58 @@ async function knownAddresses(sql: Sql): Promise<string[]> {
   return found;
 }
 
+function withUniverseId(change: ParsedChange, payload: SitePayload, universeId: string, replay: boolean): ParsedChange {
+  return {
+    ...change,
+    site_id: "",
+    universe_replay: replay,
+    payload: { ...payload, fields: { ...payload.fields, universe_id: universeId } },
+  };
+}
+
+async function prepareUniverseCreate(
+  sql: Sql,
+  change: ParsedChange,
+  payload: SitePayload,
+  market: string,
+  claimed: Set<string>,
+  pending: Map<string, { universeId: string; hash: string }>,
+): Promise<ParsedChange> {
+  const address = payload.fields.address || "";
+  const key = normalizeAddress(address);
+  if (!key) throw new InputError("A universe row needs an address.");
+  const lock = `${market}:${key}`;
+  const hash = universeHash(payload);
+  await lockKey(sql, `universe:${lock}`);
+  const waiting = pending.get(lock);
+  if (waiting) {
+    if (waiting.hash !== hash) throw new InputError("This address was already used for a different universe row.", 409);
+    return withUniverseId(change, payload, waiting.universeId, true);
+  }
+  const existing = await sql.query<{ universe_id: string; request_hash: string }>(
+    `SELECT universe_id, request_hash FROM universe_rows WHERE market = $1 AND address_key = $2`,
+    [market, key],
+  );
+  const prior = existing.rows[0];
+  if (prior) {
+    if (prior.request_hash !== hash) throw new InputError("This address was already used for a different universe row.", 409);
+    if (key) claimed.add(key);
+    return withUniverseId(change, payload, prior.universe_id, true);
+  }
+  const known = await knownAddresses(sql);
+  if (claimed.has(key) || addressConflict(address, known)) {
+    throw new InputError("This address matches an existing site.", 409);
+  }
+  claimed.add(key);
+  const universeId = await mintUniverseId(sql, market);
+  pending.set(lock, { universeId, hash });
+  return withUniverseId(change, payload, universeId, false);
+}
+
 async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<ParsedChange[]> {
   const prepared: ParsedChange[] = [];
   const claimed = new Set<string>();
+  const pendingUniverse = new Map<string, { universeId: string; hash: string }>();
   for (const change of changes) {
     const mint = change.entity_type === "site" ? (change.payload as SitePayload).mint : undefined;
     if (!mint || change.expected_version !== 0 || change.site_id) {
@@ -1299,6 +1374,10 @@ async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<Pa
     const market = payload.fields.market || "";
     if (!CREATE_MARKETS.includes(market as (typeof CREATE_MARKETS)[number])) {
       throw new InputError("A new site needs a market of PHX, LAS, or MIA.");
+    }
+    if (mint.kind === "universe") {
+      prepared.push(await prepareUniverseCreate(sql, change, payload, market, claimed, pendingUniverse));
+      continue;
     }
     const hash = listingHash(payload);
     await lockKey(sql, `listing:${mint.listing_id}`);
@@ -1326,6 +1405,9 @@ async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<Pa
       }
       if (key) claimed.add(key);
     }
+    if (mint.kind !== "pipeline" && mint.kind !== "land") {
+      throw new InputError("A new site needs a kind of pipeline or land.");
+    }
     const minted = await mintSitePair(sql, mint.kind, market);
     prepared.push({
       ...change,
@@ -1334,6 +1416,107 @@ async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<Pa
     });
   }
   return prepared;
+}
+
+async function applyUniverse(
+  sql: Sql,
+  actor: Actor,
+  change: ParsedChange,
+  idempotencyKey: string,
+  runId: string,
+): Promise<ChangeResult> {
+  const payload = change.payload as SitePayload;
+  const universeId = payload.fields.universe_id || "";
+  if (!universeId) throw new InputError("A universe row needs a market of PHX, LAS, or MIA.");
+  await lockKey(sql, `universe-id:${universeId}`);
+  if (change.universe_replay) {
+    const event = await sql.query<{ id: string }>(
+      `SELECT id FROM events WHERE entity_type = 'site' AND entity_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1`,
+      [universeId],
+    );
+    return {
+      entity_type: "site",
+      entity_id: universeId,
+      site_id: "",
+      event_id: event.rows[0]?.id || "",
+      version: 1,
+      universe_id: universeId,
+    };
+  }
+  const fields = payload.fields;
+  const addressKey = normalizeAddress(fields.address || "");
+  await sql.query(
+    `INSERT INTO universe_rows (
+       universe_id, market, site_id, name, address, category, apn, lat, lng, listing_url, broker, listing_id,
+       counted, created_by, facts, fact_sources, service_area_class, miles_to_depot, address_key, request_hash
+     ) VALUES (
+       $1, $2, '', $3, $4, $5, $6, $7, $8, $9, $10, '',
+       'Yes', $11, $12::jsonb, $13::jsonb, $14, $15, $16, $17
+     )`,
+    [
+      universeId,
+      fields.market || "",
+      fields.name || "",
+      fields.address || "",
+      fields.category || "",
+      fields.apn || "",
+      fields.lat || "",
+      fields.lng || "",
+      fields.listing_url || "",
+      fields.broker || "",
+      actor.id,
+      JSON.stringify(payload.facts || {}),
+      JSON.stringify(payload.sources || {}),
+      fields.service_area_class || "",
+      fields.miles_to_depot || "",
+      addressKey,
+      universeHash(payload),
+    ],
+  );
+  const recorded = {
+    kind: "universe",
+    universe_id: universeId,
+    name: fields.name || "",
+    address: fields.address || "",
+    market: fields.market || "",
+    category: fields.category || "",
+    service_area_class: fields.service_area_class || "",
+    miles_to_depot: fields.miles_to_depot || "",
+    lat: fields.lat || "",
+    lng: fields.lng || "",
+    apn: fields.apn || "",
+    facts: payload.facts || {},
+    sources: payload.sources || {},
+  };
+  const eventId = await insertEvent(sql, {
+    entityType: "site",
+    entityId: universeId,
+    siteId: "",
+    payload: recorded,
+    source: change.source,
+    actor: actor.id,
+    idempotencyKey,
+    runId,
+  });
+  try {
+    const { indexRecord } = await import("@/lib/search/docs");
+    await indexRecord(sql, {
+      entityType: "site",
+      entityId: universeId,
+      siteId: universeId,
+      payload: recorded,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));
+  }
+  return {
+    entity_type: "site",
+    entity_id: universeId,
+    site_id: "",
+    event_id: eventId,
+    version: 1,
+    universe_id: universeId,
+  };
 }
 
 async function rememberMint(sql: Sql, actor: Actor, change: ParsedChange): Promise<void> {

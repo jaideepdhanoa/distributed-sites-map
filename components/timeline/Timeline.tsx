@@ -12,7 +12,7 @@ import {
   type CommsLine,
   type MergedLine,
 } from "@/lib/comms";
-import { previewAtWord, stripGmailIds } from "@/lib/displayText";
+import NoteBody from "../NoteBody";
 import { ACTIVITY_TIMEOUT_MS, activityView } from "@/lib/timeline/load";
 import "./timeline.css";
 
@@ -43,39 +43,27 @@ const LABELS: Record<string, string> = {
   bring_back: "Brought back",
   drop_suggested: "Suggested drop",
   drop: "Dropped",
+  stage_repair: "Stage",
 };
 
-const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop"]);
+const KEPT_LINES = new Set(["bring_back", "drop_suggested", "drop", "stage_repair"]);
 
-function WhenStamp({ at, approximate }: { at: string; approximate?: boolean }) {
+function EntryTitle({ at, approximate, title }: { at: string; approximate?: boolean; title: string }) {
   const clock = formatActivityWhen(at, approximate);
-  const label = clock.label || (approximate ? "(approx.)" : "time not recorded");
-  return <time dateTime={clock.title || undefined} title={clock.title || label}>{` · ${label}`}</time>;
-}
-
-function ExpandableText({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const view = previewAtWord(stripGmailIds(text));
-  if (!view.full) return null;
-  if (!view.clipped) return <p>{view.full}</p>;
+  const when = clock.label || (approximate ? "Date approximate" : "Date not recorded");
   return (
-    <p>
-      {open ? view.full : view.preview}{" "}
-      <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {open ? "Show less" : "Show more"}
-      </button>
+    <p className="tl-title">
+      <time dateTime={clock.title || undefined} title={clock.title || when}>{when}</time>
+      <span title={title}>{title}</span>
     </p>
   );
 }
 
 function activityLine(item: MergedLine, index: number) {
   return (
-    <li key={`${item.eventId}-${item.at}-${item.type}-${index}`}>
-      <p>
-        <strong>{LABELS[item.type] || "Document"}</strong>
-        <WhenStamp at={item.at} approximate={item.approximate} />
-      </p>
-      <ExpandableText text={item.summary} />
+    <li key={`${item.eventId}-${item.at}-${item.type}-${index}`} data-testid="timeline-entry">
+      <EntryTitle at={item.at} approximate={item.approximate} title={LABELS[item.type] || "Note"} />
+      <NoteBody text={item.summary} />
     </li>
   );
 }
@@ -92,14 +80,13 @@ function commsLine(item: MergedLine, index: number, msg: string, onOpen: (id: st
       data-direction={item.direction}
     >
       <button type="button" className="list-row" onClick={() => item.commsId && onOpen(item.commsId)}>
-        <p>
-          <strong>{item.direction}</strong>
-          <WhenStamp at={item.at} approximate={item.approximate} />
-          {item.channel ? ` · ${item.channel}` : ""}
-        </p>
-        {party ? <p>{party}</p> : null}
+        <EntryTitle
+          at={item.at}
+          approximate={item.approximate}
+          title={[item.direction, item.channel, party].map((part) => part.trim()).filter(Boolean).join(" · ") || "Note"}
+        />
       </button>
-      <ExpandableText text={summaryText(item.summary)} />
+      <NoteBody text={summaryText(item.summary)} />
       {item.href ? (
         <p>
           <a className="text-link" href={item.href} target="_blank" rel="noopener noreferrer">

@@ -1,10 +1,19 @@
 /**
  * R-099 reach is a view. It does not drop or hide a site in the workbook.
- * Outside (more than 10 miles) is a knock-out and stays out of every option.
- * Legacy edge still passes the location gate, so it stays in every option.
- * A row with no class yet stays in view, except a universe row whose stored
- * gate is already false. Those were outside before the four classes existed.
+ * A blank class stays in every view. Legacy edge still passes the location gate.
+ * A universe row with no class and a stored false gate stays out. Those were
+ * outside before the four classes existed.
+ *
+ * The snapshot published before this change stamped a blank cell as "unknown"
+ * and did not record where that class came from. A class of "unknown" with no
+ * source, or with source "blank", stays in view. Source "label" is the word
+ * Unknown. Outside, and that explicit Unknown, stay out of the working set.
+ * They are not the Dropped step. Dropped is the stage only, including a drop
+ * that is also Outside or Unknown. Active Outside and explicit Unknown are
+ * the Outside service area group. The quarantined site is in neither group.
  */
+
+import { isExcludedSite } from "./alerts/excluded.ts";
 
 export type Reach = "inside" | "within5" | "within10";
 
@@ -15,8 +24,12 @@ export type ServiceClass = "inside" | "near_0_5" | "near_5_10" | "outside" | "ed
 const CLASSES = new Set<ServiceClass>(["inside", "near_0_5", "near_5_10", "outside", "edge_legacy", "unknown"]);
 
 export type AreaInput = {
+  deal_id?: string | null;
   service_area_class?: string | null;
+  /** blank, label, or unrecognized. Absent on a snapshot that stamped blanks as unknown. */
+  service_area_source?: string | null;
   in_area?: boolean | null;
+  stage_group?: string | null;
 };
 
 export function parseReach(value: string | null | undefined): Reach {
@@ -50,14 +63,52 @@ export function shownClass(record: AreaInput | null | undefined): ServiceClass |
   return "unclassified";
 }
 
+/** Explicit Outside, or Unknown that a build marked as a real label or unrecognized text. */
+export function workingSetKnockout(record: AreaInput | null | undefined): boolean {
+  const kind = explicitClass(record);
+  if (kind === "outside") return true;
+  if (kind !== "unknown") return false;
+  const source = record?.service_area_source;
+  return source === "label" || source === "unrecognized";
+}
+
 export function inReach(record: AreaInput | null | undefined, reach: Reach = REACH_DEFAULT): boolean {
   const kind = explicitClass(record);
   if (kind === "inside" || kind === "edge_legacy") return true;
   if (kind === "near_0_5") return reach === "within5" || reach === "within10";
   if (kind === "near_5_10") return reach === "within10";
-  if (kind === "outside" || kind === "unknown") return false;
+  if (workingSetKnockout(record)) return false;
+  if (kind === "unknown") return true;
   if (record?.in_area === false) return false;
   return true;
+}
+
+/**
+ * One pipeline step. Dropped is the stage only, including a drop that is also
+ * Outside or Unknown. Active Outside and explicit Unknown stay off every
+ * working step. A blank class uses its stage.
+ */
+export function dealOnPipeStep(record: AreaInput | null | undefined, step: string, reach: Reach = REACH_DEFAULT): boolean {
+  if (!record || isExcludedSite(record.deal_id)) return false;
+  if (step === "dropped") return record.stage_group === "dropped";
+  if (record.stage_group !== step) return false;
+  return inReach(record, reach);
+}
+
+/** Active Outside or explicit Unknown. Stage Dropped stays on the Dropped step. */
+export function outsideServiceArea(record: AreaInput | null | undefined): boolean {
+  if (!record || isExcludedSite(record.deal_id)) return false;
+  return workingSetKnockout(record) && record.stage_group !== "dropped";
+}
+
+/** Rows the Dropped badge and the All-chip dropped sidecar both count. */
+export function countDroppedDeals(records: readonly AreaInput[]): number {
+  return records.filter((record) => dealOnPipeStep(record, "dropped")).length;
+}
+
+/** Rows in the Outside service area group. */
+export function countOutsideServiceArea(records: readonly AreaInput[]): number {
+  return records.filter((record) => outsideServiceArea(record)).length;
 }
 
 export type AreaCounts = {

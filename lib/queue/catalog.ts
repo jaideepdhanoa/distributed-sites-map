@@ -1,3 +1,4 @@
+import { overlayHeldStages } from "@/lib/changes/heldStage";
 import { readDeals } from "@/lib/changes/read";
 import { readGenerated } from "@/lib/guard";
 import { isPipelineStore } from "@/lib/labels";
@@ -79,7 +80,7 @@ export function loadCatalogFromDisk(): CatalogSite[] {
 }
 
 export async function loadCatalog(): Promise<CatalogSite[]> {
-  const deals = await readDeals();
+  const deals = await overlayHeldStages(await readDeals(), "deal");
   return catalogFrom(
     deals as { features?: { geometry?: { type?: string; coordinates?: number[] } | null; properties?: DealProps }[] },
     readJson("sites.geojson") as { features?: { properties?: SiteProps }[] } | null,

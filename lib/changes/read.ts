@@ -3,6 +3,7 @@ import { commsSnapshotForIds, type CommsSnapshot, type CommsRecord } from "@/lib
 import { timelineForIds } from "@/lib/timeline/filter";
 import { moneyText } from "@/lib/pricing";
 import { stageKey } from "@/lib/stageOverlay";
+import { isProtectedId } from "@/lib/protectedSite";
 import { readEntityFromDb } from "./flags";
 import { readGenerated } from "@/lib/guard";
 import { NUMERIC_FACT_FIELDS, SITE_FIELDS, displayNote, listingFlags, parseMeasure, parseSheet, passingClass, photoCanonical, photosFromCanonical, recordedPerAcre, scrubText, type PhotoRef, type SiteField } from "./site";
@@ -45,7 +46,31 @@ export function applyStageRows<T extends DealFile>(file: T, rows: StageRecord[])
   return { ...file, features };
 }
 
-type SiteRead = Record<SiteField, string> & { site_id: string; sheet?: string; facts?: Record<string, string>; coord_status?: string };
+type SiteRead = Record<SiteField, string> & {
+  site_id: string;
+  sheet?: string;
+  facts?: Record<string, string>;
+  coord_status?: string;
+  /** site_mints.kind when the row was minted. The id prefix is the fallback. */
+  kind?: string;
+};
+
+function dealKind(row: { site_id: string; kind?: string }): "pipeline" | "land" | null {
+  const stored = text(row.kind).toLowerCase();
+  if (stored === "pipeline" || stored === "land") return stored;
+  const id = text(row.site_id).toUpperCase();
+  if (id.startsWith("PIPE-")) return "pipeline";
+  if (id.startsWith("LAND-")) return "land";
+  return null;
+}
+
+function copiedPoint(key: string, stored: string | undefined, snapshot: unknown): Record<string, number | null> {
+  const fromDb = stored ? numberOrNull(stored) : null;
+  if (stored && fromDb != null) return { [key]: fromDb };
+  if (snapshot == null || snapshot === "") return {};
+  const fromSnapshot = typeof snapshot === "number" ? snapshot : numberOrNull(String(snapshot));
+  return fromSnapshot == null ? {} : { [key]: fromSnapshot };
+}
 
 function numberOrNull(value: string): number | null {
   return parseMeasure(value);
@@ -74,13 +99,11 @@ function photosOf(value: unknown): PhotoRef[] {
   return photosFromCanonical(JSON.stringify(value ?? []));
 }
 
-/** Paint database site rows onto deals. A deal the database does not have keeps the snapshot. */
-export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T {
-  const byId = new Map(rows.map((row) => [row.site_id, row]));
-  const features = (file.features || []).map((feature) => {
-    const props = feature.properties || {};
-    const row = byId.get(text(props.deal_id));
-    if (!row) return feature;
+function paintDeal<T extends DealFile["features"] extends (infer Feature)[] | undefined ? Feature : never>(
+  feature: T,
+  row: SiteRead,
+): T {
+  const props = feature.properties || {};
     const cells = parseSheet(row.sheet || "{}");
     const asking = numberOrNull(cells["Asking price ($)"] || row.asking_price);
     const acres = numberOrNull(cells["Land (acres)"] || row.acreage);
@@ -109,6 +132,10 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
       service_area_polygon: row.service_area_polygon || props.service_area_polygon,
       score: row.score ? numberOrNull(row.score) : props.score,
       location_points: row.location_points ? numberOrNull(row.location_points) : props.location_points,
+      ...copiedPoint("economics_points", row.economics_points, props.economics_points),
+      ...copiedPoint("land_points", row.land_points, props.land_points),
+      ...copiedPoint("power_points", row.power_points, props.power_points),
+      ...copiedPoint("deal_points", row.deal_points, props.deal_points),
       photos: photos.map((photo) => {
         const item: Record<string, string> = {};
         for (const [key, value] of Object.entries(photo)) if (value) item[key] = value;
@@ -143,7 +170,37 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
     const lng = numberOrNull(row.lng);
     if (lat != null && lng != null) geometry = { type: "Point", coordinates: [lng, lat] };
     return { ...feature, geometry, properties: next };
+}
+
+/**
+ * Paint database site rows onto deals. A deal the database does not have keeps
+ * the snapshot. A database row whose id is missing from the snapshot is added.
+ * On an id that is in both, the snapshot feature stays and the paint above
+ * fills the database fields the list already reads. Protected ids are not added.
+ * Stage text is applied later by the site_stages overlay.
+ */
+export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T {
+  const byId = new Map(rows.map((row) => [row.site_id, row]));
+  const features = (file.features || []).map((feature) => {
+    const props = feature.properties || {};
+    const row = byId.get(text(props.deal_id));
+    if (!row) return feature;
+    return paintDeal(feature, row);
   });
+  const present = new Set(features.map((feature) => text(feature.properties?.deal_id)).filter(Boolean));
+  for (const row of rows) {
+    const id = text(row.site_id);
+    if (!id || present.has(id) || isProtectedId(id)) continue;
+    const kind = dealKind(row);
+    if (!kind) continue;
+    features.push(
+      paintDeal(
+        { type: "Feature", geometry: null, properties: { deal_id: id, kind, stage: "", stage_group: "" } } as (typeof features)[number],
+        row,
+      ),
+    );
+    present.add(id);
+  }
   return { ...file, features };
 }
 
@@ -152,7 +209,9 @@ export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> 
   try {
     const rows = await withSql((sql) =>
       sql.query<Record<string, unknown>>(
-        `SELECT site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ")}, photo_refs, sheet, facts, coord_status FROM sites`,
+        `SELECT s.site_id, ${SITE_FIELDS.filter((field) => field !== "photo_refs").map((field) => `s.${field}`).join(", ")}, s.photo_refs, s.sheet, s.facts, s.coord_status, m.kind AS site_kind
+         FROM sites s
+         LEFT JOIN site_mints m ON m.site_id = s.site_id`,
       ),
     );
     const mapped: SiteRead[] = rows.rows.map((row) => {
@@ -161,6 +220,7 @@ export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> 
         sheet: typeof row.sheet === "string" ? row.sheet : JSON.stringify(row.sheet ?? {}),
         facts: (row.facts && typeof row.facts === "object" ? row.facts : {}) as Record<string, string>,
         coord_status: text(row.coord_status),
+        kind: text(row.site_kind),
       } as SiteRead;
       for (const field of SITE_FIELDS) {
         if (field === "photo_refs") record.photo_refs = photoCanonical(photosOf(row.photo_refs));

@@ -12,8 +12,49 @@
 .tl-list li { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .tl-list button.list-row { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .tl-list p { margin: 2px 0; overflow-wrap: anywhere; }
+.tl-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+.tl-title time {
+  flex: none;
+  color: var(--ink-3);
+  font-size: var(--type-cap);
+  font-weight: 550;
+}
+.tl-title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+.note-body { position: relative; }
+.note-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  height: auto;
+  width: 100%;
+  left: 0;
+  top: 0;
+  z-index: -1;
+}
+.note-blocks p { margin: 0 0 8px; }
+.note-blocks ol { margin: 0 0 8px; padding-left: 1.25rem; }
+.note-blocks li { margin: 0; padding: 0; border: 0; background: transparent; border-radius: 0; }
+.note-blocks.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-body button.text-link { margin-top: 2px; }
 .tl-internal { background: var(--sand-2); border-style: dashed; }
 @media (max-width: 767px) {
   .tl { padding-bottom: 88px; }
-  .tl-list a.text-link { min-height: 44px; display: inline-flex; align-items: center; }
+  .tl-list a.text-link, .note-body button.text-link { min-height: 44px; display: inline-flex; align-items: center; }
 }

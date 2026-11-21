@@ -164,6 +164,11 @@ export type DealProps = {
   stage_pending?: string;
   /** Knock-out rationale. Present only while Stage is not Dropped. */
   suggested_drop?: string;
+  /** Accepted drop. Reason, proposer, approver, and the exact decision time. */
+  decision_reason?: string;
+  decision_proposer?: string;
+  decision_approver?: string;
+  decision_at?: string;
   broker_contacted?: boolean;
   last_broker_contact?: string;
   lead_source?: string;
@@ -190,8 +195,10 @@ export type DealProps = {
   coord_status: string;
   miles_to_depot: number | null;
   /** Passes the location gate: inside, either Near band, or legacy edge. */
-  in_area?: boolean;
-  service_area_class?: "inside" | "near_0_5" | "near_5_10" | "outside" | "edge_legacy" | "unknown";
+  in_area?: boolean | null;
+  service_area_class?: "inside" | "near_0_5" | "near_5_10" | "outside" | "edge_legacy" | "unknown" | null;
+  /** blank, label, or unrecognized. Absent when a blank cell was stored as unknown. */
+  service_area_source?: "blank" | "label" | "unrecognized" | "" | null;
   service_area_distance_mi?: number | null;
   service_area_polygon?: string;
   listed: boolean;
@@ -298,6 +305,18 @@ export type DealProps = {
   score?: number | null;
   /** Workbook Location points cell. Not recomputed from the service-area class. */
   location_points?: number | null;
+  /** Workbook Economics points cell. Not recomputed from the saving figure. */
+  economics_points?: number | null;
+  /** Workbook Land points cell. Not recomputed from stalls. */
+  land_points?: number | null;
+  /** Workbook Power points cell. Not recomputed from the power rating. */
+  power_points?: number | null;
+  /** Workbook Deal points cell. Not recomputed from the deal rating. */
+  deal_points?: number | null;
+  /** Workbook Saving vs. hub at screening price % cell, as written. */
+  saving_vs_hub?: string | null;
+  /** Workbook Deal rating cell, as written. */
+  deal_rating?: string | null;
   apn?: string;
   /** Site mirror of NDA Register. Blank ID means Not required. */
   nda_id?: string;

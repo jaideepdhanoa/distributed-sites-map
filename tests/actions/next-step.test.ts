@@ -77,7 +77,8 @@ test("a person drop records the recommendation and, once approved, who dropped i
     assert.equal(site.pipeline_stage, "1 Desk screen");
     const suggested = await listRecordedHistory(sql, ["PHX-U180", "PIPE-PHX-0008"], ["drop_suggested"]);
     assert.equal(suggested.length, 1);
-    assert.match(suggested[0]?.summary || "", /Writer recommended dropping this site/);
+    assert.match(suggested[0]?.summary || "", /Writer proposed dropping this site/);
+    assert.match(suggested[0]?.summary || "", /Awaiting approval/);
     assert.match(suggested[0]?.summary || "", /broker confirmed another buyer/);
     const accepted = await decideSuggestion(sql, { id: step.id, status: "accepted", actorId: "editor" }, lookup);
     assert.equal(accepted.reason, reason);
@@ -85,13 +86,14 @@ test("a person drop records the recommendation and, once approved, who dropped i
     assert.equal(site.pipeline_stage, "1 Desk screen");
     const dropped = await listRecordedHistory(sql, ["PIPE-PHX-0008"], ["drop"]);
     assert.equal(dropped.length, 1);
-    assert.match(dropped[0]?.summary || "", /Writer dropped this site/);
+    assert.match(dropped[0]?.summary || "", /Editor dropped this site/);
     assert.match(dropped[0]?.summary || "", /broker confirmed another buyer/);
+    assert.match(dropped[0]?.summary || "", /[+-]\d{2}:\d{2}$/);
     const card = mergeBringBackHistory(
       [{ date: "2026-10-18", type: "stage", summary: "Stage set to Desk screen", eventId: "A-1" }],
       dropped,
     );
-    assert.equal(card.some((item) => item.type === "drop" && /Writer dropped this site/.test(item.summary)), true);
+    assert.equal(card.some((item) => item.type === "drop" && /Editor dropped this site/.test(item.summary)), true);
     assert.equal(card.some((item) => item.type === "stage"), true);
   } finally {
     if (previous == null) delete process.env.AUTH_USERS;
@@ -185,7 +187,8 @@ test("bring back needs a reason and a stage, and approval records who, why, and 
     const history = await listBringBackHistory(sql, ["PHX-U180", "PIPE-PHX-0008"]);
     assert.equal(history.length, 1);
     assert.equal(history[0]?.siteId, "PIPE-PHX-0008");
-    assert.match(history[0]?.summary || "", /Writer brought this site back to Desk screen/);
+    assert.match(history[0]?.summary || "", /Editor brought this site back to Desk screen/);
+    assert.match(history[0]?.summary || "", /[+-]\d{2}:\d{2}$/);
     assert.match(history[0]?.summary || "", /The seller put it back on the market/);
     assert.equal((history[0]?.summary || "").includes(reason.trim().slice(-20)), true);
     assert.match(history[0]?.at || "", /^\d{4}-\d{2}-\d{2}$/);
@@ -194,7 +197,7 @@ test("bring back needs a reason and a stage, and approval records who, why, and 
     const items = mergeBringBackHistory(card.items, history);
     assert.equal(items.some((item) => item.type === "stage" && item.summary === "Stage set to Dropped"), true);
     const brought = items.find((item) => item.type === "bring_back");
-    assert.match(brought?.summary || "", /Writer/);
+    assert.match(brought?.summary || "", /Editor/);
     assert.match(brought?.summary || "", /Desk screen/);
     assert.match(brought?.summary || "", /seller put it back on the market/);
     const csv = await nextStepsCsv([accepted], lookup);

@@ -120,7 +120,7 @@ for (const city of CITIES) {
   test(`${city} pins match the API at every step and filter`, async ({ page }) => {
     test.setTimeout(480_000);
     const catalog = await loadCatalog(page, city);
-    const cityQuery = city === "PHX" ? "" : `city=${city}&`;
+    const cityQuery = `city=${city}&`;
     await page.goto(`/?${cityQuery}funnel=universe`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
     await page.waitForFunction(() => ((window as unknown as { __src?: { sites?: unknown[] } }).__src?.sites || []).length > 0);
@@ -234,7 +234,7 @@ for (const city of CITIES) {
 
   test(`${city} pipeline squares match the selected stage`, async ({ page }) => {
     const catalog = await loadCatalog(page, city);
-    const cityQuery = city === "PHX" ? "" : `city=${city}&`;
+    const cityQuery = `city=${city}&`;
     await page.goto(`/?${cityQuery}`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
     await page.waitForSelector(".map[data-deal-markers='square']");

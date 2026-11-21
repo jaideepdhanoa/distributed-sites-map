@@ -13,7 +13,7 @@ import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBo
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 import type { GroundBox } from "@/lib/spaces/measure";
-import SpaceTools from "./spaces/SpaceTools";
+import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
@@ -69,7 +69,14 @@ type Props = {
   onSpaceSelect?: (id: string) => void;
   onSpaceCreate?: (box: GroundBox) => void;
   onSpaceChange?: (space: SpaceShape) => void;
+  onSpaceDelete?: (space: SpaceShape) => void;
   onSpaceDone?: () => void;
+  fitAll?: boolean;
+  canDrawLots?: boolean;
+  onDrawLots?: () => void;
+  commentedSpaceIds?: string[];
+  threadSpaceId?: string;
+  onThreadClose?: () => void;
   onMapFailed?: (message: string) => void;
 };
 
@@ -152,6 +159,25 @@ function fitMap(
   map.fitBounds(bounds, fitted);
 }
 
+function frameSites(map: Map, points: [number, number][], phone: boolean) {
+  const finite = points.filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+  if (!finite.length) return false;
+  const lngs = finite.map((point) => point[0]);
+  const lats = finite.map((point) => point[1]);
+  fitMap(
+    map,
+    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+    {
+      padding: phone
+        ? { top: 176, bottom: 120, left: 28, right: 28 }
+        : { top: 72, bottom: 64, left: 48, right: 260 },
+      maxZoom: 10.5,
+      duration: 0,
+    },
+  );
+  return true;
+}
+
 function acresOf(coords: [number, number][]) {
   const radius = 6378137;
   let area = 0;
@@ -217,6 +243,10 @@ export default function MapView(props: Props) {
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
+  const [draftPoints, setDraftPoints] = useState(0);
+  const [drawCommand, setDrawCommand] = useState<{ id: number; type: "undo" | "cancel" | "finish" } | null>(null);
+  const [deleteAsk, setDeleteAsk] = useState(0);
+  const drawSeq = useRef(0);
   const measureRef = useRef(false);
   measureRef.current = measure;
   const measureDoneRef = useRef(false);
@@ -803,14 +833,22 @@ export default function MapView(props: Props) {
           map.easeTo({ center, zoom });
         }).catch(() => undefined);
       });
+      const lotAt = (event: MapLayerMouseEvent | MapMouseEvent) => {
+        const id = spaceIdAt(map, event.point, event.lngLat, propsRef.current.spaceShapes || []);
+        if (!id) return false;
+        propsRef.current.onSpaceSelect?.(id);
+        return true;
+      };
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
+        if (lotAt(event)) return;
         const feature = event.features?.[0];
         const id = feature?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "offmarket", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
+        if (lotAt(event)) return;
         const id = event.features?.[0]?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
@@ -970,6 +1008,7 @@ export default function MapView(props: Props) {
       map.on("mouseout", hideTip);
       map.on("dragstart", hideTip);
       map.on("click", (event: MapMouseEvent) => {
+        if (!propsRef.current.spaceDrawing && !measureRef.current && lotAt(event)) return;
         if (propsRef.current.spaceDrawing || event.originalEvent.defaultPrevented) return;
         if (!measureRef.current || measureDoneRef.current) return;
         points.current = [...points.current, [event.lngLat.lng, event.lngLat.lat]];
@@ -1107,6 +1146,7 @@ export default function MapView(props: Props) {
       markCentered(map, id, pin[0], pin[1]);
       if (preserveView || !map.isStyleLoaded()) return;
       map.resize();
+      if (propsRef.current.spaceDrawing) return;
       const center = map.getCenter();
       const pad = pointPadding(map);
       const padded = Math.abs((map.getPadding().right ?? 0) - pad.right) < 1;
@@ -1340,9 +1380,14 @@ export default function MapView(props: Props) {
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
-      const phonePad = phone && !reviewing;
+      const drawing = Boolean(propsRef.current.spaceDrawing);
+      const phonePad = phone && !reviewing && !drawing;
       const padKey = phonePad ? "clear" : "flush";
-      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : { top: 0, bottom: 0, left: 0, right: 0 });
+      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
+      const drawFly = propsRef.current.spaceFly;
+      if (drawing && drawFly && map.getZoom() < 17) {
+        map.jumpTo({ center: [drawFly.lng, drawFly.lat], zoom: 18, padding: pointPadding(map) });
+      }
       if ((props.basemap || "satellite") === "satellite") {
         if (map.getLayer("areas-current")) map.setPaintProperty("areas-current", "fill-opacity", phone ? 0.1 : 0.18);
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
@@ -1350,6 +1395,7 @@ export default function MapView(props: Props) {
       }
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
+      if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
       if (reviewToken) {
         appliedReview.current = reviewToken;
         appliedPad.current = "flush";
@@ -1358,10 +1404,15 @@ export default function MapView(props: Props) {
         const held = heldView.current;
         heldView.current = null;
         if (held) map.jumpTo({ center: held.center, zoom: held.zoom });
-        appliedFit.current = fitKey;
+        appliedFit.current = props.fitAll ? `all:${fitKey}:${padKey}` : fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
-      } else if (!propsRef.current.spaceDrawing && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
+      } else if (!propsRef.current.spaceDrawing && !props.selectedId && props.fitAll && fitKey && appliedFit.current !== `all:${fitKey}:${padKey}`) {
+        appliedFit.current = `all:${fitKey}:${padKey}`;
+        appliedPad.current = padKey;
+        appliedFocus.current = focusToken;
+        if (!frameSites(map, finiteFit, phone)) glide(map, [props.focusLng, props.focusLat], props.focusZoom);
+      } else if (!props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
@@ -1372,7 +1423,7 @@ export default function MapView(props: Props) {
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
-      } else if (!propsRef.current.spaceDrawing && appliedFocus.current !== focusToken) {
+      } else if (!props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
@@ -1384,7 +1435,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.fitAll, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1507,6 +1558,7 @@ export default function MapView(props: Props) {
         return;
       }
       if (!props.selectedId) {
+        if (props.fitAll) return;
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
         return;
       }
@@ -1533,14 +1585,21 @@ export default function MapView(props: Props) {
       );
     };
     if (props.reviewFocus) return;
-    if (props.selectedId && !selectedOnMap) return;
+    if (props.spaceDrawing && props.spaceFly) {
+      map.jumpTo({ center: [props.spaceFly.lng, props.spaceFly.lat], zoom: 18, padding: pointPadding(map) });
+      return;
+    }
+    if (props.selectedId && !selectedOnMap) {
+      glide(map, [props.focusLng, props.focusLat], props.focusZoom);
+      return;
+    }
     go();
     if (props.selectedId) map.once("idle", go);
     return () => {
       cancel = true;
       map.off("idle", go);
     };
-  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus, gridToken]);
+  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, gridToken]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1653,10 +1712,22 @@ export default function MapView(props: Props) {
     source?.setData({ type: "FeatureCollection", features: [] });
   }, [measure]);
 
+  function sendDraw(type: "undo" | "cancel" | "finish") {
+    drawSeq.current += 1;
+    setDrawCommand({ id: drawSeq.current, type });
+  }
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (!measureRef.current) return;
-      if (event.key === "Escape") setMeasure(false);
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select")) return;
+      if (propsRef.current.spaceDrawing) {
+        event.preventDefault();
+        sendDraw("cancel");
+        return;
+      }
+      if (measureRef.current) setMeasure(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1710,9 +1781,17 @@ export default function MapView(props: Props) {
           drawing={Boolean(props.spaceDrawing)}
           selectedId={props.selectedSpaceId || ""}
           names={props.spaceNames || {}}
+          commentedIds={props.commentedSpaceIds || []}
+          threadOpen={Boolean(props.threadSpaceId) && props.threadSpaceId === props.selectedSpaceId}
+          onThreadClose={props.onThreadClose}
           onSelect={(id) => props.onSpaceSelect?.(id)}
           onCreate={(box) => props.onSpaceCreate?.(box)}
           onChange={(space) => props.onSpaceChange?.(space)}
+          onDelete={(space) => props.onSpaceDelete?.(space)}
+          onCloseDraw={() => props.onSpaceDone?.()}
+          drawCommand={drawCommand}
+          onDraftPoints={setDraftPoints}
+          requestDelete={deleteAsk}
         />
       ) : null}
       {mapFailed ? (
@@ -1728,10 +1807,14 @@ export default function MapView(props: Props) {
         </div>
         <div className="measure-row">
           {props.spaceDrawing ? (
-            <div className="measure-bar" data-testid="space-draw-bar">
-              <span>Drag a rectangle, then rotate it to the rows</span>
-              <button type="button" className="paper-btn" data-testid="space-done" onClick={() => props.onSpaceDone?.()}>Done</button>
+            <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
+              <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>
+              <button type="button" className="paper-btn" data-testid="space-cancel" onClick={() => sendDraw("cancel")}>Cancel</button>
+              <button type="button" className="primary" data-testid="space-finish" onClick={() => sendDraw("finish")}>Finish</button>
+              {props.selectedSpaceId ? <button type="button" className="paper-btn" data-testid="space-draw-delete" onClick={() => setDeleteAsk((value) => value + 1)}>Delete</button> : null}
             </div>
+          ) : props.canDrawLots ? (
+            <button type="button" className="primary" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}>Draw available lots</button>
           ) : null}
           {measure ? (
             <div className="measure-bar">

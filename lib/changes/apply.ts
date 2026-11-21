@@ -17,12 +17,16 @@ import {
   type SiteField,
 } from "./site";
 import { isExcludedSite } from "@/lib/alerts/excluded";
+import { storeComment } from "@/lib/comments/record";
+import { derivePowerRating } from "@/lib/score/power-rating";
+import { storeConflict } from "@/lib/conflicts/record";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
-import type { ActivityPayload, Actor, CommsPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
-import { formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, validateBatch } from "./schema";
+import type { ActivityPayload, Actor, CommentPayload, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
+import { AGENT_STAGE_DECISION_SOURCE, RECEIPT_ACTIVITY_SUMMARY, formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, receiptCitation, validateBatch } from "./schema";
+import { CREATE_MARKETS } from "./site";
 import { marketCode, serviceAreaCode } from "./stageLabel";
-import type { EntityType, Market, ServiceAreaClass } from "./vocab";
+import { LISTING_ID, SITE_ID, type EntityType, type Market, type ServiceAreaClass } from "./vocab";
 
 export type { Actor } from "./schema";
 
@@ -32,6 +36,9 @@ export type ChangeResult = {
   site_id: string;
   event_id: string;
   version: number;
+  /** Set when this result minted or replayed a site. */
+  universe_id?: string;
+  listing_id?: string;
 };
 
 export type ApplyResult = {
@@ -109,8 +116,8 @@ async function tableIdFloor(sql: Sql, name: "activity" | "comms" | "pnl_period" 
   return max;
 }
 
-async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space"): Promise<number> {
-  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space") {
+async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict" | "comment"): Promise<number> {
+  if (name === "event" || name === "pnl_period" || name === "pnl_line" || name === "site_space" || name === "data_conflict" || name === "comment") {
     const result = await sql.query<{ value: number | string }>(
       `INSERT INTO id_counters (name, value)
        VALUES ($1, 1)
@@ -133,12 +140,14 @@ async function mint(sql: Sql, name: "activity" | "comms" | "event" | "pnl_period
   return next;
 }
 
-export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space", value: number): string {
+export function formatEntityId(kind: "activity" | "comms" | "event" | "pnl_period" | "pnl_line" | "site_space" | "data_conflict" | "comment", value: number): string {
   if (kind === "activity") return `A-${String(value).padStart(6, "0")}`;
   if (kind === "comms") return `CM-${String(value).padStart(4, "0")}`;
   if (kind === "pnl_period") return `PP-${String(value).padStart(6, "0")}`;
   if (kind === "pnl_line") return `PL-${String(value).padStart(6, "0")}`;
   if (kind === "site_space") return `SS-${String(value).padStart(6, "0")}`;
+  if (kind === "data_conflict") return `CF-${String(value).padStart(6, "0")}`;
+  if (kind === "comment") return `NT-${String(value).padStart(6, "0")}`;
   return `EV-${String(value).padStart(8, "0")}`;
 }
 
@@ -150,6 +159,14 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
       [change.site_id, family],
     );
     return result.rows[0] ? Number(result.rows[0].version) : 0;
+  }
+  if (change.entity_type === "comment") {
+    const result = await sql.query<{ version: number | string | null }>(
+      `SELECT version FROM notes WHERE id = $1`,
+      [change.entity_id],
+    );
+    const version = result.rows[0]?.version;
+    return version == null ? 0 : Number(version);
   }
   if (change.entity_type === "stage" || change.entity_type === "site") {
     const table = change.entity_type === "stage" ? "site_stages" : "sites";
@@ -165,7 +182,9 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
       ? "pnl_lines"
       : change.entity_type === "site_space"
         ? "site_spaces"
-        : "comms_entries";
+        : change.entity_type === "data_conflict"
+          ? "data_conflicts"
+          : "comms_entries";
   const column = change.entity_type === "site_space" ? "id" : "entity_id";
   const result = await sql.query<{ version: number | string }>(
     `SELECT version FROM ${table} WHERE ${column} = $1`,
@@ -355,6 +374,13 @@ async function writeComms(
     workbook_source: payload.workbook_source ?? textOf(prior.workbook_source),
     message_id: messageId,
   };
+  const relinkedBy = payload.relinked_by || textOf(prior.relinked_by);
+  const relinkedFrom = payload.relinked_by ? payload.relinked_from || "" : textOf(prior.relinked_from);
+  const recorded: Record<string, unknown> = { ...stored };
+  if (relinkedBy) {
+    recorded.relinked_from = relinkedFrom;
+    recorded.relinked_by = relinkedBy;
+  }
   await sql.query(
     `INSERT INTO comms_entries (
        entity_id, site_id, payload, version, updated_by, message_id, thread_id, link, gmail_message_id, gmail_thread_id
@@ -370,9 +396,9 @@ async function writeComms(
        link = EXCLUDED.link,
        gmail_message_id = EXCLUDED.gmail_message_id,
        gmail_thread_id = EXCLUDED.gmail_thread_id`,
-    [entityId, change.site_id, JSON.stringify(stored), version, actorId, messageId, threadId, link, gmailMessageId, gmailThreadId],
+    [entityId, change.site_id, JSON.stringify(recorded), version, actorId, messageId, threadId, link, gmailMessageId, gmailThreadId],
   );
-  return stored;
+  return recorded;
 }
 
 type SiteDb = Record<SiteField, string> & {
@@ -386,18 +412,131 @@ type SiteDb = Record<SiteField, string> & {
 };
 
 const SITE_COLUMNS = SITE_FIELDS.filter((field) => field !== "photo_refs").join(", ");
+const SITE_POINT_FIELDS = ["economics_points", "land_points", "power_points", "deal_points"] as const;
+const SITE_LEGACY_COLUMNS = SITE_FIELDS.filter(
+  (field) => field !== "photo_refs" && !SITE_POINT_FIELDS.includes(field as (typeof SITE_POINT_FIELDS)[number]),
+).join(", ");
+const SITE_READ_TAIL = "photo_refs, fact_sources, sheet, sheet_writes, facts, coord_status, version";
+
+function undefinedColumn(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
+}
 
 async function readSite(sql: Sql, siteId: string): Promise<SiteDb | null> {
-  const result = await sql.query<SiteDb>(
-    `SELECT ${SITE_COLUMNS}, photo_refs, fact_sources, sheet, sheet_writes, facts, coord_status, version FROM sites WHERE site_id = $1`,
-    [siteId],
-  );
-  return result.rows[0] || null;
+  try {
+    const result = await sql.query<SiteDb>(
+      `SELECT ${SITE_COLUMNS}, ${SITE_READ_TAIL} FROM sites WHERE site_id = $1`,
+      [siteId],
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    if (!undefinedColumn(error)) throw error;
+    const result = await sql.query<SiteDb>(
+      `SELECT ${SITE_LEGACY_COLUMNS}, ${SITE_READ_TAIL} FROM sites WHERE site_id = $1`,
+      [siteId],
+    );
+    return result.rows[0] || null;
+  }
 }
 
 function storedPhotos(value: unknown): PhotoRef[] {
   if (typeof value === "string") return photosFromCanonical(value);
   return photosFromCanonical(JSON.stringify(value ?? []));
+}
+
+
+function sitePlaceholders(includePoints: boolean, includeRating: boolean): string {
+  const lines = [
+    "$1, $2, $3, $4, $5, $6, $7, $8, $9, $10",
+    "$11, $12, $13, $14, $15, $16, $17",
+    "$18, $19, $20, $21",
+    "$22, $23::jsonb, $24, $25, $26, $27, $28",
+    "$29, $30, $31, $32",
+  ];
+  let n = 33;
+  const take = (count: number, jsonbAt: number[] = []) => {
+    const bits: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const index = n;
+      n += 1;
+      bits.push(jsonbAt.includes(i) ? `$${index}::jsonb` : `$${index}`);
+    }
+    return bits.join(", ");
+  };
+  if (includePoints) lines.push(take(4));
+  if (includeRating) lines.push(take(3, [2]));
+  lines.push(take(1));
+  lines.push(take(4, [0, 1, 2, 3]));
+  lines.push(take(2));
+  return lines.join(",\n       ");
+}
+
+function siteUpsertSql(includePoints: boolean, includeRating: boolean): string {
+  const points = includePoints ? ", economics_points, land_points, power_points, deal_points" : "";
+  const rating = includeRating ? ", power_rating, power_rating_reason, power_rating_inputs" : "";
+  const pointAssign = includePoints
+    ? `economics_points = EXCLUDED.economics_points,
+       land_points = EXCLUDED.land_points,
+       power_points = EXCLUDED.power_points,
+       deal_points = EXCLUDED.deal_points,`
+    : "";
+  const ratingAssign = includeRating
+    ? `power_rating = EXCLUDED.power_rating,
+       power_rating_reason = EXCLUDED.power_rating_reason,
+       power_rating_inputs = EXCLUDED.power_rating_inputs,`
+    : "";
+  return `INSERT INTO sites (
+       site_id, name, address, market, lat, lng, category, broker, firm, listing_url,
+       asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
+       service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
+       notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
+       universe_id, listing_status, score, location_points${points}${rating},
+       coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
+     ) VALUES (
+       ${sitePlaceholders(includePoints, includeRating)}
+     )
+     ON CONFLICT (site_id) DO UPDATE SET
+       name = EXCLUDED.name,
+       address = EXCLUDED.address,
+       market = EXCLUDED.market,
+       lat = EXCLUDED.lat,
+       lng = EXCLUDED.lng,
+       category = EXCLUDED.category,
+       broker = EXCLUDED.broker,
+       firm = EXCLUDED.firm,
+       listing_url = EXCLUDED.listing_url,
+       asking_price = EXCLUDED.asking_price,
+       acreage = EXCLUDED.acreage,
+       apn = EXCLUDED.apn,
+       land_value = EXCLUDED.land_value,
+       improvement_value = EXCLUDED.improvement_value,
+       county_value = EXCLUDED.county_value,
+       county_value_basis = EXCLUDED.county_value_basis,
+       service_area_class = EXCLUDED.service_area_class,
+       service_area_distance_mi = EXCLUDED.service_area_distance_mi,
+       service_area_polygon = EXCLUDED.service_area_polygon,
+       miles_to_depot = EXCLUDED.miles_to_depot,
+       notes = EXCLUDED.notes,
+       photo_refs = EXCLUDED.photo_refs,
+       photo_status = EXCLUDED.photo_status,
+       photo_diligence_count = EXCLUDED.photo_diligence_count,
+       photo_listing_count = EXCLUDED.photo_listing_count,
+       photos_checked = EXCLUDED.photos_checked,
+       photo_notes = EXCLUDED.photo_notes,
+       universe_id = EXCLUDED.universe_id,
+       listing_status = EXCLUDED.listing_status,
+       score = EXCLUDED.score,
+       location_points = EXCLUDED.location_points,
+       ${pointAssign}
+       ${ratingAssign}
+       coord_status = EXCLUDED.coord_status,
+       sheet = EXCLUDED.sheet,
+       sheet_writes = EXCLUDED.sheet_writes,
+       facts = EXCLUDED.facts,
+       fact_sources = EXCLUDED.fact_sources,
+       version = EXCLUDED.version,
+       updated_at = clock_timestamp(),
+       updated_by = EXCLUDED.updated_by`;
 }
 
 async function writeSite(
@@ -446,7 +585,7 @@ async function writeSite(
         : parseSheet(JSON.stringify(previous?.sheet_writes ?? {}));
   const writes = { ...priorWrites };
   if (mode === "workbook") {
-    for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points"] as const) {
+    for (const field of [...SITE_NUMERIC_FIELDS, "score", "location_points", "economics_points", "land_points", "power_points", "deal_points"] as const) {
       if (field === "lat" || field === "lng") continue;
       if (stored[field]) sources[field] = change.source;
       else delete sources[field];
@@ -494,102 +633,79 @@ async function writeSite(
   if (perAcre) facts.price_per_acre = perAcre;
   else delete facts.price_per_acre;
   const photos = storedPhotos(stored.photo_refs);
-  await sql.query(
-    `INSERT INTO sites (
-       site_id, name, address, market, lat, lng, category, broker, firm, listing_url,
-       asking_price, acreage, apn, land_value, improvement_value, county_value, county_value_basis,
-       service_area_class, service_area_distance_mi, service_area_polygon, miles_to_depot,
-       notes, photo_refs, photo_status, photo_diligence_count, photo_listing_count, photos_checked, photo_notes,
-       universe_id, listing_status, score, location_points, coord_status, sheet, sheet_writes, facts, fact_sources, version, updated_by
-     ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-       $11, $12, $13, $14, $15, $16, $17,
-       $18, $19, $20, $21,
-       $22, $23::jsonb, $24, $25, $26, $27, $28,
-       $29, $30, $31, $32, $33, $34::jsonb, $35::jsonb, $36::jsonb, $37::jsonb, $38, $39
-     )
-     ON CONFLICT (site_id) DO UPDATE SET
-       name = EXCLUDED.name,
-       address = EXCLUDED.address,
-       market = EXCLUDED.market,
-       lat = EXCLUDED.lat,
-       lng = EXCLUDED.lng,
-       category = EXCLUDED.category,
-       broker = EXCLUDED.broker,
-       firm = EXCLUDED.firm,
-       listing_url = EXCLUDED.listing_url,
-       asking_price = EXCLUDED.asking_price,
-       acreage = EXCLUDED.acreage,
-       apn = EXCLUDED.apn,
-       land_value = EXCLUDED.land_value,
-       improvement_value = EXCLUDED.improvement_value,
-       county_value = EXCLUDED.county_value,
-       county_value_basis = EXCLUDED.county_value_basis,
-       service_area_class = EXCLUDED.service_area_class,
-       service_area_distance_mi = EXCLUDED.service_area_distance_mi,
-       service_area_polygon = EXCLUDED.service_area_polygon,
-       miles_to_depot = EXCLUDED.miles_to_depot,
-       notes = EXCLUDED.notes,
-       photo_refs = EXCLUDED.photo_refs,
-       photo_status = EXCLUDED.photo_status,
-       photo_diligence_count = EXCLUDED.photo_diligence_count,
-       photo_listing_count = EXCLUDED.photo_listing_count,
-       photos_checked = EXCLUDED.photos_checked,
-       photo_notes = EXCLUDED.photo_notes,
-       universe_id = EXCLUDED.universe_id,
-       listing_status = EXCLUDED.listing_status,
-       score = EXCLUDED.score,
-       location_points = EXCLUDED.location_points,
-       coord_status = EXCLUDED.coord_status,
-       sheet = EXCLUDED.sheet,
-       sheet_writes = EXCLUDED.sheet_writes,
-       facts = EXCLUDED.facts,
-       fact_sources = EXCLUDED.fact_sources,
-       version = EXCLUDED.version,
-       updated_at = clock_timestamp(),
-       updated_by = EXCLUDED.updated_by`,
-    [
-      change.site_id,
-      stored.name,
-      stored.address,
-      stored.market,
-      stored.lat,
-      stored.lng,
-      stored.category,
-      stored.broker,
-      stored.firm,
-      stored.listing_url,
-      stored.asking_price,
-      stored.acreage,
-      stored.apn,
-      stored.land_value,
-      stored.improvement_value,
-      stored.county_value,
-      stored.county_value_basis,
-      stored.service_area_class,
-      stored.service_area_distance_mi,
-      stored.service_area_polygon,
-      stored.miles_to_depot,
-      stored.notes,
-      JSON.stringify(photos),
-      stored.photo_status,
-      stored.photo_diligence_count,
-      stored.photo_listing_count,
-      stored.photos_checked,
-      stored.photo_notes,
-      stored.universe_id,
-      stored.listing_status,
-      stored.score,
-      stored.location_points,
-      coord,
-      sheetCanonical(sheet),
-      writesCanonical(writes),
-      JSON.stringify(facts),
-      JSON.stringify(sources),
-      version,
-      actorId,
-    ],
-  );
+  const derived = derivePowerRating({ market: stored.market, ...facts });
+  const throughLocation = [
+    change.site_id,
+    stored.name,
+    stored.address,
+    stored.market,
+    stored.lat,
+    stored.lng,
+    stored.category,
+    stored.broker,
+    stored.firm,
+    stored.listing_url,
+    stored.asking_price,
+    stored.acreage,
+    stored.apn,
+    stored.land_value,
+    stored.improvement_value,
+    stored.county_value,
+    stored.county_value_basis,
+    stored.service_area_class,
+    stored.service_area_distance_mi,
+    stored.service_area_polygon,
+    stored.miles_to_depot,
+    stored.notes,
+    JSON.stringify(photos),
+    stored.photo_status,
+    stored.photo_diligence_count,
+    stored.photo_listing_count,
+    stored.photos_checked,
+    stored.photo_notes,
+    stored.universe_id,
+    stored.listing_status,
+    stored.score,
+    stored.location_points,
+  ];
+  const pointValues = [stored.economics_points, stored.land_points, stored.power_points, stored.deal_points];
+  const ratingValues = [derived.rating, derived.reason, JSON.stringify(derived.inputs)];
+  const tail = [
+    coord,
+    sheetCanonical(sheet),
+    writesCanonical(writes),
+    JSON.stringify(facts),
+    JSON.stringify(sources),
+    version,
+    actorId,
+  ];
+  const attempts: Array<[boolean, boolean]> = [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ];
+  let saved = false;
+  let lastError: unknown;
+  for (const [includePoints, includeRating] of attempts) {
+    try {
+      await sql.query(
+        siteUpsertSql(includePoints, includeRating),
+        [
+          ...throughLocation,
+          ...(includePoints ? pointValues : []),
+          ...(includeRating ? ratingValues : []),
+          ...tail,
+        ],
+      );
+      saved = true;
+      break;
+    } catch (error) {
+      if (!undefinedColumn(error)) throw error;
+      lastError = error;
+    }
+  }
+  if (!saved) throw lastError;
   return { ...stored, photo_refs: photoCanonical(photos), sources };
 }
 
@@ -655,7 +771,28 @@ async function applyOne(
       ? "pnl_line"
       : change.entity_type === "site_space"
         ? "site_space"
-        : "activity";
+        : change.entity_type === "data_conflict"
+          ? "data_conflict"
+          : change.entity_type === "comment"
+            ? "comment"
+            : "activity";
+  if (change.listing_replay) {
+    const replayVersion = await readVersion(sql, change);
+    const event = await sql.query<{ id: string }>(
+      `SELECT id FROM events WHERE entity_type = 'site' AND site_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1`,
+      [change.site_id],
+    );
+    const minted = change.payload as SitePayload;
+    return {
+      entity_type: "site",
+      entity_id: change.site_id,
+      site_id: change.site_id,
+      event_id: event.rows[0]?.id || "",
+      version: replayVersion,
+      universe_id: minted.fields.universe_id || "",
+      listing_id: minted.mint?.listing_id,
+    };
+  }
   const entityId = tag
     ? `${change.site_id}:${family}`
     : siteKeyed
@@ -671,8 +808,19 @@ async function applyOne(
   let payload: Record<string, unknown>;
   if (change.entity_type === "stage") {
     const written = await applyStage(sql, change, actor.id, version, mode);
-    const at = (change.payload as StagePayload).at;
-    payload = { ...written.stored, previous_stage: written.previousStage, ...(at ? { at } : {}) };
+    const stageBody = change.payload as StagePayload;
+    if (stageBody.decision_source === "agent" && written.previousStage !== "1 Desk screen") {
+      throw new InputError("An agent can only move a site from Desk screen to Financial screen.", 403);
+    }
+    const at = stageBody.at;
+    payload = {
+      ...written.stored,
+      previous_stage: written.previousStage,
+      ...(at ? { at } : {}),
+      ...(stageBody.decision_source === "agent"
+        ? { decision_source: "agent", receipt: stageBody.receipt, cited_source: change.source }
+        : {}),
+    };
   } else if (change.entity_type === "site") {
     payload = await writeSite(sql, change, actor.id, version, mode);
   } else if (change.entity_type === "activity") {
@@ -701,6 +849,74 @@ async function applyOne(
     });
     if (!written.ok) throw conflict(change, written.entityId, written.actual);
     payload = written.payload;
+  } else if (change.entity_type === "data_conflict") {
+    const body = change.payload as ConflictPayload;
+    const written = await storeConflict(sql, entityId, {
+      siteId: change.site_id,
+      subject: body.subject,
+      field: body.field,
+      period: body.period,
+      sources: body.sources,
+      valueInUse: body.value_in_use,
+      status: body.status,
+      resolutionNote: body.resolution_note,
+      actor: actor.id,
+      at: body.at,
+    }, change.expected_version);
+    if ("conflict" in written) throw conflict(change, written.conflict.id, written.conflict.version);
+    const stored = written.record;
+    payload = {
+      subject: stored.subject,
+      field: stored.field,
+      period: stored.period,
+      sources: stored.sources,
+      value_in_use: stored.valueInUse,
+      status: stored.status,
+      resolution_note: stored.resolutionNote,
+      created_by: stored.createdBy,
+      updated_by: stored.updatedBy,
+      created_at: stored.createdAt,
+      updated_at: stored.updatedAt,
+      actor: actor.id,
+      at: body.at,
+    };
+  } else if (change.entity_type === "comment") {
+    const body = change.payload as CommentPayload;
+    const written = await storeComment(sql, entityId, {
+      siteId: change.site_id,
+      parentId: body.parent_id || null,
+      anchor: body.anchor
+        ? {
+            type: body.anchor.type,
+            siteId: change.site_id,
+            line: body.anchor.line,
+            period: body.anchor.period,
+            spaceId: body.anchor.space_id,
+            label: "",
+          }
+        : null,
+      body: body.body ?? null,
+      tag: body.tag ?? null,
+      mentions: body.mentions ?? null,
+      resolved: body.resolved ?? null,
+      actor: actor.id,
+      at: body.at,
+    }, change.expected_version);
+    if (!written.ok) throw conflict(change, written.id, written.version);
+    payload = {
+      anchor: {
+        type: written.anchor.type,
+        line: written.anchor.line,
+        period: written.anchor.period,
+        space_id: written.anchor.spaceId,
+        label: written.anchor.label,
+      },
+      tag: written.tag,
+      resolved: written.resolved,
+      parent_id: body.parent_id || "",
+      actor: actor.id,
+      at: body.at,
+    };
   } else if (change.entity_type === "site_space") {
     const space = change.payload as SiteSpacePayload;
     payload = await storeSiteSpace(sql, {
@@ -721,30 +937,46 @@ async function applyOne(
       layout: space.deleted ? undefined : space.layout,
     });
   } else {
+    change.payload = await attachCommsRelink(sql, actor, change);
     payload = await writeComms(sql, change, entityId, actor.id, version);
   }
+  if (change.entity_type === "site" && (change.payload as SitePayload).mint) {
+    await rememberMint(sql, actor, change);
+  }
+  const stageBody = change.entity_type === "stage" ? (change.payload as StagePayload) : null;
   const eventId = await insertEvent(sql, {
     entityType: change.entity_type,
     entityId,
     siteId: change.site_id,
     payload,
-    source: change.source,
+    source: stageBody?.decision_source === "agent" ? AGENT_STAGE_DECISION_SOURCE : change.source,
     actor: actor.id,
     idempotencyKey,
     runId,
   });
   try {
     const { indexRecord } = await import("@/lib/search/docs");
+    const indexPayload = change.entity_type === "comment"
+      ? { ...payload, body: (change.payload as CommentPayload).body || "" }
+      : payload;
     await indexRecord(sql, {
       entityType: change.entity_type,
       entityId,
       siteId: change.site_id,
-      payload,
+      payload: indexPayload,
     });
   } catch (error) {
     console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));
   }
-  return { entity_type: change.entity_type, entity_id: entityId, site_id: change.site_id, event_id: eventId, version };
+  const minted = change.entity_type === "site" ? (change.payload as SitePayload).mint : undefined;
+  return {
+    entity_type: change.entity_type,
+    entity_id: entityId,
+    site_id: change.site_id,
+    event_id: eventId,
+    version,
+    ...(minted ? { universe_id: (change.payload as SitePayload).fields.universe_id || "", listing_id: minted.listing_id } : {}),
+  };
 }
 
 const SYSTEM_ACTOR: Actor = { id: "system", kind: "agent" };
@@ -794,7 +1026,13 @@ async function ensureCapture(
       );
     }
     const hasActivity = changes.some((row) => row.entity_type === "activity" && row.site_id === change.site_id);
-    if (!hasActivity) {
+    const alreadyAdded = hasActivity
+      ? { rows: [{}] }
+      : await sql.query(
+          `SELECT 1 FROM activities WHERE site_id = $1 AND payload->>'summary' = 'Site added' LIMIT 1`,
+          [change.site_id],
+        );
+    if (!hasActivity && !alreadyAdded.rows.length) {
       const zoned = parseZonedTimestamp(formatZonedTimestamp());
       if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
       const payload: ActivityPayload = { date: zoned.date, date_iso: zoned.iso, type: "capture", summary: "Site added" };
@@ -815,6 +1053,54 @@ async function ensureCapture(
         ),
       );
     }
+  }
+  return extra;
+}
+
+async function ensureReceiptMoves(
+  sql: Sql,
+  actor: Actor,
+  changes: ParsedChange[],
+  idempotencyKey: string,
+  runId: string,
+  mode: "api" | "workbook",
+): Promise<ChangeResult[]> {
+  if (mode !== "api") return [];
+  const extra: ChangeResult[] = [];
+  for (const change of changes) {
+    if (change.entity_type !== "stage") continue;
+    const stage = change.payload as StagePayload;
+    if (stage.decision_source !== "agent" || !stage.receipt) continue;
+    const existing = await sql.query(
+      `SELECT 1 FROM activities WHERE site_id = $1 AND payload->>'summary' = $2 LIMIT 1`,
+      [change.site_id, RECEIPT_ACTIVITY_SUMMARY],
+    );
+    if (existing.rows.length) continue;
+    const zoned = parseZonedTimestamp(formatZonedTimestamp());
+    if (!zoned) throw new InputError("Use an ISO-8601 time with a zone offset.");
+    const payload: ActivityPayload = {
+      date: zoned.date,
+      date_iso: zoned.iso,
+      type: "stage",
+      summary: RECEIPT_ACTIVITY_SUMMARY,
+      source_link: receiptCitation(stage.receipt),
+    };
+    extra.push(
+      await applyOne(
+        sql,
+        actor,
+        {
+          entity_type: "activity",
+          site_id: change.site_id,
+          expected_version: 0,
+          source: AGENT_STAGE_DECISION_SOURCE,
+          payload,
+        },
+        `${idempotencyKey}#receipt:${change.site_id}`,
+        runId,
+        mode,
+      ),
+    );
   }
   return extra;
 }
@@ -850,10 +1136,12 @@ export async function applyParsedChanges(
       [runId, actor.id, notes.slice(0, 500)],
     );
     const results: ChangeResult[] = [];
-    for (let index = 0; index < changes.length; index += 1) {
-      results.push(await applyOne(sql, actor, changes[index], `${idempotencyKey}#${index}`, runId, mode));
+    const writable = await prepareMintedSites(sql, changes);
+    for (let index = 0; index < writable.length; index += 1) {
+      results.push(await applyOne(sql, actor, writable[index], `${idempotencyKey}#${index}`, runId, mode));
     }
-    results.push(...(await ensureCapture(sql, actor, changes, idempotencyKey, runId, mode)));
+    results.push(...(await ensureCapture(sql, actor, writable, idempotencyKey, runId, mode)));
+    results.push(...(await ensureReceiptMoves(sql, actor, writable, idempotencyKey, runId, mode)));
     if (results.some((row) => row.entity_type === "stage")) {
       await sql.exec("SAVEPOINT proposal_close");
       try {
@@ -901,8 +1189,179 @@ export async function applyBatch(sql: Sql, actor: Actor, idempotencyKey: string,
   return applyParsedChanges(sql, actor, key, changes, "api", "api", options);
 }
 
+const LABELED_ID = /^(PIPE|LAND|WB)-([A-Z]{2,4})-(\d+)$/;
+
+/** Highest suffix for each PIPE, LAND, or WB prefix. The name is the id_counters key. */
+export function labeledIdFloors(ids: string[]): { name: string; value: number }[] {
+  const max = new Map<string, number>();
+  for (const id of ids) {
+    const match = LABELED_ID.exec(String(id || "").trim());
+    if (!match) continue;
+    const name = `${match[1]}:${match[2]}`;
+    max.set(name, Math.max(max.get(name) || 0, Number(match[3])));
+  }
+  return [...max.entries()].map(([name, value]) => ({ name, value }));
+}
+
+function formatLabeled(prefix: string, value: number): string {
+  return `${prefix}${String(value).padStart(4, "0")}`;
+}
+
+async function nextLabeled(sql: Sql, counter: string, prefix: string, scans: string[]): Promise<string> {
+  await lockKey(sql, `mint:${counter}`);
+  let floor = 0;
+  const counterRow = await sql.query<{ value: number | string }>(`SELECT value FROM id_counters WHERE name = $1`, [counter]);
+  floor = Math.max(floor, Number(counterRow.rows[0]?.value || 0));
+  for (const scan of scans) {
+    const rows = await sql.query<{ id: string }>(scan, [`${prefix}%`]);
+    for (const row of rows.rows) floor = Math.max(floor, numericSuffix(prefix, String(row.id || "")));
+  }
+  let next = floor + 1;
+  let id = formatLabeled(prefix, next);
+  while (isExcludedSite(id)) {
+    next += 1;
+    id = formatLabeled(prefix, next);
+  }
+  await sql.query(
+    `INSERT INTO id_counters (name, value) VALUES ($1, $2)
+     ON CONFLICT (name) DO UPDATE SET value = GREATEST(id_counters.value, EXCLUDED.value)`,
+    [counter, next],
+  );
+  return id;
+}
+
+/** Next PIPE/LAND id and the next Universe id for one market. Locks each counter for the transaction. */
+export async function mintSitePair(
+  sql: Sql,
+  kind: "pipeline" | "land",
+  market: string,
+): Promise<{ siteId: string; universeId: string }> {
+  const prefix = kind === "land" ? "LAND" : "PIPE";
+  const sitePrefix = `${prefix}-${market}-`;
+  const universePrefix = `WB-${market}-`;
+  const siteId = await nextLabeled(sql, `${prefix}:${market}`, sitePrefix, [
+    `SELECT site_id AS id FROM sites WHERE site_id LIKE $1`,
+    `SELECT site_id AS id FROM site_mints WHERE site_id LIKE $1`,
+  ]);
+  const universeId = await nextLabeled(sql, `WB:${market}`, universePrefix, [
+    `SELECT universe_id AS id FROM sites WHERE universe_id LIKE $1`,
+    `SELECT universe_id AS id FROM universe_rows WHERE universe_id LIKE $1`,
+    `SELECT universe_id AS id FROM site_mints WHERE universe_id LIKE $1`,
+  ]);
+  return { siteId, universeId };
+}
+
+function listingHash(payload: SitePayload): string {
+  const mint = payload.mint;
+  const fields = { ...payload.fields };
+  delete fields.universe_id;
+  return createHash("sha256")
+    .update(
+      canonicalJson({
+        kind: mint?.kind || "",
+        listing_id: mint?.listing_id || "",
+        market: fields.market || "",
+        fields,
+        sources: payload.sources || {},
+      }),
+    )
+    .digest("hex");
+}
+
+async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<ParsedChange[]> {
+  const prepared: ParsedChange[] = [];
+  for (const change of changes) {
+    const mint = change.entity_type === "site" ? (change.payload as SitePayload).mint : undefined;
+    if (!mint || change.expected_version !== 0 || change.site_id) {
+      prepared.push(change);
+      continue;
+    }
+    const payload = change.payload as SitePayload;
+    const market = payload.fields.market || "";
+    if (!CREATE_MARKETS.includes(market as (typeof CREATE_MARKETS)[number])) {
+      throw new InputError("A new site needs a market of PHX, LAS, or MIA.");
+    }
+    const hash = listingHash(payload);
+    await lockKey(sql, `listing:${mint.listing_id}`);
+    const existing = await sql.query<{ site_id: string; universe_id: string; request_hash: string }>(
+      `SELECT site_id, universe_id, request_hash FROM site_mints WHERE listing_id = $1`,
+      [mint.listing_id],
+    );
+    const prior = existing.rows[0];
+    if (prior) {
+      if (prior.request_hash !== hash) throw new InputError("This listing id was already used for a different site.", 409);
+      prepared.push({
+        ...change,
+        site_id: prior.site_id,
+        listing_replay: true,
+        payload: { ...payload, fields: { ...payload.fields, universe_id: prior.universe_id } },
+      });
+      continue;
+    }
+    const minted = await mintSitePair(sql, mint.kind, market);
+    prepared.push({
+      ...change,
+      site_id: minted.siteId,
+      payload: { ...payload, fields: { ...payload.fields, universe_id: minted.universeId } },
+    });
+  }
+  return prepared;
+}
+
+async function rememberMint(sql: Sql, actor: Actor, change: ParsedChange): Promise<void> {
+  const payload = change.payload as SitePayload;
+  const mint = payload.mint;
+  const universeId = payload.fields.universe_id || "";
+  if (!mint || !universeId) return;
+  const fields = payload.fields;
+  await sql.query(
+    `INSERT INTO site_mints (listing_id, site_id, universe_id, kind, market, request_hash, actor)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [mint.listing_id, change.site_id, universeId, mint.kind, fields.market || "", listingHash(payload), actor.id],
+  );
+  await sql.query(
+    `INSERT INTO universe_rows (
+       universe_id, market, site_id, name, address, category, apn, lat, lng, listing_url, broker, listing_id, counted, created_by
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Yes', $13)`,
+    [
+      universeId,
+      fields.market || "",
+      change.site_id,
+      fields.name || "",
+      fields.address || "",
+      fields.category || "",
+      fields.apn || "",
+      fields.lat || "",
+      fields.lng || "",
+      fields.listing_url || "",
+      fields.broker || "",
+      mint.listing_id,
+      actor.id,
+    ],
+  );
+}
+
+async function attachCommsRelink(sql: Sql, actor: Actor, change: ParsedChange): Promise<CommsPayload> {
+  const payload: CommsPayload = { ...(change.payload as CommsPayload) };
+  if (actor.kind !== "agent" || change.expected_version === 0) return payload;
+  const prior = await sql.query<{ site_id: string }>(`SELECT site_id FROM comms_entries WHERE entity_id = $1`, [change.entity_id]);
+  const current = (prior.rows[0]?.site_id || "").trim();
+  if (current === change.site_id) return payload;
+  const open = current === "" || LISTING_ID.test(current);
+  if (!open || !SITE_ID.test(change.site_id)) {
+    throw new InputError("An agent can only attach a comms row that has no site or a listing id.", 403);
+  }
+  if (payload.relink_from === undefined || payload.relink_from !== current) {
+    throw new InputError("A comms relink names the current blank site or listing id in relink_from.");
+  }
+  payload.relinked_from = current;
+  payload.relinked_by = actor.id;
+  payload.site_ids = change.site_id;
+  return payload;
+}
+
 /** Highest numeric suffix already stored, so a later mint does not reuse a workbook id. */
-export async function raiseIdFloor(sql: Sql, name: "activity" | "comms" | "event", value: number): Promise<void> {
+export async function raiseIdFloor(sql: Sql, name: string, value: number): Promise<void> {
   if (value < 1) return;
   await sql.query(
     `INSERT INTO id_counters (name, value) VALUES ($1, $2)

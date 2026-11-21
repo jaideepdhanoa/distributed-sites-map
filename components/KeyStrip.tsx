@@ -10,6 +10,9 @@ import { basisBadge } from "@/lib/pricing";
 import { stripGmailIds } from "@/lib/displayText";
 import PricingSection from "./PricingSection";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
+import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
+import { COMMENT_CHANGED } from "@/lib/comments/nav";
+import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
@@ -157,24 +160,42 @@ export default function KeyStrip({
   const [financialsOpen, setFinancialsOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
+  const [conflicts, setConflicts] = useState<DataConflict[]>([]);
+  const [comments, setComments] = useState<OpenPnlComment[]>([]);
+  const [commentTick, setCommentTick] = useState(0);
+  useEffect(() => {
+    const refresh = () => setCommentTick((value) => value + 1);
+    window.addEventListener(COMMENT_CHANGED, refresh);
+    return () => window.removeEventListener(COMMENT_CHANGED, refresh);
+  }, []);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
     setFinancialsOpen(deepFinancials && signedIn === true && showFinancials);
     setFinancials(null);
+    setConflicts([]);
+    setComments([]);
   }, [deal.deal_id, deepFinancials, signedIn, showFinancials]);
   useEffect(() => {
     if (!signedIn || !showFinancials) return undefined;
     let cancel = false;
+    if (commentTick === 0) {
+      setFinancials(null);
+      setConflicts([]);
+      setComments([]);
+    }
     fetch(`/api/data/financials/${encodeURIComponent(deal.deal_id)}`, { cache: "no-store" })
-      .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel : null))
+      .then(async (response) => (response.ok ? (await response.json()) as FinancialPanel & { conflicts?: unknown; comments?: unknown } : null))
       .then((panel) => {
-        if (!cancel && panel) setFinancials({ ...panel, pnl: readPnl(panel.pnl) });
+        if (cancel || !panel) return;
+        setFinancials({ ...panel, pnl: readPnl(panel.pnl) });
+        setConflicts(conflictList(panel.conflicts));
+        setComments(commentList(panel.comments));
       })
       .catch(() => undefined);
     return () => {
       cancel = true;
     };
-  }, [signedIn, showFinancials, deal.deal_id]);
+  }, [signedIn, showFinancials, deal.deal_id, commentTick]);
   const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
   const shownPanel = showFinancials ? (financials ?? fallbackPanel) : null;
   const population = trade.find((line) => line.startsWith("3-mile population"));
@@ -247,7 +268,7 @@ export default function KeyStrip({
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
       {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
-        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} initialGrain={grain} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={signedIn ? deal.deal_id : ""} initialGrain={grain} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
         document.body,
       ) : null}
       {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (

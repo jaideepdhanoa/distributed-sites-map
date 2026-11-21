@@ -1,6 +1,7 @@
 import { NOT_IN_PACKAGE } from "../keyNumbers";
 import { buildPnlGrid } from "./grid";
-import type { PnlStatement } from "./statement";
+import type { PnlStatement, PnlYearView } from "./statement";
+import { windowCoverage } from "./window";
 
 export { packageOnFile } from "./package.ts";
 
@@ -12,31 +13,56 @@ export type FinancialsCard = {
   coverage: string;
 };
 
-function amount(statement: PnlStatement, year: number, id: string): string {
-  const grid = buildPnlGrid(statement, "years");
-  const view = statement.years.find((item) => item.year === year);
-  const columnId = view?.annual?.id || `year-${year}`;
+function amount(statement: PnlStatement, mode: "months" | "years", year: number, columnId: string, id: string): string {
+  const grid = buildPnlGrid(statement, mode, mode === "months" ? year : undefined);
   const index = grid.columns.findIndex((column) => column.id === columnId);
   if (index < 0) return "";
   const cell = grid.rows.find((row) => row.id === id)?.cells[index];
   return cell?.kind === "value" ? cell.amount : "";
 }
 
-/** Compact figures for the latest full year, plus coverage across every captured year. */
+function shownYear(statement: PnlStatement): PnlYearView | null {
+  return statement.years.find((year) => year.annual || year.ranges?.length || year.months.some(Boolean) || year.missingMonths?.length) ?? null;
+}
+
+function calendarYearLabel(period: { year: number; columnLabel: string; periodStart: string; periodEnd: string }): string {
+  const startYear = period.periodStart.slice(0, 4);
+  if (
+    startYear === String(period.year)
+    && period.periodEnd.slice(0, 4) === startYear
+    && period.periodStart.endsWith("-01-01")
+    && period.periodEnd.endsWith("-12-31")
+  ) {
+    return `FY${period.year}`;
+  }
+  return period.columnLabel || `FY${period.year}`;
+}
+
+/**
+ * Figures from the same column the sheet shows for this period.
+ * A full year uses that statement. A partial uses the year-to-date sum of
+ * its months, which leaves missing months out. A stored range statement is
+ * used only when that window has no monthly lines.
+ */
 export function financialsCard(statement: PnlStatement, sample = false): FinancialsCard | null {
   if (statement.status !== "ready" || !statement.years.length) return null;
-  const full = statement.years.find((year) => year.annual) ?? statement.years[0];
-  const sde = amount(statement, full.year, "sde");
-  const ebitda = amount(statement, full.year, "ebitda");
-  const years = statement.years.map((year) => year.year).sort((a, b) => a - b);
-  const span = years.length === 1 ? `FY${years[0]}` : `FY${years[0]}–${years[years.length - 1]}`;
-  const months = statement.years.reduce((sum, year) => sum + year.months.filter(Boolean).length, 0);
-  const coverage = `${span} · ${months} of ${statement.years.length * 12} months${sample ? " · Sample package" : ""}`;
+  const year = shownYear(statement);
+  if (!year) return null;
+  const statementColumn = Boolean(year.annual);
+  const mode = statementColumn ? "years" : "months";
+  const columnId = statementColumn ? year.annual!.id : "ytd";
+  const read = (id: string) => amount(statement, mode, year.year, columnId, id);
+  const sde = read("sde");
+  const ebitda = read("ebitda");
+  const periodLabel = statementColumn
+    ? `${calendarYearLabel(year.annual!)} · ${year.months.filter(Boolean).length} of 12 months`
+    : (year.months.some(Boolean) || year.missingMonths?.length ? windowCoverage(year) : year.ranges?.[0]?.columnLabel) || `FY${year.year}`;
+  const coverage = `${periodLabel}${sample ? " · Sample package" : ""}`;
   return {
-    revenue: amount(statement, full.year, "total-revenue") || "—",
+    revenue: read("total-revenue") || "—",
     cash: sde || ebitda || "—",
     cashLabel: sde ? "SDE" : "EBITDA",
-    margin: (sde ? amount(statement, full.year, "sde-margin") : "") || amount(statement, full.year, "margin") || "—",
+    margin: (sde ? read("sde-margin") : "") || read("margin") || "—",
     coverage,
   };
 }

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { canCloseProposal } from "@/lib/actions/proposalAccess";
-import { allowsAssignee, allowsDate, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, showCardBringBack, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
+import { suggestedDropProposal } from "@/lib/actions/nextStep";
+import { allowsAssignee, allowsDate, droppedStage, emptyNextStepActions, forwardStageId, NEXT_STEP_TYPES, nextStageChoices, nextStepType, nextStepTypeLabel, showCardBringBack, stageMoveLabel, type NextStepTypeId } from "@/lib/actions/nextStepTypes";
 import { stripGmailIds } from "@/lib/displayText";
 import { plainNextStep } from "@/lib/nextStepLine";
 import { stageTitle } from "@/lib/labels";
@@ -17,7 +18,8 @@ import { ReasonPicker } from "../ReasonPicker";
 import { TagChip } from "../TagChip";
 import type { TagView } from "@/lib/tags/map";
 import { tagFamily } from "@/lib/tags/vocab";
-import { SuggestedDropMark } from "../SuggestedDrop";
+import NoteBody from "../NoteBody";
+import { suggestedDropPhrase } from "@/lib/suggestedDropLine";
 import { approvedStage, publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { quietActionsFetch } from "@/lib/actions/quiet";
 import { formatPacific } from "@/lib/actions/time";
@@ -110,7 +112,7 @@ function sameIdea(title: string, kind: string) {
 function statusMark(status: string) {
   if (status === "ready") return { label: "Ready for approval", tone: "pending" };
   if (status === "agreed_waiting") return { label: "Agreed, waiting", tone: "held" };
-  return { label: "Waiting for approval", tone: "pending" };
+  return { label: "Awaiting approval", tone: "pending" };
 }
 
 export function NextStepCard({
@@ -123,6 +125,7 @@ export function NextStepCard({
   suggestedDrop,
   blocker,
   chips,
+  waitingShown = false,
 }: {
   kind: "site" | "deal";
   id: string;
@@ -133,6 +136,8 @@ export function NextStepCard({
   suggestedDrop?: string | null;
   blocker?: (Pick<DealProps, "stage" | "stage_group"> & Partial<Pick<DealProps, "stage_blocker" | "stage_blocker_since">>) | null;
   chips?: TagView[];
+  /** The decision row already shows the waiting chip. */
+  waitingShown?: boolean;
 }) {
   const params = useSearchParams();
   const proposal = params.get("panel") === "proposal";
@@ -158,6 +163,8 @@ export function NextStepCard({
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [dropHidden, setDropHidden] = useState(false);
+  const dropKey = `sites-drop-hide:${kind}:${id}`;
   const [closeReason, setCloseReason] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [decisionRecommendationId, setDecisionRecommendationId] = useState<string | null>(null);
@@ -290,7 +297,8 @@ export function NextStepCard({
     else if (nextStepType(focus.detail) === "stage_move") setOutcome("agreed_waiting");
     else setOutcome("accepted");
     setCloseReason("");
-    setDecisionNote("");
+    const stageDecision = nextStepType(focus.detail) === "knock_off" || nextStepType(focus.detail) === "stage_move" || nextStepType(focus.detail) === "bring_back";
+    setDecisionNote(stageDecision ? focus.reason || "" : "");
     setDecisionRecommendationId(null);
     setHoldLabel("");
     setHoldParty("");
@@ -319,21 +327,36 @@ export function NextStepCard({
     window.dispatchEvent(new CustomEvent("sites-sheet-snap", { detail: "full" }));
   }, [status.enabled, reviewer, open, focus, proposal, reviewing]);
 
+  useEffect(() => {
+    try {
+      setDropHidden(sessionStorage.getItem(dropKey) === "1");
+    } catch {
+      setDropHidden(false);
+    }
+  }, [dropKey]);
+
   const workbookDue = workbook?.due ? contactDate(workbook.due) : "";
   const workbookBlock = signedIn && workbook ? <WorkbookLine text={workbook.text} owner={workbook.owner} due={workbookDue} /> : null;
   const nextAction = chips?.find((chip) => chip.family === "next_action");
-  const waiting = chips?.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
+  const dropPhrase = suggestedDropPhrase(suggestedDrop || "");
+  const dropProposed = steps.some((item) => nextStepType(item.detail) === "knock_off" && !item.doneAt && item.status !== "rejected" && item.status !== "overtaken");
+  const showDrop = Boolean(dropPhrase) && !droppedStage(stageGroup, recordStage) && !dropHidden && !dropProposed;
   const context = (
     <>
-      <SuggestedDropMark reason={suggestedDrop} stageGroup={stageGroup} stage={recordStage} />
       {nextAction ? <TagChip chip={nextAction} compact={Boolean(workbook?.text)} /> : null}
-      {waiting ? <TagChip chip={waiting} compact /> : !workbook?.text && blocker ? <BlockerLine deal={blocker} /> : null}
+      {waitingShown || workbook?.text || !blocker ? null : <BlockerLine deal={blocker} />}
     </>
   );
   if (!status.enabled) {
     const blocked = blocker ? blockerSentenceForDeal(blocker, pacificToday()) : "";
-    if (!workbookBlock && !String(suggestedDrop || "").trim() && !blocked) return null;
-    return <section className="next-card" data-testid="next-step">{context}{workbookBlock}</section>;
+    if (!workbookBlock && !showDrop && !blocked && !nextAction) return null;
+    return (
+      <section className="next-card" data-testid="next-step">
+        {showDrop ? <div className="suggested-row" data-testid="suggested-drop"><p>{dropPhrase}</p></div> : null}
+        {context}
+        {workbookBlock}
+      </section>
+    );
   }
 
   const approved = steps
@@ -383,6 +406,21 @@ export function NextStepCard({
     resetForm();
     await reload();
     window.dispatchEvent(new Event("queue-refresh"));
+  }
+
+  function dismissDrop() {
+    setDropHidden(true);
+    try {
+      sessionStorage.setItem(dropKey, "1");
+    } catch {
+      // The line stays hidden for this view.
+    }
+  }
+
+  function acceptDrop() {
+    const proposal = suggestedDropProposal(suggestedDrop || "");
+    if (!proposal.reason || !writable) return;
+    void submit("/api/actions/suggestions", { targetKind: kind, targetId: id, ...proposal });
   }
 
   function startEdit(item: Step) {
@@ -547,7 +585,7 @@ export function NextStepCard({
             <ul>
               {proposalNotes.map((note) => (
                 <li key={note.id}>
-                  <p>{stripGmailIds(note.body)}</p>
+                  <NoteBody text={note.body} />
                   <p className="proposal-meta">{who(accounts, note.authorId)} · {formatPacific(note.createdAt)}</p>
                 </li>
               ))}
@@ -606,6 +644,8 @@ export function NextStepCard({
             onHoldFollow={setHoldFollow}
             pending={pending}
             stageMove={stepType === "stage_move" || stepType === "bring_back"}
+            acceptReason={stepType === "knock_off" || stepType === "stage_move" || stepType === "bring_back"}
+            reasonRequired={stepType === "knock_off" || stepType === "bring_back"}
             needsCount={needs.length}
             onSend={() => {
               if (outcome === "reply") {
@@ -675,32 +715,32 @@ export function NextStepCard({
   } else if (!open) {
     body = (
       <>
-        <div className="next-step-row">
-          {workbookBlock || <h3>Next step</h3>}
-          <div className="step-actions" role="group" aria-label="Next step type">
-            {emptyNextStepActions(stageGroup, recordStage).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                data-testid={`empty-step-${item.id}`}
-                onClick={() => {
-                  setType(item.id);
-                  setStage(item.id === "stage_move" ? forward : "");
-                  setOpen(true);
-                }}
-                className={item.prominent ? "paper-btn" : "text-link"}
-              >
-                {item.id === "stage_move" ? moveLabel : nextStepTypeLabel(item.id)}
-              </button>
-            ))}
+        {workbookBlock}
+        <div className="stage-actions" role="group" aria-label="Stage actions">
+          <div className="decision-actions">
+          {emptyNextStepActions(stageGroup, recordStage).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              data-testid={item.id === "bring_back" ? "bring-back-dropped" : `empty-step-${item.id}`}
+              onClick={() => {
+                setType(item.id);
+                setStage(item.id === "stage_move" ? forward : "");
+                setOpen(true);
+              }}
+              className={item.prominent ? "primary" : "paper-btn"}
+            >
+              {item.id === "stage_move" ? moveLabel : nextStepTypeLabel(item.id)}
+            </button>
+          ))}
           </div>
         </div>
-        <p className="hint">Approval updates the stage on the map. The database is the record, and the mirror copies it. Do not edit the workbook. Resolving a comment does not change Stage.</p>
       </>
     );
   }
 
   const tone = open ? "compose" : focus ? (nextStepType(focus.detail) === "knock_off" ? "knock" : "pending") : approved ? "approved" : "empty";
+  const idle = !open && !focus && !approved;
   const bringBack = showCardBringBack({
     stageGroup,
     stage: recordStage,
@@ -710,10 +750,21 @@ export function NextStepCard({
   });
   return (
     <section ref={cardRef} className={`next-card ${tone}`} data-testid="next-step" data-panel={proposal ? "proposal" : undefined}>
+      {showDrop ? (
+        <div className="suggested-row" data-testid="suggested-drop">
+          <p>{dropPhrase}</p>
+          {writable ? (
+            <div className="suggested-actions">
+              <button type="button" className="paper-btn" data-testid="suggested-drop-accept" disabled={pending} onClick={acceptDrop}>Accept</button>
+              <button type="button" className="paper-btn" data-testid="suggested-drop-dismiss" disabled={pending} onClick={dismissDrop}>Dismiss</button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {context}
       {tone === "empty" ? null : workbookBlock}
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
-      {bringBack ? (
+      {bringBack && !idle ? (
         <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
       ) : null}
       {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
@@ -815,6 +866,8 @@ function OutcomeForm({
   onHoldFollow,
   pending,
   stageMove,
+  acceptReason,
+  reasonRequired,
   needsCount,
   onSend,
 }: {
@@ -834,6 +887,8 @@ function OutcomeForm({
   onHoldFollow: (value: string) => void;
   pending: boolean;
   stageMove: boolean;
+  acceptReason: boolean;
+  reasonRequired: boolean;
   needsCount: number;
   onSend: () => void;
 }) {
@@ -844,7 +899,9 @@ function OutcomeForm({
   const holdOptional = outcome === "agreed_waiting" && needsCount > 0;
   const holdStarted = Boolean(holdLabel.trim() || holdParty.trim() || holdAsked || holdFollow);
   const showHold = outcome === "agreed_waiting" && (!holdOptional || holdOpen || holdStarted);
-  const showReply = replyNeeded || noteOpen || Boolean(reply.trim());
+  const stageAccept = acceptReason && outcome === "accepted";
+  const showReply = stageAccept || replyNeeded || noteOpen || Boolean(reply.trim());
+  const reasonMissing = stageAccept && reasonRequired && !reply.trim();
   return (
     <form
       className="proposal-decide"
@@ -867,8 +924,8 @@ function OutcomeForm({
       {outcome === "agreed_waiting" ? <p className="hint">The stage stays. This links the open blockers and replies to the proposer.</p> : null}
       {showReply ? (
         <label>
-          Reply
-          <textarea className="field" aria-label="Reply to the proposer" data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded} />
+          {stageAccept ? "Reason" : "Reply"}
+          <textarea className="field" aria-label={stageAccept ? "Reason" : "Reply to the proposer"} data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded || reasonMissing} />
         </label>
       ) : (
         <button type="button" className="text-link" aria-expanded="false" onClick={() => setNoteOpen(true)}>Add a note</button>
@@ -903,7 +960,7 @@ function OutcomeForm({
         <button type="button" className="text-link" aria-expanded="false" onClick={() => setHoldOpen(true)}>Add a hold</button>
       ) : null}
       <div className="proposal-send">
-        <button type="submit" className="propose" disabled={pending || holdNeeded || (replyNeeded && !reply.trim())}>Send</button>
+        <button type="submit" className="propose" disabled={pending || holdNeeded || reasonMissing || (replyNeeded && !reply.trim())}>Send</button>
       </div>
     </form>
   );

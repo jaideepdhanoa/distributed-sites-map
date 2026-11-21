@@ -1,5 +1,5 @@
 import type { Sql } from "@/lib/actions/db";
-import type { Actor } from "@/lib/changes/schema";
+import { isAgentStageDecision, type Actor } from "@/lib/changes/schema";
 import { isExcludedSite } from "./excluded";
 import { discussionHref, homeHref, proposalHref, reviewHref } from "./links";
 import { queueAgentAlert, reviewerRecipients } from "./notify";
@@ -64,7 +64,7 @@ export async function notifyAppliedChanges(
   const actorId = actor.id.trim().toLowerCase();
   for (const result of results) {
     if (!result.site_id || isExcludedSite(result.site_id)) continue;
-    if (result.entity_type === "activity" || result.entity_type === "comms" || result.entity_type === "site" || result.entity_type === "pnl_line" || result.entity_type === "site_space") continue;
+    if (result.entity_type === "activity" || result.entity_type === "comms" || result.entity_type === "site" || result.entity_type === "pnl_line" || result.entity_type === "site_space" || result.entity_type === "data_conflict" || result.entity_type === "comment") continue;
     if (result.entity_type !== "stage") continue;
     const event = await sql.query<{ payload: unknown; source: string; actor: string }>(
       `SELECT payload, source, actor FROM events WHERE id = $1`,
@@ -75,7 +75,8 @@ export async function notifyAppliedChanges(
     const payload = asObject(row.payload);
     if (stageWriteKind(payload) === "skip") continue;
     const stage = String(payload.stage || "");
-    const approved = await tiedToApprovedDecision(sql, result.site_id, stage);
+    const agentReceipt = isAgentStageDecision(payload);
+    const approved = agentReceipt || (await tiedToApprovedDecision(sql, result.site_id, stage));
     if (!approved) {
       await queueAgentAlert(sql, {
         actorId,
@@ -95,7 +96,7 @@ export async function notifyAppliedChanges(
       userIds: reviewerRecipients(),
       category: "stages",
       siteId: result.site_id,
-      summary: "A stage change from an approved decision.",
+      summary: agentReceipt ? "Moved to Financial screen on package receipt." : "A stage change from an approved decision.",
       href: reviewHref(result.site_id),
       refId: result.event_id,
     });

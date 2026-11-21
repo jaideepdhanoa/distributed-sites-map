@@ -4,7 +4,7 @@ import type { Sql } from "@/lib/actions/db";
 import { stamp } from "@/lib/actions/text";
 import { pacificToday } from "./today";
 
-export type AppEventType = "note" | "reply" | "next_proposed" | "next_accepted" | "next_rejected" | "document_request" | "bring_back" | "drop_suggested" | "drop" | "proposal_closed";
+export type AppEventType = "note" | "reply" | "next_proposed" | "next_accepted" | "next_rejected" | "document_request" | "bring_back" | "drop_suggested" | "drop" | "proposal_closed" | "stage_repair";
 
 export async function recordAppEvent(
   sql: Sql,
@@ -41,7 +41,7 @@ function eventDay(value: Date | string): string {
 
 export type RecordedHistory = { siteId: string; type: string; summary: string; at: string; eventId: string };
 
-const HISTORY_TYPES = ["bring_back", "drop", "drop_suggested"];
+const HISTORY_TYPES = ["bring_back", "drop", "drop_suggested", "stage_repair"];
 
 export async function listRecordedHistory(sql: Sql, ids: string[], types: string[] = HISTORY_TYPES): Promise<RecordedHistory[]> {
   const wanted = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];

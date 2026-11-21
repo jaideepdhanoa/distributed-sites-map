@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { GridCell, GridColumn, PnlGrid, ValueCell } from "@/lib/pnl/grid";
+import { withoutGmail } from "@/lib/displayText";
+import { columnPeriodKey, type GridCell, type GridColumn, type PnlGrid, type ValueCell } from "@/lib/pnl/grid";
+import { sourceView } from "@/lib/pnl/sourceLink";
+import PnlLinePopover from "./PnlLinePopover";
 
 function figure(cell: ValueCell, percent: boolean): { primary: string; secondary: string } {
   if (percent) return { primary: cell.share || "—", secondary: cell.amount === cell.share ? "" : cell.amount };
@@ -19,14 +22,73 @@ function HeaderLabel({ column }: { column: GridColumn }) {
   );
 }
 
+function ConflictMark({ cell }: { cell: GridCell }) {
+  if (!cell.conflict || cell.conflict.status === "resolved") return null;
+  return <i className="pnl-mark conflict" data-testid="pnl-conflict-mark" aria-label="Sources disagree" />;
+}
+
+function CommentGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 6h14v9H8l-3 3V6z" />
+    </svg>
+  );
+}
+
+function CommentPin({
+  count,
+  label,
+  testId,
+  className = "",
+  onClick,
+}: {
+  count: number;
+  label: string;
+  testId: string;
+  className?: string;
+  onClick: () => void;
+}) {
+  if (count < 1) return null;
+  const name = count > 1 ? `${count} comments` : label;
+  return (
+    <button
+      type="button"
+      className={`icon-btn pnl-pin ${className}`.trim()}
+      data-testid={testId}
+      aria-label={name}
+      title={name}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <CommentGlyph />
+      {count > 1 ? <span>{count}</span> : null}
+    </button>
+  );
+}
+
+function missingTitle(cell: GridCell): string | undefined {
+  if (cell.kind !== "missing") return undefined;
+  const view = sourceView({
+    document: cell.sourceDocument,
+    page: cell.sourcePage,
+    href: cell.sourceHref || "",
+    capturedLabel: "",
+  });
+  const source = [view.label, view.pageAside || view.pageNote, withoutGmail(cell.markerSource)].filter(Boolean).join(" · ");
+  return source ? `Missing · ${source}` : "Missing";
+}
+
 function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
-  if (cell.kind === "missing") return <span className="pnl-missing" />;
-  if (cell.kind === "blank") return <span className="pnl-blank">—</span>;
+  if (cell.kind === "missing") return <span className="pnl-missing">Missing<ConflictMark cell={cell} /></span>;
+  if (cell.kind === "blank") return <span className="pnl-blank"><ConflictMark cell={cell} />—</span>;
   const shown = figure(cell, percent);
   return (
     <span className="pnl-figure">
       <span className="pnl-amount">
         {cell.status === "calculated" ? null : <i className={`pnl-mark ${cell.status}`} aria-label={cell.status === "estimated" ? "Estimated" : cell.status === "normalized" ? "Normalized" : "Reported"} />}
+        <ConflictMark cell={cell} />
         <strong>{shown.primary}</strong>
       </span>
       {shown.secondary ? <small>{shown.secondary}</small> : null}
@@ -34,8 +96,21 @@ function CellBody({ cell, percent }: { cell: GridCell; percent: boolean }) {
   );
 }
 
-export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boolean }) {
+export default function PnlGrid({
+  grid,
+  percent,
+  onComment,
+  focusLine,
+  focusPeriod,
+}: {
+  grid: PnlGrid;
+  percent: boolean;
+  onComment?: (anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) => void;
+  focusLine?: string;
+  focusPeriod?: string;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const [focus, setFocus] = useState<{ row: number; col: number } | null>(null);
   const [open, setOpen] = useState<{ row: number; col: number; top: number; left: number } | null>(null);
   const focusable = grid.rows.filter((row) => row.kind !== "group");
@@ -67,7 +142,8 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
 
   function reveal(row: number, col: number, target: HTMLElement) {
     const cell = focusable[row]?.cells[col];
-    if (!cell || cell.kind !== "value") {
+    const canOpen = Boolean(onComment) || cell?.kind === "value" || cell?.kind === "missing" || Boolean(cell?.conflict);
+    if (!cell || !canOpen) {
       setOpen(null);
       return;
     }
@@ -82,7 +158,14 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
       if (left + width > window.innerWidth - 8) left = Math.max(8, rect.left - width - 8);
     }
     if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+    opener.current = target;
     setOpen({ row, col, top, left });
+  }
+
+  function closePopover() {
+    const node = opener.current;
+    setOpen(null);
+    node?.focus();
   }
 
   function onKey(event: React.KeyboardEvent) {
@@ -101,13 +184,20 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
     } else if (event.key === "Enter" && focus) {
       const target = event.target;
       if (target instanceof HTMLElement) reveal(focus.row, focus.col, target);
-    } else if (event.key === "Escape" && open) {
-      event.stopPropagation();
-      setOpen(null);
     }
   }
 
+  useEffect(() => {
+    if (!focusLine) return;
+    const period = focusPeriod || "";
+    const cell = scrollRef.current?.querySelector<HTMLElement>(`[data-line="${CSS.escape(focusLine)}"][data-period="${CSS.escape(period)}"]`);
+    if (!cell) return;
+    reveal(Number(cell.dataset.row || 0), Number(cell.dataset.colindex || 0), cell);
+  }, [focusLine, focusPeriod, grid.columns.length, grid.rows.length]);
+
   const popover = open ? focusable[open.row]?.cells[open.col] : null;
+  const popoverRow = open ? focusable[open.row] : null;
+  const popoverColumn = open ? grid.columns[open.col] : null;
   let cursor = 0;
 
   return (
@@ -138,7 +228,23 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
             cursor += 1;
             return (
               <tr key={row.id} role="row" className="list-row">
-                <th scope="row" className="is-pinned" data-col="line">{row.label}</th>
+                <th scope="row" className="is-pinned" data-col="line">
+                  {row.label}
+                  {onComment ? (
+                    <button
+                      type="button"
+                      className={`icon-btn pnl-pin pnl-row-pin${row.commentCount ? " has-comments" : ""}`}
+                      data-testid="pnl-line-comment"
+                      data-row={row.id}
+                      aria-label={row.commentCount && row.commentCount > 1 ? `${row.commentCount} comments on line` : "Comment on line"}
+                      title="Comment on line"
+                      onClick={() => onComment({ type: "pnl_line", line: row.id, period: "" })}
+                    >
+                      <CommentGlyph />
+                      {row.commentCount && row.commentCount > 1 ? <span>{row.commentCount}</span> : null}
+                    </button>
+                  ) : null}
+                </th>
                 {row.cells.map((cell, col) => {
                   const flagged = cell.kind === "value" && Boolean(cell.flag);
                   const missing = cell.kind === "missing";
@@ -148,14 +254,30 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
                       key={grid.columns[col]?.id || col}
                       role="gridcell"
                       data-cell={`${index}:${col}`}
+                      data-line={row.id}
+                      data-row={index}
+                      data-colindex={col}
+                      data-period={grid.columns[col] ? columnPeriodKey(grid.columns[col]) : ""}
                       data-col={grid.columns[col]?.id}
                       tabIndex={focused || (!focus && index === 0 && col === 0) ? 0 : -1}
-                      className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${focused ? "cell-focus" : ""}`.trim()}
-                      title={cell.kind === "missing" ? "Month not in the package" : cell.kind === "value" && cell.flag ? cell.flag : undefined}
+                      className={`${missing ? "is-missing" : ""} ${flagged ? "is-flag" : ""} ${cell.conflict && cell.conflict.status !== "resolved" ? "is-conflict" : ""} ${focused ? "cell-focus" : ""}`.trim()}
+                      title={missingTitle(cell) || (cell.kind === "value" && cell.flag ? cell.flag : undefined)}
+                      data-pnl-anchor={open?.row === index && open?.col === col ? "open" : undefined}
                       onFocus={() => setFocus({ row: index, col })}
-                      onClick={(event) => reveal(index, col, event.currentTarget)}
+                      onClick={(event) => {
+                        if (open?.row === index && open?.col === col) return;
+                        reveal(index, col, event.currentTarget);
+                      }}
                     >
                       <CellBody cell={cell} percent={percent} />
+                      {onComment ? (
+                        <CommentPin
+                          count={cell.commentCount || 0}
+                          label="Open comment"
+                          testId="pnl-cell-pin"
+                          onClick={() => onComment({ type: "pnl_cell", line: row.id, period: grid.columns[col] ? columnPeriodKey(grid.columns[col]) : "" })}
+                        />
+                      ) : null}
                     </td>
                   );
                 })}
@@ -164,16 +286,25 @@ export default function PnlGrid({ grid, percent }: { grid: PnlGrid; percent: boo
           })}
         </tbody>
       </table>
-      {open && popover && popover.kind === "value" ? (
-        <div className="pnl-pop" role="dialog" aria-label="Line source" data-testid="pnl-popover" style={{ top: open.top, left: open.left }}>
-          <strong>{focusable[open.row]?.label}</strong>
-          <p>{popover.amount}{popover.share ? ` · ${popover.share}` : ""}</p>
-          <p>{popover.status === "calculated" ? "Calculated" : popover.status === "estimated" ? "Estimated" : popover.status === "normalized" ? "Normalized" : "Reported"}</p>
-          <p>{popover.sourceDocument}{popover.sourcePage ? ` · ${popover.sourcePage}` : ""}</p>
-          {popover.capturedLabel ? <p>Captured {popover.capturedLabel}</p> : null}
-          {popover.sourceHref ? <a className="text-link" href={popover.sourceHref} target="_blank" rel="noopener noreferrer">Open source ↗</a> : null}
-          {popover.flag ? <p className="pnl-flag">{popover.flag}</p> : null}
-        </div>
+      {open && popover ? (
+        <PnlLinePopover
+          label={focusable[open.row]?.label || "Line"}
+          cell={popover}
+          style={{ top: open.top, left: open.left }}
+          onClose={closePopover}
+          actions={onComment && popoverRow && popoverColumn ? (
+            <button
+              type="button"
+              className="icon-btn pnl-pin pnl-comment-btn"
+              data-testid="pnl-cell-comment"
+              aria-label="Comment"
+              title="Comment"
+              onClick={() => onComment({ type: "pnl_cell", line: popoverRow.id, period: columnPeriodKey(popoverColumn) })}
+            >
+              <CommentGlyph />
+            </button>
+          ) : null}
+        />
       ) : null}
     </div>
     </div>

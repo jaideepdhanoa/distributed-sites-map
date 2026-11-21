@@ -43,7 +43,7 @@ A `<select>` uses class `secondary`: fill `#fffdf8`, 1px `#d6cebe`, radius 999, 
 
 A text field uses class `field`: fill `#fffdf8`, 1px `#d6cebe`, radius 8px, and the focus ring. Search keeps class `search`.
 
-The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click cycles ascending, descending, then list order. The same header holds a reorder grip, a resize edge, a filter field, and a pin control, each a `sort-header` or a `check` / `field` inside the column menu. The phone list is a column of cards: name, address, the stage chip on its own line, then a meta line with a gap and a dot between score, asking, and the firm. A missing open-land figure stays off that line. The stat row is one compact line with short labels. Sort stays a `secondary` select. Select, export, and clear area sit in a More `paper-btn` menu so the toolbar stays one row. Search this area is not shown in list view.
+The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click cycles ascending, descending, then list order. The same header holds a reorder grip, a resize edge, a filter field, and a pin control, each a `sort-header` or a `check` / `field` inside the column menu. The phone list is a column of cards: name, address, the stage chip on its own line, then a meta line with a gap and a dot between score, asking, and the firm. The stage chip is the stage name only. A missing open-land figure stays off that line. The stat row is one compact line with short labels. Sort stays a `secondary` select. Select, export, and clear area sit in a More `paper-btn` menu so the toolbar stays one row. Search this area is not shown in list view.
 
 Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle. In list view the sheet fills the width. Extra space goes to Site, Asking · source, Power, Traffic, and Cash flow. A saved column layout keeps its widths, and the last of those columns fills a pane that is still wider. Those cells wrap, the full value stays on the tooltip, and the comparison bar stays under the text. Measure and the other map controls stay on the map and hide while the list is open.
 
@@ -81,7 +81,19 @@ Satellite is the default basemap. The choice is remembered in `localStorage` und
 
 On desktop the switch is one segmented control under the zoom buttons, always visible while the map is the view. On a phone it is only at the top of the Layers sheet. List view hides the map controls, including Measure.
 
-Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, and Measure. They stay inside the screen, clear of the zoom control.
+A first visit, and the saved market when none was chosen, fits the map to every site in Phoenix, Las Vegas, and Miami. The market switcher is All markets / Phoenix / Las Vegas / Miami. A shared link that names a site or a market still opens there, and choosing a site still flies to it.
+
+Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, Measure, and, when a site is selected, Draw available lots. That button sits in the map stack next to Measure, in the accent fill, and only then. Its tooltip is “Outline open land or parking a charger could use.” The record keeps a one-line lot summary whose link opens the same tool. While drawing, a floating toolbar offers Undo point, Cancel, and Finish. Escape cancels and discards the shape that is not finished yet. A finished lot’s popover has Edit and Delete; Delete asks before it removes the lot. On a phone the button stays in the map controls, and drawing uses the full map with the toolbar at the bottom. They stay inside the screen, clear of the zoom control.
+
+## Chips
+
+A chip, pill, or badge is a short label on one line. More than one word is fine: `Outside service area`, `Near, 4.2 mi`, `Financial screen`. It is not a sentence, and it does not join clauses with a middle dot.
+
+The label is at most 28 characters. It does not wrap, and it does not grow the chip. Longer text is a tooltip, a line on the site card, or a column. A stage chip is the stage name only. The reason, who proposed it, who approved it, and the time sit in the tooltip and on the card. The Drop reason column keeps the reason.
+
+This is a design-review requirement. A chip that holds a sentence is the wrong design.
+
+A list cell follows the same rule. The cash flow cell is the amount and the figure name on one line (`$102,517 EBITDA`). Package status and the source sit in the cell title and on the card. A phone list fact does not start a wrapped line with a middle dot.
 
 ## One home for each control
 
@@ -89,7 +101,7 @@ Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo
 - A single choice is a segmented control on one row. If it will not fit, use a secondary select. Do not wrap pills onto a second row.
 - On/off switches and single choices never share one chip row.
 - A control has one home. A new entry point replaces the old one.
-- Map chrome is only zoom, the basemap switch, Layers, and Measure. Anything else goes in Layers or More.
+- Map chrome is zoom, the basemap switch, Layers, Measure, and Draw available lots when a site is selected. Anything else goes in Layers or More.
 - A filter shows as an active-filter chip and changes the counts, or it does not ship.
 
 ## CI guards

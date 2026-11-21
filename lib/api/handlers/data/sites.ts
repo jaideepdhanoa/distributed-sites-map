@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
+import { overlayHeldStages } from "@/lib/changes/heldStage";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { omitProtectedSites } from "@/lib/protectedSite";
 import type { SiteFeature } from "@/lib/types";
@@ -124,7 +125,7 @@ export async function GET(request: NextRequest) {
     for (const key of KEEP) properties[key] = feature.properties[key];
     return { type: "Feature", geometry: feature.geometry, properties };
   });
-  const staged = await overlayStageFile({ type: "FeatureCollection", features }, "site");
+  const staged = await overlayHeldStages(await overlayStageFile({ type: "FeatureCollection", features }, "site"), "site");
   console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
   return NextResponse.json(redactGmailPayload(staged), { headers: privateHeaders });
 }

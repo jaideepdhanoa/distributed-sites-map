@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { actionsEnabled, withSql } from "@/lib/actions/db";
+import { commentLoops } from "@/lib/comments/loops";
+import { conflictLoops } from "@/lib/conflicts/loops";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { ndaQueueAllowed } from "@/lib/nda";
 import { openLoopsBody } from "@/lib/openLoops";
@@ -11,6 +14,18 @@ export async function GET() {
   if (!ndaQueueAllowed(session.actionRole)) {
     return NextResponse.json({ error: "You do not have permission for that." }, { status: 403, headers: privateHeaders });
   }
+  const body = openLoopsBody(loadOpenLoops());
+  if (actionsEnabled()) {
+    try {
+      const extra = await withSql(async (sql) => {
+        const [conflicts, comments] = await Promise.all([conflictLoops(sql), commentLoops(sql)]);
+        return [...conflicts, ...comments];
+      });
+      body.loops = [...body.loops, ...extra];
+    } catch (error) {
+      console.error(JSON.stringify({ event: "conflict_read_error", name: error instanceof Error ? error.name : "error" }));
+    }
+  }
   console.info(JSON.stringify({ event: "data", user: session.u, part: "open-loops" }));
-  return NextResponse.json(redactGmailPayload(openLoopsBody(loadOpenLoops())), { headers: privateHeaders });
+  return NextResponse.json(redactGmailPayload(body), { headers: privateHeaders });
 }

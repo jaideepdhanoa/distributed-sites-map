@@ -27,5 +27,12 @@ export function mergeBringBackHistory(
     if (!b.date) return 1;
     return b.date.localeCompare(a.date) || a.eventId.localeCompare(b.eventId);
   });
-  return out;
+  return omitDatelessSuggestionDuplicates(out);
+}
+
+/** A dated proposal or decision replaces the dateless suggested-drop line. */
+export function omitDatelessSuggestionDuplicates(items: TimelineItem[]): TimelineItem[] {
+  const dated = items.some((item) => item.date && (item.type === "drop" || item.type === "drop_suggested"));
+  if (!dated) return items;
+  return items.filter((item) => item.type !== "drop_suggested" || Boolean(item.date));
 }

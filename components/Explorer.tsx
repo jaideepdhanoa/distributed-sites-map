@@ -17,7 +17,7 @@ import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
 import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/actions/quiet";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
-import { initialSheetSnap, type SheetSnap } from "@/lib/sheetSnap";
+import { initialSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
 import { areaQuery, inMapArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
 import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
@@ -32,9 +32,13 @@ import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landL
 import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
+import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
 import type { SpaceShape } from "./spaces/SpacePopover";
+import { siteSpaceChange } from "@/lib/spaces/change";
+import CommentGridHost from "./comments/CommentGridHost";
+import { COMMENT_CHANGED, COMMENT_OPEN, readCommentAnchor } from "@/lib/comments/nav";
 import type { GroundBox } from "@/lib/spaces/measure";
 import type { SpaceLayout, SpaceType } from "@/lib/spaces/vocab";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
@@ -50,7 +54,7 @@ import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
-import { inReach, parseReach, reachLabel, serviceAreaSplit, type Reach } from "@/lib/reach";
+import { countDroppedDeals, countOutsideServiceArea, dealOnPipeStep, inReach, outsideServiceArea, parseReach, reachLabel, serviceAreaSplit, type Reach } from "@/lib/reach";
 import { NdaChip } from "./NdaChip";
 import NdaQueue from "./NdaQueue";
 import OpenLoops from "./OpenLoops";
@@ -158,6 +162,7 @@ export default function Explorer() {
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
+  const [queueTick, setQueueTick] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [loadedQueueKey, setLoadedQueueKey] = useState("");
@@ -249,6 +254,9 @@ export default function Explorer() {
   const [spaceNames, setSpaceNames] = useState<Record<string, string>>({});
   const [marking, setMarking] = useState<{ siteId: string; lng: number; lat: number; nonce: number } | null>(null);
   const [pickedSpace, setPickedSpace] = useState("");
+  const [commentedSpaceIds, setCommentedSpaceIds] = useState<string[]>([]);
+  const [threadSpaceId, setThreadSpaceId] = useState("");
+  const [commentFly, setCommentFly] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const [mapNote, setMapNote] = useState("");
   useEffect(() => {
     if (!me?.u) return undefined;
@@ -256,8 +264,9 @@ export default function Explorer() {
     const pull = () => {
       void fetch("/api/data/spaces", { cache: "no-store" })
         .then((response) => response.ok ? response.json() : { spaces: [] })
-        .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }> }) => {
+        .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }>; openThreads?: string[] }) => {
           if (cancel) return;
+          setCommentedSpaceIds(body.openThreads || []);
           setMarkedSpaces((body.spaces || []).map((row) => ({
             id: row.id,
             siteId: row.siteId,
@@ -286,11 +295,36 @@ export default function Explorer() {
       cancel = true;
     };
   }, [me?.u]);
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const anchor = readCommentAnchor((event as CustomEvent).detail);
+      if (!anchor || anchor.type !== "space") return;
+      const space = markedSpaces.find((item) => item.id === anchor.spaceId);
+      if (!space) return;
+      setPickedSpace(space.id);
+      setThreadSpaceId(space.id);
+      setSheetSnap("peek");
+      setCommentFly({ lng: space.box.center.lng, lat: space.box.center.lat, nonce: Date.now() });
+    };
+    const onChanged = () => {
+      void fetch("/api/data/spaces", { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : { openThreads: [] }))
+        .then((body: { openThreads?: string[] }) => setCommentedSpaceIds(body.openThreads || []))
+        .catch(() => undefined);
+    };
+    window.addEventListener(COMMENT_OPEN, onOpen);
+    window.addEventListener(COMMENT_CHANGED, onChanged);
+    return () => {
+      window.removeEventListener(COMMENT_OPEN, onOpen);
+      window.removeEventListener(COMMENT_CHANGED, onChanged);
+    };
+  }, [markedSpaces]);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
-  const allCities = params.get("city") === "all";
-  const city = allCities ? "PHX" : (params.get("city") || "PHX");
+  const urlCity = params.get("city");
+  const allCities = !urlCity || urlCity === "all";
+  const city: MarketId = urlCity === "PHX" || urlCity === "LAS" || urlCity === "MIA" ? urlCity : "PHX";
   const allStages = params.get("stage") === "all";
   const stageParam = params.get("stage") as StageId | null;
   const stage: StageId = !allStages && stageParam && STEPS.some((step) => step.id === stageParam) ? stageParam : "land";
@@ -321,6 +355,7 @@ export default function Explorer() {
   const pipeView = parsePipeView(params.get("pstage"));
   const allPipes = pipeView.all;
   const pipeStage: PipeId = pipeView.stage;
+  const outsideGroup = funnel === "pipeline" && params.get("outside") === "1" && allPipes;
   const listView = params.get("view") === "list";
   const [liveArea, setLiveArea] = useState<MapArea | null>(null);
   const [followArea, setFollowArea] = useState(false);
@@ -352,6 +387,9 @@ export default function Explorer() {
   const pillParam = params.get("pill");
   const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [basemap, setBasemap] = useState<"positron" | "satellite">("satellite");
+  const [marketPref, setMarketPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
+  const [marketReady, setMarketReady] = useState(false);
+  const appliedMarket = useRef(false);
   const pinLabel: PinLabel = resolvePinLabel(pillParam, pinPref);
   const pipelineSortId = (PIPELINE_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as PipelineColumnId;
 
@@ -406,7 +444,20 @@ export default function Explorer() {
     });
     const base = window.localStorage.getItem("basemap");
     if (base === "satellite" || base === "positron") setBasemap(base);
+    setMarketPref({
+      version: window.localStorage.getItem(MARKET_VERSION_KEY),
+      value: window.localStorage.getItem(MARKET_STORAGE),
+    });
+    setMarketReady(true);
   }, []);
+  useEffect(() => {
+    if (!marketReady || appliedMarket.current) return;
+    appliedMarket.current = true;
+    if (params.get("city") || params.get("site") || params.get("review") === "1" || params.get("view") === "review") return;
+    if (marketPref.version !== MARKET_VERSION) return;
+    if (marketPref.value !== "PHX" && marketPref.value !== "LAS" && marketPref.value !== "MIA") return;
+    write({ city: marketPref.value });
+  }, [marketReady, params, marketPref]);
   useEffect(() => {
     if (params.get("funnel")) return;
     if (funnelPref.version !== FUNNEL_VERSION || funnelPref.value !== "universe") return;
@@ -629,6 +680,11 @@ export default function Explorer() {
     ...queueParams,
   }).toString();
   useEffect(() => {
+    const refresh = () => setQueueTick((value) => value + 1);
+    window.addEventListener("queue-refresh", refresh);
+    return () => window.removeEventListener("queue-refresh", refresh);
+  }, []);
+  useEffect(() => {
     if (!me?.actionsEnabled) return;
     const key = queueKey;
     let cancel = false;
@@ -674,7 +730,7 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, queueKey]);
+  }, [me?.actionsEnabled, queueKey, queueTick]);
 
   useEffect(() => {
     if (!me?.actionsEnabled) return;
@@ -694,7 +750,7 @@ export default function Explorer() {
     return () => {
       cancel = true;
     };
-  }, [me?.actionsEnabled, badgeKey]);
+  }, [me?.actionsEnabled, badgeKey, queueTick]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1100px)");
@@ -815,7 +871,7 @@ export default function Explorer() {
   }, [features]);
   const censusFeatures = features.filter((feature) => feature.properties.origin !== "off-market");
   const sites = censusFeatures.map((feature) => presentSite(feature.properties));
-  const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && feature.properties.city === city);
+  const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && (allCities || feature.properties.city === city));
   const dealBundle = useMemo(() => {
     const rows = data?.deals.features ?? [];
     const byId = new Map<string, DealProps>();
@@ -943,10 +999,6 @@ export default function Explorer() {
     return dealInCategories(deal, categories);
   }
 
-  function viewDeal(deal: DealProps): boolean {
-    return inReach(deal, reach);
-  }
-
   function inDealMarket(deal: DealProps, wide: boolean) {
     if (wide || allCities) return true;
     const feature = dealFeatures.find((item) => item.properties.deal_id === deal.deal_id);
@@ -957,7 +1009,7 @@ export default function Explorer() {
   const localDealMatches = query
     ? dealRows.filter((deal) => {
         if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-        if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+        if (!inReach(deal, reach) || !dealAllowed(deal)) return false;
         if (!inDealMarket(deal, false)) return false;
         if (!allPipes && !who && deal.stage_group !== pipeStage) return false;
         if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
@@ -972,6 +1024,13 @@ export default function Explorer() {
     droppedLayer: showDroppedDeals,
     searchWide: pipelineWide || Boolean(who),
   });
+  function viewDeal(deal: DealProps): boolean {
+    if (isProtectedId(deal.deal_id)) return false;
+    if (outsideGroup) return outsideServiceArea(deal);
+    if (!allPipes && !dealWide) return dealOnPipeStep(deal, pipeStage, reach);
+    if (inReach(deal, reach)) return true;
+    return showDroppedRows && deal.stage_group === "dropped";
+  }
   function includeDropped(group: string) {
     if (group !== "dropped") return true;
     return showDroppedRows;
@@ -983,7 +1042,6 @@ export default function Explorer() {
     if (!dealAllowed(deal)) return false;
     if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
     if (!inDealMarket(deal, pipelineWide)) return false;
-    if (!dealWide && deal.stage_group !== pipeStage) return false;
     if (!includeDropped(deal.stage_group)) return false;
     if (query && !dealQueryHit(deal)) return false;
     return true;
@@ -1042,7 +1100,7 @@ export default function Explorer() {
 
   const pipelineStepRows = pipelineDeals;
   const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
-  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || deal.stage_group === pipeStage);
+  const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || dealOnPipeStep(deal, pipeStage, reach));
   const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const landSiteDrawn = new Set(
     visibleFeatures
@@ -1087,7 +1145,7 @@ export default function Explorer() {
     return [{ label: feature.properties.label, coordinates: [coords[0], coords[1]] as [number, number] }];
   });
   const handedOff = useRef("");
-  const stepKey = `${funnel}|${stage}|${pipeStage}|${listed}|${allStages}|${allPipes}`;
+  const stepKey = `${funnel}|${stage}|${pipeStage}|${listed}|${allStages}|${allPipes}|${outsideGroup}`;
   const seenStep = useRef(stepKey);
   useEffect(() => {
     if (seenStep.current === stepKey) return;
@@ -1150,7 +1208,7 @@ export default function Explorer() {
     }));
     return nearbyWashPoints(origin, rows, exclude);
   })();
-  const withheldHere = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && !feature.properties.pinned) : [];
+  const withheldHere = showUnscreened ? unscreened.filter((feature) => (allCities || feature.properties.city === city) && !feature.properties.pinned) : [];
 
   const selectedDealId = dealRows.some((deal) => deal.deal_id === selected) ? selected : "";
   const selectedSiteId = selectedDealId
@@ -1183,9 +1241,17 @@ export default function Explorer() {
     write({ site: id }, true);
   }
 
+  function rememberMarket(nextCity: string) {
+    const value = nextCity === "PHX" || nextCity === "LAS" || nextCity === "MIA" ? nextCity : "all";
+    window.localStorage.setItem(MARKET_STORAGE, value);
+    window.localStorage.setItem(MARKET_VERSION_KEY, MARKET_VERSION);
+    setMarketPref({ version: MARKET_VERSION, value });
+  }
+
   function jump(nextCity: string) {
     setSelected(null);
-    write({ city: nextCity === "PHX" ? null : nextCity, site: null }, true);
+    rememberMarket(nextCity);
+    write({ city: nextCity === "all" ? null : nextCity, site: null }, true);
   }
 
   function openParty(name: string) {
@@ -1237,7 +1303,7 @@ export default function Explorer() {
   function countLiveContactedDeals() {
     return dealRows.filter((deal) => {
       if (!isLiveContactedDeal(deal) || (!allCities && deal.city !== city)) return false;
-      if (!viewDeal(deal) || !dealAllowed(deal)) return false;
+      if (!inReach(deal, reach) || !dealAllowed(deal)) return false;
       if (!query) return true;
       return dealQueryHit(deal);
     }).length;
@@ -1256,7 +1322,7 @@ export default function Explorer() {
     const deal = dealRows.find((row) => row.deal_id === id);
     if (deal) {
       if (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA") {
-        const wantCity = deal.city === "PHX" ? null : deal.city;
+        const wantCity = marketSearchValue(deal.city);
         if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
       }
       if (search.get("funnel") !== "pipeline") {
@@ -1272,13 +1338,16 @@ export default function Explorer() {
         searchWide: false,
       });
       const stageShown = (view.all || search.get("pstage") === deal.stage_group) && (deal.stage_group !== "dropped" || droppedVisible);
-      if (!stageShown) patch.pstage = known ? deal.stage_group : null;
+      if (!stageShown) {
+        patch.pstage = known ? deal.stage_group : null;
+        patch.outside = null;
+      }
       return patch;
     }
     const site = features.find((feature) => feature.properties.site_id === id)?.properties;
     if (!site) return patch;
     if (site.city === "PHX" || site.city === "LAS" || site.city === "MIA") {
-      const wantCity = site.city === "PHX" ? null : site.city;
+      const wantCity = marketSearchValue(site.city);
       if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
     }
     if (resolveFunnelMode(search.get("funnel"), funnelPref) === "pipeline") {
@@ -1368,7 +1437,7 @@ export default function Explorer() {
     if (restoreId && !restoreDropped && feed.some((item) => item.siteId === restoreId && item.status !== "snoozed")) {
       const at = feed.findIndex((item) => item.siteId === restoreId && item.status !== "snoozed");
       const patch: Record<string, string | null> = { review: "1", view: null, i: String(at + 1), site: restoreId, funnel: "pipeline", tab: "pipeline", table: null };
-      if (restoreDeal && (restoreDeal.city === "PHX" || restoreDeal.city === "LAS" || restoreDeal.city === "MIA")) patch.city = restoreDeal.city === "PHX" ? null : restoreDeal.city;
+      if (restoreDeal && (restoreDeal.city === "PHX" || restoreDeal.city === "LAS" || restoreDeal.city === "MIA")) patch.city = marketSearchValue(restoreDeal.city);
       if (restoreDeal && (restoreDeal.stage_group === "desk" || restoreDeal.stage_group === "contacted" || restoreDeal.stage_group === "later" || restoreDeal.stage_group === "dropped")) {
         patch.pstage = restoreDeal.stage_group;
       }
@@ -1381,7 +1450,7 @@ export default function Explorer() {
     if (linkedReviewSite && !reviewQueueSettled && data) {
       const deal = dealRows.find((row) => row.deal_id === linkedReviewSite);
       const patch: Record<string, string | null> = { site: linkedReviewSite, funnel: "pipeline", tab: "pipeline", table: null };
-      if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
+      if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = marketSearchValue(deal.city);
       if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
         patch.pstage = deal.stage_group;
       }
@@ -1422,7 +1491,7 @@ export default function Explorer() {
     }
     const deal = dealFeatures.find((feature) => feature.properties.deal_id === reviewSiteId)?.properties;
     const patch: Record<string, string | null> = { review: "1", i: String(reviewIndex + 1), site: reviewSiteId, funnel: "pipeline", tab: "pipeline", view: null, table: null };
-    if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = deal.city === "PHX" ? null : deal.city;
+    if (deal && (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA")) patch.city = marketSearchValue(deal.city);
     if (deal && (deal.stage_group === "desk" || deal.stage_group === "contacted" || deal.stage_group === "later" || deal.stage_group === "dropped")) {
       patch.pstage = deal.stage_group;
     }
@@ -1475,7 +1544,10 @@ export default function Explorer() {
   }
 
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
-  const focus = (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : (CITY_VIEW[city] ?? CITY_VIEW.PHX);
+  const home = marketFocus(allCities ? "all" : city);
+  const wideFocus = !allCities && (pipelineWide || universeWide) && CITY_VIEW[wideCity] ? CITY_VIEW[wideCity] : null;
+  const focus = wideFocus ?? home;
+  const fitAll = allCities && !selected && !reviewing && (funnel === "pipeline" ? dealFeatures.length > 0 : catalogSites.length > 0);
   const dropCount = sites.filter((site) => droppedAt(site, stage) && (allCities || site.city === city) && siteInCategories(site, links, categories)).length;
 
   const sheet = {
@@ -1483,16 +1555,17 @@ export default function Explorer() {
     snap: sheetSnap,
     onToggle: () => setSheetSnap((snap) => (snap === "full" ? "half" : snap === "peek" ? "half" : "full")),
     onSnap: setSheetSnap,
+    onStep: (direction: "more" | "less") => setSheetSnap((snap) => stepSheet(snap, direction)),
   };
-  const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !dealPoint(deal) && viewDeal(deal) && dealAllowed(deal));
-  const offMarketPool = universeWide && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
+  const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && !dealPoint(deal) && inReach(deal, reach) && dealAllowed(deal));
+  const offMarketPool = (universeWide || allCities) && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
     if (!feature.geometry) return false;
     if (!(allStages || universeWide || stage === "universe") && !atStage(feature.properties, stage)) return false;
     return passesChips(feature.properties, false, universeWide);
   });
   const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry) : [];
-  const unscreenedPins = showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : [];
+  const unscreenedPins = showUnscreened ? unscreened.filter((feature) => (allCities || feature.properties.city === city) && feature.geometry) : [];
   const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
 
@@ -1591,7 +1664,7 @@ export default function Explorer() {
   const listRows = [...(funnel === "pipeline"
     ? pipelineSquares.map((feature) => dealRow(feature.properties))
     : [...universePins.map((feature) => siteRow(feature.properties)), ...offMarketShown.map((feature) => siteRow(feature.properties))]
-  ), ...(showUnscreened ? unscreened.filter((feature) => feature.properties.city === city).map((feature) => ({ ...unscreenedRow(feature.properties), ...pointOf(feature.geometry?.coordinates) })) : [])];
+  ), ...(showUnscreened ? unscreened.filter((feature) => (allCities || feature.properties.city === city)).map((feature) => ({ ...unscreenedRow(feature.properties), ...pointOf(feature.geometry?.coordinates) })) : [])];
   const tierOn = (deal: DealProps) => (dealCategory(deal) !== "wash" || matchesOpenLandTier(deal.open_land_sqft, landTier)) && (!mapArea || (() => {
     const point = dealPoint(deal);
     return point ? inMapArea(point[0], point[1], mapArea) : false;
@@ -1658,7 +1731,6 @@ export default function Explorer() {
       write(patch);
     },
   });
-  if (allCities && !who) activeFilters.push({ id: "markets", label: "All markets", clear: () => write({ city: null }) });
   if (allStages && funnel !== "pipeline" && !who) activeFilters.push({ id: "all-stages", label: "All stages", clear: () => write({ stage: null }) });
 
   function closeMenus() {
@@ -1670,23 +1742,40 @@ export default function Explorer() {
     setUnplacedOpen(false);
   }
 
-  const stageUnmapped = funnel === "pipeline" && !allPipes && !pipelineWide
-    ? [...pipelineDeals, ...stageLandRows].filter((deal) => deal.stage_group === pipeStage && !dealPoint(deal)).length
+  const stageUnmapped = funnel === "pipeline" && (outsideGroup || (!allPipes && !pipelineWide))
+    ? [...pipelineDeals, ...stageLandRows].filter((deal) => !dealPoint(deal)).length
     : 0;
+
+  function inFunnelMarket(deal: DealProps): boolean {
+    if (isProtectedId(deal.deal_id)) return false;
+    if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
+    if (!dealAllowed(deal)) return false;
+    if (!allCities && deal.city !== city) return false;
+    if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
+    if (query && !dealQueryHit(deal)) return false;
+    return true;
+  }
 
   function summaryText() {
     if (funnel !== "pipeline") return "";
-    const stageView = !allPipes && !pipelineWide && !who;
-    const rows = stageView
+    const stageView = !outsideGroup && !allPipes && !pipelineWide && !who;
+    const home = !stageView && !outsideGroup;
+    const rows = stageView || outsideGroup
       ? [...pipelineDeals, ...stageLandRows]
-      : dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && (allCities || deal.city === city) && viewDeal(deal) && dealAllowed(deal));
-    const droppedRows = rows.filter((deal) => deal.stage_group === "dropped");
+      : dealRows.filter((deal) => {
+          if (!inFunnelMarket(deal)) return false;
+          if (inReach(deal, reach)) return true;
+          return showDroppedRows && deal.stage_group === "dropped";
+        });
+    const droppedRows = home
+      ? dealRows.filter((deal) => inFunnelMarket(deal) && dealOnPipeStep(deal, "dropped", reach))
+      : rows.filter((deal) => deal.stage_group === "dropped");
     return pipelineMapSummary({
       placed: rows.filter((deal) => deal.stage_group !== "dropped" && Boolean(dealPoint(deal))).length,
       dropped: droppedRows.length,
       droppedPlaced: droppedRows.filter((deal) => Boolean(dealPoint(deal))).length,
-      droppedShown: showDroppedRows,
-      droppedOnly: showDroppedRows && !dealWide && pipeStage === "dropped",
+      droppedShown: outsideGroup ? false : showDroppedRows,
+      droppedOnly: !outsideGroup && showDroppedRows && !dealWide && pipeStage === "dropped",
     });
   }
 
@@ -1760,16 +1849,15 @@ export default function Explorer() {
       : { lng: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[0], lat: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).center[1], zoom: (CITY_VIEW[reviewMarket] ?? CITY_VIEW.PHX).zoom })
     : null;
   const openQueueIds = feed.filter((site) => site.status === "open").map((site) => site.siteId);
-  const allMarketDeals = dealRows.filter((deal) => {
-    if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
-    if (!viewDeal(deal) || !dealAllowed(deal)) return false;
-    if (!allCities && deal.city !== city) return false;
-    if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
-    if (query && !dealQueryHit(deal)) return false;
-    return true;
-  });
-  const hiddenDropped = showDroppedRows ? 0 : allMarketDeals.filter((deal) => deal.stage_group === "dropped").length;
-  const allCount = pipelineAllCount(allMarketDeals.length - hiddenDropped, hiddenDropped);
+  const marketDeals = dealRows.filter(inFunnelMarket);
+  const droppedInMarket = countDroppedDeals(marketDeals);
+  const hiddenDropped = showDroppedRows ? 0 : droppedInMarket;
+  const inReachMarket = marketDeals.filter((deal) => inReach(deal, reach));
+  const shownCount = showDroppedRows
+    ? inReachMarket.length + marketDeals.filter((deal) => deal.stage_group === "dropped" && !inReach(deal, reach)).length
+    : inReachMarket.filter((deal) => deal.stage_group !== "dropped").length;
+  const allCount = pipelineAllCount(shownCount, hiddenDropped);
+  const outsideCount = countOutsideServiceArea(marketDeals);
   const reviewMarkers = inReview && !reviewMiss ? reviewList.flatMap((site, index) => {
     const deal = dealRows.find((row) => row.deal_id === site.siteId);
     const point = (deal ? dealPoint(deal) : null) || (site.lng != null && site.lat != null ? [site.lng, site.lat] as [number, number] : null);
@@ -1788,7 +1876,8 @@ export default function Explorer() {
   async function refreshSpaces() {
     const response = await fetch("/api/data/spaces", { cache: "no-store" });
     if (!response.ok) return;
-    const body = await response.json() as { spaces?: Array<SpaceShape & { center?: { lng: number; lat: number }; lengthFt?: number; widthFt?: number; rotationDeg?: number }> };
+    const body = await response.json() as { spaces?: Array<SpaceShape & { center?: { lng: number; lat: number }; lengthFt?: number; widthFt?: number; rotationDeg?: number }>; openThreads?: string[] };
+    setCommentedSpaceIds(body.openThreads || []);
     setMarkedSpaces((body.spaces || []).map((row) => ({
       id: row.id,
       siteId: row.siteId,
@@ -1806,24 +1895,7 @@ export default function Explorer() {
     const response = await fetch("/api/changes", {
       method: "POST",
       headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-      body: JSON.stringify({
-        changes: [{
-          entity_type: "site_space",
-          site_id: space.siteId,
-          ...(space.version > 0 ? { entity_id: space.id } : {}),
-          expected_version: space.version,
-          source: "Site aerial",
-          payload: deleted ? { deleted: true } : {
-            center_lng: space.box.center.lng,
-            center_lat: space.box.center.lat,
-            length_ft: space.box.lengthFt,
-            width_ft: space.box.widthFt,
-            rotation_deg: space.box.rotationDeg,
-            type: space.type,
-            layout: space.layout,
-          },
-        }],
-      }),
+      body: JSON.stringify({ changes: [siteSpaceChange(space, deleted)] }),
     });
     if (!response.ok) return "";
     const body = await response.json() as { results?: { entity_id?: string }[] };
@@ -1837,10 +1909,12 @@ export default function Explorer() {
     if (!selected || !point) return;
     chooseBasemap("satellite");
     setShowSpaces(true);
+    if (listView) write({ view: null });
     setMarking({ siteId: selected, lng: point[0], lat: point[1], nonce: Date.now() });
   }
 
   const recordSpaces = markedSpaces.filter((space) => space.siteId === selected);
+  const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
     <div ref={bindShell} className={`shell ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
@@ -1863,7 +1937,8 @@ export default function Explorer() {
       <header className="bar">
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
-          <div className="cities only-desktop" role="group" aria-label="City">
+          <div className="cities only-desktop" role="group" aria-label="Market">
+            <button type="button" className={allCities ? "chip on" : "chip"} onClick={() => jump("all")}>All markets</button>
             {CITIES.map((item) => (
               <button key={item} className={!allCities && city === item ? "chip on" : "chip"} type="button" onClick={() => jump(item)}>
                 {item === "PHX" ? "Phoenix" : item === "LAS" ? "Las Vegas" : "Miami"}
@@ -1919,7 +1994,7 @@ export default function Explorer() {
           </div>
           <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
             {funnel === "pipeline"
-              ? (allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
+              ? (outsideGroup ? "Outside service area" : allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
           </button>
           <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
@@ -1965,7 +2040,7 @@ export default function Explorer() {
             {funnel === "universe" ? null : (
               <>
                 <span className="step">
-                  <button className={allPipes ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes ? "step" : undefined} title="Every deal in this market that this view shows. Dropped deals stay out until that step is open." onClick={() => write({ pstage: null }, true)}>
+                  <button className={allPipes && !outsideGroup ? "chip on" : "chip"} type="button" data-testid="all-stages" aria-current={allPipes && !outsideGroup ? "step" : undefined} title="Every deal in this market that this view shows. Dropped deals stay out until that step is open." onClick={() => write({ pstage: null, outside: null }, true)}>
                     <span>All</span>
                     <strong>{allCount.count}</strong>
                     {allCount.dropped ? <span className="split"> · {allCount.dropped}</span> : null}
@@ -2002,39 +2077,35 @@ export default function Explorer() {
                   </span>
                 </Fragment>
               );
-            }) : PIPE_STEPS.map((step, index) => {
-              const rows = dealRows.filter((deal) => {
-                if (deal.kind !== "pipeline" || deal.stage_group !== step.id) return false;
-                if (!viewDeal(deal) || !dealAllowed(deal)) return false;
-                if (!allCities && deal.city !== city) return false;
-                if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
-                if (!query) return true;
-                return dealQueryHit(deal);
-              });
-              const landHere = dealRows.filter((deal) => {
-                if (deal.kind !== "land" || deal.stage_group !== step.id) return false;
-                if (!viewDeal(deal) || !dealAllowed(deal)) return false;
-                if (!allCities && deal.city !== city) return false;
-                if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
-                if (!query) return true;
-                return dealQueryHit(deal);
-              });
-              const total = rows.length + landHere.length;
-              const brokerHere = [...rows, ...landHere].filter((deal) => deal.broker_contacted).length;
-              const split = rows.length > 0 && landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
-              return (
-                <Fragment key={step.id}>
-                  {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
-                  <span className="step">
-                    <button className={!allPipes && !pipelineWide && pipeStage === step.id ? "chip on" : "chip"} type="button" aria-current={!allPipes && !pipelineWide && pipeStage === step.id ? "step" : undefined} title={`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`} onMouseEnter={() => setTip(`${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id }, true)}>
-                      <span>{step.label}</span>
-                      <strong>{total.toLocaleString()}</strong>
-                      {split ? <span className="split">{split}</span> : null}
-                    </button>
-                  </span>
-                </Fragment>
-              );
-            })}
+            }) : (
+              <>
+                {PIPE_STEPS.map((step, index) => {
+                  const rows = dealRows.filter((deal) => deal.kind === "pipeline" && inFunnelMarket(deal) && dealOnPipeStep(deal, step.id, reach));
+                  const landHere = dealRows.filter((deal) => deal.kind === "land" && inFunnelMarket(deal) && dealOnPipeStep(deal, step.id, reach));
+                  const total = rows.length + landHere.length;
+                  const brokerHere = [...rows, ...landHere].filter((deal) => deal.broker_contacted).length;
+                  const split = rows.length > 0 && landHere.length > 0 ? ` (${rows.length.toLocaleString()} deals, ${landHere.length.toLocaleString()} land)` : "";
+                  const note = `${FUNNEL_NOTES[step.id]}${brokerHere ? ` ${brokerHere.toLocaleString()} deals contacted.` : ""}`;
+                  const selected = !outsideGroup && !allPipes && !pipelineWide && pipeStage === step.id;
+                  return (
+                    <Fragment key={step.id}>
+                      {index > 0 ? <span className="chev" aria-hidden="true">›</span> : null}
+                      <span className="step">
+                        <button className={selected ? "chip on" : "chip"} type="button" aria-current={selected ? "step" : undefined} title={note} onMouseEnter={() => setTip(note)} onMouseLeave={() => setTip("")} onClick={() => write({ pstage: step.id, outside: null }, true)}>
+                          <span>{step.label}</span>
+                          <strong>{total.toLocaleString()}</strong>
+                          {split ? <span className="split">{split}</span> : null}
+                        </button>
+                      </span>
+                    </Fragment>
+                  );
+                })}
+                <button className={outsideGroup ? "aside on" : "aside"} type="button" data-testid="outside-service-area" aria-current={outsideGroup ? "step" : undefined} title={FUNNEL_NOTES.outside} onMouseEnter={() => setTip(FUNNEL_NOTES.outside)} onMouseLeave={() => setTip("")} onClick={() => write({ outside: outsideGroup ? null : "1", pstage: null }, true)}>
+                  <span>Outside service area</span>
+                  <strong>{outsideCount.toLocaleString()}</strong>
+                </button>
+              </>
+            )}
           </nav>
             {showUnscreened && withheldHere.length > 0 ? (
               <button className={`aside ${withheldOpen ? "on" : ""}`} type="button" onClick={() => { setWithheldOpen((value) => !value); setUnplacedOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
@@ -2333,6 +2404,7 @@ export default function Explorer() {
 
       <div className="map-stage">
         <ActionsDialogs />
+        <CommentGridHost />
         {inReview && !caughtUp && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
           <ReviewRail sites={reviewList.map((site) => ({ ...site, score: displayScore(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) || "—" }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} links={reviewLinks} />
         ) : null}
@@ -2378,7 +2450,7 @@ export default function Explorer() {
           depots={data.depots.features}
           parcels={data.parcels.features}
           offMarket={offMarketShown}
-          unscreened={showUnscreened ? unscreened.filter((feature) => feature.properties.city === city && feature.geometry) : []}
+          unscreened={showUnscreened ? unscreened.filter((feature) => (allCities || feature.properties.city === city) && feature.geometry) : []}
           selectedId={selected}
           showAreas={showAreas}
           showDepots={showDepots}
@@ -2387,6 +2459,7 @@ export default function Explorer() {
           focusLng={focus.center[0]}
           focusLat={focus.center[1]}
           focusZoom={focus.zoom}
+          fitAll={fitAll}
           reviewMarkers={reviewMarkers}
           queueIds={openQueueIds}
           reviewFocus={reviewFocus}
@@ -2411,9 +2484,12 @@ export default function Explorer() {
           spaceShapes={markedSpaces}
           showSpaces={showSpaces}
           spaceDrawing={Boolean(marking)}
-          spaceFly={marking}
+          spaceFly={commentFly || marking}
           selectedSpaceId={pickedSpace}
           spaceNames={spaceNames}
+          commentedSpaceIds={commentedSpaceIds}
+          threadSpaceId={threadSpaceId}
+          onThreadClose={() => setThreadSpaceId("")}
           onSpaceSelect={setPickedSpace}
           onSpaceCreate={(box) => {
             if (!marking) return;
@@ -2424,7 +2500,14 @@ export default function Explorer() {
           onSpaceChange={(space) => {
             void writeSpace(space);
           }}
+          onSpaceDelete={(space) => {
+            void writeSpace(space, true).then((id) => {
+              if (id) setPickedSpace("");
+            });
+          }}
           onSpaceDone={() => { setMarking(null); setPickedSpace(""); }}
+          canDrawLots={Boolean(me && spacePoint())}
+          onDrawLots={beginMark}
           onMapFailed={setMapNote}
           onBounds={(bounds, meta) => {
             if (!bounds.getWest || !bounds.getSouth || !bounds.getEast || !bounds.getNorth) return;
@@ -2569,10 +2652,10 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="swatch stage-dropped" /></span>
                   Dropped deals
                 </label>
-                <label className="layer-row" title="Rectangles marked on the satellite view. Slot counts stay estimated until someone checks them.">
+                <label className="layer-row" title="Lots drawn on the satellite view. Slot counts stay estimated until someone checks them.">
                   <input className="check" type="checkbox" checked={showSpaces} onChange={(event) => setShowSpaces(event.target.checked)} data-testid="spaces-layer" />
                   <span className="layer-mark"><i className="swatch l10" /></span>
-                  Marked spaces
+                  Available lots
                 </label>
                 <p className="eyebrow">Context</p>
                 <label className="layer-row" title={LAYER_TITLES.areas}>
@@ -2672,6 +2755,7 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
@@ -2711,6 +2795,7 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
             figuresReady={figuresReady}

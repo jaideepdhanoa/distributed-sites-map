@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
+import type { QueryResultRow } from "pg";
 import type { Sql } from "@/lib/actions/db";
 import { readEntityFromDb, type ShadowEntity } from "./flags";
-import { numericSuffix } from "./apply";
+import { labeledIdFloors, numericSuffix } from "./apply";
+import { derivePowerRating, type PowerRatingName } from "@/lib/score/power-rating";
+import { DERIVED_POWER_HEADER, columnsToAppend, isPowerRatingName, rowsToAppend } from "@/lib/score/power-sheet";
 import { MIRROR_FIELD_HEADERS, isDateField, isTruncatedCell, losesSheetDate, mirrorCellInput, mirrorHeaderAllowed, parseSheet, sameCommsStamp, sameSheetDate, sameWorkbookCell, sheetAllowsApprox, shortHash, withSheetStamp } from "./site";
 import { COMMS_FIELDS, type CommsField } from "./vocab";
 
@@ -438,6 +441,172 @@ export function planSiteMirror(
   return combined;
 }
 
+export type CreatedSiteMirror = {
+  site_id: string;
+  kind: "pipeline" | "land";
+  values: Record<string, string>;
+};
+
+export type UniverseMirrorRow = {
+  universe_id: string;
+  values: Record<string, string>;
+};
+
+/** Append a server-minted site onto Pipeline or Land Sites. Existing rows stay on the update path. */
+export function planCreatedSiteMirror(tables: SheetTable[], rows: CreatedSiteMirror[]): MirrorPlan {
+  const combined = emptyPlan();
+  for (const table of tables) {
+    const kind = table.title === "Land Sites" ? "land" : table.title === "Pipeline" ? "pipeline" : "";
+    if (!kind) continue;
+    const records = rows.filter((row) => row.kind === kind && row.site_id !== PROTECTED_SITE_ID);
+    const plan = planTable({
+      table,
+      idHeaders: ["site id"],
+      fields: CREATED_SITE_FIELDS,
+      records: records.map((row) => ({ id: row.site_id, values: { ...row.values, id: row.site_id } })),
+      append: true,
+      protectRow: true,
+      idPattern: /^(PIPE|LAND)-[A-Z]{2,4}-\d{4,}$/,
+      skipBlank: true,
+    });
+    combined.changes.push(...plan.changes);
+    combined.skippedProtected += plan.skippedProtected;
+    combined.unmatched.push(...plan.unmatched);
+    combined.appended += plan.appended;
+    combined.refused.push(...plan.refused);
+    combined.held.push(...plan.held);
+  }
+  return combined;
+}
+
+function lastUsedHeader(headers: string[]): number {
+  let last = 0;
+  headers.forEach((header, index) => {
+    if (header.trim()) last = index + 1;
+  });
+  return last;
+}
+
+/** Market, business name, and address. A blank part cannot identify a row. */
+export function universeMatchKey(market: string, name: string, address: string): string {
+  const norm = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const parts = [norm(market), norm(name), norm(address)];
+  if (parts.some((part) => !part)) return "";
+  return parts.join("|");
+}
+
+function columnText(headers: string[], cells: string[], names: string[]): string {
+  const index = headerIndex(headers, names);
+  if (index < 0) return "";
+  return cellText(cells[index]);
+}
+
+/**
+ * Append a minted Universe row. The id is the WB- id already stored.
+ * A missing id column is added. Existing legacy cells are not rewritten:
+ * a blank id is filled only when one sheet row and one database row share
+ * the same market, name, and address.
+ */
+export function planUniverseMirror(table: SheetTable, rows: UniverseMirrorRow[]): MirrorPlan {
+  const plan = emptyPlan();
+  let idAt = headerIndex(table.headers, ["universe id", "site id", "lead id"]);
+  if (idAt < 0) {
+    const column = lastUsedHeader(table.headers) + 1;
+    while (table.headers.length < column) table.headers.push("");
+    table.headers[column - 1] = "Universe ID";
+    idAt = column - 1;
+    plan.changes.push({
+      sheet: table.title,
+      row: table.headerRow,
+      column,
+      header: "Universe ID",
+      id: "",
+      before: "",
+      after: "Universe ID",
+    });
+  }
+  const idHeader = table.headers[idAt] || "Universe ID";
+  let skippedProtected = 0;
+  const incoming = rows.filter((row) => {
+    if (row.universe_id !== PROTECTED_SITE_ID) return true;
+    skippedProtected += 1;
+    return false;
+  });
+  const rowById = new Map<string, { row: number; cells: string[] }>();
+  for (const row of table.rows) {
+    const id = cellText(row.cells[idAt]);
+    if (id && !rowById.has(id)) rowById.set(id, row);
+  }
+  const blankByKey = new Map<string, { row: number; cells: string[] }[]>();
+  for (const row of table.rows) {
+    if (cellText(row.cells[idAt])) continue;
+    const key = universeMatchKey(
+      columnText(table.headers, row.cells, ["market"]),
+      columnText(table.headers, row.cells, ["business name", "name"]),
+      columnText(table.headers, row.cells, ["address"]),
+    );
+    if (!key) continue;
+    const list = blankByKey.get(key) || [];
+    list.push(row);
+    blankByKey.set(key, list);
+  }
+  const pending = incoming.filter((row) => !rowById.has(row.universe_id));
+  const dbByKey = new Map<string, UniverseMirrorRow[]>();
+  for (const row of pending) {
+    const key = universeMatchKey(row.values.market || "", row.values.name || "", row.values.address || "");
+    if (!key) continue;
+    const list = dbByKey.get(key) || [];
+    list.push(row);
+    dbByKey.set(key, list);
+  }
+  const claimed = new Set<string>();
+  for (const row of pending) {
+    const key = universeMatchKey(row.values.market || "", row.values.name || "", row.values.address || "");
+    if (!key) continue;
+    const sheets = blankByKey.get(key) || [];
+    const dbs = dbByKey.get(key) || [];
+    if (sheets.length !== 1 || dbs.length !== 1) {
+      if (sheets.length > 0) {
+        claimed.add(row.universe_id);
+        plan.unmatched.push(row.universe_id);
+      }
+      continue;
+    }
+    const target = sheets[0];
+    while (target.cells.length <= idAt) target.cells.push("");
+    target.cells[idAt] = row.universe_id;
+    plan.changes.push({
+      sheet: table.title,
+      row: target.row,
+      column: idAt + 1,
+      header: idHeader,
+      id: row.universe_id,
+      before: "",
+      after: row.universe_id,
+    });
+    claimed.add(row.universe_id);
+  }
+  const appended = planTable({
+    table,
+    idHeaders: ["universe id", "site id", "lead id"],
+    fields: UNIVERSE_FIELDS,
+    records: pending
+      .filter((row) => !claimed.has(row.universe_id))
+      .map((row) => ({ id: row.universe_id, values: { ...row.values, id: row.universe_id } })),
+    append: true,
+    protectRow: false,
+    idPattern: /^WB-[A-Z]{2,4}-\d{4,}$/,
+    skipBlank: true,
+  });
+  plan.changes.push(...appended.changes);
+  plan.skippedProtected += skippedProtected + appended.skippedProtected;
+  plan.unmatched.push(...appended.unmatched);
+  plan.appended += appended.appended;
+  plan.refused.push(...appended.refused);
+  plan.held.push(...appended.held);
+  return plan;
+}
+
 function referencesProtectedSite(siteId: string, siteIds = ""): boolean {
   if (siteId === PROTECTED_SITE_ID) return true;
   return siteIds.split(/[;,\s]+/).some((part) => part === PROTECTED_SITE_ID);
@@ -528,6 +697,17 @@ export function assertMirrorRefusals(refused: string[]): void {
 }
 
 /** Highest numeric id on a sheet tab. The value is a number, not cell text. */
+export function tableIds(table: SheetTable, idHeaders: string[]): string[] {
+  const idAt = headerIndex(table.headers, idHeaders);
+  if (idAt < 0) return [];
+  return table.rows.map((row) => cellText(row.cells[idAt])).filter(Boolean);
+}
+
+/** PIPE, LAND, and WB floors already on a sheet tab. */
+export function labeledFloorsFromTable(table: SheetTable, idHeaders: string[]): { name: string; value: number }[] {
+  return labeledIdFloors(tableIds(table, idHeaders));
+}
+
 export function sheetIdFloor(table: SheetTable, idHeaders: string[], prefix: string): number {
   const idAt = headerIndex(table.headers, idHeaders);
   if (idAt < 0) return 0;
@@ -570,7 +750,7 @@ export function entityChangeCounts(changes: CellChange[]): { site: number; stage
     if (change.sheet === ACTIVITY_SHEET) counts.activity += 1;
     else if (change.sheet === COMMS_SHEET) counts.comms += 1;
     else if (change.header.trim().toLowerCase() === "stage") counts.stage += 1;
-    else if (change.sheet === "Pipeline" || change.sheet === "Land Sites") counts.site += 1;
+    else if (change.sheet === "Pipeline" || change.sheet === "Land Sites" || change.sheet === UNIVERSE_SHEET) counts.site += 1;
   }
   return counts;
 }
@@ -579,6 +759,112 @@ export function entityChangeCounts(changes: CellChange[]): { site: number; stage
 export function formatPlanSummary(changes: CellChange[]): string {
   const counts = entityChangeCounts(changes);
   return `site ${counts.site}\nstage ${counts.stage}\nactivity ${counts.activity}\ncomms ${counts.comms}`;
+}
+
+/** Cell counts by sheet title. Values are not included. */
+export function formatTabCounts(changes: CellChange[]): string {
+  const counts = new Map<string, number>();
+  for (const change of changes) counts.set(change.sheet, (counts.get(change.sheet) || 0) + 1);
+  if (!counts.size) return "tabs 0";
+  return [...counts.entries()].map(([sheet, count]) => `${sheet} ${count}`).join("\n");
+}
+
+/** Status text safe for a public log. Tokens, keys, hosts, and emails are removed. */
+export function redactMirrorError(error: unknown): string {
+  const text = error instanceof Error ? error.message : "workbook mirror failed";
+  return text
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
+    .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
+    .replace(/ya29\.[A-Za-z0-9._-]+/g, "[redacted-token]")
+    .replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, "[redacted-key]")
+    .replace(/"private_key"\s*:\s*"(?:\\.|[^"\\])*"/g, '"private_key":"[redacted]"')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .slice(0, 500);
+}
+
+export type MirrorTabTask = {
+  tab: string;
+  run: () => Promise<MirrorPlan>;
+};
+
+export type PlannedMirrorTab = {
+  tab: string;
+  plan: MirrorPlan;
+};
+
+export type FailedMirrorTab = {
+  tab: string;
+  message: string;
+};
+
+/** Plan each tab on its own. A thrown tab is recorded and the rest still plan. */
+export async function planMirrorTabs(tasks: MirrorTabTask[]): Promise<{ planned: PlannedMirrorTab[]; failed: FailedMirrorTab[] }> {
+  const planned: PlannedMirrorTab[] = [];
+  const failed: FailedMirrorTab[] = [];
+  for (const task of tasks) {
+    try {
+      planned.push({ tab: task.tab, plan: await task.run() });
+    } catch (error) {
+      failed.push({ tab: task.tab, message: redactMirrorError(error) });
+    }
+  }
+  return { planned, failed };
+}
+
+/** Write each planned tab on its own. A thrown write is recorded and the rest still write. */
+export async function writeMirrorTabs(
+  planned: PlannedMirrorTab[],
+  write: (tab: string, changes: CellChange[]) => Promise<void>,
+): Promise<{ written: CellChange[]; failed: FailedMirrorTab[] }> {
+  const written: CellChange[] = [];
+  const failed: FailedMirrorTab[] = [];
+  for (const tab of planned) {
+    try {
+      await write(tab.tab, tab.plan.changes);
+      written.push(...tab.plan.changes);
+    } catch (error) {
+      failed.push({ tab: tab.tab, message: redactMirrorError(error) });
+    }
+  }
+  return { written, failed };
+}
+
+export type MirrorSheetGrid = {
+  sheetId: number;
+  columnCount: number;
+  rowCount: number;
+};
+
+/** True when a values write would land outside the current grid. */
+export function mirrorGridNeedsGrowth(changes: CellChange[], grid: Pick<MirrorSheetGrid, "columnCount" | "rowCount">): boolean {
+  return changes.some((change) => columnsToAppend(change.column, grid.columnCount) > 0 || rowsToAppend(change.row, grid.rowCount) > 0);
+}
+
+/**
+ * One spreadsheets.batchUpdate body. appendDimension runs before updateCells.
+ * The request is atomic: a rejected range writes nothing.
+ * Cell text is stored as a string, so a leading "=" is not a formula.
+ */
+export function mirrorGridRequests(changes: CellChange[], grid: MirrorSheetGrid): { requests: Record<string, unknown>[] } {
+  const requests: Record<string, unknown>[] = [];
+  let extraColumns = 0;
+  let extraRows = 0;
+  for (const change of changes) {
+    extraColumns = Math.max(extraColumns, columnsToAppend(change.column, grid.columnCount));
+    extraRows = Math.max(extraRows, rowsToAppend(change.row, grid.rowCount));
+  }
+  if (extraColumns > 0) requests.push({ appendDimension: { sheetId: grid.sheetId, dimension: "COLUMNS", length: extraColumns } });
+  if (extraRows > 0) requests.push({ appendDimension: { sheetId: grid.sheetId, dimension: "ROWS", length: extraRows } });
+  for (const change of changes) {
+    requests.push({
+      updateCells: {
+        start: { sheetId: grid.sheetId, rowIndex: change.row - 1, columnIndex: change.column - 1 },
+        rows: [{ values: [{ userEnteredValue: { stringValue: change.after } }] }],
+        fields: "userEnteredValue",
+      },
+    });
+  }
+  return { requests };
 }
 
 function planValue(_change: CellChange, value: string): string {
@@ -669,10 +955,38 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 }
 
+/** 025 is not on production until that migration workflow runs. The mirror still copies the older tables. */
+async function optionalMirrorQuery<T extends QueryResultRow>(sql: Sql, textSql: string): Promise<T[]> {
+  try {
+    return (await sql.query<T>(textSql)).rows;
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code) : "";
+    if (code === "42P01") return [];
+    throw error;
+  }
+}
+
 /** The shadow import and the capture import write these sources. An API batch does not. */
 export function importedFromWorkbook(source: string | null | undefined): boolean {
   const text = (source || "").trim().toLowerCase();
   return text.startsWith("workbook snapshot") || text.startsWith("workbook capture import");
+}
+
+function undefinedColumn(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
+}
+
+type SiteMirrorDb = { site_id: string; market?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
+
+async function loadSiteMirrorSources(sql: Sql): Promise<{ rows: SiteMirrorDb[] }> {
+  try {
+    return await sql.query<SiteMirrorDb>(
+      `SELECT site_id, market, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
+    );
+  } catch (error) {
+    if (!undefinedColumn(error)) throw error;
+    return sql.query<SiteMirrorDb>(`SELECT site_id, market, sheet_writes, facts FROM sites ORDER BY site_id`);
+  }
 }
 
 export async function loadMirrorRows(sql: Sql): Promise<{
@@ -680,6 +994,8 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   activities: { entity_id: string; site_id: string; date: string; type: string; summary: string; source_link: string; imported?: boolean; date_iso?: string; at_approximate?: boolean }[];
   comms: { entity_id: string; values: Record<string, string> }[];
   sites: { site_id: string; writes: Record<string, string> }[];
+  createdSites: CreatedSiteMirror[];
+  universeRows: UniverseMirrorRow[];
 }> {
   const stages = await sql.query<StageDb>(`SELECT site_id, stage FROM site_stages ORDER BY site_id`);
   const activities = await sql.query<ActivityDb>(`SELECT entity_id, site_id, payload, at_approximate FROM activities ORDER BY entity_id`);
@@ -693,7 +1009,45 @@ export async function loadMirrorRows(sql: Sql): Promise<{
   const comms = await sql.query<CommsDb>(
     `SELECT entity_id, payload, message_id, thread_id, link FROM comms_entries ORDER BY entity_id`,
   );
-  const sites = await sql.query<{ site_id: string; sheet_writes: unknown }>(`SELECT site_id, sheet_writes FROM sites ORDER BY site_id`);
+  const sites = await loadSiteMirrorSources(sql);
+  const created = await optionalMirrorQuery<{
+    site_id: string;
+    universe_id: string;
+    kind: string;
+    name: string;
+    address: string;
+    market: string;
+    category: string;
+    apn: string;
+    lat: string;
+    lng: string;
+    listing_url: string;
+    broker: string;
+    stage: string | null;
+  }>(sql,
+    `SELECT m.site_id, m.universe_id, m.kind, s.name, s.address, s.market, s.category, s.apn, s.lat, s.lng,
+            s.listing_url, s.broker, st.stage
+     FROM site_mints m
+     JOIN sites s ON s.site_id = m.site_id
+     LEFT JOIN site_stages st ON st.site_id = m.site_id
+     ORDER BY m.site_id`,
+  );
+  const universe = await optionalMirrorQuery<{
+    universe_id: string;
+    market: string;
+    name: string;
+    address: string;
+    category: string;
+    apn: string;
+    lat: string;
+    lng: string;
+    listing_url: string;
+    broker: string;
+    counted: string;
+  }>(sql,
+    `SELECT universe_id, market, name, address, category, apn, lat, lng, listing_url, broker, counted
+     FROM universe_rows ORDER BY universe_id`,
+  );
   return {
     stages: stages.rows.map((row) => ({ site_id: text(row.site_id), stage: text(row.stage) })),
     activities: activities.rows.map((row) => {
@@ -725,9 +1079,47 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       if (!values.at_text && values.at_approximate === "1" && values.at_iso) values.at = `${values.at_iso} (approx.)`;
       return { entity_id: text(row.entity_id), values };
     }),
-    sites: sites.rows.map((row) => ({
+    sites: sites.rows.map((row) => {
+      const writes = typeof row.sheet_writes === "string" ? parseSheet(row.sheet_writes) : parseSheet(JSON.stringify(row.sheet_writes ?? {}));
+      const facts = asObject(row.facts);
+      const stored = text(row.power_rating);
+      const rating: PowerRatingName = isPowerRatingName(stored)
+        ? stored
+        : derivePowerRating({ market: text(row.market), ...facts }).rating;
+      writes[DERIVED_POWER_HEADER] = rating;
+      return { site_id: text(row.site_id), writes };
+    }),
+    createdSites: created.map((row) => ({
       site_id: text(row.site_id),
-      writes: typeof row.sheet_writes === "string" ? parseSheet(row.sheet_writes) : parseSheet(JSON.stringify(row.sheet_writes ?? {})),
+      kind: row.kind === "land" ? "land" as const : "pipeline" as const,
+      values: {
+        stage: text(row.stage) || "1 Desk screen",
+        name: text(row.name),
+        address: text(row.address),
+        market: text(row.market),
+        category: text(row.category),
+        apn: text(row.apn),
+        lat: text(row.lat),
+        lng: text(row.lng),
+        listing_url: text(row.listing_url),
+        broker: text(row.broker),
+        universe_id: text(row.universe_id),
+      },
+    })),
+    universeRows: universe.map((row) => ({
+      universe_id: text(row.universe_id),
+      values: {
+        name: text(row.name),
+        address: text(row.address),
+        market: text(row.market),
+        category: text(row.category),
+        apn: text(row.apn),
+        lat: text(row.lat),
+        lng: text(row.lng),
+        listing_url: text(row.listing_url),
+        broker: text(row.broker),
+        counted: text(row.counted) || "Yes",
+      },
     })),
   };
 }
@@ -805,5 +1197,36 @@ export const ACTIVITY_HEADER_ROW = 1;
 export const COMMS_HEADER_ROW = 1;
 export const ACTIVITY_SHEET = "Activity";
 export const COMMS_SHEET = "Comms Log";
+export const UNIVERSE_SHEET = "Universe";
+export const UNIVERSE_HEADER_ROW = 1;
+
+const CREATED_SITE_FIELDS: { headers: string[]; key: string }[] = [
+  { headers: ["site id"], key: "id" },
+  { headers: ["stage"], key: "stage" },
+  { headers: ["name"], key: "name" },
+  { headers: ["address", "site"], key: "address" },
+  { headers: ["market"], key: "market" },
+  { headers: ["segment group", "category"], key: "category" },
+  { headers: ["apn or folio", "apn"], key: "apn" },
+  { headers: ["lat"], key: "lat" },
+  { headers: ["lng", "lon"], key: "lng" },
+  { headers: ["listing link"], key: "listing_url" },
+  { headers: ["broker"], key: "broker" },
+  { headers: ["universe id", "lead id"], key: "universe_id" },
+];
+
+const UNIVERSE_FIELDS: { headers: string[]; key: string }[] = [
+  { headers: ["universe id", "site id", "lead id"], key: "id" },
+  { headers: ["business name", "name"], key: "name" },
+  { headers: ["address"], key: "address" },
+  { headers: ["market"], key: "market" },
+  { headers: ["apn", "apn or folio"], key: "apn" },
+  { headers: ["lat"], key: "lat" },
+  { headers: ["lon", "lng"], key: "lng" },
+  { headers: ["segment group", "category"], key: "category" },
+  { headers: ["listing link"], key: "listing_url" },
+  { headers: ["broker"], key: "broker" },
+  { headers: ["counted in funnel"], key: "counted" },
+];
 
 export type { CommsField };

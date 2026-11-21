@@ -106,7 +106,8 @@ export function draftsForRecord(input: {
       visibility: "signed-in",
     }];
   }
-  if (input.entityType === "note") {
+  if (input.entityType === "comment" || input.entityType === "note") {
+    if (input.entityType === "comment" && !scrub(input.payload.body)) return [];
     return [{
       docType: "note",
       entityId: input.entityId,

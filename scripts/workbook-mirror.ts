@@ -1,6 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { withConnectionString } from "../lib/actions/db";
 import { assertProductionDiff } from "../lib/changes/guard";
+import { raiseIdFloor } from "../lib/changes/apply";
 import { sheetsAccessToken } from "../lib/changes/sheetsAuth";
 import { MIRROR_FIELD_HEADERS } from "../lib/changes/site";
 import {
@@ -21,17 +22,30 @@ import {
   formatMirrorDrift,
   formatPlan,
   formatPlanSummary,
+  formatTabCounts,
+  labeledFloorsFromTable,
   loadMirrorRows,
   mirrorDrift,
   mirrorDryRun,
+  mirrorGridNeedsGrowth,
+  mirrorGridRequests,
   planActivityMirror,
   planCommsMirror,
+  planCreatedSiteMirror,
+  planMirrorTabs,
   planSiteMirror,
+  planUniverseMirror,
   newMirrorRunId,
   planStageMirror,
+  redactMirrorError,
+  UNIVERSE_HEADER_ROW,
+  UNIVERSE_SHEET,
   saveMirrorRun,
   sheetIdFloor,
   watchMirrorCancel,
+  writeMirrorTabs,
+  type FailedMirrorTab,
+  type MirrorPlan,
   type MirrorWritePhase,
   stageTabs,
   type CellChange,
@@ -39,6 +53,7 @@ import {
   type SheetTable,
 } from "../lib/changes/mirror";
 import { loadSheetTable, readBackCells, readBackOutcome, readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
+import { writeFormulaBatch, readGrids } from "./power-sheet-read";
 
 function summary(text: string): void {
   const file = process.env.GITHUB_STEP_SUMMARY;
@@ -47,14 +62,30 @@ function summary(text: string): void {
 }
 
 function publicError(error: unknown): string {
-  const text = error instanceof Error ? error.message : "workbook mirror failed";
-  return text
-    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
-    .replace(/\b[\w.-]+\.neon\.tech\b/gi, "[redacted-host]")
-    .replace(/ya29\.[A-Za-z0-9._-]+/g, "[redacted-token]")
-    .replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, "[redacted-key]")
-    .replace(/"private_key"\s*:\s*"(?:\\.|[^"\\])*"/g, '"private_key":"[redacted]"')
-    .slice(0, 500);
+  return redactMirrorError(error);
+}
+
+function logTabFailure(failure: FailedMirrorTab): void {
+  console.error(JSON.stringify({ event: "mirror_tab_failed", tab: failure.tab, message: failure.message }));
+}
+
+function failedTabsError(failed: FailedMirrorTab[], suffix = ""): Error {
+  const detail = failed.map((failure) => `${failure.tab}: ${failure.message}`).join("\n");
+  return new Error(`Workbook mirror failed on ${failed.map((failure) => failure.tab).join(", ")}.${suffix}\n${detail}`);
+}
+
+/** Grow the Universe grid, then write the new column. Returns false when the cells already fit. */
+async function writeUniverseGrid(token: string, changes: CellChange[]): Promise<boolean> {
+  const grids = await readGrids(token);
+  const grid = grids.find((item) => item.title === UNIVERSE_SHEET);
+  if (!grid) throw new Error("Universe sheet is missing from the workbook.");
+  if (!mirrorGridNeedsGrowth(changes, grid)) return false;
+  await writeFormulaBatch(token, mirrorGridRequests(changes, grid).requests);
+  return true;
+}
+
+function blankPlan(): MirrorPlan {
+  return { changes: [], skippedProtected: 0, unmatched: [], appended: 0, refused: [], held: [] };
 }
 
 function sheetsToken(raw: string): Promise<string> {
@@ -117,83 +148,150 @@ async function main(): Promise<void> {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
   if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set.");
   const token = await sheetsToken(raw);
-  const changes: CellChange[] = [];
   const refused: string[] = [];
   const held: { id: string; header: string }[] = [];
   let skippedProtected = 0;
   let appended = 0;
   let unmatched = 0;
   let activitySheetFloor = 0;
+  const failed: FailedMirrorTab[] = [];
+  const tasks: { tab: string; run: () => Promise<MirrorPlan> }[] = [];
   if (selected.includes("stage")) {
-    const tables = [];
-    for (const tab of stageTabs()) {
-      tables.push(await loadTable(token, tab.title, tab.headerRow, [["site id"], ["stage"]]));
-    }
-    const plan = planStageMirror(tables, rows.stages);
-    changes.push(...plan.changes);
-    skippedProtected += plan.skippedProtected;
-    appended += plan.appended;
-    unmatched += plan.unmatched.length;
+    tasks.push({
+      tab: "Stage",
+      run: async () => {
+        const tables = [];
+        for (const tab of stageTabs()) {
+          tables.push(await loadTable(token, tab.title, tab.headerRow, [["site id"], ["stage"]]));
+        }
+        return planStageMirror(tables, rows.stages);
+      },
+    });
   }
   if (selected.includes("site")) {
-    const tables = [];
-    const names = [...new Set(MIRROR_FIELD_HEADERS.flatMap((row) => row.headers))];
-    const headers = [["site id"], ...names.map((name) => [name])];
-    for (const tab of stageTabs()) {
-      tables.push(await loadTable(token, tab.title, tab.headerRow, headers, true));
-    }
-    const plan = planSiteMirror(tables, rows.sites);
-    changes.push(...plan.changes);
-    skippedProtected += plan.skippedProtected;
-    appended += plan.appended;
-    unmatched += plan.unmatched.length;
+    tasks.push({
+      tab: "Sites",
+      run: async () => {
+        const tables = [];
+        const names = [...new Set(MIRROR_FIELD_HEADERS.flatMap((row) => row.headers))];
+        const headers = [["site id"], ...names.map((name) => [name])];
+        for (const tab of stageTabs()) {
+          tables.push(await loadTable(token, tab.title, tab.headerRow, headers, true));
+        }
+        const plan = planSiteMirror(tables, rows.sites);
+        const created = planCreatedSiteMirror(tables, rows.createdSites);
+        const floors = tables.flatMap((table) => labeledFloorsFromTable(table, ["site id"]));
+        await withConnectionString(url, async (sql) => {
+          for (const floor of floors) await raiseIdFloor(sql, floor.name, floor.value);
+        });
+        return {
+          changes: [...plan.changes, ...created.changes],
+          skippedProtected: plan.skippedProtected + created.skippedProtected,
+          unmatched: [...plan.unmatched, ...created.unmatched],
+          appended: plan.appended + created.appended,
+          refused: [...plan.refused, ...created.refused],
+          held: [...plan.held, ...created.held],
+        };
+      },
+    });
+    tasks.push({
+      tab: "Universe",
+      run: async () => {
+        let universe: SheetTable;
+        try {
+          universe = await loadTable(token, UNIVERSE_SHEET, UNIVERSE_HEADER_ROW, [
+            ["universe id", "site id", "lead id"],
+            ["business name", "name"],
+            ["address"],
+            ["market"],
+            ["apn", "apn or folio"],
+            ["lat"],
+            ["lon", "lng"],
+            ["segment group", "category"],
+            ["listing link"],
+            ["broker"],
+            ["counted in funnel"],
+          ]);
+        } catch (error) {
+          if (rows.universeRows.length) throw error;
+          console.error(JSON.stringify({ event: "universe_sheet_skipped" }));
+          return blankPlan();
+        }
+        const plan = planUniverseMirror(universe, rows.universeRows);
+        const floors = labeledFloorsFromTable(universe, ["universe id", "site id", "lead id"]);
+        await withConnectionString(url, async (sql) => {
+          for (const floor of floors) await raiseIdFloor(sql, floor.name, floor.value);
+        });
+        return plan;
+      },
+    });
   }
   if (selected.includes("activity")) {
-    const table = await loadTable(token, ACTIVITY_SHEET, ACTIVITY_HEADER_ROW, [
-      ["event id"],
-      ["date", "when"],
-      ["site id", "site_id", "record id"],
-      ["type", "kind"],
-      ["summary"],
-      ["source link", "source_link"],
-    ]);
-    activitySheetFloor = sheetIdFloor(table, ["event id"], "A-");
-    const plan = planActivityMirror(table, rows.activities);
-    changes.push(...plan.changes);
-    skippedProtected += plan.skippedProtected;
-    appended += plan.appended;
-    unmatched += plan.unmatched.length;
-    refused.push(...plan.refused);
-    held.push(...plan.held);
+    tasks.push({
+      tab: "Activity",
+      run: async () => {
+        const table = await loadTable(token, ACTIVITY_SHEET, ACTIVITY_HEADER_ROW, [
+          ["event id"],
+          ["date", "when"],
+          ["site id", "site_id", "record id"],
+          ["type", "kind"],
+          ["summary"],
+          ["source link", "source_link"],
+        ]);
+        activitySheetFloor = sheetIdFloor(table, ["event id"], "A-");
+        return planActivityMirror(table, rows.activities);
+      },
+    });
   }
   if (selected.includes("comms")) {
-    const table = await loadTable(token, COMMS_SHEET, COMMS_HEADER_ROW, [
-      ["comms id"],
-      ["site ids"],
-      ["thread id"],
-      ["link"],
-      ["date/time"],
-      ["direction"],
-      ["counterparty person"],
-      ["counterparty firm"],
-      ["channel"],
-      ["summary"],
-      ["asks made"],
-      ["asks answered"],
-      ["attachments"],
-      ["state changes"],
-      ["source"],
-      ["message id"],
-      ["subject"],
-    ]);
-    const plan = planCommsMirror(table, rows.comms);
-    changes.push(...plan.changes);
-    skippedProtected += plan.skippedProtected;
-    appended += plan.appended;
-    unmatched += plan.unmatched.length;
-    refused.push(...plan.refused);
-    held.push(...plan.held);
+    tasks.push({
+      tab: "Comms Log",
+      run: async () => {
+        const table = await loadTable(token, COMMS_SHEET, COMMS_HEADER_ROW, [
+          ["comms id"],
+          ["site ids"],
+          ["thread id"],
+          ["link"],
+          ["date/time"],
+          ["direction"],
+          ["counterparty person"],
+          ["counterparty firm"],
+          ["channel"],
+          ["summary"],
+          ["asks made"],
+          ["asks answered"],
+          ["attachments"],
+          ["state changes"],
+          ["source"],
+          ["message id"],
+          ["subject"],
+        ]);
+        return planCommsMirror(table, rows.comms);
+      },
+    });
   }
+  const plannedTabs = await planMirrorTabs(tasks);
+  for (const failure of plannedTabs.failed) logTabFailure(failure);
+  failed.push(...plannedTabs.failed);
+  const changes: CellChange[] = [];
+  for (const tab of plannedTabs.planned) {
+    changes.push(...tab.plan.changes);
+    skippedProtected += tab.plan.skippedProtected;
+    appended += tab.plan.appended;
+    unmatched += tab.plan.unmatched.length;
+    refused.push(...tab.plan.refused);
+    held.push(...tab.plan.held);
+  }
+  const bySheet = new Map<string, CellChange[]>();
+  for (const change of changes) {
+    const list = bySheet.get(change.sheet) || [];
+    list.push(change);
+    bySheet.set(change.sheet, list);
+  }
+  const sheetPlans = [...bySheet.entries()].map(([tab, sheetChanges]) => ({
+    tab,
+    plan: { ...blankPlan(), changes: sheetChanges },
+  }));
   assertPlannedWrites(changes);
   const byEntity = entityChangeCounts(changes);
   const drift = mirrorDrift(changes);
@@ -215,12 +313,16 @@ async function main(): Promise<void> {
   };
   const preview = formatPlan(changes);
   const counted = formatPlanSummary(changes);
+  const tabCounts = formatTabCounts(changes);
+  const failureNote = failed.length ? failed.map((failure) => `${failure.tab}: ${failure.message}`).join("\n") : "tabs failed 0";
   const notes = [
     driftText,
     formatHeld(held),
     counted,
+    tabCounts,
     `activity_sheet_floor ${activitySheetFloor}`,
     `refused ${refused.length}${refused.length ? ` ${refused.join(", ")}` : ""}`,
+    failureNote,
   ].join("\n");
   console.log(notes);
   console.log(preview);
@@ -228,7 +330,10 @@ async function main(): Promise<void> {
     summary(`## Workbook mirror dry run\n\nNothing was written.\n\n${notes}\n\n\`\`\`\n${preview.slice(0, 8000)}\n\`\`\`\n`);
   }
   assertMirrorRefusals(refused);
-  if (dryRun) return;
+  if (dryRun) {
+    if (failed.length) throw failedTabsError(failed);
+    return;
+  }
   const runId = newMirrorRunId();
   let phase: MirrorWritePhase = "idle";
   let settled = false;
@@ -245,28 +350,44 @@ async function main(): Promise<void> {
     (note) => finish("failed", note),
     (code) => process.exit(code),
   );
+  let written: CellChange[] = [];
   try {
     await withConnectionString(url, (sql) => saveMirrorRun(sql, runId, counts, "writing cells", "running"));
     phase = "writing";
-    await writeCells(token, changes);
+    const writtenTabs = await writeMirrorTabs(sheetPlans, async (tab, sheetChanges) => {
+      if (!sheetChanges.length) return;
+      if (tab === UNIVERSE_SHEET) {
+        const wroteGrid = await writeUniverseGrid(token, sheetChanges);
+        if (wroteGrid) return;
+      }
+      await writeCells(token, sheetChanges);
+    });
+    for (const failure of writtenTabs.failed) logTabFailure(failure);
+    failed.push(...writtenTabs.failed);
+    written = writtenTabs.written;
     phase = "written";
   } catch (error) {
     await finish("failed", "write failed");
     throw error;
   }
   try {
-    assertReadBack(changes, await readBack(token, changes));
+    if (written.length) assertReadBack(written, await readBack(token, written));
   } catch (error) {
     const outcome = readBackOutcome(error);
-    await finish(outcome.status, outcome.note);
+    await finish(failed.length || outcome.rethrow ? "failed" : outcome.status, failed.length ? "tab failed" : outcome.note);
     if (outcome.rethrow) throw error;
-    console.log(`Wrote ${counts.cells} cells. Read-back was rate limited after retries.\n${driftText}\n${counted}`);
-    summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Read-back was rate limited after retries. The run is recorded as succeeded.\n\n${driftText}\n\n${counted}\n`);
+    if (failed.length) throw failedTabsError(failed);
+    console.log(`Wrote ${written.length} cells. Read-back was rate limited after retries.\n${driftText}\n${counted}`);
+    summary(`## Workbook mirror\n\nWrote ${written.length} cells. Read-back was rate limited after retries. The run is recorded as succeeded.\n\n${driftText}\n\n${counted}\n`);
     return;
   }
+  if (failed.length) {
+    await finish("failed", "tab failed");
+    throw failedTabsError(failed, ` Wrote ${written.length} cells on the other tabs.`);
+  }
   await finish("succeeded", "wrote cells");
-  console.log(`Wrote ${counts.cells} cells.\n${driftText}\n${counted}`);
-  summary(`## Workbook mirror\n\nWrote ${counts.cells} cells. Protected rows skipped: ${skippedProtected}. Drifted cells were overwritten with the database value.\n\n${driftText}\n\n${counted}\n`);
+  console.log(`Wrote ${written.length} cells.\n${driftText}\n${counted}\n${tabCounts}`);
+  summary(`## Workbook mirror\n\nWrote ${written.length} cells. Protected rows skipped: ${skippedProtected}. Drifted cells were overwritten with the database value.\n\n${driftText}\n\n${counted}\n\n${tabCounts}\n`);
 }
 
 main().catch((error: unknown) => {

@@ -54,10 +54,11 @@ export function estimateSlots(lengthFt: number, widthFt: number, layout: SpaceLa
   return along * stallRows(widthFt, stall.depthFt, AISLE_FT[layout]);
 }
 
-export function spaceRollup(count: number, slots: number): string {
-  if (count <= 0) return "No spaces marked yet";
-  const areas = count === 1 ? "1 space" : `${count.toLocaleString("en-US")} spaces`;
-  return `${areas} · ~${Math.max(0, slots).toLocaleString("en-US")} slots est.`;
+export function spaceRollup(count: number, slots: number, sqft = 0): string {
+  if (count <= 0) return "No lots drawn yet";
+  const lots = count === 1 ? "1 lot" : `${count.toLocaleString("en-US")} lots`;
+  const area = `${Math.max(0, Math.round(sqft)).toLocaleString("en-US")} sq ft`;
+  return `${lots} · ${area} · ~${Math.max(0, slots).toLocaleString("en-US")} slots`;
 }
 
 export function spaceMapLabel(lengthFt: number, widthFt: number, slots: number): string {

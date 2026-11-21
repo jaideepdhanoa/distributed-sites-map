@@ -7,6 +7,9 @@ import type { VisibleRecommendation } from "@/lib/agent/recommend";
 import { publishStageRefresh, refreshFromSuggestion } from "@/lib/stageOverlay";
 import { SuggestedBlock } from "../agent/SuggestedBlock";
 import { useRecommendations } from "../agent/useRecommendations";
+import type { CommentAnchor } from "@/lib/comments/anchor";
+import CommentChip from "../comments/CommentChip";
+import CommentThread from "../comments/CommentThread";
 import { MentionChips, MentionField, type MentionAccount } from "./MentionField";
 import { canReview, canWrite, useActionStatus, type ActionRole } from "./panel";
 
@@ -20,6 +23,10 @@ type Note = {
   deleted: boolean;
   resolvedAt: string | null;
   mentions?: MentionAccount[];
+  anchor?: CommentAnchor | null;
+  tag?: string;
+  version?: number | null;
+  brokerQuestion?: string | null;
 };
 type Suggestion = {
   id: string;
@@ -169,9 +176,24 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   });
   const pendingSteps = suggestions.filter((item) => item.field === "proposed_next_step" && item.status === "open");
 
+  const anchoredKeys = new Set<string>();
+  const anchored = roots.flatMap((item) => {
+    if (!item.anchor) return [];
+    const key = `${item.anchor.type}:${item.anchor.line}:${item.anchor.period}:${item.anchor.spaceId}`;
+    if (anchoredKeys.has(key)) return [];
+    anchoredKeys.add(key);
+    return [item.anchor];
+  });
+  const plain = roots.filter((item) => !item.anchor);
   const threads = roots.length ? (
     <div className="act-threads" data-testid="note-threads">
-      {roots.map((item) => (
+      {anchored.map((item) => (
+        <div key={`${item.type}:${item.line}:${item.period}:${item.spaceId}`} data-testid="anchored-discussion">
+          <CommentChip anchor={item} />
+          <CommentThread siteId={item.siteId || id} anchor={item} notes={notes} variant="inline" source="Discussion" onReload={() => void reload()} />
+        </div>
+      ))}
+      {plain.map((item) => (
         <NoteThread
           key={item.id}
           note={item}

@@ -68,6 +68,7 @@ export const ENTITY_TYPES = ["stage", "activity", "comms", "site", "pnl_line", "
 /** Categories the map already ships. The workbook Segment cell is freer text and is not this list. */
 export const BUSINESS_TYPES = [
   "Car wash",
+  "Quick lube",
   "Auto repair",
   "Tire and lube",
   "Gas station",

@@ -13,7 +13,8 @@ import {
   siteInCategories,
 } from "../lib/categories.ts";
 import { inStage, presentSite } from "../lib/filter.ts";
-import { CATEGORY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isAutoBusinessType } from "../lib/labels.ts";
+import { chipLabelProblem } from "../lib/chips.ts";
+import { CATEGORY_NOTES, QUICK_LUBE_LABEL, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isAutoBusinessType } from "../lib/labels.ts";
 import { collectSearchHits } from "../lib/search.ts";
 import type { SiteProps } from "../lib/types.ts";
 
@@ -38,19 +39,24 @@ const sites = JSON.parse(readFileSync("data/generated/sites.geojson", "utf8")).f
 ) as SiteRow[];
 
 test("category links default to car washes and auto service", () => {
-  assert.deepEqual(defaultCategories(), { wash: true, auto: true, land: false, store: false });
+  assert.deepEqual(defaultCategories(), { wash: true, lube: true, auto: true, land: false, store: false });
   assert.deepEqual(parseCategories({}), defaultCategories());
-  assert.deepEqual(parseCategories({ landlayer: "1" }), { wash: true, auto: true, land: true, store: false });
-  assert.deepEqual(parseCategories({ cstore: "1" }), { wash: true, auto: true, land: false, store: true });
-  assert.deepEqual(parseCategories({ cats: "land" }), { wash: false, auto: false, land: true, store: false });
-  assert.deepEqual(parseCategories({ cats: "wash|store", landlayer: "1" }), { wash: true, auto: false, land: false, store: true });
-  assert.deepEqual(parseCategories({ cats: "none" }), { wash: false, auto: false, land: false, store: false });
+  assert.deepEqual(parseCategories({ landlayer: "1" }), { wash: true, lube: true, auto: true, land: true, store: false });
+  assert.deepEqual(parseCategories({ cstore: "1" }), { wash: true, lube: true, auto: true, land: false, store: true });
+  assert.deepEqual(parseCategories({ cats: "land" }), { wash: false, lube: false, auto: false, land: true, store: false });
+  assert.deepEqual(parseCategories({ cats: "wash|store", landlayer: "1" }), { wash: true, lube: false, auto: false, land: false, store: true });
+  assert.deepEqual(parseCategories({ cats: "none" }), { wash: false, lube: false, auto: false, land: false, store: false });
   assert.equal(categoriesParam(defaultCategories()), null);
-  assert.equal(categoriesParam({ wash: true, auto: false, land: true, store: false }), "wash|land");
-  assert.equal(categoriesParam({ wash: true, auto: true, land: true, store: false }), "wash|auto|land");
-  assert.equal(categoriesParam({ wash: false, auto: false, land: false, store: false }), "none");
+  assert.equal(categoriesParam({ wash: true, lube: false, auto: false, land: true, store: false }), "wash|land");
+  assert.equal(categoriesParam({ wash: true, lube: false, auto: true, land: true, store: false }), "wash|auto|land");
+  assert.equal(categoriesParam({ wash: true, lube: true, auto: true, land: false, store: false }), null);
+  assert.equal(categoriesParam({ wash: true, lube: false, auto: true, land: false, store: false }), "wash|auto");
+  assert.equal(categoriesParam({ wash: false, lube: false, auto: false, land: false, store: false }), "none");
+  assert.equal(QUICK_LUBE_LABEL, "Quick lube");
+  assert.equal(chipLabelProblem(QUICK_LUBE_LABEL), "");
   assert.match(CATEGORY_NOTES.auto, /Auto repair/);
-  assert.match(CATEGORY_NOTES.auto, /tire and lube/);
+  assert.match(CATEGORY_NOTES.auto, /Auto repair and tire\./);
+  assert.doesNotMatch(CATEGORY_NOTES.auto, /lube/);
   assert.equal(UNSCREENED_LISTINGS_LABEL, "Unscreened market listings");
   assert.equal(UNSCREENED_LISTINGS_NOTE, "Listings not yet in Pipeline or Universe.");
 });
@@ -99,6 +105,10 @@ test("auto service is a pipeline category, separate from car washes", () => {
     assert.equal(dealCategory({ kind: "pipeline", business_type: type }), "auto", type);
     assert.equal(dealCategory({ kind: "land", business_type: type }), "land", type);
   }
+  assert.equal(dealCategory({ kind: "pipeline", business_type: "Quick lube" }), "lube");
+  assert.equal(dealCategory({ kind: "land", business_type: "Quick lube" }), "land");
+  assert.equal(dealInCategories({ kind: "pipeline", business_type: "Quick lube" }, defaultCategories()), true);
+  assert.equal(dealInCategories({ kind: "pipeline", business_type: "Quick lube" }, { ...defaultCategories(), lube: false }), false);
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Car wash" }), "wash");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Other" }), "wash");
   assert.equal(dealCategory({ kind: "pipeline", business_type: "Gas station", name: "Corner service station with a tenant" }), "store");

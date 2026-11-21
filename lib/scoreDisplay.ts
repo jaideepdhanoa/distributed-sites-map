@@ -46,6 +46,8 @@ export type StoredScoreInput = {
   dealRating?: string | null;
   /** Derived power reason. The copied power points stay as stored. */
   powerDetail?: string | null;
+  /** Quick lube is not ranked on wash cash flow. Economics shows N/A, not zero. */
+  naEconomics?: boolean;
 };
 
 export type ScoreLine = {
@@ -82,16 +84,17 @@ export function storedScoreView(input: StoredScoreInput): {
   };
   const parts = ORDER.map((id) => {
     const value = numbers[id];
+    const na = id === "economics" && input.naEconomics;
     return {
       id,
       label: LABELS[id],
-      shown: value == null ? "—" : formatPoints(value),
+      shown: na ? "N/A" : value == null ? "—" : formatPoints(value),
       max: SCORE_MAX[id],
-      detail: details[id],
+      detail: na ? "Wash cash flow does not apply." : details[id],
     };
   });
   const totalNumber = pointNumber(input.score);
-  const present = ORDER.map((id) => numbers[id]);
+  const present = ORDER.filter((id) => !(id === "economics" && input.naEconomics)).map((id) => numbers[id]);
   const mismatch = totalNumber != null && present.every((value) => value != null) && Math.abs(present.reduce((sum, value) => sum + (value || 0), 0) - totalNumber) > 0.05;
   return {
     total: displayScore(input.score),

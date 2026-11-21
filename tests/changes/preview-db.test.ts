@@ -28,7 +28,9 @@ import {
   previewDeploymentsQuery,
   PUBLIC_VERCEL_PROJECT_ID,
   PUBLIC_VERCEL_TEAM_ID,
+  isPreviewDeployment,
   redeployBody,
+  redeployPreview,
   selectPreviewDeployment,
 } from "../../lib/preview/vercel";
 
@@ -249,7 +251,48 @@ test("vercel preview writes do not include production", async () => {
     { uid: "dpl_prod", target: "production", readyState: "READY" },
     { uid: "dpl_preview", target: null, readyState: "READY" },
   ])?.uid, "dpl_preview");
-  assert.equal(redeployBody("sites", "dpl_preview").target, "preview");
+  const redeploy = redeployBody("sites", "dpl_preview");
+  assert.equal("target" in redeploy, false);
+  assert.equal(redeploy.deploymentId, "dpl_preview");
+  assert.equal(isPreviewDeployment({ target: null }), true);
+  assert.equal(isPreviewDeployment({ target: "preview" }), true);
+  assert.equal(isPreviewDeployment({ target: "production" }), false);
+});
+
+test("a preview redeploy omits target and refuses a production deployment", async () => {
+  const options = {
+    token: "vercel-test-token",
+    projectId: "prj_test",
+    teamId: "team_test",
+    fetchImpl: (async () => new Response("{}", { status: 200 })) as typeof fetch,
+  };
+  await assert.rejects(
+    () => redeployPreview(options, "sites", { uid: "dpl_prod", target: "production", readyState: "READY" }),
+    /not a preview/,
+  );
+  let posted = "";
+  await redeployPreview(
+    {
+      ...options,
+      fetchImpl: async (_input, init) => {
+        posted = typeof init?.body === "string" ? init.body : "";
+        return new Response("{}", { status: 200 });
+      },
+    },
+    "sites",
+    { uid: "dpl_preview", target: "preview", readyState: "READY" },
+  );
+  const body = JSON.parse(posted) as { deploymentId?: string };
+  assert.equal("target" in body, false);
+  assert.equal(body.deploymentId, "dpl_preview");
+  const script = readFileSync("scripts/reset-preview-db.ts", "utf8");
+  const prepared = script.slice(script.indexOf("const prepared"), script.indexOf("console.log(prepared)"));
+  const redeployAt = script.indexOf("await redeployPreview");
+  assert.ok(prepared.length > 0 && script.indexOf("console.log(prepared)") < redeployAt);
+  assert.match(prepared, /preview\.action/);
+  assert.match(prepared, /Wrote Preview env keys/);
+  assert.equal(prepared.includes("preview.pooled"), false);
+  assert.equal(prepared.includes("preview.direct"), false);
 });
 
 test("the deployments query does not send target=preview", async () => {

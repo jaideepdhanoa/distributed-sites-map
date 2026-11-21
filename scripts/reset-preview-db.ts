@@ -82,21 +82,22 @@ async function main(): Promise<void> {
   };
   const records = await listProjectEnv(vercel);
   const applied = await applyPreviewEnv(vercel, records, values);
-  const name = await projectName(vercel);
-  const deployment = await latestPreviewDeployment(vercel);
-  if (deployment) await redeployPreview(vercel, name, deployment);
-  const redeployed = deployment ? "Redeployed the latest preview." : "No ready preview deployment. The Preview env applies on the next preview build.";
   const narrowed = applied.narrowed.length ? applied.narrowed.join(", ") : "none";
   const wrote = applied.written.length ? applied.written.join(", ") : "none";
-  const message = [
+  const prepared = [
     `The Neon branch named preview was ${preview.action} from the production branch.`,
     `Narrowed shared env keys: ${narrowed}.`,
     `Wrote Preview env keys: ${wrote}.`,
     "Production and Development were not changed.",
-    redeployed,
   ].join(" ");
-  console.log(message);
-  summary(`## Preview database\n\n${message}\n`);
+  console.log(prepared);
+  summary(`## Preview database\n\n${prepared}\n`);
+  const name = await projectName(vercel);
+  const deployment = await latestPreviewDeployment(vercel);
+  if (deployment) await redeployPreview(vercel, name, deployment);
+  const redeployed = deployment ? "Redeployed the latest preview." : "No ready preview deployment. The Preview env applies on the next preview build.";
+  console.log(redeployed);
+  summary(`${redeployed}\n`);
 }
 
 main().catch((error: unknown) => {

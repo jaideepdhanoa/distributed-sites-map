@@ -1,4 +1,6 @@
 import { actionsEnabled, withSql } from "@/lib/actions/db";
+import { mergeQuickLubeCensus, type CensusRow } from "@/lib/quickLube";
+import type { SiteFeature } from "@/lib/types";
 import { commsSnapshotForIds, type CommsSnapshot, type CommsRecord } from "@/lib/comms";
 import { timelineForIds } from "@/lib/timeline/filter";
 import { moneyText } from "@/lib/pricing";
@@ -202,6 +204,42 @@ export function applySiteRows<T extends DealFile>(file: T, rows: SiteRead[]): T 
     present.add(id);
   }
   return { ...file, features };
+}
+
+export async function overlayQuickLubeCensus<T extends { features?: SiteFeature[] }>(file: T): Promise<T> {
+  if (!readEntityFromDb("site") || !actionsEnabled()) return file;
+  try {
+    const rows = await withSql((sql) =>
+      sql.query<Record<string, unknown>>(
+        `SELECT u.universe_id, u.site_id, u.market, u.name, u.address, u.category, u.lat, u.lng,
+                s.service_area_class, s.miles_to_depot, s.listing_status, s.facts
+         FROM universe_rows u
+         LEFT JOIN sites s ON s.site_id = u.site_id
+         WHERE u.category = 'Quick lube'`,
+      ),
+    );
+    const census: CensusRow[] = rows.rows.map((row) => {
+      const facts = row.facts && typeof row.facts === "object" ? row.facts as Record<string, string> : {};
+      return {
+        universeId: text(row.universe_id),
+        siteId: text(row.site_id),
+        market: text(row.market),
+        name: text(row.name),
+        address: text(row.address),
+        category: text(row.category),
+        lat: text(row.lat),
+        lng: text(row.lng),
+        serviceArea: text(row.service_area_class),
+        miles: text(row.miles_to_depot),
+        listingStatus: text(row.listing_status),
+        facts,
+      };
+    });
+    return mergeQuickLubeCensus(file, census);
+  } catch {
+    console.error(JSON.stringify({ event: "quick_lube_census_fallback" }));
+    return file;
+  }
 }
 
 export async function overlayDealSites<T extends DealFile>(file: T): Promise<T> {

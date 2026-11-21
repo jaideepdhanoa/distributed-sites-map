@@ -29,7 +29,7 @@ import { dealSearchParts, matchesQuery, partyMatch, siteSearchParts } from "@/li
 import { paletteGroups } from "@/lib/search/palette";
 import { PIPELINE_COLUMNS, capacitySummary, defaultColumnIds, displayScore, factsForDeal, factsForSite, inRange, parseColumns, rangeQuery, rangesFromSearch, vehiclesPerDay, type PinLabel, type PipelineColumnId } from "@/lib/keyNumbers";
 import { categorySearch, dealCategory, dealInCategories, isLandParcelSite, landLinks, parseCategories, siteCategory, siteInCategories, type CategoryId } from "@/lib/categories";
-import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
+import { CATEGORY_NOTES, FUNNEL_NOTES, LAYER_TITLES, QUICK_LUBE_LABEL, SPARE_LAND_NOTE, STATUS_NOTES, SUMMARY_NOTES, UNSCREENED_LISTINGS_LABEL, UNSCREENED_LISTINGS_NOTE, isPipelineStore, plainVerdict, stageDetail, stageTitle, tierLabel } from "@/lib/labels";
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
@@ -1708,6 +1708,7 @@ export default function Explorer() {
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
   if (!categories.wash) activeFilters.push({ id: "wash", label: "Car washes off", clear: () => setCategory("wash", true) });
+  if (!categories.lube) activeFilters.push({ id: "lube", label: "Quick lube off", clear: () => setCategory("lube", true) });
   if (!categories.auto) activeFilters.push({ id: "auto", label: "Auto service off", clear: () => setCategory("auto", true) });
   if (categories.land) activeFilters.push({ id: "landcat", label: "Land", clear: () => setCategory("land", false) });
   if (categories.store) activeFilters.push({ id: "store", label: "C-stores", clear: () => setCategory("store", false) });
@@ -1932,6 +1933,7 @@ export default function Explorer() {
           cStores: categories.store,
           land: categories.land,
           auto: categories.auto,
+          lube: categories.lube,
         })}
       />
       <header className="bar">
@@ -2173,6 +2175,10 @@ export default function Explorer() {
               <label title={CATEGORY_NOTES.wash}>
                 <input className="check" type="checkbox" data-testid="wash-category" checked={categories.wash} onChange={() => setCategory("wash", !categories.wash)} />
                 <span>Car washes<span className="layer-meta">{CATEGORY_NOTES.wash}</span></span>
+              </label>
+              <label title={CATEGORY_NOTES.lube}>
+                <input className="check" type="checkbox" data-testid="lube-category" checked={categories.lube} onChange={() => setCategory("lube", !categories.lube)} />
+                <span>{QUICK_LUBE_LABEL}<span className="layer-meta">{CATEGORY_NOTES.lube}</span></span>
               </label>
               <label title={CATEGORY_NOTES.auto}>
                 <input className="check" type="checkbox" data-testid="auto-category" checked={categories.auto} onChange={() => setCategory("auto", !categories.auto)} />
@@ -2725,7 +2731,7 @@ export default function Explorer() {
             <h2>How to read this</h2>
             <p>The universe funnel starts with one site for each place. The hover note on Universe says how many census records were merged to get there. Each later step keeps only the sites that passed the step before it.</p>
             <p>When a step has sites on the market, a count beside it lists them. Click that count to show those sites. A larger site has about 10,000 sq ft of open land. A smaller site has about 4,000. Open land is leftover land on an operating wash. It is not a vacant parcel.</p>
-            <p>Filters chooses the working set. Car washes and auto service are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
+            <p>Filters chooses the working set. Car washes, quick lube, and auto service are on. Land parcels, such as LAND-PHX, and c-stores stay off until you turn them on. The header, the list, and the map all follow that set.</p>
             <p>Power sits beside open land. It lists the measured facts on file, with the source and confidence for each. A blank layer stays blank.</p>
             <p>Deals contacted, beside Universe, counts deals in the categories you have on, in this city, with an outbound email or call on file. Dropped deals stay out of that count.</p>
             <p>Held sites are cleared on the land, but they sit outside the current service area. They are not counted in the in-area steps.</p>

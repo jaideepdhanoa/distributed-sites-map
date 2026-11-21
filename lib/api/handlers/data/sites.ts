@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import { overlayHeldStages } from "@/lib/changes/heldStage";
+import { overlayQuickLubeCensus } from "@/lib/changes/read";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { omitProtectedSites } from "@/lib/protectedSite";
 import type { SiteFeature } from "@/lib/types";
@@ -73,6 +74,18 @@ const KEEP = [
   "research_sources",
   "research_note",
   "business_type",
+  "brand_type",
+  "brand_note",
+  "bay_count",
+  "lift_count",
+  "lot_sqft",
+  "outside_sqft",
+  "outside_note",
+  "owner_of_record",
+  "owner_verdict",
+  "listing_source",
+  "listing_status",
+  "source_tag",
   "evidence",
   "spare_ac_own_text",
   "spare_ac_adjoining_text",
@@ -123,9 +136,10 @@ export async function GET(request: NextRequest) {
   const features = chosen.map((feature) => {
     const properties: Record<string, unknown> = {};
     for (const key of KEEP) properties[key] = feature.properties[key];
-    return { type: "Feature", geometry: feature.geometry, properties };
+    return { type: "Feature" as const, geometry: feature.geometry, properties: properties as SiteFeature["properties"] };
   });
-  const staged = await overlayHeldStages(await overlayStageFile({ type: "FeatureCollection", features }, "site"), "site");
+  const withCensus = await overlayQuickLubeCensus({ type: "FeatureCollection", features });
+  const staged = await overlayHeldStages(await overlayStageFile(withCensus, "site"), "site");
   console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
   return NextResponse.json(redactGmailPayload(staged), { headers: privateHeaders });
 }

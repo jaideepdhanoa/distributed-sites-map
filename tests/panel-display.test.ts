@@ -130,8 +130,16 @@ test("the score line shows copied points, a dash when one is missing, and a flag
 
   const off = storedScoreView({ score: 72, economics: 10, land: 10, power: 7.5, location: 10, deal: 5 });
   assert.equal(off.mismatch, true);
+  assert.equal(off.status, "provisional");
+  assert.equal(off.chip, "Provisional");
+  assert.equal(off.summed, "42.5");
   assert.equal(off.parts.map((part) => part.shown).join(","), "10,10,7.5,10,5");
   assert.equal(off.total, "72");
+
+  const unscored = storedScoreView({ score: 72, economics: null, land: 10, power: 7.5, location: 10, deal: 5 });
+  assert.equal(unscored.status, "not_scored");
+  assert.equal(unscored.chip, "Not scored");
+  assert.equal(unscored.mismatch, false);
 });
 
 test("accepting a suggested drop opens the human drop flow and does not set a status", () => {

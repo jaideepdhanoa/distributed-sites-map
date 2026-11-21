@@ -8,26 +8,48 @@ export type AppEventType = "note" | "reply" | "next_proposed" | "next_accepted" 
 
 export async function recordAppEvent(
   sql: Sql,
-  input: { siteId: string; type: AppEventType; summary: string; actorId: string; refId?: string; max?: number },
+  input: { siteId: string; type: AppEventType; summary: string; actorId: string; refId?: string; max?: number; eventAt?: string | null },
 ): Promise<void> {
   const summary = safeSnapshot(input.summary, input.max ?? 240);
   if (!summary) return;
   assertClean(summary);
-  await sql.query(
-    `INSERT INTO queue_events (id, site_id, type, summary, actor_id, ref_id) VALUES ($1, $2, $3, $4, $5, $6)`,
-    [randomUUID(), input.siteId, input.type, summary, input.actorId, input.refId || null],
-  );
+  const id = randomUUID();
+  const values = [id, input.siteId, input.type, summary, input.actorId, input.refId || null, input.eventAt || null];
+  try {
+    await sql.query(
+      `INSERT INTO queue_events (id, site_id, type, summary, actor_id, ref_id, event_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      values,
+    );
+  } catch (error) {
+    const missing = error instanceof Error && /event_at/.test(error.message);
+    if (!missing) throw error;
+    await sql.query(
+      `INSERT INTO queue_events (id, site_id, type, summary, actor_id, ref_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+      values.slice(0, 6),
+    );
+  }
 }
 
 export async function listAppEvents(sql: Sql): Promise<{ siteId: string; type: string; summary: string; at: string }[]> {
-  const rows = await sql.query<{ site_id: string; type: string; summary: string; created_at: Date | string }>(
-    `SELECT site_id, type, summary, created_at FROM queue_events ORDER BY created_at ASC`,
-  );
-  return rows.rows.map((row) => ({
+  let rows: { site_id: string; type: string; summary: string; created_at: Date | string; event_at?: Date | string | null }[];
+  try {
+    const selected = await sql.query<{ site_id: string; type: string; summary: string; created_at: Date | string; event_at: Date | string | null }>(
+      `SELECT site_id, type, summary, created_at, event_at FROM queue_events ORDER BY COALESCE(event_at, created_at) ASC`,
+    );
+    rows = selected.rows;
+  } catch (error) {
+    const missing = error instanceof Error && /event_at/.test(error.message);
+    if (!missing) throw error;
+    const selected = await sql.query<{ site_id: string; type: string; summary: string; created_at: Date | string }>(
+      `SELECT site_id, type, summary, created_at FROM queue_events ORDER BY created_at ASC`,
+    );
+    rows = selected.rows;
+  }
+  return rows.map((row) => ({
     siteId: row.site_id,
     type: row.type,
     summary: safeSnapshot(row.summary, 240),
-    at: stamp(row.created_at),
+    at: stamp(row.event_at || row.created_at),
   })).filter((row) => row.summary);
 }
 

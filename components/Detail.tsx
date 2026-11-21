@@ -177,10 +177,12 @@ function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps |
   return (
     <section className="score-tile" data-testid="score-tile" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <span>Score</span>
-      <strong>{view.total || "—"}</strong>
+      {view.status === "not_scored" ? <strong data-testid="score-chip">Not scored</strong> : view.status === "provisional" ? (
+        <strong data-testid="score-chip" title={`Stored total ${view.total}. Parts sum to ${view.summed}.`}>
+          <span className="chip">Provisional</span> {view.summed}
+        </strong>
+      ) : <strong data-testid="score-chip">{view.total || "—"}</strong>}
       <p className="score-parts" data-testid="score-parts">{view.line}</p>
-      {view.total ? null : <p className="score-parts">No score on file.</p>}
-      {view.mismatch ? <p className="score-flag" data-testid="score-mismatch">doesn't add up</p> : null}
       <button type="button" className="text-link" data-testid="score-breakdown" aria-expanded={open} onClick={() => setPinned((value) => !value)}>
         {pinned ? "Hide breakdown" : "Breakdown"}
       </button>

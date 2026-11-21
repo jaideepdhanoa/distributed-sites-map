@@ -30,6 +30,8 @@ import {
   acresTotal,
 } from "@/lib/keyNumbers";
 import { basisBadge, compMedianOf } from "@/lib/pricing";
+import { storedScoreView } from "@/lib/scoreDisplay";
+import { marketBucket } from "@/lib/counts";
 import { stripPlace, stripStats, stripTip, type StripDirection, type StripStats } from "@/lib/rangeStrip";
 import { displayAddress, folderHref, listingHref, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaShort } from "@/lib/cardStatus";
@@ -97,7 +99,20 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
-  if (id === "score") return displayScore(deal.score) || "—";
+  if (id === "score") {
+    const view = storedScoreView({
+      score: deal.score,
+      economics: deal.economics_points,
+      land: deal.land_points,
+      power: deal.power_points,
+      location: deal.location_points,
+      deal: deal.deal_points,
+      naEconomics: deal.business_type === "Quick lube",
+    });
+    if (view.status === "not_scored") return "Not scored";
+    if (view.status === "provisional") return `Provisional ${view.summed}`;
+    return view.total || "—";
+  }
   if (id === "asking") {
     if (!signedIn) return "—";
     if (!deal.asking_price_display) return "—";
@@ -182,11 +197,27 @@ function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   return null;
 }
 
+function dropReason(deal: DealProps): string {
+  if (deal.stage_group !== "dropped") return "";
+  const chip = deal.chips?.find((item) => item.family === "drop_reason");
+  return chip?.label || String((deal as DealProps & { stage_reason?: string }).stage_reason || "");
+}
+
+function csvCell(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
 export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], signedIn = true) {
-  const header = columns.map((id) => PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id);
+  const fixed = ["Site ID", "Market", "Stage", "Drop reason"];
+  const rest = columns.filter((id) => id !== "site" && id !== "stage" && id !== "chip_drop");
+  const header = [...fixed, ...rest.map((id) => PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id)];
   const lines = [
     header.join(","),
-    ...rows.map((row) => columns.map((id) => `"${cell(row, id, signedIn).replaceAll('"', '""')}"`).join(",")),
+    ...rows.map((row) => {
+      const lead = [row.deal.deal_id, marketBucket(row.deal.city), cell(row, "stage", signedIn), dropReason(row.deal)];
+      const tail = rest.map((id) => cell(row, id, signedIn));
+      return [...lead, ...tail].map(csvCell).join(",");
+    }),
   ];
   return lines.join("\n");
 }

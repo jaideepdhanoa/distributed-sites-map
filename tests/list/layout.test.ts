@@ -10,6 +10,7 @@ import {
   displayIds,
   FLEX_COLUMN_IDS,
   fitColumnWidths,
+  parkCounty,
   moveColumn,
   phoneColumns,
   prepareRows,
@@ -99,6 +100,18 @@ test("column filters and numeric sort leave text facts as text", () => {
 
 const pipelineIds = ["site", "stage", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
 const flexIds = new Set(["site", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
+
+test("county check sits beside stage when a saved order left it at the end", () => {
+  assert.deepEqual(
+    parkCounty(["site", "stage", "score", "asking", "chip_environmental", "county"]),
+    ["site", "stage", "county", "score", "asking", "chip_environmental"],
+  );
+  const layout = sanitizeLayout(
+    { order: ["site", "stage", "score", "asking", "chip_environmental", "county"], touched: true },
+    ["site", "stage", "county", "score", "asking", "chip_environmental"],
+  );
+  assert.deepEqual(layout.order, ["site", "stage", "county", "score", "asking", "chip_environmental"]);
+});
 
 test("the universe sheet meets a 1280 pane with the county column", () => {
   const ids = ["site", "stage", "county", "score", "spare", "grade", "traffic", "listed"];

@@ -11,6 +11,7 @@ import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
 import type { StoredScoreInput } from "@/lib/scoreDisplay";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
+import { ColumnPicker, RowCheck } from "./ListChrome";
 import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
 import { stageChipLabel } from "@/lib/chips";
 import {
@@ -118,6 +119,8 @@ export default function ListView({
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [selecting, setSelecting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
@@ -126,11 +129,30 @@ export default function ListView({
     id,
     label: LIST_COLUMNS.find((column) => column.id === id)?.label || id,
     text: (row) => shownText(row, id as ListColumnId, signedIn),
+    customTip: id === "stage" || id === "score" || id === "county",
   }));
   const ordered = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => Number.isFinite(row.lng) && Number.isFinite(row.lat) && inMapArea(row.lng as number, row.lat as number, mapArea)) : rows;
     return prepareRows(scoped, columns, activeLayout, visible);
   }, [activeLayout, columns, mapArea, rows, visible]);
+
+  const showChecks = !phone || selecting;
+  const visibleIds = ordered.map((row) => row.id);
+  const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
+  const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
+  function toggleRow(id: string) {
+    setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+  function toggleAll() {
+    setPicked(allOn ? [] : visibleIds);
+  }
+  function toggleColumn(id: string) {
+    if (id === "site") return;
+    const hidden = activeLayout.hidden.includes(id)
+      ? activeLayout.hidden.filter((item) => item !== id)
+      : [...activeLayout.hidden, id];
+    commit({ ...activeLayout, hidden, touched: true });
+  }
 
   function commit(next: ListLayout) {
     update(next);
@@ -176,11 +198,20 @@ export default function ListView({
             })}
           </select>
         </label>
+        <ColumnPicker
+          resetLabel="Universe default"
+          columns={LIST_COLUMNS.map((column) => ({ id: column.id, label: column.label }))}
+          hidden={activeLayout.hidden}
+          onToggle={toggleColumn}
+          onReset={() => update(defaultLayout(allowed))}
+        />
         <button type="button" className="paper-btn only-desktop" onClick={() => downloadVisible(columns, ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
+              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); downloadVisible(columns, ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
             </div>
@@ -218,8 +249,12 @@ export default function ListView({
         onOpen={onOpen}
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
+        headerExtra={(id) => id === "site" && showChecks ? (
+          <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
+        ) : null}
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
+            {showChecks ? <RowCheck label={`Select ${row.site || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null}
             <span className="site-title">
               <span className="site-name-text" title={row.site || row.id}>{row.site || "—"}</span>
               <span className="site-meta">

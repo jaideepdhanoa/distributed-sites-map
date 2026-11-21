@@ -470,7 +470,7 @@ export default function SheetGrid<Row>({
                       data-wrap={wrap.has(column.id) ? "text" : undefined}
                       tabIndex={focused || (item.index === 0 && col === 0 && focus.row === 0 && focus.col === 0) ? 0 : -1}
                       className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.className || ""}`.trim()}
-                      title={full && full !== "—" ? full : undefined}
+                      title={column.customTip ? undefined : (full && full !== "—" ? full : undefined)}
                       style={{
                         width: `${width}px`,
                         minWidth: `${width}px`,

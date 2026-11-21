@@ -91,6 +91,43 @@ function readGrid() {
   };
 }
 
+test("chip notes have no native title on an ancestor", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop tooltips");
+  await page.goto("/?funnel=pipeline&view=list&cats=wash|lube|auto|land", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("[data-testid=list-score]");
+  async function ancestorTitles(testId: string) {
+    const chip = page.getByTestId(testId).first();
+    await expect(chip).toBeVisible();
+    return chip.evaluate((node) => {
+      const found: string[] = [];
+      let current: Element | null = node;
+      while (current) {
+        const title = current.getAttribute("title");
+        if (title) found.push(title);
+        current = current.parentElement;
+      }
+      return found;
+    });
+  }
+  expect(await ancestorTitles("list-score")).toEqual([]);
+  expect(await ancestorTitles("county-chip")).toEqual([]);
+  const grid = page.getByTestId("sheet-grid");
+  for (let step = 0; step < 12 && await page.getByTestId("land-paused").count() === 0; step += 1) {
+    await grid.evaluate((node) => { (node as HTMLElement).scrollTop += 480; });
+  }
+  expect(await page.getByTestId("land-paused").count()).toBeGreaterThan(0);
+  expect(await ancestorTitles("land-paused")).toEqual([]);
+  await page.goto("/?funnel=universe&view=list&city=PHX", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("columns-button")).toBeVisible();
+  await expect(page.locator(".list-pane .row-check input.check").first()).toBeVisible();
+  const heads = await page.locator(".list-pane thead th").allTextContents();
+  const stage = heads.findIndex((text) => text.includes("Stage"));
+  const county = heads.findIndex((text) => text.includes("County check"));
+  const score = heads.findIndex((text) => text.includes("Score"));
+  expect(county).toBe(stage + 1);
+  expect(score).toBeGreaterThan(county);
+});
+
 test("desktop lists fill the pane and wrap clipped values", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop list");
   await blockLayoutWrites(page);

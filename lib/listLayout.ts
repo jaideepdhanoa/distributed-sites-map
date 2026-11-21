@@ -21,6 +21,8 @@ export type SheetColumn<Row> = {
   label: string;
   text: (row: Row) => string;
   sortValue?: (row: Row) => number | null;
+  /** This cell draws its own note. The cell must not set a native title. */
+  customTip?: boolean;
   /** Chip-set filter. The saved value is the selected codes joined with |. */
   choices?: { code: string; label: string }[];
   /** False when no visible row carries a code for this chip-set. */
@@ -130,6 +132,17 @@ export function allowedIds(ids: string[], signedIn: boolean): string[] {
   return unique(ids).filter((id) => !blocked.has(id));
 }
 
+/** A new County check column belongs beside Stage, not at the end of a saved order. */
+export function parkCounty(order: string[]): string[] {
+  if (!order.includes("county") || !order.includes("stage")) return order;
+  const scoreAt = order.indexOf("score");
+  const countyAt = order.indexOf("county");
+  if (scoreAt >= 0 && countyAt < scoreAt) return order;
+  const rest = order.filter((id) => id !== "county");
+  rest.splice(rest.indexOf("stage") + 1, 0, "county");
+  return rest;
+}
+
 export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   const base = defaultLayout(allowed);
   if (!input || typeof input !== "object") return base;
@@ -137,6 +150,8 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   const known = new Set(allowed);
   const order = unique((Array.isArray(raw.order) ? raw.order : []).filter((id): id is string => typeof id === "string" && known.has(id)));
   for (const id of allowed) if (!order.includes(id)) order.push(id);
+  const parked = parkCounty(order);
+  order.splice(0, order.length, ...parked);
   const hidden = unique((Array.isArray(raw.hidden) ? raw.hidden : []).filter((id): id is string => typeof id === "string" && known.has(id) && id !== "site"));
   const pinned = unique((Array.isArray(raw.pinned) ? raw.pinned : base.pinned).filter((id): id is string => typeof id === "string" && known.has(id) && !hidden.includes(id)));
   if (!pinned.length && order.includes("site")) pinned.push("site");

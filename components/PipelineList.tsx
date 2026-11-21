@@ -39,6 +39,7 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
+import { ColumnPicker, RowCheck } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
@@ -282,7 +283,6 @@ export default function PipelineList({
   onDismiss?: () => void;
 }) {
   const unread = new Set(unreadIds || []);
-  const [columnsOpen, setColumnsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const allowed = useMemo(() => allowedIds(PIPELINE_COLUMNS.map((column) => column.id), signedIn), [signedIn]);
   const fallback = useMemo(() => {
@@ -325,6 +325,7 @@ export default function PipelineList({
       id,
       label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
       className: id === "capacity" ? "power-col" : id === "stage" ? "stage-col" : undefined,
+      customTip: id === "stage" || id === "score" || id === "county" || id === "type",
       text: (row) => cell(row, id as PipelineColumnId, signedIn),
       choices,
       hasValues: choices ? rows.some((row) => Boolean(codeOf(row))) : undefined,
@@ -501,21 +502,13 @@ export default function PipelineList({
             </button>
           );
         })}
-        <div className="col-picker only-desktop">
-          <button type="button" className="paper-btn" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((value) => !value)}>Columns</button>
-          {columnsOpen ? (
-            <div className="menu" role="group" aria-label="Columns">
-              <button type="button" className="text-link" onClick={() => { update(defaultLayout(allowed)); onResetColumns(); }}>Pipeline default</button>
-              <p className="menu-note">The strip runs from the lowest to the highest in this filter. The tick is the median. Green is the better third and amber the worse third.</p>
-              {PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => (
-                <label key={column.id}>
-                  <input className="check" type="checkbox" checked={!activeLayout.hidden.includes(column.id)} disabled={column.id === "site"} onChange={() => toggleColumn(column.id)} />
-                  {column.label}
-                </label>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ColumnPicker
+          resetLabel="Pipeline default"
+          columns={PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => ({ id: column.id, label: column.label }))}
+          hidden={activeLayout.hidden}
+          onToggle={(id) => toggleColumn(id as PipelineColumnId)}
+          onReset={() => { update(defaultLayout(allowed)); onResetColumns(); }}
+        />
         <label className="list-sort only-mobile">
           Sort
           <select
@@ -607,9 +600,7 @@ export default function PipelineList({
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
         headerExtra={(id) => id === "site" && showChecks ? (
-          <label className="row-check">
-            <input className="check" type="checkbox" aria-label="Select all shown" checked={allOn} onChange={toggleAll} />
-          </label>
+          <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
@@ -660,9 +651,7 @@ export default function PipelineList({
           if (column === "site") return (
             <span className="site-name">
               {showChecks ? (
-                <label className="row-check">
-                  <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
-                </label>
+                <RowCheck label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
               ) : null}
               <span className="site-title">
                 <span className="site-name-text" title={String(cell(row, "site", signedIn) || row.deal.deal_id)}>

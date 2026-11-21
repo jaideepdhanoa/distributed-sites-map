@@ -55,7 +55,8 @@ test("category links default to car washes and auto service", () => {
   assert.equal(QUICK_LUBE_LABEL, "Quick lube");
   assert.equal(chipLabelProblem(QUICK_LUBE_LABEL), "");
   assert.match(CATEGORY_NOTES.auto, /Auto repair/);
-  assert.match(CATEGORY_NOTES.auto, /tire and lube/);
+  assert.match(CATEGORY_NOTES.auto, /Auto repair and tire\./);
+  assert.doesNotMatch(CATEGORY_NOTES.auto, /lube/);
   assert.equal(UNSCREENED_LISTINGS_LABEL, "Unscreened market listings");
   assert.equal(UNSCREENED_LISTINGS_NOTE, "Listings not yet in Pipeline or Universe.");
 });

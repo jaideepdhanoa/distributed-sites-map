@@ -94,7 +94,7 @@ export const CENSUS_NOTE = "Car washes and quick lube. Auto service is on for pi
 export const CATEGORY_NOTES = {
   wash: "Operating car washes. This is the usual view.",
   lube: "Quick lube sites. On with car washes.",
-  auto: "Auto repair and tire and lube. An auto center belongs here once it is typed Auto repair.",
+  auto: "Auto repair and tire. An auto center belongs here once it is typed Auto repair.",
   land: "Vacant parcels, such as LAND-PHX. Not spare land on a wash.",
   store: "Fuel and convenience stores. Off until you turn them on.",
 } as const;

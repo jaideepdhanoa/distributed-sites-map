@@ -48,7 +48,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(panel.getByTestId("auto-category")).toBeChecked();
   await expect(panel.getByTestId("land-category")).not.toBeChecked();
   await expect(panel.getByTestId("cstore-category")).not.toBeChecked();
-  await expect(panel.getByText("Auto repair and tire and lube.")).toBeVisible();
+  await expect(panel.getByText("Auto repair and tire.")).toBeVisible();
   const listings = panel.getByTestId("unscreened-listings");
   await expect(listings).not.toBeChecked();
   await expect(panel.getByText("Unscreened market listings")).toBeVisible();

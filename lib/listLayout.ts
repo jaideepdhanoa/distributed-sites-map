@@ -55,7 +55,7 @@ const SITE_MIN_WIDTH = 280;
 const MAX_WIDTH = 480;
 
 /** Columns that take leftover pane width. The pipeline list adds its power column. */
-export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow", "type", "spare"]);
+export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow", "type", "spare", "county"]);
 
 /** The Show on map column. It stays this wide so spare pane width does not pool there. */
 export const TRAILING_COLUMN_WIDTH = 112;
@@ -120,8 +120,8 @@ export function defaultLayout(ids: string[], pinned: string[] = ["site"], hidden
 }
 
 export function phoneColumns(surface: LayoutSurface): string[] {
-  if (surface === "pipeline") return ["site", "stage", "score", "openLand"];
-  return ["site", "type", "stage", "county", "score"];
+  if (surface === "pipeline") return ["site", "stage", "county", "score", "openLand"];
+  return ["site", "stage", "county", "score"];
 }
 
 export function allowedIds(ids: string[], signedIn: boolean): string[] {

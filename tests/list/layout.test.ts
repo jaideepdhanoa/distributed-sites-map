@@ -101,11 +101,15 @@ const pipelineIds = ["site", "stage", "score", "asking", "openLand", "capacity",
 const flexIds = new Set(["site", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
 
 test("the universe sheet meets a 1280 pane with the county column", () => {
-  const ids = ["site", "type", "stage", "county", "score", "spare", "grade", "traffic", "listed"];
+  const ids = ["site", "stage", "county", "score", "spare", "grade", "traffic", "listed"];
   const fitted = fitColumnWidths(ids, {}, 1280, TRAILING_COLUMN_WIDTH, FLEX_COLUMN_IDS);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
   assert.ok(fitted.every((width) => width >= 96));
   assert.ok(fitted[0] >= 280);
+  const pipeline = ["site", "stage", "county", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
+  const pipeFlex = new Set(["site", "asking", "capacity", "traffic", "cashFlow", "county"]);
+  const pipeFit = fitColumnWidths(pipeline, {}, 1280, TRAILING_COLUMN_WIDTH, pipeFlex);
+  assert.equal(pipeFit.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
 });
 
 test("a default sheet uses the pane and keeps rigid columns", () => {

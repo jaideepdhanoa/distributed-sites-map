@@ -38,6 +38,7 @@ function shortRoad(value?: unknown) {
 export const PIPELINE_COLUMNS = [
   { id: "site", label: "Site" },
   { id: "stage", label: "Stage" },
+  { id: "county", label: "County check" },
   { id: "chip_waiting", label: "Waiting on", optional: true },
   { id: "chip_drop", label: "Drop reason", optional: true },
   { id: "chip_advance", label: "Advance reason", optional: true },

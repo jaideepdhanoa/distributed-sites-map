@@ -10,7 +10,7 @@ import { useListLayout } from "./useListLayout";
 import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
 import type { StoredScoreInput } from "@/lib/scoreDisplay";
-import { CountyChip, LandPausedChip, ScoreCell, StageChip, TypeChip } from "./ListLook";
+import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
 import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
 import { stageChipLabel } from "@/lib/chips";
 import {
@@ -59,7 +59,6 @@ export type ListRow = {
 
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id" | "lng" | "lat" | "nda" | "ndaId" | "near" | "nearShort" | "address" | "listingUrl" | "folderUrl" | "packageUrl" | "lead" | "tier" | "zoning" | "city">; label: string }[] = [
   { id: "site", label: "Site" },
-  { id: "type", label: "Type" },
   { id: "stage", label: "Stage" },
   { id: "county", label: "County check" },
   { id: "score", label: "Score" },
@@ -140,7 +139,13 @@ export default function ListView({
   }
 
   return (
-    <div ref={paneRef} className="list-pane" data-list-count={rows.length}>
+    <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length}>
+      <div className="summary-row" data-testid="summary-row">
+        <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{ordered.length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Listed</span><span className="only-mobile">Listed</span><strong>{ordered.filter((row) => /^yes/i.test(row.listed)).length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Land OK</span><span className="only-mobile">Land OK</span><strong>{ordered.filter((row) => row.county === "Land OK").length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Not reviewed</span><span className="only-mobile">Unchecked</span><strong>{ordered.filter((row) => row.county === "Not reviewed").length.toLocaleString()}</strong></div>
+      </div>
       {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
@@ -224,13 +229,16 @@ export default function ListView({
             </span>
             <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
           </span>
-        ) : column === "type" ? (
-          <span className="stage-cell"><TypeChip value={row.type} />{row.landPaused ? <LandPausedChip /> : null}</span>
         ) : column === "stage" ? (
-          <span className="stage-cell">
-            {row.universeOnly ? <StageChip stage={UNIVERSE_STAGE_LABEL} group="" quiet /> : <StageChip stage={row.stage} group={row.stageGroup || ""} detail={row.stageDetail} />}
-            {row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
-          </span>
+          <StageTypeCell
+            stage={row.stage}
+            group={row.stageGroup || ""}
+            detail={row.stageDetail}
+            type={row.type}
+            quiet={row.universeOnly}
+            land={row.landPaused}
+            extra={row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
+          />
         ) : column === "county" ? (
           row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : "—"
         ) : column === "score" ? (

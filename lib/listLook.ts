@@ -64,6 +64,22 @@ export function stageChipName(stage: string, group: string): string {
   return chipFace(stage.trim() || "Stage").label;
 }
 
+/** Keep a tooltip inside the viewport. Width wraps; it does not widen the page. */
+export function placeTip(
+  anchor: { left: number; right: number; top: number; bottom: number },
+  viewport: { width: number; height: number },
+): { left: number; top: number; maxWidth: number } {
+  const margin = 8;
+  const maxWidth = Math.min(288, Math.max(120, viewport.width - margin * 2));
+  let left = anchor.left;
+  if (left + maxWidth > viewport.width - margin) left = viewport.width - margin - maxWidth;
+  if (left < margin) left = margin;
+  const height = 96;
+  let top = anchor.bottom + 6;
+  if (top + height > viewport.height - margin) top = Math.max(margin, anchor.top - height - 6);
+  return { left, top, maxWidth };
+}
+
 export const LIST_CHIP_LABELS = [
   LAND_PAUSED_LABEL,
   LAND_FILTER_TAG,

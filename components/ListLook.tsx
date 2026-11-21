@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ChipFace } from "./ChipFace";
-import { LAND_PAUSED_LABEL, LAND_PAUSED_NOTE, typeChip } from "@/lib/listLook";
+import type { ReactNode } from "react";
+import { ChipFace, TipTrigger } from "./ChipFace";
+import { LAND_PAUSED_LABEL, LAND_PAUSED_NOTE, UNIVERSE_STAGE_LABEL, typeChip } from "@/lib/listLook";
 import { storedScoreView, type StoredScoreInput } from "@/lib/scoreDisplay";
 import { stageTone } from "@/lib/labels";
 
@@ -40,34 +40,43 @@ export function LandPausedChip() {
   return <ChipFace className="stage-pill tone-sand" testId="land-paused" label={LAND_PAUSED_LABEL} detail={LAND_PAUSED_NOTE} />;
 }
 
+/** Stage and type sit in one cell on both lists. */
+export function StageTypeCell({
+  stage,
+  group,
+  detail,
+  type,
+  quiet,
+  land,
+  extra,
+}: {
+  stage: string;
+  group: string;
+  detail?: string;
+  type?: string;
+  quiet?: boolean;
+  land?: boolean;
+  extra?: ReactNode;
+}) {
+  return (
+    <span className="stage-cell">
+      {quiet ? <StageChip stage={UNIVERSE_STAGE_LABEL} group="" quiet /> : <StageChip stage={stage} group={group} detail={detail} />}
+      {type ? <TypeChip value={type} /> : null}
+      {land ? <LandPausedChip /> : null}
+      {extra}
+    </span>
+  );
+}
+
 /** The score number. Hover or tap shows the same parts line as the site panel. */
 export function ScoreCell({ input }: { input: StoredScoreInput }) {
   const view = storedScoreView(input);
   const label = view.status === "not_scored" ? "Not scored" : view.status === "provisional" ? "Provisional" : view.chip || "—";
-  const [open, setOpen] = useState(false);
   if (label === "—") return <span>—</span>;
   return (
-    <span className="stage-hold" data-open={open ? "1" : undefined}>
-      <span
-        className="stage-pill tone-pine score-chip"
-        data-testid="list-score"
-        role="button"
-        tabIndex={0}
-        title={view.line || undefined}
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen((value) => !value);
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          event.stopPropagation();
-          setOpen((value) => !value);
-        }}
-      >
-        {label}
-      </span>
-      {view.line ? <span className="stage-tip" role="tooltip" data-testid="score-breakdown-tip">{view.line}</span> : null}
+    <span className="stage-hold">
+      <TipTrigger className="stage-pill tone-pine score-chip" testId="list-score" tip={view.line || undefined}>{label}</TipTrigger>
+      {view.line ? <span className="sr" data-testid="score-breakdown-tip">{view.line}</span> : null}
     </span>
   );
 }

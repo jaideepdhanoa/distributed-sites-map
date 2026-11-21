@@ -38,7 +38,7 @@ import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaS
 import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
-import { LandPausedChip, ScoreCell, StageChip, TypeChip } from "./ListLook";
+import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
@@ -56,6 +56,8 @@ export type PipelineRow = {
   noPin: boolean;
   zoning?: string;
   apn?: string;
+  countyLabel?: string;
+  countyNote?: string;
   point?: [number, number] | null;
 };
 
@@ -103,6 +105,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
+  if (id === "county") return row.countyLabel || "—";
   if (id === "score") {
     const view = storedScoreView({
       score: deal.score,
@@ -574,6 +577,7 @@ export default function PipelineList({
                   <>
                     <TypeChip value={typeLabel(row.deal)} />
                     {row.deal.kind === "land" ? <LandPausedChip /> : null}
+                    {row.countyLabel ? <CountyChip label={row.countyLabel} note={row.countyNote || ""} /> : null}
                     <ScoreCell input={scoreInput(row)} />
                     {waiting ? <TagChip chip={waiting} compact /> : null}
                     {gap ? <TagChip chip={gap} compact /> : null}
@@ -635,17 +639,22 @@ export default function PipelineList({
             if (column !== "nda") return "—";
           }
           if (column === "score") return <ScoreCell input={scoreInput(row)} />;
+          if (column === "county") return row.countyLabel ? <CountyChip label={row.countyLabel} note={row.countyNote || ""} /> : "—";
           if (column === "type") return <span className="stage-cell"><TypeChip value={typeLabel(row.deal)} />{row.deal.kind === "land" ? <LandPausedChip /> : null}</span>;
           if (column === "stage") {
             const nda = signedIn ? dealChips(row.deal, signedIn).find((chip) => chip.family === "nda" && chip.code !== "not_required") : undefined;
             return (
-              <span className="stage-cell">
-                <StageChip stage={row.deal.stage || ""} group={row.deal.stage_group || ""} detail={droppedDecisionLine(row.deal)} />
-                <TypeChip value={typeLabel(row.deal)} />
-                {row.deal.kind === "land" ? <LandPausedChip /> : null}
-                {nda ? <TagChip chip={nda} compact /> : null}
-                <StagePending note={row.deal.stage_pending} />
-              </span>
+              <StageTypeCell
+                stage={row.deal.stage || ""}
+                group={row.deal.stage_group || ""}
+                detail={droppedDecisionLine(row.deal)}
+                type={typeLabel(row.deal)}
+                land={row.deal.kind === "land"}
+                extra={<>
+                  {nda ? <TagChip chip={nda} compact /> : null}
+                  <StagePending note={row.deal.stage_pending} />
+                </>}
+              />
             );
           }
           if (column === "site") return (
@@ -678,7 +687,7 @@ export default function PipelineList({
           );
           return cell(row, column as PipelineColumnId, signedIn);
         }}
-        flexIds={["site", "asking", "capacity", "traffic", "cashFlow"]}
+        flexIds={["site", "asking", "capacity", "traffic", "cashFlow", "county"]}
         wrapIds={["site", "stage", "asking", "capacity", "traffic", "cashFlow"]}
         trailing={(row) => (
           <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(row.deal.deal_id); }}>{row.noPin ? "No pin" : "Show on map"}</button>

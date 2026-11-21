@@ -1722,7 +1722,8 @@ export default function Explorer() {
   }
   const pipelineRows: PipelineRow[] = listDeals.map((deal) => {
     const linked = deal.universe_id ? siteById.get(deal.universe_id) : undefined;
-    return { deal, noPin: !dealPoint(deal), zoning: linked?.zoning || "", apn: deal.apn || linked?.apn || "", point: dealPoint(deal) };
+    const county = countyCheck(linked || {});
+    return { deal, noPin: !dealPoint(deal), zoning: linked?.zoning || "", apn: deal.apn || linked?.apn || "", countyLabel: county.label, countyNote: county.note, point: dealPoint(deal) };
   });
   const outsideDeal = selectedDeal && !listDeals.some((deal) => deal.deal_id === selectedDeal.deal_id) ? selectedDeal : null;
   const outsideRow: PipelineRow | null = outsideDeal

@@ -391,7 +391,8 @@ function FollowSite({ siteId }: { siteId: string }) {
   useEffect(() => {
     let cancel = false;
     const load = () => {
-      quietActionsFetch(`/api/queue/follow?siteId=${encodeURIComponent(siteId)}`).then(async (response) => {
+      // A follow miss must not trip the actions circuit. That circuit would hide notes.
+      fetch(`/api/queue/follow?siteId=${encodeURIComponent(siteId)}`, { cache: "no-store" }).then(async (response) => {
         if (cancel || !response.ok) return;
         const body = (await response.json()) as { follow?: boolean };
         if (!cancel) {

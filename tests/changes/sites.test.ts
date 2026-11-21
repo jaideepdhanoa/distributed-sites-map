@@ -41,6 +41,44 @@ function siteChange(payload: Record<string, unknown>, expected = 0) {
   };
 }
 
+test("Muse can create a quick lube site, and an unknown category is refused", () => {
+  const created = validateBatch(agent, "quick-lube", {
+    changes: [{
+      entity_type: "site",
+      expected_version: 0,
+      source: "Sample listing",
+      payload: {
+        kind: "pipeline",
+        market: "PHX",
+        listing_id: "L-9101",
+        name: "Sample lube",
+        category: "Quick lube",
+        sources: { name: "Sample listing", market: "Sample listing", category: "Sample listing" },
+      },
+    }],
+  });
+  const payload = created.changes[0]?.payload;
+  assert.equal(payload && "fields" in payload ? payload.fields.category : "", "Quick lube");
+  assert.throws(
+    () => validateBatch(agent, "bad-category", {
+      changes: [{
+        entity_type: "site",
+        expected_version: 0,
+        source: "Sample listing",
+        payload: {
+          kind: "pipeline",
+          market: "PHX",
+          listing_id: "L-9102",
+          name: "Sample lube",
+          category: "Oil change",
+          sources: { name: "Sample listing", category: "Sample listing" },
+        },
+      }],
+    }),
+    /Category must be one of the map business types/,
+  );
+});
+
 test("a contributor or agent can update site content, and stage stays off this path", async () => {
   assert.throws(() => validateBatch(viewer, "v", { changes: [siteChange({ name: "Sonoran" })] }), /do not have permission/);
   assert.throws(

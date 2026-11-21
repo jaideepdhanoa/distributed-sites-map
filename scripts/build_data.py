@@ -2177,6 +2177,7 @@ def _broker_channel(broker: str) -> str:
 
 BUSINESS_TYPES = (
     "Car wash",
+    "Quick lube",
     "Auto repair",
     "Tire and lube",
     "Gas station",
@@ -2257,6 +2258,8 @@ def business_type_from_text(raw: str) -> str:
     text = re.sub(r"\s+", " ", raw or "").strip().lower()
     if not text:
         return "Other"
+    if text == "quick lube":
+        return "Quick lube"
     if "tire" in text or "lube" in text:
         return "Tire and lube"
     if "vacant" in text or "land only" in text or "entitled" in text or text == "land":

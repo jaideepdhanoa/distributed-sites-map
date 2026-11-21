@@ -39,7 +39,7 @@ import { RowLinks } from "./RowLinks";
 import { ChipFace } from "./ChipFace";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
-import { stageTone } from "@/lib/labels";
+import { QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily, tagFamily } from "@/lib/tags/vocab";
@@ -59,6 +59,7 @@ export type PipelineRow = {
 
 function typeLabel(deal: DealProps): string {
   const category = dealCategory(deal);
+  if (category === "lube") return QUICK_LUBE_LABEL;
   if (category === "wash") return "Car wash";
   if (category === "auto") return "Auto service";
   if (category === "land") return "Land";

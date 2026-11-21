@@ -24,6 +24,8 @@ class BusinessTypeTests(unittest.TestCase):
         self.assertEqual(business_type_from_text("Auto repair"), "Auto repair")
         self.assertEqual(business_type_from_text("Tire and lube"), "Tire and lube")
         self.assertEqual(business_type_from_text("Car wash"), "Car wash")
+        self.assertEqual(business_type_from_text("Quick lube"), "Quick lube")
+        self.assertNotEqual(business_type_from_text("Quick lube"), "Tire and lube")
         self.assertEqual(business_type_from_text("Other"), "Other")
         self.assertNotEqual(business_type_from_text("Auto service"), "Car wash")
         self.assertNotEqual(business_type_from_text("General auto repair"), "Other")

@@ -40,7 +40,6 @@ export function selectPreviewDeployment(deployments: readonly DeploymentRow[]): 
 export function redeployBody(projectName: string, deploymentId: string): {
   name: string;
   deploymentId: string;
-  target: "preview";
   meta: { action: "redeploy" };
 } {
   const id = deploymentId.trim();
@@ -48,7 +47,6 @@ export function redeployBody(projectName: string, deploymentId: string): {
   return {
     name: projectName,
     deploymentId: id,
-    target: "preview",
     meta: { action: "redeploy" },
   };
 }
@@ -201,7 +199,9 @@ export async function redeployPreview(options: VercelClientOptions, name: string
   const fetchImpl = options.fetchImpl || fetch;
   const token = assertToken(options.token);
   const body = redeployBody(name, deployment.uid);
-  if (body.target !== "preview") throw new Error("Refusing to redeploy outside Preview.");
+  if ("target" in body || !isPreviewDeployment(deployment)) {
+    throw new Error("Refusing to redeploy outside Preview.");
+  }
   const response = await fetchImpl(`https://api.vercel.com/v13/deployments?${teamQuery(options.teamId)}&forceNew=1`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },

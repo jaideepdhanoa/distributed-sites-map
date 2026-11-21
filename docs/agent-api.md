@@ -438,7 +438,7 @@ On create, an agent omits `site_id`. The server mints the next `PIPE-{MKT}-NNNN`
 
 `listing_id` is an `L-` id. The same listing id returns the same site id and universe id. A different body for that listing id is `409`. The batch `Idempotency-Key` still replays the whole response when the body is unchanged.
 
-On this create, the agent may set `name`, `address`, `market`, `category`, `apn`, `lat`, `lng`, `listing_url`, and `broker`. Each one that is sent needs `sources.<field>`. After create, those identity fields stay owner-locked. Folder, photos, land evidence, typed power, check statuses, and financial claims are still rejected on a new row.
+On this create, the agent may set `name`, `address`, `market`, `category`, `apn`, `lat`, `lng`, `listing_url`, and `broker`. Each one that is sent needs `sources.<field>`. `category` is a map business type. `Quick lube` is accepted beside `Car wash`. After create, those identity fields stay owner-locked. Folder, photos, land evidence, typed power, check statuses, and financial claims are still rejected on a new row.
 
 The create still opens at `1 Desk screen` and records a `Site added` capture activity. The mirror appends the new Pipeline or Land Sites row and the Universe row. It does not copy the guarded fields.
 

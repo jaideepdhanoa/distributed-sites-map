@@ -1,14 +1,14 @@
-import { isAutoBusinessType, isPipelineStore } from "./labels";
+import { isAutoBusinessType, isPipelineStore, isQuickLube } from "./labels";
 
-export const CATEGORY_IDS = ["wash", "auto", "land", "store"] as const;
+export const CATEGORY_IDS = ["wash", "lube", "auto", "land", "store"] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
 
 export type Categories = Record<CategoryId, boolean>;
 
 /**
- * Car washes and auto service are the working set. Land parcels and c-stores stay
- * off until a link or the Filters panel turns them on.
+ * Car washes and auto service are the working set. Quick lube, land parcels, and
+ * c-stores stay off until a link or the Filters panel turns them on.
  *
  * `cats` is the shareable choice (`cats=wash|auto`). A missing `cats` is car washes
  * and auto service. Older links still opt in: `landlayer=1` turns Land on, and
@@ -24,15 +24,17 @@ export function parseCategories(input: {
   if (input.cats == null || input.cats === "") {
     return {
       wash: true,
+      lube: false,
       auto: true,
       land: input.landlayer === "1",
       store: input.cstore === "1",
     };
   }
-  if (input.cats === "none") return { wash: false, auto: false, land: false, store: false };
+  if (input.cats === "none") return { wash: false, lube: false, auto: false, land: false, store: false };
   const on = new Set(input.cats.split("|"));
   return {
     wash: on.has("wash"),
+    lube: on.has("lube"),
     auto: on.has("auto"),
     land: on.has("land"),
     store: on.has("store"),
@@ -40,7 +42,7 @@ export function parseCategories(input: {
 }
 
 export function defaultCategories(): Categories {
-  return { wash: true, auto: true, land: false, store: false };
+  return { wash: true, lube: false, auto: true, land: false, store: false };
 }
 
 /** Null when the choice is the default, so the URL stays clean. `none` means every category is off. */
@@ -105,12 +107,14 @@ type DealLike = {
 
 /**
  * Land deals are the Land category, including a parcel whose business type says auto repair or gas station.
+ * Pipeline quick lube is its own category, beside car washes.
  * Pipeline auto repair, tire and lube, and auto service are the Auto service category.
  * Pipeline fuel and c-stores are the C-stores category. Every other pipeline deal stays with car washes.
  */
 export function dealCategory(deal: DealLike & { deal_id?: string | null }): CategoryId | null {
   if (deal.kind === "land" || String(deal.deal_id || "").startsWith("LAND-")) return "land";
   if (deal.kind !== "pipeline") return null;
+  if (isQuickLube(deal.business_type)) return "lube";
   if (isAutoBusinessType(deal.business_type)) return "auto";
   if (deal.is_c_store || isPipelineStore(deal)) return "store";
   return "wash";

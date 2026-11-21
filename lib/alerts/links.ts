@@ -30,6 +30,23 @@ export function discussionHref(siteId: string): string {
   return absoluteSiteUrl(appOrigin(), "note", siteId);
 }
 
+/** Opens Discussion on one comment. Anchor fields from migration 022 stay on the link. */
+export function commentHref(
+  siteId: string,
+  noteId: string,
+  anchor?: { type?: string | null; line?: string | null; period?: string | null; spaceId?: string | null } | null,
+): string {
+  if (isExcludedSite(siteId)) return reviewHomeHref();
+  const url = new URL(discussionHref(siteId));
+  if (noteId) url.searchParams.set("note", noteId);
+  if (anchor?.type === "pnl_cell" || anchor?.type === "pnl_line") {
+    if (anchor.line) url.searchParams.set("cline", anchor.line);
+    if (anchor.type === "pnl_cell" && anchor.period) url.searchParams.set("cperiod", anchor.period);
+  }
+  if (anchor?.type === "space" && anchor.spaceId) url.searchParams.set("space", anchor.spaceId);
+  return url.toString();
+}
+
 export function proposalHref(siteId: string): string {
   return absoluteSiteUrl(appOrigin(), "suggestion", siteId);
 }
@@ -82,10 +99,44 @@ export function mailLink(item: MailLink): string {
   }
   if ((item.category === "followed" || item.category === "recommendations") && proposalLink(item.href)) return proposalHref(siteId);
   const space = spaceIdFromHref(item.href);
-  if (space && (item.category === "mentions" || item.category === "replies" || item.category === "followed")) {
-    return spaceHref(siteId, space);
+  if (space && (item.category === "mentions" || item.category === "replies" || item.category === "comments" || item.category === "followed")) {
+    return withNote(spaceHref(siteId, space), item.href);
+  }
+  if (item.category === "mentions" || item.category === "replies" || item.category === "comments" || item.category === "followed") {
+    return keepCommentTarget(item.href, siteId);
   }
   return discussionHref(siteId);
+}
+
+function withNote(base: string, href: string | undefined): string {
+  const url = new URL(base);
+  if (!href) return url.toString();
+  try {
+    const source = new URL(href, "https://distributedsites.com");
+    for (const key of ["note", "cline", "cperiod"]) {
+      const value = source.searchParams.get(key);
+      if (value) url.searchParams.set(key, value);
+    }
+  } catch {
+    return url.toString();
+  }
+  return url.toString();
+}
+
+function keepCommentTarget(href: string | undefined, siteId: string): string {
+  const base = discussionHref(siteId);
+  if (!href) return base;
+  try {
+    const source = new URL(href, "https://distributedsites.com");
+    const url = new URL(base);
+    for (const key of ["note", "cline", "cperiod", "space"]) {
+      const value = source.searchParams.get(key);
+      if (value) url.searchParams.set(key, value);
+    }
+    return url.toString();
+  } catch {
+    return base;
+  }
 }
 
 function spaceIdFromHref(href: string | undefined): string {

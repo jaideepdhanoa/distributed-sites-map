@@ -12,7 +12,7 @@ const SECTIONS: { title: string; categories: MailItem["category"][] }[] = [
   { title: "New listings", categories: ["sites"] },
   { title: "Inbound replies", categories: ["comms"] },
   { title: "Needs your approval", categories: ["approvals"] },
-  { title: "Mentions & replies", categories: ["mentions", "replies", "followed"] },
+  { title: "Mentions & replies", categories: ["mentions", "comments", "replies", "followed"] },
   { title: "Assigned to you", categories: ["assignments"] },
   { title: "Flags", categories: ["flags"] },
 ];
@@ -118,6 +118,7 @@ function actionLine(item: MailItem, recipientId?: string): string {
   if (!who || summaryRow(item)) return "";
   if (item.category === "approvals") return `${who} asked you to approve a next step.`;
   if (item.category === "mentions") return `${who} mentioned you.`;
+  if (item.category === "comments") return `${who} commented.`;
   if (item.category === "replies") return `${who} replied.`;
   if (item.category === "flags") return `${who} flagged this for you.`;
   if (item.category === "assignments") return `${who} assigned this to you.`;
@@ -132,6 +133,7 @@ function actionLine(item: MailItem, recipientId?: string): string {
 function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchup"): string {
   if (category === "approvals") return "You received this because an approval is waiting on you.";
   if (category === "mentions") return "You received this because someone mentioned you.";
+  if (category === "comments") return "You received this because you follow this site.";
   if (category === "replies") return "You received this because someone replied on a thread you are part of.";
   if (category === "flags") return "You received this because someone flagged a site for you.";
   if (category === "assignments") return "You received this because a site was assigned to you.";
@@ -153,6 +155,7 @@ function buttonLabel(item: MailItem): string {
   if (item.category === "recommendations") return "Open the recommendation";
   if (item.category === "stages" || item.category === "activity" || item.category === "comms") return "Open the site";
   if (item.category === "flags") return "Open in Review";
+  if (item.category === "comments") return "Open comment";
   if (item.category === "mentions" || item.category === "replies" || item.category === "followed") return "Reply in Discussion";
   return "Open in Review";
 }

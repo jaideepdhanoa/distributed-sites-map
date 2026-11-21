@@ -245,6 +245,7 @@ function ReviewMenu({ mode, siteId, followed, moveLabel, onClose, onShowSnooze, 
       return;
     }
     if (path.endsWith("/snooze")) onSnooze();
+    window.dispatchEvent(new Event("queue-refresh"));
     onClose();
   }
   return (

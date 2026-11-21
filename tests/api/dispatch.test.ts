@@ -72,6 +72,7 @@ const expected = [
   "POST /api/logout",
   "GET /api/me",
   "POST /api/queue/flag",
+  "GET /api/queue/follow",
   "POST /api/queue/follow",
   "POST /api/queue/mentions",
   "POST /api/queue/snooze",

@@ -6,6 +6,7 @@ import { ALERT_CATEGORIES, type AlertMode, type AlertPreferences } from "@/lib/a
 const LABELS: Record<string, string> = {
   approvals: "Approvals",
   mentions: "Mentions",
+  comments: "Comments",
   replies: "Replies",
   flags: "Flags",
   assignments: "Assignments",
@@ -22,15 +23,17 @@ const CHOICES: AlertMode[] = ["instant", "digest", "off"];
 export default function AlertSettings({ onClose }: { onClose: () => void }) {
   const [prefs, setPrefs] = useState<AlertPreferences | null>(null);
   const [email, setEmail] = useState("");
+  const [owner, setOwner] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     let cancel = false;
     fetch("/api/alerts/preferences").then(async (response) => {
       if (cancel || !response.ok) return;
-      const payload = (await response.json()) as { preferences?: AlertPreferences; email?: string };
+      const payload = (await response.json()) as { preferences?: AlertPreferences; email?: string; owner?: boolean };
       if (!cancel) {
         setPrefs(payload.preferences || null);
         setEmail(payload.email || "");
+        setOwner(Boolean(payload.owner));
       }
     }).catch(() => undefined);
     return () => {
@@ -38,7 +41,20 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  async function choose(key: keyof AlertPreferences, mode: AlertMode) {
+  async function chooseFollowAll(on: boolean) {
+    if (!prefs) return;
+    const next = { ...prefs, followAll: on };
+    setPrefs(next);
+    setError("");
+    const response = await fetch("/api/alerts/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(next),
+    });
+    if (!response.ok) setError("Those settings could not be saved.");
+  }
+
+  async function choose(key: Exclude<keyof AlertPreferences, "followAll">, mode: AlertMode) {
     if (!prefs) return;
     const next = { ...prefs, [key]: mode };
     setPrefs(next);
@@ -72,6 +88,15 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
               </span>
             </div>
           ))}
+          {owner ? (
+            <div className="alert-row">
+              <span>Follow all</span>
+              <span className="alert-modes" role="group" aria-label="Follow all">
+                <button type="button" className={prefs.followAll ? "chip on" : "chip"} onClick={() => void chooseFollowAll(true)}>On</button>
+                <button type="button" className={prefs.followAll ? "chip" : "chip on"} onClick={() => void chooseFollowAll(false)}>Off</button>
+              </span>
+            </div>
+          ) : null}
           <div className="alert-row">
             <span>{LABELS.followed}</span>
             <span className="alert-modes" role="group" aria-label="Daily digest">
@@ -79,7 +104,7 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
               <button type="button" className={prefs.followed === "off" ? "chip on" : "chip"} onClick={() => void choose("followed", "off")}>Off</button>
             </span>
           </div>
-          <p className="note">Instant mail goes out about 10 minutes after the first item. A burst is one email, and a person gets at most six of those a day. The digest is 7:00 AM Pacific, and it is skipped when there is nothing new.</p>
+          <p className="note">Instant mail goes out about 10 minutes after the first item. A burst is one email. The owner has no daily instant limit. Every other account gets at most six of those a day. The digest is 7:00 AM Pacific, and it is skipped when there is nothing new.</p>
         </>
       ) : <p className="note">Loading</p>}
       {error ? <p className="err">{error}</p> : null}

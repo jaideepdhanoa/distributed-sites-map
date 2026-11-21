@@ -5,6 +5,7 @@ import type { Sql } from "./db";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
 import { attachRecommendation } from "@/lib/agent/recommend";
 import { notifyNote } from "@/lib/alerts/notify";
+import { autoFollow } from "@/lib/queue/follow";
 import { recordAppEvent } from "@/lib/queue/events";
 import { fileLookup, type RecordLookup } from "./records";
 import { permanentSiteId } from "./suggestions";
@@ -267,6 +268,7 @@ export async function createNote(
   } catch (error) {
     console.error(JSON.stringify({ event: "search_index_error", name: error instanceof Error ? error.name : "error" }));
   }
+  await autoFollow(sql, input.authorId, siteId);
   await notifyNote(sql, {
     noteId: id,
     siteId,

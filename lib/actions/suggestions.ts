@@ -4,6 +4,7 @@ import { getUsers } from "@/lib/users";
 import { ingestDecision, ingestProposalEvent } from "@/lib/agent/inbox";
 import { attachRecommendation } from "@/lib/agent/recommend";
 import { notifySuggestion } from "@/lib/alerts/notify";
+import { autoFollow } from "@/lib/queue/follow";
 import { recordAppEvent } from "@/lib/queue/events";
 import { mentionsBySource, parseMentionIds, replaceMentions, type Mention } from "./mentions";
 import { audit } from "./audit";
@@ -296,6 +297,8 @@ export async function createSuggestion(
       });
     }
   }
+  await autoFollow(sql, input.authorId, siteId);
+  if (ownerId) await autoFollow(sql, ownerId, siteId);
   await notifySuggestion(sql, {
     id,
     siteId,
@@ -483,6 +486,7 @@ export async function decideSuggestion(
       }
     }
   }
+  await autoFollow(sql, input.actorId, siteId);
   if (input.status === "accepted") {
     const stageSiteId = await permanentSiteId(row.target_kind, row.target_id, lookup);
     await writeAcceptedStage(sql, {
@@ -580,6 +584,10 @@ export async function reviseSuggestion(
       if (owner && !getUsers().some((user) => user.u === owner)) throw new InputError("Choose an account from the list.");
     }
     await sql.query(`UPDATE suggestions SET target_on = $2, owner_id = $3 WHERE id = $1`, [input.id, date, owner]);
+    if (owner) {
+      const siteId = await permanentSiteId(row.target_kind, row.target_id);
+      await autoFollow(sql, owner, siteId);
+    }
     await audit(sql, {
       actorId: input.actorId,
       action: "suggestion.revise",
@@ -602,6 +610,10 @@ export async function reviseSuggestion(
       `UPDATE suggestions SET detail = $2, title = $3, proposed_value = $4, reason = $5, target_on = $6, owner_id = $7 WHERE id = $1 AND status = 'open'`,
       [input.id, normalized.detail, normalized.title, normalized.proposedValue, normalized.reason, normalized.targetOn, normalized.ownerId],
     );
+    if (normalized.ownerId) {
+      const siteId = await permanentSiteId(row.target_kind, row.target_id);
+      await autoFollow(sql, normalized.ownerId, siteId);
+    }
     await audit(sql, {
       actorId: input.actorId,
       action: "suggestion.revise",

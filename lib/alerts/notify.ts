@@ -3,11 +3,12 @@ import type { Sql } from "@/lib/actions/db";
 import { resolveActionRole } from "@/lib/actions/roles";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
-import { discussionHref, proposalHref, reviewHref, spaceHref } from "./links";
+import { commentHref, discussionHref, proposalHref, reviewHref } from "./links";
 import { batchWindowMs } from "./clock";
 import { enqueueAlert, flushInstant } from "./deliver";
 import { isExcludedSite } from "./excluded";
 import { scheduleInstantFlush } from "./schedule";
+import { isOwnerAccount } from "./owner";
 import { loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
 
@@ -106,12 +107,58 @@ export async function queueAgentAlert(
   return instant;
 }
 
+async function noteAnchor(sql: Sql, noteId: string): Promise<{ type: string; line: string; period: string; spaceId: string } | null> {
+  try {
+    const rows = await sql.query<{ anchor_type: string | null; anchor_line: string | null; anchor_period: string | null; anchor_space_id: string | null }>(
+      `SELECT anchor_type, anchor_line, anchor_period, anchor_space_id FROM notes WHERE id = $1`,
+      [noteId],
+    );
+    const row = rows.rows[0];
+    if (!row?.anchor_type) return null;
+    return { type: row.anchor_type, line: row.anchor_line || "", period: row.anchor_period || "", spaceId: row.anchor_space_id || "" };
+  } catch {
+    return null;
+  }
+}
+
+async function followerIds(sql: Sql, siteId: string): Promise<string[]> {
+  const rows = await sql.query<{ user_id: string }>(`SELECT user_id FROM queue_follows WHERE site_id = $1`, [siteId]);
+  return rows.rows.map((row) => row.user_id);
+}
+
+/** The owner follows every site without a queue_follows row, including sites created later. */
+async function followAllIds(sql: Sql): Promise<string[]> {
+  const ids: string[] = [];
+  for (const user of getUsers()) {
+    if (!isOwnerAccount(user.u)) continue;
+    const prefs = await loadPreferences(sql, user.u);
+    if (prefs?.followAll) ids.push(user.u);
+  }
+  return ids;
+}
+
 export async function notifyNote(
   sql: Sql,
   input: { noteId: string; siteId: string; recordId?: string; body: string; authorId: string; parentId: string | null; mentionIds: string[] },
 ): Promise<void> {
-  const href = input.recordId && /^SS-\d{4,}$/.test(input.recordId) ? spaceHref(input.siteId, input.recordId) : discussionHref(input.siteId);
+  const anchor = await noteAnchor(sql, input.noteId);
+  const recordId = input.recordId || "";
+  const spaceTarget = /^SS-\d{4,}$/.test(recordId) ? { type: "space", line: "", period: "", spaceId: recordId } : null;
+  const href = commentHref(input.siteId, input.noteId, anchor?.type ? anchor : spaceTarget);
   let instant = false;
+  if (!input.parentId) {
+    const mentioned = new Set(input.mentionIds.map((id) => id.trim().toLowerCase()));
+    const followers = [...new Set([...(await followerIds(sql, input.siteId)), ...(await followAllIds(sql))])].filter((id) => !mentioned.has(id.trim().toLowerCase()));
+    if (await queueFor(sql, {
+      actorId: input.authorId,
+      userIds: followers,
+      category: "comments",
+      siteId: input.siteId,
+      summary: input.body,
+      href,
+      refId: input.noteId,
+    })) instant = true;
+  }
   if (input.parentId) {
     const people = await sql.query<{ user_id: string }>(
       `SELECT author_id AS user_id FROM notes WHERE id = $1 OR parent_id = $1

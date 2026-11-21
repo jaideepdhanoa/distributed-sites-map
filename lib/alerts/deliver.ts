@@ -7,7 +7,8 @@ import { getUsers } from "@/lib/users";
 import { DAILY_CAP, INSTANT_DAILY_CAP, batchWindowMs, digestWindowStart, losAngelesParts, stampOf } from "./clock";
 import { renderBatch, type MailItem } from "./compose";
 import { isExcludedSite } from "./excluded";
-import { discussionHref, proposalHref, reviewHomeHref } from "./links";
+import { isOwnerAccount } from "./owner";
+import { proposalHref, reviewHomeHref } from "./links";
 import { digestEnabled, loadPreferences, shouldSendDigest, type AlertCategory } from "./preferences";
 import { emptyBrief, loadDigestBrief } from "./summary";
 import { accountEmail } from "./recipients";
@@ -262,7 +263,7 @@ export async function flushInstant(sql: Sql, now = new Date()): Promise<number> 
         continue;
       }
       const instantToday = await instantSentToday(sql, userId, losAngelesParts(now).day);
-      if (instantToday >= INSTANT_DAILY_CAP) {
+      if (!isOwnerAccount(userId) && instantToday >= INSTANT_DAILY_CAP) {
         await rollToDigest(sql, ids);
         continue;
       }
@@ -298,19 +299,9 @@ async function siteLabel(siteId: string): Promise<string> {
   return siteId;
 }
 
-type NoteRow = { id: string; body: string; author_id: string; target_id: string };
 type SuggestionRow = { id: string; title: string | null; proposed_value: string; author_id: string; target_id: string; field_name: string };
 
 async function followedItems(sql: Sql, userId: string, since: Date): Promise<MailItem[]> {
-  const notes = await sql.query<NoteRow>(
-    `SELECT n.id, n.body, n.author_id, n.target_id
-     FROM notes n
-     JOIN queue_follows f ON f.site_id = n.target_id AND f.user_id = $1
-     WHERE n.deleted_at IS NULL AND n.parent_id IS NULL AND n.created_at > $2 AND n.author_id <> $1
-       AND NOT EXISTS (SELECT 1 FROM alert_outbox o WHERE o.user_id = $1 AND o.ref_id = n.id)
-     ORDER BY n.created_at ASC`,
-    [userId, since],
-  );
   const suggestions = await sql.query<SuggestionRow>(
     `SELECT s.id, s.title, s.proposed_value, s.author_id, s.target_id, s.field_name
      FROM suggestions s
@@ -321,16 +312,6 @@ async function followedItems(sql: Sql, userId: string, since: Date): Promise<Mai
     [userId, since],
   );
   const items: MailItem[] = [];
-  for (const note of notes.rows) {
-    items.push({
-      category: "followed",
-      siteId: note.target_id,
-      siteLabel: await siteLabel(note.target_id),
-      summary: note.body,
-      authorId: note.author_id,
-      href: discussionHref(note.target_id),
-    });
-  }
   for (const row of suggestions.rows) {
     items.push({
       category: "followed",

@@ -133,6 +133,19 @@ export type SiteProps = {
   research_sources?: string;
   research_note?: string;
   business_type?: string;
+  /** Quick lube only. Blank means unknown. */
+  brand_type?: string;
+  brand_note?: string;
+  bay_count?: number | null;
+  lift_count?: number | null;
+  lot_sqft?: number | null;
+  outside_sqft?: number | null;
+  outside_note?: string;
+  owner_of_record?: string;
+  owner_verdict?: string;
+  listing_source?: string;
+  listing_status?: string;
+  source_tag?: string;
   evidence: string;
   operating: string;
   agreement: string;

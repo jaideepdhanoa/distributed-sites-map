@@ -82,14 +82,16 @@ export function isLandParcelSite(
 }
 
 export function siteCategory(
-  site: { site_id?: string | null; linked_deal_id?: string | null },
+  site: { site_id?: string | null; linked_deal_id?: string | null; business_type?: string | null },
   links: LandLinks,
-): "wash" | "land" {
-  return isLandParcelSite(site, links) ? "land" : "wash";
+): CategoryId {
+  if (isLandParcelSite(site, links)) return "land";
+  if (isQuickLube(site.business_type)) return "lube";
+  return "wash";
 }
 
 export function siteInCategories(
-  site: { site_id?: string | null; linked_deal_id?: string | null },
+  site: { site_id?: string | null; linked_deal_id?: string | null; business_type?: string | null },
   links: LandLinks,
   categories: Categories,
 ): boolean {

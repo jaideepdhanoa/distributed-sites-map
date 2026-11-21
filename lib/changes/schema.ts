@@ -30,6 +30,7 @@ import { safeGmailLink } from "@/lib/comms";
 import { parseTag, type TagPayload } from "@/lib/tags/parse";
 import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
+import { QUICK_LUBE_FIELDS, quickLubeValueProblem, serviceAreaToken } from "@/lib/quickLube";
 import { coverageOf } from "@/lib/pnl/period";
 import {
   ACTIVITY_TYPES,
@@ -1202,7 +1203,19 @@ function assertContentActor(actor: Actor, index: number): void {
   }
 }
 
+function withServiceAreaToken(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  const raw = { ...(payload as Record<string, unknown>) };
+  if (typeof raw.service_area_class !== "string") return raw;
+  const token = serviceAreaToken(raw.service_area_class);
+  if (token == null) return raw;
+  if (!token) delete raw.service_area_class;
+  else raw.service_area_class = token;
+  return raw;
+}
+
 function parseSite(actor: Actor, index: number, expectedVersion: number, payload: unknown, mint = false): SitePayload {
+  payload = withServiceAreaToken(payload);
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new InputError(`Change ${index + 1}: That change is not valid.`);
   }
@@ -1274,11 +1287,25 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     }
     facts[key] = value == null ? "" : canonicalFact(value);
   }
+  for (const key of QUICK_LUBE_FIELDS) {
+    if (!(key in facts)) continue;
+    const value = facts[key] || "";
+    if (!value) {
+      delete facts[key];
+      continue;
+    }
+    const problem = quickLubeValueProblem(key, value);
+    if (problem) throw new InputError(`Change ${index + 1}: ${problem}`);
+    if (key === "source_tag") continue;
+    const source = data.sources?.[key]?.trim() || "";
+    if (!source) throw new InputError(`Change ${index + 1}: ${key} needs a source.`);
+  }
   if (data.folder_url !== undefined) facts.folder_url = data.folder_url;
   if (!Object.keys(fields).length && !Object.keys(facts).length) throw new InputError(`Change ${index + 1}: Add a field to change.`);
   for (const key of Object.keys(data.sources || {})) {
     const identitySource = mint && (CREATE_IDENTITY_FIELDS as readonly string[]).includes(key);
-    if (!identitySource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    const quickSource = (QUICK_LUBE_FIELDS as readonly string[]).includes(key);
+    if (!identitySource && !quickSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1290,6 +1317,13 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     if (value === undefined || value === "") continue;
     const source = data.sources?.[field]?.trim() || "";
     if (!source) throw new InputError(`Change ${index + 1}: Every numeric fact needs a source.`);
+    cleanText(source);
+    sources[field] = source;
+  }
+  for (const field of QUICK_LUBE_FIELDS) {
+    if (!facts[field]) continue;
+    const source = data.sources?.[field]?.trim() || "";
+    if (!source) continue;
     cleanText(source);
     sources[field] = source;
   }

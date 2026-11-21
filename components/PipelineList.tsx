@@ -39,7 +39,7 @@ import { RowLinks } from "./RowLinks";
 import { ChipFace } from "./ChipFace";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
-import { QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
+import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily, tagFamily } from "@/lib/tags/vocab";
@@ -111,6 +111,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "traffic") return vehiclesPerDay(deal.trade_aadt) || "—";
   if (id === "cashFlow") {
     if (!signedIn) return "—";
+    if (isQuickLube(deal.business_type)) return "N/A";
     const cash = cashTile(deal);
     if (cash.hidden) return "";
     if (cash.value === "—" || cash.value === "Vacant land, no business") return cash.value;
@@ -534,9 +535,11 @@ export default function PipelineList({
                 const chips = dealChips(row.deal, signedIn);
                 const waiting = chips.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
                 const gap = chips.find((chip) => chip.family === "biggest_gap");
-                if (!waiting && !gap) return null;
+                const category = isQuickLube(row.deal.business_type) ? <ChipFace className="stage-pill tone-brass" testId="quick-lube-chip" label={QUICK_LUBE_LABEL} /> : null;
+                if (!waiting && !gap && !category) return null;
                 return (
                   <>
+                    {category}
                     {waiting ? <TagChip chip={waiting} compact /> : null}
                     {gap ? <TagChip chip={gap} compact /> : null}
                   </>
@@ -578,6 +581,7 @@ export default function PipelineList({
           if (column === "traffic") return <NumberCell label={cell(row, "traffic", signedIn)} value={row.deal.trade_aadt} stats={strips.traffic} direction="higher" format={countText} />;
           if (column === "depot") return row.noPin ? <span className="no-pin">No pin</span> : <NumberCell label={cell(row, "depot", signedIn)} value={row.deal.miles_to_depot} stats={strips.depot} direction="lower" format={mileText} />;
           if (column === "cashFlow") {
+            if (signedIn && isQuickLube(row.deal.business_type)) return <NumberCell label="N/A" labelTitle="Wash cash flow does not apply." value={null} stats={strips.cash} direction="higher" format={fullMoney} />;
             if (!signedIn || cashTile(row.deal).hidden) return <span>{signedIn ? "" : "—"}</span>;
             const cashLabel = cashFlowListLabel(row.deal);
             return <NumberCell label={cashLabel.text} labelTitle={cashLabel.title} value={row.deal.stated_cash_flow} stats={strips.cash} direction="higher" markNegative format={fullMoney} />;
@@ -600,6 +604,7 @@ export default function PipelineList({
             return (
               <span className="stage-cell">
                 <ChipFace className={`stage-pill tone-${stageTone(row.deal)}`} testId="stage-chip" label={stageChipLabel(row.deal.stage, row.deal.stage_group)} detail={droppedDecisionLine(row.deal)} />
+                {isQuickLube(row.deal.business_type) ? <ChipFace className="stage-pill tone-brass" testId="quick-lube-chip" label={QUICK_LUBE_LABEL} /> : null}
                 {nda ? <TagChip chip={nda} compact /> : null}
                 <StagePending note={row.deal.stage_pending} />
               </span>

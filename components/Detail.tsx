@@ -10,7 +10,7 @@ import Timeline from "./timeline/Timeline";
 import { ChipFace } from "./ChipFace";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
-import { nextStepText, plainVerdict, stageDetail, stageTone, statusOf } from "@/lib/labels";
+import { isQuickLube, nextStepText, plainVerdict, QUICK_LUBE_LABEL, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { derivePowerRating, type PowerRatingInput } from "@/lib/score/power-rating";
 import { storedScoreView } from "@/lib/scoreDisplay";
@@ -169,6 +169,7 @@ function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps |
     serviceArea: deal?.service_area_class,
     dealRating: deal?.deal_rating,
     powerDetail: reason,
+    naEconomics: isQuickLube(deal?.business_type) || isQuickLube(site?.business_type),
   });
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -193,6 +194,44 @@ function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps |
           ))}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function factText(record: object | null | undefined, key: string): string {
+  if (!record) return "";
+  const value = (record as Record<string, unknown>)[key];
+  if (value == null || value === "") return "";
+  return String(value);
+}
+
+function QuickLubeFacts({ site, deal }: { site?: SiteProps | null; deal?: DealProps | null }) {
+  if (!isQuickLube(site?.business_type) && !isQuickLube(deal?.business_type)) return null;
+  const record = { ...(deal || {}), ...(site || {}) };
+  const text = (key: string) => factText(record, key);
+  const brand = text("brand_type");
+  const verdict = text("owner_verdict");
+  const miles = text("miles_to_depot");
+  return (
+    <section data-testid="quick-lube-facts">
+      <h3>{QUICK_LUBE_LABEL}</h3>
+      <div className="kv">
+        <span>Brand</span>
+        <div>
+          {brand ? <ChipFace className="stage-pill tone-pine" label={brand} testId="brand-chip" /> : "—"}
+          {text("brand_note") ? ` ${text("brand_note")}` : ""}
+        </div>
+        <span>Bays</span><div>{text("bay_count") || "—"}</div>
+        <span>Lifts</span><div>{text("lift_count") || "—"}</div>
+        <span>Lot</span><div>{text("lot_sqft") ? `${text("lot_sqft")} sq ft` : "—"}</div>
+        <span>Outside</span><div>{text("outside_sqft") ? `${text("outside_sqft")} sq ft` : "—"}{text("outside_note") ? ` ${text("outside_note")}` : ""}</div>
+        <span>Owner</span><div>{text("owner_of_record") || text("owner") || "—"}</div>
+        <span>Owns the lot</span>
+        <div>{verdict ? <ChipFace className="stage-pill tone-sand" label={verdict} testId="owner-verdict-chip" /> : "—"}</div>
+        <span>Listed</span><div>{text("listing_status") || "—"}{text("listing_source") ? ` ${text("listing_source")}` : ""}</div>
+        <span>Depot</span><div>{miles ? `${miles} mi` : "—"}</div>
+      </div>
+      {text("source_tag") ? <p className="note">{text("source_tag")}</p> : null}
     </section>
   );
 }
@@ -668,6 +707,7 @@ export default function Detail({
                 </div>
               </>
             ) : null}
+            <QuickLubeFacts site={site} deal={linkedDeal} />
             <h3>Owner</h3>
             <p>{site.owner || "—"}</p>
             {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}
@@ -918,6 +958,7 @@ export function DealDetail({
             </details>
             <AreaChip record={deal} />
             <ChipRow chips={recordChips} testId="section-chips" />
+            <QuickLubeFacts site={universeSite} deal={deal} />
             <h3>Broker</h3>
             <div className="kv">
               <span>Broker</span>

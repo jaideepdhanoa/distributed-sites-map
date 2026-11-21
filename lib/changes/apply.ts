@@ -25,6 +25,9 @@ import { storeSiteSpace } from "@/lib/spaces/store";
 import type { ActivityPayload, Actor, CommentPayload, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
 import { AGENT_STAGE_DECISION_SOURCE, RECEIPT_ACTIVITY_SUMMARY, formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, receiptCitation, validateBatch } from "./schema";
 import { CREATE_MARKETS } from "./site";
+import { isQuickLube } from "@/lib/labels";
+import { addressConflict, normalizeAddress } from "@/lib/quickLube";
+import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { marketCode, serviceAreaCode } from "./stageLabel";
 import { LISTING_ID, SITE_ID, type EntityType, type Market, type ServiceAreaClass } from "./vocab";
 
@@ -1268,8 +1271,24 @@ function listingHash(payload: SitePayload): string {
     .digest("hex");
 }
 
+async function knownAddresses(sql: Sql): Promise<string[]> {
+  const rows = await sql.query<{ address: string }>(
+    `SELECT address FROM sites WHERE address <> ''
+     UNION ALL
+     SELECT address FROM universe_rows WHERE address <> ''`,
+  );
+  const found = rows.rows.map((row) => row.address);
+  const file = readGeneratedOptional("sites.geojson") as { features?: { properties?: { address?: string } }[] } | undefined;
+  for (const feature of file?.features || []) {
+    const address = feature.properties?.address;
+    if (address) found.push(address);
+  }
+  return found;
+}
+
 async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<ParsedChange[]> {
   const prepared: ParsedChange[] = [];
+  const claimed = new Set<string>();
   for (const change of changes) {
     const mint = change.entity_type === "site" ? (change.payload as SitePayload).mint : undefined;
     if (!mint || change.expected_version !== 0 || change.site_id) {
@@ -1297,6 +1316,15 @@ async function prepareMintedSites(sql: Sql, changes: ParsedChange[]): Promise<Pa
         payload: { ...payload, fields: { ...payload.fields, universe_id: prior.universe_id } },
       });
       continue;
+    }
+    if (isQuickLube(payload.fields.category)) {
+      const address = payload.fields.address || "";
+      const key = normalizeAddress(address);
+      const known = await knownAddresses(sql);
+      if ((key && claimed.has(key)) || addressConflict(address, known)) {
+        throw new InputError("This address matches an existing site.", 409);
+      }
+      if (key) claimed.add(key);
     }
     const minted = await mintSitePair(sql, mint.kind, market);
     prepared.push({

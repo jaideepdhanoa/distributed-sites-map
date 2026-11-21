@@ -24,3 +24,20 @@ export function sameAddress(left: string, right: string): boolean {
   const key = normalizeAddress(left);
   return Boolean(key) && key === normalizeAddress(right);
 }
+
+const TRAILING_ZIP = / \d{5}$/;
+
+/**
+ * Exact normalized address, or the same address with a ZIP on only one side.
+ * Two different ZIPs do not match. A blank address does not match.
+ */
+export function samePlaceAddress(left: string, right: string): boolean {
+  const a = normalizeAddress(left);
+  const b = normalizeAddress(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const aZip = TRAILING_ZIP.test(a);
+  const bZip = TRAILING_ZIP.test(b);
+  if (aZip === bZip) return false;
+  return a.replace(TRAILING_ZIP, "") === b.replace(TRAILING_ZIP, "");
+}

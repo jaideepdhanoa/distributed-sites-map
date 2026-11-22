@@ -8,7 +8,6 @@ const sizes = [
 async function ready(page: Page) {
   await page.goto("/?funnel=pipeline&city=PHX", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".shell")).toBeVisible();
-  await expect(page.getByTestId("view-help")).toBeVisible();
 }
 
 for (const size of sizes) {
@@ -16,7 +15,7 @@ for (const size of sizes) {
     test.skip(info.project.name !== size.project, size.project);
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
-    await expect(page.getByTestId("view-help")).toHaveText("Deals in this market");
+    await expect(page.getByTestId("view-help")).toHaveCount(0);
     if (size.width < 768) await page.getByRole("button", { name: "Menu" }).click();
     const tab = page.getByRole("button", { name: "NDA queue" });
     await expect(tab).toBeVisible();
@@ -24,17 +23,6 @@ for (const size of sizes) {
     await expect(page).toHaveURL(/nda=1/);
     await expect(page.getByTestId("nda-queue")).toBeVisible();
     await expect(page.getByTestId("view-help")).toHaveText("Agreements still open");
-  });
-
-  test(`Show land turns the Land category on at ${size.width}`, async ({ page }, info) => {
-    test.skip(info.project.name !== size.project, size.project);
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await ready(page);
-    const banner = page.getByTestId("land-banner");
-    await expect(banner).toContainText("Land sites are hidden by your filters");
-    await page.getByTestId("show-land").click();
-    await expect(page).toHaveURL(/cats=[^&]*land/);
-    await expect(banner).toHaveCount(0);
   });
 
   test(`Dropped keeps the market and the zoom at ${size.width}`, async ({ page }, info) => {

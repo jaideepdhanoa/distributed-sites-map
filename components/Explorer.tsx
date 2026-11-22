@@ -53,7 +53,7 @@ import CommandSearch from "./CommandSearch";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
-import { fullUniverseNeeded, viewHelp } from "@/lib/viewHelp";
+import { fullUniverseNeeded } from "@/lib/viewHelp";
 import { resolveSiteLink, siteHref } from "@/lib/siteLink";
 import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
 import { canWrite } from "./actions/panel";
@@ -1610,9 +1610,6 @@ export default function Explorer() {
   const locationFix = params.get("fix") === "location"
     ? (me?.actionRole === "reviewer" ? "edit" : me?.actionRole === "contributor" ? "propose" : null)
     : null;
-  const hiddenLand = funnel === "pipeline" && !categories.land
-    ? dealRows.filter((deal) => deal.kind === "land" && !isProtectedId(deal.deal_id) && shownInMarket(deal.city)).length
-    : 0;
   const offMarketPool = (universeWide || allCities) && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
     if (!feature.geometry) return false;
@@ -2073,7 +2070,7 @@ export default function Explorer() {
             <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }}>Search name, address, broker, APN, id</button>
             <kbd aria-hidden="true">/</kbd>
           </div>
-          <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
+          <button type="button" className="chip command-open only-desktop" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
@@ -2164,14 +2161,7 @@ export default function Explorer() {
           ) : null}
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
-        {ndaVisible ? null : <p className="note view-line" data-testid="view-help">{viewHelp(inReview ? "review" : funnel === "pipeline" ? "pipeline" : "universe")}</p>}
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
-        {hiddenLand > 0 && !inReview ? (
-          <p className="land-banner" role="status" data-testid="land-banner">
-            Land sites are hidden by your filters
-            <button type="button" className="chip" data-testid="show-land" onClick={() => setCategory("land", true)}>Show land</button>
-          </p>
-        ) : null}
         <div className="funnel-row">
           <div className="funnel-sheet-head only-mobile">
             <p className="eyebrow">Steps</p>

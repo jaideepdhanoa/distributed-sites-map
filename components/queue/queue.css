@@ -17,6 +17,10 @@
   position: relative;
   z-index: 21;
 }
+.shell.reviewing .bar:has(.user-menu .menu),
+.shell.reviewing .alert-sheet {
+  z-index: 32;
+}
 .review-bar:has(.queue-pop) { z-index: 30; }
 .review-site-empty p { margin: 0; flex: 1 1 auto; min-width: 0; }
 .review-bar {

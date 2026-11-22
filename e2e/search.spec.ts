@@ -79,11 +79,13 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/data/timeline?**", (route) => route.fulfill({ json: { items: [], materials: [] } }));
 });
 
-test("ctrl+k and slash open search, and the chip names the shortcut", async ({ page }) => {
+test("ctrl+k and slash open search, and the chip names the shortcut", async ({ page }, info) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   const apple = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac OS|iPhone|iPad/.test(navigator.userAgent));
-  await expect(page.getByTestId("command-search-open")).toHaveText(apple ? "⌘K" : "Ctrl K");
+  const hint = page.getByTestId("command-search-open");
+  if (info.project.name === "desktop") await expect(hint).toHaveText(apple ? "⌘K" : "Ctrl K");
+  else await expect(hint).toBeHidden();
   await page.keyboard.press("Control+k");
   const palette = page.getByTestId("command-search");
   await expect(palette).toBeVisible();

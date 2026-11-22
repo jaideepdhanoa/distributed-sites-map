@@ -8,6 +8,7 @@ import {
   PIN_SPLIT_ZOOM,
   bubbleClearsSheet,
   clusterBubbleLabel,
+  countedPins,
   leafBounds,
   phoneBubbleRadius,
   pinsOverlap,
@@ -32,6 +33,16 @@ test("a bubble label is only the count", () => {
   }
   assert.equal(clusterBubbleLabel(12), "12");
   assert.equal(clusterBubbleLabel(1200), "1.2k");
+});
+
+test("a pipeline bubble counts each deal once and leaves the county pins out", () => {
+  const site = { geometry: { type: "Point", coordinates: [-112, 33.4] }, properties: { site_id: "PHX-U9101", pin_kind: "site" } };
+  const deal = { geometry: { type: "Point", coordinates: [-112, 33.4] }, properties: { deal_id: "PIPE-PHX-9101", pin_kind: "deal" } };
+  const other = { geometry: { type: "Point", coordinates: [-115, 36.1] }, properties: { deal_id: "PIPE-LAS-9101", pin_kind: "deal" } };
+  const deals = countedPins({ group: "deals", sites: [site], offMarket: [], deals: [deal, other, deal] });
+  assert.deepEqual(deals.map((feature) => feature.properties?.deal_id), ["PIPE-PHX-9101", "PIPE-LAS-9101"]);
+  const universe = countedPins({ group: "sites", sites: [site], offMarket: [], deals: [deal, other] });
+  assert.deepEqual(universe.map((feature) => feature.properties?.site_id), ["PHX-U9101"]);
 });
 
 test("a deep-linked pin is kept out of the group", () => {

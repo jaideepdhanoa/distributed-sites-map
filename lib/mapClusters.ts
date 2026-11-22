@@ -44,6 +44,24 @@ function sameId(properties: Record<string, unknown> | null | undefined, id: stri
   return properties.site_id === id || properties.deal_id === id || properties.listing_id === id;
 }
 
+/**
+ * One feature per place. Pipeline counts deals. Universe counts sites.
+ * The county-status diamonds are not added on top of the stage pins.
+ */
+export function countedPins(input: { group: "deals" | "sites"; sites: PinFeature[]; offMarket: PinFeature[]; deals: PinFeature[] }): PinFeature[] {
+  const rows = input.group === "deals" ? input.deals : [...input.sites, ...input.offMarket];
+  const seen = new Set<string>();
+  const counted: PinFeature[] = [];
+  for (const feature of rows) {
+    if (!feature.geometry || feature.geometry.type !== "Point") continue;
+    const id = String(feature.properties?.deal_id || feature.properties?.site_id || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    counted.push(feature);
+  }
+  return counted;
+}
+
 /** The deep-linked record stays a single pin. Everything else can share a bubble. */
 export function takeSolo<T extends PinFeature>(features: T[], id: string | null | undefined): { grouped: T[]; solo: T | null } {
   if (!id) return { grouped: features, solo: null };

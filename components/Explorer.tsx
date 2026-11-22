@@ -2520,6 +2520,7 @@ export default function Explorer() {
           showAreas={showAreas}
           showDepots={showDepots}
           showSites={showUniverse}
+          groupPins={funnel === "pipeline" ? "deals" : "sites"}
           showRings={showRings}
           focusLng={focus.center[0]}
           focusLat={focus.center[1]}

@@ -40,7 +40,7 @@ async function spots(page: Page): Promise<{ pins: Spot[]; groups: Spot[]; zoom: 
     }).__sitesMap;
     const pins: Spot[] = [];
     const seen = new Set<string>();
-    for (const feature of map.queryRenderedFeatures({ layers: ["sites", "deals-pipe", "deals-land", "offmarket", "focus-pin"] })) {
+    for (const feature of map.queryRenderedFeatures({ layers: ["sites", "deals-pipe", "deals-land", "offmarket", "focus-pin", "pin-singles"] })) {
       if (feature.properties?.point_count || feature.geometry?.type !== "Point" || !feature.geometry.coordinates) continue;
       const id = String(feature.properties?.site_id || feature.properties?.deal_id || "");
       const key = id || feature.geometry.coordinates.join(",");
@@ -72,31 +72,33 @@ function overlapping(pins: Spot[]) {
   return false;
 }
 
+async function countryGroups(page: Page) {
+  await page.waitForFunction(() => {
+    const shell = document.querySelector(".stage-map");
+    const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures: (options: { layers: string[] }) => unknown[] } }).__sitesMap;
+    const count = Number(shell?.getAttribute("data-group-count") || "0");
+    return Boolean(map && map.getZoom() < 8 && count > 0 && map.queryRenderedFeatures({ layers: ["clusters"] }).length > 0);
+  });
+  const view = await spots(page);
+  const counted = Number(await page.locator(".stage-map").getAttribute("data-group-count"));
+  const drawn = view.groups.reduce((sum, group) => sum + group.count, 0) + view.pins.length;
+  expect(view.zoom).toBeLessThan(8);
+  expect(view.groups.length).toBeGreaterThan(0);
+  expect(overlapping(view.pins)).toBe(false);
+  expect(drawn).toBe(counted);
+  return view;
+}
+
 test("All view groups nearby pins, and a group opens onto its pins", async ({ page }, info) => {
   test.skip(info.project.name === "mobile", "desktop click");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?funnel=universe&city=all&stage=all", { waitUntil: "domcontentloaded" });
   await ready(page);
-  await jump(page, [-98, 33], 4);
-  await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { queryRenderedFeatures: (options: { layers: string[] }) => unknown[] } }).__sitesMap;
-    return Boolean(map && map.queryRenderedFeatures({ layers: ["clusters"] }).length > 0);
-  });
-  const universe = await spots(page);
-  expect(universe.zoom).toBeLessThan(10);
-  expect(universe.groups.length).toBeGreaterThan(0);
-  expect(overlapping(universe.pins)).toBe(false);
+  await countryGroups(page);
 
   await page.goto("/?funnel=pipeline&city=all", { waitUntil: "domcontentloaded" });
   await ready(page);
-  await jump(page, [-98, 33], 4);
-  await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { queryRenderedFeatures: (options: { layers: string[] }) => unknown[] } }).__sitesMap;
-    return Boolean(map && map.queryRenderedFeatures({ layers: ["clusters"] }).length > 0);
-  });
-  const pipeline = await spots(page);
-  expect(pipeline.groups.length).toBeGreaterThan(0);
-  expect(overlapping(pipeline.pins)).toBe(false);
+  const pipeline = await countryGroups(page);
   const target = [...pipeline.groups].sort((a, b) => b.count - a.count)[0];
   const before = pipeline.zoom;
   const mapBox = await page.locator(".map").boundingBox();
@@ -104,7 +106,9 @@ test("All view groups nearby pins, and a group opens onto its pins", async ({ pa
   await page.mouse.click(mapBox!.x + target.x, mapBox!.y + target.y);
   await page.waitForFunction((zoom) => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
-    return Boolean(map && map.getZoom() > zoom + 0.6);
+    const tip = document.querySelector(".map-tip-fixed");
+    const summary = tip?.getAttribute("data-hidden") !== "1" && (tip?.textContent?.includes("County record") || tip?.textContent?.includes("Desk screen"));
+    return Boolean(map && map.getZoom() > zoom + 0.6 && !summary);
   }, before);
 });
 

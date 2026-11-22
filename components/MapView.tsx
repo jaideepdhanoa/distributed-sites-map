@@ -5,8 +5,8 @@ import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapLayerMouse
 import "maplibre-gl/dist/maplibre-gl.css";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
-import { areaTip, clusterTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
-import { CLUSTER_SOURCE, PHONE_BUBBLE_PX, PIN_SPLIT_ZOOM, clusterBubbleLabel, leafBounds, phoneBubbleRadius, takeSolo, type PinFeature } from "@/lib/mapClusters";
+import { areaTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
+import { CLUSTER_SOURCE, PHONE_BUBBLE_PX, PIN_SPLIT_ZOOM, clusterBubbleLabel, countedPins, leafBounds, phoneBubbleRadius, takeSolo, type PinFeature } from "@/lib/mapClusters";
 import { mutedPositronStyle } from "@/lib/mutedStyle";
 import { AREA_TIP_DWELL_MS, placeReadableTip, type TipBox } from "@/lib/tipPlace";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
@@ -30,6 +30,8 @@ type Props = {
   showDepots: boolean;
   showSites: boolean;
   showRings: boolean;
+  /** Pipeline bubbles count deals. Universe bubbles count sites. */
+  groupPins?: "deals" | "sites";
   focusLng: number;
   focusLat: number;
   focusZoom: number;
@@ -120,13 +122,14 @@ function pointPadding(map: Map) {
 function applyClusterChrome(map: Map) {
   const phone = window.matchMedia("(max-width: 767px)").matches;
   if (map.getLayer("clusters")) {
-    map.setPaintProperty("clusters", "circle-radius", phone ? phoneBubbleRadius() : ["step", ["get", "point_count"], 18, 20, 20, 80, 24]);
+    map.setPaintProperty("clusters", "circle-radius", phone ? phoneBubbleRadius() : ["step", ["get", "point_count"], 22, 20, 26, 80, 30]);
   }
   if (map.getLayer("clusters-halo")) {
-    map.setPaintProperty("clusters-halo", "circle-radius", phone ? phoneBubbleRadius() + 7 : ["+", ["step", ["get", "point_count"], 18, 20, 20, 80, 24], 7]);
+    map.setPaintProperty("clusters-halo", "circle-radius", phone ? phoneBubbleRadius() + 8 : ["+", ["step", ["get", "point_count"], 22, 20, 26, 80, 30], 8]);
   }
   const pinIcon = phone ? PHONE_BUBBLE_PX / 36 : 0.9;
   if (map.getLayer("focus-pin")) map.setLayoutProperty("focus-pin", "icon-size", phone ? PHONE_BUBBLE_PX / 36 : 0.92);
+  if (map.getLayer("pin-singles")) map.setLayoutProperty("pin-singles", "icon-size", phone ? PHONE_BUBBLE_PX / 36 : 0.92);
   if (map.getLayer("offmarket")) map.setLayoutProperty("offmarket", "icon-size", phone ? pinIcon : 0.9);
   if (map.getLayer("deals-pipe")) map.setLayoutProperty("deals-pipe", "icon-size", phone ? pinIcon : 0.9);
   if (map.getLayer("deals-land")) map.setLayoutProperty("deals-land", "icon-size", phone ? pinIcon : 0.9);
@@ -134,7 +137,7 @@ function applyClusterChrome(map: Map) {
     map.setLayoutProperty("sites", "icon-size", phone ? pinIcon : ["interpolate", ["linear"], ["zoom"], 8, 0.74, 14, 0.92]);
   }
   const shell = map.getContainer().closest(".stage-map");
-  if (shell instanceof HTMLElement) shell.dataset.clusterPx = phone ? String(PHONE_BUBBLE_PX) : "36";
+  if (shell instanceof HTMLElement) shell.dataset.clusterPx = String(phone ? PHONE_BUBBLE_PX : 44);
 }
 
 function markZoomBand(map: Map) {
@@ -268,6 +271,8 @@ export default function MapView(props: Props) {
   const skipViewReset = useRef(false);
   const freezeCamera = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
+  const holdCamera = useRef(false);
+  const sawSelection = useRef<string | null>(null);
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
   const [draftPoints, setDraftPoints] = useState(0);
@@ -343,38 +348,40 @@ export default function MapView(props: Props) {
           {
             id: "missing-parcel",
             type: "circle",
-            source: "pins",
+            source: "sites",
             minzoom: 14,
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "parcel_match"], "none"]],
+            filter: ["==", ["get", "parcel_match"], "none"],
             paint: { "circle-radius": 13, "circle-color": "transparent", "circle-stroke-color": "#a8711b", "circle-stroke-width": 2 },
           },
           {
             id: "missing-parcel-deals",
             type: "circle",
-            source: "pins",
+            source: "deals",
             minzoom: 14,
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "parcel_match"], "none"]],
+            filter: ["==", ["get", "parcel_match"], "none"],
             paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#a8711b", "circle-stroke-width": 2 },
           },
           {
             id: "offmarket-halo",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], ""]],
+            source: "offmarket",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "site_id"], ""],
             paint: { "circle-radius": 22, "circle-color": "#8a8173", "circle-opacity": 0.16 },
           },
           {
             id: "offmarket",
             type: "symbol",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"]],
+            source: "offmarket",
+            minzoom: PIN_SPLIT_ZOOM,
             layout: { "icon-image": "dia-stone", "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "offmarket-selected",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], ""]],
+            source: "offmarket",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "site_id"], ""],
             paint: { "circle-radius": 16, "circle-color": "transparent", "circle-stroke-color": "#fffdf8", "circle-stroke-width": 2 },
           },
           {
@@ -387,7 +394,7 @@ export default function MapView(props: Props) {
               "circle-opacity": 0.22,
               "circle-stroke-color": "#1c1914",
               "circle-stroke-width": 2,
-              "circle-radius": ["+", ["step", ["get", "point_count"], 18, 20, 20, 80, 24], 7],
+              "circle-radius": ["+", ["step", ["get", "point_count"], 22, 20, 26, 80, 30], 8],
             },
           },
           {
@@ -395,21 +402,22 @@ export default function MapView(props: Props) {
             type: "circle",
             source: "pins",
             filter: ["has", "point_count"],
-            paint: { "circle-color": "#1e4636", "circle-radius": ["step", ["get", "point_count"], 18, 20, 20, 80, 24], "circle-stroke-color": "#fffdf8", "circle-stroke-width": 3, "circle-opacity": 1 },
+            paint: { "circle-color": "#1e4636", "circle-radius": ["step", ["get", "point_count"], 22, 20, 26, 80, 30], "circle-stroke-color": "#fffdf8", "circle-stroke-width": 3, "circle-opacity": 1 },
           },
           {
             id: "cluster-count",
             type: "symbol",
             source: "pins",
             filter: ["has", "point_count"],
-            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 13, "text-allow-overlap": true },
+            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 15, "text-allow-overlap": true },
             paint: { "text-color": "#fffdf8", "text-halo-color": "#1e4636", "text-halo-width": 1 },
           },
           {
             id: "tier-large-halo",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L10"]],
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "land_tier"], "L10"],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 10, 14, 16],
               "circle-color": "transparent",
@@ -421,8 +429,9 @@ export default function MapView(props: Props) {
           {
             id: "tier-large",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L10"]],
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "land_tier"], "L10"],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
               "circle-color": "transparent",
@@ -433,8 +442,9 @@ export default function MapView(props: Props) {
           {
             id: "tier-small-halo",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L4"]],
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "land_tier"], "L4"],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 7, 14, 11],
               "circle-color": "transparent",
@@ -446,8 +456,9 @@ export default function MapView(props: Props) {
           {
             id: "tier-small",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L4"]],
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "land_tier"], "L4"],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
               "circle-color": "transparent",
@@ -458,7 +469,8 @@ export default function MapView(props: Props) {
           {
             id: "selected-halo",
             type: "circle",
-            source: "pins",
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
             paint: {
               "circle-radius": 24,
@@ -478,15 +490,16 @@ export default function MapView(props: Props) {
           {
             id: "selected",
             type: "circle",
-            source: "pins",
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
             paint: { "circle-radius": 15, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "sites",
             type: "symbol",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"]],
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
             layout: {
               "icon-image": [
                 "case",
@@ -505,14 +518,16 @@ export default function MapView(props: Props) {
           {
             id: "linked",
             type: "circle",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["has", "linked_deal_id"], ["!=", ["get", "linked_deal_id"], ""]],
+            source: "sites",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["all", ["has", "linked_deal_id"], ["!=", ["get", "linked_deal_id"], ""]],
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#f7f3ea", "circle-stroke-width": 2 },
           },
           {
             id: "deal-halo",
             type: "circle",
-            source: "pins",
+            source: "deals",
+            minzoom: PIN_SPLIT_ZOOM,
             filter: ["==", ["get", "deal_id"], ""],
             paint: {
               "circle-radius": 24,
@@ -530,22 +545,25 @@ export default function MapView(props: Props) {
           {
             id: "deal-ring",
             type: "circle",
-            source: "pins",
+            source: "deals",
+            minzoom: PIN_SPLIT_ZOOM,
             filter: ["==", ["get", "deal_id"], ""],
             paint: { "circle-radius": 15, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "deals-pipe",
             type: "symbol",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "kind"], "pipeline"]],
+            source: "deals",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "kind"], "pipeline"],
             layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "deal-site-badge",
             type: "symbol",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "kind"], "pipeline"], ["has", "universe_id"], ["!=", ["get", "universe_id"], ""]],
+            source: "deals",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["all", ["==", ["get", "kind"], "pipeline"], ["has", "universe_id"], ["!=", ["get", "universe_id"], ""]],
             layout: {
               "text-field": "Site",
               "text-font": ["Noto Sans Regular"],
@@ -577,8 +595,9 @@ export default function MapView(props: Props) {
           {
             id: "deals-land",
             type: "symbol",
-            source: "pins",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "kind"], "land"]],
+            source: "deals",
+            minzoom: PIN_SPLIT_ZOOM,
+            filter: ["==", ["get", "kind"], "land"],
             layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
@@ -621,6 +640,7 @@ export default function MapView(props: Props) {
             id: "area-labels",
             type: "symbol",
             source: "area-labels",
+            minzoom: PIN_SPLIT_ZOOM,
             layout: {
               "text-field": ["get", "name"],
               "text-font": ["Noto Sans Regular"],
@@ -629,7 +649,8 @@ export default function MapView(props: Props) {
               "text-anchor": "left",
               "text-offset": [0.2, 0],
               "text-justify": "left",
-              "text-allow-overlap": true,
+              "text-allow-overlap": false,
+              "text-optional": true,
               "text-padding": 6,
             },
             paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 2 },
@@ -663,15 +684,40 @@ export default function MapView(props: Props) {
           { id: "measure-fill", type: "fill", source: "measure", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#1e4636", "fill-opacity": 0.28 } },
           { id: "measure", type: "line", source: "measure", paint: { "line-color": "#fffdf8", "line-width": 2 } },
           {
+            id: "pin-singles",
+            type: "symbol",
+            source: "pins",
+            maxzoom: PIN_SPLIT_ZOOM,
+            filter: ["!", ["has", "point_count"]],
+            layout: {
+              "icon-image": [
+                "case",
+                ["==", ["get", "pin_kind"], "deal"], ["concat", "sq-", ["coalesce", ["get", "stage_group"], "sourced"]],
+                ["==", ["get", "pin_kind"], "off"], "dia-stone",
+                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "dia-held",
+                ["==", ["get", "verdict"], "PASS"], "dia-moss",
+                ["==", ["get", "verdict"], "MAYBE"], "dia-amber",
+                ["==", ["get", "verdict"], "UNRESOLVED"], "dia-clay",
+                ["==", ["get", "verdict"], "FAIL"], "dia-clay",
+                ["==", ["get", "verdict"], "NOT_A_WASH"], "dia-clay",
+                "dia-stone",
+              ],
+              "icon-size": 0.92,
+              "icon-allow-overlap": true,
+            },
+          },
+          {
             id: "focus-ring",
             type: "circle",
             source: "focus-pin",
+            maxzoom: PIN_SPLIT_ZOOM,
             paint: { "circle-radius": 18, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "focus-pin",
             type: "symbol",
             source: "focus-pin",
+            maxzoom: PIN_SPLIT_ZOOM,
             layout: {
               "icon-image": [
                 "case",
@@ -883,7 +929,16 @@ export default function MapView(props: Props) {
         }
       }
       if (!map.hasImage("tri-land")) map.addImage("tri-land", { width: size, height: size, data: triangle });
+      const raiseGroups = () => {
+        for (const id of ["clusters-halo", "clusters", "cluster-count", "pin-singles", "focus-ring", "focus-pin"]) {
+          if (map.getLayer(id)) map.moveLayer(id);
+        }
+      };
+      raiseGroups();
+      let hideGroupTip = () => undefined as void;
       const openGroup = (clusterId: number) => {
+        holdCamera.current = true;
+        hideGroupTip();
         const source = map.getSource("pins") as GeoJSONSource;
         source.getClusterLeaves(clusterId, 10000, 0).then((leaves) => {
           const bounds = leafBounds(leaves as PinFeature[]);
@@ -899,18 +954,25 @@ export default function MapView(props: Props) {
           });
         }).catch(() => undefined);
       };
-      map.on("click", "clusters", (event: MapLayerMouseEvent) => {
-        const feature = event.features?.[0];
-        const clusterId = feature?.properties?.cluster_id;
+      const groupAt = (point: { x: number; y: number }) => {
+        const layers = ["clusters", "cluster-count", "clusters-halo"].filter((id) => map.getLayer(id));
+        const hit = layers.length ? map.queryRenderedFeatures([point.x, point.y], { layers })[0] : undefined;
+        const clusterId = hit?.properties?.cluster_id;
+        return clusterId == null ? null : Number(clusterId);
+      };
+      map.on("click", (event) => {
+        const point = (event as MapMouseEvent).point;
+        if (!point) return;
+        const clusterId = groupAt(point);
         if (clusterId == null) return;
-        event.originalEvent.preventDefault();
-        openGroup(Number(clusterId));
+        (event as MapMouseEvent).originalEvent?.preventDefault();
+        openGroup(clusterId);
       });
-      map.on("click", "cluster-count", (event: MapLayerMouseEvent) => {
-        const clusterId = event.features?.[0]?.properties?.cluster_id;
-        if (clusterId == null) return;
-        event.originalEvent.preventDefault();
-        openGroup(Number(clusterId));
+      map.on("dragstart", () => {
+        holdCamera.current = true;
+      });
+      map.on("zoomstart", (event) => {
+        if ((event as { originalEvent?: Event }).originalEvent) holdCamera.current = true;
       });
       const lotAt = (event: MapLayerMouseEvent | MapMouseEvent) => {
         const id = spaceIdAt(map, event.point, event.lngLat, propsRef.current.spaceShapes || []);
@@ -918,21 +980,27 @@ export default function MapView(props: Props) {
         propsRef.current.onSpaceSelect?.(id);
         return true;
       };
+      map.on("click", "pin-singles", (event: MapLayerMouseEvent) => {
+        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
+        const props = event.features?.[0]?.properties;
+        const id = props?.site_id || props?.deal_id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
       map.on("click", "focus-pin", (event: MapLayerMouseEvent) => {
-        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
+        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         const props = event.features?.[0]?.properties;
         const id = props?.site_id || props?.deal_id || props?.listing_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
-        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
+        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         if (lotAt(event)) return;
         const feature = event.features?.[0];
         const id = feature?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "offmarket", (event: MapLayerMouseEvent) => {
-        if (measureRef.current) return;
+        if (measureRef.current || groupAt(event.point) != null) return;
         if (lotAt(event)) return;
         const id = event.features?.[0]?.properties?.site_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
@@ -943,12 +1011,12 @@ export default function MapView(props: Props) {
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "deals-pipe", (event: MapLayerMouseEvent) => {
-        if (measureRef.current) return;
+        if (measureRef.current || groupAt(event.point) != null) return;
         const id = event.features?.[0]?.properties?.deal_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
       map.on("click", "deals-land", (event: MapLayerMouseEvent) => {
-        if (measureRef.current) return;
+        if (measureRef.current || groupAt(event.point) != null) return;
         const id = event.features?.[0]?.properties?.deal_id;
         if (typeof id === "string") propsRef.current.onSelect(id);
       });
@@ -983,6 +1051,7 @@ export default function MapView(props: Props) {
         tip.dataset.hidden = "1";
         map.getCanvas().style.cursor = "";
       };
+      hideGroupTip = hideTip;
       const chromeBoxes = (): TipBox[] => ["aside.drawer", "aside.layers.open", ".map-float", ".maplibregl-ctrl-top-right"].flatMap((selector) => {
         const node = document.querySelector(selector);
         if (!node) return [];
@@ -1052,24 +1121,9 @@ export default function MapView(props: Props) {
           return;
         }
         clearDwell();
-        if (layer === "clusters" || layer === "cluster-count") {
-          const clusterId = Number(props.cluster_id);
-          const key = `cluster:${clusterId}`;
+        if (layer === "clusters" || layer === "cluster-count" || layer === "clusters-halo") {
           const count = Number(props.point_count) || 0;
-          const cached = clusterLeaves.current.get(clusterId);
-          if (cached) {
-            showTip(key, event.lngLat, clusterTip(cached), event.point);
-            return;
-          }
-          showTip(key, event.lngLat, { title: clusterBubbleLabel(count), marks: [] }, event.point);
-          const ticket = ++request;
-          const source = map.getSource("pins") as GeoJSONSource;
-          source.getClusterLeaves(clusterId, Math.max(count, 1), 0).then((leaves) => {
-            clusterLeaves.current.set(clusterId, leaves as { properties?: Record<string, unknown> }[]);
-            if (ticket !== request || shownKey !== key) return;
-            tip.innerHTML = tipHtml(clusterTip(leaves as { properties?: Record<string, unknown> }[]));
-            placeTip(tipPoint);
-          }).catch(() => undefined);
+          showTip(`cluster:${props.cluster_id}`, event.lngLat, { title: clusterBubbleLabel(count), marks: [] }, event.point);
           return;
         }
         const model = layer === "focus-pin"
@@ -1247,15 +1301,11 @@ export default function MapView(props: Props) {
       const pad = pointPadding(map);
       const padded = Math.abs((map.getPadding().right ?? 0) - pad.right) < 1;
       const near = padded && Math.abs(center.lng - pin[0]) < 0.01 && Math.abs(center.lat - pin[1]) < 0.01 && map.getZoom() >= 13;
-      if (!near) map.jumpTo({ center: pin, zoom: 15, padding: pad });
+      if (!holdCamera.current && !near) map.jumpTo({ center: pin, zoom: 15, padding: pad });
     };
     observer = new ResizeObserver(() => {
       applyClusterChrome(map);
-      if (!propsRef.current.selectedId) {
-        map.resize();
-        return;
-      }
-      recenter();
+      map.resize();
     });
     observer.observe(observed);
     resizeTimer = window.setInterval(recenter, 250);
@@ -1319,11 +1369,23 @@ export default function MapView(props: Props) {
       (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: offFeatures });
       (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: dealFeatures });
       const groupedSelection = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
-      const split = takeSolo([...siteFeatures, ...offFeatures, ...dealFeatures], groupedSelection ? null : props.selectedId);
+      const counted = countedPins({
+        group: props.groupPins === "sites" ? "sites" : "deals",
+        sites: siteFeatures,
+        offMarket: offFeatures,
+        deals: dealFeatures,
+      });
+      const split = takeSolo(counted, groupedSelection ? null : props.selectedId);
       (map.getSource("pins") as GeoJSONSource).setData({ type: "FeatureCollection", features: split.grouped });
       (map.getSource("focus-pin") as GeoJSONSource).setData({ type: "FeatureCollection", features: split.solo ? [split.solo] : [] });
       const shell = map.getContainer().closest(".stage-map");
-      if (shell instanceof HTMLElement) shell.dataset.solo = split.solo ? String(props.selectedId || "") : "";
+      if (shell instanceof HTMLElement) {
+        shell.dataset.solo = split.solo ? String(props.selectedId || "") : "";
+        shell.dataset.groupCount = String(counted.length);
+      }
+      for (const id of ["clusters-halo", "clusters", "cluster-count", "pin-singles", "focus-ring", "focus-pin"]) {
+        if (map.getLayer(id)) map.moveLayer(id);
+      }
       const queued = new Set(props.queueIds || []);
       const queueData = {
         type: "FeatureCollection" as const,
@@ -1340,6 +1402,7 @@ export default function MapView(props: Props) {
           id: "queue-dots",
           type: "circle",
           source: "queue-dots",
+          minzoom: PIN_SPLIT_ZOOM,
           paint: {
             "circle-radius": (props.basemap || "satellite") === "satellite" ? 4 : 3.5,
             "circle-color": (props.basemap || "satellite") === "satellite" ? "#1c1914" : "#8d7350",
@@ -1480,12 +1543,12 @@ export default function MapView(props: Props) {
       if (map.getLayer("parcels-selected")) {
         map.setFilter("parcels-selected", ["all", ["==", ["get", "site_id"], props.selectedId || ""], ["!=", ["get", "role"], "adjoining"]]);
       }
-      if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], props.selectedId || ""]]);
-      if (map.getLayer("offmarket-halo")) map.setFilter("offmarket-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], props.selectedId || ""]]);
-      map.setFilter("selected", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "site_id"], props.selectedId || ""]]);
-      if (map.getLayer("selected-halo")) map.setFilter("selected-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "site_id"], props.selectedId || ""]]);
-      if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "deal_id"], props.selectedId || ""]]);
-      if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "deal_id"], props.selectedId || ""]]);
+      if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["==", ["get", "site_id"], props.selectedId || ""]);
+      if (map.getLayer("offmarket-halo")) map.setFilter("offmarket-halo", ["==", ["get", "site_id"], props.selectedId || ""]);
+      map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
+      if (map.getLayer("selected-halo")) map.setFilter("selected-halo", ["==", ["get", "site_id"], props.selectedId || ""]);
+      if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
+      if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -1503,6 +1566,9 @@ export default function MapView(props: Props) {
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
         if (map.getLayer("areas-priority")) map.setPaintProperty("areas-priority", "fill-opacity", phone ? 0.16 : 0.24);
       }
+      const clearedSelection = Boolean(sawSelection.current) && !props.selectedId;
+      if (props.selectedId) sawSelection.current = props.selectedId;
+      else if (clearedSelection) holdCamera.current = true;
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
@@ -1517,12 +1583,12 @@ export default function MapView(props: Props) {
         appliedFit.current = props.fitAll ? `all:${fitKey}:${padKey}` : fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
-      } else if (!propsRef.current.spaceDrawing && !props.selectedId && props.fitAll && fitKey && appliedFit.current !== `all:${fitKey}:${padKey}`) {
+      } else if (!holdCamera.current && !propsRef.current.spaceDrawing && !props.selectedId && props.fitAll && fitKey && appliedFit.current !== `all:${fitKey}:${padKey}`) {
         appliedFit.current = `all:${fitKey}:${padKey}`;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
         if (!frameSites(map, finiteFit, phone)) glide(map, [props.focusLng, props.focusLat], props.focusZoom);
-      } else if (!props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
+      } else if (!holdCamera.current && !props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && phone && fitKey && (appliedFit.current !== fitKey || appliedPad.current !== padKey)) {
         appliedFit.current = fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
@@ -1533,7 +1599,7 @@ export default function MapView(props: Props) {
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: { top: 176, bottom: 168, left: 72, right: 36 }, maxZoom: 12.4, duration: 0 },
         );
-      } else if (!props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && appliedFocus.current !== focusToken) {
+      } else if (!holdCamera.current && !props.fitAll && !propsRef.current.spaceDrawing && !props.selectedId && appliedFocus.current !== focusToken) {
         appliedFocus.current = focusToken;
         appliedReview.current = "";
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
@@ -1545,7 +1611,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.pinLabel, props.fitPoints, props.fitAll, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1670,7 +1736,7 @@ export default function MapView(props: Props) {
         return;
       }
       if (!props.selectedId) {
-        if (props.fitAll) return;
+        if (props.fitAll || holdCamera.current) return;
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
         return;
       }

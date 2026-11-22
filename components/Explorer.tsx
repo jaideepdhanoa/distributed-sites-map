@@ -2048,6 +2048,7 @@ export default function Explorer() {
         })}
       />
       <header className="bar">
+        <ActionsQuietNotice />
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
           <div className="cities only-desktop" role="group" aria-label="Market">
@@ -2507,7 +2508,6 @@ export default function Explorer() {
           </div>
         ) : null}
       </header>
-      <ActionsQuietNotice />
       {inReview && reviewMiss ? (
         <div className="review-bar review-site-empty" data-testid="review-site-empty" role="status">
           <p>No review items for {reviewScopeName}</p>

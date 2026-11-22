@@ -105,6 +105,7 @@ a { color: var(--pine); }
 }
 .top, .funnel-row { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .map-stage, .dock { min-width: 0; max-width: 100%; }
+.map-stage { overflow: hidden; }
 .top { height: 40px; }
 .funnel-row { height: auto; min-height: 40px; flex-wrap: wrap; }
 .funnel {
@@ -986,7 +987,7 @@ select, .field input { border: 1px solid var(--line); background: white; border-
     width: min(400px, calc(100vw - var(--drawer-offset, 0px) - var(--layers-clear, 120px) - 24px));
   }
 }
-.list-pane { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; background: #faf7f1; }
+.list-pane { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; background: #faf7f1; min-width: 0; max-width: 100%; overflow: hidden; }
 .shell.list-open .list-pane { display: flex; }
 .shell.list-open.drawer-open .list-pane { right: var(--drawer-width); }
 .shell.list-open .legend, .shell.list-open .map-key, .shell.list-open .layers, .shell.list-open .map-float { display: none; }
@@ -1057,7 +1058,9 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .list-sort { display: flex; align-items: center; gap: 6px; font-size: var(--type-body); }
 .list-sort select { max-width: 46vw; height: 36px; }
-.list-scroll { flex: 1; min-width: 0; min-height: 0; overflow-x: auto; overflow-y: auto; }
+.list-scroll { flex: 1; min-width: 0; max-width: 100%; min-height: 0; overflow-x: auto; overflow-y: auto; }
+.list-scroll:has(.list-x) { display: flex; flex-direction: column; overflow: hidden; }
+.list-x { flex: 1 1 auto; min-width: 0; max-width: 100%; min-height: 0; overflow-x: auto; overflow-y: auto; }
 .shell.list-open.drawer-open .list-scroll { overflow-x: auto; }
 .shell.list-open.drawer-open .list-table { width: max(100%, 960px); min-width: 960px; }
 .shell.list-open.drawer-open .list-table th:first-child,

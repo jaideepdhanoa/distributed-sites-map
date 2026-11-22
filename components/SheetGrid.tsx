@@ -262,7 +262,8 @@ export default function SheetGrid<Row>({
   const tableWidth = columns.reduce((sum, column) => sum + widthOf(column.id), 0) + trailingWidth;
 
   return (
-    <div className="list-scroll" ref={scrollRef} data-testid="sheet-grid" data-pane-width={paneWidth} onKeyDown={onGridKey}>
+    <div className="list-scroll">
+      <div className="list-x" ref={scrollRef} data-testid="sheet-grid" data-pane-width={paneWidth} onKeyDown={onGridKey}>
       <table className="list-table" role="grid" aria-labelledby={labelledBy} aria-rowcount={rows.length + 1} aria-colcount={span} style={{ width: tableWidth, minWidth: tableWidth }}>
         <colgroup>
           {columns.map((column) => <col key={column.id} style={{ width: widthOf(column.id) }} />)}
@@ -508,6 +509,7 @@ export default function SheetGrid<Row>({
       {rows.length === 0 ? (
         <p className="note empty-filter" data-testid="empty-filter">No sites match this filter.</p>
       ) : null}
+      </div>
     </div>
   );
 }

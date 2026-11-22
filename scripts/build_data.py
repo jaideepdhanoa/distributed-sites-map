@@ -2194,8 +2194,9 @@ _CSTORE_TOKEN = re.compile(r"(?i)(?:c[\s-]*stores?|\bampm\b|am\s*/\s*pm)")
 def is_c_store_text(segment: str, name: str) -> bool:
     """True when Segment or the deal name names a convenience store.
 
-    A segment that is only "Gas station" does not qualify. Branded tokens such
-    as ampm do, including when they sit in the deal name.
+    A segment that is only "Gas station" does not qualify. "Gas station and c-store"
+    does, because it names a c-store. The map category for that label stays
+    Gas station. Branded tokens such as ampm do, including when they sit in the deal name.
     """
     segment_text = re.sub(r"\s+", " ", str(segment or "")).strip()
     name_text = re.sub(r"\s+", " ", str(name or "")).strip()

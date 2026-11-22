@@ -54,6 +54,7 @@ KNOWN_SEGMENT_GROUPS = {
     "quick lube",
     "tire and light auto service",
     "gas station",
+    "gas station and c-store",
     "c-store",
     "convenience store",
     "land",

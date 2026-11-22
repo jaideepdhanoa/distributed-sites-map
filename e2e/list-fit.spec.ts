@@ -117,6 +117,17 @@ test("chip notes have no native title on an ancestor", async ({ page }, info) =>
   }
   expect(await page.getByTestId("land-paused").count()).toBeGreaterThan(0);
   expect(await ancestorTitles("land-paused")).toEqual([]);
+  const paused = page.getByTestId("land-paused").first();
+  await paused.scrollIntoViewIfNeeded();
+  await paused.hover();
+  const pausedTip = page.getByTestId("land-paused-tip");
+  await expect(pausedTip).toBeVisible();
+  await expect(pausedTip).toHaveText("Land is paused since Nov 20, 2026. No sourcing or follow-up while the freeze is on.");
+  const tipBox = await pausedTip.boundingBox();
+  const viewport = page.viewportSize();
+  expect(tipBox).toBeTruthy();
+  expect(tipBox!.x).toBeGreaterThanOrEqual(0);
+  expect(tipBox!.x + tipBox!.width).toBeLessThanOrEqual((viewport?.width || 1440) + 1);
   await page.goto("/?funnel=universe&view=list&city=PHX", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("columns-button")).toBeVisible();
   await expect(page.locator(".list-pane .row-check input.check").first()).toBeVisible();

@@ -139,6 +139,21 @@ export const FACT_FIELDS = [
 
 export type FactField = (typeof FACT_FIELDS)[number];
 
+/** Trade-area facts. Muse and Indie may write them. trade_area_checked is derived and is not in this list. */
+export const TRADE_FIELDS = [
+  "trade_aadt",
+  "trade_aadt_road",
+  "trade_aadt_m",
+  "trade_aadt_max",
+  "trade_population",
+  "trade_growth",
+  "trade_income",
+  "trade_washes_1mi",
+  "trade_washes_3mi",
+] as const;
+
+export type TradeField = (typeof TRADE_FIELDS)[number];
+
 export const NUMERIC_FACT_FIELDS = [
   ...SITE_NUMERIC_FIELDS,
   "parcel_acres",
@@ -181,12 +196,12 @@ export const INDIE_IDENTITY_FIELDS = ["address", "apn", "lat", "lng"] as const;
 export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes", "folder_url"] as const;
 
 /** Facts Muse stores under facts. A site payload may also send these at the top level. */
-export const TOP_LEVEL_FACT_FIELDS = ["asking_price_source", "land_acres_basis", "parcel_acres", "parcel_match", "open_land_sqft", "open_land_basis", "source_kind", "source_line", "trade_aadt", "trade_aadt_road", "trade_aadt_m", "trade_aadt_max", "trade_population", "trade_growth", "trade_income", "trade_washes_1mi", "trade_washes_3mi"] as const;
+export const TOP_LEVEL_FACT_FIELDS = ["asking_price_source", "land_acres_basis", "parcel_acres", "parcel_match", "open_land_sqft", "open_land_basis", "source_kind", "source_line", ...TRADE_FIELDS] as const;
 
 export const CHECK_FIELDS = ["checked_live", "bays_that_fit", POWER_RATING, "cap_a_substation_mi", "cap_a_line_ft", "cap_a_source", "cap_a_as_of", "cap_a_confidence", "cap_b_feeder", "cap_b_frontage", "cap_b_nearby", "cap_b_horizon", "cap_b_source", "cap_b_as_of", "cap_b_confidence", "cap_c_amps", "cap_c_volts", "cap_c_phase", "cap_c_panels", "cap_c_source", "cap_c_as_of", "cap_c_confidence", "cap_d_peak", "cap_d_year", "cap_d_source", "cap_d_as_of", "cap_d_confidence"] as const;
 
 /** Capture, distances, and service area. Muse writes these. Comms stay on the comms entity. */
-export const MUSE_FIELDS = ["notes", "listing_url", "listing_status", "asking_price", "acreage", "land_value", "improvement_value", "county_value", "county_value_basis", "broker", "firm", "service_area_class", "service_area_distance_mi", "service_area_polygon", "miles_to_depot", "asking_price_source", "land_acres_basis", "open_land_sqft", "open_land_basis", "parcel_acres", "parcel_match", "source_line", "source_kind", "trade_aadt", "trade_aadt_road", "trade_aadt_m", "trade_aadt_max", "trade_population", "trade_growth", "trade_income", "trade_washes_1mi", "trade_washes_3mi", "brand_type", "brand_note", "bay_count", "lift_count", "lot_sqft", "outside_sqft", "outside_note", "owner_of_record", "owner_verdict", "listing_source", "source_tag"] as const;
+export const MUSE_FIELDS = ["notes", "listing_url", "listing_status", "asking_price", "acreage", "land_value", "improvement_value", "county_value", "county_value_basis", "broker", "firm", "service_area_class", "service_area_distance_mi", "service_area_polygon", "miles_to_depot", "asking_price_source", "land_acres_basis", "open_land_sqft", "open_land_basis", "parcel_acres", "parcel_match", "source_line", "source_kind", ...TRADE_FIELDS, "brand_type", "brand_note", "bay_count", "lift_count", "lot_sqft", "outside_sqft", "outside_note", "owner_of_record", "owner_verdict", "listing_source", "source_tag"] as const;
 
 export const PHOTO_ROLES = ["spare_land_annotated", "lot_aerial", "access_spare", "building", "street_level", "electrical", "listing", "street_frontage"] as const;
 
@@ -394,6 +409,7 @@ const CLASS_LABEL: Record<string, string> = {
  * Power rating (derived) is the mirror of the derived grade. An API change cannot type it.
  */
 export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
+  { field: "apn", headers: ["APN or folio", "APN"] },
   { field: "broker", headers: ["Broker"] },
   { field: "notes", headers: ["Next step"] },
   { field: "listing_url", headers: ["Listing link"] },

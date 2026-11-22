@@ -51,6 +51,7 @@ KNOWN_SEGMENT_GROUPS = {
     "auto repair",
     "general auto repair",
     "tire and lube",
+    "quick lube",
     "tire and light auto service",
     "gas station",
     "c-store",

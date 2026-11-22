@@ -3,7 +3,7 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { InputError } from "../../lib/actions/text";
 import { applyBatch } from "../../lib/changes/apply";
-import { mirrorGridNeedsGrowth, mirrorGridRequests, planCreatedSiteMirror, planSiteMirror, sheetsFailureMessage, type SheetTable } from "../../lib/changes/mirror";
+import { loadMirrorRows, mirrorGridNeedsGrowth, mirrorGridRequests, planCreatedSiteMirror, planSiteMirror, sheetsFailureMessage, type SheetTable } from "../../lib/changes/mirror";
 import { validateBatch, type Actor, type SitePayload } from "../../lib/changes/schema";
 import { MIRROR_FIELD_HEADERS } from "../../lib/changes/site";
 import { readConflict } from "../../lib/conflicts/record";
@@ -176,6 +176,69 @@ test("Folder, Segment, and Trade-area checked copy only a non-empty difference",
   }]);
   assert.equal(created.changes.some((change) => change.header === "Segment" && change.after === "Quick lube"), true);
   assert.equal(created.changes.some((change) => change.header === "Folder"), false);
+});
+
+test("a stored APN copies onto an existing row only when it differs", async () => {
+  assert.equal(MIRROR_FIELD_HEADERS.some((row) => row.field === "apn" && row.headers.includes("APN or folio") && row.headers.includes("APN")), true);
+  const sql = await memorySql();
+  await migrate(sql);
+  await sql.query(`INSERT INTO sites (site_id, apn, version, updated_by) VALUES ('PIPE-PHX-9101', '000-00-086', 1, 'test'), ('PIPE-PHX-9102', '', 1, 'test')`);
+  const rows = await loadMirrorRows(sql);
+  const filled = rows.sites.find((row) => row.site_id === "PIPE-PHX-9101");
+  const blank = rows.sites.find((row) => row.site_id === "PIPE-PHX-9102");
+  assert.equal(filled?.writes["APN or folio"], "000-00-086");
+  assert.equal(blank?.writes["APN or folio"], undefined);
+  const table: SheetTable = {
+    title: "Pipeline",
+    headerRow: 4,
+    headers: ["site id", "APN"],
+    rows: [
+      { row: 8, cells: ["PIPE-PHX-9101", ""] },
+      { row: 9, cells: ["PIPE-PHX-9102", "000-00-087"], formulas: ["", "=B9"] },
+    ],
+  };
+  const plan = planSiteMirror([table], [
+    { site_id: "PIPE-PHX-9101", writes: { "APN or folio": "000-00-086" } },
+    { site_id: "PIPE-PHX-9102", writes: { "APN or folio": "" } },
+  ]);
+  assert.deepEqual(plan.changes.map((change) => ({ row: change.row, header: change.header, after: change.after })), [
+    { row: 8, header: "APN", after: "000-00-086" },
+  ]);
+  assert.throws(
+    () => fieldsOf(muse, "muse-apn", { apn: "000-00-099", sources: { apn: "Sample map" } }),
+    /cannot write that field/,
+  );
+});
+
+test("Indie can write trade-area facts, and the road still needs a source", () => {
+  const written = fieldsOf(indie, "indie-trade", {
+    trade_aadt: 12000,
+    trade_aadt_road: "Sample Road",
+    trade_growth: 0.0119,
+    sources: { trade_aadt: "Sample count", trade_aadt_road: "Sample map", trade_growth: "Sample count" },
+  });
+  assert.equal(written.facts.trade_aadt, "12000");
+  assert.equal(written.facts.trade_aadt_road, "Sample Road");
+  assert.equal(written.sources.trade_aadt_road, "Sample map");
+  assert.equal(written.facts.trade_growth, "0.0119");
+  assert.throws(
+    () => fieldsOf(indie, "indie-road-bare", { trade_aadt_road: "Sample Road" }),
+    /trade_aadt_road needs a source/,
+  );
+  assert.throws(
+    () => fieldsOf(indie, "indie-trade-unknown", { trade_area_checked: "Yes" }),
+    /That field is not accepted/,
+  );
+});
+
+test("a source longer than 200 characters is rejected on its own", () => {
+  assert.throws(
+    () => fieldsOf(indie, "long-source", {
+      trade_aadt: 12000,
+      sources: { trade_aadt: "S".repeat(201) },
+    }),
+    /Source text is too long \(200 characters max\)/,
+  );
 });
 
 test("a Sheets failure keeps the status and message and drops a token", () => {

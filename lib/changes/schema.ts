@@ -12,6 +12,7 @@ import {
   CREATE_MARKETS,
   FACT_FIELDS,
   INDIE_IDENTITY_FIELDS,
+  TRADE_FIELDS,
   LISTING_STATUSES,
   MUSE_FIELDS,
   NUMERIC_FACT_FIELDS,
@@ -483,6 +484,7 @@ function issueMessage(path: string, code: string): string {
   if (path.endsWith("service_area_class")) {
     return `Service area class must be one of ${SERVICE_AREA_CLASSES.join(", ")}.`;
   }
+  if (path.includes("sources") && code === "too_big") return "Source text is too long (200 characters max).";
   if (path.includes("sources")) return "Every numeric fact needs a source.";
   if (path.endsWith("source")) return "Every change needs a source.";
   if (path.endsWith("category")) return "Category must be one of the map business types.";
@@ -1333,7 +1335,8 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     const identitySource = mint && (CREATE_IDENTITY_FIELDS as readonly string[]).includes(key);
     const indieIdentity = !mint && actor.kind === "agent" && actor.id === "indie" && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
     const quickSource = (QUICK_LUBE_FIELDS as readonly string[]).includes(key);
-    if (!identitySource && !indieIdentity && !quickSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    const roadSource = key === "trade_aadt_road";
+    if (!identitySource && !indieIdentity && !quickSource && !roadSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1347,6 +1350,13 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     if (!source) throw new InputError(`Change ${index + 1}: Every numeric fact needs a source.`);
     cleanText(source);
     sources[field] = source;
+  }
+  const road = facts.trade_aadt_road?.trim() || "";
+  if (road) {
+    const source = data.sources?.trade_aadt_road?.trim() || "";
+    if (!source) throw new InputError(`Change ${index + 1}: trade_aadt_road needs a source.`);
+    cleanText(source);
+    sources.trade_aadt_road = source;
   }
   for (const field of QUICK_LUBE_FIELDS) {
     if (!facts[field]) continue;
@@ -1429,7 +1439,7 @@ function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, 
   if (serviceArea === "edge_legacy" || serviceArea === "unknown") {
     throw new InputError(`Change ${index + 1}: An agent cannot set that service area.`);
   }
-  const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
+  const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS, ...TRADE_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
   const createAllowed = mint ? new Set<string>(CREATE_IDENTITY_FIELDS) : new Set<string>();
   const indieUpdate = new Set<string>(actor.id === "indie" && !mint ? ["folder_url", ...INDIE_IDENTITY_FIELDS] : []);
   for (const key of touched) {

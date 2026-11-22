@@ -61,7 +61,7 @@ test("category links default to car washes and auto service", () => {
   assert.equal(UNSCREENED_LISTINGS_NOTE, "Listings not yet in Pipeline or Universe.");
 });
 
-test("live counts are car washes and auto service until land or c-stores are turned on", () => {
+test("live counts are car washes, quick lube, and auto service until land or c-stores are turned on", () => {
   const links = landLinks(deals);
   const open = defaultCategories();
   const withLand = { ...open, land: true };
@@ -78,10 +78,12 @@ test("live counts are car washes and auto service until land or c-stores are tur
     const desk = (categories: typeof open) =>
       deals.filter((deal) => deal.city === city && deal.stage_group === "desk" && dealInCategories(deal, categories));
     const usual = desk(open);
-    const washOnly = desk({ ...open, auto: false }).map((deal) => deal.deal_id);
-    const autoOnly = desk({ ...open, wash: false }).map((deal) => deal.deal_id);
-    assert.equal(new Set([...washOnly, ...autoOnly]).size, washOnly.length + autoOnly.length);
-    assert.deepEqual([...washOnly, ...autoOnly].sort(), usual.map((deal) => deal.deal_id).sort());
+    const washOnly = desk({ ...open, lube: false, auto: false }).map((deal) => deal.deal_id);
+    const lubeOnly = desk({ ...open, wash: false, auto: false }).map((deal) => deal.deal_id);
+    const autoOnly = desk({ ...open, wash: false, lube: false }).map((deal) => deal.deal_id);
+    const slices = [...washOnly, ...lubeOnly, ...autoOnly];
+    assert.equal(new Set(slices).size, slices.length);
+    assert.deepEqual(slices.sort(), usual.map((deal) => deal.deal_id).sort());
     assert.ok(usual.every((deal) => deal.kind !== "land" && dealCategory(deal) !== "store"));
     const addedLand = desk(withLand).filter((deal) => !usual.some((row) => row.deal_id === deal.deal_id));
     const addedStores = desk(withStores).filter((deal) => !usual.some((row) => row.deal_id === deal.deal_id));

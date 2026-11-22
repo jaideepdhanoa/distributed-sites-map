@@ -994,7 +994,7 @@ function undefinedColumn(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
 }
 
-type SiteMirrorDb = { site_id: string; market?: string; category?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
+type SiteMirrorDb = { site_id: string; market?: string; category?: string; apn?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
 
 function tradeAreaChecked(facts: Record<string, unknown>): string {
   return Object.keys(facts).some((key) => key.startsWith("trade_") && text(facts[key])) ? "Yes" : "";
@@ -1003,12 +1003,19 @@ function tradeAreaChecked(facts: Record<string, unknown>): string {
 async function loadSiteMirrorSources(sql: Sql): Promise<{ rows: SiteMirrorDb[] }> {
   try {
     return await sql.query<SiteMirrorDb>(
+      `SELECT site_id, market, category, apn, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
+    );
+  } catch (error) {
+    if (!undefinedColumn(error)) throw error;
+  }
+  try {
+    return await sql.query<SiteMirrorDb>(
       `SELECT site_id, market, category, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
     );
   } catch (error) {
     if (!undefinedColumn(error)) throw error;
-    return sql.query<SiteMirrorDb>(`SELECT site_id, market, category, sheet_writes, facts FROM sites ORDER BY site_id`);
   }
+  return sql.query<SiteMirrorDb>(`SELECT site_id, market, category, sheet_writes, facts FROM sites ORDER BY site_id`);
 }
 
 export async function loadMirrorRows(sql: Sql): Promise<{
@@ -1112,6 +1119,8 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       writes[DERIVED_POWER_HEADER] = rating;
       const folder = text(facts.folder_url);
       if (folder) writes.Folder = folder;
+      const apn = text(row.apn);
+      if (apn) writes["APN or folio"] = apn;
       const segment = text(row.category);
       if (segment) writes.Segment = segment;
       const checked = tradeAreaChecked(facts);

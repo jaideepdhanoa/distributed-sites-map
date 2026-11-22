@@ -432,6 +432,24 @@ The same move can cite the email date instead of a comms id:
 
 A move with no receipt is `400`. A move to any other stage is `403` with `An agent can only move a site from Desk screen to Financial screen.` A drop is `403` with `An agent cannot set Stage to Dropped.`
 
+## Trade area
+
+Muse and Indie may write these nine facts on a site. Send them in `facts` or at the top level. `trade_area_checked` is not one of them. The mirror derives it: any non-empty `trade_*` value copies `Yes` into Trade-area checked. Do not post `trade_area_checked`.
+
+| Key | Unit |
+| --- | --- |
+| `trade_aadt` | vehicles per day, nearest count |
+| `trade_aadt_road` | road name. Needs `sources.trade_aadt_road`. |
+| `trade_aadt_m` | meters from the site to that road segment |
+| `trade_aadt_max` | vehicles per day, highest count within 800 m |
+| `trade_population` | people within 3 miles |
+| `trade_growth` | fraction. `0.0119` means 1.19%. |
+| `trade_income` | dollars, median household income within 3 miles |
+| `trade_washes_1mi` | wash count within 1 mile |
+| `trade_washes_3mi` | wash count within 3 miles |
+
+A numeric trade fact needs `sources.<field>`. Source text is capped at 200 characters.
+
 ## One-pass site create
 
 On create, an agent omits `site_id`. For `kind` `pipeline` or `land`, the server mints the next `PIPE-{MKT}-NNNN` or `LAND-{MKT}-NNNN` and, in the same transaction, the next Universe id `WB-{MKT}-NNNN`. `market` is `PHX`, `LAS`, or `MIA`. The numbers stay above ids already stored and above the workbook counters those sheets report. `PIPE-PHX-0006` is never minted. A census shop with no listing uses `kind` `universe` instead. That create is below.
@@ -440,7 +458,7 @@ On create, an agent omits `site_id`. For `kind` `pipeline` or `land`, the server
 
 On this create, the agent may set `name`, `address`, `market`, `category`, `apn`, `lat`, `lng`, `listing_url`, `broker`, and `service_area_class`. Each one that is sent needs `sources.<field>`. `category` is a map business type. `Quick lube` is accepted beside `Car wash`. `service_area_class` is an R-099 class: `inside`, `near_0_5`, `near_5_10`, `outside`, or blank for unclassified. The labels `Inside`, `Near 0-5`, `Near 5-10`, `Outside`, and `Unclassified` are accepted and stored as those tokens. A Quick lube listing (`kind` `pipeline` with an `L-` id) also writes the Universe row and opens at Desk screen. A Quick lube address that matches an existing site or Universe row is `409`. Muse stays create-only for `address`, `apn`, `lat`, and `lng`. Indie may update those four on a site that already exists, and each one still needs `sources.<field>`. When that update replaces a non-empty value, the server keeps the new value and records a conflict row with both values and both sources. Folder, photos, land evidence, typed power, check statuses, and financial claims are still rejected on a new row. On an existing row, Indie may set `folder_url` to a `https://drive.google.com` folder link or a bare folder id.
 
-Optional Quick lube facts live in `facts`, or at the top level of the same payload. Top-level keys are lifted into `facts` the same way `acreage` is accepted beside the nested bag. They are `open_land_sqft`, `open_land_basis`, `parcel_acres`, `parcel_match`, `land_acres_basis`, `source_line`, `source_kind`, `asking_price_source`, and the `trade_*` facts (`trade_aadt`, `trade_aadt_road`, `trade_aadt_m`, `trade_aadt_max`, `trade_population`, `trade_growth`, `trade_income`, `trade_washes_1mi`, `trade_washes_3mi`). A numeric fact still needs `sources.<field>`. A key that is not on this list is `That field is not accepted.` A blank fact stays unknown. `brand_type` is `Independent`, `Local chain`, or `National chain`. `owner_verdict` is `Same`, `Different`, or `Unknown`. Counts are `bay_count`, `lift_count`, `lot_sqft`, and `outside_sqft`. Notes are `brand_note` and `outside_note`. `owner_of_record` is the name on the deed. `listing_source` cites the listed status. `source_tag` is the citation for the row and does not need its own source. Depot distance stays `miles_to_depot`. Wash cash flow does not score a Quick lube site.
+Optional Quick lube facts live in `facts`, or at the top level of the same payload. Top-level keys are lifted into `facts` the same way `acreage` is accepted beside the nested bag. They are `open_land_sqft`, `open_land_basis`, `parcel_acres`, `parcel_match`, `land_acres_basis`, `source_line`, `source_kind`, `asking_price_source`, and the trade-area facts in the Trade area section. A numeric fact still needs `sources.<field>`. `trade_aadt_road` needs `sources.trade_aadt_road` as well. Each source value is at most 200 characters. A longer one is `Source text is too long (200 characters max).` A field name the API does not know is `That field is not accepted.` A blank fact stays unknown. `brand_type` is `Independent`, `Local chain`, or `National chain`. `owner_verdict` is `Same`, `Different`, or `Unknown`. Counts are `bay_count`, `lift_count`, `lot_sqft`, and `outside_sqft`. Notes are `brand_note` and `outside_note`. `owner_of_record` is the name on the deed. `listing_source` cites the listed status. `source_tag` is the citation for the row and does not need its own source. Depot distance stays `miles_to_depot`. Wash cash flow does not score a Quick lube site.
 
 The create still opens at `1 Desk screen` and records a `Site added` capture activity. The mirror appends the new Pipeline or Land Sites row and the Universe row. It does not copy the guarded fields.
 

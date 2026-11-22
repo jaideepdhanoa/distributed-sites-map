@@ -54,6 +54,7 @@ import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
 import { fullUniverseNeeded, viewHelp } from "@/lib/viewHelp";
+import { resolveSiteLink, siteHref } from "@/lib/siteLink";
 import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
@@ -173,6 +174,7 @@ export default function Explorer() {
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
   const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
+  const [missingSite, setMissingSite] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
   const tableOpen = params.get("table") === "1";
   const compare = params.get("disagree") === "1";
@@ -655,7 +657,8 @@ export default function Explorer() {
     };
   }, [city]);
 
-  const needCatalog = fullUniverseNeeded(allCities, query);
+  const linkedId = params.get("site") || "";
+  const needCatalog = fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
@@ -1134,6 +1137,10 @@ export default function Explorer() {
     : stage !== "in_area" && subcount("in_area", "listed") > 0 ? "in_area"
     : null;
   const shownFeatures = handoffStep ? listedFeatures(handoffStep) : visibleFeatures;
+  const selectedUniverseFeature = funnel !== "pipeline" && selected ? poolById.get(selected) : undefined;
+  const universeMapSites = selectedUniverseFeature && !shownFeatures.some((feature) => feature.properties.site_id === selected)
+    ? [...shownFeatures, selectedUniverseFeature]
+    : shownFeatures;
   const handoffCopy = handoffStep
     ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "Service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
     : handoff;
@@ -1329,6 +1336,20 @@ export default function Explorer() {
 
   function selectionPatch(id: string, search: URLSearchParams = params): Record<string, string | null> {
     const patch: Record<string, string | null> = {};
+    const linked = resolveSiteLink(id, dealRows);
+    if (linked.kind === "pipeline" && linked.id !== id) {
+      return { site: linked.id, funnel: "pipeline", tab: "pipeline" };
+    }
+    if (linked.kind === "universe") {
+      if (linked.market) {
+        const wantCity = marketSearchValue(linked.market);
+        if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
+      }
+      if (search.get("funnel") !== "universe") patch.funnel = "universe";
+      if (search.get("tab")) patch.tab = null;
+      if (search.get("stage") !== "all") patch.stage = "all";
+      return patch;
+    }
     const deal = dealRows.find((row) => row.deal_id === id);
     if (deal) {
       if (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA") {
@@ -1366,6 +1387,24 @@ export default function Explorer() {
     }
     return patch;
   }
+
+  useEffect(() => {
+    const id = params.get("site") || "";
+    if (!data || !id || isProtectedId(id)) {
+      setMissingSite("");
+      return;
+    }
+    const linked = resolveSiteLink(id, dealRows);
+    if (linked.kind === "pipeline" && linked.id !== id) {
+      setMissingSite("");
+      return;
+    }
+    const known = dealRows.some((deal) => deal.deal_id === id)
+      || sites.some((site) => site.site_id === id)
+      || (catalog ?? []).some((feature) => feature.properties.site_id === id);
+    const waiting = linked.kind === "universe" && !catalog && !known;
+    setMissingSite(!waiting && !known ? "Site not found" : "");
+  }, [data, params, catalog]);
 
   useEffect(() => {
     if (!data || !selected || reviewing) return;
@@ -2035,8 +2074,8 @@ export default function Explorer() {
           </div>
           <button type="button" className="chip command-open" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
-            <button className={funnel === "universe" && !ndaVisible ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
-            <button className={funnel === "pipeline" && !ndaVisible && !inReview ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
             {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
               <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
             ) : null}
@@ -2117,14 +2156,15 @@ export default function Explorer() {
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
-          <button className={funnel === "universe" && !ndaVisible ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
-          <button className={funnel === "pipeline" && !ndaVisible && !inReview ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
+          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
             <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
           ) : null}
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {ndaVisible ? null : <p className="note view-line" data-testid="view-help">{viewHelp(inReview ? "review" : funnel === "pipeline" ? "pipeline" : "universe")}</p>}
+        {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
         {hiddenLand > 0 ? (
           <p className="land-banner" role="status" data-testid="land-banner">
             Land sites are hidden by your filters
@@ -2406,6 +2446,9 @@ export default function Explorer() {
             <div className="funnel-switch segment" role="group" aria-label="Which funnel">
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+              {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
+                <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDA</button>
+              ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">
               <button type="button" onClick={() => { setFiltersOpen(true); setLayersOpen(false); setMenuOpen(false); }} className="menu-item">Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
@@ -2540,7 +2583,7 @@ export default function Explorer() {
         ) : null}
         <PanelBoundary name="Map">
         <MapView
-          sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? shownFeatures : [])}
+          sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           coverage={funnel !== "pipeline" && showUniverse ? {
             listed: shownFeatures.length,
             missingPoint: shownFeatures.filter((feature) => !feature.geometry).length,

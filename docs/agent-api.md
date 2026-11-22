@@ -4,6 +4,18 @@
 
 The figures in this file are fake. They are not a site, a broker package, or a stored deal.
 
+## Links
+
+A site link is `/?site=` plus the record id. The host is the request host.
+
+| Id | Opens |
+| --- | --- |
+| `PIPE-{market}-{number}` | That Pipeline deal |
+| `LAND-{market}-{number}` | That Land deal |
+| `WB-{market}-{number}` | That Universe row. The map switches to Universe, uses the market in the id, and opens the card on that pin. If the row was promoted to a `PIPE-` id, the link opens that Pipeline deal instead. |
+
+`PIPE-PHX-0006` is not served. An id that is not on file shows Site not found.
+
 ## P&L line
 
 Rule R-102. A `pnl_line` change stores one captured profit-and-loss line. The first line for a period creates that period. The server does not sum lines, does not fill a month, and does not calculate EBITDA. Send only what the package states, what it normalizes, or what it estimates.

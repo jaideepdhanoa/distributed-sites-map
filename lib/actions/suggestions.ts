@@ -383,6 +383,8 @@ export async function decideSuggestion(
     [input.id, input.status, input.actorId, note || null, attached.recommendationId, attached.draftedByAgent, from],
   );
   if (!updated.rows.length) throw new InputError("Only an open suggestion can be accepted or rejected.");
+  const { resetAcceptedStageCache } = await import("@/lib/stageOverlayLoad");
+  resetAcceptedStageCache();
   await audit(sql, {
     actorId: input.actorId,
     action: DECISION_ACTION[input.status],

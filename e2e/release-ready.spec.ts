@@ -17,6 +17,7 @@ for (const size of sizes) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     await expect(page.getByTestId("view-help")).toHaveText("Deals in this market");
+    if (size.width < 768) await page.getByRole("button", { name: "Menu" }).click();
     const tab = page.getByRole("button", { name: "NDA queue" });
     await expect(tab).toBeVisible();
     await tab.click();
@@ -44,7 +45,7 @@ for (const size of sizes) {
     await expect.poll(async () => page.locator(".shell").getAttribute("data-zoom")).toMatch(/^\d/);
     if (size.width < 768) await page.getByRole("button", { name: "Layers" }).click();
     const zoomBefore = await page.locator(".shell").getAttribute("data-zoom");
-    await page.getByTestId("dropped-layer").check();
+    await page.locator("label.layer-row", { has: page.getByTestId("dropped-layer") }).click();
     await expect(page).toHaveURL(/city=PHX/);
     await expect(page).toHaveURL(/dropped=1/);
     await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
@@ -57,13 +58,13 @@ for (const size of sizes) {
     await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("sort-control")).toBeVisible();
     await page.getByTestId("sort-by").selectOption("stage");
-    await expect(page).toHaveURL(/sort=stage:asc/);
+    await expect(page).toHaveURL(/sort=stage(?::|%3A)asc/);
     await page.getByTestId("sort-direction").click();
-    await expect(page).toHaveURL(/sort=stage:desc/);
+    await expect(page).toHaveURL(/sort=stage(?::|%3A)desc/);
     const header = page.locator("button.sort-header", { hasText: "Stage" }).first();
     if (await header.count()) await header.click();
     await expect(page).not.toHaveURL(/sort=none/);
-    await expect(page).toHaveURL(/sort=stage:/);
+    await expect(page).toHaveURL(/sort=stage(?::|%3A)/);
   });
 
   test(`Needs location opens a fix for the signed-in role at ${size.width}`, async ({ page }, info) => {
@@ -92,6 +93,52 @@ for (const size of sizes) {
     await expect(fix).toBeVisible();
     if (me.actionRole === "reviewer") await expect(fix.getByTestId("location-address")).toBeVisible();
     else await expect(fix.getByTestId("location-proposal")).toBeVisible();
-    await expect(page.getByText("PIPE-PHX-0006")).toHaveCount(0);
+    await expect(list).not.toContainText("PIPE-PHX-0006");
   });
 }
+
+for (const size of sizes) {
+  test(`a WB link opens the Universe card at ${size.width}`, async ({ page }, info) => {
+    test.skip(info.project.name !== size.project, size.project);
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.route("**/api/data/sites**", async (route) => {
+      if (/\/api\/data\/sites\/[^/?]+/.test(route.request().url())) {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch();
+      const body = await response.json() as { features?: unknown[] };
+      body.features = [...(body.features || []), {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [-115.15, 36.17] },
+        properties: {
+          site_id: "WB-LAS-9101",
+          city: "LAS",
+          name: "Sample site",
+          address: "10 Sample St",
+          business_type: "Car wash",
+          origin: "universe",
+          counts_as_site: true,
+          in_area: true,
+        },
+      }];
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    await page.goto("/?site=WB-LAS-9101", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/funnel=universe/);
+    await expect(page).toHaveURL(/city=LAS/);
+    await expect(page.locator("aside.drawer")).toContainText("Sample site");
+    await page.getByTestId("copy-site-link").click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/\?site=WB-LAS-9101$/);
+  });
+}
+
+test("an unknown id shows Site not found and a protected id stays closed", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop");
+  await page.goto("/?site=WB-LAS-9999", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("site-missing")).toHaveText("Site not found");
+  await page.goto("/?site=PIPE-PHX-0006", { waitUntil: "domcontentloaded" });
+  await expect(page).not.toHaveURL(/PIPE-PHX-0006/);
+  await expect(page.locator("aside.drawer")).toHaveCount(0);
+});

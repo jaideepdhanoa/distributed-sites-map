@@ -25,6 +25,7 @@ import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
 import { LocationFix } from "./LocationFix";
+import { siteHref } from "@/lib/siteLink";
 import { ChipRow, TagChip } from "./TagChip";
 import { chipsForDeal } from "@/lib/tags/show";
 import { DILIGENCE_FAMILIES, sectionChips } from "@/lib/tags/vocab";
@@ -608,6 +609,14 @@ export default function Detail({
         <h2>{site.name || site.address || site.site_id}</h2>
         {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
         <p className="note">{site.address || "—"}</p>
+        <button
+          type="button"
+          className="paper-btn"
+          data-testid="copy-site-link"
+          onClick={() => { void navigator.clipboard.writeText(siteHref(window.location.origin, site.site_id)); }}
+        >
+          Copy link
+        </button>
         {locationFix ? <LocationFix id={site.site_id} mode={locationFix} address={site.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {site.land_only ? <p className="note">Land site</p> : null}

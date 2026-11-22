@@ -148,6 +148,16 @@ test("the segment list matches the workbook vocabulary", () => {
   assert.deepEqual(python, [...SEGMENT_GROUPS].sort());
 });
 
+test("Indie can set Gas station and c-store and the label stays verbatim", () => {
+  const written = fieldsOf(indie, "segment-fuel", {
+    segment: "Gas station and c-store",
+    segment_group: "gas station and c-store",
+    sources: { segment: "Sample classification" },
+  });
+  assert.equal(written.fields.category, "Gas station and c-store");
+  assert.equal(written.facts.segment_group, "Gas station and c-store");
+});
+
 test("Indie can set a known segment, and Muse cannot change one", async () => {
   const written = fieldsOf(indie, "segment", {
     segment: "Quick lube",

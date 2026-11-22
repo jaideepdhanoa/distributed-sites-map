@@ -1,4 +1,5 @@
 import { ChipFace } from "./ChipFace";
+import { chipFace } from "@/lib/chips";
 import { blockerSentenceForDeal, cardNdaLabel, type NdaMirror } from "@/lib/nda";
 import { pacificToday } from "@/lib/queue/today";
 import type { DealProps } from "@/lib/types";
@@ -8,11 +9,13 @@ export function NdaChip({
   text,
   signedIn = true,
   showMissing = false,
+  onOpen,
 }: {
   deal?: Partial<NdaMirror>;
   text?: string;
   signedIn?: boolean;
   showMissing?: boolean;
+  onOpen?: (id: string) => void;
 }) {
   if (!signedIn) return null;
   const label = text ? (text === "Not required" || text.startsWith("NDA:") ? (text === "Not required" ? "" : text) : `NDA: ${text}`) : cardNdaLabel(deal || {}, true);
@@ -21,10 +24,28 @@ export function NdaChip({
     return <span className="badge quiet nda-chip" data-testid="nda-chip">No NDA</span>;
   }
   const id = deal?.nda_id || "";
+  if (!id || !onOpen) {
+    return (
+      <span data-nda-id={id || undefined}>
+        <ChipFace className="badge quiet nda-chip" testId="nda-chip" label={label} />
+      </span>
+    );
+  }
+  const face = chipFace(label);
   return (
-    <span data-nda-id={id || undefined}>
-      <ChipFace className="badge quiet nda-chip" testId="nda-chip" label={label} />
-    </span>
+    <button
+      type="button"
+      className="chip nda-chip"
+      data-testid="nda-open"
+      data-nda-id={id}
+      title={face.title || label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen(id);
+      }}
+    >
+      {face.label}
+    </button>
   );
 }
 

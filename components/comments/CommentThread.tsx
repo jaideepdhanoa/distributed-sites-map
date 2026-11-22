@@ -43,6 +43,7 @@ export default function CommentThread({
   variant,
   source,
   preview = false,
+  compact = false,
   onClose,
   onReload,
 }: {
@@ -52,6 +53,7 @@ export default function CommentThread({
   variant: "inline" | "sheet";
   source: string;
   preview?: boolean;
+  compact?: boolean;
   onClose?: () => void;
   onReload?: () => void;
 }) {
@@ -173,6 +175,42 @@ export default function CommentThread({
     notifyCommentChange();
     onReload?.();
     return true;
+  }
+
+  const flat = roots.flatMap((note) => {
+    const replies = loaded.filter((item) => item.parentId === note.id && !item.deleted);
+    return [note, ...replies];
+  }).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const latest = flat.slice(-2);
+  if (compact) {
+    return (
+      <div className="act-threads" data-testid="comment-threads">
+        {latest.length ? latest.map((note) => (
+          <article key={note.id} className="act-thread" data-testid="comment-thread-item" data-note-id={note.id}>
+            <div className="note-copy">{shown(note)}</div>
+            <p className="note"><strong>{name(note.authorId)}</strong> · {formatPacific(note.createdAt)}</p>
+            {writable ? <button type="button" className="menu-item" onClick={() => setReplyFor(note.parentId || note.id)}>Reply</button> : null}
+          </article>
+        )) : <p className="note">No comments yet.</p>}
+        {replyFor ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save({ expectedVersion: 0, parentId: replyFor, body: reply, mentions: replyMentions.map((item) => item.id) }).then((ok) => {
+                if (!ok) return;
+                setReply("");
+                setReplyMentions([]);
+                setReplyFor(null);
+              });
+            }}
+          >
+            <MentionField label="Reply" value={reply} onChange={setReply} mentions={replyMentions} onMentions={setReplyMentions} accounts={accounts} testId="comment-reply" rows={2} maxLength={2000} />
+            <button type="submit" className="menu-item" disabled={pending}>Reply</button>
+          </form>
+        ) : null}
+        {error ? <p className="note" role="alert">{error}</p> : null}
+      </div>
+    );
   }
 
   const thread = (

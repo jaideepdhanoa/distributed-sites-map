@@ -46,6 +46,7 @@ import {
   MARKETS,
   SERVICE_AREA_CLASSES,
   LISTING_ID,
+  NDA_ID,
   SITE_ID,
   commsSiteAllowed,
   type ActivityType,
@@ -199,9 +200,9 @@ export type SiteSpacePayload =
 
 export type { TagPayload } from "@/lib/tags/parse";
 
-/** A discussion note anchored to a P&L cell, a P&L line, or a marked lot. */
+/** A discussion note anchored to a P&L cell, a P&L line, a marked lot, or an NDA. */
 export type CommentPayload = {
-  anchor?: { type: "pnl_cell" | "pnl_line" | "space"; line: string; period: string; space_id: string };
+  anchor?: { type: "pnl_cell" | "pnl_line" | "space" | "nda"; line: string; period: string; space_id: string };
   parent_id?: string;
   body?: string;
   tag?: CommentTag;
@@ -225,6 +226,17 @@ export type ConflictPayload = {
   at: string;
 };
 
+/** A status, owner, or next-step write on an NDA register row. */
+export type NdaPayload = {
+  action: "status" | "assign" | "next_step";
+  status: string;
+  waiting_on: string;
+  owner: string;
+  next_step: string;
+  note: string;
+  at: string;
+};
+
 export type ParsedChange = {
   entity_type: EntityType;
   site_id: string;
@@ -239,7 +251,7 @@ export type ParsedChange = {
   universe_replay?: boolean;
   /** A Universe-only row was given this Pipeline id. Facts and the Universe id stay. */
   promoted?: boolean;
-  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload | CommentPayload;
+  payload: StagePayload | ActivityPayload | CommsPayload | SitePayload | PnlLinePayload | PnlRetractPayload | SiteSpacePayload | TagPayload | ConflictPayload | CommentPayload | NdaPayload;
 };
 
 const stagePayload = z
@@ -445,7 +457,7 @@ const conflictPayload = z
 
 const commentAnchorPayload = z
   .object({
-    type: z.enum(["pnl_cell", "pnl_line", "space"]),
+    type: z.enum(["pnl_cell", "pnl_line", "space", "nda"]),
     line: z.string().trim().max(40).optional(),
     period: z.string().trim().max(80).optional(),
     space_id: z.string().trim().max(40).optional(),
@@ -466,7 +478,7 @@ const commentPayload = z
 
 const changeSchema = z
   .object({
-    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict", "comment"]),
+    entity_type: z.enum(["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict", "comment", "nda"]),
     site_id: z.string().trim().max(40).optional(),
     entity_id: z.string().trim().min(1).max(40).optional(),
     expected_version: z.number().int().nonnegative(),
@@ -618,7 +630,7 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
 
   const changes: ParsedChange[] = parsed.data.changes.map((input, index) => {
     const row = { ...input, site_id: (input.site_id || "").trim() };
-    const siteKeyed = row.entity_type === "stage" || row.entity_type === "site";
+    const siteKeyed = row.entity_type === "stage" || row.entity_type === "site" || row.entity_type === "nda";
     const tagKeyed = row.entity_type === "tag";
     if (row.entity_id && (row.expected_version === 0 || siteKeyed || tagKeyed)) {
       throw new InputError(`Change ${index + 1}: The server assigns ids.`);
@@ -653,13 +665,20 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       ? true
       : row.entity_type === "comms"
         ? commsSiteAllowed(siteId)
-        : row.entity_type === "site_space" || row.entity_type === "comment"
+        : row.entity_type === "site_space"
           ? spaceSiteAllowed(siteId)
-          : SITE_ID.test(siteId);
+          : row.entity_type === "comment"
+            ? spaceSiteAllowed(siteId) || NDA_ID.test(siteId)
+          : row.entity_type === "nda"
+            ? NDA_ID.test(siteId)
+            : SITE_ID.test(siteId);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
     if (row.entity_type === "site") {
       return { ...row, payload: parseSite(actor, index, row.expected_version, row.payload, agentMint) };
+    }
+    if (row.entity_type === "nda") {
+      return { ...row, payload: parseNda(actor, index, row.payload) };
     }
     if (row.entity_type === "stage") {
       const parsedPayload = stagePayload.safeParse(row.payload);
@@ -1014,6 +1033,43 @@ function assertCommentActor(actor: Actor, index: number, resolved: boolean | und
   }
 }
 
+function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
+  if (actor.kind !== "human" || !actor.role || !canWriteContent(actor.role)) {
+    throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
+  }
+  const raw = payload as Record<string, unknown>;
+  const action = raw.action;
+  if (action !== "status" && action !== "assign" && action !== "next_step") {
+    throw new InputError(`Change ${index + 1}: That NDA action is not accepted.`, 400, "action");
+  }
+  const atRaw = typeof raw.at === "string" ? raw.at : "";
+  const zoned = parseZonedTimestamp(atRaw);
+  if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`, 400, "at");
+  const note = typeof raw.note === "string" ? raw.note.trim() : "";
+  const status = typeof raw.status === "string" ? raw.status.trim() : "";
+  const waiting = typeof raw.waiting_on === "string" ? raw.waiting_on.trim() : "";
+  const owner = typeof raw.owner === "string" ? raw.owner.trim() : "";
+  const next = typeof raw.next_step === "string" ? raw.next_step.trim() : "";
+  if (note.length > 400) throw new InputError(`Change ${index + 1}: The note is too long.`, 400, "note");
+  if (status.length > 80) throw new InputError(`Change ${index + 1}: That status is too long.`, 400, "status");
+  if (waiting.length > 80) throw new InputError(`Change ${index + 1}: That court is too long.`, 400, "waiting_on");
+  if (owner.length > 80) throw new InputError(`Change ${index + 1}: That owner is too long.`, 400, "owner");
+  if (next.length > 400) throw new InputError(`Change ${index + 1}: That next step is too long.`, 400, "next_step");
+  cleanText(note);
+  cleanText(status);
+  cleanText(waiting);
+  cleanText(owner);
+  cleanText(next);
+  if (action === "status" && !status) throw new InputError(`Change ${index + 1}: Choose a status.`, 400, "status");
+  if (action === "status" && !note) throw new InputError(`Change ${index + 1}: A status change needs a note.`, 400, "note");
+  if (action === "assign" && !owner) throw new InputError(`Change ${index + 1}: Choose an owner.`, 400, "owner");
+  if (action === "next_step" && !next) throw new InputError(`Change ${index + 1}: Write the next step.`, 400, "next_step");
+  return { action, status, waiting_on: waiting, owner, next_step: next, note, at: zoned.iso };
+}
+
 function parseComment(actor: Actor, index: number, siteId: string, expectedVersion: number, payload: unknown): CommentPayload {
   if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -1041,14 +1097,20 @@ function parseComment(actor: Actor, index: number, siteId: string, expectedVersi
     throw new InputError(`Change ${index + 1}: That thread id is not valid.`, 400, "parent_id");
   }
   if (creating && !parsed.data.parent_id && !parsed.data.anchor) {
-    throw new InputError(`Change ${index + 1}: A comment needs a P&L cell, a P&L line, or a lot.`, 400, "anchor");
+    throw new InputError(`Change ${index + 1}: A comment needs a P&L cell, a P&L line, a lot, or an NDA.`, 400, "anchor");
   }
   if (!creating && (parsed.data.anchor || parsed.data.parent_id)) {
     throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "anchor");
   }
   const anchor = parsed.data.anchor;
   if (anchor?.type === "space" && !anchor.space_id) throw new InputError(`Change ${index + 1}: A lot comment needs the lot id.`, 400, "space_id");
-  if (anchor && anchor.type !== "space" && !isCommentLine(anchor.line || "")) {
+  if (anchor?.type === "nda" && !NDA_ID.test((anchor.line || "").toUpperCase())) {
+    throw new InputError(`Change ${index + 1}: An NDA comment needs the agreement id.`, 400, "line");
+  }
+  if (anchor?.type === "nda" && siteId.toUpperCase() !== (anchor.line || "").toUpperCase()) {
+    throw new InputError(`Change ${index + 1}: An NDA comment stays on that agreement.`, 400, "site_id");
+  }
+  if (anchor && anchor.type !== "space" && anchor.type !== "nda" && !isCommentLine(anchor.line || "")) {
     throw new InputError(`Change ${index + 1}: That line is not in the chart of accounts.`, 400, "line");
   }
   if (anchor?.type === "pnl_cell" && !anchor.period) throw new InputError(`Change ${index + 1}: A cell comment needs a period.`, 400, "period");
@@ -1070,7 +1132,7 @@ function parseComment(actor: Actor, index: number, siteId: string, expectedVersi
       ? {
           anchor: {
             type: anchor.type,
-            line: anchor.type === "space" ? "" : anchor.line || "",
+            line: anchor.type === "space" ? "" : anchor.type === "nda" ? (anchor.line || "").toUpperCase() : anchor.line || "",
             period: anchor.type === "pnl_cell" ? anchor.period || "" : "",
             space_id: anchor.type === "space" ? anchor.space_id || "" : "",
           },

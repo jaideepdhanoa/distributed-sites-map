@@ -37,6 +37,12 @@ export function commentHref(
   anchor?: { type?: string | null; line?: string | null; period?: string | null; spaceId?: string | null } | null,
 ): string {
   if (isExcludedSite(siteId)) return reviewHomeHref();
+  if (/^NDA-\d{3,}$/.test(siteId)) {
+    const url = new URL("/", appOrigin());
+    url.searchParams.set("nda", siteId);
+    if (noteId) url.searchParams.set("note", noteId);
+    return url.toString();
+  }
   const url = new URL(discussionHref(siteId));
   if (noteId) url.searchParams.set("note", noteId);
   if (anchor?.type === "pnl_cell" || anchor?.type === "pnl_line") {

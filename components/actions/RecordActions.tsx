@@ -79,7 +79,7 @@ function fieldLabel(id: string) {
   return FIELDS.find((item) => item.id === id)?.label || COLUMNS.find((item) => item.id === id)?.label || id;
 }
 
-export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "deal"; id: string; variant?: "card" | "queue" }) {
+export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "deal" | "nda"; id: string; variant?: "card" | "queue" }) {
   const status = useActionStatus();
   const [notes, setNotes] = useState<Note[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -104,10 +104,10 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     const [notesRes, suggestionsRes] = await Promise.all([
       quietActionsFetch(`/api/actions/notes?${query}`),
-      quietActionsFetch(`/api/actions/suggestions?${query}`),
+      kind === "nda" ? Promise.resolve(null) : quietActionsFetch(`/api/actions/suggestions?${query}`),
     ]);
     if (notesRes.ok) setNotes(((await notesRes.json()) as { notes: Note[] }).notes || []);
-    if (suggestionsRes.ok) setSuggestions(((await suggestionsRes.json()) as { suggestions: Suggestion[] }).suggestions || []);
+    if (suggestionsRes?.ok) setSuggestions(((await suggestionsRes.json()) as { suggestions: Suggestion[] }).suggestions || []);
   }
 
   useEffect(() => {
@@ -116,12 +116,12 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     Promise.all([
       quietActionsFetch(`/api/actions/notes?${query}`),
-      quietActionsFetch(`/api/actions/suggestions?${query}`),
+      kind === "nda" ? Promise.resolve(null) : quietActionsFetch(`/api/actions/suggestions?${query}`),
       quietActionsFetch("/api/actions/accounts"),
     ]).then(async ([notesRes, suggestionsRes, accountsRes]) => {
       if (cancel) return;
       if (notesRes.ok) setNotes(((await notesRes.json()) as { notes: Note[] }).notes || []);
-      if (suggestionsRes.ok) setSuggestions(((await suggestionsRes.json()) as { suggestions: Suggestion[] }).suggestions || []);
+      if (suggestionsRes?.ok) setSuggestions(((await suggestionsRes.json()) as { suggestions: Suggestion[] }).suggestions || []);
       if (accountsRes.ok) setAccounts(((await accountsRes.json()) as { accounts: Account[] }).accounts || []);
     }).catch(() => undefined);
     return () => {
@@ -154,7 +154,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
       setError(payload.error || "That could not be saved.");
       return;
     }
-    const refresh = payload.suggestion ? refreshFromSuggestion(kind, id, payload.suggestion) : null;
+    const refresh = payload.suggestion && kind !== "nda" ? refreshFromSuggestion(kind, id, payload.suggestion) : null;
     if (refresh) publishStageRefresh(refresh);
     clear();
     await reload();
@@ -248,7 +248,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
         rows={variant === "queue" ? 2 : 3}
         maxLength={2000}
       />
-      <button type="submit" disabled={pending} className="menu-item">Save note</button>
+      <button type="submit" disabled={pending} className={kind === "nda" ? "paper-btn" : "menu-item"}>{kind === "nda" ? "Add comment" : "Save note"}</button>
     </form>
   ) : (
     <p className="note">Notes are read only for this login.</p>
@@ -296,6 +296,16 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
       <button type="submit" disabled={pending} className="menu-item">Propose next step</button>
     </form>
   ) : null;
+
+  if (kind === "nda") {
+    return (
+      <section className="act nda-thread" data-testid="nda-thread">
+        {threads}
+        {noteForm}
+        {error ? <p className="err" role="alert" data-testid="action-error">{error}</p> : null}
+      </section>
+    );
+  }
 
   if (variant === "queue") {
     const steps = [

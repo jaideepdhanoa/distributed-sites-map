@@ -14,7 +14,7 @@ import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_ID } from "@/lib/spaces/vocab";
 import { suggestBrokerQuestion, type CommentAnchor } from "@/lib/comments/anchor";
 
-export type ThreadKind = TargetKind | "suggestion" | "site_space";
+export type ThreadKind = TargetKind | "suggestion" | "site_space" | "nda";
 
 export type Note = {
   id: string;
@@ -63,7 +63,7 @@ const SELECT = `id, target_kind, target_id, parent_id, body, author_id, created_
 const SELECT_ANCHOR = `${SELECT}, entity_id, version, anchor_type, anchor_line, anchor_period, anchor_space_id, anchor_label, tag, created_at_iso`;
 
 function anchorOf(row: NoteRow): CommentAnchor | null {
-  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space") return null;
+  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space" && row.anchor_type !== "nda") return null;
   return {
     type: row.anchor_type,
     siteId: row.target_id,
@@ -110,7 +110,10 @@ async function withMentions(sql: Sql, notes: Note[]): Promise<Note[]> {
   return notes.map((note) => ({ ...note, mentions: map.get(note.id) || [] }));
 }
 
+const NDA_ID = /^NDA-\d{3,}$/;
+
 async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): Promise<string> {
+  if (targetKind === "nda") return targetId;
   if (targetKind === "site_space") {
     const found = await sql.query<{ site_id: string }>(`SELECT site_id FROM site_spaces WHERE id = $1`, [targetId]);
     const siteId = found.rows[0]?.site_id || "";
@@ -192,6 +195,10 @@ export async function createNote(
     if (!SPACE_ID.test(target)) throw new InputError("That record id is not valid.");
     const found = await sql.query(`SELECT id FROM site_spaces WHERE id = $1`, [target]);
     if (!found.rows.length) throw new InputError("That space is not on the map.", 404);
+    targetId = target;
+  } else if (targetKind === "nda") {
+    const target = String(targetId || "").trim().toUpperCase();
+    if (!NDA_ID.test(target)) throw new InputError("That record id is not valid.");
     targetId = target;
   } else {
     const target = parseTarget(targetKind, targetId);

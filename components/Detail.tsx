@@ -24,6 +24,8 @@ import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
+import NdaCardThread from "./NdaCardThread";
+import { cardNdaLabel } from "@/lib/nda";
 import { LocationFix } from "./LocationFix";
 import { siteHref } from "@/lib/siteLink";
 import { ChipRow, TagChip } from "./TagChip";
@@ -539,6 +541,7 @@ export default function Detail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  onOpenNda,
 }: {
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -566,6 +569,7 @@ export default function Detail({
   spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
+  onOpenNda?: (id: string) => void;
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
   const pnl = usePnlTiles(signedIn && linkedDeal && linkedDeal.kind !== "land" ? linkedDeal.deal_id : "");
@@ -640,7 +644,8 @@ export default function Detail({
       <div className="card-chips">
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
-        <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing />
+        <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing onOpen={onOpenNda} />
+        {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? <NdaCardThread ndaId={linkedDeal.nda_id} onOpen={onOpenNda} /> : null}
       </div>
       {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
       {site.linked_deal_id ? (
@@ -859,6 +864,7 @@ export function DealDetail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  onOpenNda,
 }: {
   deal: DealProps;
   peers?: DealProps[];
@@ -887,6 +893,7 @@ export function DealDetail({
   spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
+  onOpenNda?: (id: string) => void;
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
   const pnl = usePnlTiles(signedIn && deal.kind !== "land" ? deal.deal_id : "");
@@ -937,7 +944,8 @@ export function DealDetail({
       <SitePhotos card={photos} />
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
-        <NdaChip deal={deal} signedIn={signedIn} showMissing />
+        <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
+        {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? <NdaCardThread ndaId={deal.nda_id} onOpen={onOpenNda} /> : null}
         <NextStepCard
           kind="deal"
           id={deal.deal_id}

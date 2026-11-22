@@ -20,7 +20,7 @@ export default function CommentGridHost() {
   useEffect(() => {
     const onOpen = (event: Event) => {
       const anchor = readCommentAnchor((event as CustomEvent).detail);
-      if (!anchor || anchor.type === "space") return;
+      if (!anchor || anchor.type === "space" || anchor.type === "nda") return;
       setSiteId(anchor.siteId);
       setFocus({ type: anchor.type, line: anchor.line, period: anchor.period });
       setOpen(false);

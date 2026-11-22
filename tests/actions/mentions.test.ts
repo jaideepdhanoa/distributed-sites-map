@@ -32,6 +32,30 @@ async function ready() {
   return sql;
 }
 
+test("an NDA keeps one thread for replies and mentions", async () => {
+  const sql = await ready();
+  const note = await createNote(sql, {
+    targetKind: "nda",
+    targetId: "NDA-901",
+    body: "Please look at the form.",
+    authorId: "contributor",
+    mentions: ["reviewer"],
+  });
+  assert.equal(note.targetKind, "nda");
+  assert.equal(note.targetId, "NDA-901");
+  assert.deepEqual(note.mentions.map((item) => item.id), ["reviewer"]);
+  const reply = await createNote(sql, {
+    targetKind: "nda",
+    targetId: "NDA-901",
+    parentId: note.id,
+    body: "Looking now.",
+    authorId: "reviewer",
+  });
+  assert.equal(reply.parentId, note.id);
+  const thread = await listNotes(sql, "nda", "NDA-901");
+  assert.deepEqual(thread.map((item) => item.id), [note.id, reply.id]);
+});
+
 test("a mention is stored as an account id and queued only for that account", async () => {
   const sql = await ready();
   const typed = "Someone not on the list";

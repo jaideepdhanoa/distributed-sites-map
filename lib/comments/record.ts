@@ -55,7 +55,7 @@ export function missingCommentColumn(error: unknown): boolean {
 }
 
 function anchorFrom(row: Pick<NoteRow, "target_id" | "anchor_type" | "anchor_line" | "anchor_period" | "anchor_space_id" | "anchor_label">): CommentAnchor | null {
-  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space") return null;
+  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space" && row.anchor_type !== "nda") return null;
   return {
     type: row.anchor_type,
     siteId: row.target_id,
@@ -120,7 +120,7 @@ async function insertComment(sql: Sql, entityId: string, input: CommentWrite): P
     anchor = parentAnchor;
     parentId = parent.id;
   } else {
-    if (!input.anchor) throw new InputError("A comment needs a P&L cell, a P&L line, or a lot.", 400, "anchor");
+    if (!input.anchor) throw new InputError("A comment needs a P&L cell, a P&L line, a lot, or an NDA.", 400, "anchor");
     anchor = await checkedAnchor(sql, input.siteId, input.anchor);
     tag = input.tag || "investigate";
   }
@@ -169,6 +169,13 @@ async function insertComment(sql: Sql, entityId: string, input: CommentWrite): P
 }
 
 async function checkedAnchor(sql: Sql, siteId: string, anchor: CommentAnchor): Promise<CommentAnchor> {
+  if (anchor.type === "nda") {
+    const id = anchor.line.trim().toUpperCase();
+    if (!/^NDA-\d{3,}$/.test(id) || siteId.toUpperCase() !== id) {
+      throw new InputError("An NDA comment stays on that agreement.", 400, "line");
+    }
+    return { type: "nda", siteId: id, line: id, period: "", spaceId: "", label: id };
+  }
   if (anchor.type === "space") {
     const label = await spaceLabel(sql, siteId, anchor.spaceId);
     return { type: "space", siteId, line: "", period: "", spaceId: anchor.spaceId, label };

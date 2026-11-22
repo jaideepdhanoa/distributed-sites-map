@@ -12,9 +12,9 @@ export const UNIVERSE_STAGE_LABEL = "Universe";
 const COUNTY_LABEL: Record<string, string> = {
   cleared: "Land OK",
   held: "Land OK",
-  possible: "Land borderline",
-  unresolved: "Records unclear",
-  unchecked: "Not reviewed",
+  possible: "Borderline",
+  unresolved: "Unclear",
+  unchecked: "Unchecked",
   "ruled-out": "Ruled out",
 };
 
@@ -37,8 +37,8 @@ export function countyCheck(site: {
             : "unchecked";
   const source = STATUS_NOTES.find((item) => item.id === status) || STATUS_NOTES[4];
   const note = status === "unchecked" ? uncheckedNote(site.aerial_fit) : source.note;
-  const label = COUNTY_LABEL[status] || "Not reviewed";
-  return { label: chipLabelProblem(label) ? "Not reviewed" : label, note };
+  const label = COUNTY_LABEL[status] || "Unchecked";
+  return { label: chipLabelProblem(label) ? "Unchecked" : label, note };
 }
 
 export function plainCounty(verdict?: string | null): string {
@@ -85,9 +85,9 @@ export const LIST_CHIP_LABELS = [
   LAND_FILTER_TAG,
   UNIVERSE_STAGE_LABEL,
   "Land OK",
-  "Land borderline",
-  "Records unclear",
-  "Not reviewed",
+  "Borderline",
+  "Unclear",
+  "Unchecked",
   "Ruled out",
   "Car wash",
   "Auto service",

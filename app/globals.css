@@ -1011,6 +1011,12 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-table .stage-cell { flex-wrap: wrap; align-items: flex-start; overflow: visible; white-space: normal; }
 .stage-cell .tag-pair { flex-wrap: nowrap; max-width: none; }
 .stage-cell .stage-pill { flex: 0 0 auto; margin-top: 0; max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; height: auto; }
+.list-table th[data-col="county"] .col-head > .sort-header:not(.col-grip):not(.col-resize) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.15;
+}
 .suggested-inline {
   flex: 1 1 16rem;
   display: inline-block;

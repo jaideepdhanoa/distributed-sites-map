@@ -166,7 +166,7 @@ export default function ListView({
         <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{ordered.length.toLocaleString()}</strong></div>
         <div><span className="only-desktop">Listed</span><span className="only-mobile">Listed</span><strong>{ordered.filter((row) => /^yes/i.test(row.listed)).length.toLocaleString()}</strong></div>
         <div><span className="only-desktop">Land OK</span><span className="only-mobile">Land OK</span><strong>{ordered.filter((row) => row.county === "Land OK").length.toLocaleString()}</strong></div>
-        <div><span className="only-desktop">Not reviewed</span><span className="only-mobile">Unchecked</span><strong>{ordered.filter((row) => row.county === "Not reviewed").length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Not reviewed</span><span className="only-mobile">Unchecked</span><strong>{ordered.filter((row) => row.county === "Unchecked").length.toLocaleString()}</strong></div>
       </div>
       {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">

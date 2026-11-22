@@ -118,11 +118,29 @@ test("the universe sheet meets a 1280 pane with the county column", () => {
   const fitted = fitColumnWidths(ids, {}, 1280, TRAILING_COLUMN_WIDTH, FLEX_COLUMN_IDS);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
   assert.ok(fitted.every((width) => width >= 96));
-  assert.ok(fitted[0] >= 280);
+  assert.ok(fitted[0] >= 304);
+  assert.equal(fitted[ids.indexOf("county")], columnWidth("county"));
   const pipeline = ["site", "stage", "county", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
-  const pipeFlex = new Set(["site", "asking", "capacity", "traffic", "cashFlow", "county"]);
+  const pipeFlex = new Set(["site", "asking", "capacity", "traffic", "cashFlow"]);
   const pipeFit = fitColumnWidths(pipeline, {}, 1280, TRAILING_COLUMN_WIDTH, pipeFlex);
   assert.equal(pipeFit.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
+  assert.ok(pipeFit[0] >= 304);
+  assert.equal(pipeFit[2], columnWidth("county"));
+  assert.equal(columnWidth("county"), 120);
+  const saved = {
+    site: 280,
+    stage: 140,
+    score: 100,
+    asking: 150,
+    openLand: 110,
+    capacity: 130,
+    traffic: 100,
+    cashFlow: 140,
+  };
+  const kept = fitColumnWidths(pipeline, saved, 1920, TRAILING_COLUMN_WIDTH, pipeFlex);
+  assert.equal(kept[0], 280);
+  assert.equal(kept[2], columnWidth("county"));
+  assert.ok(kept[8] > 400);
 });
 
 test("a default sheet uses the pane and keeps rigid columns", () => {
@@ -141,7 +159,7 @@ test("a default sheet uses the pane and keeps rigid columns", () => {
   assert.ok(wide[6] > columnWidth("traffic"));
   assert.ok(wide[7] > columnWidth("cashFlow"));
   const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.ok(narrow[0] < columnWidth("site"));
+  assert.equal(narrow[0], columnWidth("site"));
   assert.ok(narrow[0] >= 280);
   const withWaiting = fitColumnWidths(["site", "chip_waiting", ...pipelineIds.slice(1)], {}, 1024, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(withWaiting[0] >= 280);

@@ -70,9 +70,9 @@ test("data-driven chips stay a short label and do not join clauses", () => {
   const county = countyCheck({ verdict: "PASS" });
   assert.equal(county.label, "Land OK");
   assert.match(county.note, /County records confirm/);
-  assert.equal(countyCheck({ verdict: "MAYBE" }).label, "Land borderline");
-  assert.equal(countyCheck({ verdict: "UNRESOLVED" }).label, "Records unclear");
-  assert.equal(countyCheck({ verdict: null }).label, "Not reviewed");
+  assert.equal(countyCheck({ verdict: "MAYBE" }).label, "Borderline");
+  assert.equal(countyCheck({ verdict: "UNRESOLVED" }).label, "Unclear");
+  assert.equal(countyCheck({ verdict: null }).label, "Unchecked");
   assert.equal(countyCheck({ verdict: "FAIL" }).label, "Ruled out");
   assert.equal(chipLabelProblem("Land paused"), "");
   assert.match(LAND_PAUSED_NOTE, /Nov 20, 2026/);

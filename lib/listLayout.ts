@@ -56,8 +56,8 @@ const MIN_WIDTH = 96;
 const SITE_MIN_WIDTH = 280;
 const MAX_WIDTH = 480;
 
-/** Columns that take leftover pane width. The pipeline list adds its power column. */
-export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow", "type", "spare", "county"]);
+/** Columns that take leftover pane width. County check stays a fixed compact column. */
+export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow", "type", "spare"]);
 
 /** The Show on map column. It stays this wide so spare pane width does not pool there. */
 export const TRAILING_COLUMN_WIDTH = 112;
@@ -66,6 +66,7 @@ export const TRAILING_COLUMN_WIDTH = 112;
 const COLUMN_WIDTH: Record<string, number> = {
   site: 320,
   stage: 148,
+  county: 120,
   score: 96,
   asking: 168,
   listed: 148,
@@ -73,7 +74,7 @@ const COLUMN_WIDTH: Record<string, number> = {
   city: 96,
   acres: 104,
   perAcre: 120,
-  openLand: 120,
+  openLand: 112,
   spare: 120,
   grade: 168,
   traffic: 112,
@@ -230,6 +231,8 @@ export function clampWidth(value: number): number {
  * shrinks those columns (not below the minimum) when the pane is narrower.
  * A saved width stays put. Leftover width goes to flexible columns that were
  * not saved, or to the last flexible column when every one of them was saved.
+ * A narrow pane shrinks flexible columns other than Site first, so the site
+ * name keeps its width until those columns are at their minimum.
  */
 export function fitColumnWidths(
   ids: string[],
@@ -267,12 +270,21 @@ export function fitColumnWidths(
   }
   if (!openFlex.length) return base;
   const floor = (index: number) => (ids[index] === "site" ? SITE_MIN_WIDTH : MIN_WIDTH);
-  const room = openFlex.map((index) => Math.max(0, base[index] - floor(index)));
-  if (room.every((value) => value === 0)) return base;
-  const cuts = shares(Math.min(-delta, room.reduce((total, value) => total + value, 0)), room, room);
-  openFlex.forEach((index, position) => {
-    base[index] -= cuts[position];
-  });
+  const siteFlex = openFlex.filter((index) => ids[index] === "site");
+  const restFlex = openFlex.filter((index) => ids[index] !== "site");
+  let left = -delta;
+  const cutFrom = (indexes: number[]) => {
+    if (!indexes.length || left <= 0) return;
+    const room = indexes.map((index) => Math.max(0, base[index] - floor(index)));
+    if (room.every((value) => value === 0)) return;
+    const cuts = shares(Math.min(left, room.reduce((total, value) => total + value, 0)), room, room);
+    indexes.forEach((index, position) => {
+      base[index] -= cuts[position];
+      left -= cuts[position];
+    });
+  };
+  cutFrom(restFlex);
+  cutFrom(siteFlex);
   return base;
 }
 

@@ -70,6 +70,24 @@ test("provisional and not scored render from a fixture", async ({ page }, info) 
   await expect(page.getByTestId("score-chip")).toHaveText("47.1");
 });
 
+test("the Phoenix chip matches All after Phoenix is selected", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop market chips");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+  const phoenix = page.getByTestId("market-PHX");
+  await expect(phoenix).toBeVisible();
+  await phoenix.click();
+  await expect(page).toHaveURL(/[?&]city=PHX(?:&|$)/);
+  const numberIn = async (locator: ReturnType<typeof page.getByTestId>) => {
+    const text = await locator.innerText();
+    return Number(text.replace(/,/g, "").match(/\d+/)?.[0] || "NaN");
+  };
+  await expect.poll(async () => numberIn(page.getByTestId("all-stages").locator("strong"))).toBeGreaterThan(0);
+  const all = await numberIn(page.getByTestId("all-stages").locator("strong"));
+  const chip = await numberIn(phoenix);
+  expect(chip).toBe(all);
+});
+
 test("phone pipeline keeps the All chip", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone funnel");
   await page.setViewportSize({ width: 390, height: 844 });

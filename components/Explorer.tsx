@@ -36,7 +36,7 @@ import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, 
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
-import { inCountedMarket, labeledCount, marketCounts, reviewBadge } from "@/lib/counts";
+import { inCountedMarket, labeledCount, reviewBadge, shownMarketCounts } from "@/lib/counts";
 import { scoreIssue } from "@/lib/scoreDisplay";
 import type { SpaceShape } from "./spaces/SpacePopover";
 import { siteSpaceChange } from "@/lib/spaces/change";
@@ -654,7 +654,7 @@ export default function Explorer() {
     };
   }, [city]);
 
-  const needCatalog = allCities || Boolean(who) || query.trim().length >= 2;
+  const needCatalog = allCities || funnel === "universe" || Boolean(who) || query.trim().length >= 2;
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
@@ -1892,10 +1892,36 @@ export default function Explorer() {
   const marketDeals = dealRows.filter(inFunnelMarket);
   const droppedInMarket = countDroppedDeals(marketDeals);
   const hiddenDropped = showDroppedRows ? 0 : droppedInMarket;
-  const inReachMarket = marketDeals.filter((deal) => inReach(deal, reach));
-  const shownCount = showDroppedRows
-    ? inReachMarket.length + marketDeals.filter((deal) => deal.stage_group === "dropped" && !inReach(deal, reach)).length
-    : inReachMarket.filter((deal) => deal.stage_group !== "dropped").length;
+  function pipelineViewDeal(deal: DealProps): boolean {
+    if (isProtectedId(deal.deal_id)) return false;
+    if (deal.kind !== "pipeline" && deal.kind !== "land") return false;
+    if (!dealAllowed(deal)) return false;
+    if (who && !partyMatch(who, deal.broker, deal.firm)) return false;
+    if (query && !dealQueryHit(deal)) return false;
+    if (inReach(deal, reach)) return showDroppedRows || deal.stage_group !== "dropped";
+    return showDroppedRows && deal.stage_group === "dropped";
+  }
+  const pipelineViewDeals = dealRows.filter(pipelineViewDeal);
+  function universeCountSites() {
+    const pool = catalogSites.length ? catalogSites : sites;
+    const step: StageId = allStages || universeWide ? "universe" : stage;
+    const byId = new Map<string, SiteProps>();
+    const add = (list: SiteProps[]) => {
+      for (const site of list) byId.set(site.site_id, site);
+    };
+    if (compare && !universeWide) add(pool.filter((site) => site.verdict_disagreement && passesChips(site, true, true)));
+    else if (extra === "held" && !universeWide) add(pool.filter((site) => heldOutside(site) && passesChips(site, true, true)));
+    else if (extra === "listed" && !universeWide) add(pool.filter((site) => atStage(site, step) && site.listed && passesChips(site, true, true)));
+    else if (extra === "contacted" && !universeWide) add(pool.filter((site) => atStage(site, step) && site.contacted && passesChips(site, true, true)));
+    else {
+      add(pool.filter((site) => atStage(site, step) && passesChips(site, false, true)));
+      if (showDropped) add(pool.filter((site) => droppedAt(site, step) && passesChips(site, true, true)));
+      if (landSites) add(pool.filter((site) => site.land_only && passesChips(site, true, true)));
+    }
+    return [...byId.values()];
+  }
+  const marketView = shownMarketCounts(funnel === "pipeline" ? pipelineViewDeals : universeCountSites(), selectedMarket);
+  const shownCount = marketView.shown;
   const allCount = pipelineAllCount(shownCount, hiddenDropped);
   const outsideCount = countOutsideServiceArea(marketDeals);
   const reviewMarkers = inReview && !reviewMiss ? reviewList.flatMap((site, index) => {
@@ -1980,12 +2006,12 @@ export default function Explorer() {
           <Wordmark view={tableOpen ? "list" : "map"} />
           <div className="cities only-desktop" role="group" aria-label="Market">
             {(() => {
-              const totals = marketCounts(dealRows.filter((deal) => deal.kind === "pipeline" || deal.kind === "land"));
+              const totals = marketView.totals;
               return (
                 <>
-                  <button type="button" className={selectedMarket === "all" ? "chip on" : "chip"} onClick={() => jump("all")}>All {totals.All.toLocaleString("en-US")}</button>
+                  <button type="button" className={selectedMarket === "all" ? "chip on" : "chip"} data-testid="market-all" onClick={() => jump("all")}>All {totals.All.toLocaleString("en-US")}</button>
                   {CITIES.map((item) => (
-                    <button key={item} className={selectedMarket === item ? "chip on" : "chip"} type="button" onClick={() => jump(item)}>
+                    <button key={item} className={selectedMarket === item ? "chip on" : "chip"} type="button" data-testid={`market-${item}`} onClick={() => jump(item)}>
                       {item === "PHX" ? "Phoenix" : item === "LAS" ? "Las Vegas" : "Miami"} {totals[item].toLocaleString("en-US")}
                     </button>
                   ))}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { pipelineCsv, type PipelineRow } from "../components/PipelineList.tsx";
-import { inCountedMarket, latestTouch, marketCounts, reviewBadge, stepParts } from "../lib/counts.ts";
+import { inCountedMarket, latestTouch, marketCounts, reviewBadge, shownMarketCounts, stepParts } from "../lib/counts.ts";
 import { scoreIssue, storedScoreView } from "../lib/scoreDisplay.ts";
 import type { DealProps } from "../lib/types.ts";
 import { reviewWhen } from "../lib/queue/when.ts";
@@ -20,6 +20,23 @@ test("market chips add up to All, including Other", () => {
   assert.equal(inCountedMarket("SNA", "other"), true);
   assert.equal(inCountedMarket("PHX", "other"), false);
   assert.equal(inCountedMarket("PHX", "PHX"), true);
+});
+
+test("a selected market chip matches the All count for that filter", () => {
+  const rows = [
+    { city: "PHX" },
+    { city: "PHX" },
+    { city: "LAS" },
+    { city: "MIA" },
+    { city: "SNA" },
+  ];
+  const phoenix = shownMarketCounts(rows, "PHX");
+  assert.equal(phoenix.shown, phoenix.totals.PHX);
+  assert.equal(phoenix.totals.PHX, 2);
+  const everywhere = shownMarketCounts(rows, "all");
+  assert.equal(everywhere.shown, everywhere.totals.All);
+  assert.equal(phoenix.totals.PHX + phoenix.totals.LAS + phoenix.totals.MIA + phoenix.totals.Other, everywhere.shown);
+  assert.equal(shownMarketCounts(rows, "other").shown, phoenix.totals.Other);
 });
 
 test("step parts can still separate land rows from operating rows", () => {

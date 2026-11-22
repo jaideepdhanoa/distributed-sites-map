@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
 import {
+  INDIE_IDENTITY_FIELDS,
   SITE_FIELDS,
   SITE_NUMERIC_FIELDS,
   emptySiteFields,
@@ -618,6 +619,30 @@ async function writeSite(
     }
     if (incoming.asking_price === "") delete facts.asking_price_source;
     if (incoming.acreage === "") delete facts.land_acres_basis;
+    if (actorId === "indie" && previous) {
+      for (const field of INDIE_IDENTITY_FIELDS) {
+        const next = incoming[field];
+        if (next === undefined || next === "") continue;
+        const prior = priorFields[field] || "";
+        if (!prior || prior === next) continue;
+        const entityId = formatEntityId("data_conflict", await mint(sql, "data_conflict"));
+        await storeConflict(sql, entityId, {
+          siteId: change.site_id,
+          subject: field,
+          field,
+          period: "",
+          sources: [
+            { value: prior, document: textOf(priorSources[field]) || "on file", page: "prior" },
+            { value: next, document: textOf(payload.sources?.[field]) || "indie", page: "update" },
+          ],
+          valueInUse: next,
+          status: "open",
+          resolutionNote: "",
+          actor: actorId,
+          at: new Date().toISOString(),
+        }, 0);
+      }
+    }
     const brokerCell = priorSheet.Broker || priorSheet.broker || "";
     const edited = mirrorWrites(incoming, payload.facts || {}, { cell: brokerCell });
     if (incoming.broker !== undefined || incoming.firm !== undefined) {

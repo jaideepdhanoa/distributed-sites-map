@@ -407,7 +407,6 @@ export function planSiteMirror(
         const formula = cellText(existing.formulas?.[index]);
         if (formula.startsWith("=")) continue;
         const after = cellText(raw);
-        if (!after) continue;
         const before = cellText(existing.cells[index]);
         const header = table.headers[index] || key;
         if (isDateField(key, header)) {
@@ -417,6 +416,7 @@ export function planSiteMirror(
             continue;
           }
         }
+        if (!after) continue;
         if (sameWorkbookCell(before, after)) continue;
         if (isTruncatedCell(before, after)) {
           combined.held.push({ id: record.site_id, header });

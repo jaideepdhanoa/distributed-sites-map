@@ -620,6 +620,26 @@ async function writeSite(
     if (incoming.asking_price === "") delete facts.asking_price_source;
     if (incoming.acreage === "") delete facts.land_acres_basis;
     if (actorId === "indie" && previous) {
+      const nextSegment = incoming.category;
+      const priorSegment = priorFields.category || "";
+      if (nextSegment && priorSegment && priorSegment !== nextSegment) {
+        const entityId = formatEntityId("data_conflict", await mint(sql, "data_conflict"));
+        await storeConflict(sql, entityId, {
+          siteId: change.site_id,
+          subject: "segment",
+          field: "segment",
+          period: "",
+          sources: [
+            { value: priorSegment, document: textOf(priorSources.category) || textOf(priorSources.segment) || "on file", page: "prior" },
+            { value: nextSegment, document: textOf(payload.sources?.segment) || textOf(payload.sources?.segment_group) || textOf(payload.sources?.category) || "indie", page: "update" },
+          ],
+          valueInUse: nextSegment,
+          status: "open",
+          resolutionNote: "",
+          actor: actorId,
+          at: new Date().toISOString(),
+        }, 0);
+      }
       for (const field of INDIE_IDENTITY_FIELDS) {
         const next = incoming[field];
         if (next === undefined || next === "") continue;

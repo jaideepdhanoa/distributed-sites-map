@@ -381,6 +381,8 @@ export function planSiteMirror(
   for (const table of tables) {
     const idAt = headerIndex(table.headers, ["site id"]);
     if (idAt < 0) throw new Error(`${table.title} is missing an id column (site id).`);
+    const needsUniverseId = writable.some((record) => cellText(record.writes?.["Universe ID"] || ""));
+    if (needsUniverseId) ensureUniverseIdColumn(table, combined);
     const byId = new Map<string, { row: number; cells: string[]; formulas?: string[] }>();
     for (const row of table.rows) {
       const id = cellText(row.cells[idAt]);
@@ -480,6 +482,28 @@ export function planCreatedSiteMirror(tables: SheetTable[], rows: CreatedSiteMir
     combined.held.push(...plan.held);
   }
   return combined;
+}
+
+/** Pipeline and Land Sites gain a Universe ID column when a stored id has nowhere to land. */
+function ensureUniverseIdColumn(table: SheetTable, plan: MirrorPlan): void {
+  if (table.title !== "Pipeline" && table.title !== "Land Sites") return;
+  const wanted = new Set(headerAliases("Universe ID"));
+  if (table.headers.some((header) => wanted.has(header.trim().toLowerCase()))) return;
+  const column = lastUsedHeader(table.headers) + 1;
+  while (table.headers.length < column) table.headers.push("");
+  table.headers[column - 1] = "Universe ID";
+  for (const row of table.rows) {
+    while (row.cells.length < column) row.cells.push("");
+  }
+  plan.changes.push({
+    sheet: table.title,
+    row: table.headerRow,
+    column,
+    header: "Universe ID",
+    id: "",
+    before: "",
+    after: "Universe ID",
+  });
 }
 
 function lastUsedHeader(headers: string[]): number {
@@ -994,7 +1018,7 @@ function undefinedColumn(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
 }
 
-type SiteMirrorDb = { site_id: string; market?: string; category?: string; apn?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
+type SiteMirrorDb = { site_id: string; market?: string; category?: string; apn?: string; universe_id?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
 
 function tradeAreaChecked(facts: Record<string, unknown>): string {
   return Object.keys(facts).some((key) => key.startsWith("trade_") && text(facts[key])) ? "Yes" : "";
@@ -1003,7 +1027,7 @@ function tradeAreaChecked(facts: Record<string, unknown>): string {
 async function loadSiteMirrorSources(sql: Sql): Promise<{ rows: SiteMirrorDb[] }> {
   try {
     return await sql.query<SiteMirrorDb>(
-      `SELECT site_id, market, category, apn, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
+      `SELECT site_id, market, category, apn, universe_id, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
     );
   } catch (error) {
     if (!undefinedColumn(error)) throw error;
@@ -1121,6 +1145,8 @@ export async function loadMirrorRows(sql: Sql): Promise<{
       if (folder) writes.Folder = folder;
       const apn = text(row.apn);
       if (apn) writes["APN or folio"] = apn;
+      const universeId = text(row.universe_id);
+      if (universeId) writes["Universe ID"] = universeId;
       const segment = text(row.category);
       if (segment) writes.Segment = segment;
       const checked = tradeAreaChecked(facts);

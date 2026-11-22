@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { segmentLabel } from "@/lib/segments";
 import { BUSINESS_TYPES, MARKETS, SERVICE_AREA_CLASSES, SITE_ID } from "./vocab";
 
 export type SiteIssue = { id: string; field: string; value: string };
@@ -410,6 +411,7 @@ const CLASS_LABEL: Record<string, string> = {
  */
 export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "apn", headers: ["APN or folio", "APN"] },
+  { field: "universe_id", headers: ["Universe ID"] },
   { field: "broker", headers: ["Broker"] },
   { field: "notes", headers: ["Next step"] },
   { field: "listing_url", headers: ["Listing link"] },
@@ -876,7 +878,7 @@ export function siteIssues(rows: SiteRow[]): SiteIssue[] {
     if (!row.market || !MARKETS.includes(row.market as (typeof MARKETS)[number])) {
       issues.push({ id: row.site_id, field: "market", value: row.market });
     }
-    if (row.category && !BUSINESS_TYPES.includes(row.category as (typeof BUSINESS_TYPES)[number])) {
+    if (row.category && !BUSINESS_TYPES.includes(row.category as (typeof BUSINESS_TYPES)[number]) && !segmentLabel(row.category)) {
       issues.push({ id: row.site_id, field: "category", value: row.category });
     }
     if (row.service_area_class && !SERVICE_AREA_CLASSES.includes(row.service_area_class as (typeof SERVICE_AREA_CLASSES)[number])) {

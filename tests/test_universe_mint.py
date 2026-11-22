@@ -66,6 +66,26 @@ class UniverseMintTest(unittest.TestCase):
         row = {"Market": "PHX", "Universe ID": "WB-PHX-9001", "APN or folio": "222", "Site": "9 Main St"}
         self.assertEqual(match_deal_universe(row, sites, by_apn, by_street), "WB-PHX-9001")
 
+    def test_universe_id_joins_when_the_street_number_differs(self):
+        sites = [
+            {
+                "site_id": "WB-MIA-0050",
+                "city": "MIA",
+                "origin": "universe",
+                "counts_as_site": True,
+                "apn": "100-00-050",
+                "address": "10 Sample St",
+                "name": "",
+            },
+        ]
+        by_apn, by_street = universe_match_index(sites)
+        linked = {"Market": "MIA", "Universe ID": "WB-MIA-0050", "Site": "40 Sample St"}
+        self.assertEqual(match_deal_universe(linked, sites, by_apn, by_street), "WB-MIA-0050")
+        bare = {"Market": "MIA", "Site": "40 Sample St", "APN or folio": "100-00-050"}
+        self.assertEqual(match_deal_universe(bare, sites, by_apn, by_street), "WB-MIA-0050")
+        neither = {"Market": "MIA", "Site": "40 Sample St"}
+        self.assertIsNone(match_deal_universe(neither, sites, by_apn, by_street))
+
     def test_an_uncounted_id_falls_back_to_the_parcel(self):
         sites = [
             {

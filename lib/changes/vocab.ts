@@ -63,7 +63,7 @@ export const COMMS_DIRECTIONS = ["in", "out"] as const;
 
 export type CommsDirection = (typeof COMMS_DIRECTIONS)[number];
 
-export const ENTITY_TYPES = ["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict", "comment"] as const;
+export const ENTITY_TYPES = ["stage", "activity", "comms", "site", "pnl_line", "site_space", "tag", "data_conflict", "comment", "nda"] as const;
 
 /** Categories the map already ships. The workbook Segment cell is freer text and is not this list. */
 export const BUSINESS_TYPES = [
@@ -83,6 +83,9 @@ export type BusinessType = (typeof BUSINESS_TYPES)[number];
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
 export const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
+
+/** An NDA register id, such as NDA-001. */
+export const NDA_ID = /^NDA-\d{3,}$/;
 
 /** A listing id on a comms row, such as L-441. */
 export const LISTING_ID = /^L-\d+$/;

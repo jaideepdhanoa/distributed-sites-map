@@ -287,12 +287,87 @@ export function overlayDeals<T extends { features?: { properties?: Record<string
   };
 }
 
+export type NdaHistoryItem = {
+  status: string;
+  note: string;
+  actor: string;
+  at: string;
+};
+
+export type NdaStateRow = {
+  nda_id: string;
+  status: string;
+  waiting_on: string;
+  owner: string;
+  next_step: string;
+  last_action: string;
+  last_action_date: string;
+  version: number;
+};
+
+export type NdaQueueItem = NdaAgreement & {
+  owner: string;
+  next_step: string;
+  last_action: string;
+  version: number;
+  history: NdaHistoryItem[];
+};
+
+export function registerHistory(row: Pick<NdaAgreement, "nda_status" | "nda_last_action_date" | "nda_opened_date">): NdaHistoryItem {
+  return {
+    status: displayStatus(row.nda_status, true) || NO_VALUE,
+    note: "On the register",
+    actor: "",
+    at: row.nda_last_action_date || row.nda_opened_date || "",
+  };
+}
+
+export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, history: NdaHistoryItem[] = []): NdaQueueItem {
+  const written = history.filter((item) => item.status || item.note);
+  return {
+    ...row,
+    nda_status: state?.status || displayStatus(row.nda_status, true),
+    nda_waiting_on: state?.waiting_on || row.nda_waiting_on,
+    nda_last_action_date: state?.last_action_date || row.nda_last_action_date,
+    owner: state?.owner || "",
+    next_step: state?.next_step || "",
+    last_action: state?.last_action || "",
+    version: state ? Number(state.version) || 0 : 0,
+    history: [registerHistory(row), ...written],
+  };
+}
+
+export function presentQueue(rows: NdaAgreement[], states: NdaStateRow[] = [], history: (NdaHistoryItem & { nda_id: string })[] = []): NdaQueueItem[] {
+  const byId = new Map(states.map((row) => [row.nda_id, row]));
+  const notes = new Map<string, NdaHistoryItem[]>();
+  for (const row of history) {
+    const list = notes.get(row.nda_id) || [];
+    list.push({ status: row.status, note: row.note, actor: row.actor, at: row.at });
+    notes.set(row.nda_id, list);
+  }
+  return openNdaQueue(rows)
+    .map((row) => presentNda(row, byId.get(row.nda_id), notes.get(row.nda_id) || []))
+    .filter((row) => isOpenAgreement(row));
+}
+
+/** The first covered Pipeline or Land row. Discussion stays on that site. */
+export function discussionSite(row: Pick<NdaAgreement, "site_ids">): string {
+  return coveredSites(row.site_ids || "").ids[0] || "";
+}
+
+export function lastActionLine(row: Pick<NdaQueueItem, "last_action" | "nda_last_action_date">): string {
+  const action = text(row.last_action);
+  const date = text(row.nda_last_action_date);
+  if (action && date) return `${action} · ${date}`;
+  return action || date || NO_VALUE;
+}
+
 export function ndaQueueBody(snapshot: NdaSnapshot) {
   return {
     source: snapshot.source,
     as_of: snapshot.as_of,
     label: snapshot.label,
-    queue: openNdaQueue(snapshot.register || []),
+    queue: presentQueue(snapshot.register || []),
   };
 }
 

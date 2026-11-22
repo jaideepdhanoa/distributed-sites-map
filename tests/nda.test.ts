@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { brokerFollowUp, draftMentionsProduct } from "../lib/ndaDraft.ts";
 import {
   blockerSentence,
   blockerSentenceForDeal,
   coveredSites,
   courtDayCount,
+  discussionSite,
   gateLabel,
   cardNdaLabel,
   ndaChip,
@@ -13,6 +15,7 @@ import {
   ndaQueueBody,
   openNdaQueue,
   overlayDeals,
+  presentQueue,
   queueCourt,
   type NdaAgreement,
   type NdaSnapshot,
@@ -199,6 +202,39 @@ test("the NDA queue is signed in the same way as financials", () => {
   assert.match(route, /ndaQueueAllowed\(session\.actionRole\)/);
   assert.equal(snapshot.source, "workbook");
   assert.equal(JSON.stringify(snapshot).includes("Not started"), false);
+});
+
+test("a saved status sits on the register row and a closed one leaves the queue", () => {
+  const row = agreement({ nda_id: "NDA-901", site_ids: "PIPE-PHX-9101", nda_status: "With counterparty legal", nda_days_in_court: 2 });
+  const saved = presentQueue([row], [{
+    nda_id: "NDA-901",
+    status: "With Moove legal",
+    waiting_on: "Us — legal",
+    owner: "cindel",
+    next_step: "Send the form",
+    last_action: "Status set to With Moove legal",
+    last_action_date: "2026-11-20",
+    version: 1,
+  }], [{ nda_id: "NDA-901", status: "With Moove legal", note: "Legal has it.", actor: "cindel", at: "2026-11-20T15:00:00Z" }]);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0]?.owner, "cindel");
+  assert.equal(saved[0]?.history[0]?.note, "On the register");
+  assert.equal(saved[0]?.history[1]?.note, "Legal has it.");
+  assert.equal(discussionSite(row), coveredSites(row.site_ids).ids[0]);
+  const closed = presentQueue([row], [{
+    nda_id: "NDA-901",
+    status: "Executed",
+    waiting_on: "",
+    owner: "",
+    next_step: "",
+    last_action: "",
+    last_action_date: "",
+    version: 2,
+  }]);
+  assert.equal(closed.length, 0);
+  const draft = brokerFollowUp(row);
+  assert.equal(draftMentionsProduct(draft), false);
+  assert.match(draft, /NDA-901/);
 });
 
 test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {

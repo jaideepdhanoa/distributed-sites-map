@@ -23,7 +23,7 @@ import { derivePowerRating } from "@/lib/score/power-rating";
 import { storeConflict } from "@/lib/conflicts/record";
 import { retractPnlLine, storePnlLine } from "@/lib/pnl/store";
 import { storeSiteSpace } from "@/lib/spaces/store";
-import type { ActivityPayload, Actor, CommentPayload, CommsPayload, ConflictPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
+import type { ActivityPayload, Actor, CommentPayload, CommsPayload, ConflictPayload, NdaPayload, ParsedChange, PnlLinePayload, SitePayload, SiteSpacePayload, StagePayload, TagPayload } from "./schema";
 import { AGENT_STAGE_DECISION_SOURCE, RECEIPT_ACTIVITY_SUMMARY, formatZonedTimestamp, isPnlRetract, parseZonedTimestamp, receiptCitation, validateBatch } from "./schema";
 import { CREATE_MARKETS } from "./site";
 import { isQuickLube } from "@/lib/labels";
@@ -172,6 +172,13 @@ async function readVersion(sql: Sql, change: ParsedChange): Promise<number> {
     );
     const version = result.rows[0]?.version;
     return version == null ? 0 : Number(version);
+  }
+  if (change.entity_type === "nda") {
+    const result = await sql.query<{ version: number | string }>(
+      `SELECT version FROM nda_state WHERE nda_id = $1`,
+      [change.site_id],
+    );
+    return result.rows[0] ? Number(result.rows[0].version) : 0;
   }
   if (change.entity_type === "stage" || change.entity_type === "site") {
     const table = change.entity_type === "stage" ? "site_stages" : "sites";
@@ -801,6 +808,60 @@ async function writeTag(sql: Sql, change: ParsedChange, actorId: string, version
   return stored;
 }
 
+async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version: number): Promise<Record<string, unknown>> {
+  const body = change.payload as NdaPayload;
+  const prior = await sql.query<{ status: string; waiting_on: string; owner: string; next_step: string }>(
+    `SELECT status, waiting_on, owner, next_step FROM nda_state WHERE nda_id = $1`,
+    [change.site_id],
+  );
+  const current = prior.rows[0];
+  const status = body.action === "status" ? body.status : current?.status || "";
+  const waiting = body.action === "status" ? body.waiting_on || current?.waiting_on || "" : current?.waiting_on || "";
+  const owner = body.action === "assign" ? body.owner : current?.owner || "";
+  const next = body.action === "next_step" ? body.next_step : current?.next_step || "";
+  const lastAction = body.action === "status"
+    ? `Status set to ${status}`
+    : body.action === "assign"
+      ? `Owner set to ${owner}`
+      : "Next step updated";
+  const lastDate = body.at.slice(0, 10);
+  await sql.query(
+    `INSERT INTO nda_state (
+       nda_id, status, waiting_on, owner, next_step, last_action, last_action_date, version, updated_by, updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+     ON CONFLICT (nda_id) DO UPDATE SET
+       status = EXCLUDED.status,
+       waiting_on = EXCLUDED.waiting_on,
+       owner = EXCLUDED.owner,
+       next_step = EXCLUDED.next_step,
+       last_action = EXCLUDED.last_action,
+       last_action_date = EXCLUDED.last_action_date,
+       version = EXCLUDED.version,
+       updated_by = EXCLUDED.updated_by,
+       updated_at = now()`,
+    [change.site_id, status, waiting, owner, next, lastAction, lastDate, version, actorId],
+  );
+  if (body.action === "status") {
+    await sql.query(
+      `INSERT INTO nda_history (id, nda_id, status, note, actor, at)
+       VALUES ($1, $2, $3, $4, $5, $6::timestamptz)`,
+      [`NH-${randomUUID()}`, change.site_id, status, body.note, actorId, body.at],
+    );
+  }
+  return {
+    action: body.action,
+    status,
+    waiting_on: waiting,
+    owner,
+    next_step: next,
+    note: body.note,
+    last_action: lastAction,
+    last_action_date: lastDate,
+    at: body.at,
+    actor: actorId,
+  };
+}
+
 async function applyOne(
   sql: Sql,
   actor: Actor,
@@ -814,7 +875,7 @@ async function applyOne(
   }
   const tag = change.entity_type === "tag";
   const family = tag ? (change.payload as TagPayload).family : "";
-  const siteKeyed = change.entity_type === "stage" || change.entity_type === "site";
+  const siteKeyed = change.entity_type === "stage" || change.entity_type === "site" || change.entity_type === "nda";
   const lock = tag ? `tag:${change.site_id}:${family}` : siteKeyed ? `${change.entity_type}:${change.site_id}` : `${change.entity_type}:${change.entity_id || "new"}`;
   await lockKey(sql, lock);
   const mintedKind = change.entity_type === "comms"
@@ -875,6 +936,8 @@ async function applyOne(
     };
   } else if (change.entity_type === "site") {
     payload = await writeSite(sql, change, actor.id, version, mode);
+  } else if (change.entity_type === "nda") {
+    payload = await writeNda(sql, change, actor.id, version);
   } else if (change.entity_type === "activity") {
     payload = await writeActivity(sql, change, entityId, actor.id, version);
   } else if (change.entity_type === "pnl_line" && isPnlRetract(change.payload)) {

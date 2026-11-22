@@ -22,7 +22,9 @@ for (const size of sizes) {
     await tab.click();
     await expect(page).toHaveURL(/nda=1/);
     await expect(page.getByTestId("nda-queue")).toBeVisible();
-    await expect(page.getByTestId("view-help")).toHaveText("Agreements still open");
+    await expect(page.getByTestId("nda-export")).toBeVisible();
+    if (size.width < 768) await expect(page.getByTestId("nda-cards")).toBeVisible();
+    else await expect(page.getByRole("button", { name: "NDA id" })).toBeVisible();
   });
 
   test(`Dropped keeps the market and the zoom at ${size.width}`, async ({ page }, info) => {

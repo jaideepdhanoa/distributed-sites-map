@@ -1002,6 +1002,18 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .nda-filters label.loop-filter { display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-body); color: var(--ink); }
 .nda-bar { padding: 8px 12px; border-bottom: 1px solid var(--line); background: #faf7f1; }
 .nda-scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px 28px; }
+.nda-work { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.nda-sheet { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.nda-sheet > .list-scroll { flex: 1; min-height: 0; }
+.nda-cards { display: none; }
+.nda-card { display: grid; gap: 2px; width: 100%; text-align: left; }
+.nda-detail { position: absolute; inset: 0; z-index: 6; overflow: auto; background: #faf7f1; padding: 0 0 32px; }
+.nda-detail h2, .nda-detail h3 { margin: 12px 16px 8px; font-size: var(--type-lead); }
+.nda-detail section > .note, .nda-detail .nda-sites, .nda-detail .nda-history { margin-left: 16px; margin-right: 16px; }
+.nda-actions { display: grid; gap: 8px; max-width: 36rem; margin: 0 16px 12px; }
+.nda-actions label { display: grid; gap: 4px; }
+.nda-history { margin: 0; padding-left: 1.2rem; display: grid; gap: 8px; }
+.nda-history p { margin: 0; }
 .nda-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
 .nda-row { background: #fffdf8; border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-wrap: anywhere; }
 .nda-row h3 { margin: 0 0 6px; font-size: var(--type-lead); font-weight: 650; }
@@ -1674,6 +1686,9 @@ tr { cursor: pointer; }
   .shell.nda-open.drawer-open .nda-pane, .shell.loops-open.drawer-open .nda-pane { right: 0; bottom: var(--sheet-h, 56vh); z-index: 3; }
   .nda-filters select.secondary, .nda-filters label.loop-filter { min-height: 44px; }
   .nda-row .text-link { min-height: 44px; display: inline-flex; align-items: center; }
+  .nda-sheet { display: none; }
+  .nda-cards { display: block; overflow: auto; padding: 12px 16px 28px; }
+  .nda-card { min-height: 44px; }
   .stack-list { display: block; }
   .stack-list button {
     width: 100%;

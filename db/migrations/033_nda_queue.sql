@@ -1,6 +1,7 @@
 -- NDA queue writes. The register snapshot stays the baseline.
--- nda_state holds the latest status, court, owner, and next step.
+-- nda_state holds the latest status, waiting-on, owner, and next step.
 -- nda_history keeps each status change and the note that came with it.
+-- Notes may use target_kind nda so one agreement has one thread.
 -- The app does not apply this file to production.
 
 CREATE TABLE IF NOT EXISTS nda_state (
@@ -26,6 +27,10 @@ CREATE TABLE IF NOT EXISTS nda_history (
 );
 
 CREATE INDEX IF NOT EXISTS nda_history_nda_idx ON nda_history (nda_id, at);
+
+ALTER TABLE notes DROP CONSTRAINT IF EXISTS notes_target_kind_check;
+ALTER TABLE notes ADD CONSTRAINT notes_target_kind_check
+  CHECK (target_kind IN ('site', 'deal', 'suggestion', 'site_space', 'nda'));
 
 DO $$
 DECLARE

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { RecordActions } from "./actions/RecordActions";
 import Timeline from "./timeline/Timeline";
 import { brokerFollowUp } from "@/lib/ndaDraft";
-import { coveredSites, discussionSite, queueCourt, type NdaQueueItem } from "@/lib/nda";
+import { coveredSites, queueCourt, type NdaQueueItem } from "@/lib/nda";
 
 const STATUSES = [
   "With counterparty legal",
@@ -49,7 +49,6 @@ export default function NdaDetail({
   onSaved: () => void;
 }) {
   const sites = coveredSites(row.site_ids || "").ids;
-  const thread = discussionSite(row);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [status, setStatus] = useState(row.nda_status || STATUSES[0]);
   const [court, setCourt] = useState(queueCourt(row) === "—" ? "" : queueCourt(row));
@@ -75,6 +74,10 @@ export default function NdaDetail({
   }, []);
 
   async function save(payload: Record<string, string>) {
+    if (payload.action === "status" && !payload.note.trim()) {
+      setError("A status change needs a note.");
+      return;
+    }
     setPending(true);
     setError("");
     try {
@@ -126,14 +129,14 @@ export default function NdaDetail({
           </select>
         </label>
         <label>
-          Court
-          <input className="field" aria-label="Court" value={court} onChange={(event) => setCourt(event.target.value)} maxLength={80} />
+          Waiting on
+          <input className="field" aria-label="Waiting on" value={court} onChange={(event) => setCourt(event.target.value)} maxLength={80} />
         </label>
         <label>
           Note
-          <textarea className="field" aria-label="Status note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={400} rows={3} />
+          <textarea className="field" aria-label="Status note" required value={note} onChange={(event) => setNote(event.target.value)} maxLength={400} rows={3} />
         </label>
-        <button type="button" className="paper-btn" disabled={pending} onClick={() => void save({ action: "status", status, waiting_on: court, note })}>Save status</button>
+        <button type="button" className="paper-btn" disabled={pending || !note.trim()} onClick={() => void save({ action: "status", status, waiting_on: court, note })}>Save status</button>
         <h3>Assign owner</h3>
         <label>
           Owner
@@ -162,12 +165,7 @@ export default function NdaDetail({
       </section>
       <section data-testid="nda-discussion">
         <h3>Discussion</h3>
-        {thread ? (
-          <>
-            <p className="note">Comments stay on {thread}, the first covered site, so mentions use that thread.</p>
-            <RecordActions kind="deal" id={thread} variant="queue" />
-          </>
-        ) : <p className="note">This agreement has no Pipeline or Land row yet, so there is no discussion thread.</p>}
+        <RecordActions kind="nda" id={row.nda_id} />
       </section>
       <section>
         <h3>Follow-up</h3>

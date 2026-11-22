@@ -20,4 +20,17 @@ test("the NDA queue is a table on desktop and cards on a phone", async ({ page }
   expect(draft.toLowerCase()).not.toContain("charging");
   expect(draft).not.toMatch(/\bAVs?\b/i);
   await expect(page.getByRole("button", { name: "Copy draft" })).toBeVisible();
+  await expect(page.getByTestId("nda-draft-text")).not.toHaveValue(/Thank you/);
+});
+
+test("the NDA detail stays within a phone width", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone width");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?nda=1", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("nda-cards")).toBeVisible();
+  await page.getByTestId("nda-cards").locator("button").first().click();
+  const panel = page.getByTestId("nda-detail");
+  await expect(panel).toBeVisible();
+  const fit = await panel.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  expect(fit.scroll).toBeLessThanOrEqual(fit.client);
 });

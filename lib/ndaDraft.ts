@@ -8,17 +8,17 @@ export function brokerFollowUp(row: Pick<NdaAgreement, "nda_id" | "site_ids" | "
   const covered = sites.ids.length ? sites.ids.join(", ") : "the sites on this agreement";
   const party = counterpartyLine(row);
   const hello = party ? `Hello ${party.split(" · ")[0]},` : "Hello,";
-  const text = [
+  const status = String(row.nda_status || "").trim();
+  const lines = [
     hello,
     "",
     `Following up on ${row.nda_id}.`,
     `Covered sites: ${covered}.`,
-    `Status: ${row.nda_status || "open"}.`,
-    `Court: ${queueCourt(row)}.`,
-    "Please reply with the next step when you can.",
-    "",
-    "Thank you",
-  ].join("\n");
+  ];
+  if (status) lines.push(`Status: ${status}.`);
+  lines.push(`Waiting on: ${queueCourt(row)}.`);
+  lines.push("Please reply with the next step when you can.");
+  const text = lines.join("\n");
   if (BROKER_BANNED.test(text)) throw new Error("The follow-up draft used a banned word.");
   return text;
 }

@@ -234,7 +234,12 @@ test("a saved status sits on the register row and a closed one leaves the queue"
   assert.equal(closed.length, 0);
   const draft = brokerFollowUp(row);
   assert.equal(draftMentionsProduct(draft), false);
+  assert.equal(draft.includes("Thank you"), false);
+  assert.match(draft, /Status: With counterparty legal/);
   assert.match(draft, /NDA-901/);
+  const blank = brokerFollowUp({ ...row, nda_status: "  " });
+  assert.equal(blank.includes("Status:"), false);
+  assert.equal(blank.includes("Thank you"), false);
 });
 
 test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {

@@ -15,6 +15,11 @@ function parseNoteTarget(kind: string | null, id: string): { targetKind: ThreadK
     if (!SPACE_ID.test(targetId)) throw new InputError("That record id is not valid.");
     return { targetKind: "site_space", targetId };
   }
+  if (kind === "nda") {
+    const targetId = id.trim().toUpperCase();
+    if (!/^NDA-\d{3,}$/.test(targetId)) throw new InputError("That record id is not valid.");
+    return { targetKind: "nda", targetId };
+  }
   return parseTarget(kind, id);
 }
 

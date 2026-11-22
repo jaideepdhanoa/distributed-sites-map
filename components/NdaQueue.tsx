@@ -30,7 +30,7 @@ function columns(): SheetColumn<NdaQueueItem>[] {
     { id: "sites", label: "Covered sites", text: (row) => coveredSites(row.site_ids || "").ids.join(", ") || "—" },
     { id: "party", label: "Counterparty", text: (row) => counterpartyLine(row) || "—" },
     { id: "status", label: "Status", text: (row) => row.nda_status || "—" },
-    { id: "court", label: "Court", text: (row) => queueCourt(row) },
+    { id: "court", label: "Waiting on", text: (row) => queueCourt(row) },
     { id: "daysOpen", label: "Days open", text: (row) => dayCount(row.nda_days_open) == null ? "—" : String(dayCount(row.nda_days_open)), sortValue: (row) => dayCount(row.nda_days_open) },
     { id: "daysCourt", label: "Days in court", text: (row) => courtDayCount(row.nda_days_in_court) == null ? "—" : String(courtDayCount(row.nda_days_in_court)), sortValue: (row) => courtDayCount(row.nda_days_in_court) },
     { id: "last", label: "Last action", text: (row) => lastActionLine(row) },

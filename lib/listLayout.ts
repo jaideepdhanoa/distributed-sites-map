@@ -62,15 +62,8 @@ const MONEY_FLOOR: Record<string, number> = {
   cashFlow: 152,
 };
 
-/** Open land, power, and traffic give up width before the money columns do. */
-const YIELD_FLOOR: Record<string, number> = {
-  openLand: 48,
-  capacity: 48,
-  traffic: 80,
-};
-
 /** Columns that take leftover pane width. County check stays a fixed compact column. */
-export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow", "type", "spare"]);
+export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "cashFlow", "type", "spare"]);
 
 /** The Show on map column. It stays this wide so spare pane width does not pool there. */
 export const TRAILING_COLUMN_WIDTH = 112;
@@ -252,9 +245,9 @@ export function clampWidth(value: number): number {
  * floor when a saved width is narrower than the header and a dollar amount.
  * Leftover width goes to flexible columns that were not saved, or to the last
  * flexible column when every one of them was saved.
- * A narrow pane takes width from Open land, Power, and Traffic first, then
- * from other flexible columns, and from Site only after the money columns
- * are at their floor.
+ * A narrow pane takes width from `yieldFloors` first, then from other flexible
+ * columns, and from an unsaved Site column only after the money columns are
+ * at their floor.
  */
 export function fitColumnWidths(
   ids: string[],
@@ -262,6 +255,7 @@ export function fitColumnWidths(
   paneWidth: number,
   trailing = 0,
   flexIds: ReadonlySet<string> = FLEX_COLUMN_IDS,
+  yieldFloors: Record<string, number> = {},
 ): number[] {
   const base = ids.map((id) => {
     const saved = savedWidths[id];
@@ -300,11 +294,11 @@ export function fitColumnWidths(
       left -= cuts[position];
     });
   };
-  const yieldIndexes = ids.flatMap((id, index) => (id in YIELD_FLOOR ? [index] : []));
+  const yieldIndexes = ids.flatMap((id, index) => (typeof yieldFloors[id] === "number" ? [index] : []));
   const siteSaved = typeof savedWidths.site === "number" && Number.isFinite(savedWidths.site);
   const siteIndexes = !siteSaved && ids.includes("site") ? [ids.indexOf("site")] : [];
-  const other = openFlex.filter((index) => !(ids[index] in YIELD_FLOOR) && !MONEY_FLOOR[ids[index]] && ids[index] !== "site");
-  cutFrom(yieldIndexes, (index) => YIELD_FLOOR[ids[index]]);
+  const other = openFlex.filter((index) => yieldFloors[ids[index]] == null && !MONEY_FLOOR[ids[index]] && ids[index] !== "site");
+  cutFrom(yieldIndexes, (index) => yieldFloors[ids[index]]);
   cutFrom(other, () => MIN_WIDTH);
   cutFrom(siteIndexes, () => SITE_MIN_WIDTH);
   return base;

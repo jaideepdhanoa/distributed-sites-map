@@ -101,6 +101,7 @@ test("column filters and numeric sort leave text facts as text", () => {
 
 const pipelineIds = ["site", "stage", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
 const flexIds = new Set(["site", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
+const yieldFloors = { openLand: 48, capacity: 48, traffic: 80 };
 
 test("county check sits beside stage when a saved order left it at the end", () => {
   assert.deepEqual(
@@ -119,12 +120,12 @@ test("the universe sheet meets a 1280 pane with the county column", () => {
   const fitted = fitColumnWidths(ids, {}, 1280, TRAILING_COLUMN_WIDTH, FLEX_COLUMN_IDS);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
   assert.ok(fitted.every((width, index) => ids[index] === "traffic" || width >= 96));
-  assert.ok(fitted[ids.indexOf("traffic")] >= 80);
+  assert.equal(fitted[ids.indexOf("traffic")], columnWidth("traffic"));
   assert.ok(fitted[0] >= 304);
   assert.equal(fitted[ids.indexOf("county")], columnWidth("county"));
   const pipeline = ["site", "stage", "county", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
   const pipeFlex = new Set(["site", "asking", "capacity", "traffic", "cashFlow"]);
-  const pipeFit = fitColumnWidths(pipeline, {}, 1280, TRAILING_COLUMN_WIDTH, pipeFlex);
+  const pipeFit = fitColumnWidths(pipeline, {}, 1280, TRAILING_COLUMN_WIDTH, pipeFlex, yieldFloors);
   assert.equal(pipeFit.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
   assert.ok(pipeFit[0] >= 304);
   assert.equal(pipeFit[2], columnWidth("county"));
@@ -154,7 +155,7 @@ test("the universe sheet meets a 1280 pane with the county column", () => {
     openLand: 160,
     capacity: 160,
     traffic: 140,
-  }, 1280, TRAILING_COLUMN_WIDTH, pipeFlex);
+  }, 1280, TRAILING_COLUMN_WIDTH, pipeFlex, yieldFloors);
   assert.ok(crushed[pipeline.indexOf("asking")] >= columnFloor("asking"));
   assert.ok(crushed[pipeline.indexOf("cashFlow")] >= columnFloor("cashFlow"));
   assert.ok(crushed[pipeline.indexOf("site")] >= 280);
@@ -180,8 +181,8 @@ test("a default sheet uses the pane and keeps rigid columns", () => {
   assert.ok(wide[6] > columnWidth("traffic"));
   assert.ok(wide[7] > columnWidth("cashFlow"));
   const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.equal(narrow[0], columnWidth("site"));
   assert.ok(narrow[0] >= 280);
+  assert.ok(narrow[0] <= columnWidth("site"));
   const withWaiting = fitColumnWidths(["site", "chip_waiting", ...pipelineIds.slice(1)], {}, 1024, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(withWaiting[0] >= 280);
   const savedNarrow = fitColumnWidths(

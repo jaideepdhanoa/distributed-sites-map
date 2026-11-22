@@ -7,6 +7,7 @@ import {
   columnWidth,
   cycleSort,
   defaultLayout,
+  columnFloor,
   displayIds,
   FLEX_COLUMN_IDS,
   fitColumnWidths,
@@ -117,7 +118,8 @@ test("the universe sheet meets a 1280 pane with the county column", () => {
   const ids = ["site", "stage", "county", "score", "spare", "grade", "traffic", "listed"];
   const fitted = fitColumnWidths(ids, {}, 1280, TRAILING_COLUMN_WIDTH, FLEX_COLUMN_IDS);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
-  assert.ok(fitted.every((width) => width >= 96));
+  assert.ok(fitted.every((width, index) => ids[index] === "traffic" || width >= 96));
+  assert.ok(fitted[ids.indexOf("traffic")] >= 80);
   assert.ok(fitted[0] >= 304);
   assert.equal(fitted[ids.indexOf("county")], columnWidth("county"));
   const pipeline = ["site", "stage", "county", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
@@ -127,6 +129,10 @@ test("the universe sheet meets a 1280 pane with the county column", () => {
   assert.ok(pipeFit[0] >= 304);
   assert.equal(pipeFit[2], columnWidth("county"));
   assert.equal(columnWidth("county"), 120);
+  assert.ok(pipeFit[pipeline.indexOf("asking")] >= columnFloor("asking"));
+  assert.ok(pipeFit[pipeline.indexOf("cashFlow")] >= columnFloor("cashFlow"));
+  assert.ok(pipeFit[pipeline.indexOf("openLand")] < pipeFit[pipeline.indexOf("asking")]);
+  assert.ok(pipeFit[pipeline.indexOf("capacity")] < pipeFit[pipeline.indexOf("cashFlow")]);
   const saved = {
     site: 280,
     stage: 140,
@@ -141,6 +147,19 @@ test("the universe sheet meets a 1280 pane with the county column", () => {
   assert.equal(kept[0], 280);
   assert.equal(kept[2], columnWidth("county"));
   assert.ok(kept[8] > 400);
+  const crushed = fitColumnWidths(pipeline, {
+    site: 280,
+    asking: 70,
+    cashFlow: 50,
+    openLand: 160,
+    capacity: 160,
+    traffic: 140,
+  }, 1280, TRAILING_COLUMN_WIDTH, pipeFlex);
+  assert.ok(crushed[pipeline.indexOf("asking")] >= columnFloor("asking"));
+  assert.ok(crushed[pipeline.indexOf("cashFlow")] >= columnFloor("cashFlow"));
+  assert.ok(crushed[pipeline.indexOf("site")] >= 280);
+  assert.ok(crushed[pipeline.indexOf("openLand")] < 160);
+  assert.equal(crushed.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1280);
 });
 
 test("a default sheet uses the pane and keeps rigid columns", () => {
@@ -149,9 +168,11 @@ test("a default sheet uses the pane and keeps rigid columns", () => {
     assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, pane);
     assert.equal(fitted[1], columnWidth("stage"));
     assert.equal(fitted[2], columnWidth("score"));
-    assert.equal(fitted[4], columnWidth("openLand"));
-    assert.ok(fitted.every((width) => width >= 96));
+    assert.ok(fitted[pipelineIds.indexOf("asking")] >= columnFloor("asking"));
+    assert.ok(fitted[pipelineIds.indexOf("cashFlow")] >= columnFloor("cashFlow"));
   }
+  const wideOpen = fitColumnWidths(pipelineIds, {}, 1920, TRAILING_COLUMN_WIDTH, flexIds);
+  assert.equal(wideOpen[pipelineIds.indexOf("openLand")], columnWidth("openLand"));
   const wide = fitColumnWidths(pipelineIds, {}, 1920, TRAILING_COLUMN_WIDTH, flexIds);
   assert.ok(wide[0] > columnWidth("site"));
   assert.ok(wide[3] > columnWidth("asking"));
@@ -189,13 +210,13 @@ test("a saved layout keeps its widths and the last flexible column fills a wider
   const fitted = fitColumnWidths(pipelineIds, widths, 1600, TRAILING_COLUMN_WIDTH, flexIds);
   assert.equal(fitted[0], 300);
   assert.equal(fitted[1], 140);
-  assert.equal(fitted[3], 150);
+  assert.equal(fitted[3], columnFloor("asking"));
   assert.equal(fitted[5], 130);
   assert.equal(fitted[6], 100);
   assert.ok(fitted[7] > 140);
   assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1600);
   const askingLast = fitColumnWidths(["site", "cashFlow", "asking"], { site: 300, cashFlow: 120, asking: 140 }, 900, 0, flexIds);
-  assert.deepEqual(askingLast, [300, 120, 480]);
+  assert.deepEqual(askingLast, [300, columnFloor("cashFlow"), 900 - 300 - columnFloor("cashFlow")]);
   const wider = fitColumnWidths(pipelineIds, { ...widths, site: 420, asking: 400, capacity: 400, traffic: 300, cashFlow: 400 }, 1280, TRAILING_COLUMN_WIDTH, flexIds);
   assert.equal(wider[0], 420);
   assert.equal(wider[7], 400);

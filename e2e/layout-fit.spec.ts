@@ -27,9 +27,8 @@ for (const size of viewports) {
     await failActions(page);
     await page.goto("/?funnel=pipeline&city=PHX", { waitUntil: "domcontentloaded" });
     await expect(page.getByText("Discussion is unavailable on this preview")).toBeVisible();
-    await expect(page.getByTestId("view-help")).toHaveText("Deals in this market");
+    await expect(page.getByTestId("view-help")).toHaveCount(0);
     await topInView(page, ".map-stage");
-    await topInView(page, "[data-testid=view-help]");
     await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
     await topInView(page, "[data-testid=pipeline-list]");
   });

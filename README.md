@@ -275,7 +275,7 @@ Resend is the sender. The Vercel integration injects `RESEND_API_KEY` and `RESEN
 4. Connect the Resend integration to this project so `RESEND_API_KEY` and `RESEND_EMAIL_DOMAIN` are set. `ALERT_FROM` is optional.
 5. Set `APP_URL` to `https://distributedsites.com`. Links in the mail use `APP_URL`. If it is unset, they use `https://distributedsites.com`.
 
-Live mail goes only to accounts named in `liveUsernames` in `config/alerts.json`. That list is `jaideep` until a test send is approved. Every other account is written to the would-send log and is not handed to Resend.
+Live mail goes only to accounts named in `liveUsernames` in `config/alerts.json`: jaideep, cindel, ming, ricardo, yuka, jason, mark, brittni, and jose. Muse and Indie stay off that list. Every other account is written to the would-send log and is not handed to Resend. Each person's mailbox is the `email` field on their `AUTH_USERS` entry. A saved preference still chooses Instant, Digest, or Off, and every account except the owner still gets at most six instant emails in a Pacific day.
 
 Replies go to `jaideep@dhanoa.in`. Set `ALERT_REPLY_TO` only to use a different reply address.
 

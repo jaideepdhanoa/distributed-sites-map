@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, clusterTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
+import { CLUSTER_SOURCE, PHONE_BUBBLE_PX, PIN_SPLIT_ZOOM, clusterBubbleLabel, leafBounds, phoneBubbleRadius, takeSolo, type PinFeature } from "@/lib/mapClusters";
 import { mutedPositronStyle } from "@/lib/mutedStyle";
 import { AREA_TIP_DWELL_MS, placeReadableTip, type TipBox } from "@/lib/tipPlace";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
@@ -116,6 +117,32 @@ function pointPadding(map: Map) {
   return { top: 0, bottom: 0, left: 0, right: drawerInset(map) };
 }
 
+function applyClusterChrome(map: Map) {
+  const phone = window.matchMedia("(max-width: 767px)").matches;
+  if (map.getLayer("clusters")) {
+    map.setPaintProperty("clusters", "circle-radius", phone ? phoneBubbleRadius() : ["step", ["get", "point_count"], 18, 20, 20, 80, 24]);
+  }
+  if (map.getLayer("clusters-halo")) {
+    map.setPaintProperty("clusters-halo", "circle-radius", phone ? phoneBubbleRadius() + 7 : ["+", ["step", ["get", "point_count"], 18, 20, 20, 80, 24], 7]);
+  }
+  const pinIcon = phone ? PHONE_BUBBLE_PX / 36 : 0.9;
+  if (map.getLayer("focus-pin")) map.setLayoutProperty("focus-pin", "icon-size", phone ? PHONE_BUBBLE_PX / 36 : 0.92);
+  if (map.getLayer("offmarket")) map.setLayoutProperty("offmarket", "icon-size", phone ? pinIcon : 0.9);
+  if (map.getLayer("deals-pipe")) map.setLayoutProperty("deals-pipe", "icon-size", phone ? pinIcon : 0.9);
+  if (map.getLayer("deals-land")) map.setLayoutProperty("deals-land", "icon-size", phone ? pinIcon : 0.9);
+  if (map.getLayer("sites")) {
+    map.setLayoutProperty("sites", "icon-size", phone ? pinIcon : ["interpolate", ["linear"], ["zoom"], 8, 0.74, 14, 0.92]);
+  }
+  const shell = map.getContainer().closest(".stage-map");
+  if (shell instanceof HTMLElement) shell.dataset.clusterPx = phone ? String(PHONE_BUBBLE_PX) : "36";
+}
+
+function markZoomBand(map: Map) {
+  const band = map.getZoom() >= PIN_SPLIT_ZOOM ? "pins" : "groups";
+  const shell = map.getContainer().closest(".stage-map");
+  if (shell instanceof HTMLElement) shell.dataset.zoomBand = band;
+}
+
 function glide(map: Map, center: [number, number], zoom: number) {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   map.flyTo({ center, zoom, padding: pointPadding(map), duration: reduce ? 0 : 300, essential: true });
@@ -147,7 +174,7 @@ function fitMap(
   const cover = Math.max(drawerInset(map), reserved.right ?? 0);
   const padding = {
     top: Math.min(options.padding.top, Math.floor(roomHeight / 5)),
-    bottom: Math.min(options.padding.bottom, Math.floor(roomHeight / 5)),
+      bottom: Math.min(options.padding.bottom, Math.floor(roomHeight / 5)),
     left: Math.min(options.padding.left, Math.floor(roomWidth / 6)),
     right: Math.min(Math.max(0, cover - (reserved.right ?? 0)), Math.max(0, roomWidth - 48)),
   };
@@ -279,9 +306,11 @@ export default function MapView(props: Props) {
           areas: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           parcels: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "area-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-          sites: { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterRadius: 48, clusterMaxZoom: 11 },
+          sites: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          pins: { type: "geojson", data: { type: "FeatureCollection", features: [] }, ...CLUSTER_SOURCE },
+          "focus-pin": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "deal-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           unscreened: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -314,70 +343,73 @@ export default function MapView(props: Props) {
           {
             id: "missing-parcel",
             type: "circle",
-            source: "sites",
+            source: "pins",
             minzoom: 14,
-            filter: ["==", ["get", "parcel_match"], "none"],
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "parcel_match"], "none"]],
             paint: { "circle-radius": 13, "circle-color": "transparent", "circle-stroke-color": "#a8711b", "circle-stroke-width": 2 },
           },
           {
             id: "missing-parcel-deals",
             type: "circle",
-            source: "deals",
+            source: "pins",
             minzoom: 14,
-            filter: ["==", ["get", "parcel_match"], "none"],
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "parcel_match"], "none"]],
             paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#a8711b", "circle-stroke-width": 2 },
           },
           {
             id: "offmarket-halo",
             type: "circle",
-            source: "offmarket",
-            filter: ["==", ["get", "site_id"], ""],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], ""]],
             paint: { "circle-radius": 22, "circle-color": "#8a8173", "circle-opacity": 0.16 },
           },
           {
             id: "offmarket",
             type: "symbol",
-            source: "offmarket",
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"]],
             layout: { "icon-image": "dia-stone", "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "offmarket-selected",
             type: "circle",
-            source: "offmarket",
-            filter: ["==", ["get", "site_id"], ""],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], ""]],
             paint: { "circle-radius": 16, "circle-color": "transparent", "circle-stroke-color": "#fffdf8", "circle-stroke-width": 2 },
           },
           {
             id: "clusters-halo",
             type: "circle",
-            source: "sites",
+            source: "pins",
             filter: ["has", "point_count"],
             paint: {
               "circle-color": "#1e4636",
-              "circle-opacity": 0.14,
-              "circle-radius": ["+", ["step", ["get", "point_count"], 16, 20, 20, 80, 26], 6],
+              "circle-opacity": 0.22,
+              "circle-stroke-color": "#1c1914",
+              "circle-stroke-width": 2,
+              "circle-radius": ["+", ["step", ["get", "point_count"], 18, 20, 20, 80, 24], 7],
             },
           },
           {
             id: "clusters",
             type: "circle",
-            source: "sites",
+            source: "pins",
             filter: ["has", "point_count"],
-            paint: { "circle-color": "#1e4636", "circle-radius": ["step", ["get", "point_count"], 15, 20, 18, 80, 22], "circle-stroke-color": "#fffdf8", "circle-stroke-width": 2.5, "circle-opacity": 1 },
+            paint: { "circle-color": "#1e4636", "circle-radius": ["step", ["get", "point_count"], 18, 20, 20, 80, 24], "circle-stroke-color": "#fffdf8", "circle-stroke-width": 3, "circle-opacity": 1 },
           },
           {
             id: "cluster-count",
             type: "symbol",
-            source: "sites",
+            source: "pins",
             filter: ["has", "point_count"],
-            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 13 },
-            paint: { "text-color": "#fffdf8" },
+            layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 13, "text-allow-overlap": true },
+            paint: { "text-color": "#fffdf8", "text-halo-color": "#1e4636", "text-halo-width": 1 },
           },
           {
             id: "tier-large-halo",
             type: "circle",
-            source: "sites",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L10"]],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 10, 14, 16],
               "circle-color": "transparent",
@@ -389,8 +421,8 @@ export default function MapView(props: Props) {
           {
             id: "tier-large",
             type: "circle",
-            source: "sites",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L10"]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L10"]],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 14, 12, 20, 15, 28],
               "circle-color": "transparent",
@@ -401,8 +433,8 @@ export default function MapView(props: Props) {
           {
             id: "tier-small-halo",
             type: "circle",
-            source: "sites",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L4"]],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 7, 14, 11],
               "circle-color": "transparent",
@@ -414,8 +446,8 @@ export default function MapView(props: Props) {
           {
             id: "tier-small",
             type: "circle",
-            source: "sites",
-            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "land_tier"], "L4"]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "land_tier"], "L4"]],
             paint: {
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 11, 15, 14],
               "circle-color": "transparent",
@@ -426,7 +458,7 @@ export default function MapView(props: Props) {
           {
             id: "selected-halo",
             type: "circle",
-            source: "sites",
+            source: "pins",
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
             paint: {
               "circle-radius": 24,
@@ -446,15 +478,15 @@ export default function MapView(props: Props) {
           {
             id: "selected",
             type: "circle",
-            source: "sites",
+            source: "pins",
             filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], ""]],
             paint: { "circle-radius": 15, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "sites",
             type: "symbol",
-            source: "sites",
-            filter: ["!", ["has", "point_count"]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"]],
             layout: {
               "icon-image": [
                 "case",
@@ -473,14 +505,14 @@ export default function MapView(props: Props) {
           {
             id: "linked",
             type: "circle",
-            source: "sites",
-            filter: ["all", ["has", "linked_deal_id"], ["!=", ["get", "linked_deal_id"], ""]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["has", "linked_deal_id"], ["!=", ["get", "linked_deal_id"], ""]],
             paint: { "circle-radius": 11, "circle-color": "transparent", "circle-stroke-color": "#f7f3ea", "circle-stroke-width": 2 },
           },
           {
             id: "deal-halo",
             type: "circle",
-            source: "deals",
+            source: "pins",
             filter: ["==", ["get", "deal_id"], ""],
             paint: {
               "circle-radius": 24,
@@ -498,22 +530,22 @@ export default function MapView(props: Props) {
           {
             id: "deal-ring",
             type: "circle",
-            source: "deals",
+            source: "pins",
             filter: ["==", ["get", "deal_id"], ""],
             paint: { "circle-radius": 15, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
           },
           {
             id: "deals-pipe",
             type: "symbol",
-            source: "deals",
-            filter: ["==", ["get", "kind"], "pipeline"],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "kind"], "pipeline"]],
             layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "deal-site-badge",
             type: "symbol",
-            source: "deals",
-            filter: ["all", ["==", ["get", "kind"], "pipeline"], ["has", "universe_id"], ["!=", ["get", "universe_id"], ""]],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "kind"], "pipeline"], ["has", "universe_id"], ["!=", ["get", "universe_id"], ""]],
             layout: {
               "text-field": "Site",
               "text-font": ["Noto Sans Regular"],
@@ -545,14 +577,15 @@ export default function MapView(props: Props) {
           {
             id: "deals-land",
             type: "symbol",
-            source: "deals",
-            filter: ["==", ["get", "kind"], "land"],
+            source: "pins",
+            filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "kind"], "land"]],
             layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "deal-pills",
             type: "symbol",
             source: "deal-labels",
+            minzoom: PIN_SPLIT_ZOOM,
             layout: {
               "text-field": ["get", "pill"],
               "text-font": ["Noto Sans Regular"],
@@ -629,6 +662,33 @@ export default function MapView(props: Props) {
           },
           { id: "measure-fill", type: "fill", source: "measure", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#1e4636", "fill-opacity": 0.28 } },
           { id: "measure", type: "line", source: "measure", paint: { "line-color": "#fffdf8", "line-width": 2 } },
+          {
+            id: "focus-ring",
+            type: "circle",
+            source: "focus-pin",
+            paint: { "circle-radius": 18, "circle-color": "#e7f0ea", "circle-stroke-color": "#1e4636", "circle-stroke-width": 3 },
+          },
+          {
+            id: "focus-pin",
+            type: "symbol",
+            source: "focus-pin",
+            layout: {
+              "icon-image": [
+                "case",
+                ["==", ["get", "pin_kind"], "deal"], ["concat", "sq-", ["coalesce", ["get", "stage_group"], "sourced"]],
+                ["==", ["get", "pin_kind"], "off"], "dia-stone",
+                ["all", ["==", ["get", "verdict"], "PASS"], ["==", ["get", "network_status"], "held"]], "dia-held",
+                ["==", ["get", "verdict"], "PASS"], "dia-moss",
+                ["==", ["get", "verdict"], "MAYBE"], "dia-amber",
+                ["==", ["get", "verdict"], "UNRESOLVED"], "dia-clay",
+                ["==", ["get", "verdict"], "FAIL"], "dia-clay",
+                ["==", ["get", "verdict"], "NOT_A_WASH"], "dia-clay",
+                "dia-stone",
+              ],
+              "icon-size": 0.92,
+              "icon-allow-overlap": true,
+            },
+          },
           {
             id: "review-ring",
             type: "circle",
@@ -823,15 +883,34 @@ export default function MapView(props: Props) {
         }
       }
       if (!map.hasImage("tri-land")) map.addImage("tri-land", { width: size, height: size, data: triangle });
+      const openGroup = (clusterId: number) => {
+        const source = map.getSource("pins") as GeoJSONSource;
+        source.getClusterLeaves(clusterId, 10000, 0).then((leaves) => {
+          const bounds = leafBounds(leaves as PinFeature[]);
+          if (!bounds) return;
+          const phone = window.matchMedia("(max-width: 767px)").matches;
+          const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          fitMap(map, bounds, {
+            padding: phone
+              ? { top: 96, bottom: 120, left: 28, right: 28 }
+              : { top: 72, bottom: 64, left: 48, right: Math.max(48, drawerInset(map)) },
+            maxZoom: 16,
+            duration: reduce ? 0 : 450,
+          });
+        }).catch(() => undefined);
+      };
       map.on("click", "clusters", (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
         const clusterId = feature?.properties?.cluster_id;
-        const source = map.getSource("sites") as GeoJSONSource;
-        const center = (feature?.geometry && feature.geometry.type === "Point" ? feature.geometry.coordinates : null) as [number, number] | null;
-        if (clusterId == null || !center) return;
-        source.getClusterExpansionZoom(clusterId).then((zoom) => {
-          map.easeTo({ center, zoom });
-        }).catch(() => undefined);
+        if (clusterId == null) return;
+        event.originalEvent.preventDefault();
+        openGroup(Number(clusterId));
+      });
+      map.on("click", "cluster-count", (event: MapLayerMouseEvent) => {
+        const clusterId = event.features?.[0]?.properties?.cluster_id;
+        if (clusterId == null) return;
+        event.originalEvent.preventDefault();
+        openGroup(Number(clusterId));
       });
       const lotAt = (event: MapLayerMouseEvent | MapMouseEvent) => {
         const id = spaceIdAt(map, event.point, event.lngLat, propsRef.current.spaceShapes || []);
@@ -839,6 +918,12 @@ export default function MapView(props: Props) {
         propsRef.current.onSpaceSelect?.(id);
         return true;
       };
+      map.on("click", "focus-pin", (event: MapLayerMouseEvent) => {
+        if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
+        const props = event.features?.[0]?.properties;
+        const id = props?.site_id || props?.deal_id || props?.listing_id;
+        if (typeof id === "string") propsRef.current.onSelect(id);
+      });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing) return;
         if (lotAt(event)) return;
@@ -882,7 +967,7 @@ export default function MapView(props: Props) {
       tip.dataset.hidden = "1";
       document.body.appendChild(tip);
       tipEl = tip;
-      const tipLayers = ["clusters", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "nearby-washes", ...RING_LAYER_IDS, ...AREA_LAYER_IDS];
+      const tipLayers = ["clusters", "cluster-count", "focus-pin", "sites", "offmarket", "deals-pipe", "deals-land", "unscreened", "depots", "nearby-washes", ...RING_LAYER_IDS, ...AREA_LAYER_IDS];
       const areaLayers = new Set([...AREA_LAYER_IDS, ...RING_LAYER_IDS]);
       let shownKey = "";
       let request = 0;
@@ -967,7 +1052,7 @@ export default function MapView(props: Props) {
           return;
         }
         clearDwell();
-        if (layer === "clusters") {
+        if (layer === "clusters" || layer === "cluster-count") {
           const clusterId = Number(props.cluster_id);
           const key = `cluster:${clusterId}`;
           const count = Number(props.point_count) || 0;
@@ -976,9 +1061,9 @@ export default function MapView(props: Props) {
             showTip(key, event.lngLat, clusterTip(cached), event.point);
             return;
           }
-          showTip(key, event.lngLat, { title: `${count.toLocaleString()} sites`, marks: [] }, event.point);
+          showTip(key, event.lngLat, { title: clusterBubbleLabel(count), marks: [] }, event.point);
           const ticket = ++request;
-          const source = map.getSource("sites") as GeoJSONSource;
+          const source = map.getSource("pins") as GeoJSONSource;
           source.getClusterLeaves(clusterId, Math.max(count, 1), 0).then((leaves) => {
             clusterLeaves.current.set(clusterId, leaves as { properties?: Record<string, unknown> }[]);
             if (ticket !== request || shownKey !== key) return;
@@ -987,7 +1072,9 @@ export default function MapView(props: Props) {
           }).catch(() => undefined);
           return;
         }
-        const model = layer === "unscreened"
+        const model = layer === "focus-pin"
+          ? (props.pin_kind === "deal" ? dealTip(props) : siteTip(props, props.pin_kind === "off"))
+          : layer === "unscreened"
           ? { title: String(props.name || props.address || props.listing_id || "Listing"), marks: [{ swatch: "listing", label: "Listed, not yet screened" }] }
           : layer === "offmarket"
           ? siteTip(props, true)
@@ -1109,10 +1196,16 @@ export default function MapView(props: Props) {
         paint("deal-ring", "circle-color", "#e7f0ea");
         paint("deal-ring", "circle-stroke-color", "#1e4636");
         paint("deal-ring", "circle-stroke-width", 3);
+        paint("clusters", "circle-color", "#1e4636");
+        paint("clusters", "circle-stroke-color", "#fffdf8");
         paint("clusters", "circle-stroke-width", 3);
-        paint("clusters-halo", "circle-opacity", 0.5);
-        paint("clusters-halo", "circle-stroke-color", "#fffdf8");
+        paint("clusters-halo", "circle-color", "#1e4636");
+        paint("clusters-halo", "circle-opacity", 0.28);
+        paint("clusters-halo", "circle-stroke-color", "#1c1914");
         paint("clusters-halo", "circle-stroke-width", 2);
+        paint("cluster-count", "text-color", "#fffdf8");
+        paint("cluster-count", "text-halo-color", "#1e4636");
+        paint("cluster-count", "text-halo-width", 1);
         paint("deal-pills", "text-halo-color", "#fffdf8");
         paint("deal-pills", "text-halo-width", 4);
         paint("deal-site-badge", "text-halo-width", 1.6);
@@ -1125,9 +1218,12 @@ export default function MapView(props: Props) {
         paint("offmarket-selected", "circle-stroke-width", 3);
       }
       map.on("moveend", (event) => {
+        markZoomBand(map);
         const user = Boolean((event as { originalEvent?: Event }).originalEvent);
         propsRef.current.onBounds(map.getBounds(), { user });
       });
+      applyClusterChrome(map);
+      markZoomBand(map);
       propsRef.current.onBounds(map.getBounds(), { user: false });
     });
     const observed = node.current;
@@ -1154,6 +1250,7 @@ export default function MapView(props: Props) {
       if (!near) map.jumpTo({ center: pin, zoom: 15, padding: pad });
     };
     observer = new ResizeObserver(() => {
+      applyClusterChrome(map);
       if (!propsRef.current.selectedId) {
         map.resize();
         return;
@@ -1201,20 +1298,32 @@ export default function MapView(props: Props) {
     let cancel = false;
     const push = () => {
       if (cancel) return;
-      if (!map.getSource("sites") || !map.getSource("deals") || !map.getSource("offmarket") || !map.getSource("unscreened")) {
+      if (!map.getSource("sites") || !map.getSource("deals") || !map.getSource("offmarket") || !map.getSource("unscreened") || !map.getSource("pins") || !map.getSource("focus-pin")) {
         if (mapRef.current === map) map.once("idle", push);
         return;
       }
       clusterLeaves.current.clear();
-      (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.sites.filter((f) => f.geometry) });
-      (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.offMarket.filter((f) => f.geometry) });
-      (map.getSource("deals") as GeoJSONSource).setData({
-        type: "FeatureCollection",
-        features: props.deals.filter((feature) => feature.geometry).map((feature) => ({
-          ...feature,
-          properties: publicDeal(feature.properties),
-        })),
-      });
+      const siteFeatures = props.sites.filter((feature) => feature.geometry).map((feature) => ({
+        ...feature,
+        properties: { ...feature.properties, pin_kind: "site" },
+      }));
+      const offFeatures = props.offMarket.filter((feature) => feature.geometry).map((feature) => ({
+        ...feature,
+        properties: { ...feature.properties, pin_kind: "off" },
+      }));
+      const dealFeatures = props.deals.filter((feature) => feature.geometry).map((feature) => ({
+        ...feature,
+        properties: { ...publicDeal(feature.properties), pin_kind: "deal" },
+      }));
+      (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: siteFeatures });
+      (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: offFeatures });
+      (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: dealFeatures });
+      const groupedSelection = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
+      const split = takeSolo([...siteFeatures, ...offFeatures, ...dealFeatures], groupedSelection ? null : props.selectedId);
+      (map.getSource("pins") as GeoJSONSource).setData({ type: "FeatureCollection", features: split.grouped });
+      (map.getSource("focus-pin") as GeoJSONSource).setData({ type: "FeatureCollection", features: split.solo ? [split.solo] : [] });
+      const shell = map.getContainer().closest(".stage-map");
+      if (shell instanceof HTMLElement) shell.dataset.solo = split.solo ? String(props.selectedId || "") : "";
       const queued = new Set(props.queueIds || []);
       const queueData = {
         type: "FeatureCollection" as const,
@@ -1340,6 +1449,7 @@ export default function MapView(props: Props) {
           id: "deal-pills",
           type: "symbol",
           source: "deal-labels",
+          minzoom: PIN_SPLIT_ZOOM,
           layout: {
             "text-field": ["get", "pill"],
             "text-font": ["Noto Sans Regular"],
@@ -1370,12 +1480,12 @@ export default function MapView(props: Props) {
       if (map.getLayer("parcels-selected")) {
         map.setFilter("parcels-selected", ["all", ["==", ["get", "site_id"], props.selectedId || ""], ["!=", ["get", "role"], "adjoining"]]);
       }
-      if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["==", ["get", "site_id"], props.selectedId || ""]);
-      if (map.getLayer("offmarket-halo")) map.setFilter("offmarket-halo", ["==", ["get", "site_id"], props.selectedId || ""]);
-      map.setFilter("selected", ["==", ["get", "site_id"], props.selectedId || ""]);
-      if (map.getLayer("selected-halo")) map.setFilter("selected-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "site_id"], props.selectedId || ""]]);
-      if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
-      if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
+      if (map.getLayer("offmarket-selected")) map.setFilter("offmarket-selected", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], props.selectedId || ""]]);
+      if (map.getLayer("offmarket-halo")) map.setFilter("offmarket-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "off"], ["==", ["get", "site_id"], props.selectedId || ""]]);
+      map.setFilter("selected", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "site_id"], props.selectedId || ""]]);
+      if (map.getLayer("selected-halo")) map.setFilter("selected-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "site"], ["==", ["get", "site_id"], props.selectedId || ""]]);
+      if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "deal_id"], props.selectedId || ""]]);
+      if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["all", ["!", ["has", "point_count"]], ["==", ["get", "pin_kind"], "deal"], ["==", ["get", "deal_id"], props.selectedId || ""]]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
       map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -1450,9 +1560,11 @@ export default function MapView(props: Props) {
       vis("depot-labels", depotsOn);
       for (const id of RING_LAYER_IDS) vis(id, props.showRings);
       vis("sites", props.showSites);
-      vis("clusters", props.showSites);
-      vis("clusters-halo", props.showSites);
-      vis("cluster-count", props.showSites);
+      vis("clusters", true);
+      vis("clusters-halo", true);
+      vis("cluster-count", true);
+      vis("focus-pin", true);
+      vis("focus-ring", true);
       vis("selected-halo", props.showSites);
       vis("tier-large", props.showSites);
       vis("tier-large-halo", props.showSites);
@@ -1668,7 +1780,11 @@ export default function MapView(props: Props) {
       set("sites", "icon-opacity", dimmed ? 0.3 : 1);
       set("offmarket", "icon-opacity", dimmed ? 0.3 : 1);
       set("clusters", "circle-opacity", dimmed ? 0.3 : 1);
-      set("clusters-halo", "circle-opacity", dimmed ? 0.05 : 0.14);
+      set("clusters-halo", "circle-opacity", dimmed ? 0.08 : 0.22);
+      set("cluster-count", "text-opacity", dimmed ? 0.3 : 1);
+      set("focus-pin", "icon-opacity", dimmed ? 0 : 1);
+      set("focus-ring", "circle-opacity", dimmed ? 0 : 1);
+      set("focus-ring", "circle-stroke-opacity", dimmed ? 0 : 1);
       set("unscreened", "circle-stroke-opacity", dimmed ? 0.3 : 1);
       set("deals-pipe", "icon-opacity", dimmed ? 0 : 1);
       set("deals-land", "icon-opacity", dimmed ? 0 : 1);

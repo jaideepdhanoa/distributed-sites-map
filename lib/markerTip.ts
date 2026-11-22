@@ -119,19 +119,33 @@ export function washTip(props: Record<string, unknown>): TipModel {
   };
 }
 
+function clusterMark(props: Record<string, unknown>): { id: string; label: string; order: number } {
+  const kind = text(props.pin_kind);
+  if (kind === "deal") {
+    if (text(props.kind) === "land") return { id: "land", label: "Land", order: 20 };
+    const group = text(props.stage_group) || "desk";
+    return { id: `stage-${group}`, label: stageTitle(group), order: 30 };
+  }
+  if (kind === "off") return { id: "offmarket", label: "Off-market", order: 40 };
+  const status = statusOf(props as { verdict?: string | null; network_status?: string | null; tenure_fail?: boolean });
+  return { id: status.id, label: status.label, order: STATUS_NOTES.findIndex((item) => item.id === status.id) };
+}
+
 export function clusterTip(leaves: { properties?: Record<string, unknown> }[]): TipModel {
   const counts = new Map<string, { label: string; swatch: string; count: number; order: number }>();
   for (const leaf of leaves) {
-    const status = statusOf((leaf.properties || {}) as { verdict?: string | null; network_status?: string | null; tenure_fail?: boolean });
-    const current = counts.get(status.id);
+    const mark = clusterMark(leaf.properties || {});
+    const current = counts.get(mark.id);
     if (current) current.count += 1;
-    else counts.set(status.id, { label: status.label, swatch: status.id, count: 1, order: STATUS_NOTES.findIndex((item) => item.id === status.id) });
+    else counts.set(mark.id, { label: mark.label, swatch: mark.id, count: 1, order: mark.order });
   }
   const marks = [...counts.values()]
     .sort((a, b) => a.order - b.order)
     .map((item) => ({ swatch: item.swatch, label: `${item.count.toLocaleString()} ${item.label}` }));
   const n = leaves.length;
-  return { title: `${n.toLocaleString()} site${n === 1 ? "" : "s"}`, marks };
+  const kinds = new Set(leaves.map((leaf) => text(leaf.properties?.pin_kind)));
+  const noun = kinds.size === 1 && kinds.has("deal") ? "deal" : kinds.size === 1 && (kinds.has("site") || kinds.has("")) ? "site" : "pin";
+  return { title: `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`, marks };
 }
 
 function escapeHtml(value: string) {

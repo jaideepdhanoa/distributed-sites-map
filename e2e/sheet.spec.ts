@@ -27,7 +27,7 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   await cycleSort(stage);
   await expect(stage).toHaveAttribute("aria-sort", "descending");
   await cycleSort(stage);
-  await expect(stage).toHaveAttribute("aria-sort", "none");
+  await expect(stage).toHaveAttribute("aria-sort", "ascending");
 
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("group", { name: "Columns" }).getByText("Traffic", { exact: true }).click();

@@ -39,7 +39,7 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck } from "./ListChrome";
+import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
@@ -509,32 +509,14 @@ export default function PipelineList({
           onToggle={(id) => toggleColumn(id as PipelineColumnId)}
           onReset={() => { update(defaultLayout(allowed)); onResetColumns(); }}
         />
-        <label className="list-sort only-mobile">
-          Sort
-          <select
-            className="secondary"
-            aria-label="Sort"
-            value={activeLayout.sort ? `${activeLayout.sort.id}:${activeLayout.sort.desc ? "desc" : "asc"}` : "none"}
-            onChange={(event) => {
-              if (event.target.value === "none") {
-                commit({ ...activeLayout, sort: null, touched: true });
-                return;
-              }
-              const [id, direction] = event.target.value.split(":");
-              commit({ ...activeLayout, sort: { id, desc: direction === "desc" }, touched: true });
-            }}
-          >
-            <option value="none">List order</option>
-            {visible.flatMap((id) => {
-              const column = PIPELINE_COLUMNS.find((item) => item.id === id);
-              if (!column) return [];
-              return [
-                <option key={`${column.id}:asc`} value={`${column.id}:asc`}>{column.label}, low to high</option>,
-                <option key={`${column.id}:desc`} value={`${column.id}:desc`}>{column.label}, high to low</option>,
-              ];
-            })}
-          </select>
-        </label>
+        <SortControl
+          columns={visible.flatMap((id) => {
+            const column = PIPELINE_COLUMNS.find((item) => item.id === id);
+            return column ? [{ id: column.id, label: column.label }] : [];
+          })}
+          sort={{ id: activeLayout.sort?.id || "site", desc: Boolean(activeLayout.sort?.desc) }}
+          onChange={(id, desc) => commit({ ...activeLayout, sort: { id, desc }, touched: true })}
+        />
         <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>

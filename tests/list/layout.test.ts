@@ -34,10 +34,10 @@ test("a signed-out sheet drops financials, NDA, contact, and next step", () => {
   assert.equal(layout.pinned.includes("asking"), false);
 });
 
-test("header sort cycles ascending, descending, then none", () => {
+test("header sort switches direction and does not clear", () => {
   assert.deepEqual(cycleSort(null, "stage"), { id: "stage", desc: false });
   assert.deepEqual(cycleSort({ id: "stage", desc: false }, "stage"), { id: "stage", desc: true });
-  assert.equal(cycleSort({ id: "stage", desc: true }, "stage"), null);
+  assert.deepEqual(cycleSort({ id: "stage", desc: true }, "stage"), { id: "stage", desc: false });
   assert.deepEqual(cycleSort({ id: "stage", desc: false }, "score"), { id: "score", desc: false });
 });
 

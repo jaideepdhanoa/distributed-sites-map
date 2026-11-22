@@ -3,6 +3,7 @@ import { recordLinks } from "@/lib/actions/records";
 import { stamp, type TargetKind } from "@/lib/actions/text";
 import { getUsers } from "@/lib/users";
 import { applyStageOverlay, type StageDecision, type StageKind } from "@/lib/stageOverlay";
+import { currentSnapshotMeta, snapshotGeneration } from "@/lib/snapshot/read";
 
 type DecisionRow = {
   id: string;
@@ -27,8 +28,16 @@ function actorName(id: string | null): string {
   return account?.displayName || id;
 }
 
+let acceptedCache: { key: string; rows: StageDecision[] } | null = null;
+
+export function resetAcceptedStageCache(): void {
+  acceptedCache = null;
+}
+
 export async function loadAcceptedStageDecisions(): Promise<StageDecision[]> {
   if (!actionsEnabled()) return [];
+  const key = currentSnapshotMeta()?.id || `files:${snapshotGeneration()}`;
+  if (acceptedCache?.key === key) return acceptedCache.rows;
   const rows = await withSql((sql) =>
     sql.query<DecisionRow>(
       `SELECT id, target_kind, target_id, field_name, detail, current_value, proposed_value, reason,
@@ -42,7 +51,7 @@ export async function loadAcceptedStageDecisions(): Promise<StageDecision[]> {
          )`,
     ),
   );
-  return rows.rows.map((row) => ({
+  const decisions = rows.rows.map((row) => ({
     id: row.id,
     targetKind: row.target_kind,
     targetId: row.target_id,
@@ -57,6 +66,8 @@ export async function loadAcceptedStageDecisions(): Promise<StageDecision[]> {
     createdAt: stamp(row.created_at),
     stageAt: row.stage_at,
   }));
+  acceptedCache = { key, rows: decisions };
+  return decisions;
 }
 
 /**

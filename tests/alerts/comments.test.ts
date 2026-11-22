@@ -68,6 +68,41 @@ test("a followed reviewer gets one comment email that opens the note", async () 
   assert.match(href, new RegExp(`note=${posted.id}`));
 });
 
+test("a contributor following a site gets an instant comment email", async () => {
+  const sql = await ready();
+  await sql.query(
+    `INSERT INTO queue_follows (user_id, site_id) VALUES ('contributor', $1) ON CONFLICT DO NOTHING`,
+    [deal.deal_id],
+  );
+  await createNote(sql, {
+    targetKind: "deal",
+    targetId: deal.deal_id,
+    body: "A new comment on the followed site.",
+    authorId: "reviewer",
+  }, lookup);
+  const sent = await sql.query<{ status: string }>(
+    `SELECT status FROM alert_log WHERE user_id = 'contributor' AND body LIKE '%A new comment on the followed site.%'`,
+  );
+  assert.equal(sent.rows.length, 1);
+  assert.equal(sent.rows[0]?.status, "would_send");
+  const queued = await sql.query<{ channel: string; status: string }>(
+    `SELECT channel, status FROM alert_outbox WHERE user_id = 'contributor' AND summary = 'A new comment on the followed site.'`,
+  );
+  assert.equal(queued.rows[0]?.channel, "instant");
+  await savePreferences(sql, "contributor", { ...defaultPreferences("contributor"), followed: "digest" });
+  await createNote(sql, {
+    targetKind: "deal",
+    targetId: deal.deal_id,
+    body: "A saved digest preference waits.",
+    authorId: "reviewer",
+  }, lookup);
+  const waiting = await sql.query<{ channel: string; status: string }>(
+    `SELECT channel, status FROM alert_outbox WHERE user_id = 'contributor' AND summary = 'A saved digest preference waits.'`,
+  );
+  assert.equal(waiting.rows[0]?.channel, "digest");
+  assert.equal(waiting.rows[0]?.status, "pending");
+});
+
 test("turning Comments off stops the follower email", async () => {
   const sql = await ready();
   await createNote(sql, {

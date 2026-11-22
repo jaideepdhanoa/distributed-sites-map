@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { canReadFinancials } from "@/lib/agent/access";
 import { attachPackageHrefs } from "@/lib/financials";
 import { packageHrefMap } from "@/lib/financialsLoad";
-import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
+import { isSession, requireUser, snapshotCacheHeaders } from "@/lib/guard";
+import { currentSnapshotMeta, snapshotGeneration } from "@/lib/snapshot/read";
 import { overlayDeals } from "@/lib/nda";
 import { loadNdaSnapshot } from "@/lib/ndaLoad";
 import { withPricing } from "@/lib/pricingLoad";
@@ -23,5 +24,6 @@ export async function GET() {
   const dropped = withSuggestedDrops(staged);
   const chipped = await overlayDealChips(dropped, true);
   const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature)));
-  return NextResponse.json(redactGmailPayload({ ...dropped, features }), { headers: privateHeaders });
+  const version = currentSnapshotMeta()?.id || `files-${snapshotGeneration()}`;
+  return NextResponse.json(redactGmailPayload({ ...dropped, features }), { headers: snapshotCacheHeaders(version) });
 }

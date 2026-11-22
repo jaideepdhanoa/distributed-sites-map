@@ -4,7 +4,8 @@ import { resolveActionRole } from "@/lib/actions/roles";
 import { stageTitle } from "@/lib/labels";
 import { loadCatalog } from "@/lib/queue/catalog";
 import { getUsers } from "@/lib/users";
-import { DAILY_CAP, INSTANT_DAILY_CAP, batchWindowMs, digestWindowStart, losAngelesParts, stampOf } from "./clock";
+import { digestCadence } from "./cadence";
+import { DAILY_CAP, INSTANT_DAILY_CAP, batchWindowMs, digestWindowStart, isPacificMonday, losAngelesParts, stampOf, weekKey, weekOfLabel, weekWindowStart } from "./clock";
 import { renderBatch, type MailItem } from "./compose";
 import { isExcludedSite } from "./excluded";
 import { isOwnerAccount } from "./owner";
@@ -100,7 +101,7 @@ export async function deliverRows(
     now?: Date;
     subjectPrefix?: string;
     subject?: string;
-    kind?: "instant" | "digest" | "updates" | "catchup";
+    kind?: "instant" | "digest" | "updates" | "catchup" | "week";
   },
 ): Promise<string> {
   const now = input.now || new Date();
@@ -343,74 +344,117 @@ async function rollToDigest(sql: Sql, ids: string[]): Promise<void> {
   );
 }
 
+async function pendingDigest(sql: Sql, userId: string): Promise<OutboxRow[]> {
+  const pending = await sql.query<OutboxRow>(
+    `SELECT id, idempotency_key, user_id, to_email, category, channel, site_id, site_label, summary, author_id, href, ref_id, created_at, status
+     FROM alert_outbox WHERE user_id = $1 AND channel = 'digest' AND status = 'pending' ORDER BY created_at ASC, id ASC`,
+    [userId],
+  );
+  return pending.rows;
+}
+
+async function reviewCount(sql: Sql, userId: string, reviewer: boolean): Promise<number> {
+  const { loadQueue } = await import("@/lib/queue/load");
+  const queue = await loadQueue(sql, userId, { market: "all", viable: true }, reviewer);
+  return queue.items.filter((item) => !isExcludedSite(item.siteId)).length;
+}
+
+async function sendDaily(sql: Sql, user: { u: string; h: string; role: string }, email: string, now: Date): Promise<boolean> {
+  const userId = user.u;
+  const prefs = await loadPreferences(sql, userId);
+  if (!prefs) return false;
+  const { day } = losAngelesParts(now);
+  const already = await sql.query<{ user_id: string }>(
+    `SELECT user_id FROM alert_digest_runs WHERE user_id = $1 AND sent_on = $2`,
+    [userId, day],
+  );
+  if (already.rows.length) return false;
+  const pending = await pendingDigest(sql, userId);
+  const prior = await sql.query<{ sent_at: Date | string }>(
+    `SELECT sent_at FROM alert_digest_runs WHERE user_id = $1`,
+    [userId],
+  );
+  const priorAt = prior.rows[0] ? new Date(stampOf(prior.rows[0].sent_at)) : null;
+  // No earlier checkpoint, and a checkpoint from before midnight Nov 16 PT, both
+  // stop at that midnight. The Nov 15 workbook import is outside this window.
+  const windowStart = digestWindowStart(now, priorAt);
+  const digestOn = digestEnabled(prefs);
+  const followed = digestOn ? await followedItems(sql, userId, windowStart) : [];
+  const brief = digestOn ? await loadDigestBrief(sql, { userId, since: windowStart, prefs }) : emptyBrief();
+  let queueCount = 0;
+  if (digestOn) queueCount = await reviewCount(sql, userId, resolveActionRole(user) === "reviewer");
+  if (!shouldSendDigest({ items: pending.length + followed.length + brief.items.length, queueCount, digestOn })) return false;
+  const extra = [...brief.items, ...followed];
+  if (digestOn && queueCount > 0) {
+    extra.unshift({
+      category: "queue",
+      siteId: "",
+      siteLabel: "",
+      summary: `${queueCount} waiting in Review`,
+      authorId: userId,
+      href: reviewHomeHref(),
+    });
+  }
+  const status = await deliverRows(sql, {
+    userId,
+    email,
+    rows: pending,
+    extra,
+    key: `digest:${userId}:${day}`,
+    now,
+    kind: "digest",
+  });
+  if (status === "error") return false;
+  await sql.query(
+    `INSERT INTO alert_digest_runs (user_id, sent_on, sent_at) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE SET sent_on = EXCLUDED.sent_on, sent_at = EXCLUDED.sent_at`,
+    [userId, day, now.toISOString()],
+  );
+  return true;
+}
+
+async function sendWeekly(sql: Sql, userId: string, email: string, now: Date): Promise<boolean> {
+  const prefs = await loadPreferences(sql, userId);
+  if (!prefs) return false;
+  const key = `week:${userId}:${weekKey(now)}`;
+  const already = await sql.query<{ id: string }>(
+    `SELECT id FROM alert_log WHERE idempotency_key = $1 AND status IN ('sent', 'would_send', 'capped', 'skipped')`,
+    [key],
+  );
+  if (already.rows.length) return false;
+  const since = weekWindowStart(now);
+  const digestOn = digestEnabled(prefs);
+  const pending = await pendingDigest(sql, userId);
+  const followed = digestOn ? await followedItems(sql, userId, since) : [];
+  const brief = digestOn ? await loadDigestBrief(sql, { userId, since, prefs }) : emptyBrief();
+  if (pending.length + followed.length + brief.items.length === 0) return false;
+  const status = await deliverRows(sql, {
+    userId,
+    email,
+    rows: pending,
+    extra: [...brief.items, ...followed],
+    key,
+    now,
+    kind: "week",
+    subject: `Distributed Sites: week of ${weekOfLabel(now)}`,
+  });
+  return status !== "error";
+}
+
 export async function sendDigests(sql: Sql, now = new Date()): Promise<number> {
   // Two UTC hours cover 7:00 AM Pacific in both standard time and daylight time.
   // A run outside that hour does not send and does not consume the day's idempotency key.
   const parts = losAngelesParts(now);
   if (parts.hour !== 7) return 0;
-  const { day } = parts;
+  const monday = isPacificMonday(now);
   let count = 0;
   for (const user of getUsers()) {
     if (resolveActionRole(user) == null) continue;
     const email = accountEmail(user.u);
-    const prefs = await loadPreferences(sql, user.u);
-    if (!email || !prefs) continue;
-    const already = await sql.query<{ user_id: string }>(
-      `SELECT user_id FROM alert_digest_runs WHERE user_id = $1 AND sent_on = $2`,
-      [user.u, day],
-    );
-    if (already.rows.length) continue;
-    const pending = await sql.query<OutboxRow>(
-      `SELECT id, idempotency_key, user_id, to_email, category, channel, site_id, site_label, summary, author_id, href, ref_id, created_at, status
-       FROM alert_outbox WHERE user_id = $1 AND channel = 'digest' AND status = 'pending' ORDER BY created_at ASC, id ASC`,
-      [user.u],
-    );
-    const prior = await sql.query<{ sent_at: Date | string }>(
-      `SELECT sent_at FROM alert_digest_runs WHERE user_id = $1`,
-      [user.u],
-    );
-    const priorAt = prior.rows[0] ? new Date(stampOf(prior.rows[0].sent_at)) : null;
-    // No earlier checkpoint, and a checkpoint from before midnight Nov 16 PT, both
-    // stop at that midnight. The Nov 15 workbook import is outside this window.
-    const windowStart = digestWindowStart(now, priorAt);
-    const digestOn = digestEnabled(prefs);
-    const followed = digestOn ? await followedItems(sql, user.u, windowStart) : [];
-    const brief = digestOn ? await loadDigestBrief(sql, { userId: user.u, since: windowStart, prefs }) : emptyBrief();
-    let queueCount = 0;
-    if (digestOn) {
-      const { loadQueue } = await import("@/lib/queue/load");
-      const { isExcludedSite } = await import("./excluded");
-      const queue = await loadQueue(sql, user.u, { market: "all", viable: true }, resolveActionRole(user) === "reviewer");
-      queueCount = queue.items.filter((item) => !isExcludedSite(item.siteId)).length;
-    }
-    if (!shouldSendDigest({ items: pending.rows.length + followed.length + brief.items.length, queueCount, digestOn })) continue;
-    const extra = [...brief.items, ...followed];
-    if (digestOn && queueCount > 0) {
-      extra.unshift({
-        category: "queue",
-        siteId: "",
-        siteLabel: "",
-        summary: `${queueCount} waiting in Review`,
-        authorId: user.u,
-        href: reviewHomeHref(),
-      });
-    }
-    const status = await deliverRows(sql, {
-      userId: user.u,
-      email,
-      rows: pending.rows,
-      extra,
-      key: `digest:${user.u}:${day}`,
-      now,
-      kind: "digest",
-    });
-    if (status === "error") continue;
-    await sql.query(
-      `INSERT INTO alert_digest_runs (user_id, sent_on, sent_at) VALUES ($1, $2, $3)
-       ON CONFLICT (user_id) DO UPDATE SET sent_on = EXCLUDED.sent_on, sent_at = EXCLUDED.sent_at`,
-      [user.u, day, now.toISOString()],
-    );
-    count += 1;
+    if (!email) continue;
+    const cadence = digestCadence(user.u);
+    if (cadence.daily && await sendDaily(sql, user, email, now)) count += 1;
+    if (monday && cadence.weekly && await sendWeekly(sql, user.u, email, now)) count += 1;
   }
   return count;
 }

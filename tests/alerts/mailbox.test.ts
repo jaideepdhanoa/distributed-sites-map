@@ -1,11 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import alertDefaults from "../../config/alerts.json";
 import { accountEmail } from "../../lib/alerts/recipients";
+import { INSTANT_DAILY_CAP } from "../../lib/alerts/clock";
+import { digestCadence } from "../../lib/alerts/cadence";
 import { defaultPreferences } from "../../lib/alerts/preferences";
 import { liveMailAllowed } from "../../lib/alerts/transport";
 import { getUsers } from "../../lib/users";
 
 const hash = "$2b$08$012345678901234567890u";
+
+test("live mail includes the team and still uses the role defaults and the instant cap", () => {
+  assert.deepEqual(alertDefaults.liveUsernames, [
+    "jaideep",
+    "cindel",
+    "ming",
+    "ricardo",
+    "yuka",
+    "jason",
+    "mark",
+    "brittni",
+    "jose",
+  ]);
+  for (const id of alertDefaults.liveUsernames) assert.equal(liveMailAllowed(id), true);
+  assert.equal(liveMailAllowed("muse"), false);
+  assert.equal(liveMailAllowed("indie"), false);
+  assert.equal(INSTANT_DAILY_CAP, 6);
+  assert.deepEqual(alertDefaults.weeklyOnlyUsernames, ["ming"]);
+  assert.deepEqual(digestCadence("jason"), { daily: true, weekly: true });
+  assert.deepEqual(digestCadence("jaideep"), { daily: true, weekly: true });
+  assert.deepEqual(digestCadence("ming"), { daily: false, weekly: true });
+  assert.deepEqual(digestCadence("indie"), { daily: true, weekly: false });
+  assert.equal(defaultPreferences("contributor").mentions, "instant");
+  assert.equal(defaultPreferences("contributor").followed, "instant");
+  assert.equal(defaultPreferences("contributor").proposals, "digest");
+  assert.equal(defaultPreferences("reviewer").followed, "instant");
+  assert.equal(defaultPreferences("viewer").followed, "off");
+  assert.equal(defaultPreferences("reviewer").approvals, "instant");
+  assert.equal(defaultPreferences("viewer").comments, "off");
+});
 
 test("the named admin account resolves to its mailbox and reviewer defaults", () => {
   const previous = process.env.AUTH_USERS;

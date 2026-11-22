@@ -1,6 +1,7 @@
 import { findPolicyHits, safeSnapshot } from "@/lib/policy/banned";
 import { EXCLUDED_SITE_ID, isExcludedSite } from "./excluded";
 import { mailLink, reviewHomeHref, settingsHref } from "./links";
+import { weekOfLabel } from "./clock";
 import { authorName, categoryLabel, publicSnippet, screenEmail, type MailItem } from "./compose";
 
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
@@ -86,6 +87,10 @@ export function instantSubject(item: MailItem, recipientId?: string): string {
   return `${categoryLabel(item.category)}: ${name}`;
 }
 
+export function weekSubject(now: Date): string {
+  return `Distributed Sites: week of ${weekOfLabel(now)}`;
+}
+
 export function digestSubject(items: MailItem[], now: Date): string {
   const count = items.filter((item) => item.category !== "queue" && item.category !== "brief").length;
   const date = new Intl.DateTimeFormat("en-US", {
@@ -130,7 +135,7 @@ function actionLine(item: MailItem, recipientId?: string): string {
   return `${who} added a note.`;
 }
 
-function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchup"): string {
+function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchup" | "week"): string {
   if (category === "approvals") return "You received this because an approval is waiting on you.";
   if (category === "mentions") return "You received this because someone mentioned you.";
   if (category === "comments") return "You received this because you follow this site.";
@@ -143,6 +148,7 @@ function whyLine(category: MailItem["category"] | "digest" | "updates" | "catchu
   if (category === "stages") return "You received this because an agent changed a stage.";
   if (category === "updates") return "You received this because several updates arrived together.";
   if (category === "catchup") return "You received this because these updates were waiting to be sent.";
+  if (category === "week") return "You received this because it is your weekly recap.";
   return "You received this because it is your daily digest.";
 }
 
@@ -300,11 +306,12 @@ function appendSite(item: MailItem, textLines: string[], html: string[], recipie
   if (quote) html.push(`<tr><td style="padding:2px 28px 8px;font-family:${SANS};font-size:14px;line-height:1.4;color:#1c1914;">“${esc(quote)}”</td></tr>`);
 }
 
-type BatchTone = "digest" | "updates" | "catchup";
+type BatchTone = "digest" | "updates" | "catchup" | "week";
 
-function batchHeading(tone: BatchTone): string {
+function batchHeading(tone: BatchTone, now: Date): string {
   if (tone === "catchup") return "Catch-up";
   if (tone === "updates") return "Updates";
+  if (tone === "week") return `Week of ${weekOfLabel(now)}`;
   return "Daily digest";
 }
 
@@ -312,6 +319,7 @@ function batchSubject(items: MailItem[], now: Date, tone: BatchTone): string {
   const count = items.filter((item) => item.category !== "queue" && item.category !== "brief").length;
   if (tone === "catchup") return catchUpSubject(count);
   if (tone === "updates") return updatesSubject(count);
+  if (tone === "week") return weekSubject(now);
   return digestSubject(items, now);
 }
 
@@ -362,7 +370,7 @@ function renderGrouped(items: MailItem[], settingsHref: string, recipientId?: st
 function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: BatchTone = "digest", recipientId?: string): { subject: string; text: string; rows: string } {
   if (tone === "updates") return renderGrouped(items, settingsHref, recipientId);
   const home = reviewHomeHref();
-  const heading = batchHeading(tone);
+  const heading = batchHeading(tone, now);
   const textLines = ["Distributed Sites", "", heading];
   const html: string[] = [eyebrow(heading)];
   for (const item of items.filter((row) => row.category === "queue" || row.category === "brief")) {
@@ -384,7 +392,7 @@ function renderDigest(items: MailItem[], now: Date, settingsHref: string, tone: 
   return { subject: batchSubject(items, now, tone), text: textLines.join("\n"), rows: html.join("\n") };
 }
 
-export type AlertKind = "instant" | "digest" | "updates" | "catchup";
+export type AlertKind = "instant" | "digest" | "updates" | "catchup" | "week";
 
 export function renderAlert(items: MailItem[], options?: { now?: Date; kind?: AlertKind; settingsHref?: string; recipientId?: string }): RenderedMail | null {
   const content = items.filter((item) => item.category !== "queue" && item.category !== "brief");
@@ -393,8 +401,8 @@ export function renderAlert(items: MailItem[], options?: { now?: Date; kind?: Al
   const now = options?.now || new Date();
   const settings = options?.settingsHref || settingsHref();
   const recipientId = options?.recipientId;
-  const tone: BatchTone = options?.kind === "digest" || options?.kind === "updates" || options?.kind === "catchup" ? options.kind : "updates";
-  const oneInstant = options?.kind !== "digest" && options?.kind !== "updates" && options?.kind !== "catchup" && content.length === 1 && !framed;
+  const tone: BatchTone = options?.kind === "digest" || options?.kind === "updates" || options?.kind === "catchup" || options?.kind === "week" ? options.kind : "updates";
+  const oneInstant = options?.kind !== "digest" && options?.kind !== "updates" && options?.kind !== "catchup" && options?.kind !== "week" && content.length === 1 && !framed;
   const rendered = oneInstant ? renderInstant(content[0], settings, recipientId) : renderDigest(items, now, settings, tone, recipientId);
   const screened = screenEmail(rendered.subject, rendered.text);
   if (!screened) return null;

@@ -1,4 +1,40 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
+
+const viewports = [
+  { width: 1280, height: 1072, project: "desktop" },
+  { width: 390, height: 844, project: "mobile" },
+] as const;
+
+async function failActions(page: Page) {
+  const down = (route: Route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "down" }) });
+  await page.route("**/api/queue**", down);
+  await page.route("**/api/actions/accounts**", down);
+  await page.route("**/api/data/spaces**", down);
+}
+
+async function topInView(page: Page, selector: string) {
+  const box = await page.locator(selector).first().boundingBox();
+  const viewport = page.viewportSize();
+  expect(box, selector).toBeTruthy();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeLessThan(viewport!.height);
+}
+
+for (const size of viewports) {
+  test(`map and list stay in view when discussion is down at ${size.width}x${size.height}`, async ({ page }, info) => {
+    test.skip(info.project.name !== size.project, size.project);
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await failActions(page);
+    await page.goto("/?funnel=pipeline&city=PHX", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Discussion is unavailable on this preview")).toBeVisible();
+    await expect(page.getByTestId("view-help")).toHaveText("Deals in this market");
+    await topInView(page, ".map-stage");
+    await topInView(page, "[data-testid=view-help]");
+    await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
+    await topInView(page, "[data-testid=pipeline-list]");
+  });
+}
+
 
 test("the phone funnel keeps the service-area split off the listed line", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone funnel");

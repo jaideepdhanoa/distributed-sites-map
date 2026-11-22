@@ -64,7 +64,7 @@ export function screenEmail(subject: string, body: string): { subject: string; b
 
 export function renderBatch(
   items: MailItem[],
-  options?: { now?: Date; kind?: "instant" | "digest" | "updates" | "catchup"; recipientId?: string },
+  options?: { now?: Date; kind?: "instant" | "digest" | "updates" | "catchup" | "week"; recipientId?: string },
 ): { subject: string; body: string; html: string } | null {
   return renderAlert(items, options);
 }

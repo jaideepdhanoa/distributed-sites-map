@@ -11,7 +11,7 @@ type DealProps = {
 };
 
 // The viable queue hides dropped deals and c-stores. Pick one from the file so a sync can change which id that is.
-async function activePipelineDeal(request: APIRequestContext): Promise<string> {
+async function pipelineDeals(request: APIRequestContext): Promise<string[]> {
   const response = await request.get("/api/data/deals");
   expect(response.ok()).toBeTruthy();
   const body = (await response.json()) as { features?: { properties?: DealProps }[] };
@@ -20,8 +20,12 @@ async function activePipelineDeal(request: APIRequestContext): Promise<string> {
     .filter((props) => props.kind === "pipeline" && props.stage_group !== "dropped" && props.is_c_store !== true && props.deal_id)
     .map((props) => String(props.deal_id))
     .sort();
-  expect(ids.length).toBeGreaterThan(0);
-  return ids[0];
+  expect(ids.length).toBeGreaterThan(1);
+  return ids;
+}
+
+async function activePipelineDeal(request: APIRequestContext): Promise<string> {
+  return (await pipelineDeals(request))[0];
 }
 
 test.describe.configure({ mode: "serial" });
@@ -137,7 +141,11 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 });
 
 test("a mention is queued only for the mentioned account", async ({ page, request }) => {
-  await openAs(page, "contributor", "/?review=1&qmarket=all&qstage=any&panel=discussion");
+  await login(request, "contributor");
+  // Mentions is listed before Assigned, and a site is shown in only one group.
+  // This mention uses a different deal so the first deal can still appear under Assigned.
+  const deal = (await pipelineDeals(request)).at(-1)!;
+  await openAs(page, "contributor", `/?funnel=pipeline&site=${deal}&panel=discussion`);
   await page.getByTestId("panel-tab-discussion").click();
   const body = page.getByTestId("note-body");
   await body.click();
@@ -184,8 +192,9 @@ test("an assignment shows under Assigned to me, and a non-owner cannot mark it d
   expect(card?.snapshot?.assignments?.some((item) => item.title === "Schedule a site visit" && item.date === "2026-12-15")).toBeTruthy();
 
   await openAs(page, "reviewer", "/?review=1&qmarket=all&qstage=any&qassign=1");
-  const assignedName = (card?.snapshot as { name?: string } | null)?.name || deal;
-  await page.getByTestId("review-assigned").getByRole("button", { name: assignedName }).click();
+  const assignedRow = page.getByTestId("review-assigned").locator(`[data-site="${deal}"]`);
+  await assignedRow.scrollIntoViewIfNeeded();
+  await assignedRow.click();
   await page.getByTestId("panel-tab-discussion").click();
   const panel = page.locator(".drawer");
   await expect(panel.getByTestId("next-step")).toContainText("Schedule a site visit");

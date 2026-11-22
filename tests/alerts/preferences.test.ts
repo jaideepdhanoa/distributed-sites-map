@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { losAngelesParts } from "../../lib/alerts/clock";
-import { defaultPreferences, loadPreferences, savePreferences, shouldSendDigest } from "../../lib/alerts/preferences";
+import { defaultPreferences, deliveryMode, loadPreferences, savePreferences, shouldSendDigest } from "../../lib/alerts/preferences";
 import { memorySql } from "../helpers/sql";
 
 test("role defaults", () => {
@@ -18,7 +18,7 @@ test("role defaults", () => {
     decisions: "instant",
     stages: "digest",
     asks: "digest",
-    followed: "digest",
+    followed: "instant",
     followAll: false,
   });
   assert.deepEqual(defaultPreferences("contributor"), {
@@ -33,7 +33,7 @@ test("role defaults", () => {
     decisions: "digest",
     stages: "digest",
     asks: "digest",
-    followed: "digest",
+    followed: "instant",
     followAll: false,
   });
   assert.deepEqual(defaultPreferences("viewer"), {
@@ -51,6 +51,18 @@ test("role defaults", () => {
     followed: "off",
     followAll: false,
   });
+});
+
+test("a followed site sends comments instantly unless that category is off", () => {
+  const contributor = defaultPreferences("contributor");
+  assert.equal(deliveryMode(contributor, "comments", true), "instant");
+  assert.equal(deliveryMode(contributor, "replies", true), "instant");
+  assert.equal(deliveryMode(contributor, "proposals", true), "instant");
+  assert.equal(deliveryMode(contributor, "comments", false), "digest");
+  assert.equal(deliveryMode({ ...contributor, comments: "off" }, "comments", true), "off");
+  assert.equal(deliveryMode({ ...contributor, followed: "digest" }, "comments", true), "digest");
+  assert.equal(deliveryMode(defaultPreferences("viewer"), "comments", true), "off");
+  assert.equal(deliveryMode(contributor, "mentions", true), "instant");
 });
 
 test("the digest is skipped when there is nothing to report", () => {

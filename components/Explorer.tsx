@@ -53,6 +53,8 @@ import CommandSearch from "./CommandSearch";
 import "@/app/alerts.css";
 import type { AppData, DealFeature, DealProps, GeoFeature, SiteFeature, SiteProps, UnscreenedFeature, UnscreenedProps } from "@/lib/types";
 import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
+import { fullUniverseNeeded, viewHelp } from "@/lib/viewHelp";
+import { resolveSiteLink, siteHref } from "@/lib/siteLink";
 import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
@@ -172,6 +174,7 @@ export default function Explorer() {
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
   const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
+  const [missingSite, setMissingSite] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
   const tableOpen = params.get("table") === "1";
   const compare = params.get("disagree") === "1";
@@ -265,7 +268,7 @@ export default function Explorer() {
     if (!me?.u) return undefined;
     let cancel = false;
     const pull = () => {
-      void fetch("/api/data/spaces", { cache: "no-store" })
+      void quietActionsFetch("/api/data/spaces", { cache: "no-store" })
         .then((response) => response.ok ? response.json() : { spaces: [] })
         .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }>; openThreads?: string[] }) => {
           if (cancel) return;
@@ -494,7 +497,7 @@ export default function Explorer() {
     window.localStorage.setItem(FUNNEL_STORAGE, next);
     window.localStorage.setItem(FUNNEL_VERSION_KEY, FUNNEL_VERSION);
     setFunnelPref({ version: FUNNEL_VERSION, value: next });
-    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null });
+    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null, nda: null, loops: null });
   }
 
   function chooseBasemap(next: "positron" | "satellite") {
@@ -559,12 +562,12 @@ export default function Explorer() {
     let cancel = false;
     const token = ++dataGen.current;
     Promise.all([
-      fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
+      fetch(`/api/data/sites?city=${city}`),
       fetch("/api/data/areas"),
       fetch("/api/data/depots"),
       fetch(`/api/data/parcels?city=${city}`),
       fetch("/api/data/funnel"),
-      fetch("/api/data/deals", { cache: "no-store" }),
+      fetch("/api/data/deals"),
       fetch("/api/data/unscreened"),
       fetch("/api/data/timeline/summary"),
       fetch("/api/me"),
@@ -618,10 +621,10 @@ export default function Explorer() {
     let cancel = false;
     async function refresh(token: number) {
       const requests = [
-        fetch("/api/data/deals", { cache: "no-store" }),
-        fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
+        fetch("/api/data/deals"),
+        fetch(`/api/data/sites?city=${city}`),
       ];
-      if (catalogOn.current) requests.push(fetch("/api/data/sites", { cache: "no-store" }));
+      if (catalogOn.current) requests.push(fetch("/api/data/sites"));
       const [dealsRes, sitesRes, allSitesRes] = await Promise.all(requests);
       if (cancel || token !== dataGen.current || !dealsRes?.ok || !sitesRes?.ok) return;
       const deals = await dealsRes.json();
@@ -654,7 +657,8 @@ export default function Explorer() {
     };
   }, [city]);
 
-  const needCatalog = allCities || funnel === "universe" || Boolean(who) || query.trim().length >= 2;
+  const linkedId = params.get("site") || "";
+  const needCatalog = fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
@@ -1133,6 +1137,10 @@ export default function Explorer() {
     : stage !== "in_area" && subcount("in_area", "listed") > 0 ? "in_area"
     : null;
   const shownFeatures = handoffStep ? listedFeatures(handoffStep) : visibleFeatures;
+  const selectedUniverseFeature = funnel !== "pipeline" && selected ? poolById.get(selected) : undefined;
+  const universeMapSites = selectedUniverseFeature && !shownFeatures.some((feature) => feature.properties.site_id === selected)
+    ? [...shownFeatures, selectedUniverseFeature]
+    : shownFeatures;
   const handoffCopy = handoffStep
     ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "Service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
     : handoff;
@@ -1328,6 +1336,20 @@ export default function Explorer() {
 
   function selectionPatch(id: string, search: URLSearchParams = params): Record<string, string | null> {
     const patch: Record<string, string | null> = {};
+    const linked = resolveSiteLink(id, dealRows);
+    if (linked.kind === "pipeline" && linked.id !== id) {
+      return { site: linked.id, funnel: "pipeline", tab: "pipeline" };
+    }
+    if (linked.kind === "universe") {
+      if (linked.market) {
+        const wantCity = marketSearchValue(linked.market);
+        if ((search.get("city") || null) !== wantCity) patch.city = wantCity;
+      }
+      if (search.get("funnel") !== "universe") patch.funnel = "universe";
+      if (search.get("tab")) patch.tab = null;
+      if (search.get("stage") !== "all") patch.stage = "all";
+      return patch;
+    }
     const deal = dealRows.find((row) => row.deal_id === id);
     if (deal) {
       if (deal.city === "PHX" || deal.city === "LAS" || deal.city === "MIA") {
@@ -1365,6 +1387,24 @@ export default function Explorer() {
     }
     return patch;
   }
+
+  useEffect(() => {
+    const id = params.get("site") || "";
+    if (!data || !id || isProtectedId(id)) {
+      setMissingSite("");
+      return;
+    }
+    const linked = resolveSiteLink(id, dealRows);
+    if (linked.kind === "pipeline" && linked.id !== id) {
+      setMissingSite("");
+      return;
+    }
+    const known = dealRows.some((deal) => deal.deal_id === id)
+      || sites.some((site) => site.site_id === id)
+      || (catalog ?? []).some((feature) => feature.properties.site_id === id);
+    const waiting = linked.kind === "universe" && !catalog && !known;
+    setMissingSite(!waiting && !known ? "Site not found" : "");
+  }, [data, params, catalog]);
 
   useEffect(() => {
     if (!data || !selected || reviewing) return;
@@ -1566,7 +1606,13 @@ export default function Explorer() {
     onSnap: setSheetSnap,
     onStep: (direction: "more" | "less") => setSheetSnap((snap) => stepSheet(snap, direction)),
   };
-  const unplacedDeals = dealRows.filter((deal) => (deal.kind === "pipeline" || deal.kind === "land") && shownInMarket(deal.city) && !dealPoint(deal) && inReach(deal, reach) && dealAllowed(deal));
+  const unplacedDeals = dealRows.filter((deal) => !isProtectedId(deal.deal_id) && (deal.kind === "pipeline" || deal.kind === "land") && shownInMarket(deal.city) && !dealPoint(deal) && inReach(deal, reach) && dealAllowed(deal));
+  const locationFix = params.get("fix") === "location"
+    ? (me?.actionRole === "reviewer" ? "edit" : me?.actionRole === "contributor" ? "propose" : null)
+    : null;
+  const hiddenLand = funnel === "pipeline" && !categories.land
+    ? dealRows.filter((deal) => deal.kind === "land" && !isProtectedId(deal.deal_id) && shownInMarket(deal.city)).length
+    : 0;
   const offMarketPool = (universeWide || allCities) && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
     if (!feature.geometry) return false;
@@ -2002,6 +2048,7 @@ export default function Explorer() {
         })}
       />
       <header className="bar">
+        <ActionsQuietNotice />
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
           <div className="cities only-desktop" role="group" aria-label="Market">
@@ -2030,13 +2077,16 @@ export default function Explorer() {
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+            {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
+              <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
+            ) : null}
           </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any" })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
               Review{(() => {
                 const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
                 return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
@@ -2109,8 +2159,19 @@ export default function Explorer() {
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
           <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+          {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
+            <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
+          ) : null}
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
+        {ndaVisible ? null : <p className="note view-line" data-testid="view-help">{viewHelp(inReview ? "review" : funnel === "pipeline" ? "pipeline" : "universe")}</p>}
+        {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
+        {hiddenLand > 0 && !inReview ? (
+          <p className="land-banner" role="status" data-testid="land-banner">
+            Land sites are hidden by your filters
+            <button type="button" className="chip" data-testid="show-land" onClick={() => setCategory("land", true)}>Show land</button>
+          </p>
+        ) : null}
         <div className="funnel-row">
           <div className="funnel-sheet-head only-mobile">
             <p className="eyebrow">Steps</p>
@@ -2195,8 +2256,8 @@ export default function Explorer() {
               </button>
             ) : null}
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
-                All stages not on the map ({unplacedDeals.length.toLocaleString()})
+              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
+                Needs location ({unplacedDeals.length.toLocaleString()})
               </button>
             ) : null}
           {query && funnel === "universe" && stage !== "universe" ? (
@@ -2225,7 +2286,6 @@ export default function Explorer() {
               <div className="menu" role="menu">
                 <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
                 <ActionsMenuButtons close={() => setMoreOpen(false)} />
-                <button type="button" data-testid="nda-queue-open" onClick={() => { setMoreOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }} className="menu-item">NDA queue</button>
                 {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMoreOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
                 <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
                 {changesNote ? <p className="menu-note">{changesNote}</p> : null}
@@ -2387,6 +2447,9 @@ export default function Explorer() {
             <div className="funnel-switch segment" role="group" aria-label="Which funnel">
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+              {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
+                <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDA</button>
+              ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">
               <button type="button" onClick={() => { setFiltersOpen(true); setLayersOpen(false); setMenuOpen(false); }} className="menu-item">Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
@@ -2394,11 +2457,10 @@ export default function Explorer() {
             <div className="menu-group" role="group" aria-label="Tools">
               <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
               <ActionsMenuButtons close={() => setMenuOpen(false)} />
-              <button type="button" data-testid="nda-queue-open" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }} className="menu-item">NDA queue</button>
               {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMenuOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
               <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }} className="menu-item">How to read this</button>
               {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-                <button type="button" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Not on the map, all stages ({unplacedDeals.length.toLocaleString()})</button>
+                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedDeals.length.toLocaleString()})</button>
               ) : null}
             </div>
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
@@ -2429,9 +2491,9 @@ export default function Explorer() {
           </div>
         ) : null}
         {unplacedOpen ? (
-          <div className="popover" role="dialog" aria-label="Unplaced deals">
+          <div className="popover" role="dialog" aria-label="Needs location" data-testid="needs-location-list">
             <div className="popover-head">
-              <h2>{unplacedDeals.length.toLocaleString()} deals not on the map</h2>
+              <h2>Needs location</h2>
               <button type="button" className="close" aria-label="Close" onClick={() => setUnplacedOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <ul className="unplaced-list">
@@ -2439,14 +2501,13 @@ export default function Explorer() {
                 <li key={deal.deal_id}>
                   <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
                   {" · "}{stageTitle(deal.stage_group)}
-                  {" · "}<NdaChip deal={deal} signedIn={Boolean(me)} />
+                  <button type="button" className="chip" data-testid="fix-location" onClick={() => { setSelected(deal.deal_id); write({ site: deal.deal_id, fix: "location" }); setUnplacedOpen(false); }}>Fix</button>
                 </li>
               ))}
             </ul>
           </div>
         ) : null}
       </header>
-      <ActionsQuietNotice />
       {inReview && reviewMiss ? (
         <div className="review-bar review-site-empty" data-testid="review-site-empty" role="status">
           <p>No review items for {reviewScopeName}</p>
@@ -2522,7 +2583,7 @@ export default function Explorer() {
         ) : null}
         <PanelBoundary name="Map">
         <MapView
-          sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? shownFeatures : [])}
+          sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           coverage={funnel !== "pipeline" && showUniverse ? {
             listed: shownFeatures.length,
             missingPoint: shownFeatures.filter((feature) => !feature.geometry).length,
@@ -2552,6 +2613,7 @@ export default function Explorer() {
           focusLat={focus.center[1]}
           focusZoom={focus.zoom}
           fitAll={fitAll}
+          preserveCamera={showDroppedDeals ? "dropped" : "shown"}
           reviewMarkers={reviewMarkers}
           queueIds={openQueueIds}
           reviewFocus={reviewFocus}
@@ -2740,7 +2802,7 @@ export default function Explorer() {
                   </label>
                 )}
                 <label className="layer-row" title={LAYER_TITLES.dropped}>
-                  <input className="check" type="checkbox" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} />
+                  <input className="check" type="checkbox" data-testid="dropped-layer" checked={showDroppedDeals} onChange={(event) => write({ dropped: event.target.checked ? "1" : null })} />
                   <span className="layer-mark"><i className="swatch stage-dropped" /></span>
                   Dropped deals
                 </label>
@@ -2851,6 +2913,7 @@ export default function Explorer() {
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
+            locationFix={locationFix}
             figuresReady={Boolean(selectedDeal) || figuresReady}
             outsideFilter={Boolean(outsideDeal) || !dealInCategories(selectedDeal, categories)}
             related={relatedPanel({ id: selectedDeal.deal_id, kind: "deal", name: selectedDeal.name, address: selectedDeal.address, apn: selectedDeal.apn || siteById.get(selectedDeal.universe_id)?.apn })}
@@ -2884,6 +2947,7 @@ export default function Explorer() {
             onClose={() => choose(null)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
+            locationFix={locationFix}
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}

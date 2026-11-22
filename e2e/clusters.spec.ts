@@ -80,15 +80,16 @@ async function countryGroups(page: Page, kind: "deal" | "site") {
     return Boolean(map && !map.isMoving() && map.getZoom() < 8 && count > 0 && map.queryRenderedFeatures({ layers: ["clusters"] }).length > 0);
   });
   const view = await spots(page);
-  const counted = await page.evaluate(() => {
+  const counted = await page.evaluate(async () => {
     const shell = document.querySelector(".stage-map");
     const map = (window as unknown as {
       __sitesMap: {
-        getSource: (id: string) => { _data?: { features?: { properties?: { pin_kind?: string } }[] } };
+        getSource: (id: string) => { getData: () => Promise<{ features?: { properties?: { pin_kind?: string } }[] }> };
         queryRenderedFeatures: (options: { layers: string[] }) => unknown[];
       };
     }).__sitesMap;
-    const features = map.getSource("pins")._data?.features || [];
+    const data = await map.getSource("pins").getData();
+    const features = data.features || [];
     const cityPins = map.queryRenderedFeatures({ layers: ["sites", "deals-pipe", "deals-land", "offmarket"] }).length;
     return {
       group: Number(shell?.getAttribute("data-group-count") || "0"),

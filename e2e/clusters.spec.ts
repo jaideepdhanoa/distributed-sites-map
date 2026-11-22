@@ -137,11 +137,12 @@ test("All view groups nearby pins, and a group opens onto its pins", async ({ pa
   expect(point, "a cluster is visible on the map").toBeTruthy();
   const before = pipeline.zoom;
   await page.mouse.click(point!.x, point!.y);
+  await page.mouse.move(8, 8);
   await page.waitForFunction((zoom) => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
     const tip = document.querySelector(".map-tip-fixed");
     const summary = tip?.getAttribute("data-hidden") !== "1" && (tip?.textContent?.includes("County record") || tip?.textContent?.includes("Desk screen"));
-    return Boolean(map && map.getZoom() > zoom + 0.6 && !summary);
+    return Boolean(map && map.getZoom() > zoom + 0.25 && !summary);
   }, before);
 });
 

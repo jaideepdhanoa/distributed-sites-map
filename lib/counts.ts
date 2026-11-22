@@ -19,6 +19,18 @@ export function marketCounts(rows: readonly { city?: string | null }[]): MarketT
   return counts;
 }
 
+/**
+ * One tally for the market chips and the All chip.
+ * `rows` is the view before a market is chosen. `shown` is All when every market is open,
+ * and that market's chip when one market is selected.
+ */
+export function shownMarketCounts(rows: readonly { city?: string | null }[], selected: string): { totals: MarketTotals; shown: number } {
+  const totals = marketCounts(rows);
+  if (!selected || selected === "all") return { totals, shown: totals.All };
+  if (selected === "other") return { totals, shown: totals.Other };
+  return { totals, shown: totals[marketBucket(selected)] };
+}
+
 export function inCountedMarket(city: string | null | undefined, selected: string): boolean {
   if (!selected || selected === "all") return true;
   if (selected === "other") return marketBucket(city) === "Other";

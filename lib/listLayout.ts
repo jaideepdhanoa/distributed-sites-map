@@ -1,3 +1,5 @@
+import { COLUMN_MINIMUMS } from "./keyNumbers";
+
 /**
  * Column layout for the list sheet.
  * Sort numbers only when the column already exposes a number.
@@ -53,65 +55,21 @@ export const LAYOUT_SURFACES = ["pipeline", "universe"] as const;
 export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 
 const MIN_WIDTH = 96;
-const SITE_MIN_WIDTH = 280;
 const MAX_WIDTH = 480;
 
-/** Header plus one full dollar amount. These stay readable before other columns grow. */
-const MONEY_FLOOR: Record<string, number> = {
-  asking: 172,
-  cashFlow: 152,
-};
-
-/** Columns that take leftover pane width. County check stays a fixed compact column. */
+/** Columns that may grow when a pane has spare room. A narrow pane does not shrink them. */
 export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "cashFlow", "type", "spare"]);
 
-/** The Show on map column. It stays this wide so spare pane width does not pool there. */
-export const TRAILING_COLUMN_WIDTH = 112;
-
-/** Starting widths so a default sheet does not clip a label mid-word. */
-const COLUMN_WIDTH: Record<string, number> = {
-  site: 320,
-  stage: 148,
-  county: 120,
-  score: 96,
-  asking: 172,
-  listed: 148,
-  type: 120,
-  city: 96,
-  acres: 104,
-  perAcre: 120,
-  openLand: 112,
-  spare: 120,
-  grade: 168,
-  traffic: 112,
-  cashFlow: 152,
-  revenue: 136,
-  askingRevenue: 148,
-  askingCash: 156,
-  businessMultiple: 168,
-  landEstimate: 148,
-  countyValue: 140,
-  depot: 104,
-  checked: 104,
-  address: 220,
-  apn: 140,
-  zoning: 148,
-  broker: 188,
-  area: 156,
-  nda: 140,
-  lastContact: 124,
-  nextStep: 240,
-  chip_waiting: 148,
-};
+/** The Show on map column. It stays wide enough for the full link. */
+export const TRAILING_COLUMN_WIDTH = 120;
 
 export function columnWidth(id: string): number {
-  return COLUMN_WIDTH[id] || 148;
+  return COLUMN_MINIMUMS[id] ?? 160;
 }
 
-/** The narrowest width a column may keep. Asking and cash flow stay wide enough for the header and one dollar amount. */
+/** Every column keeps enough room for its full header and a one-line value. */
 export function columnFloor(id: string): number {
-  if (id === "site") return SITE_MIN_WIDTH;
-  return MONEY_FLOOR[id] ?? MIN_WIDTH;
+  return columnWidth(id);
 }
 const FILTER_LIMIT = 80;
 
@@ -168,6 +126,7 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   const hidden = unique((Array.isArray(raw.hidden) ? raw.hidden : []).filter((id): id is string => typeof id === "string" && known.has(id) && id !== "site"));
   const pinned = unique((Array.isArray(raw.pinned) ? raw.pinned : base.pinned).filter((id): id is string => typeof id === "string" && known.has(id) && !hidden.includes(id)));
   if (!pinned.length && order.includes("site")) pinned.push("site");
+  if (known.has("site") && !hidden.includes("site") && !pinned.includes("site")) pinned.unshift("site");
   const widths: Record<string, number> = {};
   if (raw.widths && typeof raw.widths === "object") {
     for (const [id, value] of Object.entries(raw.widths)) {
@@ -239,99 +198,25 @@ export function clampWidth(value: number): number {
 
 /**
  * Pixel widths for the visible columns.
- * A default sheet spreads leftover width across the flexible columns, and
- * shrinks those columns (not below the minimum) when the pane is narrower.
- * A saved width stays put, except Asking and Cash flow are raised to their
- * floor when a saved width is narrower than the header and a dollar amount.
- * Leftover width goes to flexible columns that were not saved, or to the last
- * flexible column when every one of them was saved.
- * A narrow pane takes width from `yieldFloors` first, then from other flexible
- * columns, and from an unsaved Site column only after the money columns are
- * at their floor.
+ * Each column is at least wide enough for its header and a one-line value.
+ * A saved width above that floor stays. A narrower pane scrolls; nothing is
+ * squeezed to make the columns add up to the pane.
  */
 export function fitColumnWidths(
   ids: string[],
   savedWidths: Record<string, number>,
-  paneWidth: number,
+  paneWidth = 0,
   trailing = 0,
   flexIds: ReadonlySet<string> = FLEX_COLUMN_IDS,
-  yieldFloors: Record<string, number> = {},
 ): number[] {
-  const base = ids.map((id) => {
+  void paneWidth;
+  void trailing;
+  void flexIds;
+  return ids.map((id) => {
     const saved = savedWidths[id];
     const width = typeof saved === "number" && Number.isFinite(saved) ? saved : columnWidth(id);
     return Math.max(width, columnFloor(id));
   });
-  if (!ids.length || paneWidth <= 0) return base;
-  const target = Math.max(0, Math.floor(paneWidth) - Math.max(0, Math.round(trailing)));
-  const sum = base.reduce((total, width) => total + width, 0);
-  const delta = target - sum;
-  if (delta === 0) return base;
-  const flex = ids.flatMap((id, index) => (flexIds.has(id) ? [index] : []));
-  const saved = (index: number) => {
-    const width = savedWidths[ids[index]];
-    return typeof width === "number" && Number.isFinite(width);
-  };
-  const openFlex = flex.filter((index) => !saved(index));
-  if (!flex.length) {
-    if (delta > 0) base[base.length - 1] += delta;
-    return base;
-  }
-  if (delta > 0) {
-    const grow = openFlex.length ? openFlex : [flex[flex.length - 1]];
-    if (grow.length === 1 && !openFlex.length) base[grow[0]] += delta;
-    else applyShares(base, grow, shares(delta, grow.map((index) => Math.max(base[index], 1))));
-    return base;
-  }
-  let left = -delta;
-  const cutFrom = (indexes: number[], floorOf: (index: number) => number) => {
-    if (!indexes.length || left <= 0) return;
-    const room = indexes.map((index) => Math.max(0, base[index] - floorOf(index)));
-    if (room.every((value) => value === 0)) return;
-    const cuts = shares(Math.min(left, room.reduce((total, value) => total + value, 0)), room, room);
-    indexes.forEach((index, position) => {
-      base[index] -= cuts[position];
-      left -= cuts[position];
-    });
-  };
-  const yieldIndexes = ids.flatMap((id, index) => (typeof yieldFloors[id] === "number" ? [index] : []));
-  const siteSaved = typeof savedWidths.site === "number" && Number.isFinite(savedWidths.site);
-  const siteIndexes = !siteSaved && ids.includes("site") ? [ids.indexOf("site")] : [];
-  const other = openFlex.filter((index) => yieldFloors[ids[index]] == null && !MONEY_FLOOR[ids[index]] && ids[index] !== "site");
-  cutFrom(yieldIndexes, (index) => yieldFloors[ids[index]]);
-  cutFrom(other, () => MIN_WIDTH);
-  cutFrom(siteIndexes, () => SITE_MIN_WIDTH);
-  return base;
-}
-
-function applyShares(base: number[], indexes: number[], cuts: number[]) {
-  indexes.forEach((index, position) => {
-    base[index] += cuts[position];
-  });
-}
-
-/** Whole pixels that sum to `total`, weighted. A cap stops a column from taking more than it can give up. */
-function shares(total: number, weights: number[], caps?: number[]): number[] {
-  const out = weights.map(() => 0);
-  let left = Math.max(0, Math.round(total));
-  for (let round = 0; round < weights.length + 2 && left > 0; round += 1) {
-    const active = weights.map((weight, index) => {
-      const cap = caps ? caps[index] : Number.POSITIVE_INFINITY;
-      return { index, weight, room: cap - out[index] };
-    }).filter((item) => item.room > 0 && item.weight > 0);
-    if (!active.length) break;
-    const weight = active.reduce((sum, item) => sum + item.weight, 0);
-    let moved = 0;
-    active.forEach((item, position) => {
-      const raw = position === active.length - 1 ? left - moved : Math.round((left * item.weight) / weight);
-      const add = Math.max(0, Math.min(item.room, raw));
-      out[item.index] += add;
-      moved += add;
-    });
-    if (moved <= 0) break;
-    left -= moved;
-  }
-  return out;
 }
 
 export function prepareRows<Row>(

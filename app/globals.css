@@ -3650,10 +3650,6 @@ button.paper-btn.on,
 .list-table td[data-col="site"] .site-name,
 .list-table td[data-col="site"] .site-title,
 .list-table td[data-col="site"] .site-name-text,
-.list-table th[data-col="asking"],
-.list-table td[data-col="asking"] { min-width: 172px; }
-.list-table th[data-col="cashFlow"],
-.list-table td[data-col="cashFlow"] { min-width: 152px; }
 .list-table td[data-col="asking"] .metric,
 .list-table td[data-col="asking"] .metric-label,
 .list-table td[data-col="asking"] .metric-label button,

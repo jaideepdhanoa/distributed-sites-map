@@ -36,7 +36,6 @@ export default function SheetGrid<Row>({
   scrollRef: scrollRefProp,
   flexIds,
   wrapIds,
-  yieldFloors,
 }: {
   rows: Row[];
   rowId: (row: Row) => string;
@@ -53,8 +52,6 @@ export default function SheetGrid<Row>({
   scrollRef?: RefObject<HTMLDivElement | null>;
   flexIds?: readonly string[];
   wrapIds?: readonly string[];
-  /** Columns that give up width before Asking and Cash flow. */
-  yieldFloors?: Record<string, number>;
 }) {
   const innerRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollRefProp ?? innerRef;
@@ -70,7 +67,7 @@ export default function SheetGrid<Row>({
   const trailingWidth = trailing ? TRAILING_COLUMN_WIDTH : 0;
   const flex = new Set(flexIds ?? FLEX_COLUMN_IDS);
   const wrap = new Set(wrapIds ?? WRAP_COLUMNS);
-  const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth, flex, yieldFloors);
+  const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth, flex);
   const widthById = new Map(ids.map((id, index) => [id, fitted[index] || columnWidth(id)]));
   const virtualizer = useVirtualizer({
     count: rows.length,

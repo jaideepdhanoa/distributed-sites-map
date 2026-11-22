@@ -677,7 +677,6 @@ export default function PipelineList({
           return cell(row, column as PipelineColumnId, signedIn);
         }}
         flexIds={["site", "asking", "capacity", "traffic", "cashFlow"]}
-        yieldFloors={{ openLand: 48, capacity: 48, traffic: 80 }}
         wrapIds={["site", "stage", "asking", "cashFlow"]}
         trailing={(row) => (
           <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(row.deal.deal_id); }}>{row.noPin ? "No pin" : "Show on map"}</button>

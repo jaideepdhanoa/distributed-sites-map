@@ -1,3 +1,5 @@
+import { COLUMN_MINIMUMS } from "./keyNumbers";
+
 /**
  * Column layout for the list sheet.
  * Sort numbers only when the column already exposes a number.
@@ -21,6 +23,8 @@ export type SheetColumn<Row> = {
   label: string;
   text: (row: Row) => string;
   sortValue?: (row: Row) => number | null;
+  /** This cell draws its own note. The cell must not set a native title. */
+  customTip?: boolean;
   /** Chip-set filter. The saved value is the selected codes joined with |. */
   choices?: { code: string; label: string }[];
   /** False when no visible row carries a code for this chip-set. */
@@ -51,52 +55,21 @@ export const LAYOUT_SURFACES = ["pipeline", "universe"] as const;
 export type LayoutSurface = (typeof LAYOUT_SURFACES)[number];
 
 const MIN_WIDTH = 96;
-const SITE_MIN_WIDTH = 280;
 const MAX_WIDTH = 480;
 
-/** Columns that take leftover pane width. The pipeline list adds its power column. */
-const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
+/** Columns that may grow when a pane has spare room. A narrow pane does not shrink them. */
+export const FLEX_COLUMN_IDS = new Set(["site", "asking", "listed", "grade", "cashFlow", "type", "spare"]);
 
-/** The Show on map column. It stays this wide so spare pane width does not pool there. */
-export const TRAILING_COLUMN_WIDTH = 112;
-
-/** Starting widths so a default sheet does not clip a label mid-word. */
-const COLUMN_WIDTH: Record<string, number> = {
-  site: 320,
-  stage: 148,
-  score: 96,
-  asking: 168,
-  listed: 148,
-  type: 120,
-  city: 96,
-  acres: 104,
-  perAcre: 120,
-  openLand: 120,
-  spare: 120,
-  grade: 168,
-  traffic: 112,
-  cashFlow: 156,
-  revenue: 136,
-  askingRevenue: 148,
-  askingCash: 156,
-  businessMultiple: 168,
-  landEstimate: 148,
-  countyValue: 140,
-  depot: 104,
-  checked: 104,
-  address: 220,
-  apn: 140,
-  zoning: 148,
-  broker: 188,
-  area: 156,
-  nda: 140,
-  lastContact: 124,
-  nextStep: 240,
-  chip_waiting: 148,
-};
+/** The Show on map column. It stays wide enough for the full link. */
+export const TRAILING_COLUMN_WIDTH = 120;
 
 export function columnWidth(id: string): number {
-  return COLUMN_WIDTH[id] || 148;
+  return COLUMN_MINIMUMS[id] ?? 160;
+}
+
+/** Every column keeps enough room for its full header and a one-line value. */
+export function columnFloor(id: string): number {
+  return columnWidth(id);
 }
 const FILTER_LIMIT = 80;
 
@@ -120,14 +93,25 @@ export function defaultLayout(ids: string[], pinned: string[] = ["site"], hidden
 }
 
 export function phoneColumns(surface: LayoutSurface): string[] {
-  if (surface === "pipeline") return ["site", "stage", "score", "openLand"];
-  return ["site", "type", "stage", "score"];
+  if (surface === "pipeline") return ["site", "stage", "county", "score", "openLand"];
+  return ["site", "stage", "county", "score"];
 }
 
 export function allowedIds(ids: string[], signedIn: boolean): string[] {
   if (signedIn) return unique(ids);
   const blocked = new Set<string>(PRIVATE_COLUMN_IDS);
   return unique(ids).filter((id) => !blocked.has(id));
+}
+
+/** A new County check column belongs beside Stage, not at the end of a saved order. */
+export function parkCounty(order: string[]): string[] {
+  if (!order.includes("county") || !order.includes("stage")) return order;
+  const scoreAt = order.indexOf("score");
+  const countyAt = order.indexOf("county");
+  if (scoreAt >= 0 && countyAt < scoreAt) return order;
+  const rest = order.filter((id) => id !== "county");
+  rest.splice(rest.indexOf("stage") + 1, 0, "county");
+  return rest;
 }
 
 export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
@@ -137,15 +121,18 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   const known = new Set(allowed);
   const order = unique((Array.isArray(raw.order) ? raw.order : []).filter((id): id is string => typeof id === "string" && known.has(id)));
   for (const id of allowed) if (!order.includes(id)) order.push(id);
+  const parked = parkCounty(order);
+  order.splice(0, order.length, ...parked);
   const hidden = unique((Array.isArray(raw.hidden) ? raw.hidden : []).filter((id): id is string => typeof id === "string" && known.has(id) && id !== "site"));
   const pinned = unique((Array.isArray(raw.pinned) ? raw.pinned : base.pinned).filter((id): id is string => typeof id === "string" && known.has(id) && !hidden.includes(id)));
   if (!pinned.length && order.includes("site")) pinned.push("site");
+  if (known.has("site") && !hidden.includes("site") && !pinned.includes("site")) pinned.unshift("site");
   const widths: Record<string, number> = {};
   if (raw.widths && typeof raw.widths === "object") {
     for (const [id, value] of Object.entries(raw.widths)) {
       if (!known.has(id) || typeof value !== "number" || !Number.isFinite(value)) continue;
       const width = clampWidth(value);
-      widths[id] = id === "site" ? Math.max(SITE_MIN_WIDTH, width) : width;
+      widths[id] = Math.max(columnFloor(id), width);
     }
   }
   const filters: Record<string, string> = {};
@@ -211,84 +198,25 @@ export function clampWidth(value: number): number {
 
 /**
  * Pixel widths for the visible columns.
- * A default sheet spreads leftover width across the flexible columns, and
- * shrinks those columns (not below the minimum) when the pane is narrower.
- * A saved width stays put. Leftover width goes to flexible columns that were
- * not saved, or to the last flexible column when every one of them was saved.
+ * Each column is at least wide enough for its header and a one-line value.
+ * A saved width above that floor stays. A narrower pane scrolls; nothing is
+ * squeezed to make the columns add up to the pane.
  */
 export function fitColumnWidths(
   ids: string[],
   savedWidths: Record<string, number>,
-  paneWidth: number,
+  paneWidth = 0,
   trailing = 0,
   flexIds: ReadonlySet<string> = FLEX_COLUMN_IDS,
 ): number[] {
-  const base = ids.map((id) => {
+  void paneWidth;
+  void trailing;
+  void flexIds;
+  return ids.map((id) => {
     const saved = savedWidths[id];
-    return typeof saved === "number" && Number.isFinite(saved) ? saved : columnWidth(id);
+    const width = typeof saved === "number" && Number.isFinite(saved) ? saved : columnWidth(id);
+    return Math.max(width, columnFloor(id));
   });
-  if (!ids.length || paneWidth <= 0) return base;
-  const siteAt = ids.indexOf("site");
-  if (siteAt >= 0) base[siteAt] = Math.max(SITE_MIN_WIDTH, base[siteAt]);
-  const target = Math.max(0, Math.floor(paneWidth) - Math.max(0, Math.round(trailing)));
-  const sum = base.reduce((total, width) => total + width, 0);
-  const delta = target - sum;
-  if (delta === 0) return base;
-  const flex = ids.flatMap((id, index) => (flexIds.has(id) ? [index] : []));
-  const saved = (index: number) => {
-    const width = savedWidths[ids[index]];
-    return typeof width === "number" && Number.isFinite(width);
-  };
-  const openFlex = flex.filter((index) => !saved(index));
-  if (!flex.length) {
-    if (delta > 0) base[base.length - 1] += delta;
-    return base;
-  }
-  if (delta > 0) {
-    const grow = openFlex.length ? openFlex : [flex[flex.length - 1]];
-    if (grow.length === 1 && !openFlex.length) base[grow[0]] += delta;
-    else applyShares(base, grow, shares(delta, grow.map((index) => Math.max(base[index], 1))));
-    return base;
-  }
-  if (!openFlex.length) return base;
-  const floor = (index: number) => (ids[index] === "site" ? SITE_MIN_WIDTH : MIN_WIDTH);
-  const room = openFlex.map((index) => Math.max(0, base[index] - floor(index)));
-  if (room.every((value) => value === 0)) return base;
-  const cuts = shares(Math.min(-delta, room.reduce((total, value) => total + value, 0)), room, room);
-  openFlex.forEach((index, position) => {
-    base[index] -= cuts[position];
-  });
-  return base;
-}
-
-function applyShares(base: number[], indexes: number[], cuts: number[]) {
-  indexes.forEach((index, position) => {
-    base[index] += cuts[position];
-  });
-}
-
-/** Whole pixels that sum to `total`, weighted. A cap stops a column from taking more than it can give up. */
-function shares(total: number, weights: number[], caps?: number[]): number[] {
-  const out = weights.map(() => 0);
-  let left = Math.max(0, Math.round(total));
-  for (let round = 0; round < weights.length + 2 && left > 0; round += 1) {
-    const active = weights.map((weight, index) => {
-      const cap = caps ? caps[index] : Number.POSITIVE_INFINITY;
-      return { index, weight, room: cap - out[index] };
-    }).filter((item) => item.room > 0 && item.weight > 0);
-    if (!active.length) break;
-    const weight = active.reduce((sum, item) => sum + item.weight, 0);
-    let moved = 0;
-    active.forEach((item, position) => {
-      const raw = position === active.length - 1 ? left - moved : Math.round((left * item.weight) / weight);
-      const add = Math.max(0, Math.min(item.room, raw));
-      out[item.index] += add;
-      moved += add;
-    });
-    if (moved <= 0) break;
-    left -= moved;
-  }
-  return out;
 }
 
 export function prepareRows<Row>(

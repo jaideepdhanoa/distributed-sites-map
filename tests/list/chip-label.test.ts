@@ -8,6 +8,8 @@ import { NdaChip } from "../../components/NdaChip";
 import { ChipRow, TagChip } from "../../components/TagChip";
 import { serviceAreaChip } from "../../lib/cardStatus";
 import { CHIP_LABEL_MAX, chipFace, chipLabelProblem, stageChipLabel } from "../../lib/chips";
+import { LAND_PAUSED_NOTE, LIST_CHIP_LABELS, countyCheck, placeTip } from "../../lib/listLook";
+import { LandPausedChip, ScoreCell } from "../../components/ListLook";
 import { cashFlowListLabel } from "../../lib/keyNumbers";
 import type { DealProps } from "../../lib/types";
 import { TAG_FAMILIES } from "../../lib/tags/vocab";
@@ -62,9 +64,39 @@ test("data-driven chips stay a short label and do not join clauses", () => {
       assert.ok(code.label.length <= CHIP_LABEL_MAX);
     }
   }
-  for (const label of ["Outside service area", "Near, 4.2 mi", "Near, under 5 mi", "Financial screen", "Offer and close", "Dropped"]) {
+  for (const label of ["Outside service area", "Near, 4.2 mi", "Near, under 5 mi", "Financial screen", "Offer and close", "Dropped", ...LIST_CHIP_LABELS]) {
     assert.equal(chipLabelProblem(label), "", label);
   }
+  const county = countyCheck({ verdict: "PASS" });
+  assert.equal(county.label, "Land OK");
+  assert.match(county.note, /County records confirm/);
+  assert.equal(countyCheck({ verdict: "MAYBE" }).label, "Borderline");
+  assert.equal(countyCheck({ verdict: "UNRESOLVED" }).label, "Unclear");
+  assert.equal(countyCheck({ verdict: null }).label, "Unchecked");
+  assert.equal(countyCheck({ verdict: "FAIL" }).label, "Ruled out");
+  assert.equal(chipLabelProblem("Land paused"), "");
+  assert.match(LAND_PAUSED_NOTE, /Nov 20, 2026/);
+  const countyHtml = renderToStaticMarkup(createElement(ChipFace, {
+    className: "stage-pill tone-quiet",
+    testId: "county-chip",
+    label: "Land OK",
+    detail: "County records confirm spare land.",
+  }));
+  assert.equal(countyHtml.includes("title="), false);
+  assert.match(countyHtml, /aria-label="County records confirm spare land."/);
+  const paused = renderToStaticMarkup(createElement(LandPausedChip));
+  assert.equal(paused.includes("title="), false);
+  assert.match(paused, /aria-label=/);
+  assert.match(paused, /Nov 20, 2026/);
+  const score = renderToStaticMarkup(createElement(ScoreCell, {
+    input: { score: 47.12, economics: 4.62, land: 25, power: 7.5, location: 5, deal: 5 },
+  }));
+  assert.equal(score.includes("title="), false);
+  assert.match(score, /aria-label=/);
+  assert.match(score, /Economics 4\.6\/40/);
+  const placed = placeTip({ left: 340, right: 380, top: 400, bottom: 428 }, { width: 390, height: 844 });
+  assert.ok(placed.left >= 8);
+  assert.ok(placed.left + placed.maxWidth <= 382);
   assert.equal(chipLabelProblem(serviceAreaChip({ service_area_class: "outside" }) || ""), "");
   assert.equal(chipLabelProblem(serviceAreaChip({ service_area_class: "near_5_10", service_area_distance_mi: 4.2 }) || ""), "");
 

@@ -10,7 +10,6 @@ import {
   expectedSites,
   expectedSquares,
   expectedStageTotal,
-  expectedStepParts,
   stageGroupFromText,
   unfilteredCount,
   type Catalog,
@@ -261,16 +260,15 @@ for (const city of CITIES) {
     }
 
     const withLand = expectedSquares(catalog, city, "desk", { land: true });
-    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|auto|land`);
+    await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|lube|auto|land`);
     await page.waitForFunction(
       (count) => (((window as unknown as { __src?: { deals?: unknown[] } }).__src?.deals) || []).length === count,
       withLand.length,
       { timeout: 20_000 },
     );
     same(`${city} pipeline land`, (await source(page, "deals")).map((pin) => pin.id), withLand);
-    const parts = expectedStepParts(catalog, city, "desk", { land: true });
-    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(parts.operating);
-    if (parts.land) await expect(page.locator(".funnel .step").filter({ hasText: PIPE_LABEL.desk }).first()).toContainText(`${parts.land} land`);
+    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { land: true }));
+    await expect(page.locator(".funnel .step").filter({ hasText: PIPE_LABEL.desk }).first()).not.toContainText(" land");
   });
 }
 

@@ -8,6 +8,7 @@ import {
   clampWidth,
   columnWidth,
   cycleSort,
+  FLEX_COLUMN_IDS,
   fitColumnWidths,
   moveColumn,
   TRAILING_COLUMN_WIDTH,
@@ -64,7 +65,7 @@ export default function SheetGrid<Row>({
   const ids = columns.map((column) => column.id);
   const colCount = ids.length + (trailing ? 1 : 0);
   const trailingWidth = trailing ? TRAILING_COLUMN_WIDTH : 0;
-  const flex = new Set(flexIds ?? ["site", "asking", "listed", "grade", "traffic", "cashFlow"]);
+  const flex = new Set(flexIds ?? FLEX_COLUMN_IDS);
   const wrap = new Set(wrapIds ?? WRAP_COLUMNS);
   const fitted = fitColumnWidths(ids, layout.widths, paneWidth, trailingWidth, flex);
   const widthById = new Map(ids.map((id, index) => [id, fitted[index] || columnWidth(id)]));
@@ -261,7 +262,8 @@ export default function SheetGrid<Row>({
   const tableWidth = columns.reduce((sum, column) => sum + widthOf(column.id), 0) + trailingWidth;
 
   return (
-    <div className="list-scroll" ref={scrollRef} data-testid="sheet-grid" data-pane-width={paneWidth} onKeyDown={onGridKey}>
+    <div className="list-scroll">
+      <div className="list-x" ref={scrollRef} data-testid="sheet-grid" data-pane-width={paneWidth} onKeyDown={onGridKey}>
       <table className="list-table" role="grid" aria-labelledby={labelledBy} aria-rowcount={rows.length + 1} aria-colcount={span} style={{ width: tableWidth, minWidth: tableWidth }}>
         <colgroup>
           {columns.map((column) => <col key={column.id} style={{ width: widthOf(column.id) }} />)}
@@ -469,7 +471,7 @@ export default function SheetGrid<Row>({
                       data-wrap={wrap.has(column.id) ? "text" : undefined}
                       tabIndex={focused || (item.index === 0 && col === 0 && focus.row === 0 && focus.col === 0) ? 0 : -1}
                       className={`${pinned ? "is-pinned" : ""} ${focused ? "cell-focus" : ""} ${column.className || ""}`.trim()}
-                      title={full && full !== "—" ? full : undefined}
+                      title={column.customTip ? undefined : (full && full !== "—" ? full : undefined)}
                       style={{
                         width: `${width}px`,
                         minWidth: `${width}px`,
@@ -507,6 +509,7 @@ export default function SheetGrid<Row>({
       {rows.length === 0 ? (
         <p className="note empty-filter" data-testid="empty-filter">No sites match this filter.</p>
       ) : null}
+      </div>
     </div>
   );
 }

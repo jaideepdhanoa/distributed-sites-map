@@ -9,6 +9,11 @@ import SheetGrid from "./SheetGrid";
 import { useListLayout } from "./useListLayout";
 import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
+import type { StoredScoreInput } from "@/lib/scoreDisplay";
+import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
+import { ColumnPicker, RowCheck } from "./ListChrome";
+import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
+import { stageChipLabel } from "@/lib/chips";
 import {
   allowedIds,
   defaultLayout,
@@ -27,6 +32,13 @@ export type ListRow = {
   city: string;
   stage: string;
   score: string;
+  county?: string;
+  countyNote?: string;
+  stageGroup?: string;
+  stageDetail?: string;
+  universeOnly?: boolean;
+  landPaused?: boolean;
+  scoreInput?: StoredScoreInput | null;
   tier: string;
   spare: string;
   grade: string;
@@ -48,8 +60,8 @@ export type ListRow = {
 
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id" | "lng" | "lat" | "nda" | "ndaId" | "near" | "nearShort" | "address" | "listingUrl" | "folderUrl" | "packageUrl" | "lead" | "tier" | "zoning" | "city">; label: string }[] = [
   { id: "site", label: "Site" },
-  { id: "type", label: "Type" },
   { id: "stage", label: "Stage" },
+  { id: "county", label: "County check" },
   { id: "score", label: "Score" },
   { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
@@ -107,6 +119,8 @@ export default function ListView({
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [selecting, setSelecting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
@@ -115,11 +129,30 @@ export default function ListView({
     id,
     label: LIST_COLUMNS.find((column) => column.id === id)?.label || id,
     text: (row) => shownText(row, id as ListColumnId, signedIn),
+    customTip: id === "stage" || id === "score" || id === "county",
   }));
   const ordered = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => Number.isFinite(row.lng) && Number.isFinite(row.lat) && inMapArea(row.lng as number, row.lat as number, mapArea)) : rows;
     return prepareRows(scoped, columns, activeLayout, visible);
   }, [activeLayout, columns, mapArea, rows, visible]);
+
+  const showChecks = !phone || selecting;
+  const visibleIds = ordered.map((row) => row.id);
+  const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
+  const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
+  function toggleRow(id: string) {
+    setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+  function toggleAll() {
+    setPicked(allOn ? [] : visibleIds);
+  }
+  function toggleColumn(id: string) {
+    if (id === "site") return;
+    const hidden = activeLayout.hidden.includes(id)
+      ? activeLayout.hidden.filter((item) => item !== id)
+      : [...activeLayout.hidden, id];
+    commit({ ...activeLayout, hidden, touched: true });
+  }
 
   function commit(next: ListLayout) {
     update(next);
@@ -128,7 +161,13 @@ export default function ListView({
   }
 
   return (
-    <div ref={paneRef} className="list-pane" data-list-count={rows.length}>
+    <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length}>
+      <div className="summary-row" data-testid="summary-row">
+        <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{ordered.length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Listed</span><span className="only-mobile">Listed</span><strong>{ordered.filter((row) => /^yes/i.test(row.listed)).length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Land OK</span><span className="only-mobile">Land OK</span><strong>{ordered.filter((row) => row.county === "Land OK").length.toLocaleString()}</strong></div>
+        <div><span className="only-desktop">Not reviewed</span><span className="only-mobile">Unchecked</span><strong>{ordered.filter((row) => row.county === "Unchecked").length.toLocaleString()}</strong></div>
+      </div>
       {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
@@ -159,11 +198,20 @@ export default function ListView({
             })}
           </select>
         </label>
+        <ColumnPicker
+          resetLabel="Universe default"
+          columns={LIST_COLUMNS.map((column) => ({ id: column.id, label: column.label }))}
+          hidden={activeLayout.hidden}
+          onToggle={toggleColumn}
+          onReset={() => update(defaultLayout(allowed))}
+        />
         <button type="button" className="paper-btn only-desktop" onClick={() => downloadVisible(columns, ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
+              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); downloadVisible(columns, ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
             </div>
@@ -176,7 +224,15 @@ export default function ListView({
             id: row.id,
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
-            stage: shownText(row, "stage", signedIn) || "—",
+            stage: row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || ""),
+            chips: (
+              <>
+                <TypeChip value={row.type} />
+                {row.landPaused ? <LandPausedChip /> : null}
+                {row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null}
+                {row.scoreInput ? <ScoreCell input={row.scoreInput} /> : null}
+              </>
+            ),
             facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
             onOpen: () => onOpen(row.id),
@@ -193,8 +249,12 @@ export default function ListView({
         onOpen={onOpen}
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
+        headerExtra={(id) => id === "site" && showChecks ? (
+          <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
+        ) : null}
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
+            {showChecks ? <RowCheck label={`Select ${row.site || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null}
             <span className="site-title">
               <span className="site-name-text" title={row.site || row.id}>{row.site || "—"}</span>
               <span className="site-meta">
@@ -204,11 +264,22 @@ export default function ListView({
             </span>
             <RowLinks listing={row.listingUrl} folder={row.folderUrl} packageHref={row.packageUrl} />
           </span>
+        ) : column === "stage" ? (
+          <StageTypeCell
+            stage={row.stage}
+            group={row.stageGroup || ""}
+            detail={row.stageDetail}
+            type={row.type}
+            quiet={row.universeOnly}
+            land={row.landPaused}
+            extra={row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
+          />
+        ) : column === "county" ? (
+          row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : "—"
+        ) : column === "score" ? (
+          row.scoreInput ? <ScoreCell input={row.scoreInput} /> : shownText(row, "score", signedIn) || "—"
         ) : (
-          <>
-            {shownText(row, column as ListColumnId, signedIn) || "—"}
-            {column === "stage" && row.nda ? <NdaChip text={row.nda} deal={{ nda_id: row.ndaId }} /> : null}
-          </>
+          shownText(row, column as ListColumnId, signedIn) || "—"
         )}
         trailing={(row) => (
           <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
@@ -233,12 +304,14 @@ function downloadVisible(columns: SheetColumn<ListRow>[], rows: ListRow[]) {
 
 export function listCellText(row: ListRow, id: ListColumnId, signedIn: boolean) {
   if (id === "score") return listScoreText(row.score);
+  if (id === "county") return row.county || "—";
+  if (id === "stage") return row.universeOnly ? UNIVERSE_STAGE_LABEL : String(row.stage || "—");
   if (id === "listed" && !signedIn) return /^yes/i.test(row.listed) ? "Yes" : row.listed === "No" ? "No" : "—";
   return String(row[id] ?? "");
 }
 
 export function universeCardFacts(row: ListRow, signedIn: boolean): string[] {
-  return [listCellText(row, "score", signedIn), listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
+  return [listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
     .filter((fact) => fact && fact !== "—" && fact !== "Not on file");
 }
 

@@ -62,7 +62,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   const counts = cityPipelineCounts("PHX");
   const desk = page.locator("nav.funnel .step").filter({ hasText: "Desk screen" });
   await expect(desk.locator("strong")).toHaveText(String(counts.deskDeals));
-  await expect(page.getByTestId("land-beside-desk")).toHaveText(`+${counts.deskLand} land`);
+  await expect(page.getByTestId("land-beside-desk")).toHaveCount(0);
   const chipText = async () => page.locator(".summary-chip").first().textContent();
   await expect.poll(chipText).toContain("on the map ·");
   await expect.poll(chipText).toContain("dropped, hidden");
@@ -70,7 +70,8 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".pipeline-list");
   if (name !== "mobile") {
-    await expect(page.locator(".pipeline-list thead th")).toHaveCount(9);
+    await expect(page.locator(".pipeline-list thead th")).toHaveCount(10);
+    await expect(page.locator(".pipeline-list thead")).toContainText("County check");
     const overflow = await page.locator(".pipeline-list .list-scroll").evaluate((node) => node.scrollWidth - node.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   } else {
@@ -92,6 +93,16 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     expect(cardGaps.bareMissing).toBe(false);
   }
   await page.screenshot({ path: `review-shots/${name}-list.png`, fullPage: false });
+  await page.goto("/?funnel=universe&view=list&city=PHX", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".list-pane");
+  if (name !== "mobile") {
+    await expect(page.locator(".list-pane thead")).toContainText("County check");
+    await expect(page.getByTestId("type-chip").first()).toBeVisible();
+  } else {
+    await expect(page.getByTestId("phone-cards")).toBeVisible();
+    await expect(page.getByTestId("type-chip").first()).toBeVisible();
+  }
+  await page.screenshot({ path: `review-shots/${name}-universe-list.png`, fullPage: false });
   await page.goto("/?newlist=1&city=PHX&site=L-239", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
   await waitForBasemap(page);

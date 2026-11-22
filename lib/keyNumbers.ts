@@ -38,6 +38,7 @@ function shortRoad(value?: unknown) {
 export const PIPELINE_COLUMNS = [
   { id: "site", label: "Site" },
   { id: "stage", label: "Stage" },
+  { id: "county", label: "County check" },
   { id: "chip_waiting", label: "Waiting on", optional: true },
   { id: "chip_drop", label: "Drop reason", optional: true },
   { id: "chip_advance", label: "Advance reason", optional: true },
@@ -81,6 +82,63 @@ export const PIPELINE_COLUMNS = [
   { id: "nextStep", label: "Next step", optional: true },
   { id: "type", label: "Type", optional: true },
 ] as const;
+
+/**
+ * The narrowest width that keeps a column's full header and a one-line value.
+ * A narrower pane scrolls. Columns are not squeezed below these widths.
+ * Header chrome is the grip, the gaps, and the cell padding, about 66px.
+ */
+export const COLUMN_MINIMUMS: Record<string, number> = {
+  site: 320,
+  stage: 156,
+  county: 172,
+  score: 112,
+  asking: 184,
+  listed: 140,
+  type: 128,
+  city: 112,
+  acres: 112,
+  perAcre: 128,
+  openLand: 144,
+  spare: 144,
+  grade: 130,
+  traffic: 120,
+  cashFlow: 140,
+  revenue: 140,
+  askingRevenue: 176,
+  askingCash: 192,
+  businessMultiple: 232,
+  landEstimate: 168,
+  countyValue: 160,
+  depot: 112,
+  checked: 128,
+  address: 220,
+  apn: 140,
+  zoning: 148,
+  broker: 160,
+  area: 156,
+  nda: 148,
+  lastContact: 156,
+  nextStep: 160,
+  chip_waiting: 140,
+  chip_drop: 152,
+  chip_advance: 184,
+  chip_gap: 152,
+  chip_next: 148,
+  chip_package: 128,
+  chip_business: 176,
+  chip_listing: 120,
+  chip_lead: 152,
+  chip_photos: 120,
+  chip_price: 148,
+  chip_financials: 192,
+  chip_land: 148,
+  chip_power: 156,
+  chip_zoning: 160,
+  chip_title: 144,
+  chip_environmental: 220,
+  capacity: 130,
+};
 
 export type PipelineColumnId = (typeof PIPELINE_COLUMNS)[number]["id"];
 export type PinLabel = "none" | "asking" | "acres" | "peracre";

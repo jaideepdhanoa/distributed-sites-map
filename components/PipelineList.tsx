@@ -19,7 +19,6 @@ import {
   isOpenLandBlank,
   fullMoney,
   capacitySummary,
-  displayScore,
   listScoreText,
   factsForDeal,
   powerSummary,
@@ -39,7 +38,8 @@ import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaColumn, serviceAreaS
 import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
-import { ChipFace } from "./ChipFace";
+import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
+import { ColumnPicker, RowCheck } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
@@ -57,6 +57,8 @@ export type PipelineRow = {
   noPin: boolean;
   zoning?: string;
   apn?: string;
+  countyLabel?: string;
+  countyNote?: string;
   point?: [number, number] | null;
 };
 
@@ -70,25 +72,30 @@ function typeLabel(deal: DealProps): string {
   return "";
 }
 
-function phoneScore(value: string): string {
-  const shown = displayScore(value);
-  if (shown) return `Score ${shown}`;
-  if (!value || value === "—") return "";
-  return `Score ${value}`;
-}
-
 function phoneFact(value: string): string {
   return value.replace(/\s+/g, " ").replace(/^(?:·\s*)+/, "").replace(/(?:\s*·)+$/, "").trim();
 }
 
+function scoreInput(row: PipelineRow) {
+  const deal = row.deal;
+  return {
+    score: deal.score,
+    economics: deal.economics_points,
+    land: deal.land_points,
+    power: deal.power_points,
+    location: deal.location_points,
+    deal: deal.deal_points,
+    naEconomics: isQuickLube(deal.business_type),
+  };
+}
+
 function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
   const deal = row.deal;
-  const score = phoneScore(String(cell(row, "score", signedIn)));
   const asking = signedIn && deal.asking_price != null ? `${compactMoney(deal.asking_price)} asking` : "";
   const party = shownFirm(deal) || shownBroker(deal) || shownPriceSource(deal);
   const land = openLandLabel(deal.open_land_sqft, deal.open_land_basis);
   const openLand = isOpenLandBlank(land) ? "" : `${land} open`;
-  return [score, asking, party, openLand].map(phoneFact).filter(Boolean);
+  return [asking, party, openLand].map(phoneFact).filter(Boolean);
 }
 
 function dealChips(deal: DealProps, signedIn: boolean) {
@@ -99,6 +106,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
+  if (id === "county") return row.countyLabel || "—";
   if (id === "score") {
     const view = storedScoreView({
       score: deal.score,
@@ -275,7 +283,6 @@ export default function PipelineList({
   onDismiss?: () => void;
 }) {
   const unread = new Set(unreadIds || []);
-  const [columnsOpen, setColumnsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const allowed = useMemo(() => allowedIds(PIPELINE_COLUMNS.map((column) => column.id), signedIn), [signedIn]);
   const fallback = useMemo(() => {
@@ -318,6 +325,7 @@ export default function PipelineList({
       id,
       label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
       className: id === "capacity" ? "power-col" : id === "stage" ? "stage-col" : undefined,
+      customTip: id === "stage" || id === "score" || id === "county" || id === "type",
       text: (row) => cell(row, id as PipelineColumnId, signedIn),
       choices,
       hasValues: choices ? rows.some((row) => Boolean(codeOf(row))) : undefined,
@@ -494,21 +502,13 @@ export default function PipelineList({
             </button>
           );
         })}
-        <div className="col-picker only-desktop">
-          <button type="button" className="paper-btn" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((value) => !value)}>Columns</button>
-          {columnsOpen ? (
-            <div className="menu" role="group" aria-label="Columns">
-              <button type="button" className="text-link" onClick={() => { update(defaultLayout(allowed)); onResetColumns(); }}>Pipeline default</button>
-              <p className="menu-note">The strip runs from the lowest to the highest in this filter. The tick is the median. Green is the better third and amber the worse third.</p>
-              {PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => (
-                <label key={column.id}>
-                  <input className="check" type="checkbox" checked={!activeLayout.hidden.includes(column.id)} disabled={column.id === "site"} onChange={() => toggleColumn(column.id)} />
-                  {column.label}
-                </label>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ColumnPicker
+          resetLabel="Pipeline default"
+          columns={PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => ({ id: column.id, label: column.label }))}
+          hidden={activeLayout.hidden}
+          onToggle={(id) => toggleColumn(id as PipelineColumnId)}
+          onReset={() => { update(defaultLayout(allowed)); onResetColumns(); }}
+        />
         <label className="list-sort only-mobile">
           Sort
           <select
@@ -566,11 +566,12 @@ export default function PipelineList({
                 const chips = dealChips(row.deal, signedIn);
                 const waiting = chips.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
                 const gap = chips.find((chip) => chip.family === "biggest_gap");
-                const category = isQuickLube(row.deal.business_type) ? <ChipFace className="stage-pill tone-brass" testId="quick-lube-chip" label={QUICK_LUBE_LABEL} /> : null;
-                if (!waiting && !gap && !category) return null;
                 return (
                   <>
-                    {category}
+                    <TypeChip value={typeLabel(row.deal)} />
+                    {row.deal.kind === "land" ? <LandPausedChip /> : null}
+                    {row.countyLabel ? <CountyChip label={row.countyLabel} note={row.countyNote || ""} /> : null}
+                    <ScoreCell input={scoreInput(row)} />
                     {waiting ? <TagChip chip={waiting} compact /> : null}
                     {gap ? <TagChip chip={gap} compact /> : null}
                   </>
@@ -599,9 +600,7 @@ export default function PipelineList({
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
         headerExtra={(id) => id === "site" && showChecks ? (
-          <label className="row-check">
-            <input className="check" type="checkbox" aria-label="Select all shown" checked={allOn} onChange={toggleAll} />
-          </label>
+          <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
@@ -630,23 +629,29 @@ export default function PipelineList({
             if (chip && (signedIn || !family.signedIn)) return <TagChip chip={chip} compact />;
             if (column !== "nda") return "—";
           }
+          if (column === "score") return <ScoreCell input={scoreInput(row)} />;
+          if (column === "county") return row.countyLabel ? <CountyChip label={row.countyLabel} note={row.countyNote || ""} /> : "—";
+          if (column === "type") return <span className="stage-cell"><TypeChip value={typeLabel(row.deal)} />{row.deal.kind === "land" ? <LandPausedChip /> : null}</span>;
           if (column === "stage") {
             const nda = signedIn ? dealChips(row.deal, signedIn).find((chip) => chip.family === "nda" && chip.code !== "not_required") : undefined;
             return (
-              <span className="stage-cell">
-                <ChipFace className={`stage-pill tone-${stageTone(row.deal)}`} testId="stage-chip" label={stageChipLabel(row.deal.stage, row.deal.stage_group)} detail={droppedDecisionLine(row.deal)} />
-                {isQuickLube(row.deal.business_type) ? <ChipFace className="stage-pill tone-brass" testId="quick-lube-chip" label={QUICK_LUBE_LABEL} /> : null}
-                {nda ? <TagChip chip={nda} compact /> : null}
-                <StagePending note={row.deal.stage_pending} />
-              </span>
+              <StageTypeCell
+                stage={row.deal.stage || ""}
+                group={row.deal.stage_group || ""}
+                detail={droppedDecisionLine(row.deal)}
+                type={typeLabel(row.deal)}
+                land={row.deal.kind === "land"}
+                extra={<>
+                  {nda ? <TagChip chip={nda} compact /> : null}
+                  <StagePending note={row.deal.stage_pending} />
+                </>}
+              />
             );
           }
           if (column === "site") return (
             <span className="site-name">
               {showChecks ? (
-                <label className="row-check">
-                  <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
-                </label>
+                <RowCheck label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
               ) : null}
               <span className="site-title">
                 <span className="site-name-text" title={String(cell(row, "site", signedIn) || row.deal.deal_id)}>
@@ -672,7 +677,7 @@ export default function PipelineList({
           return cell(row, column as PipelineColumnId, signedIn);
         }}
         flexIds={["site", "asking", "capacity", "traffic", "cashFlow"]}
-        wrapIds={["site", "stage", "asking", "capacity", "traffic", "cashFlow"]}
+        wrapIds={["site", "stage", "asking", "cashFlow"]}
         trailing={(row) => (
           <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(row.deal.deal_id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
         )}

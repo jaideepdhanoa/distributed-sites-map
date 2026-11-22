@@ -4,11 +4,12 @@ import { readFileSync } from "node:fs";
 import { memorySql } from "../helpers/sql";
 import {
   allowedIds,
-  columnWidth,
   cycleSort,
   defaultLayout,
+  columnFloor,
   displayIds,
   fitColumnWidths,
+  parkCounty,
   moveColumn,
   phoneColumns,
   prepareRows,
@@ -51,7 +52,7 @@ test("reorder, pin, and hide keep the site column and the saved order", () => {
   assert.deepEqual(layout.order.slice(0, 3), ["site", "score", "stage"]);
   assert.equal(layout.hidden.includes("site"), false);
   assert.equal(layout.hidden.includes("cashFlow"), true);
-  assert.equal(layout.widths.stage, 96);
+  assert.equal(layout.widths.stage, columnFloor("stage"));
   assert.equal(layout.widths.score, 480);
   const shown = displayIds(layout, allowedIds(pipeline, true), false, phoneColumns("pipeline"));
   assert.equal(shown[0], "stage");
@@ -97,66 +98,52 @@ test("column filters and numeric sort leave text facts as text", () => {
 });
 
 const pipelineIds = ["site", "stage", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
-const flexIds = new Set(["site", "asking", "listed", "capacity", "grade", "traffic", "cashFlow"]);
 
-test("a default sheet uses the pane and keeps rigid columns", () => {
-  for (const pane of [1280, 1440, 1920]) {
-    const fitted = fitColumnWidths(pipelineIds, {}, pane, TRAILING_COLUMN_WIDTH, flexIds);
-    assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, pane);
-    assert.equal(fitted[1], columnWidth("stage"));
-    assert.equal(fitted[2], columnWidth("score"));
-    assert.equal(fitted[4], columnWidth("openLand"));
-    assert.ok(fitted.every((width) => width >= 96));
-  }
-  const wide = fitColumnWidths(pipelineIds, {}, 1920, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.ok(wide[0] > columnWidth("site"));
-  assert.ok(wide[3] > columnWidth("asking"));
-  assert.ok(wide[5] > columnWidth("capacity"));
-  assert.ok(wide[6] > columnWidth("traffic"));
-  assert.ok(wide[7] > columnWidth("cashFlow"));
-  const narrow = fitColumnWidths(pipelineIds, {}, 1280, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.ok(narrow[0] < columnWidth("site"));
-  assert.ok(narrow[0] >= 280);
-  const withWaiting = fitColumnWidths(["site", "chip_waiting", ...pipelineIds.slice(1)], {}, 1024, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.ok(withWaiting[0] >= 280);
-  const savedNarrow = fitColumnWidths(
-    ["site", "chip_waiting", "stage", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"],
-    { site: 48, stage: 140, score: 96, asking: 160, openLand: 110, capacity: 120, traffic: 100, cashFlow: 140 },
-    1024,
-    TRAILING_COLUMN_WIDTH,
-    flexIds,
+test("county check sits beside stage when a saved order left it at the end", () => {
+  assert.deepEqual(
+    parkCounty(["site", "stage", "score", "asking", "chip_environmental", "county"]),
+    ["site", "stage", "county", "score", "asking", "chip_environmental"],
   );
-  assert.ok(savedNarrow[0] >= 280);
-  const loaded = sanitizeLayout({ widths: { site: 48, stage: 90 }, order: ["site", "stage"], touched: true }, ["site", "stage", "chip_waiting"]);
-  assert.ok((loaded.widths.site || 0) >= 280);
+  const layout = sanitizeLayout(
+    { order: ["site", "stage", "score", "asking", "chip_environmental", "county"], touched: true },
+    ["site", "stage", "county", "score", "asking", "chip_environmental"],
+  );
+  assert.deepEqual(layout.order, ["site", "stage", "county", "score", "asking", "chip_environmental"]);
 });
 
-test("a saved layout keeps its widths and the last flexible column fills a wider pane", () => {
-  const widths = {
-    site: 300,
-    stage: 140,
-    score: 100,
-    asking: 150,
-    openLand: 110,
-    capacity: 130,
-    traffic: 100,
-    cashFlow: 140,
-  };
-  const fitted = fitColumnWidths(pipelineIds, widths, 1600, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.equal(fitted[0], 300);
-  assert.equal(fitted[1], 140);
-  assert.equal(fitted[3], 150);
-  assert.equal(fitted[5], 130);
-  assert.equal(fitted[6], 100);
-  assert.ok(fitted[7] > 140);
-  assert.equal(fitted.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH, 1600);
-  const askingLast = fitColumnWidths(["site", "cashFlow", "asking"], { site: 300, cashFlow: 120, asking: 140 }, 900, 0, flexIds);
-  assert.deepEqual(askingLast, [300, 120, 480]);
-  const wider = fitColumnWidths(pipelineIds, { ...widths, site: 420, asking: 400, capacity: 400, traffic: 300, cashFlow: 400 }, 1280, TRAILING_COLUMN_WIDTH, flexIds);
-  assert.equal(wider[0], 420);
-  assert.equal(wider[7], 400);
-  assert.ok(wider.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH > 1280);
-  assert.deepEqual(fitColumnWidths(pipelineIds, {}, 0, TRAILING_COLUMN_WIDTH, flexIds), pipelineIds.map((id) => columnWidth(id)));
+test("a narrow pane scrolls instead of shrinking a column below its header", () => {
+  const ids = ["site", "stage", "county", "score", "spare", "grade", "traffic", "listed"];
+  const widePane = fitColumnWidths(ids, {}, 1920, TRAILING_COLUMN_WIDTH);
+  for (const pane of [1024, 1280, 1440]) {
+    const fitted = fitColumnWidths(ids, {}, pane, TRAILING_COLUMN_WIDTH);
+    assert.deepEqual(fitted, widePane);
+    ids.forEach((id, index) => assert.ok(fitted[index] >= columnFloor(id), id));
+  }
+  assert.ok(widePane.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH > 1280);
+  assert.equal(columnFloor("openLand"), 144);
+  assert.equal(columnFloor("grade"), 130);
+  assert.equal(columnFloor("traffic"), 120);
+  assert.equal(columnFloor("chip_advance"), 184);
+  const pipeline = ["site", "stage", "county", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"];
+  const narrow = fitColumnWidths(pipeline, {}, 1280, TRAILING_COLUMN_WIDTH);
+  assert.equal(narrow[pipeline.indexOf("county")], columnFloor("county"));
+  assert.ok(narrow.reduce((sum, width) => sum + width, 0) + TRAILING_COLUMN_WIDTH > 1280);
+  const crushed = fitColumnWidths(pipeline, {
+    site: 200,
+    asking: 70,
+    openLand: 40,
+    capacity: 40,
+    traffic: 50,
+    cashFlow: 50,
+  }, 1280, TRAILING_COLUMN_WIDTH);
+  pipeline.forEach((id, index) => assert.ok(crushed[index] >= columnFloor(id), id));
+  const wide = fitColumnWidths(pipeline, { site: 420, cashFlow: 400 }, 1920, TRAILING_COLUMN_WIDTH);
+  assert.equal(wide[0], 420);
+  assert.equal(wide[pipeline.indexOf("cashFlow")], 400);
+  assert.equal(wide[pipeline.indexOf("asking")], columnFloor("asking"));
+  const loaded = sanitizeLayout({ widths: { site: 48, stage: 90 }, order: ["site", "stage"], touched: true, pinned: ["stage"] }, ["site", "stage", "chip_waiting"]);
+  assert.ok((loaded.widths.site || 0) >= columnFloor("site"));
+  assert.equal(loaded.pinned[0], "site");
 });
 
 test("a closed preview layout read stays on the browser layout", async () => {

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { SEGMENT_GROUPS } from "../../lib/segments";
 import { migrate } from "../../lib/actions/migrate";
 import { InputError } from "../../lib/actions/text";
 import { applyBatch } from "../../lib/changes/apply";
@@ -137,6 +139,113 @@ test("Land Sites growth is planned when a write passes the last row", () => {
     ],
   );
   assert.ok(body.requests.findIndex((request) => "appendDimension" in request) < body.requests.findIndex((request) => "updateCells" in request));
+});
+
+test("the segment list matches the workbook vocabulary", () => {
+  const source = readFileSync("scripts/vocabulary.py", "utf8");
+  const block = source.match(/KNOWN_SEGMENT_GROUPS = \{([\s\S]*?)\n\}/)?.[1] || "";
+  const python = [...block.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+  assert.deepEqual(python, [...SEGMENT_GROUPS].sort());
+});
+
+test("Indie can set a known segment, and Muse cannot change one", async () => {
+  const written = fieldsOf(indie, "segment", {
+    segment: "Quick lube",
+    segment_group: "quick lube",
+    sources: { segment: "Sample classification" },
+  });
+  assert.equal(written.fields.category, "Quick lube");
+  assert.equal(written.facts.segment_group, "Quick lube");
+  assert.throws(
+    () => fieldsOf(indie, "segment", { segment: "Bakery", sources: { segment: "Sample classification" } }),
+    /Segment must be one of the known segment groups/,
+  );
+  assert.throws(
+    () => fieldsOf(indie, "segment", { segment: "Quick lube" }),
+    /segment needs a source/,
+  );
+  assert.throws(
+    () => fieldsOf(muse, "segment", { segment: "Quick lube", sources: { segment: "Sample classification" } }),
+    /cannot write that field/,
+  );
+  const created = validateBatch(muse, "muse-create-segment", {
+    changes: [{
+      entity_type: "site",
+      expected_version: 0,
+      source: "Sample listing",
+      payload: {
+        kind: "pipeline",
+        listing_id: "L-9101",
+        name: "Sample lube",
+        market: "PHX",
+        segment: "Quick lube",
+        sources: { name: "Sample listing", market: "Sample listing", segment: "Sample classification" },
+      },
+    }],
+  });
+  const minted = created.changes[0]?.payload;
+  assert.ok(minted && "fields" in minted);
+  assert.equal(minted.fields.category, "Quick lube");
+  assert.equal(minted.facts.segment_group, "Quick lube");
+});
+
+test("Indie overriding a stored segment records both labels", async () => {
+  const sql = await memorySql();
+  await migrate(sql);
+  await applyBatch(sql, human, "seed-segment", {
+    changes: [siteChange({
+      name: "Sample lube",
+      market: "PHX",
+      category: "Car wash",
+    }, 0)],
+  });
+  await applyBatch(sql, indie, "override-segment", {
+    changes: [siteChange({
+      segment: "Quick lube",
+      sources: { segment: "Sample classification" },
+    }, 1)],
+  });
+  const rows = await sql.query<{ subject: string; source_a_value: string; source_b_value: string; value_in_use: string }>(
+    `SELECT subject, source_a_value, source_b_value, value_in_use FROM data_conflicts`,
+  );
+  assert.equal(rows.rows[0]?.subject, "segment");
+  assert.equal(rows.rows[0]?.source_a_value, "Car wash");
+  assert.equal(rows.rows[0]?.source_b_value, "Quick lube");
+  assert.equal(rows.rows[0]?.value_in_use, "Quick lube");
+});
+
+test("a stored Universe id copies onto the deal row when it differs", async () => {
+  const sql = await memorySql();
+  await migrate(sql);
+  await sql.query(
+    `INSERT INTO sites (site_id, market, name, address, category, apn, universe_id, version, updated_by)
+     VALUES ('PIPE-MIA-9101', 'MIA', 'Sample', '40 Sample St', 'Car wash', '', 'WB-MIA-0050', 1, 'test')`,
+  );
+  const loaded = await loadMirrorRows(sql);
+  assert.equal(loaded.sites[0]?.writes["Universe ID"], "WB-MIA-0050");
+  const table: SheetTable = {
+    title: "Pipeline",
+    headerRow: 4,
+    headers: ["site id", "Universe ID", "Site"],
+    rows: [{ row: 5, cells: ["PIPE-MIA-9101", "", "40 Sample St"] }],
+  };
+  const plan = planSiteMirror([table], loaded.sites);
+  assert.deepEqual(plan.changes.map((change) => change.header), ["Universe ID"]);
+  assert.equal(plan.changes[0]?.after, "WB-MIA-0050");
+  const land: SheetTable = {
+    title: "Land Sites",
+    headerRow: 4,
+    headers: ["site id", "Site"],
+    rows: [{ row: 5, cells: ["PIPE-MIA-9101", "40 Sample St"] }],
+  };
+  const added = planSiteMirror([land], loaded.sites);
+  assert.deepEqual(
+    added.changes.map((change) => ({ row: change.row, header: change.header, after: change.after })),
+    [
+      { row: 4, header: "Universe ID", after: "Universe ID" },
+      { row: 5, header: "Universe ID", after: "WB-MIA-0050" },
+    ],
+  );
 });
 
 test("Folder, Segment, and Trade-area checked copy only a non-empty difference", () => {

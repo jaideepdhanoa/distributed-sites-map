@@ -36,6 +36,7 @@ import { parseTag, type TagPayload } from "@/lib/tags/parse";
 import { BUSINESS_TYPES as PNL_BUSINESSES, PNL_LINE_CODES, type PnlBusiness, type PnlLineCode } from "@/lib/pnl/lines";
 import { parseAmount } from "@/lib/pnl/money";
 import { QUICK_LUBE_FIELDS, UNIVERSE_CREATE_CATEGORIES, normalizeAddress, quickLubeValueProblem, serviceAreaToken } from "@/lib/quickLube";
+import { segmentKey, segmentLabel } from "@/lib/segments";
 import { coverageOf } from "@/lib/pnl/period";
 import {
   ACTIVITY_TYPES,
@@ -325,6 +326,8 @@ const sitePayload = z
     lat: z.number().finite().nullable().optional(),
     lng: z.number().finite().nullable().optional(),
     category: z.enum(BUSINESS_TYPES).optional(),
+    segment: z.string().trim().max(80).optional(),
+    segment_group: z.string().trim().max(80).optional(),
     broker: z.string().trim().max(120).optional(),
     firm: z.string().trim().max(160).optional(),
     listing_url: z.string().trim().max(400).optional(),
@@ -1259,6 +1262,18 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   put("lat", data.lat);
   put("lng", data.lng);
   put("category", data.category);
+  const segmentInput = data.segment ?? data.segment_group;
+  if (data.segment !== undefined && data.segment_group !== undefined && segmentKey(data.segment) !== segmentKey(data.segment_group)) {
+    throw new InputError(`Change ${index + 1}: segment and segment_group have to match.`);
+  }
+  if (segmentInput !== undefined) {
+    const label = segmentLabel(segmentInput);
+    if (!label) throw new InputError(`Change ${index + 1}: Segment must be one of the known segment groups.`);
+    fields.category = label;
+    if (expectedVersion === 0 && data.sources && !data.sources.category) {
+      data.sources.category = data.sources.segment || data.sources.segment_group || "";
+    }
+  }
   put("broker", data.broker);
   put("firm", data.firm);
   if (data.listing_url && listingSearchPage(data.listing_url)) {
@@ -1319,6 +1334,7 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     if (!source) throw new InputError(`Change ${index + 1}: ${key} needs a source.`);
   }
   if (data.folder_url !== undefined) facts.folder_url = data.folder_url;
+  if (fields.category && (data.segment !== undefined || data.segment_group !== undefined)) facts.segment_group = fields.category;
   const topLevel = data as Record<string, unknown>;
   for (const key of TOP_LEVEL_FACT_FIELDS) {
     const value = topLevel[key];
@@ -1336,7 +1352,8 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     const indieIdentity = !mint && actor.kind === "agent" && actor.id === "indie" && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
     const quickSource = (QUICK_LUBE_FIELDS as readonly string[]).includes(key);
     const roadSource = key === "trade_aadt_road";
-    if (!identitySource && !indieIdentity && !quickSource && !roadSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    const segmentSource = key === "segment" || key === "segment_group" || key === "category";
+    if (!identitySource && !indieIdentity && !quickSource && !roadSource && !segmentSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1364,6 +1381,12 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     if (!source) continue;
     cleanText(source);
     sources[field] = source;
+  }
+  if (!mint && actor.kind === "agent" && actor.id === "indie" && fields.category && (data.segment !== undefined || data.segment_group !== undefined || data.category !== undefined)) {
+    const source = data.sources?.segment?.trim() || data.sources?.segment_group?.trim() || data.sources?.category?.trim() || "";
+    if (!source) throw new InputError(`Change ${index + 1}: segment needs a source.`);
+    cleanText(source);
+    sources.segment = source;
   }
   if (!mint && actor.kind === "agent" && actor.id === "indie") {
     for (const field of INDIE_IDENTITY_FIELDS) {
@@ -1440,8 +1463,8 @@ function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, 
     throw new InputError(`Change ${index + 1}: An agent cannot set that service area.`);
   }
   const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS, ...TRADE_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
-  const createAllowed = mint ? new Set<string>(CREATE_IDENTITY_FIELDS) : new Set<string>();
-  const indieUpdate = new Set<string>(actor.id === "indie" && !mint ? ["folder_url", ...INDIE_IDENTITY_FIELDS] : []);
+  const createAllowed = mint ? new Set<string>([...CREATE_IDENTITY_FIELDS, "segment", "segment_group"]) : new Set<string>();
+  const indieUpdate = new Set<string>(actor.id === "indie" && !mint ? ["folder_url", "category", "segment", "segment_group", ...INDIE_IDENTITY_FIELDS] : []);
   for (const key of touched) {
     if (createAllowed.has(key) || indieUpdate.has(key)) continue;
     if ((SCHEMA_FIELDS as readonly string[]).includes(key) || !allowed.has(key)) {

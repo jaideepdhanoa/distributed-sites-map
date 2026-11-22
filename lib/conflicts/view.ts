@@ -1,5 +1,5 @@
 export type ConflictStatus = "open" | "asked_broker" | "resolved";
-export const CONFLICT_SUBJECTS = ["field", "pnl_line", "address", "apn", "lat", "lng", "open_land_sqft"] as const;
+export const CONFLICT_SUBJECTS = ["field", "pnl_line", "address", "apn", "lat", "lng", "open_land_sqft", "segment"] as const;
 export type ConflictSubject = (typeof CONFLICT_SUBJECTS)[number];
 
 export type ConflictSource = {

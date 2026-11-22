@@ -11,10 +11,12 @@ import {
   CREATE_IDENTITY_FIELDS,
   CREATE_MARKETS,
   FACT_FIELDS,
+  INDIE_IDENTITY_FIELDS,
   LISTING_STATUSES,
   MUSE_FIELDS,
   NUMERIC_FACT_FIELDS,
   PHOTO_FIELDS,
+  TOP_LEVEL_FACT_FIELDS,
   PHOTO_ROLES,
   PHOTO_SOURCES,
   SCHEMA_FIELDS,
@@ -25,6 +27,7 @@ import {
   type PhotoRef,
   type SiteField,
 } from "./site";
+import { CONFLICT_SUBJECTS, type ConflictSubject } from "@/lib/conflicts/view";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { SPACE_LAYOUT_IDS, SPACE_TYPE_IDS, spaceSiteAllowed, type SpaceLayout, type SpaceType } from "@/lib/spaces/vocab";
 import { safeGmailLink } from "@/lib/comms";
@@ -210,7 +213,7 @@ export type ConflictSourcePayload = { value: string; document: string; page: str
 
 /** Two sources that disagree. Muse writes it. The values stay on the signed-in read. */
 export type ConflictPayload = {
-  subject: "field" | "pnl_line";
+  subject: ConflictSubject;
   field: string;
   period: string;
   sources: [ConflictSourcePayload, ConflictSourcePayload];
@@ -326,6 +329,7 @@ const sitePayload = z
     listing_url: z.string().trim().max(400).optional(),
     asking_price: z.number().finite().nullable().optional(),
     acreage: z.number().finite().nullable().optional(),
+    ...Object.fromEntries(TOP_LEVEL_FACT_FIELDS.map((key) => [key, z.union([z.string().trim().max(500), z.number().finite(), z.null()]).optional()])),
     apn: z.string().trim().max(80).optional(),
     land_value: z.number().finite().nullable().optional(),
     improvement_value: z.number().finite().nullable().optional(),
@@ -424,7 +428,7 @@ const conflictSourcePayload = z
 
 const conflictPayload = z
   .object({
-    subject: z.enum(["field", "pnl_line"]),
+    subject: z.enum(CONFLICT_SUBJECTS),
     field: z.string().trim().min(1).max(80),
     period: z.string().trim().max(80).optional(),
     sources: z.tuple([conflictSourcePayload, conflictSourcePayload]),
@@ -1313,11 +1317,23 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     if (!source) throw new InputError(`Change ${index + 1}: ${key} needs a source.`);
   }
   if (data.folder_url !== undefined) facts.folder_url = data.folder_url;
+  const topLevel = data as Record<string, unknown>;
+  for (const key of TOP_LEVEL_FACT_FIELDS) {
+    const value = topLevel[key];
+    if (value === undefined || facts[key] !== undefined) continue;
+    facts[key] = value == null ? "" : canonicalFact(value as string | number);
+  }
+  if (facts.folder_url) {
+    const problem = driveFolderProblem(facts.folder_url);
+    if (problem) throw new InputError(`Change ${index + 1}: ${problem}`, 400, "folder_url");
+  }
   if (!Object.keys(fields).length && !Object.keys(facts).length) throw new InputError(`Change ${index + 1}: Add a field to change.`);
+  assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class, mint);
   for (const key of Object.keys(data.sources || {})) {
     const identitySource = mint && (CREATE_IDENTITY_FIELDS as readonly string[]).includes(key);
+    const indieIdentity = !mint && actor.kind === "agent" && actor.id === "indie" && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
     const quickSource = (QUICK_LUBE_FIELDS as readonly string[]).includes(key);
-    if (!identitySource && !quickSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    if (!identitySource && !indieIdentity && !quickSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1338,6 +1354,16 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     if (!source) continue;
     cleanText(source);
     sources[field] = source;
+  }
+  if (!mint && actor.kind === "agent" && actor.id === "indie") {
+    for (const field of INDIE_IDENTITY_FIELDS) {
+      const value = fields[field as SiteField];
+      if (value === undefined || value === "") continue;
+      const source = data.sources?.[field]?.trim() || "";
+      if (!source) throw new InputError(`Change ${index + 1}: ${field} needs a source.`);
+      cleanText(source);
+      sources[field] = source;
+    }
   }
   if (expectedVersion === 0 && !CREATE_MARKETS.includes(data.market as (typeof CREATE_MARKETS)[number])) {
     throw new InputError(`Change ${index + 1}: A new site needs a market of PHX, LAS, or MIA.`);
@@ -1395,7 +1421,6 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
       siteMint = { kind: data.kind, listing_id: listing };
     }
   }
-  assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class, mint);
   return { fields, sources, facts, photos: data.photo_refs ? photos : undefined, ...(siteMint ? { mint: siteMint } : {}) };
 }
 
@@ -1406,10 +1431,28 @@ function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, 
   }
   const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
   const createAllowed = mint ? new Set<string>(CREATE_IDENTITY_FIELDS) : new Set<string>();
+  const indieUpdate = new Set<string>(actor.id === "indie" && !mint ? ["folder_url", ...INDIE_IDENTITY_FIELDS] : []);
   for (const key of touched) {
-    if (createAllowed.has(key)) continue;
+    if (createAllowed.has(key) || indieUpdate.has(key)) continue;
     if ((SCHEMA_FIELDS as readonly string[]).includes(key) || !allowed.has(key)) {
       throw new InputError(`Change ${index + 1}: An agent cannot write that field.`);
     }
   }
+}
+
+/** A Drive folder link, or the folder id by itself. */
+export function driveFolderProblem(value: string): string {
+  const text = value.trim();
+  if (!text) return "";
+  if (/^[A-Za-z0-9_-]{10,80}$/.test(text)) return "";
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return "folder_url must be a Drive folder URL or folder id.";
+  }
+  const id = url.searchParams.get("id") || "";
+  const folder = /\/folders\/([A-Za-z0-9_-]+)/.exec(url.pathname)?.[1] || "";
+  if (url.protocol === "https:" && url.hostname === "drive.google.com" && (folder || id)) return "";
+  return "folder_url must be a Drive folder URL or folder id.";
 }

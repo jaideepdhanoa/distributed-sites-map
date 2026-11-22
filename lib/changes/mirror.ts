@@ -209,7 +209,7 @@ function planTable(input: {
   for (const column of required) {
     if (column.index < 0) throw new Error(`${input.table.title} is missing the ${column.headers[0]} column.`);
   }
-  const byId = new Map<string, { row: number; cells: string[] }>();
+  const byId = new Map<string, { row: number; cells: string[]; formulas?: string[] }>();
   for (const row of input.table.rows) {
     const id = cellText(row.cells[idAt]);
     if (id && !byId.has(id)) byId.set(id, row);
@@ -281,6 +281,8 @@ function planTable(input: {
     }
     for (const column of columns) {
       if (column.index < 0 || column.key === "id") continue;
+      const formula = cellText(existing.formulas?.[column.index]);
+      if (formula.startsWith("=")) continue;
       const after = cellText(record.values[column.key]);
       if (input.skipBlank && !after) continue;
       const before = cellText(existing.cells[column.index]);
@@ -414,6 +416,7 @@ export function planSiteMirror(
             continue;
           }
         }
+        if (!after) continue;
         if (sameWorkbookCell(before, after)) continue;
         if (isTruncatedCell(before, after)) {
           combined.held.push({ id: record.site_id, header });
@@ -770,6 +773,21 @@ export function formatTabCounts(changes: CellChange[]): string {
 }
 
 /** Status text safe for a public log. Tokens, keys, hosts, and emails are removed. */
+/** Sheets error text for a failed write. Status and message only. No token or key. */
+export function sheetsFailureMessage(status: number, body: string): string {
+  let statusText = "";
+  let message = "";
+  try {
+    const parsed = JSON.parse(body) as { error?: { status?: string; message?: string } };
+    statusText = typeof parsed.error?.status === "string" ? parsed.error.status : "";
+    message = typeof parsed.error?.message === "string" ? parsed.error.message : "";
+  } catch {
+    message = body.replace(/\s+/g, " ").trim();
+  }
+  const detail = [statusText, message].filter(Boolean).join(": ");
+  return redactMirrorError(new Error(`Sheets write failed (${status})${detail ? `: ${detail}` : ""}.`));
+}
+
 export function redactMirrorError(error: unknown): string {
   const text = error instanceof Error ? error.message : "workbook mirror failed";
   return text
@@ -976,16 +994,20 @@ function undefinedColumn(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42703");
 }
 
-type SiteMirrorDb = { site_id: string; market?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
+type SiteMirrorDb = { site_id: string; market?: string; category?: string; sheet_writes: unknown; facts?: unknown; power_rating?: string };
+
+function tradeAreaChecked(facts: Record<string, unknown>): string {
+  return Object.keys(facts).some((key) => key.startsWith("trade_") && text(facts[key])) ? "Yes" : "";
+}
 
 async function loadSiteMirrorSources(sql: Sql): Promise<{ rows: SiteMirrorDb[] }> {
   try {
     return await sql.query<SiteMirrorDb>(
-      `SELECT site_id, market, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
+      `SELECT site_id, market, category, sheet_writes, facts, power_rating FROM sites ORDER BY site_id`,
     );
   } catch (error) {
     if (!undefinedColumn(error)) throw error;
-    return sql.query<SiteMirrorDb>(`SELECT site_id, market, sheet_writes, facts FROM sites ORDER BY site_id`);
+    return sql.query<SiteMirrorDb>(`SELECT site_id, market, category, sheet_writes, facts FROM sites ORDER BY site_id`);
   }
 }
 
@@ -1024,9 +1046,10 @@ export async function loadMirrorRows(sql: Sql): Promise<{
     listing_url: string;
     broker: string;
     stage: string | null;
+    facts?: unknown;
   }>(sql,
     `SELECT m.site_id, m.universe_id, m.kind, s.name, s.address, s.market, s.category, s.apn, s.lat, s.lng,
-            s.listing_url, s.broker, st.stage
+            s.listing_url, s.broker, st.stage, s.facts
      FROM site_mints m
      JOIN sites s ON s.site_id = m.site_id
      LEFT JOIN site_stages st ON st.site_id = m.site_id
@@ -1087,6 +1110,12 @@ export async function loadMirrorRows(sql: Sql): Promise<{
         ? stored
         : derivePowerRating({ market: text(row.market), ...facts }).rating;
       writes[DERIVED_POWER_HEADER] = rating;
+      const folder = text(facts.folder_url);
+      if (folder) writes.Folder = folder;
+      const segment = text(row.category);
+      if (segment) writes.Segment = segment;
+      const checked = tradeAreaChecked(facts);
+      if (checked) writes["Trade-area checked"] = checked;
       return { site_id: text(row.site_id), writes };
     }),
     createdSites: created.map((row) => ({
@@ -1104,6 +1133,8 @@ export async function loadMirrorRows(sql: Sql): Promise<{
         listing_url: text(row.listing_url),
         broker: text(row.broker),
         universe_id: text(row.universe_id),
+        folder_url: text(asObject(row.facts).folder_url),
+        trade_area_checked: tradeAreaChecked(asObject(row.facts)),
       },
     })),
     universeRows: universe.map((row) => ({
@@ -1213,6 +1244,9 @@ const CREATED_SITE_FIELDS: { headers: string[]; key: string }[] = [
   { headers: ["listing link"], key: "listing_url" },
   { headers: ["broker"], key: "broker" },
   { headers: ["universe id", "lead id"], key: "universe_id" },
+  { headers: ["Folder"], key: "folder_url" },
+  { headers: ["Segment"], key: "category" },
+  { headers: ["Trade-area checked"], key: "trade_area_checked" },
 ];
 
 const UNIVERSE_FIELDS: { headers: string[]; key: string }[] = [

@@ -29,6 +29,7 @@ import {
   mirrorDryRun,
   mirrorGridNeedsGrowth,
   mirrorGridRequests,
+  sheetsFailureMessage,
   planActivityMirror,
   planCommsMirror,
   planCreatedSiteMirror,
@@ -74,11 +75,13 @@ function failedTabsError(failed: FailedMirrorTab[], suffix = ""): Error {
   return new Error(`Workbook mirror failed on ${failed.map((failure) => failure.tab).join(", ")}.${suffix}\n${detail}`);
 }
 
-/** Grow the Universe grid, then write the new column. Returns false when the cells already fit. */
-async function writeUniverseGrid(token: string, changes: CellChange[]): Promise<boolean> {
+const GROWN_SHEETS = new Set([UNIVERSE_SHEET, "Pipeline", "Land Sites"]);
+
+/** Grow a sheet grid, then write those cells. Returns false when the cells already fit. */
+async function writeGrownGrid(token: string, title: string, changes: CellChange[]): Promise<boolean> {
   const grids = await readGrids(token);
-  const grid = grids.find((item) => item.title === UNIVERSE_SHEET);
-  if (!grid) throw new Error("Universe sheet is missing from the workbook.");
+  const grid = grids.find((item) => item.title === title);
+  if (!grid) throw new Error(`${title} sheet is missing from the workbook.`);
   if (!mirrorGridNeedsGrowth(changes, grid)) return false;
   await writeFormulaBatch(token, mirrorGridRequests(changes, grid).requests);
   return true;
@@ -120,9 +123,7 @@ async function writeCells(token: string, changes: CellChange[]): Promise<void> {
         }),
       });
       if (!response.ok) {
-        throw new Error(
-          `Sheets write failed (${response.status}). GOOGLE_SERVICE_ACCOUNT_JSON is used with ${MIRROR_SHEETS_SCOPE}. If the account is only a Viewer, share the Pipeline workbook with it as Editor.`,
-        );
+        throw new Error(sheetsFailureMessage(response.status, await response.text()));
       }
     }
   }
@@ -356,11 +357,18 @@ async function main(): Promise<void> {
     phase = "writing";
     const writtenTabs = await writeMirrorTabs(sheetPlans, async (tab, sheetChanges) => {
       if (!sheetChanges.length) return;
-      if (tab === UNIVERSE_SHEET) {
-        const wroteGrid = await writeUniverseGrid(token, sheetChanges);
-        if (wroteGrid) return;
+      const bySheet = new Map<string, CellChange[]>();
+      for (const change of sheetChanges) {
+        const list = bySheet.get(change.sheet) || [];
+        list.push(change);
+        bySheet.set(change.sheet, list);
       }
-      await writeCells(token, sheetChanges);
+      const remaining: CellChange[] = [];
+      for (const [title, mine] of bySheet) {
+        if (GROWN_SHEETS.has(title) && await writeGrownGrid(token, title, mine)) continue;
+        remaining.push(...mine);
+      }
+      if (remaining.length) await writeCells(token, remaining);
     });
     for (const failure of writtenTabs.failed) logTabFailure(failure);
     failed.push(...writtenTabs.failed);

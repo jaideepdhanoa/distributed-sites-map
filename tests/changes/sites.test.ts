@@ -418,7 +418,7 @@ test("the raw site sheet is not a snapshot file and is not served", () => {
   assert.equal(isSnapshotFile("deals.geojson"), true);
   assert.throws(() => readGenerated("site_sheet.json"), /not a public snapshot file/);
   assert.throws(() => readGenerated("comms_full.json"), /not a public snapshot file/);
-  assert.equal(mirrorHeaderAllowed("Folder"), false);
+  assert.equal(mirrorHeaderAllowed("Folder"), true);
   assert.equal(mirrorHeaderAllowed("Broker"), true);
   assert.equal(mirrorHeaderAllowed("Score (of 100)"), false);
   assert.equal(mirrorHeaderAllowed("Economics points"), false);

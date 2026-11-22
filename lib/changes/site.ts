@@ -169,13 +169,19 @@ export const NUMERIC_FACT_FIELDS = [
 
 export type NumericFactField = (typeof NUMERIC_FACT_FIELDS)[number];
 
-/** Identity fields. Agents do not write these after a site exists. */
+/** Identity fields. Muse stays create-only. Indie may update address, apn, lat, and lng, and may set folder_url. */
 export const SCHEMA_FIELDS = ["name", "address", "market", "category", "apn", "universe_id", "lat", "lng", "folder_url"] as const;
 
-/** Identity an agent may set on create, each with its own source. universe_id and folder_url stay server-side. */
+/** Identity an agent may set on create, each with its own source. universe_id stays server-side. */
 export const CREATE_IDENTITY_FIELDS = ["name", "address", "market", "category", "apn", "lat", "lng", "listing_url", "broker", "service_area_class"] as const;
 
-export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes"] as const;
+/** Identity Indie may change on a site that already exists. Each value needs sources.<field>. */
+export const INDIE_IDENTITY_FIELDS = ["address", "apn", "lat", "lng"] as const;
+
+export const PHOTO_FIELDS = ["photo_refs", "photo_status", "photo_diligence_count", "photo_listing_count", "photos_checked", "photo_notes", "folder_url"] as const;
+
+/** Facts Muse stores under facts. A site payload may also send these at the top level. */
+export const TOP_LEVEL_FACT_FIELDS = ["asking_price_source", "land_acres_basis", "parcel_acres", "parcel_match", "open_land_sqft", "open_land_basis", "source_kind", "source_line", "trade_aadt", "trade_aadt_road", "trade_aadt_m", "trade_aadt_max", "trade_population", "trade_growth", "trade_income", "trade_washes_1mi", "trade_washes_3mi"] as const;
 
 export const CHECK_FIELDS = ["checked_live", "bays_that_fit", POWER_RATING, "cap_a_substation_mi", "cap_a_line_ft", "cap_a_source", "cap_a_as_of", "cap_a_confidence", "cap_b_feeder", "cap_b_frontage", "cap_b_nearby", "cap_b_horizon", "cap_b_source", "cap_b_as_of", "cap_b_confidence", "cap_c_amps", "cap_c_volts", "cap_c_phase", "cap_c_panels", "cap_c_source", "cap_c_as_of", "cap_c_confidence", "cap_d_peak", "cap_d_year", "cap_d_source", "cap_d_as_of", "cap_d_confidence"] as const;
 
@@ -373,7 +379,7 @@ const CLASS_LABEL: Record<string, string> = {
 /**
  * Headers an API change may write back. Column order is not assumed.
  * Score, Economics points, Land points, Power points, Location points, Deal points, Stalls that fit, and Segment group are formulas and are absent.
- * Site, Segment, Stage, and Folder are absent.
+ * Site and Stage are absent. Segment, Folder, and Trade-area checked are written when the app value is non-empty.
  * Broker edits replace the person or the firm inside the current cell. The cell's own order stays. A cell that does not split is left unchanged.
  *
  * Database-only. These have no Pipeline or Land Sites column of their own:
@@ -444,6 +450,9 @@ export const MIRROR_FIELD_HEADERS: { field: string; headers: string[] }[] = [
   { field: "cap_d_source", headers: ["pwr_d_source_type"] },
   { field: "cap_d_as_of", headers: ["pwr_d_as_of"] },
   { field: "cap_d_confidence", headers: ["pwr_d_confidence"] },
+  { field: "folder_url", headers: ["Folder"] },
+  { field: "category", headers: ["Segment"] },
+  { field: "trade_area_checked", headers: ["Trade-area checked"] },
 ];
 
 const ENTERED_HEADERS = new Set([

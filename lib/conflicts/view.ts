@@ -1,5 +1,6 @@
 export type ConflictStatus = "open" | "asked_broker" | "resolved";
-export type ConflictSubject = "field" | "pnl_line";
+export const CONFLICT_SUBJECTS = ["field", "pnl_line", "address", "apn", "lat", "lng", "open_land_sqft"] as const;
+export type ConflictSubject = (typeof CONFLICT_SUBJECTS)[number];
 
 export type ConflictSource = {
   value: string;
@@ -45,7 +46,7 @@ export function conflictList(value: unknown): DataConflict[] {
   for (const item of value) {
     if (!item || typeof item !== "object") continue;
     const row = item as DataConflict;
-    if (row.subject !== "field" && row.subject !== "pnl_line") continue;
+    if (!(CONFLICT_SUBJECTS as readonly string[]).includes(row.subject)) continue;
     if (row.status !== "open" && row.status !== "asked_broker" && row.status !== "resolved") continue;
     if (typeof row.id !== "string" || typeof row.field !== "string") continue;
     const first = source(row.sources?.[0]);

@@ -11,7 +11,7 @@ type DealProps = {
 };
 
 // The viable queue hides dropped deals and c-stores. Pick one from the file so a sync can change which id that is.
-async function activePipelineDeal(request: APIRequestContext): Promise<string> {
+async function pipelineDeals(request: APIRequestContext): Promise<string[]> {
   const response = await request.get("/api/data/deals");
   expect(response.ok()).toBeTruthy();
   const body = (await response.json()) as { features?: { properties?: DealProps }[] };
@@ -20,8 +20,12 @@ async function activePipelineDeal(request: APIRequestContext): Promise<string> {
     .filter((props) => props.kind === "pipeline" && props.stage_group !== "dropped" && props.is_c_store !== true && props.deal_id)
     .map((props) => String(props.deal_id))
     .sort();
-  expect(ids.length).toBeGreaterThan(0);
-  return ids[0];
+  expect(ids.length).toBeGreaterThan(1);
+  return ids;
+}
+
+async function activePipelineDeal(request: APIRequestContext): Promise<string> {
+  return (await pipelineDeals(request))[0];
 }
 
 test.describe.configure({ mode: "serial" });
@@ -138,7 +142,9 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 
 test("a mention is queued only for the mentioned account", async ({ page, request }) => {
   await login(request, "contributor");
-  const deal = await activePipelineDeal(request);
+  // Mentions is listed before Assigned, and a site is shown in only one group.
+  // This mention uses a different deal so the first deal can still appear under Assigned.
+  const deal = (await pipelineDeals(request)).at(-1)!;
   await openAs(page, "contributor", `/?funnel=pipeline&site=${deal}&panel=discussion`);
   await page.getByTestId("panel-tab-discussion").click();
   const body = page.getByTestId("note-body");

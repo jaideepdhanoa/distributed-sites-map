@@ -12,9 +12,10 @@
 }
 .review-launch .count-badge { background: #f3d48a; color: #1c1914; }
 .review-launch.on { outline: 2px solid #f3d48a; }
-.shell.reviewing .bar {
+.shell.reviewing .bar,
+.shell.reviewing .review-bar {
   position: relative;
-  z-index: 8;
+  z-index: 21;
 }
 .review-bar:has(.queue-pop) { z-index: 30; }
 .review-site-empty p { margin: 0; flex: 1 1 auto; min-width: 0; }

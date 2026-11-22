@@ -87,13 +87,13 @@ for (const size of sizes) {
       test.skip(true, "this market has a point for every deal");
     }
     await expect(list.getByRole("heading", { name: "Needs location" })).toBeVisible();
+    await expect(list).not.toContainText("PIPE-PHX-0006");
     await list.getByTestId("fix-location").first().click();
     await expect(page).toHaveURL(/fix=location/);
     const fix = page.getByTestId("location-fix");
     await expect(fix).toBeVisible();
     if (me.actionRole === "reviewer") await expect(fix.getByTestId("location-address")).toBeVisible();
     else await expect(fix.getByTestId("location-proposal")).toBeVisible();
-    await expect(list).not.toContainText("PIPE-PHX-0006");
   });
 }
 

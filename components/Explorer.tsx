@@ -2165,7 +2165,7 @@ export default function Explorer() {
         </div>
         {ndaVisible ? null : <p className="note view-line" data-testid="view-help">{viewHelp(inReview ? "review" : funnel === "pipeline" ? "pipeline" : "universe")}</p>}
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
-        {hiddenLand > 0 ? (
+        {hiddenLand > 0 && !inReview ? (
           <p className="land-banner" role="status" data-testid="land-banner">
             Land sites are hidden by your filters
             <button type="button" className="chip" data-testid="show-land" onClick={() => setCategory("land", true)}>Show land</button>

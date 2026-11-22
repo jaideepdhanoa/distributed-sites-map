@@ -17,7 +17,7 @@ import { storedScoreView } from "@/lib/scoreDisplay";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
-import { nearestSheetSnap, sheetSnapHeights, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
+import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
@@ -75,8 +75,8 @@ function SheetHandle({ sheet }: { sheet?: SheetControl }) {
           const drawer = event.currentTarget.closest(".drawer") as HTMLElement | null;
           if (!drawer) return;
           ignoreClick.current = false;
-          const logical = sheetSnapHeights(window.innerHeight)[sheet.snap ?? "peek"];
-          drag.current = { y: event.clientY, height: logical, moved: false };
+          const measured = drawer.getBoundingClientRect().height;
+          drag.current = { y: event.clientY, height: measured, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
@@ -601,14 +601,6 @@ export default function Detail({
       <DrawerGrip />
       <div className="drawer-head">
         <SheetHandle sheet={sheet} />
-        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
-      </div>
-      {banner}
-      <div className="drawer-scroll">
-      <div className="card-top" data-testid="panel-top">
-        <h2>{site.name || site.address || site.site_id}</h2>
-        {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
-        <p className="note">{site.address || "—"}</p>
         <button
           type="button"
           className="paper-btn"
@@ -617,6 +609,14 @@ export default function Detail({
         >
           Copy link
         </button>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
+      </div>
+      {banner}
+      <div className="drawer-scroll">
+      <div className="card-top" data-testid="panel-top">
+        <h2>{site.name || site.address || site.site_id}</h2>
+        {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
+        <p className="note">{site.address || "—"}</p>
         {locationFix ? <LocationFix id={site.site_id} mode={locationFix} address={site.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {site.land_only ? <p className="note">Land site</p> : null}

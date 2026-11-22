@@ -118,11 +118,25 @@ test("All view groups nearby pins, and a group opens onto its pins", async ({ pa
   await page.goto("/?funnel=pipeline&city=all", { waitUntil: "domcontentloaded" });
   await ready(page);
   const pipeline = await countryGroups(page, "deal");
-  const target = [...pipeline.groups].sort((a, b) => b.count - a.count)[0];
-  const before = pipeline.zoom;
   const mapBox = await page.locator(".map").boundingBox();
   expect(mapBox).toBeTruthy();
-  await page.mouse.click(mapBox!.x + target.x, mapBox!.y + target.y);
+  const ranked = [...pipeline.groups].sort((a, b) => b.count - a.count);
+  let point: { x: number; y: number } | null = null;
+  for (const group of ranked) {
+    const x = mapBox!.x + group.x;
+    const y = mapBox!.y + group.y;
+    const hit = await page.evaluate(({ x, y }) => {
+      const node = document.elementFromPoint(x, y);
+      return node ? String(node.className) : "";
+    }, { x, y });
+    if (hit.includes("maplibregl-canvas")) {
+      point = { x, y };
+      break;
+    }
+  }
+  expect(point, "a cluster is visible on the map").toBeTruthy();
+  const before = pipeline.zoom;
+  await page.mouse.click(point!.x, point!.y);
   await page.waitForFunction((zoom) => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
     const tip = document.querySelector(".map-tip-fixed");

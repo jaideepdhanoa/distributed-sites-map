@@ -34,6 +34,30 @@ export function ColumnPicker({
   );
 }
 
+export function SortControl({
+  columns,
+  sort,
+  onChange,
+}: {
+  columns: { id: string; label: string }[];
+  sort: { id: string; desc: boolean };
+  onChange: (id: string, desc: boolean) => void;
+}) {
+  return (
+    <div className="list-sort" data-testid="sort-control">
+      <label>
+        Sort by
+        <select className="secondary" aria-label="Sort by" data-testid="sort-by" value={sort.id} onChange={(event) => onChange(event.target.value, sort.desc)}>
+          {columns.map((column) => <option key={column.id} value={column.id}>{column.label}</option>)}
+        </select>
+      </label>
+      <button type="button" className="chip" data-testid="sort-direction" onClick={() => onChange(sort.id, !sort.desc)}>
+        {sort.desc ? "Desc" : "Asc"}
+      </button>
+    </div>
+  );
+}
+
 export function RowCheck({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <label className="row-check">

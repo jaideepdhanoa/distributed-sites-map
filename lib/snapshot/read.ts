@@ -47,6 +47,7 @@ export function resetSnapshotForTests(): void {
   directBundle = undefined;
   directUntil = 0;
   generation += 1;
+  parsedCache.clear();
 }
 
 export function currentSnapshotMeta(): { id: string; createdAt: string } | null {
@@ -85,8 +86,20 @@ export function readGeneratedText(name: string): string {
   return diskText(name);
 }
 
+const parsedCache = new Map<string, { text: string; value: unknown }>();
+
+/** Parse each published file once per snapshot text. A new snapshot replaces the text. */
 export function readGenerated(name: string): unknown {
-  return JSON.parse(readGeneratedText(name)) as unknown;
+  const text = readGeneratedText(name);
+  const hit = parsedCache.get(name);
+  if (hit && hit.text === text) return hit.value;
+  const value = JSON.parse(text) as unknown;
+  parsedCache.set(name, { text, value });
+  return value;
+}
+
+export function resetParsedSnapshotCache(): void {
+  parsedCache.clear();
 }
 
 export function readGeneratedOptional(name: string): unknown | undefined {

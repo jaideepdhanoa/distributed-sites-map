@@ -11,7 +11,7 @@ import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
 import type { StoredScoreInput } from "@/lib/scoreDisplay";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck } from "./ListChrome";
+import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
 import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
 import { stageChipLabel } from "@/lib/chips";
 import {
@@ -172,32 +172,14 @@ export default function ListView({
       <div className="list-bar">
         <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
-        <label className="list-sort only-mobile">
-          Sort
-          <select
-            className="secondary"
-            aria-label="Sort"
-            value={activeLayout.sort ? `${activeLayout.sort.id}:${activeLayout.sort.desc ? "desc" : "asc"}` : "none"}
-            onChange={(event) => {
-              if (event.target.value === "none") {
-                commit({ ...activeLayout, sort: null, touched: true });
-                return;
-              }
-              const [id, direction] = event.target.value.split(":");
-              commit({ ...activeLayout, sort: { id, desc: direction === "desc" }, touched: true });
-            }}
-          >
-            <option value="none">List order</option>
-            {visible.flatMap((id) => {
-              const column = LIST_COLUMNS.find((item) => item.id === id);
-              if (!column) return [];
-              return [
-                <option key={`${column.id}:asc`} value={`${column.id}:asc`}>{column.label}, A to Z</option>,
-                <option key={`${column.id}:desc`} value={`${column.id}:desc`}>{column.label}, Z to A</option>,
-              ];
-            })}
-          </select>
-        </label>
+        <SortControl
+          columns={visible.flatMap((id) => {
+            const column = LIST_COLUMNS.find((item) => item.id === id);
+            return column ? [{ id: column.id, label: column.label }] : [];
+          })}
+          sort={{ id: activeLayout.sort?.id || "site", desc: Boolean(activeLayout.sort?.desc) }}
+          onChange={(id, desc) => commit({ ...activeLayout, sort: { id, desc }, touched: true })}
+        />
         <ColumnPicker
           resetLabel="Universe default"
           columns={LIST_COLUMNS.map((column) => ({ id: column.id, label: column.label }))}

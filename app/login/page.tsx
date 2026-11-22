@@ -41,6 +41,7 @@ export default function LoginPage() {
         </label>
         {error ? <p className="err">{error}</p> : null}
         <button className="primary" type="submit" disabled={pending}>{pending ? "Checking…" : "Sign in"}</button>
+        <p className="note">Ask Jaideep for access</p>
       </form>
     </main>
   );

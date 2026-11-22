@@ -11,6 +11,7 @@ import {
   queueCourt,
   type NdaAgreement,
 } from "@/lib/nda";
+import { viewHelp } from "@/lib/viewHelp";
 
 type Payload = {
   source?: string;
@@ -54,7 +55,10 @@ export default function NdaQueue({
   return (
     <aside className="nda-pane" data-testid="nda-queue" aria-label="NDA queue">
       <div className="layers-bar nda-bar">
-        <p className="eyebrow">NDA queue</p>
+        <div>
+          <p className="eyebrow">NDA queue</p>
+          <p className="note view-line" data-testid="view-help">{viewHelp("nda")}</p>
+        </div>
         <button type="button" className="close" aria-label="Close NDA queue" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <div className="nda-scroll">

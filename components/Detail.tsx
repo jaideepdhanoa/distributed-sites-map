@@ -24,6 +24,7 @@ import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
+import { LocationFix } from "./LocationFix";
 import { ChipRow, TagChip } from "./TagChip";
 import { chipsForDeal } from "@/lib/tags/show";
 import { DILIGENCE_FAMILIES, sectionChips } from "@/lib/tags/vocab";
@@ -531,6 +532,7 @@ export default function Detail({
   related,
   signedIn = false,
   outsideFilter = false,
+  locationFix = null,
   spaceCount = 0,
   spaceSlots = 0,
   spaceSqft = 0,
@@ -557,6 +559,7 @@ export default function Detail({
   related?: ReactNode;
   signedIn?: boolean;
   outsideFilter?: boolean;
+  locationFix?: "edit" | "propose" | null;
   spaceCount?: number;
   spaceSlots?: number;
   spaceSqft?: number;
@@ -605,6 +608,7 @@ export default function Detail({
         <h2>{site.name || site.address || site.site_id}</h2>
         {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
         <p className="note">{site.address || "—"}</p>
+        {locationFix ? <LocationFix id={site.site_id} mode={locationFix} address={site.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
@@ -627,7 +631,7 @@ export default function Detail({
       <div className="card-chips">
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
-        {linkedDeal ? <NdaChip deal={linkedDeal} signedIn={signedIn} /> : null}
+        <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing />
       </div>
       {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
       {site.linked_deal_id ? (
@@ -840,6 +844,7 @@ export function DealDetail({
   figuresReady = true,
   related,
   outsideFilter = false,
+  locationFix = null,
   spaceCount = 0,
   spaceSlots = 0,
   spaceSqft = 0,
@@ -867,6 +872,7 @@ export function DealDetail({
   figuresReady?: boolean;
   related?: ReactNode;
   outsideFilter?: boolean;
+  locationFix?: "edit" | "propose" | null;
   spaceCount?: number;
   spaceSlots?: number;
   spaceSqft?: number;
@@ -916,11 +922,13 @@ export function DealDetail({
       <div className="card-top" data-testid="panel-top">
         <h2>{deal.name || deal.address}</h2>
         <p className="note">{deal.address}</p>
+        {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
       <SitePhotos card={photos} />
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
+        <NdaChip deal={deal} signedIn={signedIn} showMissing />
         <NextStepCard
           kind="deal"
           id={deal.deal_id}

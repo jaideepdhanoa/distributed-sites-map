@@ -1056,6 +1056,10 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .list-note { margin: 0; padding: 8px 12px 0; color: var(--muted); font-size: var(--type-body); }
 .actions-quiet { margin: 0; padding: 6px 12px; background: #f7ead2; color: #5c4310; font-size: var(--type-body); }
 .list-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.view-line { margin: 4px 0 0; }
+.land-banner { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+.location-fix { display: grid; gap: 8px; margin: 8px 0; }
+.location-fix label { display: grid; gap: 4px; }
 .list-sort { display: flex; align-items: center; gap: 6px; font-size: var(--type-body); }
 .list-sort select { max-width: 46vw; height: 36px; }
 .list-scroll { flex: 1; min-width: 0; max-width: 100%; min-height: 0; overflow-x: auto; overflow-y: auto; }

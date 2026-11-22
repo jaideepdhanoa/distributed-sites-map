@@ -7,6 +7,16 @@ export const privateHeaders = {
   "X-Robots-Tag": "noindex, nofollow",
 };
 
+/** Private cache for one published snapshot. Live account routes stay no-store. */
+export function snapshotCacheHeaders(version: string): Record<string, string> {
+  const token = version.replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 80) || "files";
+  return {
+    "Cache-Control": "private, max-age=300",
+    ETag: `"${token}"`,
+    "X-Robots-Tag": "noindex, nofollow",
+  };
+}
+
 export async function requireUser(): Promise<SessionUser | NextResponse> {
   const jar = await cookies();
   const session = await readSession(jar.get(SESSION_COOKIE)?.value);

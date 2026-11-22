@@ -75,6 +75,8 @@ type Props = {
   onSpaceDelete?: (space: SpaceShape) => void;
   onSpaceDone?: () => void;
   fitAll?: boolean;
+  /** When this token changes, keep the current center and zoom. */
+  preserveCamera?: string;
   canDrawLots?: boolean;
   onDrawLots?: () => void;
   commentedSpaceIds?: string[];
@@ -143,7 +145,13 @@ function applyClusterChrome(map: Map) {
 function markZoomBand(map: Map) {
   const band = map.getZoom() >= PIN_SPLIT_ZOOM ? "pins" : "groups";
   const shell = map.getContainer().closest(".stage-map");
-  if (shell instanceof HTMLElement) shell.dataset.zoomBand = band;
+  if (shell instanceof HTMLElement) {
+    shell.dataset.zoomBand = band;
+    const zoom = map.getZoom().toFixed(2);
+    shell.dataset.zoom = zoom;
+    const root = shell.closest(".shell");
+    if (root instanceof HTMLElement) root.dataset.zoom = zoom;
+  }
 }
 
 function glide(map: Map, center: [number, number], zoom: number) {
@@ -272,6 +280,7 @@ export default function MapView(props: Props) {
   const freezeCamera = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const holdCamera = useRef(false);
+  const preserveCamera = useRef<string | undefined>(undefined);
   const sawSelection = useRef<string | null>(null);
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
@@ -1352,6 +1361,8 @@ export default function MapView(props: Props) {
         if (mapRef.current === map) map.once("idle", push);
         return;
       }
+      if (preserveCamera.current !== undefined && preserveCamera.current !== props.preserveCamera) holdCamera.current = true;
+      if (props.preserveCamera !== undefined) preserveCamera.current = props.preserveCamera;
       clusterLeaves.current.clear();
       const siteFeatures = props.sites.filter((feature) => feature.geometry).map((feature) => ({
         ...feature,
@@ -1611,7 +1622,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.preserveCamera, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;

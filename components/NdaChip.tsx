@@ -7,14 +7,19 @@ export function NdaChip({
   deal,
   text,
   signedIn = true,
+  showMissing = false,
 }: {
   deal?: Partial<NdaMirror>;
   text?: string;
   signedIn?: boolean;
+  showMissing?: boolean;
 }) {
   if (!signedIn) return null;
   const label = text ? (text === "Not required" || text.startsWith("NDA:") ? (text === "Not required" ? "" : text) : `NDA: ${text}`) : cardNdaLabel(deal || {}, true);
-  if (!label) return null;
+  if (!label) {
+    if (!showMissing) return null;
+    return <span className="badge quiet nda-chip" data-testid="nda-chip">No NDA</span>;
+  }
   const id = deal?.nda_id || "";
   return (
     <span data-nda-id={id || undefined}>

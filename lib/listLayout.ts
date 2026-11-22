@@ -166,10 +166,10 @@ export function displayIds(layout: ListLayout, allowed: string[], phone: boolean
   return ordered.length ? ordered : allowed.filter((id) => id === "site").slice(0, 1);
 }
 
+/** Header clicks switch direction. They do not clear the sort. */
 export function cycleSort(current: SheetSort, id: string): SheetSort {
   if (!current || current.id !== id) return { id, desc: false };
-  if (!current.desc) return { id, desc: true };
-  return null;
+  return { id, desc: !current.desc };
 }
 
 export function sortParam(sort: SheetSort): string | null {

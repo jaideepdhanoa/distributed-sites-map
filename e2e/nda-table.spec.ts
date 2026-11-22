@@ -1,5 +1,30 @@
 import { expect, test } from "@playwright/test";
 
+test("a site card opens its NDA and can come back", async ({ page }) => {
+  await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".shell");
+  const found = await page.evaluate(async () => {
+    const response = await fetch("/api/data/deals");
+    const body = await response.json() as { features?: { properties?: { deal_id?: string; nda_id?: string; nda_status?: string } }[] };
+    const closed = new Set(["Executed", "Not required", "Expired", "Declined / proceeding without"]);
+    const feature = (body.features || []).find((item) => {
+      const id = item.properties?.nda_id || "";
+      const status = item.properties?.nda_status || "";
+      return id.startsWith("NDA-") && !closed.has(status);
+    });
+    return { deal: feature?.properties?.deal_id || "", nda: feature?.properties?.nda_id || "" };
+  });
+  expect(found.deal).toMatch(/^PIPE-|^LAND-/);
+  expect(found.nda).toMatch(/^NDA-/);
+  await page.goto(`/?funnel=pipeline&site=${found.deal}`, { waitUntil: "domcontentloaded" });
+  await page.getByTestId("nda-open").click();
+  await expect(page).toHaveURL(new RegExp(`nda=${found.nda}`));
+  await expect(page.getByTestId("nda-detail")).toBeVisible();
+  await page.getByTestId("nda-back").click();
+  await expect(page.getByTestId("nda-detail")).toHaveCount(0);
+  await expect(page.locator(`[data-record="${found.deal}"]`)).toBeVisible();
+});
+
 test("the NDA queue is a table on desktop and cards on a phone", async ({ page }, info) => {
   await page.goto("/?nda=1", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("nda-queue")).toBeVisible();

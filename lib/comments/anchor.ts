@@ -2,7 +2,7 @@ import { withoutGmail } from "@/lib/displayText";
 import { LINE_LABELS, MONTH_NAMES, MONTH_SHORT, isPnlLineCode, type PnlLineCode } from "@/lib/pnl/lines";
 
 /** Where a discussion thread is attached. One note row, shown in two places. */
-export type CommentAnchorType = "pnl_cell" | "pnl_line" | "space";
+export type CommentAnchorType = "pnl_cell" | "pnl_line" | "space" | "nda";
 
 export type CommentTag = "investigate" | "ask_broker" | "normalize" | "explained" | "verified";
 
@@ -111,7 +111,12 @@ function cleanLabel(value: string, fallback: string): string {
 }
 
 /** Chip on the site discussion. The wording is the anchor, not the comment. */
+export function ndaAnchor(id: string): CommentAnchor {
+  return { type: "nda", siteId: id, line: id, period: "", spaceId: "", label: id };
+}
+
 export function chipLabel(anchor: CommentAnchor): string {
+  if (anchor.type === "nda") return `on NDA, ${cleanLabel(anchor.line, "agreement")}`;
   if (anchor.type === "space") return `on lot, ${cleanLabel(anchor.label, "marked lot")}`;
   const line = cleanLabel(lineChip(anchor.line), "line");
   const period = periodChip(anchor.period);
@@ -120,7 +125,9 @@ export function chipLabel(anchor: CommentAnchor): string {
 }
 
 export function sameAnchor(left: CommentAnchor, right: CommentAnchor): boolean {
-  if (left.type !== right.type || left.siteId !== right.siteId) return false;
+  if (left.type !== right.type) return false;
+  if (left.type === "nda") return left.line === right.line && Boolean(left.line);
+  if (left.siteId !== right.siteId) return false;
   if (left.type === "space") return left.spaceId === right.spaceId && Boolean(left.spaceId);
   if (left.line !== right.line) return false;
   if (left.type === "pnl_line") return true;
@@ -135,6 +142,7 @@ export function sameAnchor(left: CommentAnchor, right: CommentAnchor): boolean {
  */
 export function suggestBrokerQuestion(anchor: CommentAnchor): string {
   let text: string;
+  if (anchor.type === "nda") return "Could you confirm where this agreement stands?";
   if (anchor.type === "space") {
     const label = cleanLabel(anchor.label, "this marked area");
     text = label === "this marked area"

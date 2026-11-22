@@ -200,9 +200,9 @@ export type SiteSpacePayload =
 
 export type { TagPayload } from "@/lib/tags/parse";
 
-/** A discussion note anchored to a P&L cell, a P&L line, or a marked lot. */
+/** A discussion note anchored to a P&L cell, a P&L line, a marked lot, or an NDA. */
 export type CommentPayload = {
-  anchor?: { type: "pnl_cell" | "pnl_line" | "space"; line: string; period: string; space_id: string };
+  anchor?: { type: "pnl_cell" | "pnl_line" | "space" | "nda"; line: string; period: string; space_id: string };
   parent_id?: string;
   body?: string;
   tag?: CommentTag;
@@ -457,7 +457,7 @@ const conflictPayload = z
 
 const commentAnchorPayload = z
   .object({
-    type: z.enum(["pnl_cell", "pnl_line", "space"]),
+    type: z.enum(["pnl_cell", "pnl_line", "space", "nda"]),
     line: z.string().trim().max(40).optional(),
     period: z.string().trim().max(80).optional(),
     space_id: z.string().trim().max(40).optional(),
@@ -665,8 +665,10 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
       ? true
       : row.entity_type === "comms"
         ? commsSiteAllowed(siteId)
-        : row.entity_type === "site_space" || row.entity_type === "comment"
+        : row.entity_type === "site_space"
           ? spaceSiteAllowed(siteId)
+          : row.entity_type === "comment"
+            ? spaceSiteAllowed(siteId) || NDA_ID.test(siteId)
           : row.entity_type === "nda"
             ? NDA_ID.test(siteId)
             : SITE_ID.test(siteId);
@@ -1095,14 +1097,20 @@ function parseComment(actor: Actor, index: number, siteId: string, expectedVersi
     throw new InputError(`Change ${index + 1}: That thread id is not valid.`, 400, "parent_id");
   }
   if (creating && !parsed.data.parent_id && !parsed.data.anchor) {
-    throw new InputError(`Change ${index + 1}: A comment needs a P&L cell, a P&L line, or a lot.`, 400, "anchor");
+    throw new InputError(`Change ${index + 1}: A comment needs a P&L cell, a P&L line, a lot, or an NDA.`, 400, "anchor");
   }
   if (!creating && (parsed.data.anchor || parsed.data.parent_id)) {
     throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "anchor");
   }
   const anchor = parsed.data.anchor;
   if (anchor?.type === "space" && !anchor.space_id) throw new InputError(`Change ${index + 1}: A lot comment needs the lot id.`, 400, "space_id");
-  if (anchor && anchor.type !== "space" && !isCommentLine(anchor.line || "")) {
+  if (anchor?.type === "nda" && !NDA_ID.test((anchor.line || "").toUpperCase())) {
+    throw new InputError(`Change ${index + 1}: An NDA comment needs the agreement id.`, 400, "line");
+  }
+  if (anchor?.type === "nda" && siteId.toUpperCase() !== (anchor.line || "").toUpperCase()) {
+    throw new InputError(`Change ${index + 1}: An NDA comment stays on that agreement.`, 400, "site_id");
+  }
+  if (anchor && anchor.type !== "space" && anchor.type !== "nda" && !isCommentLine(anchor.line || "")) {
     throw new InputError(`Change ${index + 1}: That line is not in the chart of accounts.`, 400, "line");
   }
   if (anchor?.type === "pnl_cell" && !anchor.period) throw new InputError(`Change ${index + 1}: A cell comment needs a period.`, 400, "period");
@@ -1124,7 +1132,7 @@ function parseComment(actor: Actor, index: number, siteId: string, expectedVersi
       ? {
           anchor: {
             type: anchor.type,
-            line: anchor.type === "space" ? "" : anchor.line || "",
+            line: anchor.type === "space" ? "" : anchor.type === "nda" ? (anchor.line || "").toUpperCase() : anchor.line || "",
             period: anchor.type === "pnl_cell" ? anchor.period || "" : "",
             space_id: anchor.type === "space" ? anchor.space_id || "" : "",
           },

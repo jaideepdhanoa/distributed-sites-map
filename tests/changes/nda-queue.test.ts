@@ -21,6 +21,37 @@ function body(payload: Record<string, unknown>, expected = 0) {
   };
 }
 
+test("an NDA comment is an anchored note on the agreement", () => {
+  assert.doesNotThrow(() => validateBatch(contributor, "nda-comment", {
+    changes: [{
+      entity_type: "comment",
+      site_id: "NDA-901",
+      expected_version: 0,
+      source: "NDA",
+      payload: {
+        at: AT,
+        body: "Sample note on the agreement.",
+        tag: "investigate",
+        anchor: { type: "nda", line: "NDA-901" },
+      },
+    }],
+  }));
+  assert.throws(() => validateBatch(contributor, "nda-comment-site", {
+    changes: [{
+      entity_type: "comment",
+      site_id: "PIPE-PHX-9101",
+      expected_version: 0,
+      source: "NDA",
+      payload: {
+        at: AT,
+        body: "Sample note on the agreement.",
+        tag: "investigate",
+        anchor: { type: "nda", line: "NDA-901" },
+      },
+    }],
+  }));
+});
+
 test("a contributor records a status note and an owner on an NDA", async () => {
   const sql = await memorySql();
   await migrate(sql);

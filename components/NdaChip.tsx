@@ -8,11 +8,13 @@ export function NdaChip({
   text,
   signedIn = true,
   showMissing = false,
+  onOpen,
 }: {
   deal?: Partial<NdaMirror>;
   text?: string;
   signedIn?: boolean;
   showMissing?: boolean;
+  onOpen?: (id: string) => void;
 }) {
   if (!signedIn) return null;
   const label = text ? (text === "Not required" || text.startsWith("NDA:") ? (text === "Not required" ? "" : text) : `NDA: ${text}`) : cardNdaLabel(deal || {}, true);
@@ -21,10 +23,21 @@ export function NdaChip({
     return <span className="badge quiet nda-chip" data-testid="nda-chip">No NDA</span>;
   }
   const id = deal?.nda_id || "";
+  const face = <ChipFace className="badge quiet nda-chip" testId="nda-chip" label={label} />;
+  if (!id || !onOpen) return <span data-nda-id={id || undefined}>{face}</span>;
   return (
-    <span data-nda-id={id || undefined}>
-      <ChipFace className="badge quiet nda-chip" testId="nda-chip" label={label} />
-    </span>
+    <button
+      type="button"
+      className="text-link nda-open"
+      data-testid="nda-open"
+      data-nda-id={id}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen(id);
+      }}
+    >
+      {face}
+    </button>
   );
 }
 

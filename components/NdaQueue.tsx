@@ -82,15 +82,22 @@ function download(cols: SheetColumn<NdaQueueItem>[], rows: NdaQueueItem[]) {
 }
 
 export default function NdaQueue({
+  openId,
   onOpen,
+  onPick,
   onClose,
+  onBack,
+  backLabel,
 }: {
+  openId: string;
   onOpen: (id: string) => void;
+  onPick: (id: string) => void;
   onClose: () => void;
+  onBack: () => void;
+  backLabel: string;
 }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [failed, setFailed] = useState("");
-  const [selected, setSelected] = useState("");
   const [tick, setTick] = useState(0);
   const cols = useMemo(() => columns(), []);
   const [layout, setLayout] = useState<ListLayout>(() => ({
@@ -120,7 +127,7 @@ export default function NdaQueue({
   const rows = payload?.queue || [];
   const shown = filtered(rows, cols, layout);
   const visibleColumns = cols.filter((column) => !layout.hidden.includes(column.id));
-  const open = rows.find((row) => row.nda_id === selected) || null;
+  const open = rows.find((row) => row.nda_id === openId) || null;
 
   return (
     <aside className="nda-pane" data-testid="nda-queue" aria-label="NDA queue">
@@ -146,9 +153,9 @@ export default function NdaQueue({
             columns={visibleColumns}
             layout={layout}
             onLayout={setLayout}
-            selectedId={selected}
-            onOpen={setSelected}
-            onClose={() => setSelected("")}
+            selectedId={openId}
+            onOpen={onPick}
+            onClose={() => onPick("")}
             labelledBy="nda-queue-title"
             renderCell={(row, columnId) => {
               if (columnId === "sites") {
@@ -184,7 +191,7 @@ export default function NdaQueue({
           <ul>
             {shown.map((row) => (
               <li key={row.nda_id}>
-                <button type="button" className="list-row nda-card" data-testid={`nda-card-${row.nda_id}`} onClick={() => setSelected(row.nda_id)}>
+                <button type="button" className="list-row nda-card" data-testid={`nda-card-${row.nda_id}`} onClick={() => onPick(row.nda_id)}>
                   <span className="phone-card-name">{row.nda_id}</span>
                   <span>{counterpartyLine(row) || "—"}</span>
                   <span>{row.nda_status || "—"} · {queueCourt(row)}</span>
@@ -199,9 +206,11 @@ export default function NdaQueue({
         {open ? (
           <NdaDetail
             row={open}
-            onClose={() => setSelected("")}
+            onClose={() => onPick("")}
             onOpenSite={onOpen}
             onSaved={() => setTick((value) => value + 1)}
+            onBack={onBack}
+            backLabel={backLabel}
           />
         ) : null}
       </div>

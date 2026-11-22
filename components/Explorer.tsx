@@ -372,7 +372,9 @@ export default function Explorer() {
   const [followArea, setFollowArea] = useState(false);
   const mapAreaLive = followArea ? liveArea : null;
   const reach: Reach = parseReach(params.get("reach"));
-  const ndaParam = params.get("nda") === "1";
+  const ndaRaw = params.get("nda") || "";
+  const ndaId = /^NDA-\d{3,}$/i.test(ndaRaw) ? ndaRaw.toUpperCase() : "";
+  const ndaParam = ndaRaw === "1" || Boolean(ndaId);
   const loopsParam = params.get("loops") === "1";
   const loopsAllowed = Boolean(me?.actionRole && ndaQueueAllowed(me.actionRole));
   const loopsVisible = loopsParam && loopsAllowed;
@@ -2687,7 +2689,16 @@ export default function Explorer() {
             <button type="button" aria-label="Open the list" onClick={() => write({ view: "list" })} className="menu-item">List</button>
           </aside>
         ) : null}
-        {ndaVisible ? <NdaQueue onOpen={choose} onClose={() => write({ nda: null })} /> : null}
+        {ndaVisible ? (
+          <NdaQueue
+            openId={ndaId}
+            onOpen={choose}
+            onPick={(id) => write({ nda: id || "1" })}
+            onClose={() => write({ nda: null })}
+            onBack={() => write(params.get("site") ? { nda: null } : { nda: "1" })}
+            backLabel={params.get("site") ? "Back to site" : "Back to queue"}
+          />
+        ) : null}
         {loopsVisible ? <OpenLoops onOpen={choose} onClose={() => write({ loops: null })} /> : null}
         <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
@@ -2903,6 +2914,7 @@ export default function Explorer() {
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
+            onOpenNda={(id) => write({ nda: id })}
             locationFix={locationFix}
             figuresReady={Boolean(selectedDeal) || figuresReady}
             outsideFilter={Boolean(outsideDeal) || !dealInCategories(selectedDeal, categories)}
@@ -2937,6 +2949,7 @@ export default function Explorer() {
             onClose={() => choose(null)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
+            onOpenNda={(id) => write({ nda: id })}
             locationFix={locationFix}
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}

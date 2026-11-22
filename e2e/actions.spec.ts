@@ -743,6 +743,36 @@ test("turning Comments off stops the follower email", async ({ page, request }) 
   await expect(page.getByTestId("would-send").filter({ hasText: quiet })).toHaveCount(0);
 });
 
+for (const size of [
+  { width: 1440, height: 900, label: "desktop" },
+  { width: 390, height: 844, label: "phone" },
+]) {
+  test(`an NDA comment shows on the covered site at ${size.label}`, async ({ page }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await openAs(page, "reviewer", "/?funnel=pipeline");
+    const found = await page.evaluate(async () => {
+      const response = await fetch("/api/data/deals");
+      const body = await response.json() as { features?: { properties?: { deal_id?: string; nda_id?: string; nda_status?: string } }[] };
+      const closed = new Set(["Executed", "Not required", "Expired", "Declined / proceeding without"]);
+      const feature = (body.features || []).find((item) => {
+        const id = item.properties?.nda_id || "";
+        return id.startsWith("NDA-") && !closed.has(item.properties?.nda_status || "");
+      });
+      return { deal: feature?.properties?.deal_id || "", nda: feature?.properties?.nda_id || "" };
+    });
+    expect(found.nda).toMatch(/^NDA-/);
+    await page.goto(`/?funnel=pipeline&site=${found.deal}`);
+    await page.getByTestId("nda-open").click();
+    await expect(page.getByTestId("nda-detail")).toBeVisible();
+    const text = `Sample note ${size.label} on the agreement.`;
+    await page.getByTestId("nda-discussion").getByTestId("comment-body").fill(text);
+    await page.getByTestId("nda-discussion").getByRole("button", { name: "Comment" }).click();
+    await expect(page.getByTestId("nda-discussion")).toContainText(text);
+    await page.getByTestId("nda-back").click();
+    await expect(page.getByTestId("nda-site-thread")).toContainText(text);
+  });
+}
+
 function dealProps(payload: { features?: { properties?: { deal_id?: string; stage?: string; stage_group?: string; stage_pending?: string } }[] }, id: string) {
   return payload.features?.find((item) => item.properties?.deal_id === id)?.properties;
 }

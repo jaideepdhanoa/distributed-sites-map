@@ -39,7 +39,7 @@ export function commentHref(
   if (isExcludedSite(siteId)) return reviewHomeHref();
   if (/^NDA-\d{3,}$/.test(siteId)) {
     const url = new URL("/", appOrigin());
-    url.searchParams.set("nda", "1");
+    url.searchParams.set("nda", siteId);
     if (noteId) url.searchParams.set("note", noteId);
     return url.toString();
   }

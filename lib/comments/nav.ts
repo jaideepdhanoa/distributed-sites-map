@@ -16,7 +16,7 @@ export function notifyCommentChange(): void {
 export function readCommentAnchor(value: unknown): CommentAnchor | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Partial<CommentAnchor>;
-  if (row.type !== "pnl_cell" && row.type !== "pnl_line" && row.type !== "space") return null;
+  if (row.type !== "pnl_cell" && row.type !== "pnl_line" && row.type !== "space" && row.type !== "nda") return null;
   if (!row.siteId) return null;
   return {
     type: row.type,

@@ -131,6 +131,19 @@ async function followsSite(sql: Sql, userId: string, siteId: string, followAll: 
   return rows.rows.length > 0;
 }
 
+async function coveredSiteFollowers(sql: Sql, ndaId: string): Promise<string[]> {
+  if (!/^NDA-\d{3,}$/.test(ndaId)) return [];
+  const { loadNdaSnapshot } = await import("@/lib/ndaLoad");
+  const { coveredSites } = await import("@/lib/nda");
+  const row = (loadNdaSnapshot().register || []).find((item) => item.nda_id === ndaId);
+  if (!row) return [];
+  const people = new Set<string>();
+  for (const siteId of coveredSites(row.site_ids || "").ids) {
+    for (const userId of await followerIds(sql, siteId)) people.add(userId);
+  }
+  return [...people];
+}
+
 async function followerIds(sql: Sql, siteId: string): Promise<string[]> {
   const rows = await sql.query<{ user_id: string }>(`SELECT user_id FROM queue_follows WHERE site_id = $1`, [siteId]);
   return rows.rows.map((row) => row.user_id);
@@ -156,9 +169,10 @@ export async function notifyNote(
   const spaceTarget = /^SS-\d{4,}$/.test(recordId) ? { type: "space", line: "", period: "", spaceId: recordId } : null;
   const href = commentHref(input.siteId, input.noteId, anchor?.type ? anchor : spaceTarget);
   let instant = false;
+  const coveredFollowers = await coveredSiteFollowers(sql, input.siteId);
   if (!input.parentId) {
     const mentioned = new Set(input.mentionIds.map((id) => id.trim().toLowerCase()));
-    const followers = [...new Set([...(await followerIds(sql, input.siteId)), ...(await followAllIds(sql))])].filter((id) => !mentioned.has(id.trim().toLowerCase()));
+    const followers = [...new Set([...(await followerIds(sql, input.siteId)), ...coveredFollowers, ...(await followAllIds(sql))])].filter((id) => !mentioned.has(id.trim().toLowerCase()));
     if (await queueFor(sql, {
       actorId: input.authorId,
       userIds: followers,
@@ -182,6 +196,16 @@ export async function notifyNote(
       actorId: input.authorId,
       userIds: participants,
       category: "replies",
+      siteId: input.siteId,
+      summary: input.body,
+      href,
+      refId: input.noteId,
+    })) instant = true;
+    const also = coveredFollowers.filter((id) => !mentioned.has(id.trim().toLowerCase()) && !participants.includes(id));
+    if (await queueFor(sql, {
+      actorId: input.authorId,
+      userIds: also,
+      category: "comments",
       siteId: input.siteId,
       summary: input.body,
       href,

@@ -63,7 +63,7 @@ const SELECT = `id, target_kind, target_id, parent_id, body, author_id, created_
 const SELECT_ANCHOR = `${SELECT}, entity_id, version, anchor_type, anchor_line, anchor_period, anchor_space_id, anchor_label, tag, created_at_iso`;
 
 function anchorOf(row: NoteRow): CommentAnchor | null {
-  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space") return null;
+  if (row.anchor_type !== "pnl_cell" && row.anchor_type !== "pnl_line" && row.anchor_type !== "space" && row.anchor_type !== "nda") return null;
   return {
     type: row.anchor_type,
     siteId: row.target_id,

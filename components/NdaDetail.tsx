@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RecordActions } from "./actions/RecordActions";
 import Timeline from "./timeline/Timeline";
+import CommentThread from "./comments/CommentThread";
+import { ndaAnchor } from "@/lib/comments/anchor";
 import { brokerFollowUp } from "@/lib/ndaDraft";
 import { coveredSites, queueCourt, type NdaQueueItem } from "@/lib/nda";
 
@@ -42,11 +43,15 @@ export default function NdaDetail({
   onClose,
   onOpenSite,
   onSaved,
+  onBack,
+  backLabel,
 }: {
   row: NdaQueueItem;
   onClose: () => void;
   onOpenSite: (id: string) => void;
   onSaved: () => void;
+  onBack: () => void;
+  backLabel: string;
 }) {
   const sites = coveredSites(row.site_ids || "").ids;
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -95,7 +100,10 @@ export default function NdaDetail({
   return (
     <div className="nda-detail" data-testid="nda-detail">
       <div className="layers-bar nda-bar">
-        <h2>{row.nda_id}</h2>
+        <div>
+          <button type="button" className="text-link" data-testid="nda-back" onClick={onBack}>{backLabel}</button>
+          <h2>{row.nda_id}</h2>
+        </div>
         <button type="button" className="close" aria-label="Close NDA" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <section>
@@ -165,7 +173,7 @@ export default function NdaDetail({
       </section>
       <section data-testid="nda-discussion">
         <h3>Discussion</h3>
-        <RecordActions kind="nda" id={row.nda_id} />
+        <CommentThread siteId={row.nda_id} anchor={ndaAnchor(row.nda_id)} variant="inline" source="NDA" />
       </section>
       <section>
         <h3>Follow-up</h3>

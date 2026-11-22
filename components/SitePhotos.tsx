@@ -55,9 +55,9 @@ function photoKey(photo: SitePhoto, index: number) {
   return `${index}:${photo.role}:${photo.view_url || photo.file_id || ""}`;
 }
 
-export default function SitePhotos({ card, between }: { card: PhotoCard; between?: ReactNode }) {
+export default function SitePhotos({ card, between, allowStreetEmbed = true }: { card: PhotoCard; between?: ReactNode; allowStreetEmbed?: boolean }) {
   const model = galleryModel(card);
-  const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
+  const embed = allowStreetEmbed && model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const slideKey = model.slides.map((photo, index) => photoKey(photo, index)).join("|");
   useEffect(() => {

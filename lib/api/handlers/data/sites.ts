@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSession, readGenerated, requireUser, snapshotCacheHeaders } from "@/lib/guard";
 import { currentSnapshotMeta, snapshotGeneration } from "@/lib/snapshot/read";
 import { overlayHeldStages } from "@/lib/changes/heldStage";
+import { overlayUniverseMedia } from "@/lib/universeMedia";
 import { overlayQuickLubeCensus } from "@/lib/changes/read";
 import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { omitProtectedSites } from "@/lib/protectedSite";
@@ -140,7 +141,7 @@ export async function GET(request: NextRequest) {
     return { type: "Feature" as const, geometry: feature.geometry, properties: properties as SiteFeature["properties"] };
   });
   const withCensus = await overlayQuickLubeCensus({ type: "FeatureCollection", features });
-  const staged = await overlayHeldStages(await overlayStageFile(withCensus, "site"), "site");
+  const staged = await overlayUniverseMedia(await overlayHeldStages(await overlayStageFile(withCensus, "site"), "site"));
   console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
   const version = currentSnapshotMeta()?.id || `files-${snapshotGeneration()}`;
   return NextResponse.json(redactGmailPayload(staged), { headers: snapshotCacheHeaders(version) });

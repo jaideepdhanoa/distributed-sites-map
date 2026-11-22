@@ -87,6 +87,9 @@ export const SITE_ID = /^(PIPE|LAND)-[A-Z]{2,4}-\d{4}$/;
 /** An NDA register id, such as NDA-001. */
 export const NDA_ID = /^NDA-\d{3,}$/;
 
+/** A universe card id, such as WB-LAS-9101. */
+export const UNIVERSE_WB = /^WB-[A-Z]{2,4}-\d{4,}$/;
+
 /** A listing id on a comms row, such as L-441. */
 export const LISTING_ID = /^L-\d+$/;
 

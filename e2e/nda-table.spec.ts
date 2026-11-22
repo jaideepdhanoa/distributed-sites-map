@@ -8,7 +8,7 @@ test("the NDA queue is a table on desktop and cards on a phone", async ({ page }
     await expect(page.getByTestId("nda-cards")).toBeVisible();
     await page.getByTestId("nda-cards").locator("button").first().click();
   } else {
-    await expect(page.getByRole("button", { name: "NDA id" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "NDA id", exact: true })).toBeVisible();
     const cell = page.getByRole("gridcell").filter({ hasText: /^NDA-/ }).first();
     await expect(cell).toBeVisible();
     await cell.click();

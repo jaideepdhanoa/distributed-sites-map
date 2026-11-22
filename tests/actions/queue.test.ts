@@ -65,6 +65,7 @@ async function ready() {
     "030_universe_merge.sql",
     "031_site_conflicts.sql",
     "032_segment_conflicts.sql",
+    "033_nda_queue.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

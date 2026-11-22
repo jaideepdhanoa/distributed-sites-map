@@ -24,7 +24,7 @@ for (const size of sizes) {
     await expect(page.getByTestId("nda-queue")).toBeVisible();
     await expect(page.getByTestId("nda-export")).toBeVisible();
     if (size.width < 768) await expect(page.getByTestId("nda-cards")).toBeVisible();
-    else await expect(page.getByRole("button", { name: "NDA id" })).toBeVisible();
+    else await expect(page.getByRole("button", { name: "NDA id", exact: true })).toBeVisible();
   });
 
   test(`Dropped keeps the market and the zoom at ${size.width}`, async ({ page }, info) => {

@@ -3288,7 +3288,7 @@ span.listing-link.muted { text-decoration: none; }
   }
   .shell.reviewing:not(.list-open):not(.table-open) .bar {
     position: relative;
-    z-index: 7;
+    z-index: 21;
     background: var(--cream);
     pointer-events: auto;
   }
@@ -3332,7 +3332,7 @@ span.listing-link.muted { text-decoration: none; }
   .maplibregl-ctrl-top-right { top: 112px !important; right: 8px; }
   .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: calc(var(--sheet-h, 120px) + 8px); }
   .map-float { top: calc(var(--bar-h, 188px) + 8px); right: 8px; }
-  .layers:not(.open) { top: calc(var(--bar-h, 188px) + 72px); right: 8px; }
+  .layers:not(.open) { top: calc(var(--bar-h, 188px) + 8px); right: auto; left: 8px; }
   .measure-bar .paper-btn { min-height: 44px; }
   .bar { padding: 4px 8px 6px; }
   .top { row-gap: 4px; }
@@ -3617,7 +3617,7 @@ button.paper-btn.on,
 }
 @media (max-width: 767px) {
   .map-float { top: calc(var(--bar-h, 188px) + 8px); right: 8px; }
-  .layers:not(.open) { top: calc(var(--bar-h, 188px) + 72px); right: 8px; }
+  .layers:not(.open) { top: calc(var(--bar-h, 188px) + 8px); right: auto; left: 8px; }
   .measure-bar .paper-btn { min-height: 44px; }
   .rings-outside .paper-btn { min-height: 44px; }
   .map-corner {

@@ -268,7 +268,7 @@ export default function Explorer() {
     if (!me?.u) return undefined;
     let cancel = false;
     const pull = () => {
-      void fetch("/api/data/spaces", { cache: "no-store" })
+      void quietActionsFetch("/api/data/spaces", { cache: "no-store" })
         .then((response) => response.ok ? response.json() : { spaces: [] })
         .then((body: { spaces?: Array<SpaceShape & { center: { lng: number; lat: number }; lengthFt: number; widthFt: number; rotationDeg: number }>; openThreads?: string[] }) => {
           if (cancel) return;

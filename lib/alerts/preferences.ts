@@ -43,7 +43,7 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
       decisions: "instant",
       stages: "digest",
       asks: "digest",
-      followed: "digest",
+      followed: "instant",
       followAll: false,
     };
   }
@@ -60,7 +60,7 @@ export function defaultPreferences(role: ActionRole): AlertPreferences {
       decisions: "digest",
       stages: "digest",
       asks: "digest",
-      followed: "digest",
+      followed: "instant",
       followAll: false,
     };
   }
@@ -159,6 +159,19 @@ export async function savePreferences(sql: Sql, userId: string, value: unknown):
     values,
   );
   return next;
+}
+
+const FOLLOWED_MAIL = new Set<AlertCategory>(["comments", "replies", "proposals"]);
+
+/**
+ * A saved category of Off stays off. Comments, replies, and proposals on a
+ * followed site use the followed setting when that setting is instant.
+ */
+export function deliveryMode(prefs: AlertPreferences, category: AlertCategory, followsSite: boolean): AlertMode {
+  const mode = prefs[category];
+  if (mode === "off") return "off";
+  if (followsSite && FOLLOWED_MAIL.has(category) && prefs.followed === "instant") return "instant";
+  return mode;
 }
 
 export function digestEnabled(prefs: AlertPreferences): boolean {

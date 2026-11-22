@@ -111,12 +111,13 @@
 .shell.reviewing .legend { display: none; }
 .shell.reviewing .stage-map { position: relative; grid-column: 2; grid-row: 1; height: 100%; min-height: 0; }
 .review-rail {
+  position: relative;
   grid-column: 1;
   grid-row: 1;
   overflow: auto;
   background: #faf7f1;
   border-right: 1px solid var(--line);
-  z-index: 4;
+  z-index: 6;
 }
 .review-rail button, .review-sheet section button {
   display: grid;

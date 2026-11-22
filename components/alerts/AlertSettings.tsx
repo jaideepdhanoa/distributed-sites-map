@@ -100,11 +100,11 @@ export default function AlertSettings({ onClose }: { onClose: () => void }) {
           <div className="alert-row">
             <span>{LABELS.followed}</span>
             <span className="alert-modes" role="group" aria-label="Daily digest">
-              <button type="button" className={prefs.followed === "off" ? "chip" : "chip on"} onClick={() => void choose("followed", "digest")}>On</button>
+              <button type="button" className={prefs.followed === "off" ? "chip" : "chip on"} onClick={() => { if (prefs.followed === "off") void choose("followed", "instant"); }}>On</button>
               <button type="button" className={prefs.followed === "off" ? "chip on" : "chip"} onClick={() => void choose("followed", "off")}>Off</button>
             </span>
           </div>
-          <p className="note">Instant mail goes out about 10 minutes after the first item. A burst is one email. The owner has no daily instant limit. Every other account gets at most six of those a day. The digest is 7:00 AM Pacific, and it is skipped when there is nothing new.</p>
+          <p className="note">Instant mail goes out about 10 minutes after the first item. A burst is one email. The owner has no daily instant limit. Every other account gets at most six of those a day, and the rest wait for the digest. Comments, replies, and proposals on a site you follow go out with that instant mail. The daily digest is 7:00 AM Pacific. Live accounts also get a Monday recap of the past seven days. It is skipped when there is nothing new.</p>
         </>
       ) : <p className="note">Loading</p>}
       {error ? <p className="err">{error}</p> : null}

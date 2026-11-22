@@ -9,7 +9,7 @@ import { enqueueAlert, flushInstant } from "./deliver";
 import { isExcludedSite } from "./excluded";
 import { scheduleInstantFlush } from "./schedule";
 import { isOwnerAccount } from "./owner";
-import { loadPreferences, type AlertCategory } from "./preferences";
+import { deliveryMode, loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
 
 async function siteLabel(siteId: string): Promise<string> {
@@ -52,7 +52,8 @@ async function queueFor(
       prefs = await loadPreferences(sql, recipient.userId);
       prefsCache.set(recipient.userId, prefs);
     }
-    const mode = prefs?.[input.category] || "off";
+    const follows = prefs ? await followsSite(sql, recipient.userId, input.siteId, prefs.followAll) : false;
+    const mode = prefs ? deliveryMode(prefs, input.category, follows) : "off";
     if (!input.force && mode === "off") continue;
     const channel = input.force ? input.channel || "instant" : mode === "instant" ? "instant" : "digest";
     await enqueueAlert(sql, {
@@ -119,6 +120,15 @@ async function noteAnchor(sql: Sql, noteId: string): Promise<{ type: string; lin
   } catch {
     return null;
   }
+}
+
+async function followsSite(sql: Sql, userId: string, siteId: string, followAll: boolean): Promise<boolean> {
+  if (followAll) return true;
+  const rows = await sql.query<{ user_id: string }>(
+    `SELECT user_id FROM queue_follows WHERE user_id = $1 AND site_id = $2 LIMIT 1`,
+    [userId, siteId],
+  );
+  return rows.rows.length > 0;
 }
 
 async function followerIds(sql: Sql, siteId: string): Promise<string[]> {
@@ -224,6 +234,17 @@ export async function notifySuggestion(
     siteId: input.siteId,
     summary: input.summary,
     href: discussionHref(input.siteId),
+    refId: input.id,
+  })) instant = true;
+  const skip = new Set([input.authorId, input.ownerId || "", ...input.mentionIds, ...(approval ? reviewerIds() : [])].map((id) => id.trim().toLowerCase()));
+  const followers = [...new Set([...(await followerIds(sql, input.siteId)), ...(await followAllIds(sql))])].filter((id) => !skip.has(id.trim().toLowerCase()));
+  if (followers.length && await queueFor(sql, {
+    actorId: input.authorId,
+    userIds: followers,
+    category: "proposals",
+    siteId: input.siteId,
+    summary: input.summary,
+    href: proposalHref(input.siteId),
     refId: input.id,
   })) instant = true;
   if (instant) await flushQueued(sql);

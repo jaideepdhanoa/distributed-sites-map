@@ -60,3 +60,28 @@ export function digestWindowStart(now: Date, prior: Date | null): Date {
   }
   return lower;
 }
+
+/** Monday 7:00 AM Pacific is the weekly recap. The window is the seven days before that send. */
+export function isPacificMonday(now = new Date()): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short",
+  }).format(now);
+  return weekday === "Mon";
+}
+
+export function weekWindowStart(now: Date): Date {
+  return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+}
+
+export function weekOfLabel(now: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "short",
+    day: "numeric",
+  }).format(weekWindowStart(now));
+}
+
+export function weekKey(now: Date): string {
+  return losAngelesParts(weekWindowStart(now)).day;
+}

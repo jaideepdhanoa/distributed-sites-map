@@ -74,7 +74,6 @@ Checked against the Vercel project. Names only.
 | `KV_REST_API_READ_ONLY_TOKEN` | Production and Preview | The app does not read this name. Leave shared. |
 | `REDIS_URL` | Production and Preview | The app does not read this name. Leave shared. |
 | `AUTH_USERS` | Production and Preview | Shared so preview can sign in. Not a production write. |
-| `AUTH_USERS_TEAM` | Production and Preview, optional | Same JSON array as `AUTH_USERS`. Merged when accounts load. A username in `AUTH_USERS` wins. A missing or invalid value is ignored and is not printed. |
 | `AUTH_SECRET` | Production and Preview | Shared. The session cookie is host-scoped. |
 | `CHANGES_API_ENABLED` | Production only | Stays off Preview. Preview turns writes on by itself. The host check is the backstop. |
 | `READ_STAGES_FROM_DB` | Production only | Stays production only. |

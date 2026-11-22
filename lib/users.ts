@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import alertDefaults from "../config/alerts.json";
 
 export type AuthUser = {
@@ -24,7 +23,8 @@ function previewAdmin(username: string): boolean {
   return names.some((name) => String(name).trim().toLowerCase() === username);
 }
 
-function parseUsers(raw: string | undefined): AuthUser[] {
+export function getUsers(): AuthUser[] {
+  const raw = process.env.AUTH_USERS;
   if (!raw) return [];
   let parsed: unknown;
   try {
@@ -53,44 +53,4 @@ function parseUsers(raw: string | undefined): AuthUser[] {
     if (u && h.startsWith("$2")) users.push({ u, h, role: accountRole, roleLabel, actionRole: accountAction, displayName, email });
   }
   return users;
-}
-
-let teamLogKey = "";
-
-/** Missing and invalid team lists are ignored. The value is never written to the log. */
-function teamUsers(): AuthUser[] {
-  const raw = process.env.AUTH_USERS_TEAM;
-  const present = Boolean(raw && raw.trim());
-  if (!present) {
-    noteTeam("missing", "");
-    return [];
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw as string);
-  } catch {
-    noteTeam("invalid", raw as string);
-    return [];
-  }
-  if (!Array.isArray(parsed)) {
-    noteTeam("invalid", raw as string);
-    return [];
-  }
-  return parseUsers(raw);
-}
-
-function noteTeam(reason: "missing" | "invalid", raw: string) {
-  const key = `${reason}:${createHash("sha256").update(raw).digest("hex")}`;
-  if (teamLogKey === key) return;
-  teamLogKey = key;
-  const line = JSON.stringify({ event: "auth_users_team_ignored", reason });
-  if (reason === "invalid") console.error(line);
-  else console.info(line);
-}
-
-export function getUsers(): AuthUser[] {
-  const primary = parseUsers(process.env.AUTH_USERS);
-  const seen = new Set(primary.map((user) => user.u));
-  const team = teamUsers().filter((user) => !seen.has(user.u));
-  return [...primary, ...team];
 }

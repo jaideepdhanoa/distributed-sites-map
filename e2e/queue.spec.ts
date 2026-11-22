@@ -137,6 +137,7 @@ test("a reviewer can approve a next step from the queue", async ({ page, request
 });
 
 test("a mention is queued only for the mentioned account", async ({ page, request }) => {
+  await login(request, "contributor");
   const deal = await activePipelineDeal(request);
   await openAs(page, "contributor", `/?funnel=pipeline&site=${deal}&panel=discussion`);
   await page.getByTestId("panel-tab-discussion").click();

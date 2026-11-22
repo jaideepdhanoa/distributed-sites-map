@@ -3618,6 +3618,12 @@ button.paper-btn.on,
 @media (max-width: 767px) {
   .map-float { top: calc(var(--bar-h, 188px) + 8px); right: 8px; }
   .layers:not(.open) { top: calc(var(--bar-h, 188px) + 8px); right: auto; left: 8px; }
+  .shell.drawer-open .layers:not(.open) {
+    top: auto;
+    bottom: calc(var(--sheet-h, 56vh) + 8px);
+    left: 8px;
+    right: auto;
+  }
   .measure-bar .paper-btn { min-height: 44px; }
   .rings-outside .paper-btn { min-height: 44px; }
   .map-corner {

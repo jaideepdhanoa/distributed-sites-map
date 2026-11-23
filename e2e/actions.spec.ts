@@ -772,7 +772,8 @@ for (const size of [
     await discussion.getByRole("button", { name: "Comment" }).click();
     await expect(discussion).toContainText(text);
     await page.goto(`/?funnel=pipeline&site=${found.deal}&panel=activity`);
-    const row = page.locator("[data-nda-comment]");
+    const row = page.locator("[data-nda-comment]").filter({ hasText: text });
+    await expect(row).toHaveCount(1);
     await expect(row).toContainText(text);
     await expect(row.getByTestId("nda-activity-chip")).toHaveText(`on ${found.nda}`);
   });

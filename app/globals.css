@@ -1474,7 +1474,7 @@ tr { cursor: pointer; }
   .only-desktop { display: none !important; }
   .only-mobile { display: inline-flex !important; }
   .city-pick.only-mobile { display: block !important; }
-  .mobile-search { display: block !important; width: 100%; max-width: none; height: 44px; margin-top: 6px; }
+  .mobile-search { display: block !important; width: 44px; max-width: 44px; height: 44px; margin-top: 0; }
   .bar { padding: 6px 8px; overflow: visible; }
   .top { height: auto; min-height: 44px; flex-wrap: wrap; row-gap: 6px; }
   .top .review-launch, .top .icon-btn, .top .city-pick { flex: none; }
@@ -3381,12 +3381,15 @@ span.listing-link.muted { text-decoration: none; }
     min-width: 0;
     max-width: 100%;
   }
-  .phone-view-row .city-pick { flex: 1 1 11rem; min-width: 0; max-width: 100%; }
-  .phone-view-row .city-pick select { width: 100%; max-width: 100%; }
+  .phone-view-row .city-pick { flex: 0 0 auto; width: auto; max-width: 100%; }
+  .phone-view-row .city-pick select { width: auto; max-width: none; }
   .phone-view-row > .chip { flex: none; }
   .phone-view-row .funnel-switch.map-switch { display: inline-flex !important; flex: none; }
+  .phone-view-row .mobile-search { flex: 0 0 44px; width: 44px; min-width: 44px; max-width: 44px; height: 44px; margin: 0; }
+  .phone-view-row .icon-btn.only-mobile { flex: 0 0 44px; width: 44px; min-width: 44px; margin: 0; }
   .phone-view-row .reach-pick { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
   .phone-view-row select.secondary { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; }
+  .phone-view-row .city-pick select.secondary { width: auto; max-width: none; }
   .near-chip[data-short] { font-size: 0; }
   .near-chip[data-short]::after {
     content: attr(data-short);

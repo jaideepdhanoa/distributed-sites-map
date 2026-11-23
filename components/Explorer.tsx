@@ -2126,10 +2126,6 @@ export default function Explorer() {
               ? (outsideGroup ? "Outside service area" : allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
               : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
           </button>
-          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
-          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-          </button>
         </div>
         <div className="phone-view-row only-mobile">
           <label className="city-pick">
@@ -2145,6 +2141,10 @@ export default function Explorer() {
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
+          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
+          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
           <label className="reach-pick">
             <span className="sr">Reach</span>
             <select className="secondary" aria-label="Reach" data-testid="reach-chip" value={reach} onChange={(event) => write({ reach: event.target.value === "within10" ? null : event.target.value })}>

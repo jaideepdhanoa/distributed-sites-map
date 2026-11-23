@@ -25,7 +25,6 @@ import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
-import NdaCardThread from "./NdaCardThread";
 import NdaCardLine from "./NdaCardLine";
 import { cardNdaLabel } from "@/lib/nda";
 import { LocationFix } from "./LocationFix";
@@ -655,10 +654,7 @@ export default function Detail({
         <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
         <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing onOpen={onOpenNda} />
         {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? (
-          <>
-            <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} />
-            <NdaCardThread ndaId={linkedDeal.nda_id} onOpen={onOpenNda} />
-          </>
+          <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} onOpen={onOpenNda} />
         ) : null}
       </div>
       {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
@@ -842,7 +838,7 @@ export default function Detail({
             ) : null}
           </>
         ) : <p className="note">Loading figures</p>}
-        activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} />}
+        activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} ndaId={linkedDeal?.nda_id || ""} onOpenNda={onOpenNda} />}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onAddCompare} compared={compared} />
@@ -961,10 +957,7 @@ export function DealDetail({
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
         <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
         {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
-          <>
-            <NdaCardLine ndaId={deal.nda_id} mirror={deal} />
-            <NdaCardThread ndaId={deal.nda_id} onOpen={onOpenNda} />
-          </>
+          <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
         ) : null}
         <NextStepCard
           kind="deal"
@@ -1065,7 +1058,7 @@ export function DealDetail({
             </div>
           </>
         }
-        activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />}
+        activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} ndaId={deal.nda_id || ""} onOpenNda={onOpenNda} />}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onCompare ? () => onCompare(!compared) : undefined} compared={compared} />

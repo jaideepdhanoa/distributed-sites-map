@@ -12,7 +12,7 @@ function pillClass(label: string): string {
   return `court-pill ${ours ? "us" : "them"}${ours && days >= 14 ? " aged" : ""}`;
 }
 
-export default function NdaCardLine({ ndaId, mirror }: { ndaId: string; mirror?: Partial<NdaMirror> }) {
+export default function NdaCardLine({ ndaId, mirror, onOpen }: { ndaId: string; mirror?: Partial<NdaMirror>; onOpen: (id: string) => void }) {
   const [extra, setExtra] = useState<Extra | null>(null);
   useEffect(() => {
     let cancel = false;
@@ -27,17 +27,20 @@ export default function NdaCardLine({ ndaId, mirror }: { ndaId: string; mirror?:
     };
   }, [ndaId]);
   const pill = extra?.pill || courtPill(courtFromWaiting(mirror?.nda_waiting_on || ""), daysSince(mirror?.stage_blocker_since || "", pacificToday()));
-  const owner = extra ? (extra.owner || "Unassigned") : "";
+  const owner = extra?.owner || "Unassigned";
+  const next = extra?.next || "";
   return (
-    <div className="nda-card-line" data-testid="nda-card-line">
+    <button type="button" className="list-row nda-card-line" data-testid="nda-card-line" aria-label={`Open ${ndaId}`} onClick={() => onOpen(ndaId)}>
       <p>
         <span>NDA</span>
         <span aria-hidden="true">·</span>
         <span>{ndaId}</span>
         {pill ? <span className={pillClass(pill)}>{pill}</span> : null}
-        {owner ? <><span aria-hidden="true">·</span><span>{owner}</span></> : null}
+        <span aria-hidden="true">·</span>
+        <span>{owner}</span>
+        <span className="nda-card-chev" aria-hidden="true">›</span>
       </p>
-      {extra ? <p className="note">{extra.next || "No next step"}</p> : null}
-    </div>
+      <p className="note">{next || "No next step"}</p>
+    </button>
   );
 }

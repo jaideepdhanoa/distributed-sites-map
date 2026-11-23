@@ -55,7 +55,17 @@ function photoKey(photo: SitePhoto, index: number) {
   return `${index}:${photo.role}:${photo.view_url || photo.file_id || ""}`;
 }
 
-export default function SitePhotos({ card, between, allowStreetEmbed = true, emptyNote = "" }: { card: PhotoCard; between?: ReactNode; allowStreetEmbed?: boolean; emptyNote?: string }) {
+type HeroMode = "street" | "photos" | "aerial";
+
+/** Photos when the gallery has slides, otherwise Street View, otherwise the aerial. Same order as a pipeline card. */
+function firstHero(showGallery: boolean, embed: string, aerial: string): HeroMode {
+  if (showGallery) return "photos";
+  if (embed) return "street";
+  if (aerial) return "aerial";
+  return "photos";
+}
+
+export default function SitePhotos({ card, between, allowStreetEmbed = true, emptyNote = "", aerialUrl = "", siteKey = "" }: { card: PhotoCard; between?: ReactNode; allowStreetEmbed?: boolean; emptyNote?: string; aerialUrl?: string; siteKey?: string }) {
   const model = galleryModel(card);
   const embed = allowStreetEmbed && model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
@@ -82,7 +92,7 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
   const hiddenListing = Math.max(0, listing.length - listingThumbs.length);
   const [open, setOpen] = useState<number | null>(null);
   const [streetOpen, setStreetOpen] = useState(false);
-  const [hero, setHero] = useState<"street" | "photos">(model.showGallery ? "photos" : embed ? "street" : "photos");
+  const [hero, setHero] = useState<HeroMode>(firstHero(model.showGallery, embed, aerialUrl));
   const [streetFailed, setStreetFailed] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -97,8 +107,14 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
     if (!dialog.open) dialog.showModal();
   }, [open]);
   useEffect(() => {
-    if (!slides.length && embed) setHero("street");
-  }, [slides.length, embed]);
+    if (!siteKey) return;
+    setHero(firstHero(model.showGallery, embed, aerialUrl));
+  }, [siteKey, model.showGallery, embed, aerialUrl]);
+  useEffect(() => {
+    if (hero === "street" && !embed) setHero(firstHero(model.showGallery, embed, aerialUrl));
+    if (hero === "aerial" && !aerialUrl) setHero(firstHero(model.showGallery, embed, aerialUrl));
+    if (hero === "photos" && !slides.length && (embed || aerialUrl)) setHero(firstHero(false, embed, aerialUrl));
+  }, [hero, embed, aerialUrl, slides.length, model.showGallery]);
   useEffect(() => {
     if (hero !== "street" || !embed) {
       setStreetFailed(false);
@@ -200,12 +216,18 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
               <a className="text-link" href={model.frontageUrl} target="_blank" rel="noopener noreferrer">Open Street View ↗</a>
             </p>
           ) : null}
+          {hero === "aerial" && aerialUrl ? (
+            <>
+              <img className="hero-aerial" data-testid="aerial-thumb" src={aerialUrl} alt="" />
+              <span className="aerial-credit">Esri</span>
+            </>
+          ) : null}
           {hero === "photos" && slides[0] ? (
             <button type="button" className="hero-still" onClick={() => openAt(slides[0].key)}>
               <Frame photo={slides[0].photo} size="full" onMissing={() => hide(slides[0].key)} />
             </button>
           ) : null}
-          {!embed && !slides.length ? (
+          {!embed && !slides.length && hero !== "aerial" ? (
             <div className="empty-hero">
               <p>{emptyNote || "No street view or photos on file"}</p>
             </div>
@@ -214,13 +236,14 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
         <div className="hero-chrome">
           <div className="hero-tabs" role="tablist" aria-label="Site view">
             {embed ? <button type="button" role="tab" aria-selected={hero === "street"} className={hero === "street" ? "chip on" : "chip"} onClick={() => setHero("street")}>Street View</button> : null}
+            {aerialUrl ? <button type="button" role="tab" aria-selected={hero === "aerial"} className={hero === "aerial" ? "chip on" : "chip"} data-testid="aerial-tab" onClick={() => setHero("aerial")}>Aerial</button> : null}
             {slides.length ? (
               <button type="button" role="tab" aria-selected={hero === "photos"} className={hero === "photos" ? "chip on" : "chip"} data-testid="photo-tab" onClick={openGallery}>
                 Photos · {slides.length}
               </button>
             ) : null}
           </div>
-          {embed || slides.length ? (
+          {(hero === "street" && embed) || (hero === "photos" && slides.length) ? (
             <button type="button" className="hero-expand" data-testid="hero-expand" aria-label={hero === "street" && embed ? "Expand Street View" : "Expand photos"} onClick={expandHero}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" /></svg>
             </button>

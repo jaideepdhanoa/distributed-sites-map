@@ -27,16 +27,23 @@ test("a universe card shows an aerial that fills its frame and one street view l
   await expect(thumb.locator("img")).toHaveAttribute("src", /World_Imagery\/MapServer\/export\?/);
   const fit = await thumb.evaluate((node) => {
     const image = node.querySelector("img");
-    if (!image) return null;
+    const card = node.closest(".drawer-scroll");
+    if (!image || !card) return null;
     const frame = node.getBoundingClientRect();
     const box = image.getBoundingClientRect();
+    const cardStyle = getComputedStyle(card);
+    const content = card.clientWidth - parseFloat(cardStyle.paddingLeft) - parseFloat(cardStyle.paddingRight);
     return {
       covers: box.width >= frame.width - 1 && box.height >= frame.height - 1,
+      full: Math.abs(frame.width - content) <= 2,
+      ratio: frame.width / frame.height,
       fit: getComputedStyle(image).objectFit,
       position: getComputedStyle(image).objectPosition,
     };
   });
   expect(fit?.covers).toBe(true);
+  expect(fit?.ratio ?? 0).toBeGreaterThan(1.9);
+  expect(fit?.ratio ?? 0).toBeLessThan(2.1);
   expect(fit?.fit).toBe("cover");
   expect(fit?.position === "center" || fit?.position === "50% 50%").toBe(true);
   await expect(page.getByRole("link", { name: "Open Street View" })).toHaveCount(1);
@@ -46,7 +53,8 @@ test("a universe card shows an aerial that fills its frame and one street view l
   await expect(page.locator("[data-testid=street-view-frame]")).toHaveCount(0);
   await expect(page.getByText("No street view or photos on file")).toHaveCount(0);
   if ((await thumb.getAttribute("data-compact")) === "0") {
-    await expect(page.getByTestId("photo-empty")).toHaveText("No site photos on file yet");
+    expect(fit?.full).toBe(true);
+    await expect(page.getByTestId("photo-empty")).toHaveText("Aerial only — no site photos yet");
   }
   if (!found.photo) return;
   await page.goto(`/?funnel=universe&site=${found.photo}`, { waitUntil: "domcontentloaded" });

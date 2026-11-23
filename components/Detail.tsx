@@ -634,7 +634,7 @@ export default function Detail({
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
       {hasHero || !aerial ? null : <AerialThumb lat={lat} lng={lng} />}
-      <SitePhotos card={photos} allowStreetEmbed={false} emptyNote={aerial ? "No site photos on file yet" : ""} />
+      <SitePhotos card={photos} allowStreetEmbed={false} emptyNote={aerial ? "Aerial only — no site photos yet" : ""} />
       {hasHero && aerial ? <AerialThumb lat={lat} lng={lng} compact /> : null}
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />

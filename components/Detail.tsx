@@ -26,6 +26,7 @@ import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
 import NdaCardThread from "./NdaCardThread";
+import NdaCardLine from "./NdaCardLine";
 import { cardNdaLabel } from "@/lib/nda";
 import { LocationFix } from "./LocationFix";
 import { siteHref } from "@/lib/siteLink";
@@ -653,7 +654,12 @@ export default function Detail({
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
         <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing onOpen={onOpenNda} />
-        {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? <NdaCardThread ndaId={linkedDeal.nda_id} onOpen={onOpenNda} /> : null}
+        {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? (
+          <>
+            <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} />
+            <NdaCardThread ndaId={linkedDeal.nda_id} onOpen={onOpenNda} />
+          </>
+        ) : null}
       </div>
       {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
       {site.linked_deal_id ? (
@@ -954,7 +960,12 @@ export function DealDetail({
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
         <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
-        {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? <NdaCardThread ndaId={deal.nda_id} onOpen={onOpenNda} /> : null}
+        {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
+          <>
+            <NdaCardLine ndaId={deal.nda_id} mirror={deal} />
+            <NdaCardThread ndaId={deal.nda_id} onOpen={onOpenNda} />
+          </>
+        ) : null}
         <NextStepCard
           kind="deal"
           id={deal.deal_id}

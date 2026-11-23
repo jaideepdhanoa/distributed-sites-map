@@ -1,6 +1,6 @@
 import { ChipFace } from "./ChipFace";
 import { chipFace } from "@/lib/chips";
-import { blockerSentenceForDeal, cardNdaLabel, type NdaMirror } from "@/lib/nda";
+import { blockerSentenceForDeal, cardNdaLabel, courtFromWaiting, courtPill, daysSince, type NdaMirror } from "@/lib/nda";
 import { pacificToday } from "@/lib/queue/today";
 import type { DealProps } from "@/lib/types";
 
@@ -18,7 +18,9 @@ export function NdaChip({
   onOpen?: (id: string) => void;
 }) {
   if (!signedIn) return null;
-  const label = text ? (text === "Not required" || text.startsWith("NDA:") ? (text === "Not required" ? "" : text) : `NDA: ${text}`) : cardNdaLabel(deal || {}, true);
+  const full = text ? (text === "Not required" || text.startsWith("NDA:") ? (text === "Not required" ? "" : text) : `NDA: ${text}`) : cardNdaLabel(deal || {}, true);
+  const court = courtPill(courtFromWaiting(deal?.nda_waiting_on || ""), daysSince(deal?.stage_blocker_since || "", pacificToday()));
+  const label = court && court.length <= 28 ? court : full;
   if (!label) {
     if (!showMissing) return null;
     return <span className="badge quiet nda-chip" data-testid="nda-chip">No NDA</span>;

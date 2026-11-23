@@ -24,6 +24,11 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 }
 
+function firstAddress(value: string): string {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0] : "";
+}
+
 function asObject(value: unknown): Record<string, unknown> {
   if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
   if (typeof value === "string") {
@@ -452,6 +457,7 @@ export async function overlayComms(snapshot: CommsSnapshot, ids?: string[]): Pro
         source: text(payload.workbook_source),
         message_id: text(payload.message_id),
         subject: text(payload.subject),
+        email: firstAddress([payload.email, payload.contact_email, payload.from, payload.person, payload.summary].map((item) => text(item)).join(" ")),
       };
     });
     return applyCommsRows(base, rows);

@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { brokerFollowUp, draftMentionsProduct } from "../lib/ndaDraft.ts";
+import { ndaActivity, emailFromComms, type NdaActivityQuery } from "../lib/ndaActivity.ts";
+import type { CommsRecord } from "../lib/comms.ts";
+import { noteEntries } from "../lib/ndaNotes.ts";
 import {
   blockerSentence,
   blockerSentenceForDeal,
@@ -250,6 +253,77 @@ test("a register note supplies a contact email the overlay left blank", () => {
   const shown = presentQueue([row], [], [], "2026-11-23");
   assert.equal(shown[0]?.contact_email, "person@example.com");
   assert.equal(shown[0]?.contact_phone, "");
+});
+
+test("register notes split only when a date starts an entry", () => {
+  const shaped = "Asked for the form and asks (the court changed hands twice on Nov 18). Nov 20: Sent the form. Nov 18: Opened the file. Nov 19 - Heard back.";
+  const entries = noteEntries(shaped);
+  assert.deepEqual(entries.map((entry) => entry.slice(0, 6)), ["Nov 20", "Nov 19", "Nov 18", "Asked "]);
+  assert.equal(entries.some((entry) => entry.startsWith("(the court")), false);
+  assert.equal(entries.some((entry) => entry.startsWith("Nov 9.")), false);
+  assert.match(entries[3] || "", /and asks \(/);
+  const intact = "She said Nov 4 she would send it; chased Nov 2 and Nov 9.";
+  assert.deepEqual(noteEntries(intact), [intact]);
+  const kept = "First line stays.\nSecond line stays.";
+  assert.deepEqual(noteEntries(kept), [kept]);
+  const range = "Forms were agreed Oct 29-30, 2026 and nothing else was logged.";
+  assert.deepEqual(noteEntries(range), [range]);
+});
+
+function commsRow(partial: Partial<CommsRecord>): CommsRecord {
+  return {
+    comms_id: "CM-901",
+    site_ids: "",
+    thread_id: "",
+    link: "",
+    at: "2026-11-20 12:57",
+    direction: "in",
+    person: "Sample Person",
+    firm: "Sample Firm",
+    channel: "email",
+    summary: "Sent the form.",
+    asks_made: "",
+    asks_answered: "",
+    attachments: "",
+    state_changes: "",
+    source: "",
+    message_id: "",
+    subject: "NDA form",
+    ...partial,
+  };
+}
+
+test("NDA activity dedupes, groups a thread, and reads a matching contact email", () => {
+  const query: NdaActivityQuery = {
+    sites: ["PIPE-PHX-9101"],
+    ndaId: "NDA-901",
+    firm: "Sample Firm",
+    person: "Sample Person",
+    threads: ["1234abcd1234abcd"],
+    source: "",
+  };
+  const rows = [
+    commsRow({ comms_id: "CM-901", site_ids: "PIPE-PHX-9101", thread_id: "abcdef0123456789", message_id: "abcdef0123456789", at: "2026-11-20 12:57", summary: "Sent the form.", subject: "NDA form" }),
+    commsRow({ comms_id: "CM-902", site_ids: "PIPE-PHX-9102", thread_id: "abcdef0123456789", message_id: "abcdef0123456789", at: "2026-11-20 12:57", summary: "Sent the form again.", subject: "NDA form" }),
+    commsRow({ comms_id: "CM-903", site_ids: "", thread_id: "1234abcd1234abcd", message_id: "1234abcd1234abcd", at: "2026-11-18 09:00", direction: "out", summary: "Please reply to person@example.com.", subject: "Follow up" }),
+  ];
+  const activity = ndaActivity(rows, query);
+  assert.equal(activity.items.length, 2);
+  assert.equal(activity.items[0]?.at, "Nov 20, 12:57 PM");
+  assert.equal(activity.items[0]?.subject, "NDA form");
+  assert.equal(activity.items[0]?.direction, "in");
+  assert.equal(activity.items[0]?.thread, activity.items[0]?.id);
+  assert.equal(activity.items.some((item) => /abcdef|1234abcd/.test(item.thread + item.id)), false);
+  assert.equal(activity.contact_email, "person@example.com");
+  assert.equal(emailFromComms(rows, "Someone Else"), "");
+  const byFirm = ndaActivity([commsRow({ comms_id: "CM-904", at: "2026-11-02 08:15", summary: "Noted." })], {
+    ...query,
+    sites: [],
+    threads: [],
+    ndaId: "NDA-902",
+  });
+  assert.equal(byFirm.items.length, 1);
+  assert.equal(byFirm.items[0]?.at, "Nov 2, 8:15 AM");
 });
 
 test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {

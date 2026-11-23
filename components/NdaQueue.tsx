@@ -56,6 +56,7 @@ export default function NdaQueue({
   onPick,
   onClose,
   onBack,
+  onMenu,
   backLabel,
   names = {},
 }: {
@@ -64,6 +65,7 @@ export default function NdaQueue({
   onPick: (id: string) => void;
   onClose: () => void;
   onBack: () => void;
+  onMenu: () => void;
   backLabel: string;
   names?: Record<string, string>;
 }) {
@@ -201,8 +203,8 @@ export default function NdaQueue({
                     <strong>{row.counterparty_firm || row.nda_id}</strong>
                     <CourtPill court={row.court} label={row.court_pill} />
                   </span>
-                  <span>{[coveredLabel(row, names), stageLabel(row.stage) || row.nda_status].filter(Boolean).join(" · ")}</span>
-                  <span className={overdue ? "nda-overdue" : "note"}>{row.owner || "Unassigned"} · {next}{row.next_step_due ? ` · ${row.next_step_due}` : ""}</span>
+                  <span>{[row.counterparty_person || row.contact_name || "No contact", stageLabel(row.stage) || row.nda_status || "—"].join(" · ")}</span>
+                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""} · ${coveredLabel(row, names)}`}</span>
                 </button>
               </li>
             );
@@ -218,6 +220,7 @@ export default function NdaQueue({
             onSaved={() => setTick((value) => value + 1)}
             onBack={onBack}
             onClose={onClose}
+            onMenu={onMenu}
             backLabel={backLabel}
           />
         ) : null}

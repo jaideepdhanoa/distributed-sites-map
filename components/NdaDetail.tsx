@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import CommentThread from "./comments/CommentThread";
 import { ndaAnchor } from "@/lib/comments/anchor";
 import { coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
+import { noteEntries } from "@/lib/ndaNotes";
 
 const STAGES = [
   "requested",
@@ -33,69 +34,92 @@ const COURTS = [
 const KINDS = ["docusign", "clm", "drive", "email", "other"] as const;
 
 type Account = { id: string; name: string };
-type Mail = { id: string; at: string; title: string; href: string };
+type Mail = { id: string; at: string; direction: "in" | "out"; person: string; subject: string; summary: string; href: string; thread: string };
 
-const GENERIC = /^(discussion|site-specific|broker-level|none|—|-)$/i;
+const GENERIC_SCOPE = /^(site-specific|broker-level|none|—|-)$/i;
 
-function noteEntries(notes: string): string[] {
-  const parts = notes.split(/(?=(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2})/i).map((part) => part.trim()).filter(Boolean);
-  if (parts.length < 2) return notes.trim() ? [notes.trim()] : [];
-  return parts.reverse();
+function gateRows(value: string): { label: string; state: string }[] {
+  const text = value.trim();
+  if (!text || /^none\b/i.test(text) || /not gating/i.test(text)) return [];
+  return text.split(/\s*;\s*|\n+/).map((part) => part.trim()).filter(Boolean).map((part) => {
+    const split = part.split(/\s+[—–-]\s+/);
+    if (split.length >= 2) return { label: split[0], state: split.slice(1).join(" — ") };
+    const known: Record<string, string> = {
+      "proof of funds": "Pending",
+      package: "Pending",
+      discussion: "Open",
+      "location + details": "Pending",
+    };
+    return { label: part, state: known[part.toLowerCase()] || "Open" };
+  });
 }
 
-function NdaMail({ sites, threads }: { sites: string[]; threads: string[] }) {
+function NdaMail({ ndaId, sites, onEmail, onBusy }: { ndaId: string; sites: string[]; onEmail: (email: string) => void; onBusy: (busy: boolean) => void }) {
   const [rows, setRows] = useState<Mail[]>([]);
-  const [pending, setPending] = useState(Boolean(sites.length));
+  const [pending, setPending] = useState(true);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (!sites.length) {
-      setRows([]);
-      setPending(false);
-      return undefined;
-    }
     let cancel = false;
     setPending(true);
-    Promise.all(sites.map(async (id) => {
-      const response = await fetch(`/api/data/comms?id=${encodeURIComponent(id)}`);
-      if (!response.ok) return [] as Mail[];
-      const body = await response.json() as { rows?: { commsId?: string; at?: string; direction?: string; channel?: string; person?: string; summary?: string; href?: string; messageId?: string }[] };
-      return (body.rows || []).map((item) => ({
-        id: item.messageId || item.commsId || item.at || id,
-        at: item.at || "",
-        title: [item.direction, item.channel, item.person].filter(Boolean).join(" · ") || "Email",
-        href: item.href || "",
-      }));
-    })).then((groups) => {
+    onBusy(true);
+    fetch(`/api/data/nda?activity=${encodeURIComponent(ndaId)}`).then(async (response) => {
       if (cancel) return;
-      const seen = new Set<string>();
-      const merged = groups.flat().filter((item) => {
-        if (!item.id || seen.has(item.id)) return false;
-        seen.add(item.id);
-        return true;
-      }).sort((left, right) => right.at.localeCompare(left.at));
-      const matched = threads.length
-        ? merged.filter((item) => threads.some((thread) => item.id.includes(thread) || item.href.includes(thread)))
-        : [];
-      setRows(matched.length ? matched : merged);
-      setPending(false);
+      if (!response.ok) {
+        setRows([]);
+        return;
+      }
+      const body = await response.json() as { items?: Mail[]; contact_email?: string };
+      setRows(Array.isArray(body.items) ? body.items : []);
+      if (body.contact_email) onEmail(body.contact_email);
     }).catch(() => {
-      if (!cancel) setPending(false);
+      if (!cancel) setRows([]);
+    }).finally(() => {
+      if (!cancel) {
+        setPending(false);
+        onBusy(false);
+      }
     });
     return () => {
       cancel = true;
     };
-  }, [sites.join("|"), threads.join("|")]);
-  if (!sites.length) return <p className="note" data-testid="nda-no-site">No site row. {threads.length ? `Threads stay on this NDA (${threads.length}).` : "No email is linked yet."}</p>;
-  if (pending) return <p className="note">Loading email.</p>;
-  if (!rows.length) return <p className="note">No email on this NDA yet.</p>;
+  }, [ndaId]);
+  if (pending) {
+    return (
+      <ul className="nda-mail" aria-busy="true" aria-label="Loading email">
+        {[0, 1, 2].map((item) => <li key={item} className="nda-hold"><span className="skeleton nda-skel" /><span className="skeleton nda-skel wide" /></li>)}
+      </ul>
+    );
+  }
+  if (!rows.length) {
+    return <p className="note" data-testid="nda-no-site">{sites.length ? "No email on this NDA yet." : "No site row. No email is linked yet."}</p>;
+  }
+  const shown = open ? rows : rows.slice(0, 8);
+  const groups: { thread: string; subject: string; items: Mail[] }[] = [];
+  for (const item of shown) {
+    const group = groups.find((entry) => entry.thread === item.thread);
+    if (group) group.items.push(item);
+    else groups.push({ thread: item.thread, subject: item.subject, items: [item] });
+  }
   return (
-    <ul className="nda-mail">
-      {rows.map((item) => (
-        <li key={item.id}>
-          <p>{item.at ? `${item.at} · ` : ""}{item.title}</p>
-          {item.href ? <a className="text-link" href={item.href} target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a> : null}
-        </li>
+    <div className="nda-mail">
+      {groups.map((group) => (
+        <section key={group.thread} className="nda-thread">
+          <p className="nda-thread-subject">{group.subject}</p>
+          {group.items.map((item) => (
+            <div key={item.id} className="nda-mail-item">
+              <p>
+                <span className={`nda-dir ${item.direction}`}>{item.direction === "out" ? "Out" : "In"}</span>
+                <span>{item.at}</span>
+                {item.person ? <span>{item.person}</span> : null}
+              </p>
+              {item.summary ? <p className="note">{item.summary}</p> : null}
+              {item.href ? <a className="text-link" href={item.href} target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a> : null}
+            </div>
+          ))}
+        </section>
       ))}
-    </ul>
+      {rows.length > 8 ? <button type="button" className="text-link" onClick={() => setOpen((value) => !value)}>{open ? "Show less" : `Show all ${rows.length}`}</button> : null}
+    </div>
   );
 }
 
@@ -125,6 +149,7 @@ export default function NdaDetail({
   onSaved,
   onBack,
   onClose,
+  onMenu,
   backLabel,
 }: {
   row: NdaQueueItem;
@@ -134,6 +159,7 @@ export default function NdaDetail({
   onSaved: () => void;
   onBack: () => void;
   onClose: () => void;
+  onMenu: () => void;
   backLabel: string;
 }) {
   const covered = coveredSites(row.site_ids || "");
@@ -154,6 +180,8 @@ export default function NdaDetail({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [mailEmail, setMailEmail] = useState("");
+  const [mailBusy, setMailBusy] = useState(true);
   const overdue = Boolean(row.next_step_due && row.next_step_due < today);
   const stageChanged = stage !== (row.stage || "");
 
@@ -204,12 +232,13 @@ export default function NdaDetail({
     }
   }
 
-  const scopeText = GENERIC.test(row.scope || "") ? (covered.note || "No site row") : (row.scope || covered.note || "—");
-  const gateText = GENERIC.test(row.nda_gates || "") ? "" : row.nda_gates;
+  const scopeText = GENERIC_SCOPE.test(row.scope || "") ? (covered.note || "No site row") : (row.scope || covered.note || "—");
+  const gates = gateRows(row.nda_gates || "");
+  const email = row.contact_email || mailEmail;
   const notes = noteEntries(row.notes || "");
   const shownNotes = notesOpen ? notes : notes.slice(0, 4);
   return (
-    <div className="nda-detail" data-testid="nda-detail">
+    <div className={`nda-detail${mailBusy ? " busy" : ""}`} data-testid="nda-detail" aria-busy={mailBusy}>
       <div className="layers-bar nda-bar">
         <div className="nda-backline">
           <button type="button" className="text-link" data-testid="nda-back" onClick={onBack}>{backLabel}</button>
@@ -217,6 +246,7 @@ export default function NdaDetail({
           <span className="note">{row.nda_id}</span>
         </div>
         <div className="nda-bar-actions">
+          <button type="button" className="icon-btn only-mobile" aria-label="Menu" onClick={onMenu}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
           <button type="button" className="paper-btn" data-testid="nda-edit" onClick={() => setEditing(true)}>Edit</button>
           <button type="button" className="close" aria-label="Close NDA queue" onClick={onClose}><span aria-hidden="true">×</span></button>
         </div>
@@ -227,7 +257,7 @@ export default function NdaDetail({
           <h3>Facts</h3>
           <div className="kv">
             <span>Contact</span><div>{row.contact_name || "No contact name"}</div>
-            <span>Email</span><div className={row.contact_email ? "" : "note"}>{row.contact_email || "No email on file"}</div>
+            <span>Email</span><div className={email ? "" : "note"}>{email || (mailBusy ? <span className="skeleton nda-skel" /> : "No email on file")}</div>
             <span>Phone</span><div className={row.contact_phone ? "" : "note"}>{row.contact_phone || "No phone on file"}</div>
             <span>Scope</span><div>{scopeText}</div>
             <span>Stage</span><div>{stageLabel(row.stage) || "—"}{row.nda_status && row.nda_status !== stageLabel(row.stage) ? ` · Register: ${row.nda_status}` : ""}</div>
@@ -236,7 +266,14 @@ export default function NdaDetail({
             <span>Next step</span><div className={overdue ? "nda-overdue" : ""}>{row.next_step || "No next step"}{row.next_step_due ? ` · ${row.next_step_due}` : ""}</div>
             <span>Document</span><div className={row.document_url ? "" : "note"}>{row.document_url ? <a className="text-link" href={row.document_url} target="_blank" rel="noopener noreferrer">{row.document_kind || "Open document"}</a> : "No document yet"}</div>
           </div>
-          {gateText ? <><h3>Gates</h3><p>{gateText}</p></> : null}
+          {gates.length ? (
+            <>
+              <h3>Gates</h3>
+              <ul className="nda-gates">
+                {gates.map((gate) => <li key={`${gate.label}-${gate.state}`}><span>{gate.label}</span><span>{gate.state}</span></li>)}
+              </ul>
+            </>
+          ) : null}
           <h3>Covered listings</h3>
           {sites.length ? sites.map((id) => (
             <p key={id}><button type="button" className="text-link" onClick={() => onOpenSite(id)}>{names[id] || "Covered site"}</button></p>
@@ -251,7 +288,7 @@ export default function NdaDetail({
             <>
               <h3>Register notes</h3>
               <ul className="nda-notes">
-                {shownNotes.map((entry) => <li key={entry.slice(0, 40)}>{entry}</li>)}
+                {shownNotes.map((entry, index) => <li key={`${index}-${entry.slice(0, 24)}`}>{entry}</li>)}
               </ul>
               {notes.length > 4 ? <button type="button" className="text-link" onClick={() => setNotesOpen((value) => !value)}>{notesOpen ? "Show less" : "Show all"}</button> : null}
             </>
@@ -260,7 +297,7 @@ export default function NdaDetail({
         </div>
         <div>
           <h3>Activity</h3>
-          <NdaMail sites={sites} threads={row.gmail_thread_ids} />
+          <NdaMail ndaId={row.nda_id} sites={sites} onEmail={setMailEmail} onBusy={setMailBusy} />
         </div>
       </div>
       <section className="nda-discussion" data-testid="nda-discussion">
@@ -273,7 +310,7 @@ export default function NdaDetail({
             <h2>Edit</h2>
             <button type="button" className="close" aria-label="Cancel edit" onClick={() => setEditing(false)}><span aria-hidden="true">×</span></button>
           </div>
-          <form className="nda-edit" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          <form id="nda-edit-fields" className="nda-edit" onSubmit={(event) => { event.preventDefault(); void save(); }}>
             <label>Stage<select className="secondary" aria-label="Stage" value={stage} onChange={(event) => setStage(event.target.value)}>{STAGES.map((item) => <option key={item} value={item}>{stageLabel(item)}</option>)}</select></label>
             <label>Court<select className="secondary" aria-label="Court" value={court} onChange={(event) => setCourt(event.target.value)}>{COURTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
             <label>Owner<select className="secondary" aria-label="NDA owner" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="">Unassigned</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
@@ -285,11 +322,11 @@ export default function NdaDetail({
             <label>Email<input className="field" aria-label="Contact email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} /></label>
             <label>Phone<input className="field" aria-label="Contact phone" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} /></label>
             <label className="wide">Note<textarea className="field" aria-label="Status note" value={note} onChange={(event) => setNote(event.target.value)} rows={3} /></label>
-            <div className="nda-edit-bar">
-              <button type="button" className="paper-btn" onClick={() => setEditing(false)}>Cancel</button>
-              <button type="submit" className="paper-btn" data-testid="nda-save" disabled={pending}>Save</button>
-            </div>
           </form>
+          <div className="nda-edit-bar">
+            <button type="button" className="paper-btn" onClick={() => setEditing(false)}>Cancel</button>
+            <button type="submit" form="nda-edit-fields" className="paper-btn" data-testid="nda-save" disabled={pending}>Save</button>
+          </div>
         </div>
       ) : null}
     </div>

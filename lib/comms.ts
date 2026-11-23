@@ -30,6 +30,7 @@ export type CommsRecord = {
   source: string;
   message_id: string;
   subject: string;
+  email?: string;
   at_approximate?: boolean | string;
 };
 

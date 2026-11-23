@@ -10,6 +10,7 @@ import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
+import AppLoading from "./AppLoading";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
@@ -1602,7 +1603,7 @@ export default function Explorer() {
     return (
       <main className="empty">
         <Wordmark level="p" />
-        <p>Loading</p>
+        <AppLoading />
       </main>
     );
   }
@@ -2712,9 +2713,10 @@ export default function Explorer() {
               setSelected(site);
               write({ ...patch, site, nda: null, ndafrom: ndaId || "1" }, true);
             }}
-            onPick={(id) => write({ nda: id || "1" })}
+            onPick={(id) => { if (/^NDA-\d{3,}$/i.test(id)) write({ nda: id.toUpperCase() }, true); }}
             onClose={() => write({ nda: null })}
             onBack={() => write(params.get("site") ? { nda: null } : { nda: "1" })}
+            onMenu={() => setMenuOpen(true)}
             backLabel={params.get("site") ? "Back to site" : "Back to queue"}
           />
         ) : null}

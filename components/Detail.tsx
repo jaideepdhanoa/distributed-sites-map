@@ -18,7 +18,9 @@ import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./Fi
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
-import { cardPhotos, isPanoUrl } from "@/lib/photos";
+import { cardPhotos, galleryModel, isPanoUrl } from "@/lib/photos";
+import { aerialTile, streetViewHref } from "@/lib/aerial";
+import AerialThumb from "./AerialThumb";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
@@ -414,6 +416,8 @@ function CardLinks({
   street,
   signedIn,
   listingTitle,
+  streetLabel = "Street View",
+  hideEmptyStreet = false,
 }: {
   listing?: string;
   folder?: string;
@@ -422,12 +426,14 @@ function CardLinks({
   street?: string;
   signedIn: boolean;
   listingTitle?: string;
+  streetLabel?: string;
+  hideEmptyStreet?: boolean;
 }) {
   return (
     <p className="card-links">
       <RowLinks listing={listing} folder={folder} packageHref={signedIn ? packageHref : ""} listingTitle={listingTitle} showMissing testIds="card" />
       <CardLink href={map} label="Map" testId="map-link" />
-      <CardLink href={street} label="Street View" testId="street-view-link" />
+      {hideEmptyStreet && !street ? null : <CardLink href={street} label={streetLabel} testId="street-view-link" />}
     </p>
   );
 }
@@ -576,7 +582,8 @@ export default function Detail({
   const figuresPending = !pnl.settled;
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
-  const street = photos.frontageUrl || site.street_view_url;
+  const hasHero = galleryModel(photos).showGallery;
+  const aerial = aerialTile(lat, lng);
   const price = site.asking_price_display;
   const why = site.summary_why || "Not screened yet.";
   const next = nextStepText(site);
@@ -626,7 +633,9 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      <SitePhotos card={photos} />
+      {hasHero || !aerial ? null : <AerialThumb lat={lat} lng={lng} />}
+      <SitePhotos card={photos} allowStreetEmbed={false} emptyNote={aerial ? "Aerial only — no site photos yet" : ""} />
+      {hasHero && aerial ? <AerialThumb lat={lat} lng={lng} compact /> : null}
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
         <NextStepCard
@@ -660,7 +669,9 @@ export default function Detail({
         folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
         packageHref={packageHref}
         map={mapHref(lat, lng)}
-        street={streetHref(lat, lng, photos.frontageUrl || site.street_view_url)}
+        street={streetViewHref(lat, lng)}
+        streetLabel="Open Street View"
+        hideEmptyStreet
         signedIn={signedIn}
         listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
       />
@@ -763,7 +774,6 @@ export default function Detail({
               <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
               <span>Depot</span><div title={depotMiles == null && site.miles_to_depot == null ? "Not on file" : undefined}>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
               <span>County parcel</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
-              <span>Street View</span><div>{street ? <a href={street} target="_blank" rel="noopener noreferrer">Open Street View</a> : "—"}</div>
               <span>Parcel</span><div>{site.parcel_match === "none" ? "No parcel found" : site.parcel_match === "pin location" ? "Matched by pin location" : site.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
               {site.listed ? (
                 <>

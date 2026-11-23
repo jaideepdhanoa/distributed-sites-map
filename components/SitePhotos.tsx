@@ -55,9 +55,9 @@ function photoKey(photo: SitePhoto, index: number) {
   return `${index}:${photo.role}:${photo.view_url || photo.file_id || ""}`;
 }
 
-export default function SitePhotos({ card, between }: { card: PhotoCard; between?: ReactNode }) {
+export default function SitePhotos({ card, between, allowStreetEmbed = true, emptyNote = "" }: { card: PhotoCard; between?: ReactNode; allowStreetEmbed?: boolean; emptyNote?: string }) {
   const model = galleryModel(card);
-  const embed = model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
+  const embed = allowStreetEmbed && model.frontageUrl ? streetViewEmbedSrc(model.frontageUrl) : "";
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const slideKey = model.slides.map((photo, index) => photoKey(photo, index)).join("|");
   useEffect(() => {
@@ -131,6 +131,14 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
 
   const credits = Array.from(new Set(slides.map((item) => item.photo.attribution || esriCredit(item.photo)).filter(Boolean)));
   if (!model.visible) {
+    if (emptyNote) {
+      return (
+        <section className="site-photos">
+          <p className="note" data-testid="photo-empty">{emptyNote}</p>
+          {between}
+        </section>
+      );
+    }
     return (
       <section className="site-photos">
         <div className="hero-frame empty-hero">
@@ -199,7 +207,7 @@ export default function SitePhotos({ card, between }: { card: PhotoCard; between
           ) : null}
           {!embed && !slides.length ? (
             <div className="empty-hero">
-              <p>No street view or photos on file</p>
+              <p>{emptyNote || "No street view or photos on file"}</p>
             </div>
           ) : null}
         </div>

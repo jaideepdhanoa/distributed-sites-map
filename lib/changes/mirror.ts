@@ -376,8 +376,9 @@ export function planSiteMirror(
 ): MirrorPlan {
   const combined: MirrorPlan = emptyPlan();
   const claimed = new Set<string>();
-  const writable = sites.filter((row) => row.site_id !== PROTECTED_SITE_ID);
-  if (writable.length !== sites.length) combined.skippedProtected += 1;
+  const candidates = sites.filter((row) => !row.site_id.startsWith("WB-"));
+  const writable = candidates.filter((row) => row.site_id !== PROTECTED_SITE_ID);
+  if (writable.length !== candidates.length) combined.skippedProtected += 1;
   for (const table of tables) {
     const idAt = headerIndex(table.headers, ["site id"]);
     if (idAt < 0) throw new Error(`${table.title} is missing an id column (site id).`);

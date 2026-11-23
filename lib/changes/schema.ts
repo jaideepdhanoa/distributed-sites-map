@@ -48,6 +48,7 @@ import {
   LISTING_ID,
   NDA_ID,
   SITE_ID,
+  UNIVERSE_WB,
   commsSiteAllowed,
   type ActivityType,
   type CommsDirection,
@@ -366,6 +367,7 @@ const sitePayload = z
     photo_listing_count: z.number().finite().nullable().optional(),
     photos_checked: z.string().trim().max(40).optional(),
     photo_notes: z.string().trim().max(400).optional(),
+    evidence: z.string().trim().max(2000).optional(),
     photo_refs: z.array(z.object({
       role: z.enum(PHOTO_ROLES),
       source: z.enum(PHOTO_SOURCES).optional(),
@@ -669,13 +671,13 @@ export function validateBatch(actor: Actor, idempotencyKey: string, body: unknow
           ? spaceSiteAllowed(siteId)
           : row.entity_type === "comment"
             ? spaceSiteAllowed(siteId) || NDA_ID.test(siteId)
-          : row.entity_type === "nda"
-            ? NDA_ID.test(siteId)
-            : SITE_ID.test(siteId);
+            : row.entity_type === "nda"
+              ? NDA_ID.test(siteId)
+              : SITE_ID.test(siteId) || UNIVERSE_WB.test(siteId);
     if (!siteAllowed) throw new InputError(`Change ${index + 1}: That site id is not valid.`);
     cleanText(row.source);
     if (row.entity_type === "site") {
-      return { ...row, payload: parseSite(actor, index, row.expected_version, row.payload, agentMint) };
+      return { ...row, payload: parseSite(actor, index, row.expected_version, row.payload, agentMint, row.site_id) };
     }
     if (row.entity_type === "nda") {
       return { ...row, payload: parseNda(actor, index, row.payload) };
@@ -1291,7 +1293,7 @@ function withServiceAreaToken(payload: unknown): unknown {
   return raw;
 }
 
-function parseSite(actor: Actor, index: number, expectedVersion: number, payload: unknown, mint = false): SitePayload {
+function parseSite(actor: Actor, index: number, expectedVersion: number, payload: unknown, mint = false, siteId = ""): SitePayload {
   payload = withServiceAreaToken(payload);
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new InputError(`Change ${index + 1}: That change is not valid.`);
@@ -1301,7 +1303,7 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     throw new InputError(`Change ${index + 1}: Stage is not written on a site.`);
   }
   const guarded = Object.keys(raw).filter(guardKey);
-  if (guarded.length && expectedVersion === 0) {
+  if (guarded.length && expectedVersion === 0 && !UNIVERSE_WB.test(siteId)) {
     throw new InputError(
       `Change ${index + 1}: A new site does not copy Folder, photos, land evidence, typed power, check statuses, or financial claims.`,
     );
@@ -1373,6 +1375,10 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   }));
   if (data.photo_refs) fields.photo_refs = photoCanonical(photos);
   const facts: Record<string, string> = {};
+  if (data.evidence !== undefined) {
+    cleanText(data.evidence);
+    facts.evidence = data.evidence.trim();
+  }
   for (const [key, value] of Object.entries(data.facts || {})) {
     if (key === "score" || key.endsWith("_points")) {
       throw new InputError(`Change ${index + 1}: Score cells stay in the workbook.`);
@@ -1460,7 +1466,7 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
       sources[field] = source;
     }
   }
-  if (expectedVersion === 0 && !CREATE_MARKETS.includes(data.market as (typeof CREATE_MARKETS)[number])) {
+  if (expectedVersion === 0 && !UNIVERSE_WB.test(siteId) && !CREATE_MARKETS.includes(data.market as (typeof CREATE_MARKETS)[number])) {
     throw new InputError(`Change ${index + 1}: A new site needs a market of PHX, LAS, or MIA.`);
   }
   cleanText(fields.name);

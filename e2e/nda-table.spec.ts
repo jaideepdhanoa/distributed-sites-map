@@ -18,6 +18,7 @@ test("a site card opens its NDA and can come back", async ({ page }) => {
   expect(found.nda).toMatch(/^NDA-/);
   await page.goto(`/?funnel=pipeline&site=${found.deal}`, { waitUntil: "domcontentloaded" });
   const cardThread = page.getByTestId("nda-site-thread");
+  await expect(page.getByTestId("nda-card-line")).toBeVisible();
   await expect(cardThread).toBeVisible();
   await expect(cardThread.getByPlaceholder("Comment or @mention…")).toBeVisible();
   await expect(cardThread.getByRole("button", { name: "Comment" })).toBeVisible();

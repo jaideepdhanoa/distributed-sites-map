@@ -64,12 +64,22 @@ export function addressIn(value: string): string {
   return match ? match[0] : "";
 }
 
-/** An email from a matched comms row whose contact name matches. */
+function senderName(value: string): string {
+  return norm(value.replace(/<[^>]*>/g, " ").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, " "));
+}
+
+/** True only when the comms sender's display name is the contact, not a cc or another person. */
+export function senderIsContact(sender: string, contactName: string): boolean {
+  const left = senderName(sender);
+  const right = norm(contactName);
+  return Boolean(left && right && left === right);
+}
+
+/** An email from the sender row only when that sender is the contact. */
 export function emailFromComms(rows: CommsRecord[], personName: string): string {
   for (const row of rows) {
-    const blob = `${row.person || ""} ${row.summary || ""} ${row.subject || ""} ${row.source || ""}`;
-    if (!personMatch(row.person || "", personName) && !personMatch(blob, personName)) continue;
-    const found = addressIn(`${row.email || ""} ${blob}`);
+    if (!senderIsContact(row.person || "", personName)) continue;
+    const found = addressIn(`${row.email || ""} ${row.person || ""}`);
     if (found) return found;
   }
   return "";

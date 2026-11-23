@@ -189,10 +189,13 @@ export default function NdaDetail({
 
   useEffect(() => {
     if (!editing) return;
-    const sheet = document.querySelector(".nda-edit-sheet");
     const form = document.getElementById("nda-edit-fields");
-    if (sheet instanceof HTMLElement) sheet.scrollTop = 0;
-    if (form) form.scrollTop = 0;
+    const first = form?.querySelector("select, input, textarea");
+    if (first instanceof HTMLElement) first.focus({ preventScroll: true });
+    const pin = () => { if (form) form.scrollTop = 0; };
+    pin();
+    const frame = requestAnimationFrame(pin);
+    return () => cancelAnimationFrame(frame);
   }, [editing]);
 
   useEffect(() => {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { brokerFollowUp, draftMentionsProduct } from "../lib/ndaDraft.ts";
-import { ndaActivity, emailFromComms, type NdaActivityQuery } from "../lib/ndaActivity.ts";
+import { ndaActivity, emailFromComms, senderIsContact, type NdaActivityQuery } from "../lib/ndaActivity.ts";
 import type { CommsRecord } from "../lib/comms.ts";
 import { noteEntries } from "../lib/ndaNotes.ts";
 import {
@@ -14,7 +14,9 @@ import {
   discussionSite,
   gateLabel,
   cardNdaLabel,
+  collapseContained,
   ndaChip,
+  registerConflict,
   ndaQueueAllowed,
   ndaQueueBody,
   openNdaQueue,
@@ -248,11 +250,29 @@ test("a saved status sits on the register row and a closed one leaves the queue"
   assert.equal(blank.includes("Thank you"), false);
 });
 
-test("a register note supplies a contact email the overlay left blank", () => {
-  const row = agreement({ nda_id: "NDA-901", notes: "Nov 2 wrote person@example.com.", source: "fixture" });
+test("a note that mentions someone else's address does not become the contact", () => {
+  const row = agreement({ nda_id: "NDA-901", counterparty_person: "Sample Person", notes: "Counsel wrote other@example.com.", source: "fixture" });
   const shown = presentQueue([row], [], [], "2026-11-23");
-  assert.equal(shown[0]?.contact_email, "person@example.com");
+  assert.equal(shown[0]?.contact_email, "");
   assert.equal(shown[0]?.contact_phone, "");
+});
+
+test("an owner edit does not flag a register conflict, and a newer disagreed stage does", () => {
+  const row = agreement({ nda_id: "NDA-901", nda_status: "With counterparty legal", nda_waiting_on: "Them", nda_last_action_date: "2026-11-01", nda_waiting_on_since: "2026-11-01" });
+  assert.equal(registerConflict(row, {
+    nda_id: "NDA-901", status: "", waiting_on: "", owner: "sample", next_step: "Call", last_action: "Dossier updated", last_action_date: "2026-11-23", version: 1,
+  }), "");
+  assert.equal(registerConflict(row, {
+    nda_id: "NDA-901", status: "", waiting_on: "", owner: "", next_step: "", last_action: "Status set", last_action_date: "2026-11-23", version: 2,
+    stage: "with_moove_legal", court: "us",
+  }), "Register last action is older than the latest saved record.");
+});
+
+test("a scope line drops a phrase that is already inside a longer one", () => {
+  assert.deepEqual(collapseContained([
+    "Operating c-store with gas and gaming",
+    "Operating c-store with gas and gaming; car wash out of service",
+  ]), ["Operating c-store with gas and gaming; car wash out of service"]);
 });
 
 test("register notes split only when a date starts an entry", () => {
@@ -322,7 +342,9 @@ test("NDA activity dedupes, groups a thread, and reads a matching contact email"
   assert.equal(activity.items[0]?.direction, "in");
   assert.equal(activity.items[0]?.thread, activity.items[0]?.id);
   assert.equal(activity.items.some((item) => /abcdef|1234abcd/.test(item.thread + item.id)), false);
-  assert.equal(activity.contact_email, "person@example.com");
+  assert.equal(activity.contact_email, "");
+  assert.equal(emailFromComms([{ ...rows[2], email: "person@example.com", summary: "Noted." }], "Sample Person"), "person@example.com");
+  assert.equal(senderIsContact("Other Counsel <other@example.com>", "Sample Person"), false);
   assert.equal(emailFromComms(rows, "Someone Else"), "");
   const byFirm = ndaActivity([commsRow({ comms_id: "CM-904", at: "2026-11-02 08:15", summary: "Noted." })], {
     ...query,
@@ -336,7 +358,7 @@ test("NDA activity dedupes, groups a thread, and reads a matching contact email"
     commsRow({ comms_id: "CM-905", site_ids: "", firm: "Sample", person: "Sample Person", summary: "Wrote from person@example.com.", subject: "Hello", at: "2026-11-09 15:04" }),
   ], { ...query, sites: [], threads: [], ndaId: "NDA-902", firm: "Sample Firm" });
   assert.equal(noSite.items.length, 1);
-  assert.equal(noSite.contact_email, "person@example.com");
+  assert.equal(noSite.contact_email, "");
   assert.equal(noSite.items[0]?.summary.includes("…"), false);
 });
 

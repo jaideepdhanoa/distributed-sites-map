@@ -39,10 +39,15 @@ test("number values stay whole in the drawer and on a phone", async ({ page }) =
     const box = node.getBoundingClientRect();
     const tabs = node.parentElement?.querySelector(".hero-tabs")?.getBoundingClientRect();
     const overlap = tabs ? Math.min(box.bottom, tabs.bottom) - Math.max(box.top, tabs.top) : 0;
-    return { height: box.height, overlap };
+    const below = tabs ? tabs.top >= box.bottom - 1 : true;
+    return { height: box.height, width: box.width, overlap, below };
   });
-  expect(hero.height).toBeGreaterThan(180);
-  expect(hero.overlap).toBeLessThanOrEqual(1);
+  expect(hero.height).toBeGreaterThan(270);
+  expect(hero.height).toBeLessThan(320);
+  expect(hero.width / hero.height).toBeGreaterThan(1.28);
+  expect(hero.width / hero.height).toBeLessThan(1.4);
+  expect(hero.overlap).toBeGreaterThan(20);
+  expect(hero.below).toBe(false);
   await page.getByTestId("card-numbers").scrollIntoViewIfNeeded();
   expect(await brokenValues(page)).toEqual([]);
 });

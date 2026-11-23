@@ -77,6 +77,14 @@ Days in court are computed from `court_since`. Do not copy a day count from a sh
 }
 ```
 
+## Limits
+
+The API refuses a `note` over 400 characters and a `source_ref` over 200. Keep the note to about 200 characters so it reads in the dossier. Each `gmail_thread_ids` and `covered_refs` entry is at most 80 characters.
+
+Text that contains a phone number is refused with a `400` and `That text is not allowed on the map.` The check runs on every text field except `contact_phone`, including `note`, `next_step`, `court_detail`, `source_ref` and each `covered_refs` entry. Put a number only in `contact_phone`.
+
+Agents without this repo use Workflow 12 of the Agent Operating Manual. It carries the same rules.
+
 A comment on that agreement is a separate change with `entity_type` `comment`, `site_id` `NDA-901`, and `anchor.type` `nda`.
 
 Read the queue back with `GET /api/data/nda` and the same bearer token. The register text stays visible beside the suggested stage. When the register's last action is older than the saved record, the dossier shows a conflict note and does not hide either date.

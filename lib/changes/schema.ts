@@ -227,14 +227,27 @@ export type ConflictPayload = {
   at: string;
 };
 
-/** A status, owner, or next-step write on an NDA register row. */
+/** A status, owner, next-step, or dossier write on an NDA register row. */
 export type NdaPayload = {
-  action: "status" | "assign" | "next_step";
+  action: "status" | "assign" | "next_step" | "edit";
   status: string;
   waiting_on: string;
+  stage: string;
+  court: string;
+  court_detail: string;
+  court_since: string;
   owner: string;
   next_step: string;
+  next_step_due: string;
+  document_url: string;
+  document_kind: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  gmail_thread_ids: string[];
+  covered_refs: string[];
   note: string;
+  source_ref: string;
   at: string;
 };
 
@@ -1035,41 +1048,147 @@ function assertCommentActor(actor: Actor, index: number, resolved: boolean | und
   }
 }
 
+const NDA_PAYLOAD_FIELDS = new Set([
+  "action",
+  "status",
+  "waiting_on",
+  "stage",
+  "court",
+  "court_detail",
+  "court_since",
+  "owner",
+  "next_step",
+  "next_step_due",
+  "document_url",
+  "document_kind",
+  "contact_name",
+  "contact_email",
+  "contact_phone",
+  "gmail_thread_ids",
+  "covered_refs",
+  "note",
+  "source_ref",
+  "at",
+]);
+
+const NDA_STAGES = new Set([
+  "requested",
+  "our_form_sent",
+  "their_form_received",
+  "redline_with_them",
+  "redline_with_us",
+  "with_moove_legal",
+  "routing_for_signature",
+  "counterparty_signed",
+  "executed",
+  "financials_requested",
+  "financials_received",
+  "deferred",
+  "declined",
+  "not_required",
+  "expired",
+]);
+
+const NDA_COURTS = new Set(["us", "them", "seller", "none"]);
+const NDA_DOC_KINDS = new Set(["docusign", "clm", "drive", "email", "other"]);
+const NDA_AGENTS = new Set(["muse", "indie"]);
+
+function ndaText(raw: Record<string, unknown>, key: string, index: number, max: number, skipClean = false): string {
+  if (!(key in raw) || raw[key] == null) return "";
+  if (typeof raw[key] !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+  const value = raw[key].trim();
+  if (value.length > max) throw new InputError(`Change ${index + 1}: That field is too long.`, 400, key);
+  if (!skipClean) cleanText(value);
+  return value;
+}
+
+function ndaList(raw: Record<string, unknown>, key: string, index: number): string[] {
+  if (!(key in raw) || raw[key] == null) return [];
+  if (!Array.isArray(raw[key])) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+  return raw[key].map((item) => {
+    if (typeof item !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+    const value = item.trim();
+    if (!value || value.length > 80) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+    cleanText(value);
+    return value;
+  });
+}
+
 function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
-  if (actor.kind !== "human" || !actor.role || !canWriteContent(actor.role)) {
+  const agent = actor.kind === "agent" && NDA_AGENTS.has(actor.id.trim().toLowerCase());
+  const human = actor.kind === "human" && Boolean(actor.role && canWriteContent(actor.role));
+  if (!agent && !human) {
     throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
   }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
   }
   const raw = payload as Record<string, unknown>;
+  for (const key of Object.keys(raw)) {
+    if (!NDA_PAYLOAD_FIELDS.has(key)) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+  }
   const action = raw.action;
-  if (action !== "status" && action !== "assign" && action !== "next_step") {
+  if (action !== "status" && action !== "assign" && action !== "next_step" && action !== "edit") {
     throw new InputError(`Change ${index + 1}: That NDA action is not accepted.`, 400, "action");
   }
   const atRaw = typeof raw.at === "string" ? raw.at : "";
   const zoned = parseZonedTimestamp(atRaw);
   if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`, 400, "at");
-  const note = typeof raw.note === "string" ? raw.note.trim() : "";
-  const status = typeof raw.status === "string" ? raw.status.trim() : "";
-  const waiting = typeof raw.waiting_on === "string" ? raw.waiting_on.trim() : "";
-  const owner = typeof raw.owner === "string" ? raw.owner.trim() : "";
-  const next = typeof raw.next_step === "string" ? raw.next_step.trim() : "";
-  if (note.length > 400) throw new InputError(`Change ${index + 1}: The note is too long.`, 400, "note");
-  if (status.length > 80) throw new InputError(`Change ${index + 1}: That status is too long.`, 400, "status");
-  if (waiting.length > 80) throw new InputError(`Change ${index + 1}: That court is too long.`, 400, "waiting_on");
-  if (owner.length > 80) throw new InputError(`Change ${index + 1}: That owner is too long.`, 400, "owner");
-  if (next.length > 400) throw new InputError(`Change ${index + 1}: That next step is too long.`, 400, "next_step");
-  cleanText(note);
-  cleanText(status);
-  cleanText(waiting);
-  cleanText(owner);
-  cleanText(next);
-  if (action === "status" && !status) throw new InputError(`Change ${index + 1}: Choose a status.`, 400, "status");
-  if (action === "status" && !note) throw new InputError(`Change ${index + 1}: A status change needs a note.`, 400, "note");
+  const note = ndaText(raw, "note", index, 400);
+  const status = ndaText(raw, "status", index, 80);
+  const waiting = ndaText(raw, "waiting_on", index, 80);
+  const stage = ndaText(raw, "stage", index, 40);
+  const court = ndaText(raw, "court", index, 20);
+  const courtDetail = ndaText(raw, "court_detail", index, 80);
+  const courtSinceRaw = ndaText(raw, "court_since", index, 40);
+  const owner = ndaText(raw, "owner", index, 80);
+  const next = ndaText(raw, "next_step", index, 400);
+  const due = ndaText(raw, "next_step_due", index, 10);
+  const documentUrl = ndaText(raw, "document_url", index, 500);
+  const documentKind = ndaText(raw, "document_kind", index, 20);
+  const contactName = ndaText(raw, "contact_name", index, 80);
+  const contactEmail = ndaText(raw, "contact_email", index, 120);
+  const contactPhone = ndaText(raw, "contact_phone", index, 40, true);
+  const sourceRef = ndaText(raw, "source_ref", index, 200);
+  const threads = ndaList(raw, "gmail_thread_ids", index);
+  const covered = ndaList(raw, "covered_refs", index);
+  if (stage && !NDA_STAGES.has(stage)) throw new InputError(`Change ${index + 1}: That stage is not accepted.`, 400, "stage");
+  if (court && !NDA_COURTS.has(court)) throw new InputError(`Change ${index + 1}: That court is not accepted.`, 400, "court");
+  if (documentKind && !NDA_DOC_KINDS.has(documentKind)) throw new InputError(`Change ${index + 1}: That document kind is not accepted.`, 400, "document_kind");
+  if (documentUrl && !/^https:\/\//i.test(documentUrl)) throw new InputError(`Change ${index + 1}: That document link is not accepted.`, 400, "document_url");
+  let courtSince = "";
+  if (courtSinceRaw) {
+    const since = parseZonedTimestamp(courtSinceRaw);
+    if (!since) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`, 400, "court_since");
+    courtSince = since.iso;
+  }
+  if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) throw new InputError(`Change ${index + 1}: That due date is not accepted.`, 400, "next_step_due");
+  if ((action === "status" || stage) && !note) throw new InputError(`Change ${index + 1}: A status change needs a note.`, 400, "note");
+  if (action === "status" && !status && !stage) throw new InputError(`Change ${index + 1}: Choose a status.`, 400, "status");
   if (action === "assign" && !owner) throw new InputError(`Change ${index + 1}: Choose an owner.`, 400, "owner");
   if (action === "next_step" && !next) throw new InputError(`Change ${index + 1}: Write the next step.`, 400, "next_step");
-  return { action, status, waiting_on: waiting, owner, next_step: next, note, at: zoned.iso };
+  return {
+    action,
+    status,
+    waiting_on: waiting,
+    stage,
+    court,
+    court_detail: courtDetail,
+    court_since: courtSince,
+    owner,
+    next_step: next,
+    next_step_due: due,
+    document_url: documentUrl,
+    document_kind: documentKind,
+    contact_name: contactName,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
+    gmail_thread_ids: threads,
+    covered_refs: covered,
+    note,
+    source_ref: sourceRef,
+    at: zoned.iso,
+  };
 }
 
 function parseComment(actor: Actor, index: number, siteId: string, expectedVersion: number, payload: unknown): CommentPayload {

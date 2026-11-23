@@ -379,6 +379,19 @@ export default function Explorer() {
   const loopsAllowed = Boolean(me?.actionRole && ndaQueueAllowed(me.actionRole));
   const loopsVisible = loopsParam && loopsAllowed;
   const ndaVisible = ndaParam && !loopsVisible;
+  const [ndaOpenCount, setNdaOpenCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!loopsAllowed) return undefined;
+    let cancel = false;
+    fetch("/api/data/nda").then(async (response) => {
+      if (!response.ok || cancel) return;
+      const body = await response.json() as { queue?: unknown[] };
+      if (!cancel) setNdaOpenCount((body.queue || []).length);
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [loopsAllowed, ndaVisible]);
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
@@ -2076,9 +2089,6 @@ export default function Explorer() {
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-            {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-              <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
-            ) : null}
           </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
@@ -2105,6 +2115,11 @@ export default function Explorer() {
               }}
             >
               Ask
+            </button>
+          ) : null}
+          {loopsAllowed ? (
+            <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
+              NDAs {ndaOpenCount ?? ""}
             </button>
           ) : null}
           <div className="user-menu only-desktop">
@@ -2158,9 +2173,6 @@ export default function Explorer() {
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
           <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-          {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-            <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
-          ) : null}
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
@@ -2440,7 +2452,7 @@ export default function Explorer() {
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
               {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-                <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDA</button>
+                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount ?? ""}</button>
               ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">

@@ -14,7 +14,7 @@ const OPEN = new Set([
 ]);
 
 /** Handlers that call actorFromRequest. The bearer is checked there. */
-const AGENT_BEARER_PATHS = new Set(["/api/changes"]);
+const AGENT_BEARER_PATHS = new Set(["/api/changes", "/api/data/nda"]);
 
 /** Handlers that check CRON_SECRET. The proxy only requires a Bearer header. */
 const CRON_BEARER_PATHS = new Set([

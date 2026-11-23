@@ -810,25 +810,39 @@ async function writeTag(sql: Sql, change: ParsedChange, actorId: string, version
 
 async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version: number): Promise<Record<string, unknown>> {
   const body = change.payload as NdaPayload;
-  const prior = await sql.query<{ status: string; waiting_on: string; owner: string; next_step: string }>(
-    `SELECT status, waiting_on, owner, next_step FROM nda_state WHERE nda_id = $1`,
+  const prior = await sql.query<{ status: string; waiting_on: string; owner: string; next_step: string; stage: string }>(
+    `SELECT status, waiting_on, owner, next_step, stage FROM nda_state WHERE nda_id = $1`,
     [change.site_id],
   );
   const current = prior.rows[0];
-  const status = body.action === "status" ? body.status : current?.status || "";
-  const waiting = body.action === "status" ? body.waiting_on || current?.waiting_on || "" : current?.waiting_on || "";
-  const owner = body.action === "assign" ? body.owner : current?.owner || "";
-  const next = body.action === "next_step" ? body.next_step : current?.next_step || "";
-  const lastAction = body.action === "status"
-    ? `Status set to ${status}`
+  const editing = body.action === "edit";
+  const status = body.action === "status" || (editing && body.status)
+    ? body.status || current?.status || ""
+    : current?.status || "";
+  const waiting = body.action === "status" || (editing && body.waiting_on)
+    ? body.waiting_on || current?.waiting_on || ""
+    : current?.waiting_on || "";
+  const owner = body.action === "assign" || (editing && body.owner) ? body.owner : current?.owner || "";
+  const next = body.action === "next_step" || (editing && body.next_step) ? body.next_step : current?.next_step || "";
+  const stage = body.stage || (body.action === "status" ? "" : current?.stage || "");
+  const lastAction = body.action === "status" || body.stage
+    ? `Status set to ${body.stage || status}`
     : body.action === "assign"
       ? `Owner set to ${owner}`
-      : "Next step updated";
+      : body.action === "edit"
+        ? "Dossier updated"
+        : "Next step updated";
   const lastDate = body.at.slice(0, 10);
   await sql.query(
     `INSERT INTO nda_state (
-       nda_id, status, waiting_on, owner, next_step, last_action, last_action_date, version, updated_by, updated_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+       nda_id, status, waiting_on, owner, next_step, last_action, last_action_date, version, updated_by, updated_at,
+       stage, court, court_detail, court_since, next_step_due, document_url, document_kind,
+       contact_name, contact_email, contact_phone, gmail_thread_ids, covered_refs, source_ref
+     ) VALUES (
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, now(),
+       $10, $11, $12, NULLIF($13, '')::timestamptz, NULLIF($14, '')::date, $15, $16,
+       $17, $18, $19, $20::text[], $21::text[], $22
+     )
      ON CONFLICT (nda_id) DO UPDATE SET
        status = EXCLUDED.status,
        waiting_on = EXCLUDED.waiting_on,
@@ -838,23 +852,46 @@ async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version
        last_action_date = EXCLUDED.last_action_date,
        version = EXCLUDED.version,
        updated_by = EXCLUDED.updated_by,
-       updated_at = now()`,
-    [change.site_id, status, waiting, owner, next, lastAction, lastDate, version, actorId],
+       updated_at = now(),
+       stage = CASE WHEN EXCLUDED.stage <> '' THEN EXCLUDED.stage ELSE nda_state.stage END,
+       court = CASE WHEN EXCLUDED.court <> '' THEN EXCLUDED.court ELSE nda_state.court END,
+       court_detail = CASE WHEN EXCLUDED.court_detail <> '' THEN EXCLUDED.court_detail ELSE nda_state.court_detail END,
+       court_since = COALESCE(EXCLUDED.court_since, nda_state.court_since),
+       next_step_due = COALESCE(EXCLUDED.next_step_due, nda_state.next_step_due),
+       document_url = CASE WHEN EXCLUDED.document_url <> '' THEN EXCLUDED.document_url ELSE nda_state.document_url END,
+       document_kind = CASE WHEN EXCLUDED.document_kind <> '' THEN EXCLUDED.document_kind ELSE nda_state.document_kind END,
+       contact_name = CASE WHEN EXCLUDED.contact_name <> '' THEN EXCLUDED.contact_name ELSE nda_state.contact_name END,
+       contact_email = CASE WHEN EXCLUDED.contact_email <> '' THEN EXCLUDED.contact_email ELSE nda_state.contact_email END,
+       contact_phone = CASE WHEN EXCLUDED.contact_phone <> '' THEN EXCLUDED.contact_phone ELSE nda_state.contact_phone END,
+       gmail_thread_ids = CASE WHEN cardinality(EXCLUDED.gmail_thread_ids) > 0 THEN EXCLUDED.gmail_thread_ids ELSE nda_state.gmail_thread_ids END,
+       covered_refs = CASE WHEN cardinality(EXCLUDED.covered_refs) > 0 THEN EXCLUDED.covered_refs ELSE nda_state.covered_refs END,
+       source_ref = CASE WHEN EXCLUDED.source_ref <> '' THEN EXCLUDED.source_ref ELSE nda_state.source_ref END`,
+    [
+      change.site_id, status, waiting, owner, next, lastAction, lastDate, version, actorId,
+      stage, body.court, body.court_detail, body.court_since, body.next_step_due, body.document_url, body.document_kind,
+      body.contact_name, body.contact_email, body.contact_phone, body.gmail_thread_ids, body.covered_refs, body.source_ref,
+    ],
   );
-  if (body.action === "status") {
+  if (body.action === "status" || body.stage) {
     await sql.query(
       `INSERT INTO nda_history (id, nda_id, status, note, actor, at)
        VALUES ($1, $2, $3, $4, $5, $6::timestamptz)`,
-      [`NH-${randomUUID()}`, change.site_id, status, body.note, actorId, body.at],
+      [`NH-${randomUUID()}`, change.site_id, body.stage || status, body.note, actorId, body.at],
     );
   }
   return {
     action: body.action,
     status,
+    stage,
+    court: body.court,
     waiting_on: waiting,
     owner,
     next_step: next,
+    next_step_due: body.next_step_due,
+    document_url: body.document_url,
+    document_kind: body.document_kind,
     note: body.note,
+    source_ref: body.source_ref,
     last_action: lastAction,
     last_action_date: lastDate,
     at: body.at,

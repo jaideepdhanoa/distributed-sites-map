@@ -4,23 +4,38 @@ import { useEffect, useState } from "react";
 import Timeline from "./timeline/Timeline";
 import CommentThread from "./comments/CommentThread";
 import { ndaAnchor } from "@/lib/comments/anchor";
-import { brokerFollowUp } from "@/lib/ndaDraft";
-import { coveredSites, queueCourt, type NdaQueueItem } from "@/lib/nda";
+import { coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
 
-const STATUSES = [
-  "With counterparty legal",
-  "With Moove legal",
-  "Moove form sent",
-  "Broker asked — send our form",
-  "Executed",
-  "Declined / proceeding without",
-  "Expired",
-  "Not required",
-];
+const STAGES = [
+  "requested",
+  "our_form_sent",
+  "their_form_received",
+  "redline_with_them",
+  "redline_with_us",
+  "with_moove_legal",
+  "routing_for_signature",
+  "counterparty_signed",
+  "executed",
+  "financials_requested",
+  "financials_received",
+  "deferred",
+  "declined",
+  "not_required",
+  "expired",
+] as const;
+
+const COURTS = [
+  ["us", "Our court"],
+  ["them", "Their court"],
+  ["seller", "Seller"],
+  ["none", "None"],
+] as const;
+
+const KINDS = ["docusign", "clm", "drive", "email", "other"] as const;
 
 type Account = { id: string; name: string };
 
-async function postNda(row: NdaQueueItem, payload: Record<string, string>) {
+async function postNda(row: NdaQueueItem, payload: Record<string, unknown>) {
   const response = await fetch("/api/changes", {
     method: "POST",
     headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
@@ -40,30 +55,38 @@ async function postNda(row: NdaQueueItem, payload: Record<string, string>) {
 
 export default function NdaDetail({
   row,
-  onClose,
+  today,
   onOpenSite,
   onSaved,
   onBack,
   backLabel,
 }: {
   row: NdaQueueItem;
-  onClose: () => void;
+  today: string;
   onOpenSite: (id: string) => void;
   onSaved: () => void;
   onBack: () => void;
   backLabel: string;
 }) {
-  const sites = coveredSites(row.site_ids || "").ids;
+  const covered = coveredSites(row.site_ids || "");
+  const sites = Array.from(new Set([...covered.ids, ...(row.covered_refs || []).filter((item) => /^(?:PIPE|LAND)-/.test(item))]));
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [status, setStatus] = useState(row.nda_status || STATUSES[0]);
-  const [court, setCourt] = useState(queueCourt(row) === "—" ? "" : queueCourt(row));
-  const [note, setNote] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [stage, setStage] = useState(row.stage || "requested");
+  const [court, setCourt] = useState(row.court || "none");
   const [owner, setOwner] = useState(row.owner || "");
   const [nextStep, setNextStep] = useState(row.next_step || "");
-  const [draft, setDraft] = useState("");
+  const [due, setDue] = useState(row.next_step_due || "");
+  const [documentUrl, setDocumentUrl] = useState(row.document_url || "");
+  const [documentKind, setDocumentKind] = useState(row.document_kind || "other");
+  const [contactName, setContactName] = useState(row.contact_name || "");
+  const [contactEmail, setContactEmail] = useState(row.contact_email || "");
+  const [contactPhone, setContactPhone] = useState(row.contact_phone || "");
+  const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const choices = STATUSES.includes(status) ? STATUSES : [status, ...STATUSES];
+  const overdue = Boolean(row.next_step_due && row.next_step_due < today);
+  const stageChanged = stage !== (row.stage || "");
 
   useEffect(() => {
     let cancel = false;
@@ -78,17 +101,32 @@ export default function NdaDetail({
     };
   }, []);
 
-  async function save(payload: Record<string, string>) {
-    if (payload.action === "status" && !payload.note.trim()) {
+  async function save() {
+    if (stageChanged && !note.trim()) {
       setError("A status change needs a note.");
       return;
     }
     setPending(true);
     setError("");
     try {
-      await postNda(row, payload);
+      await postNda(row, {
+        action: "edit",
+        stage,
+        status: stageLabel(stage),
+        court,
+        owner,
+        next_step: nextStep,
+        next_step_due: due,
+        document_url: documentUrl,
+        document_kind: documentKind,
+        contact_name: contactName,
+        contact_email: contactEmail,
+        contact_phone: contactPhone,
+        note,
+        source_ref: "nda-dossier",
+      });
+      setEditing(false);
       setNote("");
-      setDraft("");
       onSaved();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That change was not saved.");
@@ -102,95 +140,64 @@ export default function NdaDetail({
       <div className="layers-bar nda-bar">
         <div>
           <button type="button" className="text-link" data-testid="nda-back" onClick={onBack}>{backLabel}</button>
-          <h2>{row.nda_id}</h2>
+          <h2>{row.counterparty_firm || row.nda_id}</h2>
+          <p className="note">{row.nda_id}</p>
         </div>
-        <button type="button" className="close" aria-label="Close NDA" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
-      <section>
-        <h3>Status history</h3>
-        <ol className="nda-history" data-testid="nda-history">
-          {row.history.map((item, index) => (
-            <li key={`${item.at}-${index}`}>
-              <p>{item.status || "—"}{item.at ? ` · ${item.at}` : ""}</p>
-              {item.note ? <p>{item.note}</p> : null}
-              {item.actor ? <p>{item.actor}</p> : null}
-            </li>
-          ))}
-        </ol>
-      </section>
-      <section>
-        <h3>Covered sites</h3>
-        {sites.length ? (
-          <div className="nda-sites">
-            {sites.map((id) => (
-              <button key={id} type="button" className="text-link" onClick={() => onOpenSite(id)}>{id}</button>
+      <div className="nda-dossier">
+        <div>
+          {row.conflict ? <p className="note" data-testid="nda-conflict">{row.conflict}</p> : null}
+          <h3>Facts</h3>
+          <div className="kv">
+            <span>Contact</span><div>{[row.contact_name, row.contact_email, row.contact_phone].filter(Boolean).join(" · ") || "—"}</div>
+            <span>Scope</span><div>{row.scope || covered.note || "—"}</div>
+            <span>Stage</span><div>{stageLabel(row.stage) || "—"}{row.nda_status && row.nda_status !== stageLabel(row.stage) ? ` · Register: ${row.nda_status}` : ""}</div>
+            <span>Court</span><div>{row.court_pill || "—"}{row.court_since ? ` · since ${row.court_since.slice(0, 10)}` : ""}{row.court_detail ? ` · ${row.court_detail}` : ""}</div>
+            <span>Owner</span><div>{row.owner || "Unassigned"}</div>
+            <span>Next step</span><div className={overdue ? "nda-overdue" : ""}>{row.next_step || "—"}{row.next_step_due ? ` · ${row.next_step_due}` : ""}</div>
+            <span>Document</span><div>{row.document_url ? <a href={row.document_url} target="_blank" rel="noopener noreferrer">{row.document_kind || "Open"}</a> : "—"}</div>
+          </div>
+          {row.notes ? <><h3>Register notes</h3><p>{row.notes}</p></> : null}
+          {row.nda_gates ? <><h3>Gates</h3><p>{row.nda_gates}</p></> : null}
+          <h3>Covered listings</h3>
+          {sites.length ? sites.map((id) => (
+            <p key={id}><button type="button" className="text-link" onClick={() => onOpenSite(id)}>{id}</button></p>
+          )) : <p>{row.scope || covered.note || "No site row"}</p>}
+          <h3>Status history</h3>
+          <ol className="nda-history" data-testid="nda-history">
+            {row.history.map((item, index) => (
+              <li key={`${item.at}-${index}`}>{item.status || "—"}{item.at ? ` · ${item.at.slice(0, 10)}` : ""}{item.note ? ` · ${item.note}` : ""}</li>
             ))}
-          </div>
-        ) : <p className="note">No Pipeline or Land row yet</p>}
-      </section>
-      <section className="nda-actions">
-        <h3>Change status</h3>
-        <label>
-          Status
-          <select className="secondary" aria-label="NDA status" value={status} onChange={(event) => setStatus(event.target.value)}>
-            {choices.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-        <label>
-          Waiting on
-          <input className="field" aria-label="Waiting on" value={court} onChange={(event) => setCourt(event.target.value)} maxLength={80} />
-        </label>
-        <label>
-          Note
-          <textarea className="field" aria-label="Status note" required value={note} onChange={(event) => setNote(event.target.value)} maxLength={400} rows={3} />
-        </label>
-        <button type="button" className="paper-btn" disabled={pending || !note.trim()} onClick={() => void save({ action: "status", status, waiting_on: court, note })}>Save status</button>
-        <h3>Assign owner</h3>
-        <label>
-          Owner
-          <select className="secondary" aria-label="NDA owner" value={owner} onChange={(event) => setOwner(event.target.value)}>
-            <option value="">Unassigned</option>
-            {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-          </select>
-        </label>
-        <button type="button" className="paper-btn" disabled={pending || !owner} onClick={() => void save({ action: "assign", owner })}>Assign owner</button>
-        <h3>Next step</h3>
-        <label>
-          Next step
-          <input className="field" aria-label="Next step" value={nextStep} onChange={(event) => setNextStep(event.target.value)} maxLength={400} />
-        </label>
-        <button type="button" className="paper-btn" disabled={pending || !nextStep.trim()} onClick={() => void save({ action: "next_step", next_step: nextStep })}>Save next step</button>
-        {error ? <p className="note" role="alert">{error}</p> : null}
-      </section>
-      <section>
-        <h3>Email</h3>
-        {sites.length ? sites.slice(0, 4).map((id) => (
-          <div key={id}>
-            <button type="button" className="text-link" onClick={() => onOpenSite(id)}>{id}</button>
-            <Timeline recordId={id} />
-          </div>
-        )) : <p className="note">No linked mail until a site is covered.</p>}
-      </section>
-      <section data-testid="nda-discussion">
-        <h3>Discussion</h3>
-        <CommentThread siteId={row.nda_id} anchor={ndaAnchor(row.nda_id)} variant="inline" source="NDA" />
-      </section>
-      <section>
-        <h3>Follow-up</h3>
-        <button type="button" className="paper-btn" data-testid="nda-draft" onClick={() => setDraft(brokerFollowUp(row))}>Draft follow-up</button>
-        {draft ? (
-          <>
-            <textarea className="field" aria-label="Follow-up draft" readOnly value={draft} rows={8} data-testid="nda-draft-text" />
-            <button
-              type="button"
-              className="paper-btn"
-              onClick={() => { void navigator.clipboard?.writeText(draft); }}
-            >
-              Copy draft
-            </button>
-          </>
-        ) : null}
-      </section>
+          </ol>
+          <button type="button" className="paper-btn" data-testid="nda-edit" onClick={() => setEditing((value) => !value)}>{editing ? "Close edit" : "Edit"}</button>
+          {editing ? (
+            <form className="nda-edit" data-testid="nda-edit-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+              <label>Stage<select className="secondary" aria-label="Stage" value={stage} onChange={(event) => setStage(event.target.value)}>{STAGES.map((item) => <option key={item} value={item}>{stageLabel(item)}</option>)}</select></label>
+              <label>Court<select className="secondary" aria-label="Court" value={court} onChange={(event) => setCourt(event.target.value)}>{COURTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+              <label>Owner<select className="secondary" aria-label="NDA owner" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="">Unassigned</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+              <label>Next step<input className="field" aria-label="Next step" value={nextStep} onChange={(event) => setNextStep(event.target.value)} /></label>
+              <label>Due<input className="field" aria-label="Next step due" type="date" value={due} onChange={(event) => setDue(event.target.value)} /></label>
+              <label>Document<input className="field" aria-label="Document link" value={documentUrl} onChange={(event) => setDocumentUrl(event.target.value)} /></label>
+              <label>Kind<select className="secondary" aria-label="Document kind" value={documentKind} onChange={(event) => setDocumentKind(event.target.value)}>{KINDS.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>Contact<input className="field" aria-label="Contact name" value={contactName} onChange={(event) => setContactName(event.target.value)} /></label>
+              <label>Email<input className="field" aria-label="Contact email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} /></label>
+              <label>Phone<input className="field" aria-label="Contact phone" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} /></label>
+              <label>Note<textarea className="field" aria-label="Status note" value={note} onChange={(event) => setNote(event.target.value)} rows={3} /></label>
+              <button type="submit" className="paper-btn" data-testid="nda-save" disabled={pending}>Save</button>
+            </form>
+          ) : null}
+          {error ? <p className="note" role="alert">{error}</p> : null}
+        </div>
+        <div>
+          <h3>Activity</h3>
+          {sites.length ? <Timeline recordId={sites[0]} /> : <p className="note" data-testid="nda-no-site">No site row. Threads stay on this NDA.</p>}
+          {row.gmail_thread_ids.length ? <p className="note">Threads: {row.gmail_thread_ids.join(", ")}</p> : null}
+          <section data-testid="nda-discussion">
+            <h3>Discussion</h3>
+            <CommentThread siteId={row.nda_id} anchor={ndaAnchor(row.nda_id)} variant="inline" source="NDA" />
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

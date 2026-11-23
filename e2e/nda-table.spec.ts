@@ -67,27 +67,16 @@ test("the phone NDA panel covers the site sheet", async ({ page }, info) => {
   await expect(page.getByTestId("nda-detail")).toHaveCount(0);
 });
 
-test("the NDA queue is a table on desktop and cards on a phone", async ({ page }, info) => {
+test("the NDA queue is a list and one click opens the dossier", async ({ page }, info) => {
+  if (info.project.name === "mobile") await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/?nda=1", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("nda-queue")).toBeVisible();
+  await page.getByRole("button", { name: "NDA actions" }).click();
   await expect(page.getByTestId("nda-export")).toBeVisible();
-  if (info.project.name === "mobile") {
-    await expect(page.getByTestId("nda-cards")).toBeVisible();
-    await page.getByTestId("nda-cards").locator("button").first().click();
-  } else {
-    await expect(page.getByRole("button", { name: "NDA id", exact: true })).toBeVisible();
-    const cell = page.getByRole("gridcell").filter({ hasText: /^NDA-/ }).first();
-    await expect(cell).toBeVisible();
-    await cell.click();
-  }
+  await page.getByTestId("nda-cards").locator("button").first().click();
   await expect(page.getByTestId("nda-detail")).toBeVisible();
   await expect(page.getByTestId("nda-history")).toContainText("On the register");
-  await page.getByTestId("nda-draft").click();
-  const draft = await page.getByTestId("nda-draft-text").inputValue();
-  expect(draft.toLowerCase()).not.toContain("charging");
-  expect(draft).not.toMatch(/\bAVs?\b/i);
-  await expect(page.getByRole("button", { name: "Copy draft" })).toBeVisible();
-  await expect(page.getByTestId("nda-draft-text")).not.toHaveValue(/Thank you/);
+  await expect(page.getByRole("button", { name: "Close NDA queue" })).toHaveCount(1);
 });
 
 test("the NDA detail stays within a phone width", async ({ page }, info) => {

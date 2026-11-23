@@ -46,8 +46,8 @@ test("a universe card embeds street view and can switch to the aerial", async ({
   });
   expect(heroFit?.covers).toBe(true);
   expect(heroFit?.wide).toBe(true);
-  expect(heroFit?.height ?? 0).toBeGreaterThan(phone ? 80 : 170);
-  expect(heroFit?.height ?? 0).toBeLessThan(phone ? 100 : 200);
+  expect(heroFit?.height ?? 0).toBeGreaterThan(phone ? 180 : 170);
+  expect(heroFit?.height ?? 0).toBeLessThan(phone ? 280 : 200);
   await page.getByRole("tab", { name: "Aerial" }).click();
   await expect(frame).toHaveCount(0);
   const aerial = page.getByTestId("aerial-thumb");

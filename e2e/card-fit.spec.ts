@@ -35,6 +35,14 @@ test("number values stay whole in the drawer and on a phone", async ({ page }) =
     return "";
   });
   expect(covered).toBe("");
+  const hero = await page.locator("aside.drawer .hero-frame").evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const tabs = node.parentElement?.querySelector(".hero-tabs")?.getBoundingClientRect();
+    const overlap = tabs ? Math.min(box.bottom, tabs.bottom) - Math.max(box.top, tabs.top) : 0;
+    return { height: box.height, overlap };
+  });
+  expect(hero.height).toBeGreaterThan(180);
+  expect(hero.overlap).toBeLessThanOrEqual(1);
   await page.getByTestId("card-numbers").scrollIntoViewIfNeeded();
   expect(await brokenValues(page)).toEqual([]);
 });

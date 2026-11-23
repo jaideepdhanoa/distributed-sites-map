@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
 
 test("desktop list fills the width and hides measure", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop list");
@@ -48,31 +49,38 @@ test("unknown or zero open land says it is not on file", async ({ page }, info) 
 
 test("phone list is one toolbar row of cards and hides search this area", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone list");
-  await page.setViewportSize({ width: 380, height: 800 });
+  await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=phone-cards]");
   await expect(page.getByTestId("search-area")).toHaveCount(0);
   const fit = await page.evaluate(() => {
     const bar = document.querySelector(".pipeline-list .list-bar");
     const card = document.querySelector("[data-testid=phone-cards] button.list-row");
-    if (!bar || !card) return { missing: true, tall: false, pieces: false, scroll: false };
-    const box = bar.getBoundingClientRect();
+    const count = bar?.querySelector("p");
+    const sort = bar?.querySelector("[data-testid=sort-control]");
+    if (!bar || !card || !count || !sort) return { missing: true, pieces: false, scroll: false, overlap: false, stacked: false, clipped: false };
+    const countBox = count.getBoundingClientRect();
+    const sortBox = sort.getBoundingClientRect();
+    const overlapX = Math.min(countBox.right, sortBox.right) - Math.max(countBox.left, sortBox.left);
+    const overlapY = Math.min(countBox.bottom, sortBox.bottom) - Math.max(countBox.top, sortBox.top);
     const meta = card.querySelector(".phone-card-meta");
-    const mids = [...bar.children].filter((el) => el.getBoundingClientRect().width > 0).map((el) => {
-      const box = el.getBoundingClientRect();
-      return box.top + box.height / 2;
-    });
     return {
       missing: false,
-      split: mids.length > 0 && Math.max(...mids) - Math.min(...mids) > 12,
       pieces: Boolean(card.querySelector(".phone-card-name") && card.querySelector(".phone-card-stage") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
-      scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth > 1,
+      scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth > 1 || bar.scrollWidth - bar.clientWidth > 1,
+      overlap: overlapX > 1 && overlapY > 1,
+      stacked: countBox.bottom <= sortBox.top + 1,
+      clipped: count.scrollWidth > count.clientWidth + 1,
     };
   });
   expect(fit.missing).toBe(false);
-  expect(fit.split).toBe(false);
+  expect(fit.overlap).toBe(false);
+  expect(fit.stacked).toBe(true);
+  expect(fit.clipped).toBe(false);
   expect(fit.pieces).toBe(true);
   expect(fit.scroll).toBe(false);
+  fs.mkdirSync("review-shots", { recursive: true });
+  await page.locator(".pipeline-list .list-bar").screenshot({ path: "review-shots/phone-list-toolbar.png" });
   await page.locator("[data-testid=phone-cards] button.list-row").first().click();
   await expect(page).toHaveURL(/[?&]site=/);
 });

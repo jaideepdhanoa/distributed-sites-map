@@ -10,10 +10,24 @@ import { memorySql } from "../helpers/sql";
 
 const contributor: Actor = { id: "cindel", kind: "human", role: "contributor" };
 
-test("an aerial tile uses the map's imagery service and a street link is only a link", () => {
+test("an aerial image is centered on the site and a street link is only a link", () => {
   const tile = aerialTile(36.17, -115.14);
   assert.ok(tile);
-  assert.match(tile.url, /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/17\/\d+\/\d+$/);
+  const url = new URL(tile.url);
+  assert.equal(url.origin + url.pathname, "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export");
+  assert.equal(url.searchParams.get("size"), "640,320");
+  assert.equal(url.searchParams.get("f"), "image");
+  assert.equal(tile.width / tile.height, 2);
+  const box = (url.searchParams.get("bbox") || "").split(",").map(Number);
+  assert.equal(box.length, 4);
+  const midX = (box[0] + box[2]) / 2;
+  const midY = (box[1] + box[3]) / 2;
+  const earth = 20037508.342789244;
+  const expectedX = (-115.14 * earth) / 180;
+  const rad = (36.17 * Math.PI) / 180;
+  const expectedY = Math.log(Math.tan(Math.PI / 4 + rad / 2)) * (earth / Math.PI);
+  assert.ok(Math.abs(midX - expectedX) < 0.02);
+  assert.ok(Math.abs(midY - expectedY) < 0.02);
   assert.equal(aerialTile(null, null), null);
   const href = streetViewHref(36.17, -115.14);
   assert.equal(href, "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=36.17,-115.14");

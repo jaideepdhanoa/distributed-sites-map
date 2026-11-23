@@ -1,34 +1,37 @@
-/** The same Esri World Imagery tiles the map already requests. No extra service. */
-const TILE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
+/** The same Esri World Imagery service the map already uses. One image, sized to the card. */
+const EXPORT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export";
+const EARTH = 20037508.342789244;
+const FRAME_WIDTH = 640;
+const FRAME_HEIGHT = 320;
 
-export type AerialTile = {
+export type AerialFrame = {
   url: string;
-  left: number;
-  top: number;
+  width: number;
+  height: number;
 };
 
 function finite(lat?: number | null, lng?: number | null): boolean {
   return lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
 }
 
-/** One satellite tile, shifted so the site sits in the middle of the crop. */
-export function aerialTile(lat?: number | null, lng?: number | null, zoom = 17): AerialTile | null {
+function mercator(lat: number, lng: number) {
+  const x = (lng * EARTH) / 180;
+  const rad = (lat * Math.PI) / 180;
+  const y = Math.log(Math.tan(Math.PI / 4 + rad / 2)) * (EARTH / Math.PI);
+  return { x, y };
+}
+
+/** One satellite image centered on the site, matching the card frame. */
+export function aerialTile(lat?: number | null, lng?: number | null, zoom = 17): AerialFrame | null {
   if (!finite(lat, lng)) return null;
-  const size = 256;
-  const n = 2 ** zoom;
-  const xFloat = ((lng as number) + 180) / 360 * n;
-  const latRad = (lat as number) * Math.PI / 180;
-  const yFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-  if (!Number.isFinite(xFloat) || !Number.isFinite(yFloat)) return null;
-  const x = Math.floor(xFloat);
-  const y = Math.floor(yFloat);
-  const cropW = 320;
-  const cropH = 160;
-  return {
-    url: `${TILE}/${zoom}/${y}/${x}`,
-    left: cropW / 2 - (xFloat - x) * size,
-    top: cropH / 2 - (yFloat - y) * size,
-  };
+  const point = mercator(lat as number, lng as number);
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  const metersPerPixel = (2 * EARTH) / (256 * 2 ** zoom);
+  const halfW = (FRAME_WIDTH / 2) * metersPerPixel;
+  const halfH = (FRAME_HEIGHT / 2) * metersPerPixel;
+  const bbox = [point.x - halfW, point.y - halfH, point.x + halfW, point.y + halfH].map((value) => value.toFixed(2)).join(",");
+  const url = `${EXPORT}?bbox=${bbox}&bboxSR=3857&imageSR=3857&size=${FRAME_WIDTH},${FRAME_HEIGHT}&format=jpg&f=image`;
+  return { url, width: FRAME_WIDTH, height: FRAME_HEIGHT };
 }
 
 /** A maps link only. Nothing here requests or stores a Street View image. */

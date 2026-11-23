@@ -182,6 +182,41 @@ export default function CommentThread({
     return [note, ...replies];
   }).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   const latest = flat.slice(-2);
+  const composer = writable ? (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save({ expectedVersion: 0, anchor, body, tag: draftTag, mentions: mentions.map((item) => item.id) }).then((ok) => {
+          if (!ok) return;
+          setBody("");
+          setMentions([]);
+          setDraftTag("investigate");
+        });
+      }}
+    >
+      <MentionField label="" placeholder="Comment or @mention…" value={body} onChange={setBody} mentions={mentions} onMentions={setMentions} accounts={accounts} testId="comment-body" rows={compact ? 2 : 3} maxLength={2000} />
+      <p className="hint">Type @ to mention someone.</p>
+      {compact ? null : (
+        <div className="act-row" role="group" aria-label="Tag" data-testid="comment-tags">
+          {COMMENT_TAGS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={draftTag === item.id ? "chip on" : "chip"}
+              aria-pressed={draftTag === item.id}
+              disabled={pending}
+              onClick={() => setDraftTag(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="act-row">
+        <button type="submit" className="menu-item" disabled={pending}>Comment</button>
+      </div>
+    </form>
+  ) : <p className="note">Notes are read only for this login.</p>;
   if (compact) {
     return (
       <div className="act-threads" data-testid="comment-threads">
@@ -192,6 +227,7 @@ export default function CommentThread({
             {writable ? <button type="button" className="menu-item" onClick={() => setReplyFor(note.parentId || note.id)}>Reply</button> : null}
           </article>
         )) : <p className="note">No comments yet.</p>}
+        {composer}
         {replyFor ? (
           <form
             onSubmit={(event) => {
@@ -279,39 +315,7 @@ export default function CommentThread({
           </article>
         );
       })}
-      {writable ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save({ expectedVersion: 0, anchor, body, tag: draftTag, mentions: mentions.map((item) => item.id) }).then((ok) => {
-              if (!ok) return;
-              setBody("");
-              setMentions([]);
-              setDraftTag("investigate");
-            });
-          }}
-        >
-          <MentionField label="" placeholder="Comment or @mention…" value={body} onChange={setBody} mentions={mentions} onMentions={setMentions} accounts={accounts} testId="comment-body" rows={3} maxLength={2000} />
-          <p className="hint">Type @ to mention someone.</p>
-          <div className="act-row" role="group" aria-label="Tag" data-testid="comment-tags">
-            {COMMENT_TAGS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={draftTag === item.id ? "chip on" : "chip"}
-                aria-pressed={draftTag === item.id}
-                disabled={pending}
-                onClick={() => setDraftTag(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="act-row">
-            <button type="submit" className="menu-item" disabled={pending}>Comment</button>
-          </div>
-        </form>
-      ) : <p className="note">Notes are read only for this login.</p>}
+      {composer}
       {error ? <p className="note" role="alert">{error}</p> : null}
     </div>
   );

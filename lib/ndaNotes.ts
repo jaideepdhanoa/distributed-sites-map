@@ -25,12 +25,17 @@ function parenDepth(text: string, index: number): number {
   return depth;
 }
 
-/** A date starts an entry only at the start, or after a sentence end, semicolon, or newline. */
+/** A date starts an entry at the start of the text or after a sentence end, semicolon, or newline. */
 function boundaryBefore(text: string, index: number): boolean {
   const before = text.slice(0, index).replace(/[ \t]+$/g, "");
   if (!before) return true;
   const last = before[before.length - 1];
   return last === "\n" || last === ";" || last === "." || last === "!" || last === "?";
+}
+
+function lineStart(text: string, index: number): boolean {
+  const before = text.slice(0, index).replace(/[ \t]+$/g, "");
+  return !before || before.endsWith("\n");
 }
 
 /** A colon, or a dash with space on both sides. A glued range such as Oct 29-30 is not a split. */
@@ -54,10 +59,20 @@ function dateStamp(date: string, yearFallback: number): number {
   return year * 10000 + month * 100 + day;
 }
 
+function clockAfter(text: string, index: number): number {
+  const match = /^,\s*(\d{1,2}):(\d{2})/.exec(text.slice(index));
+  if (!match) return 0;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return 0;
+  return hour * 100 + minute;
+}
+
 /**
  * Dated register notes, newest first.
- * A date splits an entry only when it starts the text or follows a sentence
- * end, semicolon, or newline, and is then followed by ":" or a spaced dash.
+ * A date splits an entry when it starts a line, or when it follows a sentence
+ * end or semicolon and is then followed by ":" or a spaced dash.
+ * A line that starts "Nov 18, 2026, 17:26 PT" is its own entry.
  * Dates inside parentheses or mid-sentence stay in the paragraph. With no
  * confident split the text is returned unchanged, including its line breaks.
  */
@@ -70,8 +85,9 @@ export function noteEntries(notes: string): string[] {
   while ((match = re.exec(text))) {
     const index = match.index;
     if (parenDepth(text, index) > 0) continue;
-    if (!boundaryBefore(text, index)) continue;
-    if (!separatorAfter(text, index + match[0].length)) continue;
+    const atLine = lineStart(text, index);
+    if (!atLine && !boundaryBefore(text, index)) continue;
+    if (!atLine && !separatorAfter(text, index + match[0].length)) continue;
     starts.push({ index, date: match[0] });
   }
   if (!starts.length) return [text];
@@ -82,7 +98,9 @@ export function noteEntries(notes: string): string[] {
   for (let i = 0; i < starts.length; i += 1) {
     const end = i + 1 < starts.length ? starts[i + 1].index : text.length;
     const body = text.slice(starts[i].index, end).trim();
-    if (body) parts.push({ text: body, stamp: dateStamp(starts[i].date, year) });
+    if (!body) continue;
+    const stamp = dateStamp(starts[i].date, year) * 10000 + clockAfter(text, starts[i].index + starts[i].date.length);
+    parts.push({ text: body, stamp });
   }
   return parts.sort((left, right) => right.stamp - left.stamp).map((part) => part.text);
 }

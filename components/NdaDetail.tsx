@@ -58,6 +58,7 @@ function NdaMail({ ndaId, sites, onEmail, onBusy }: { ndaId: string; sites: stri
   const [rows, setRows] = useState<Mail[]>([]);
   const [pending, setPending] = useState(true);
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   useEffect(() => {
     let cancel = false;
     setPending(true);
@@ -112,7 +113,8 @@ function NdaMail({ ndaId, sites, onEmail, onBusy }: { ndaId: string; sites: stri
                 <span>{item.at}</span>
                 {item.person ? <span>{item.person}</span> : null}
               </p>
-              {item.summary ? <p className="note">{item.summary}</p> : null}
+              {item.summary ? <p className={expanded[item.id] ? "nda-summary open" : "nda-summary"}>{item.summary}</p> : null}
+              {item.summary.length > 90 ? <button type="button" className="text-link" onClick={() => setExpanded((value) => ({ ...value, [item.id]: !value[item.id] }))}>{expanded[item.id] ? "Show less" : "Show all"}</button> : null}
               {item.href ? <a className="text-link" href={item.href} target="_blank" rel="noopener noreferrer">Open in Gmail ↗</a> : null}
             </div>
           ))}
@@ -184,6 +186,14 @@ export default function NdaDetail({
   const [mailBusy, setMailBusy] = useState(true);
   const overdue = Boolean(row.next_step_due && row.next_step_due < today);
   const stageChanged = stage !== (row.stage || "");
+
+  useEffect(() => {
+    if (!editing) return;
+    const sheet = document.querySelector(".nda-edit-sheet");
+    const form = document.getElementById("nda-edit-fields");
+    if (sheet instanceof HTMLElement) sheet.scrollTop = 0;
+    if (form) form.scrollTop = 0;
+  }, [editing]);
 
   useEffect(() => {
     let cancel = false;
@@ -270,7 +280,7 @@ export default function NdaDetail({
             <span>Scope</span><div>{scopeText}</div>
             <span>Stage</span><div>{stageLabel(row.stage) || "—"}{row.nda_status && row.nda_status !== stageLabel(row.stage) ? ` · Register: ${row.nda_status}` : ""}</div>
             <span>Court</span><div><span className={`court-pill ${row.court === "us" ? "us" : "them"}`}>{row.court_pill || "No court"}</span>{row.court_since ? ` · since ${row.court_since.slice(0, 10)}` : ""}</div>
-            <span>Owner</span><div>{row.owner || "Unassigned"}</div>
+            <span>Owner</span><div>{row.owner_name || row.owner || "Unassigned"}</div>
             <span>Next step</span><div className={overdue ? "nda-overdue" : ""}>{row.next_step || "No next step"}{row.next_step_due ? ` · ${row.next_step_due}` : ""}</div>
             <span>Document</span><div className={row.document_url ? "" : "note"}>{row.document_url ? <a className="text-link" href={row.document_url} target="_blank" rel="noopener noreferrer">{row.document_kind || "Open document"}</a> : "No document yet"}</div>
           </div>

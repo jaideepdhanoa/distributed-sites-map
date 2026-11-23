@@ -1599,14 +1599,7 @@ export default function Explorer() {
       </main>
     );
   }
-  if (!data) {
-    return (
-      <main className="empty">
-        <Wordmark level="p" />
-        <AppLoading />
-      </main>
-    );
-  }
+  if (!data) return <AppLoading />;
 
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const home = marketFocus(allCities ? "all" : city);

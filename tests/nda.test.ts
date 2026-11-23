@@ -268,6 +268,14 @@ test("register notes split only when a date starts an entry", () => {
   assert.deepEqual(noteEntries(kept), [kept]);
   const range = "Forms were agreed Oct 29-30, 2026 and nothing else was logged.";
   assert.deepEqual(noteEntries(range), [range]);
+  const stamped = "Nov 20: Sent the form.\n\nNov 18, 2026, 17:26 PT Called back.\nNov 18, 2026, 09:00 PT Opened the file.";
+  const times = noteEntries(stamped);
+  assert.deepEqual(times.map((entry) => entry.slice(0, 22)), [
+    "Nov 20: Sent the form.",
+    "Nov 18, 2026, 17:26 PT",
+    "Nov 18, 2026, 09:00 PT",
+  ]);
+  assert.equal(times.every((entry) => !entry.startsWith("\n") && !entry.endsWith("\n")), true);
 });
 
 function commsRow(partial: Partial<CommsRecord>): CommsRecord {
@@ -324,6 +332,12 @@ test("NDA activity dedupes, groups a thread, and reads a matching contact email"
   });
   assert.equal(byFirm.items.length, 1);
   assert.equal(byFirm.items[0]?.at, "Nov 2, 8:15 AM");
+  const noSite = ndaActivity([
+    commsRow({ comms_id: "CM-905", site_ids: "", firm: "Sample", person: "Sample Person", summary: "Wrote from person@example.com.", subject: "Hello", at: "2026-11-09 15:04" }),
+  ], { ...query, sites: [], threads: [], ndaId: "NDA-902", firm: "Sample Firm" });
+  assert.equal(noSite.items.length, 1);
+  assert.equal(noSite.contact_email, "person@example.com");
+  assert.equal(noSite.items[0]?.summary.includes("…"), false);
 });
 
 test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {

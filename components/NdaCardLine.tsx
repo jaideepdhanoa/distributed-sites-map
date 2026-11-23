@@ -18,9 +18,9 @@ export default function NdaCardLine({ ndaId, mirror }: { ndaId: string; mirror?:
     let cancel = false;
     fetch("/api/data/nda").then(async (response) => {
       if (!response.ok || cancel) return;
-      const body = await response.json() as { queue?: { nda_id?: string; owner?: string; next_step?: string; court_pill?: string }[] };
+      const body = await response.json() as { queue?: { nda_id?: string; owner?: string; owner_name?: string; next_step?: string; court_pill?: string }[] };
       const row = (body.queue || []).find((item) => item.nda_id === ndaId);
-      if (!cancel && row) setExtra({ owner: row.owner || "", next: row.next_step || "", pill: row.court_pill || "" });
+      if (!cancel && row) setExtra({ owner: row.owner_name || row.owner || "", next: row.next_step || "", pill: row.court_pill || "" });
     }).catch(() => undefined);
     return () => {
       cancel = true;

@@ -27,9 +27,18 @@ function todayIso(): string {
 function coveredLabel(row: NdaQueueItem, names: Record<string, string>): string {
   const covered = coveredSites(row.site_ids || "");
   if (covered.ids.length > 2) return `${covered.ids.length} sites`;
-  if (covered.ids.length) return covered.ids.map((id) => names[id] || "Covered site").join(" · ");
+  if (covered.ids.length) return [...new Set(covered.ids.map((id) => names[id] || "Covered site"))].join(" · ");
   const refs = row.covered_refs || [];
   return covered.note || refs.find((item) => !/^(?:PIPE|LAND|L)-/.test(item)) || row.scope || "No covered listing";
+}
+
+function queueLine(row: NdaQueueItem, names: Record<string, string>): string {
+  const contact = row.counterparty_person || row.contact_name || "No contact";
+  const stage = stageLabel(row.stage) || row.nda_status || "—";
+  const scope = coveredLabel(row, names);
+  const next = row.next_step || "";
+  const distinct = scope && scope !== contact && scope !== stage && scope !== next && scope !== "No covered listing";
+  return [contact, stage, distinct ? scope : ""].filter(Boolean).join(" · ");
 }
 
 function CourtPill({ court, label }: { court: string; label: string }) {
@@ -203,8 +212,8 @@ export default function NdaQueue({
                     <strong>{row.counterparty_firm || row.nda_id}</strong>
                     <CourtPill court={row.court} label={row.court_pill} />
                   </span>
-                  <span>{[row.counterparty_person || row.contact_name || "No contact", stageLabel(row.stage) || row.nda_status || "—"].join(" · ")}</span>
-                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""} · ${coveredLabel(row, names)}`}</span>
+                  <span>{queueLine(row, names)}</span>
+                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""}`}</span>
                 </button>
               </li>
             );

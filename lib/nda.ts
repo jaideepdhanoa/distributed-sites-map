@@ -328,6 +328,7 @@ export type NdaStateRow = {
 
 export type NdaQueueItem = NdaAgreement & {
   owner: string;
+  owner_name?: string;
   next_step: string;
   last_action: string;
   version: number;

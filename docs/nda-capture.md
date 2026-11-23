@@ -77,6 +77,32 @@ Days in court are computed from `court_since`. Do not copy a day count from a sh
 }
 ```
 
+## Clearing a field
+
+Leave a field out of the payload to keep the value already stored. To blank a dossier field, put it in the payload as `null`. A text field also clears with `""`. `gmail_thread_ids` and `covered_refs` clear with `[]` or `null`. That applies to `document_url`, `document_kind`, `contact_name`, `contact_email`, `contact_phone`, `next_step`, `next_step_due`, `court`, `court_detail`, `court_since`, `owner`, `waiting_on`, `status`, and those two lists.
+
+`stage` cannot be cleared. `null` or `""` for `stage` is rejected. A clear uses the same `source`, `payload.source_ref`, and `payload.at` as any other write. It bumps the version and records a history line such as `Cleared document link`. The dossier and its activity show that line.
+
+```json
+{
+  "changes": [
+    {
+      "entity_type": "nda",
+      "site_id": "NDA-901",
+      "expected_version": 1,
+      "source": "email",
+      "payload": {
+        "action": "edit",
+        "document_url": null,
+        "gmail_thread_ids": [],
+        "source_ref": "sample-message",
+        "at": "2026-11-23T18:04:00-08:00"
+      }
+    }
+  ]
+}
+```
+
 A comment on that agreement is a separate change with `entity_type` `comment`, `site_id` `NDA-901`, and `anchor.type` `nda`.
 
 Read the queue back with `GET /api/data/nda` and the same bearer token. The register text stays visible beside the suggested stage. When the register's last action is older than the saved record, the dossier shows a conflict note and does not hide either date.

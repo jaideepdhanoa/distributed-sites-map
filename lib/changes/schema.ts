@@ -249,6 +249,8 @@ export type NdaPayload = {
   note: string;
   source_ref: string;
   at: string;
+  /** Dossier fields this change sets to blank. Omitted when nothing is cleared. */
+  cleared?: string[];
 };
 
 export type ParsedChange = {
@@ -1093,25 +1095,44 @@ const NDA_COURTS = new Set(["us", "them", "seller", "none"]);
 const NDA_DOC_KINDS = new Set(["docusign", "clm", "drive", "email", "other"]);
 const NDA_AGENTS = new Set(["muse", "indie"]);
 
-function ndaText(raw: Record<string, unknown>, key: string, index: number, max: number, skipClean = false): string {
-  if (!(key in raw) || raw[key] == null) return "";
+type NdaPresence = "absent" | "clear" | "set";
+
+function ndaString(
+  raw: Record<string, unknown>,
+  key: string,
+  index: number,
+  max: number,
+  skipClean = false,
+): { value: string; presence: NdaPresence } {
+  if (!(key in raw)) return { value: "", presence: "absent" };
+  if (raw[key] == null) return { value: "", presence: "clear" };
   if (typeof raw[key] !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
   const value = raw[key].trim();
   if (value.length > max) throw new InputError(`Change ${index + 1}: That field is too long.`, 400, key);
+  if (!value) return { value: "", presence: "clear" };
   if (!skipClean) cleanText(value);
-  return value;
+  return { value, presence: "set" };
 }
 
-function ndaList(raw: Record<string, unknown>, key: string, index: number): string[] {
-  if (!(key in raw) || raw[key] == null) return [];
+function ndaText(raw: Record<string, unknown>, key: string, index: number, max: number, skipClean = false): string {
+  return ndaString(raw, key, index, max, skipClean).value;
+}
+
+function ndaList(raw: Record<string, unknown>, key: string, index: number): { value: string[]; presence: NdaPresence } {
+  if (!(key in raw)) return { value: [], presence: "absent" };
+  if (raw[key] == null) return { value: [], presence: "clear" };
   if (!Array.isArray(raw[key])) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
-  return raw[key].map((item) => {
-    if (typeof item !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
-    const value = item.trim();
-    if (!value || value.length > 80) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
-    cleanText(value);
-    return value;
-  });
+  if (raw[key].length === 0) return { value: [], presence: "clear" };
+  return {
+    value: raw[key].map((item) => {
+      if (typeof item !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+      const value = item.trim();
+      if (!value || value.length > 80) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+      cleanText(value);
+      return value;
+    }),
+    presence: "set",
+  };
 }
 
 function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
@@ -1135,23 +1156,55 @@ function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
   const zoned = parseZonedTimestamp(atRaw);
   if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`, 400, "at");
   const note = ndaText(raw, "note", index, 400);
-  const status = ndaText(raw, "status", index, 80);
-  const waiting = ndaText(raw, "waiting_on", index, 80);
-  const stage = ndaText(raw, "stage", index, 40);
-  const court = ndaText(raw, "court", index, 20);
-  const courtDetail = ndaText(raw, "court_detail", index, 80);
-  const courtSinceRaw = ndaText(raw, "court_since", index, 40);
-  const owner = ndaText(raw, "owner", index, 80);
-  const next = ndaText(raw, "next_step", index, 400);
-  const due = ndaText(raw, "next_step_due", index, 10);
-  const documentUrl = ndaText(raw, "document_url", index, 500);
-  const documentKind = ndaText(raw, "document_kind", index, 20);
-  const contactName = ndaText(raw, "contact_name", index, 80);
-  const contactEmail = ndaText(raw, "contact_email", index, 120);
-  const contactPhone = ndaText(raw, "contact_phone", index, 40, true);
+  const statusField = ndaString(raw, "status", index, 80);
+  const waitingField = ndaString(raw, "waiting_on", index, 80);
+  const stageField = ndaString(raw, "stage", index, 40);
+  if (stageField.presence === "clear") throw new InputError(`Change ${index + 1}: Stage cannot be cleared.`, 400, "stage");
+  const courtField = ndaString(raw, "court", index, 20);
+  const courtDetailField = ndaString(raw, "court_detail", index, 80);
+  const courtSinceField = ndaString(raw, "court_since", index, 40);
+  const ownerField = ndaString(raw, "owner", index, 80);
+  const nextField = ndaString(raw, "next_step", index, 400);
+  const dueField = ndaString(raw, "next_step_due", index, 10);
+  const documentUrlField = ndaString(raw, "document_url", index, 500);
+  const documentKindField = ndaString(raw, "document_kind", index, 20);
+  const contactNameField = ndaString(raw, "contact_name", index, 80);
+  const contactEmailField = ndaString(raw, "contact_email", index, 120);
+  const contactPhoneField = ndaString(raw, "contact_phone", index, 40, true);
   const sourceRef = ndaText(raw, "source_ref", index, 200);
   const threads = ndaList(raw, "gmail_thread_ids", index);
   const covered = ndaList(raw, "covered_refs", index);
+  const status = statusField.value;
+  const waiting = waitingField.value;
+  const stage = stageField.value;
+  const court = courtField.value;
+  const courtDetail = courtDetailField.value;
+  const courtSinceRaw = courtSinceField.value;
+  const owner = ownerField.value;
+  const next = nextField.value;
+  const due = dueField.value;
+  const documentUrl = documentUrlField.value;
+  const documentKind = documentKindField.value;
+  const contactName = contactNameField.value;
+  const contactEmail = contactEmailField.value;
+  const contactPhone = contactPhoneField.value;
+  const cleared = [
+    ["status", statusField.presence],
+    ["waiting_on", waitingField.presence],
+    ["court", courtField.presence],
+    ["court_detail", courtDetailField.presence],
+    ["court_since", courtSinceField.presence],
+    ["owner", ownerField.presence],
+    ["next_step", nextField.presence],
+    ["next_step_due", dueField.presence],
+    ["document_url", documentUrlField.presence],
+    ["document_kind", documentKindField.presence],
+    ["contact_name", contactNameField.presence],
+    ["contact_email", contactEmailField.presence],
+    ["contact_phone", contactPhoneField.presence],
+    ["gmail_thread_ids", threads.presence],
+    ["covered_refs", covered.presence],
+  ].flatMap(([key, presence]) => (presence === "clear" ? [key] : []));
   if (stage && !NDA_STAGES.has(stage)) throw new InputError(`Change ${index + 1}: That stage is not accepted.`, 400, "stage");
   if (court && !NDA_COURTS.has(court)) throw new InputError(`Change ${index + 1}: That court is not accepted.`, 400, "court");
   if (documentKind && !NDA_DOC_KINDS.has(documentKind)) throw new InputError(`Change ${index + 1}: That document kind is not accepted.`, 400, "document_kind");
@@ -1183,11 +1236,12 @@ function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
     contact_name: contactName,
     contact_email: contactEmail,
     contact_phone: contactPhone,
-    gmail_thread_ids: threads,
-    covered_refs: covered,
+    gmail_thread_ids: threads.value,
+    covered_refs: covered.value,
     note,
     source_ref: sourceRef,
     at: zoned.iso,
+    ...(cleared.length ? { cleared } : {}),
   };
 }
 

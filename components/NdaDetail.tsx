@@ -206,22 +206,29 @@ export default function NdaDetail({
     setPending(true);
     setError("");
     try {
-      await postNda(row, {
+      const payload: Record<string, unknown> = {
         action: "edit",
         stage,
         status: stageLabel(stage),
         court,
-        owner,
-        next_step: nextStep,
-        next_step_due: due,
-        document_url: documentUrl,
-        document_kind: documentKind,
-        contact_name: contactName,
-        contact_email: contactEmail,
-        contact_phone: contactPhone,
         note,
         source_ref: "nda-dossier",
-      });
+      };
+      const put = (key: string, value: string, previous: string) => {
+        const next = value.trim();
+        const prior = previous.trim();
+        if (!next && !prior) return;
+        payload[key] = next;
+      };
+      put("owner", owner, row.owner || "");
+      put("next_step", nextStep, row.next_step || "");
+      put("next_step_due", due, row.next_step_due || "");
+      put("document_url", documentUrl, row.document_url || "");
+      put("document_kind", documentKind, row.document_kind || "");
+      put("contact_name", contactName, row.contact_name || "");
+      put("contact_email", contactEmail, row.contact_email || "");
+      put("contact_phone", contactPhone, row.contact_phone || "");
+      await postNda(row, payload);
       setEditing(false);
       setNote("");
       onSaved();
@@ -237,6 +244,7 @@ export default function NdaDetail({
   const email = row.contact_email || mailEmail;
   const notes = noteEntries(row.notes || "");
   const shownNotes = notesOpen ? notes : notes.slice(0, 4);
+  const clears = row.history.filter((item) => item.status.startsWith("Cleared "));
   return (
     <div className={`nda-detail${mailBusy ? " busy" : ""}`} data-testid="nda-detail" aria-busy={mailBusy}>
       <div className="layers-bar nda-bar">
@@ -297,6 +305,13 @@ export default function NdaDetail({
         </div>
         <div>
           <h3>Activity</h3>
+          {clears.length ? (
+            <ol className="nda-history" data-testid="nda-clears">
+              {clears.map((item, index) => (
+                <li key={`${item.at}-clear-${index}`}>{item.status}{item.at ? ` · ${item.at.slice(0, 10)}` : ""}{item.note ? ` · ${item.note}` : ""}</li>
+              ))}
+            </ol>
+          ) : null}
           <NdaMail ndaId={row.nda_id} sites={sites} onEmail={setMailEmail} onBusy={setMailBusy} />
         </div>
       </div>

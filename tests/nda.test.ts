@@ -7,6 +7,7 @@ import {
   blockerSentenceForDeal,
   coveredSites,
   courtDayCount,
+  waitingOnThemLabel,
   discussionSite,
   gateLabel,
   cardNdaLabel,
@@ -90,7 +91,7 @@ test("a linked chip uses the site mirror, including the Miracle copy", () => {
   const miracle = fixture.sites["PIPE-LAS-0016"];
   assert.equal(fixture.source, "fixture");
   assert.equal(fixture.as_of, "2026-11-11");
-  assert.equal(ndaChip(miracle), "With counterparty legal · Them — legal · 13d open · 1d in court");
+  assert.equal(ndaChip(miracle), "With counterparty legal · Them — legal · 13d open · 1d waiting on them");
   assert.equal(ndaChip(fixture.sites["PIPE-LAS-0017"]), ndaChip(miracle));
   assert.equal(ndaChip(fixture.sites["LAND-LAS-0001"]), ndaChip(miracle));
   const live = snapshot.sites["PIPE-LAS-0016"];
@@ -99,8 +100,10 @@ test("a linked chip uses the site mirror, including the Miracle copy", () => {
   assert.equal(ndaChip(snapshot.sites["LAND-LAS-0001"]), liveChip);
   assert.equal(liveChip.includes(live.nda_status), true);
   if (live.nda_days_open != null) assert.equal(liveChip.includes(`${live.nda_days_open}d open`), true);
-  if (live.nda_days_in_court != null) assert.equal(liveChip.includes(`${live.nda_days_in_court}d in court`), true);
-  assert.equal(ndaChip({ nda_id: "NDA-006", nda_days_open: 10, nda_days_in_court: 2 }), "10d open · 2d in court");
+  if (live.nda_days_in_court != null) assert.equal(liveChip.includes(`${live.nda_days_in_court}d waiting on them`), true);
+  assert.equal(ndaChip({ nda_id: "NDA-006", nda_days_open: 10, nda_days_in_court: 2 }), "10d open · 2d waiting on them");
+  assert.equal(waitingOnThemLabel(2), "2d waiting on them");
+  assert.equal(waitingOnThemLabel(10 ** 12), `${10 ** 12}d with them`);
   assert.equal(ndaChip({ nda_id: "NDA-010", nda_status: "Broker asked — send our form" }), "Broker asked — send our form");
 });
 
@@ -247,5 +250,5 @@ test("the card hides a closed NDA and prefixes an open one for signed-in readers
   assert.equal(cardNdaLabel({ nda_status: "Not required" }, true), "");
   assert.equal(cardNdaLabel({ nda_id: "NDA-001", nda_status: "Executed" }, true), "");
   assert.equal(cardNdaLabel({ nda_id: "NDA-006", nda_status: "With counterparty legal", nda_days_open: 10, nda_days_in_court: 2 }, false), "");
-  assert.equal(cardNdaLabel({ nda_id: "NDA-006", nda_status: "With counterparty legal", nda_days_open: 10, nda_days_in_court: 2 }, true), "NDA: With counterparty legal · 10d open · 2d in court");
+  assert.equal(cardNdaLabel({ nda_id: "NDA-006", nda_status: "With counterparty legal", nda_days_open: 10, nda_days_in_court: 2 }, true), "NDA: With counterparty legal · 10d open · 2d waiting on them");
 });

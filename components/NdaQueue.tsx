@@ -32,7 +32,7 @@ function columns(): SheetColumn<NdaQueueItem>[] {
     { id: "status", label: "Status", text: (row) => row.nda_status || "—" },
     { id: "court", label: "Waiting on", text: (row) => queueCourt(row) },
     { id: "daysOpen", label: "Days open", text: (row) => dayCount(row.nda_days_open) == null ? "—" : String(dayCount(row.nda_days_open)), sortValue: (row) => dayCount(row.nda_days_open) },
-    { id: "daysCourt", label: "Days in court", text: (row) => courtDayCount(row.nda_days_in_court) == null ? "—" : String(courtDayCount(row.nda_days_in_court)), sortValue: (row) => courtDayCount(row.nda_days_in_court) },
+    { id: "daysCourt", label: "Days waiting on them", text: (row) => courtDayCount(row.nda_days_in_court) == null ? "—" : String(courtDayCount(row.nda_days_in_court)), sortValue: (row) => courtDayCount(row.nda_days_in_court) },
     { id: "last", label: "Last action", text: (row) => lastActionLine(row) },
     { id: "owner", label: "Owner", text: (row) => row.owner || "—" },
     { id: "next", label: "Next step", text: (row) => row.next_step || "—" },
@@ -182,7 +182,7 @@ export default function NdaQueue({
                 setLayout({ ...layout, sort: { id, desc: dir === "desc" }, touched: true });
               }}
             >
-              <option value="daysCourt:desc">Days in court</option>
+              <option value="daysCourt:desc">Days waiting on them</option>
               <option value="daysOpen:desc">Days open</option>
               <option value="id:asc">NDA id</option>
               <option value="status:asc">Status</option>

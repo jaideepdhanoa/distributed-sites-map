@@ -769,7 +769,10 @@ for (const size of [
     await page.getByTestId("nda-discussion").getByRole("button", { name: "Comment" }).click();
     await expect(page.getByTestId("nda-discussion")).toContainText(text);
     await page.getByTestId("nda-back").click();
-    await expect(page.getByTestId("nda-site-thread")).toContainText(text);
+    await page.getByTestId("panel-tab-activity").click();
+    const row = page.locator("[data-nda-comment]");
+    await expect(row).toContainText(text);
+    await expect(row.getByTestId("nda-activity-chip")).toHaveText(`on ${found.nda}`);
   });
 }
 

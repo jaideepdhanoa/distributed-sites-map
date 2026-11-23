@@ -245,6 +245,13 @@ test("a saved status sits on the register row and a closed one leaves the queue"
   assert.equal(blank.includes("Thank you"), false);
 });
 
+test("a register note supplies a contact email the overlay left blank", () => {
+  const row = agreement({ nda_id: "NDA-901", notes: "Nov 2 wrote person@example.com.", source: "fixture" });
+  const shown = presentQueue([row], [], [], "2026-11-23");
+  assert.equal(shown[0]?.contact_email, "person@example.com");
+  assert.equal(shown[0]?.contact_phone, "");
+});
+
 test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {
   assert.equal(cardNdaLabel({}, true), "");
   assert.equal(cardNdaLabel({ nda_status: "Not required" }, true), "");

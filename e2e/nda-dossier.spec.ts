@@ -67,3 +67,26 @@ test("a dossier without a site opens, and edit posts one change", async ({ page 
     await page.screenshot({ path: "review-shots/nda-dossier-desktop.png", fullPage: false });
   }
 });
+
+test("a queue row opens that dossier and the actions menu closes", async ({ page }) => {
+  const other = { ...row, nda_id: "NDA-903", counterparty_firm: "Other Firm", conflict: "", gmail_thread_ids: [] };
+  await page.route("**/api/data/nda", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [row, other] } }));
+  await page.route("**/api/actions/accounts", (route) => route.fulfill({ json: { accounts: [] } }));
+  await page.goto("/?nda=1", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("nda-cards")).toBeVisible();
+  await page.getByRole("button", { name: "NDA actions" }).click();
+  await expect(page.getByTestId("nda-export")).toBeVisible();
+  await page.getByRole("tab", { name: /All/ }).click();
+  await expect(page.getByTestId("nda-export")).toBeHidden();
+  await page.getByRole("button", { name: "NDA actions" }).click();
+  await expect(page.getByTestId("nda-export")).toBeVisible();
+  await page.getByTestId("nda-card-NDA-902").click();
+  await expect(page.getByTestId("nda-detail")).toBeVisible();
+  await expect(page.getByTestId("nda-detail")).toContainText("Sample Firm");
+  await expect(page.getByTestId("nda-export")).toBeHidden();
+  await expect(page).toHaveURL(/nda=NDA-902/);
+  await page.getByTestId("nda-back").click();
+  await page.getByTestId("nda-card-NDA-903").click();
+  await expect(page.getByTestId("nda-detail")).toContainText("Other Firm");
+  await expect(page.getByTestId("nda-cards")).toBeHidden();
+});

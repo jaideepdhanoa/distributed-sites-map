@@ -418,6 +418,16 @@ export function courtPill(court: string, days: number | null): string {
   return "";
 }
 
+function addressIn(value: string): string {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0] : "";
+}
+
+function phoneIn(value: string): string {
+  const match = value.match(/(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}/);
+  return match ? match[0] : "";
+}
+
 function listOf(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((item) => text(item)).filter(Boolean);
   return [];
@@ -452,8 +462,8 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
     document_url: text(state?.document_url),
     document_kind: text(state?.document_kind),
     contact_name: text(state?.contact_name) || text(row.counterparty_person),
-    contact_email: text(state?.contact_email),
-    contact_phone: text(state?.contact_phone),
+    contact_email: text(state?.contact_email) || addressIn(`${row.notes || ""} ${row.source || ""}`),
+    contact_phone: text(state?.contact_phone) || phoneIn(`${row.notes || ""} ${row.source || ""}`),
     gmail_thread_ids: listOf(state?.gmail_thread_ids),
     covered_refs: listOf(state?.covered_refs),
     source_ref: text(state?.source_ref),

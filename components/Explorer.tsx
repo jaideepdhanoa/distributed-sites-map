@@ -2119,7 +2119,7 @@ export default function Explorer() {
           ) : null}
           {loopsAllowed ? (
             <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
-              NDAs {ndaOpenCount ?? ""}
+              NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
             </button>
           ) : null}
           <div className="user-menu only-desktop">
@@ -2452,7 +2452,7 @@ export default function Explorer() {
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
               {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount ?? ""}</button>
+                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
               ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">
@@ -2704,7 +2704,14 @@ export default function Explorer() {
         {ndaVisible ? (
           <NdaQueue
             openId={ndaId}
-            onOpen={choose}
+            names={Object.fromEntries([...dealRows.map((deal) => [deal.deal_id, deal.name || deal.address || ""]), ...sites.map((site) => [site.site_id, site.name || site.address || ""])])}
+            onOpen={(id) => {
+              const patch = selectionPatch(id);
+              const site = typeof patch.site === "string" && patch.site ? patch.site : id;
+              placedSite.current = site;
+              setSelected(site);
+              write({ ...patch, site, nda: null, ndafrom: ndaId || "1" }, true);
+            }}
             onPick={(id) => write({ nda: id || "1" })}
             onClose={() => write({ nda: null })}
             onBack={() => write(params.get("site") ? { nda: null } : { nda: "1" })}
@@ -2913,7 +2920,8 @@ export default function Explorer() {
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={() => choose(null)}
+            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
+            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             compared={compareIds.includes(selectedDeal.deal_id)}
@@ -2958,7 +2966,8 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={() => choose(null)}
+            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
+            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             onOpenNda={(id) => write({ nda: id })}

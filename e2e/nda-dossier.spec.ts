@@ -181,6 +181,61 @@ test("a saved contact beats a derived one and the court pill sits at the right",
   await expect(page.getByLabel("Contact phone")).toHaveValue("ext 4");
 });
 
+test("a signed-in dossier shows a saved contact and the clear in history", async ({ page }) => {
+  const saved = {
+    ...row,
+    nda_id: "NDA-012",
+    version: 3,
+    contact_email: "person@example.com",
+    contact_phone: "ext 4",
+    document_url: "",
+    document_kind: "",
+    history: [
+      { status: "Our form sent", note: "On the register", actor: "", at: "2026-11-01" },
+      { status: "Cleared document link and document kind", note: "The link was removed.", actor: "muse", at: "2026-11-22T18:00:00Z" },
+      { status: "Dossier updated", note: "Owner set.", actor: "indie", at: "2026-11-21T18:00:00Z" },
+      { status: "Our form sent", note: "Form went out.", actor: "muse", at: "2026-11-20T18:00:00Z" },
+    ],
+  };
+  await page.route("**/api/data/nda**", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [saved] } }));
+  await page.route("**/api/actions/accounts", (route) => route.fulfill({ json: { accounts: [] } }));
+  await page.route("**/api/actions/notes?**", (route) => route.fulfill({ json: { notes: [] } }));
+  await page.goto("/?nda=NDA-012", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("nda-email")).toHaveText("person@example.com");
+  await expect(page.getByTestId("nda-phone")).toHaveText("ext 4");
+  await expect(page.getByTestId("nda-document")).toContainText("No document yet");
+  await expect(page.getByTestId("nda-history")).toContainText("Cleared document link and document kind");
+  await expect(page.getByRole("button", { name: "Show all" })).toBeVisible();
+});
+
+test("a narrow header keeps NDAs and Ask in the menu and the dossier title on screen", async ({ page }) => {
+  await page.setViewportSize({ width: 427, height: 844 });
+  await page.route("**/api/data/nda**", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [row] } }));
+  await page.route("**/api/actions/accounts", (route) => route.fulfill({ json: { accounts: [] } }));
+  await page.route("**/api/actions/notes?**", (route) => route.fulfill({ json: { notes: [] } }));
+  await page.goto("/?nda=NDA-902", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("nda-detail")).toBeVisible();
+  const inside = await page.evaluate(() => {
+    const width = window.innerWidth;
+    const back = document.querySelector("[data-testid=nda-back]")?.getBoundingClientRect();
+    const title = document.querySelector(".nda-backline h2")?.getBoundingClientRect();
+    const fits = (box?: DOMRect) => Boolean(box && box.left >= 0 && box.right <= width + 1 && box.width > 8);
+    const barButtons = ["nda-queue-tab", "ask-open"].map((id) => {
+      const node = document.querySelector(`.top [data-testid=${id}]`);
+      if (!(node instanceof HTMLElement) || getComputedStyle(node).display === "none") return true;
+      const box = node.getBoundingClientRect();
+      return box.right <= width + 1 && box.left >= 0;
+    });
+    return { back: fits(back), title: fits(title), barButtons };
+  });
+  expect(inside.back).toBe(true);
+  expect(inside.title).toBe(true);
+  expect(inside.barButtons.every(Boolean)).toBe(true);
+  await page.getByRole("button", { name: "Menu" }).click();
+  await expect(page.getByTestId("nda-queue-menu")).toBeVisible();
+  await expect(page.getByTestId("ask-menu")).toBeVisible();
+});
+
 test("NDAs sits before Ask and discussion is in the first view", async ({ page }, info) => {
   await page.route("**/api/data/nda**", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [row] } }));
   await page.route("**/api/actions/accounts", (route) => route.fulfill({ json: { accounts: [] } }));

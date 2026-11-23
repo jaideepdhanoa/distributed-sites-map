@@ -2097,7 +2097,7 @@ export default function Explorer() {
             </button>
           ) : null}
           {loopsAllowed ? (
-            <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
+            <button type="button" className={`paper-btn nda-launch ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
               NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
             </button>
           ) : null}

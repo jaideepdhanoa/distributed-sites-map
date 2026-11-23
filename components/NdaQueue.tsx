@@ -88,7 +88,7 @@ export default function NdaQueue({
 
   useEffect(() => {
     let cancel = false;
-    fetch("/api/data/nda").then(async (response) => {
+    fetch("/api/data/nda", { cache: "no-store" }).then(async (response) => {
       const body = (await response.json().catch(() => ({}))) as Payload;
       if (cancel) return;
       if (!response.ok) {

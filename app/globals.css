@@ -1056,10 +1056,14 @@ button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { backgroun
   .nda-dossier, .nda-discussion { grid-template-columns: 1fr; }
   .nda-edit-sheet { top: auto; height: min(86vh, 100%); width: 100%; border-left: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; }
   .nda-edit { grid-template-columns: 1fr; }
-  .nda-detail .nda-bar { padding-top: 16px; flex-wrap: nowrap; }
-  .nda-backline { flex: 1; min-width: 0; overflow: hidden; }
+  .top { flex-wrap: wrap; height: auto; overflow: visible; }
+  .top > .nda-launch, .top > .ask-launch { display: none; }
+  .nda-detail .nda-bar { padding-top: 12px; flex-wrap: wrap; align-items: flex-start; row-gap: 8px; }
+  .nda-backline { flex: 1 1 100%; min-width: 0; overflow: visible; }
+  .nda-backline .text-link { flex: none; white-space: nowrap; }
   .nda-backline h2 { flex: 1 1 auto; min-width: 0; }
   .nda-backline .note { flex: none; white-space: nowrap; }
+  .nda-bar-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
   .nda-discussion-jump { display: none; }
 }
 .shell.nda-open .nda-pane, .shell.loops-open .nda-pane { display: flex; }

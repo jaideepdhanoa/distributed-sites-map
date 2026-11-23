@@ -2096,6 +2096,11 @@ export default function Explorer() {
               })()}
             </button>
           ) : null}
+          {loopsAllowed ? (
+            <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
+              NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
+            </button>
+          ) : null}
           {me?.u ? (
             <button
               type="button"
@@ -2109,11 +2114,6 @@ export default function Explorer() {
               }}
             >
               Ask
-            </button>
-          ) : null}
-          {loopsAllowed ? (
-            <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
-              NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
             </button>
           ) : null}
           <div className="user-menu only-desktop">
@@ -2461,8 +2461,19 @@ export default function Explorer() {
             <div className="funnel-switch segment" role="group" aria-label="Which funnel">
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+            </div>
+            <div className="menu-group" role="group" aria-label="NDA and Ask">
               {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
                 <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
+              ) : null}
+              {me?.u ? (
+                <button type="button" className="menu-item ask-launch" data-testid="ask-menu" onClick={() => {
+                  setMenuOpen(false);
+                  if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
+                  else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
+                  else setAskSite(null);
+                  setAskOpen(true);
+                }}>Ask</button>
               ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">

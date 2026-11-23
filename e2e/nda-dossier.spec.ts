@@ -122,7 +122,7 @@ test("a saved contact beats a derived one and the court pill sits at the right",
             direction: "in",
             person: "Other Counsel",
             subject: "Form",
-            summary: "Asked about the utility sign-off and the rest of this note runs past the edge of the activity panel.",
+            summary: "Asked about the utility sign-off and the rest of this note runs past the edge of the activity panel and keeps going so the line has to end in an ellipsis instead of growing the card.",
             href: "",
             thread: "CM-901",
           }],
@@ -179,6 +179,28 @@ test("a saved contact beats a derived one and the court pill sits at the right",
   await expect(page.getByTestId("nda-edit-title")).toHaveText("Edit NDA-902");
   await expect(page.getByLabel("Contact email")).toHaveValue("person@example.com");
   await expect(page.getByLabel("Contact phone")).toHaveValue("ext 4");
+});
+
+test("NDAs sits before Ask and discussion is in the first view", async ({ page }, info) => {
+  await page.route("**/api/data/nda**", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [row] } }));
+  await page.route("**/api/actions/accounts", (route) => route.fulfill({ json: { accounts: [] } }));
+  await page.route("**/api/actions/notes?**", (route) => route.fulfill({ json: { notes: [] } }));
+  await page.goto("/?nda=NDA-902", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("nda-detail")).toBeVisible();
+  const order = await page.locator(".top").evaluate((bar) => [...bar.querySelectorAll("[data-testid=nda-queue-tab], [data-testid=ask-open]")].map((node) => node.getAttribute("data-testid")));
+  expect(order).toEqual(["nda-queue-tab", "ask-open"]);
+  const ask = await page.getByTestId("ask-open").evaluate((node) => getComputedStyle(node).backgroundColor);
+  expect(ask).toBe("rgb(138, 52, 24)");
+  const discussion = page.getByTestId("nda-discussion");
+  await expect(discussion).toBeVisible();
+  if (info.project.name !== "mobile") {
+    const top = await discussion.evaluate((node) => node.getBoundingClientRect().top);
+    expect(top).toBeGreaterThan(0);
+    expect(top).toBeLessThan(900);
+    await page.screenshot({ path: "review-shots/nda-dossier-after-desktop.png", fullPage: false });
+  } else {
+    await page.screenshot({ path: "review-shots/nda-dossier-after-phone.png", fullPage: false });
+  }
 });
 
 test("a queue row opens that dossier and the actions menu closes", async ({ page }) => {

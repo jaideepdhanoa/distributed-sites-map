@@ -481,6 +481,16 @@ function listOf(value: unknown): string[] {
   return [];
 }
 
+function addressIn(value: string): string {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0] : "";
+}
+
+function phoneIn(value: string): string {
+  const match = value.match(/(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}/);
+  return match ? match[0] : "";
+}
+
 export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, history: NdaHistoryItem[] = [], today = ""): NdaQueueItem {
   const written = history.filter((item) => item.status || item.note);
   const stage = state?.stage || suggestStage(displayStatus(row.nda_status, true));
@@ -489,6 +499,7 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
   const day = today ? daysSince(since.slice(0, 10), today) : null;
   const conflict = registerConflict(row, state);
   const contacts = dossierContacts(state || {}, { contact_name: row.counterparty_person });
+  const registerText = `${row.notes || ""} ${row.source || ""}`;
   return {
     ...row,
     nda_status: state?.status || displayStatus(row.nda_status, true),
@@ -507,8 +518,8 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
     document_url: contacts.document_url,
     document_kind: text(state?.document_kind),
     contact_name: contacts.contact_name,
-    contact_email: contacts.contact_email,
-    contact_phone: contacts.contact_phone,
+    contact_email: contacts.contact_email || addressIn(registerText),
+    contact_phone: contacts.contact_phone || phoneIn(registerText),
     gmail_thread_ids: listOf(state?.gmail_thread_ids),
     covered_refs: listOf(state?.covered_refs),
     source_ref: text(state?.source_ref),

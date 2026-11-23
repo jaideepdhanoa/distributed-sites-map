@@ -1017,9 +1017,20 @@ button.list-row.nda-card-line:focus-visible { outline: 2px solid #1e4636; outlin
 .nda-skel.count { width: 1.6em; height: 0.8em; }
 .nda-skel.wide { width: 14em; }
 .nda-hold { display: grid; gap: 6px; }
-.nda-dossier { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 24px; padding: 0 16px 16px; max-width: 1100px; }
-.nda-discussion { padding: 0 16px 32px; max-width: 1100px; }
-.nda-notes, .nda-mail { margin: 0 16px; padding-left: 18px; display: grid; gap: 8px; }
+.nda-dossier { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 16px; padding: 12px 16px 24px; max-width: 1100px; align-items: start; }
+.nda-stack { display: grid; gap: 12px; min-width: 0; }
+.nda-block { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-card); display: grid; gap: 6px; justify-items: stretch; text-align: left; }
+.nda-block h2, .nda-block h3, .nda-block p, .nda-block ul, .nda-block ol { margin-left: 0; margin-right: 0; }
+.nda-detail .nda-block h2 { margin: 0; font-size: var(--type-lead); }
+.nda-detail .nda-block h3 { margin: 0 0 4px; font-size: var(--type-body); }
+.nda-detail .nda-block .note { margin-left: 0; }
+.nda-block p { margin: 0; }
+.nda-block .note { margin-right: 6px; }
+.nda-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.nda-discussion { padding: 12px; max-width: none; }
+.nda-notes, .nda-mail { margin: 0; padding-left: 1.1rem; display: grid; gap: 8px; }
+button.paper-btn.ask-launch, button.menu-item.ask-launch { background: #8a3418; color: #fffdf8; border-color: transparent; }
+button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { background: #6e2912; color: #fffdf8; }
 .nda-mail p { margin: 0; }
 .nda-dossier > * { min-width: 0; }
 .nda-mail, .nda-thread, .nda-mail-item { min-width: 0; max-width: 100%; }
@@ -1070,7 +1081,12 @@ button.list-row.nda-card-line:focus-visible { outline: 2px solid #1e4636; outlin
 .nda-detail section, .nda-detail .act, .nda-detail .tl, .nda-detail .nda-actions { min-width: 0; }
 .nda-detail input, .nda-detail select, .nda-detail textarea { width: 100%; }
 .nda-detail .tl-title span { white-space: normal; }
-.nda-detail h2, .nda-detail h3 { margin: 12px 16px 8px; font-size: var(--type-lead); }
+.nda-detail h2, .nda-detail h3 { margin: 0 0 8px; font-size: var(--type-lead); }
+.nda-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; width: 100%; }
+.nda-timeline li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 8px; align-items: start; }
+.nda-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 99px; background: #1e4636; }
+.nda-check { width: 14px; height: 14px; border: 1px solid var(--line-2); border-radius: 4px; background: #fffdf8; }
+.nda-check.on { background: #1e4636; border-color: #1e4636; }
 .nda-detail section > .note, .nda-detail .nda-sites, .nda-detail .nda-history { margin-left: 16px; margin-right: 16px; }
 .nda-actions { display: grid; gap: 8px; max-width: 36rem; margin: 0 16px 12px; }
 .nda-actions label { display: grid; gap: 4px; }
@@ -1079,7 +1095,7 @@ button.list-row.nda-card-line:focus-visible { outline: 2px solid #1e4636; outlin
 .nda-site-thread { margin: 0 16px 12px; min-width: 0; }
 .nda-site-thread .note-copy, .nda-detail .note-copy { overflow-wrap: anywhere; }
 .nda-pane .nda-list { list-style: none; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 6px; width: min(100%, 880px); }
-.nda-pane > .nda-bar, .nda-pane > .nda-tabs { width: min(100%, 880px); margin-left: auto; margin-right: auto; }
+.nda-pane > .nda-bar, .nda-pane > .nda-tabs { width: min(100%, 880px); margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
 .nda-pane .nda-row { width: 100%; overflow: hidden; padding: 8px 12px; }
 .nda-pane .nda-row > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nda-pane .nda-row > span.nda-line { display: flex; align-items: center; justify-content: flex-start; gap: 16px; overflow: visible; text-overflow: unset; white-space: normal; }
@@ -1090,8 +1106,8 @@ button.list-row.nda-card-line:focus-visible { outline: 2px solid #1e4636; outlin
 .nda-mail-item p.nda-mail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .nda-mail-item p.nda-summary { display: block; width: 100%; min-width: 0; max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
 .nda-mail-item p.nda-summary.open { white-space: normal; overflow: visible; text-overflow: unset; }
-.nda-gates { list-style: none; margin: 0 16px; padding: 0; display: grid; gap: 6px; }
-.nda-gates li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fffdf8; }
+.nda-gates { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; }
+.nda-gates li { display: flex; align-items: center; gap: 8px; padding: 0; }
 .nda-gates li span:last-child { color: var(--ink-3); }
 .nda-thread { display: grid; gap: 8px; margin: 0 0 14px; }
 .nda-thread-subject { margin: 0; font-weight: 650; }

@@ -252,11 +252,25 @@ test("a saved status sits on the register row and a closed one leaves the queue"
   assert.equal(blank.includes("Thank you"), false);
 });
 
-test("a note that mentions someone else's address does not become the contact", () => {
-  const row = agreement({ nda_id: "NDA-901", counterparty_person: "Sample Person", notes: "Counsel wrote other@example.com.", source: "fixture" });
+test("a blank contact keeps the register address, and a saved contact wins", () => {
+  const row = agreement({ nda_id: "NDA-901", counterparty_person: "Sample Person", notes: "Counsel wrote other@example.com. Call (415) 555-0134.", source: "fixture" });
   const shown = presentQueue([row], [], [], "2026-11-23");
-  assert.equal(shown[0]?.contact_email, "");
-  assert.equal(shown[0]?.contact_phone, "");
+  assert.equal(shown[0]?.contact_email, "other@example.com");
+  assert.equal(shown[0]?.contact_phone, "(415) 555-0134");
+  const saved = presentQueue([row], [{
+    nda_id: "NDA-901",
+    status: "",
+    waiting_on: "",
+    owner: "",
+    next_step: "",
+    last_action: "",
+    last_action_date: "",
+    version: 2,
+    contact_email: "person@example.com",
+    contact_phone: "ext 4",
+  }], [], "2026-11-23");
+  assert.equal(saved[0]?.contact_email, "person@example.com");
+  assert.equal(saved[0]?.contact_phone, "ext 4");
 });
 
 test("a saved dossier contact beats a comms-derived one", () => {

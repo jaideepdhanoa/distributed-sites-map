@@ -195,16 +195,21 @@ export default function Timeline({ recordId, relatedId, ndaId = "", onOpenNda }:
     }
     let cancel = false;
     const query = new URLSearchParams({ targetKind: "nda", targetId: ndaId });
-    Promise.all([
-      fetch(`/api/actions/notes?${query}`, { cache: "no-store" }).then((response) => (response.ok ? response.json() : { notes: [] })),
-      fetch("/api/actions/accounts", { cache: "no-store" }).then((response) => (response.ok ? response.json() : { accounts: [] })),
-    ]).then(([notesBody, accountsBody]: [{ notes?: NdaNote[] }, { accounts?: { id: string; name: string }[] }]) => {
-      if (cancel) return;
-      setNdaNotes(notesBody.notes || []);
-      const names: Record<string, string> = {};
-      for (const account of accountsBody.accounts || []) names[account.id] = account.name;
-      setNdaNames(names);
-    }).catch(() => undefined);
+    fetch(`/api/actions/notes?${query}`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { notes: [] }))
+      .then((body: { notes?: NdaNote[] }) => {
+        if (!cancel) setNdaNotes(body.notes || []);
+      })
+      .catch(() => undefined);
+    fetch("/api/actions/accounts", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { accounts: [] }))
+      .then((body: { accounts?: { id: string; name: string }[] }) => {
+        if (cancel) return;
+        const names: Record<string, string> = {};
+        for (const account of body.accounts || []) names[account.id] = account.name;
+        setNdaNames(names);
+      })
+      .catch(() => undefined);
     return () => {
       cancel = true;
     };

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { aerialTile, streetViewHref } from "../../lib/aerial";
+import { isPanoUrl, streetViewEmbedSrc } from "../../lib/photos";
 import { applyBatch } from "../../lib/changes/apply";
 import { planSiteMirror, type SheetTable } from "../../lib/changes/mirror";
 import { validateBatch, type Actor } from "../../lib/changes/schema";
@@ -33,6 +34,11 @@ test("an aerial image is centered on the site and a street link is only a link",
   assert.equal(href, "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=36.17,-115.14");
   assert.equal(href.includes("output=svembed"), false);
   assert.equal(streetViewHref(null, -115.14), "");
+  assert.equal(isPanoUrl(href), true);
+  const embed = streetViewEmbedSrc(href);
+  assert.match(embed, /^https:\/\/www\.google\.com\/maps\?layer=c&cbll=36\.17,-115\.14&cbp=12,0,0,0,0&output=svembed$/);
+  assert.equal(embed.includes("streetviewpixels"), false);
+  assert.equal(streetViewEmbedSrc("https://example.com/still.jpg"), "");
 });
 
 test("a universe card accepts photo and evidence fields", async () => {

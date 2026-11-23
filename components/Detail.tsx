@@ -18,9 +18,8 @@ import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./Fi
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
-import { cardPhotos, galleryModel, isPanoUrl } from "@/lib/photos";
+import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import { aerialTile, streetViewHref } from "@/lib/aerial";
-import AerialThumb from "./AerialThumb";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections from "./PanelSections";
 import SitePhotos from "./SitePhotos";
@@ -582,7 +581,9 @@ export default function Detail({
   const figuresPending = !pnl.settled;
   if (!site) return null;
   const photos = cardPhotos(site, linkedDeal);
-  const hasHero = galleryModel(photos).showGallery;
+  const storedPano = photos.frontageUrl || (isPanoUrl(site.street_view_url || "") ? site.street_view_url : "");
+  const pano = storedPano || streetViewHref(lat, lng);
+  const card = pano && pano !== photos.frontageUrl ? { ...photos, frontageUrl: pano } : photos;
   const aerial = aerialTile(lat, lng);
   const price = site.asking_price_display;
   const why = site.summary_why || "Not screened yet.";
@@ -633,9 +634,7 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      {hasHero || !aerial ? null : <AerialThumb lat={lat} lng={lng} />}
-      <SitePhotos card={photos} allowStreetEmbed={false} emptyNote={aerial ? "Aerial only — no site photos yet" : ""} />
-      {hasHero && aerial ? <AerialThumb lat={lat} lng={lng} compact /> : null}
+      <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
         <NextStepCard
@@ -669,7 +668,7 @@ export default function Detail({
         folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
         packageHref={packageHref}
         map={mapHref(lat, lng)}
-        street={streetViewHref(lat, lng)}
+        street={pano ? "" : streetViewHref(lat, lng)}
         streetLabel="Open Street View"
         hideEmptyStreet
         signedIn={signedIn}

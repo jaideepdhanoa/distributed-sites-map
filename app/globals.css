@@ -3437,15 +3437,64 @@ span.listing-link.muted { text-decoration: none; }
   .phone-peek > .sheet-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 99px; background: #c3b8a8; }
   .drawer { transition: height 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   .drawer-head .close, .hero-info, .hero-expand, .map-links a, a.listing-link, .drawer .action, .compare-check, .layers-close { min-height: 44px; min-width: 44px; }
-  .hero-expand { right: 64px; }
   .drawer-head { padding-top: 4px; padding-bottom: 4px; }
   .sheet-handle { min-height: 0; }
-  .hero-slot { display: flex; flex-direction: column; margin-bottom: 8px; }
-  .hero-frame { aspect-ratio: 16 / 10; min-height: 188px; height: auto; }
-  .hero-frame iframe, .hero-still, .hero-still img, .hero-aerial { width: 100%; height: 100%; min-height: 188px; object-fit: cover; object-position: center; }
-  .hero-chrome { position: static; inset: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; }
-  .hero-tabs { position: static; left: auto; bottom: auto; flex: 1 1 auto; min-width: 0; }
-  .hero-info, .hero-expand { position: static; right: auto; bottom: auto; }
+  .hero-slot { display: block; margin-bottom: 8px; }
+  .card-hero .hero-frame { aspect-ratio: 4 / 3; min-height: 0; height: auto; }
+  .card-hero .hero-frame iframe,
+  .card-hero .hero-still,
+  .card-hero .hero-still img,
+  .card-hero .hero-aerial {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    object-fit: cover;
+    object-position: center;
+  }
+  .hero-chrome {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 6px;
+    /* The embed keeps zoom in the right 54px and Terms / Report in the bottom 14px. */
+    padding: 0 60px 22px 8px;
+    box-sizing: border-box;
+  }
+  .hero-tabs {
+    position: static;
+    left: auto;
+    bottom: auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    gap: 2px;
+    margin-right: auto;
+    padding: 2px;
+    border-radius: 999px;
+    background: rgba(255, 253, 248, 0.82);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 1px 2px rgba(28, 25, 20, 0.28);
+  }
+  .hero-tabs button.chip {
+    min-height: 0;
+    height: 24px;
+    padding: 0 5px;
+    background: transparent;
+    color: #1c1914;
+    box-shadow: none;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+  .hero-tabs button.chip.on { background: #1c1914; color: #fffdf8; }
+  .hero-info, .hero-expand { position: static; right: auto; bottom: auto; flex: none; }
+  .hero-sources { bottom: 76px; }
   .space-layout.only-mobile { display: grid !important; }
   .headline strong { font-size: var(--type-lead); line-height: 22px; }
   .headline strong.figure-hold,

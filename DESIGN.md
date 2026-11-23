@@ -71,7 +71,7 @@ Do not put chrome in a `<details>` or `<summary>`. A closed `<details>` drops it
 
 ## Phone
 
-- Tap targets are at least 44px. The quiet ✕ grows from 32px to 44px.
+- Tap targets are at least 44px. The quiet ✕ grows from 32px to 44px. The site hero's Street View, Aerial, and Photos pills are the exception: on a phone they are a compact frosted group on the picture, shorter than 44px, so the frame can be taller and the pills stay clear of the embed's zoom and the Terms row. Expand and the sources button stay 44px.
 - Overlay sheets such as Layers open at the half snap (`max-height: 50vh`), with the same eyebrow and ✕ header. The site record keeps peek, half, and full; a link can name the snap. Ask is the exception: on a phone it opens at 90% of the viewport so the transcript has room, with the same quiet round ✕.
 - A menu that belongs to a bar stacks above the sheet under it. The review filter menu uses this so it stays usable while the inbox sheet is open.
 

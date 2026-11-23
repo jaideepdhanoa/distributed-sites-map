@@ -127,7 +127,7 @@ test("data-driven chips stay a short label and do not join clauses", () => {
   assert.equal(faceText(row, "chip-diligence_environmental").includes("·"), false);
 
   const nda = renderToStaticMarkup(createElement(NdaChip, {
-    text: "NDA: With counterparty legal · 10d open · 2d in court",
+    text: "NDA: With counterparty legal · 10d open · 2d waiting on them",
   }));
   const ndaText = faceText(nda, "nda-chip");
   assert.equal(ndaText, "With counterparty legal");

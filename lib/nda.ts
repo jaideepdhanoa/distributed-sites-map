@@ -1,4 +1,5 @@
 import { canReadFinancials } from "./agent/access";
+import { chipLabelProblem } from "./chips";
 import { stageDetail } from "./labels";
 import type { DealProps } from "./types";
 
@@ -130,10 +131,17 @@ export function normalizeMirror(value: Partial<NdaMirror> | Record<string, unkno
   };
 }
 
+/** User-facing clock. The stored field stays nda_days_in_court. */
+export function waitingOnThemLabel(days: number): string {
+  const full = `${days}d waiting on them`;
+  if (!chipLabelProblem(full)) return full;
+  return `${days}d with them`;
+}
+
 function clockParts(open: number | null, court: number | null): string[] {
   const parts: string[] = [];
   if (open != null) parts.push(`${open}d open`);
-  if (court != null) parts.push(`${court}d in court`);
+  if (court != null) parts.push(waitingOnThemLabel(court));
   return parts;
 }
 

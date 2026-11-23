@@ -1691,7 +1691,8 @@ tr { cursor: pointer; }
   .row-link { width: 44px; height: 44px; }
   .row-link svg { width: 20px; height: 20px; }
   .shell.list-open.drawer-open .list-pane { right: 0; bottom: var(--sheet-h, 52vh); }
-  .shell.nda-open.drawer-open .nda-pane, .shell.loops-open.drawer-open .nda-pane { right: 0; bottom: var(--sheet-h, 56vh); z-index: 3; }
+  .shell.loops-open.drawer-open .nda-pane { right: 0; bottom: var(--sheet-h, 56vh); z-index: 3; }
+  .shell.nda-open.drawer-open .nda-pane { right: 0; bottom: 0; z-index: 7; }
   .nda-filters select.secondary, .nda-filters label.loop-filter { min-height: 44px; }
   .nda-row .text-link { min-height: 44px; display: inline-flex; align-items: center; }
   .nda-sheet { display: none; }

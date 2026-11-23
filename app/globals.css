@@ -994,6 +994,9 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .shell.list-open .maplibregl-ctrl { visibility: hidden; }
 .shell.list-open .map-attrib { display: none; }
 .nda-pane { position: absolute; inset: 0; z-index: 4; display: none; flex-direction: column; background: #faf7f1; min-width: 0; overflow: hidden; }
+.app-boot { height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #faf7f1; }
+.app-boot .map-stage { position: relative; min-height: 0; }
+.app-boot .nda-pane { display: flex; }
 .nda-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; }
 .nda-list { list-style: none; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 6px; width: min(100%, 960px); }
 .nda-row { width: 100%; text-align: left; display: grid; gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: white; }
@@ -1380,6 +1383,7 @@ tr { cursor: pointer; }
   box-shadow: var(--shadow);
 }
 .menu { top: calc(100% + 6px); right: 0; min-width: 180px; display: grid; padding: 6px; }
+.nda-bar .more-wrap .menu { top: 0; right: calc(100% + 8px); }
 .menu a, .menu button, .menu-sheet > button, .menu-sheet > a {
   text-align: left;
   background: transparent;

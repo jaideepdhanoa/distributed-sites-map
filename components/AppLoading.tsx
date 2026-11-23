@@ -2,7 +2,7 @@ import Wordmark from "./Wordmark";
 
 export default function AppLoading() {
   return (
-    <main className="shell nda-open" data-testid="app-loading" aria-busy="true" aria-label="Loading NDAs">
+    <main className="app-boot" data-testid="app-loading" aria-busy="true" aria-label="Loading NDAs">
       <header className="bar">
         <div className="top">
           <Wordmark level="p" />

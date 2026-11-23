@@ -100,7 +100,7 @@ test("the desk list keeps the location note out of the stage tabs", async ({ pag
 
 test("phone chrome stays inside the viewport and the map pill sits in its track", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone widths");
-  for (const width of [363, 390, 560]) {
+  for (const width of [360, 363, 390, 560]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/?funnel=pipeline&site=PIPE-PHX-0014", { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".shell");
@@ -114,10 +114,11 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
       const sheet = document.querySelector(".drawer-scroll");
       const city = document.querySelector(".phone-view-row .city-pick select");
       const search = document.querySelector(".phone-view-row .mobile-search");
-      const menu = document.querySelector(".phone-view-row .icon-btn");
+      const menu = document.querySelector(".phone-view-row [aria-label='Menu']");
+      const filters = document.querySelector(".phone-view-row [aria-label='Filters']");
       const row = document.querySelector(".phone-view-row");
-      if (!track || !pill || !neighbor || !sheet || !city || !search || !menu || !row) {
-        return { missing: true, overflow: 0, sheet: 0, past: 0, top: 0, bottom: 0, left: 0, gap: 0, trackH: 0, neighborH: 0, sameRow: false, compact: false, tap: 0 };
+      if (!track || !pill || !neighbor || !sheet || !city || !search || !menu || !filters || !row || row.querySelector(".reach-pick")) {
+        return { missing: true, overflow: 0, sheet: 0, past: 0, top: 0, bottom: 0, left: 0, gap: 0, trackH: 0, neighborH: 0, sameRow: false, compact: false, tap: 0, oneLine: false };
       }
       const trackBox = track.getBoundingClientRect();
       const pillBox = pill.getBoundingClientRect();
@@ -125,9 +126,10 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
       const cityBox = city.getBoundingClientRect();
       const searchBox = search.getBoundingClientRect();
       const menuBox = menu.getBoundingClientRect();
+      const filtersBox = filters.getBoundingClientRect();
       const rowBox = row.getBoundingClientRect();
       const list = track.querySelectorAll("button")[1]?.getBoundingClientRect();
-      const tops = [cityBox.top, trackBox.top, searchBox.top, menuBox.top];
+      const tops = [cityBox.top, trackBox.top, searchBox.top, filtersBox.top, menuBox.top];
       const past = [...document.querySelectorAll(".top > *, .phone-view-row > *")].filter((el) => {
         const box = el.getBoundingClientRect();
         if (box.width < 2 || box.height < 2) return false;
@@ -145,8 +147,9 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
         trackH: trackBox.height,
         neighborH: neighborBox.height,
         sameRow: Math.max(...tops) - Math.min(...tops) <= 4,
+        oneLine: rowBox.height < 60,
         compact: cityBox.width < rowBox.width * 0.6,
-        tap: Math.min(cityBox.height, searchBox.height, searchBox.width, menuBox.height, menuBox.width),
+        tap: Math.min(cityBox.height, searchBox.height, searchBox.width, filtersBox.height, filtersBox.width, menuBox.height, menuBox.width),
       };
     });
     expect(fit.missing, `${width}px layout`).toBe(false);
@@ -158,9 +161,38 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
     expect(Math.abs((fit.top ?? 0) - (fit.left ?? 0))).toBeLessThanOrEqual(1);
     expect(Math.abs((fit.top ?? 0) - (fit.gap ?? 0))).toBeLessThanOrEqual(1);
     expect(Math.abs((fit.trackH ?? 0) - (fit.neighborH ?? 0))).toBeLessThanOrEqual(1);
-    expect(fit.sameRow, `${width}px city, map, search, and menu share a row`).toBe(true);
+    expect(fit.sameRow, `${width}px city, map, search, filters, and menu share a row`).toBe(true);
+    expect(fit.oneLine, `${width}px header row does not wrap`).toBe(true);
     expect(fit.compact, `${width}px city pill stays compact`).toBe(true);
     expect(fit.tap, `${width}px tap targets`).toBeGreaterThanOrEqual(40);
+  }
+});
+
+test("phone filters keep service area and the header stays one row", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "phone filters");
+  for (const width of [360, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/?funnel=pipeline&city=LAS", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".phone-view-row");
+    const filters = page.locator(".phone-view-row [aria-label='Filters']");
+    await expect(filters).toBeVisible();
+    await expect(page.locator(".phone-view-row .reach-pick")).toHaveCount(0);
+    const before = await filters.locator(".count-badge").count() ? Number(await filters.locator(".count-badge").innerText()) : 0;
+    await filters.click();
+    const panel = page.getByRole("dialog", { name: "Filters" });
+    await expect(panel.getByTestId("reach-chip")).toBeVisible();
+    await panel.getByRole("button", { name: "Service area only" }).click();
+    await expect(page).toHaveURL(/reach=inside/);
+    await expect(filters.locator(".count-badge")).toHaveText(String(before + 1));
+    await panel.getByRole("button", { name: "Service area + 10 mi" }).click();
+    await expect(page).not.toHaveURL(/[?&]reach=/);
+    if (before === 0) await expect(filters.locator(".count-badge")).toHaveCount(0);
+    else await expect(filters.locator(".count-badge")).toHaveText(String(before));
+    await page.getByRole("button", { name: "Close filters" }).click();
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: /^Filters/ }).click();
+    await expect(page.getByRole("dialog", { name: "Filters" }).getByTestId("reach-chip")).toBeVisible();
+    await page.getByRole("button", { name: "Close filters" }).click();
   }
 });
 

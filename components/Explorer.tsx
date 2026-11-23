@@ -2142,18 +2142,21 @@ export default function Explorer() {
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
+          <button
+            type="button"
+            className="icon-btn filter-launch"
+            aria-label="Filters"
+            aria-expanded={filtersOpen}
+            aria-pressed={filtersOpen}
+            data-testid="filters-open"
+            onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.2 7.2V18l-3.6 2v-6.8L4 6z" /></svg>
+            {activeFilters.length ? <span className="count-badge" aria-hidden="true">{activeFilters.length}</span> : null}
+          </button>
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
-          <label className="reach-pick">
-            <span className="sr">Reach</span>
-            <select className="secondary" aria-label="Reach" data-testid="reach-chip" value={reach} onChange={(event) => write({ reach: event.target.value === "within10" ? null : event.target.value })}>
-              <option value="inside">Service area only</option>
-              <option value="within5">Service area + 5 mi</option>
-              <option value="within10">Service area + 10 mi</option>
-            </select>
-          </label>
-          <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
@@ -2301,6 +2304,19 @@ export default function Explorer() {
             <div className="popover-head">
               <h2>Filters</h2>
               <button type="button" className="close" aria-label="Close filters" onClick={() => setFiltersOpen(false)}><span aria-hidden="true">×</span></button>
+            </div>
+            <div className="reach-panel only-mobile">
+              <h3>Service area</h3>
+              <p className="filter-note">Service area only, plus 5 miles outside, or plus 10 miles outside. Farther than 10 miles stays off this view. Nothing is dropped.</p>
+              <div className="segmented" role="group" aria-label="Reach" data-testid="reach-chip">
+                {([
+                  ["inside", "Service area only"],
+                  ["within5", "Service area + 5 mi"],
+                  ["within10", "Service area + 10 mi"],
+                ] as const).map(([item, label]) => (
+                  <button key={item} type="button" className={`segmented ${reach === item ? "on" : ""}`} onClick={() => write({ reach: item === "within10" ? null : item })}>{label}</button>
+                ))}
+              </div>
             </div>
             <h3>Categories</h3>
             <div className="cat-row">

@@ -3379,21 +3379,26 @@ span.listing-link.muted { text-decoration: none; }
   .phone-view-row.only-mobile {
     display: flex !important;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-wrap: nowrap;
+    gap: 4px;
     width: 100%;
     min-width: 0;
     max-width: 100%;
   }
-  .phone-view-row .city-pick { flex: 0 0 auto; width: auto; max-width: 100%; }
-  .phone-view-row .city-pick select { width: auto; max-width: none; }
+  .phone-view-row .city-pick { flex: 1 1 5.5rem; min-width: 0; max-width: 8rem; }
+  .phone-view-row .city-pick select { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .phone-view-row > .chip { flex: none; }
   .phone-view-row .funnel-switch.map-switch { display: inline-flex !important; flex: none; }
+  .phone-view-row .funnel-switch.map-switch button { min-width: 40px; }
   .phone-view-row .mobile-search { flex: 0 0 44px; width: 44px; min-width: 44px; max-width: 44px; height: 44px; margin: 0; }
-  .phone-view-row .icon-btn.only-mobile { flex: 0 0 44px; width: 44px; min-width: 44px; margin: 0; }
-  .phone-view-row .reach-pick { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
+  .phone-view-row .icon-btn { flex: 0 0 44px; width: 44px; min-width: 44px; height: 44px; margin: 0; }
+  .phone-view-row .filter-launch { position: relative; }
+  .phone-view-row .filter-launch .count-badge { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 3px; font-size: 10px; line-height: 16px; }
   .phone-view-row select.secondary { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; }
-  .phone-view-row .city-pick select.secondary { width: auto; max-width: none; }
+  .phone-view-row .city-pick select.secondary { width: 100%; max-width: 100%; }
+  .reach-panel.only-mobile { display: block !important; width: 100%; }
+  .reach-panel .segmented { display: flex; flex-wrap: wrap; width: 100%; }
+  .reach-panel .segmented > button.segmented { min-height: 40px; }
   .near-chip[data-short] { font-size: 0; }
   .near-chip[data-short]::after {
     content: attr(data-short);

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("a site card opens its NDA and can come back", async ({ page }) => {
+test("a site card opens its NDA and can come back", async ({ page }, info) => {
   await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
   const found = await page.evaluate(async () => {
@@ -21,6 +21,20 @@ test("a site card opens its NDA and can come back", async ({ page }) => {
   await expect(page.getByTestId("nda-view-all")).toHaveCount(0);
   const card = page.getByTestId("nda-card-line");
   await expect(card).toBeVisible();
+  const rest = await card.evaluate((node) => getComputedStyle(node).backgroundColor);
+  await card.hover();
+  const hovered = await card.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { cursor: style.cursor, background: style.backgroundColor };
+  });
+  expect(hovered.cursor).toBe("pointer");
+  if (info.project.name !== "mobile") {
+    expect(hovered.background).not.toBe(rest);
+    await card.screenshot({ path: "review-shots/nda-card-hover.png" });
+  }
+  await card.focus();
+  const ring = await card.evaluate((node) => getComputedStyle(node).outlineStyle);
+  expect(ring).not.toBe("none");
   await card.click();
   await expect(page).toHaveURL(new RegExp(`nda=${found.nda}`));
   await expect(page.getByTestId("nda-detail")).toBeVisible();

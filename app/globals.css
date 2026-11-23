@@ -1005,9 +1005,10 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .court-pill.us { background: #f3e4d4; color: #5c4310; }
 .court-pill.us.aged { background: #8a3418; color: #fffdf8; }
 .court-pill.them { background: #e4eef6; color: #1d3f66; }
-button.nda-card-line { flex: 1 0 100%; display: grid; gap: 4px; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fffdf8; cursor: pointer; text-align: left; width: 100%; }
-button.nda-card-line:hover { background: #fff; }
-button.nda-card-line:active { background: #f3efe6; }
+button.list-row.nda-card-line { flex: 1 0 100%; display: grid; gap: 4px; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-card); cursor: pointer; text-align: left; width: 100%; }
+button.list-row.nda-card-line:hover { background: var(--sand); border-color: var(--line-2); }
+button.list-row.nda-card-line:active { background: #ddd6c8; }
+button.list-row.nda-card-line:focus-visible { outline: 2px solid #1e4636; outline-offset: 2px; box-shadow: 0 0 0 2px #fffdf8; }
 .nda-card-line p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .nda-card-chev { margin-left: auto; color: var(--ink-3); font-size: 18px; line-height: 1; }
 .card-chips .nda-card-line { margin-top: 10px; }
@@ -1024,8 +1025,10 @@ button.nda-card-line:active { background: #f3efe6; }
 .nda-mail, .nda-thread, .nda-mail-item { min-width: 0; max-width: 100%; }
 .nda-edit-sheet { position: fixed; z-index: 40; top: 0; right: 0; bottom: 0; width: min(480px, 100%); background: #faf7f1; border-left: 1px solid var(--line); box-shadow: var(--shadow-3); display: flex; flex-direction: column; }
 .nda-edit-sheet { overflow: hidden; }
-.nda-edit { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 18px 12px; padding: 12px 16px 16px; overflow: auto; flex: 1; min-height: 0; }
-.nda-edit label { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0; font-size: 13px; }
+.nda-edit-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+.nda-detail .nda-edit-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.nda-edit { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px 12px; padding: 10px 16px 12px; overflow: auto; flex: 1; min-height: 0; }
+.nda-edit label { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin: 0; font-size: 13px; }
 .nda-edit .field, .nda-edit select, .nda-edit textarea { margin: 0; }
 .nda-edit-sheet h2 { margin: 0; font-size: 16px; }
 .nda-edit .wide { grid-column: 1 / -1; }
@@ -1079,20 +1082,20 @@ button.nda-card-line:active { background: #f3efe6; }
 .nda-pane > .nda-bar, .nda-pane > .nda-tabs { width: min(100%, 880px); margin-left: auto; margin-right: auto; }
 .nda-pane .nda-row { width: 100%; overflow: hidden; padding: 8px 12px; }
 .nda-pane .nda-row > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nda-pane .nda-line { display: flex; align-items: center; gap: 16px; }
-.nda-pane .nda-line .court-pill { margin-left: auto; flex: none; }
-.nda-pane .nda-line strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nda-pane .nda-row > span.nda-line { display: flex; align-items: center; justify-content: flex-start; gap: 16px; overflow: visible; text-overflow: unset; white-space: normal; }
+.nda-pane .nda-row > span.nda-line .court-pill { margin-left: auto; flex: none; }
+.nda-pane .nda-row > span.nda-line strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nda-notes { list-style: disc; }
 .nda-notes li { display: list-item; white-space: pre-wrap; margin: 0; }
-.nda-summary { display: block; width: 100%; min-width: 0; max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
-.nda-summary.open { white-space: normal; overflow: visible; text-overflow: unset; }
+.nda-mail-item p.nda-mail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.nda-mail-item p.nda-summary { display: block; width: 100%; min-width: 0; max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+.nda-mail-item p.nda-summary.open { white-space: normal; overflow: visible; text-overflow: unset; }
 .nda-gates { list-style: none; margin: 0 16px; padding: 0; display: grid; gap: 6px; }
 .nda-gates li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fffdf8; }
 .nda-gates li span:last-child { color: var(--ink-3); }
 .nda-thread { display: grid; gap: 8px; margin: 0 0 14px; }
 .nda-thread-subject { margin: 0; font-weight: 650; }
-.nda-mail-item { display: grid; gap: 2px; }
-.nda-mail-item p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.nda-mail-item { display: grid; gap: 2px; min-width: 0; }
 .nda-dir { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 650; }
 .nda-dir.in { background: #e4eef6; color: #1d3f66; }
 .nda-dir.out { background: #f3e4d4; color: #5c4310; }

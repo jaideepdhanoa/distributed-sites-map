@@ -220,7 +220,7 @@ export default function NdaQueue({
         </ul>
         {open ? (
           <NdaDetail
-            key={open.nda_id}
+            key={`${open.nda_id}:${open.version}:${open.contact_email || ""}:${open.contact_phone || ""}`}
             row={open}
             today={today}
             names={names}

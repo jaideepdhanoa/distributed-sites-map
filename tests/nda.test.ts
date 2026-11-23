@@ -15,7 +15,9 @@ import {
   gateLabel,
   cardNdaLabel,
   collapseContained,
+  dossierContacts,
   ndaChip,
+  preferSaved,
   registerConflict,
   ndaQueueAllowed,
   ndaQueueBody,
@@ -255,6 +257,43 @@ test("a note that mentions someone else's address does not become the contact", 
   const shown = presentQueue([row], [], [], "2026-11-23");
   assert.equal(shown[0]?.contact_email, "");
   assert.equal(shown[0]?.contact_phone, "");
+});
+
+test("a saved dossier contact beats a comms-derived one", () => {
+  assert.equal(preferSaved("person@example.com", "other@example.com"), "person@example.com");
+  assert.equal(preferSaved("", "person@example.com"), "person@example.com");
+  assert.equal(preferSaved("  ", "person@example.com"), "person@example.com");
+  const kept = dossierContacts(
+    { contact_name: "Sample Person", contact_email: "person@example.com", contact_phone: "ext 4", document_url: "https://example.com/sample-doc" },
+    { contact_name: "Other Counsel", contact_email: "other@example.com", contact_phone: "ext 9", document_url: "https://example.com/other" },
+  );
+  assert.equal(kept.contact_email, "person@example.com");
+  assert.equal(kept.contact_phone, "ext 4");
+  assert.equal(kept.document_url, "https://example.com/sample-doc");
+  assert.equal(kept.contact_name, "Sample Person");
+  const filled = dossierContacts({ contact_email: "", contact_phone: "", document_url: "" }, { contact_email: "person@example.com" });
+  assert.equal(filled.contact_email, "person@example.com");
+  assert.equal(filled.contact_phone, "");
+  assert.equal(filled.document_url, "");
+  const row = agreement({ nda_id: "NDA-901", counterparty_person: "Sample Person", notes: "Counsel wrote other@example.com." });
+  const shown = presentQueue([row], [{
+    nda_id: "NDA-901",
+    status: "",
+    waiting_on: "",
+    owner: "sample",
+    next_step: "",
+    last_action: "Dossier updated",
+    last_action_date: "2026-11-23",
+    version: 2,
+    contact_name: "Sample Person",
+    contact_email: "person@example.com",
+    contact_phone: "ext 4",
+    document_url: "https://example.com/sample-doc",
+  }], [], "2026-11-23");
+  assert.equal(shown[0]?.contact_email, "person@example.com");
+  assert.equal(shown[0]?.contact_phone, "ext 4");
+  assert.equal(shown[0]?.document_url, "https://example.com/sample-doc");
+  assert.equal(shown[0]?.version, 2);
 });
 
 test("an owner edit does not flag a register conflict, and a newer disagreed stage does", () => {

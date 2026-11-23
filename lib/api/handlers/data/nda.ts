@@ -63,7 +63,6 @@ async function activityResponse(user: string, ndaId: string) {
   }
   return NextResponse.json(redactGmailPayload({
     items: activity.items,
-    contact_email: row.contact_email || activity.contact_email,
   }), { headers: privateHeaders });
 }
 

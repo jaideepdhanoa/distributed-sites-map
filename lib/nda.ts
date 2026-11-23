@@ -76,6 +76,23 @@ function text(value: unknown): string {
   return String(value).trim();
 }
 
+/** A saved dossier value wins. A comms-derived value fills only a blank field. */
+export function preferSaved(saved: unknown, derived: unknown = ""): string {
+  return text(saved) || text(derived);
+}
+
+export function dossierContacts(
+  saved: { contact_name?: unknown; contact_email?: unknown; contact_phone?: unknown; document_url?: unknown },
+  derived: { contact_name?: unknown; contact_email?: unknown; contact_phone?: unknown; document_url?: unknown } = {},
+): { contact_name: string; contact_email: string; contact_phone: string; document_url: string } {
+  return {
+    contact_name: preferSaved(saved.contact_name, derived.contact_name),
+    contact_email: preferSaved(saved.contact_email, derived.contact_email),
+    contact_phone: preferSaved(saved.contact_phone, derived.contact_phone),
+    document_url: preferSaved(saved.document_url, derived.document_url),
+  };
+}
+
 export function dayCount(value: unknown): number | null {
   if (value == null || value === "") return null;
   if (typeof value === "boolean") return null;
@@ -471,6 +488,7 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
   const since = text(state?.court_since) || text(row.nda_waiting_on_since) || text(row.nda_opened_date);
   const day = today ? daysSince(since.slice(0, 10), today) : null;
   const conflict = registerConflict(row, state);
+  const contacts = dossierContacts(state || {}, { contact_name: row.counterparty_person });
   return {
     ...row,
     nda_status: state?.status || displayStatus(row.nda_status, true),
@@ -486,11 +504,11 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
     court_detail: text(state?.court_detail),
     court_since: since,
     next_step_due: text(state?.next_step_due),
-    document_url: text(state?.document_url),
+    document_url: contacts.document_url,
     document_kind: text(state?.document_kind),
-    contact_name: text(state?.contact_name) || text(row.counterparty_person),
-    contact_email: text(state?.contact_email),
-    contact_phone: text(state?.contact_phone),
+    contact_name: contacts.contact_name,
+    contact_email: contacts.contact_email,
+    contact_phone: contacts.contact_phone,
     gmail_thread_ids: listOf(state?.gmail_thread_ids),
     covered_refs: listOf(state?.covered_refs),
     source_ref: text(state?.source_ref),

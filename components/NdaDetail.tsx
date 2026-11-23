@@ -124,6 +124,7 @@ export default function NdaDetail({
   onOpenSite,
   onSaved,
   onBack,
+  onClose,
   backLabel,
 }: {
   row: NdaQueueItem;
@@ -132,6 +133,7 @@ export default function NdaDetail({
   onOpenSite: (id: string) => void;
   onSaved: () => void;
   onBack: () => void;
+  onClose: () => void;
   backLabel: string;
 }) {
   const covered = coveredSites(row.site_ids || "");
@@ -214,7 +216,10 @@ export default function NdaDetail({
           <h2>{row.counterparty_firm || row.nda_id}</h2>
           <span className="note">{row.nda_id}</span>
         </div>
-        <button type="button" className="paper-btn" data-testid="nda-edit" onClick={() => setEditing(true)}>Edit</button>
+        <div className="nda-bar-actions">
+          <button type="button" className="paper-btn" data-testid="nda-edit" onClick={() => setEditing(true)}>Edit</button>
+          <button type="button" className="close" aria-label="Close NDA queue" onClick={onClose}><span aria-hidden="true">×</span></button>
+        </div>
       </div>
       <div className="nda-dossier">
         <div>

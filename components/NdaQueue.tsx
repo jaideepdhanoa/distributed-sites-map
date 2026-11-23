@@ -217,6 +217,7 @@ export default function NdaQueue({
             onOpenSite={(id) => { setMenu(false); onOpen(id); }}
             onSaved={() => setTick((value) => value + 1)}
             onBack={onBack}
+            onClose={onClose}
             backLabel={backLabel}
           />
         ) : null}

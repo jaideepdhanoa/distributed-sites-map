@@ -1023,7 +1023,8 @@ select, .field input { border: 1px solid var(--line); background: white; border-
 .nda-detail .nda-bar { min-height: 40px; padding: 6px 12px; }
 .nda-backline { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .nda-detail .nda-bar h2 { margin: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nda-detail .nda-bar .paper-btn { margin-left: auto; flex: none; }
+.nda-bar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+.nda-detail .nda-bar .paper-btn { flex: none; }
 @media (max-width: 767px) {
   .nda-dossier, .nda-discussion { grid-template-columns: 1fr; }
   .nda-edit-sheet { top: auto; height: min(86vh, 100%); width: 100%; border-left: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; }

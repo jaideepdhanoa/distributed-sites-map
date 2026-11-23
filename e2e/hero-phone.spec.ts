@@ -3,6 +3,19 @@ import fs from "node:fs";
 
 const widths = [360, 390] as const;
 
+async function photoSite(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch("/api/data/sites?city=PHX");
+    const body = await response.json() as { features?: { geometry?: { coordinates?: number[] } | null; properties?: { site_id?: string; photos?: unknown[] } }[] };
+    const idOf = (item: { geometry?: { coordinates?: number[] } | null; properties?: { site_id?: string } }) => {
+      const id = String(item.properties?.site_id || "");
+      return item.geometry?.coordinates && id.startsWith("WB-") ? id : "";
+    };
+    const photo = (body.features || []).find((item) => idOf(item) && Array.isArray(item.properties?.photos) && item.properties.photos.length > 0);
+    return photo ? idOf(photo) : "";
+  });
+}
+
 async function heroLayout(page: Page) {
   return page.locator("aside.drawer .hero-slot").evaluate((slot) => {
     const frameNode = slot.querySelector(".hero-frame");
@@ -55,9 +68,12 @@ async function heroLayout(page: Page) {
 test("phone hero overlays the view toggles on a 4:3 frame", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "phone hero");
   fs.mkdirSync("review-shots", { recursive: true });
+  await page.goto("/?funnel=universe&city=PHX", { waitUntil: "domcontentloaded" });
+  const site = await photoSite(page);
+  expect(site).toMatch(/^WB-/);
   for (const width of widths) {
     await page.setViewportSize({ width, height: 800 });
-    await page.goto("/?funnel=pipeline&site=PIPE-MIA-0080&sheet=full", { waitUntil: "domcontentloaded" });
+    await page.goto(`/?funnel=universe&site=${site}&sheet=full`, { waitUntil: "domcontentloaded" });
     const scroller = page.locator(".drawer-scroll");
     await scroller.evaluate((node) => { node.scrollTop = 0; });
     await expect(page.getByRole("tab", { name: "Street View" })).toBeVisible();

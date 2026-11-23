@@ -808,6 +808,51 @@ async function writeTag(sql: Sql, change: ParsedChange, actorId: string, version
   return stored;
 }
 
+const NDA_CLEAR_LABEL: Record<string, string> = {
+  status: "status",
+  waiting_on: "waiting on",
+  court: "court",
+  court_detail: "court detail",
+  court_since: "court since",
+  owner: "owner",
+  next_step: "next step",
+  next_step_due: "next step due",
+  document_url: "document link",
+  document_kind: "document kind",
+  contact_name: "contact name",
+  contact_email: "contact email",
+  contact_phone: "contact phone",
+  gmail_thread_ids: "email threads",
+  covered_refs: "covered references",
+};
+
+const NDA_CLEAR_ORDER = [
+  "status",
+  "waiting_on",
+  "court",
+  "court_detail",
+  "court_since",
+  "owner",
+  "next_step",
+  "next_step_due",
+  "document_url",
+  "document_kind",
+  "contact_name",
+  "contact_email",
+  "contact_phone",
+  "gmail_thread_ids",
+  "covered_refs",
+];
+
+function ndaClearPhrase(fields: readonly string[]): string {
+  const wanted = new Set(fields);
+  const labels = NDA_CLEAR_ORDER.filter((field) => wanted.has(field)).map((field) => NDA_CLEAR_LABEL[field]);
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return `Cleared ${labels[0]}`;
+  if (labels.length === 2) return `Cleared ${labels[0]} and ${labels[1]}`;
+  return `Cleared ${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
 async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version: number): Promise<Record<string, unknown>> {
   const body = change.payload as NdaPayload;
   const prior = await sql.query<{ status: string; waiting_on: string; owner: string; next_step: string; stage: string }>(
@@ -815,23 +860,29 @@ async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version
     [change.site_id],
   );
   const current = prior.rows[0];
+  const cleared = body.cleared || [];
+  const clearing = new Set(cleared);
+  const phrase = ndaClearPhrase(cleared);
+  const kept = (field: string, incoming: string, stored: string, writing: boolean) => {
+    if (clearing.has(field)) return "";
+    if (writing && incoming) return incoming;
+    return stored;
+  };
   const editing = body.action === "edit";
-  const status = body.action === "status" || (editing && body.status)
-    ? body.status || current?.status || ""
-    : current?.status || "";
-  const waiting = body.action === "status" || (editing && body.waiting_on)
-    ? body.waiting_on || current?.waiting_on || ""
-    : current?.waiting_on || "";
-  const owner = body.action === "assign" || (editing && body.owner) ? body.owner : current?.owner || "";
-  const next = body.action === "next_step" || (editing && body.next_step) ? body.next_step : current?.next_step || "";
+  const status = kept("status", body.status, current?.status || "", body.action === "status" || editing);
+  const waiting = kept("waiting_on", body.waiting_on, current?.waiting_on || "", body.action === "status" || editing);
+  const owner = kept("owner", body.owner, current?.owner || "", body.action === "assign" || editing);
+  const next = kept("next_step", body.next_step, current?.next_step || "", body.action === "next_step" || editing);
   const stage = body.stage || (body.action === "status" ? "" : current?.stage || "");
   const lastAction = body.action === "status" || body.stage
     ? `Status set to ${body.stage || status}`
     : body.action === "assign"
       ? `Owner set to ${owner}`
-      : body.action === "edit"
-        ? "Dossier updated"
-        : "Next step updated";
+      : phrase
+        ? phrase
+        : body.action === "edit"
+          ? "Dossier updated"
+          : "Next step updated";
   const lastDate = body.at.slice(0, 10);
   await sql.query(
     `INSERT INTO nda_state (
@@ -854,22 +905,23 @@ async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version
        updated_by = EXCLUDED.updated_by,
        updated_at = now(),
        stage = CASE WHEN EXCLUDED.stage <> '' THEN EXCLUDED.stage ELSE nda_state.stage END,
-       court = CASE WHEN EXCLUDED.court <> '' THEN EXCLUDED.court ELSE nda_state.court END,
-       court_detail = CASE WHEN EXCLUDED.court_detail <> '' THEN EXCLUDED.court_detail ELSE nda_state.court_detail END,
-       court_since = COALESCE(EXCLUDED.court_since, nda_state.court_since),
-       next_step_due = COALESCE(EXCLUDED.next_step_due, nda_state.next_step_due),
-       document_url = CASE WHEN EXCLUDED.document_url <> '' THEN EXCLUDED.document_url ELSE nda_state.document_url END,
-       document_kind = CASE WHEN EXCLUDED.document_kind <> '' THEN EXCLUDED.document_kind ELSE nda_state.document_kind END,
-       contact_name = CASE WHEN EXCLUDED.contact_name <> '' THEN EXCLUDED.contact_name ELSE nda_state.contact_name END,
-       contact_email = CASE WHEN EXCLUDED.contact_email <> '' THEN EXCLUDED.contact_email ELSE nda_state.contact_email END,
-       contact_phone = CASE WHEN EXCLUDED.contact_phone <> '' THEN EXCLUDED.contact_phone ELSE nda_state.contact_phone END,
-       gmail_thread_ids = CASE WHEN cardinality(EXCLUDED.gmail_thread_ids) > 0 THEN EXCLUDED.gmail_thread_ids ELSE nda_state.gmail_thread_ids END,
-       covered_refs = CASE WHEN cardinality(EXCLUDED.covered_refs) > 0 THEN EXCLUDED.covered_refs ELSE nda_state.covered_refs END,
+       court = CASE WHEN 'court' = ANY($23::text[]) THEN '' WHEN EXCLUDED.court <> '' THEN EXCLUDED.court ELSE nda_state.court END,
+       court_detail = CASE WHEN 'court_detail' = ANY($23::text[]) THEN '' WHEN EXCLUDED.court_detail <> '' THEN EXCLUDED.court_detail ELSE nda_state.court_detail END,
+       court_since = CASE WHEN 'court_since' = ANY($23::text[]) THEN NULL ELSE COALESCE(EXCLUDED.court_since, nda_state.court_since) END,
+       next_step_due = CASE WHEN 'next_step_due' = ANY($23::text[]) THEN NULL ELSE COALESCE(EXCLUDED.next_step_due, nda_state.next_step_due) END,
+       document_url = CASE WHEN 'document_url' = ANY($23::text[]) THEN '' WHEN EXCLUDED.document_url <> '' THEN EXCLUDED.document_url ELSE nda_state.document_url END,
+       document_kind = CASE WHEN 'document_kind' = ANY($23::text[]) THEN '' WHEN EXCLUDED.document_kind <> '' THEN EXCLUDED.document_kind ELSE nda_state.document_kind END,
+       contact_name = CASE WHEN 'contact_name' = ANY($23::text[]) THEN '' WHEN EXCLUDED.contact_name <> '' THEN EXCLUDED.contact_name ELSE nda_state.contact_name END,
+       contact_email = CASE WHEN 'contact_email' = ANY($23::text[]) THEN '' WHEN EXCLUDED.contact_email <> '' THEN EXCLUDED.contact_email ELSE nda_state.contact_email END,
+       contact_phone = CASE WHEN 'contact_phone' = ANY($23::text[]) THEN '' WHEN EXCLUDED.contact_phone <> '' THEN EXCLUDED.contact_phone ELSE nda_state.contact_phone END,
+       gmail_thread_ids = CASE WHEN 'gmail_thread_ids' = ANY($23::text[]) THEN '{}'::text[] WHEN cardinality(EXCLUDED.gmail_thread_ids) > 0 THEN EXCLUDED.gmail_thread_ids ELSE nda_state.gmail_thread_ids END,
+       covered_refs = CASE WHEN 'covered_refs' = ANY($23::text[]) THEN '{}'::text[] WHEN cardinality(EXCLUDED.covered_refs) > 0 THEN EXCLUDED.covered_refs ELSE nda_state.covered_refs END,
        source_ref = CASE WHEN EXCLUDED.source_ref <> '' THEN EXCLUDED.source_ref ELSE nda_state.source_ref END`,
     [
       change.site_id, status, waiting, owner, next, lastAction, lastDate, version, actorId,
       stage, body.court, body.court_detail, body.court_since, body.next_step_due, body.document_url, body.document_kind,
       body.contact_name, body.contact_email, body.contact_phone, body.gmail_thread_ids, body.covered_refs, body.source_ref,
+      cleared,
     ],
   );
   if (body.action === "status" || body.stage) {
@@ -879,18 +931,26 @@ async function writeNda(sql: Sql, change: ParsedChange, actorId: string, version
       [`NH-${randomUUID()}`, change.site_id, body.stage || status, body.note, actorId, body.at],
     );
   }
+  if (phrase) {
+    await sql.query(
+      `INSERT INTO nda_history (id, nda_id, status, note, actor, at)
+       VALUES ($1, $2, $3, $4, $5, $6::timestamptz)`,
+      [`NH-${randomUUID()}`, change.site_id, phrase, body.action === "status" || body.stage ? "" : body.note, actorId, body.at],
+    );
+  }
   return {
     action: body.action,
     status,
     stage,
-    court: body.court,
+    court: clearing.has("court") ? "" : body.court,
     waiting_on: waiting,
     owner,
     next_step: next,
-    next_step_due: body.next_step_due,
-    document_url: body.document_url,
-    document_kind: body.document_kind,
-    note: body.note,
+    next_step_due: clearing.has("next_step_due") ? "" : body.next_step_due,
+    document_url: clearing.has("document_url") ? "" : body.document_url,
+    document_kind: clearing.has("document_kind") ? "" : body.document_kind,
+    note: body.note || phrase,
+    ...(phrase ? { clear_note: phrase, cleared } : {}),
     source_ref: body.source_ref,
     last_action: lastAction,
     last_action_date: lastDate,

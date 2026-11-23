@@ -68,6 +68,39 @@ test("a dossier without a site opens, and edit posts one change", async ({ page 
   }
 });
 
+test("a cleared field shows on the dossier and an emptied link is posted blank", async ({ page }) => {
+  const filled = {
+    ...row,
+    document_url: "https://example.com/sample-doc",
+    document_kind: "docusign",
+    history: [
+      ...row.history,
+      { status: "Cleared contact phone", note: "", actor: "muse", at: "2026-11-22T18:00:00Z" },
+    ],
+  };
+  await page.route("**/api/data/nda", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [filled] } }));
+  let posted = "";
+  await page.route("**/api/changes", async (route) => {
+    posted = route.request().postData() || "";
+    await route.fulfill({ json: { results: [{ version: 2 }] } });
+  });
+  await page.route("**/api/actions/accounts", (route) => route.fulfill({ json: { accounts: [{ id: "sample-owner", name: "Sample Owner" }] } }));
+  await page.goto("/?nda=NDA-902", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("nda-history")).toContainText("Cleared contact phone");
+  await expect(page.getByTestId("nda-clears")).toContainText("Cleared contact phone");
+  await page.getByTestId("nda-edit").click();
+  await page.getByLabel("Document link").fill("");
+  await page.getByLabel("Status note").fill("Sample link removed.");
+  await page.getByTestId("nda-save").click();
+  await expect.poll(() => posted).toContain('"document_url":""');
+  const body = JSON.parse(posted) as { changes: { source: string; payload: Record<string, unknown> }[] };
+  expect(body.changes[0]?.source).toBe("NDA queue");
+  expect(body.changes[0]?.payload.source_ref).toBe("nda-dossier");
+  expect(body.changes[0]?.payload.document_url).toBe("");
+  expect(body.changes[0]?.payload.contact_name).toBe("Sample Person");
+  expect(body.changes[0]?.payload.contact_phone).toBeUndefined();
+});
+
 test("a queue row opens that dossier and the actions menu closes", async ({ page }) => {
   const other = { ...row, nda_id: "NDA-903", counterparty_firm: "Other Firm", conflict: "", gmail_thread_ids: [] };
   await page.route("**/api/data/nda", (route) => route.fulfill({ json: { source: "fixture", as_of: "2026-11-23", label: "Sample", queue: [row, other] } }));

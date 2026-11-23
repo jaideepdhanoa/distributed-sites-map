@@ -765,11 +765,13 @@ for (const size of [
     await page.getByTestId("nda-open").click();
     await expect(page.getByTestId("nda-detail")).toBeVisible();
     const text = `Sample note ${size.label} on the agreement.`;
-    await page.getByTestId("nda-discussion").getByTestId("comment-body").fill(text);
-    await page.getByTestId("nda-discussion").getByRole("button", { name: "Comment" }).click();
-    await expect(page.getByTestId("nda-discussion")).toContainText(text);
-    await page.getByTestId("nda-back").click();
-    await page.getByTestId("panel-tab-activity").click();
+    const discussion = page.getByTestId("nda-discussion");
+    await discussion.getByTestId("comment-body").scrollIntoViewIfNeeded();
+    await discussion.getByTestId("comment-body").fill(text);
+    await discussion.getByRole("button", { name: "Comment" }).scrollIntoViewIfNeeded();
+    await discussion.getByRole("button", { name: "Comment" }).click();
+    await expect(discussion).toContainText(text);
+    await page.goto(`/?funnel=pipeline&site=${found.deal}&panel=activity`);
     const row = page.locator("[data-nda-comment]");
     await expect(row).toContainText(text);
     await expect(row.getByTestId("nda-activity-chip")).toHaveText(`on ${found.nda}`);

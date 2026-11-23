@@ -30,18 +30,33 @@ function hexes(value: string): string[] {
   return (value.match(/\b[0-9a-f]{16}\b/gi) || []).map((item) => item.toLowerCase());
 }
 
-function firmMatch(rowFirm: string, wanted: string): boolean {
-  const left = norm(rowFirm);
-  const right = norm(wanted);
-  if (left.length < 6 || right.length < 6) return false;
-  return left === right || left.includes(right) || right.includes(left);
+const FIRM_STOP = new Set([
+  "advisors", "advisor", "associates", "associate", "business", "capital", "commercial",
+  "company", "consulting", "enterprise", "enterprises", "estate", "group", "holding",
+  "holdings", "international", "management", "partner", "partners", "properties",
+  "property", "realty", "service", "services", "solutions",
+]);
+
+function firmTokens(value: string): string[] {
+  return norm(value).split(" ").filter((part) => part.length >= 5 && !FIRM_STOP.has(part));
 }
 
-function personMatch(rowPerson: string, wanted: string): boolean {
-  const person = norm(rowPerson);
+function firmMatch(rowFirm: string, wanted: string): boolean {
+  const left = firmTokens(rowFirm);
+  const right = firmTokens(wanted);
+  if (!left.length || !right.length) return false;
+  return left.some((token) => right.some((other) => token === other || token.includes(other) || other.includes(token)));
+}
+
+function personMatch(value: string, wanted: string): boolean {
+  const person = norm(value);
   const parts = norm(wanted).split(" ").filter((part) => part.length > 2);
   if (!person || parts.length < 2) return false;
   return parts.every((part) => person.includes(part));
+}
+
+function bareSite(row: CommsRecord): boolean {
+  return siteTokens(row.site_ids || "").length === 0;
 }
 
 export function addressIn(value: string): string {
@@ -49,11 +64,22 @@ export function addressIn(value: string): string {
   return match ? match[0] : "";
 }
 
-/** An email from a comms row whose person is the NDA contact. */
+function senderName(value: string): string {
+  return norm(value.replace(/<[^>]*>/g, " ").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, " "));
+}
+
+/** True only when the comms sender's display name is the contact, not a cc or another person. */
+export function senderIsContact(sender: string, contactName: string): boolean {
+  const left = senderName(sender);
+  const right = norm(contactName);
+  return Boolean(left && right && left === right);
+}
+
+/** An email from the sender row only when that sender is the contact. */
 export function emailFromComms(rows: CommsRecord[], personName: string): string {
   for (const row of rows) {
-    if (!personMatch(row.person || "", personName)) continue;
-    const found = addressIn(`${row.email || ""} ${row.person || ""} ${row.summary || ""} ${row.subject || ""} ${row.source || ""}`);
+    if (!senderIsContact(row.person || "", personName)) continue;
+    const found = addressIn(`${row.email || ""} ${row.person || ""}`);
     if (found) return found;
   }
   return "";
@@ -63,21 +89,19 @@ function matches(row: CommsRecord, spec: NdaActivityQuery, threads: Set<string>)
   const sites = new Set(spec.sites.map((id) => id.trim().toUpperCase()).filter(Boolean));
   if (siteTokens(row.site_ids || "").some((id) => sites.has(id))) return true;
   const ndaId = spec.ndaId.trim().toUpperCase();
-  const blob = `${row.site_ids || ""} ${row.summary || ""} ${row.subject || ""} ${row.source || ""}`;
-  if (ndaId && blob.toUpperCase().includes(ndaId)) return true;
+  const blob = `${row.site_ids || ""} ${row.summary || ""} ${row.subject || ""} ${row.source || ""} ${row.firm || ""} ${row.person || ""}`;
+  if (ndaId && new RegExp(`\\b${ndaId}\\b`, "i").test(blob)) return true;
   const thread = (row.thread_id || "").trim().toLowerCase();
   const message = (row.message_id || "").trim().toLowerCase();
   if ((thread && threads.has(thread)) || (message && threads.has(message))) return true;
   if (firmMatch(row.firm || "", spec.firm)) return true;
-  if (personMatch(row.person || "", spec.person) && (!norm(row.firm || "") || firmMatch(row.firm || "", spec.firm))) return true;
+  const named = personMatch(row.person || "", spec.person) || personMatch(blob, spec.person);
+  if (named && (bareSite(row) || !norm(row.firm || "") || firmMatch(row.firm || "", spec.firm))) return true;
   return false;
 }
 
-function oneLine(value: string): string {
-  const clean = stripGmailIds(value).replace(/\s+/g, " ").trim();
-  if (clean.length <= 140) return clean;
-  const slice = clean.slice(0, 140).replace(/\s+\S*$/, "").trim();
-  return `${slice || clean.slice(0, 140).trim()}…`;
+function cleanText(value: string): string {
+  return stripGmailIds(value).replace(/\s+/g, " ").trim();
 }
 
 export function activityClock(at: string): string {
@@ -121,8 +145,8 @@ export function ndaActivity(rows: CommsRecord[], spec: NdaActivityQuery): { item
       at: activityClock(row.at || ""),
       direction: kind,
       person: (row.person || "").trim(),
-      subject: oneLine(row.subject || "") || "Email",
-      summary: oneLine(row.summary || ""),
+      subject: cleanText(row.subject || "") || "Email",
+      summary: cleanText(row.summary || ""),
       href: gmailHref(row.link || "", row.message_id || "", row.thread_id || ""),
       thread,
     };

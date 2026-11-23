@@ -9,6 +9,15 @@ import { coveredSites, ndaQueueAllowed } from "@/lib/nda";
 import { ndaActivity } from "@/lib/ndaActivity";
 import { loadNdaSnapshot } from "@/lib/ndaLoad";
 import { loadNdaQueue } from "@/lib/ndaStore";
+import { getUsers } from "@/lib/users";
+
+function ownerNames(): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const user of getUsers()) {
+    if (user.u && user.displayName) names[user.u] = user.displayName;
+  }
+  return names;
+}
 
 let commsCache: { at: number; rows: CommsRecord[] } | null = null;
 
@@ -22,12 +31,15 @@ async function commsRows(): Promise<CommsRecord[]> {
 function queueResponse(user: string) {
   console.info(JSON.stringify({ event: "data", user, part: "nda" }));
   const snapshot = loadNdaSnapshot();
-  return loadNdaQueue(snapshot.register || []).then((queue) => NextResponse.json({
-    source: snapshot.source,
-    as_of: snapshot.as_of,
-    label: snapshot.label,
-    queue,
-  }, { headers: privateHeaders }));
+  return loadNdaQueue(snapshot.register || []).then((queue) => {
+    const names = ownerNames();
+    return NextResponse.json({
+      source: snapshot.source,
+      as_of: snapshot.as_of,
+      label: snapshot.label,
+      queue: queue.map((row) => ({ ...row, owner_name: names[row.owner] || "" })),
+    }, { headers: privateHeaders });
+  });
 }
 
 async function activityResponse(user: string, ndaId: string) {
@@ -52,6 +64,7 @@ async function activityResponse(user: string, ndaId: string) {
   return NextResponse.json(redactGmailPayload({
     items: activity.items,
     contact_email: row.contact_email || activity.contact_email,
+    contact_phone: row.contact_phone || "",
   }), { headers: privateHeaders });
 }
 

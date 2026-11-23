@@ -3,6 +3,8 @@ import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { applyBatch } from "../../lib/changes/apply";
 import { validateBatch, type Actor, type NdaPayload } from "../../lib/changes/schema";
+import { ndaQueueAllowed, type NdaAgreement } from "../../lib/nda";
+import { overlayNdaRegister } from "../../lib/ndaStore";
 import { memorySql } from "../helpers/sql";
 
 const muse: Actor = { id: "muse", kind: "agent" };
@@ -210,6 +212,54 @@ test("an empty list or null clears an array and an omitted list stays", async ()
   assert.deepEqual(afterRefs.rows[0]?.gmail_thread_ids, []);
   assert.deepEqual(afterRefs.rows[0]?.covered_refs, []);
   assert.equal(afterRefs.rows[0]?.last_action, "Cleared covered references");
+});
+
+test("a contributor session still sees saved contact after a document clear", async () => {
+  assert.equal(ndaQueueAllowed("contributor"), true);
+  const sql = await memorySql();
+  await migrate(sql);
+  const id = "NDA-012";
+  const write = (payload: Record<string, unknown>, expected: number, key: string) => ({
+    changes: [{ entity_type: "nda", site_id: id, expected_version: expected, source: "email", payload }],
+  });
+  const seeded = await applyBatch(sql, muse, "nda-012-seed", write({ ...seed, at: AT }, 0, "nda-012-seed"));
+  assert.equal(seeded.results[0]?.version, 1);
+  const cleared = await applyBatch(sql, muse, "nda-012-clear", write({
+    action: "edit",
+    document_url: null,
+    document_kind: null,
+    note: "The link was removed.",
+    source_ref: "sample-message",
+    at: LATER,
+  }, 1, "nda-012-clear"));
+  assert.equal(cleared.results[0]?.version, 2);
+  const register: NdaAgreement = {
+    nda_id: id,
+    counterparty_firm: "Sample Firm",
+    counterparty_person: "Sample Person",
+    scope: "",
+    site_ids: "",
+    nda_status: "Our form sent",
+    nda_form: "",
+    nda_waiting_on: "Them",
+    nda_opened_date: "2026-11-01",
+    nda_sent_date: "",
+    nda_last_action_date: "2026-11-01",
+    nda_waiting_on_since: "2026-11-01",
+    nda_executed_date: "",
+    nda_gates: "",
+    nda_days_open: null,
+    nda_days_in_court: null,
+    source: "",
+    notes: "",
+  };
+  const queue = await overlayNdaRegister(sql, [register]);
+  const row = queue.find((item) => item.nda_id === id);
+  assert.equal(row?.version, 2);
+  assert.equal(row?.contact_email, "person@example.com");
+  assert.equal(row?.contact_phone, "ext 4");
+  assert.equal(row?.document_url, "");
+  assert.equal(row?.history.some((item) => item.status === "Cleared document link and document kind"), true);
 });
 
 test("stage cannot be cleared and a clear still needs a source", () => {

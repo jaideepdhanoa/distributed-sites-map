@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { brokerFollowUp, draftMentionsProduct } from "../lib/ndaDraft.ts";
-import { ndaActivity, emailFromComms, type NdaActivityQuery } from "../lib/ndaActivity.ts";
+import { ndaActivity, emailFromComms, senderIsContact, type NdaActivityQuery } from "../lib/ndaActivity.ts";
 import type { CommsRecord } from "../lib/comms.ts";
 import { noteEntries } from "../lib/ndaNotes.ts";
 import {
@@ -14,7 +14,11 @@ import {
   discussionSite,
   gateLabel,
   cardNdaLabel,
+  collapseContained,
+  dossierContacts,
   ndaChip,
+  preferSaved,
+  registerConflict,
   ndaQueueAllowed,
   ndaQueueBody,
   openNdaQueue,
@@ -248,11 +252,80 @@ test("a saved status sits on the register row and a closed one leaves the queue"
   assert.equal(blank.includes("Thank you"), false);
 });
 
-test("a register note supplies a contact email the overlay left blank", () => {
-  const row = agreement({ nda_id: "NDA-901", notes: "Nov 2 wrote person@example.com.", source: "fixture" });
+test("a blank contact keeps the register address, and a saved contact wins", () => {
+  const row = agreement({ nda_id: "NDA-901", counterparty_person: "Sample Person", notes: "Counsel wrote other@example.com. Call (415) 555-0134.", source: "fixture" });
   const shown = presentQueue([row], [], [], "2026-11-23");
+  assert.equal(shown[0]?.contact_email, "other@example.com");
+  assert.equal(shown[0]?.contact_phone, "(415) 555-0134");
+  const saved = presentQueue([row], [{
+    nda_id: "NDA-901",
+    status: "",
+    waiting_on: "",
+    owner: "",
+    next_step: "",
+    last_action: "",
+    last_action_date: "",
+    version: 2,
+    contact_email: "person@example.com",
+    contact_phone: "ext 4",
+  }], [], "2026-11-23");
+  assert.equal(saved[0]?.contact_email, "person@example.com");
+  assert.equal(saved[0]?.contact_phone, "ext 4");
+});
+
+test("a saved dossier contact beats a comms-derived one", () => {
+  assert.equal(preferSaved("person@example.com", "other@example.com"), "person@example.com");
+  assert.equal(preferSaved("", "person@example.com"), "person@example.com");
+  assert.equal(preferSaved("  ", "person@example.com"), "person@example.com");
+  const kept = dossierContacts(
+    { contact_name: "Sample Person", contact_email: "person@example.com", contact_phone: "ext 4", document_url: "https://example.com/sample-doc" },
+    { contact_name: "Other Counsel", contact_email: "other@example.com", contact_phone: "ext 9", document_url: "https://example.com/other" },
+  );
+  assert.equal(kept.contact_email, "person@example.com");
+  assert.equal(kept.contact_phone, "ext 4");
+  assert.equal(kept.document_url, "https://example.com/sample-doc");
+  assert.equal(kept.contact_name, "Sample Person");
+  const filled = dossierContacts({ contact_email: "", contact_phone: "", document_url: "" }, { contact_email: "person@example.com" });
+  assert.equal(filled.contact_email, "person@example.com");
+  assert.equal(filled.contact_phone, "");
+  assert.equal(filled.document_url, "");
+  const row = agreement({ nda_id: "NDA-901", counterparty_person: "Sample Person", notes: "Counsel wrote other@example.com." });
+  const shown = presentQueue([row], [{
+    nda_id: "NDA-901",
+    status: "",
+    waiting_on: "",
+    owner: "sample",
+    next_step: "",
+    last_action: "Dossier updated",
+    last_action_date: "2026-11-23",
+    version: 2,
+    contact_name: "Sample Person",
+    contact_email: "person@example.com",
+    contact_phone: "ext 4",
+    document_url: "https://example.com/sample-doc",
+  }], [], "2026-11-23");
   assert.equal(shown[0]?.contact_email, "person@example.com");
-  assert.equal(shown[0]?.contact_phone, "");
+  assert.equal(shown[0]?.contact_phone, "ext 4");
+  assert.equal(shown[0]?.document_url, "https://example.com/sample-doc");
+  assert.equal(shown[0]?.version, 2);
+});
+
+test("an owner edit does not flag a register conflict, and a newer disagreed stage does", () => {
+  const row = agreement({ nda_id: "NDA-901", nda_status: "With counterparty legal", nda_waiting_on: "Them", nda_last_action_date: "2026-11-01", nda_waiting_on_since: "2026-11-01" });
+  assert.equal(registerConflict(row, {
+    nda_id: "NDA-901", status: "", waiting_on: "", owner: "sample", next_step: "Call", last_action: "Dossier updated", last_action_date: "2026-11-23", version: 1,
+  }), "");
+  assert.equal(registerConflict(row, {
+    nda_id: "NDA-901", status: "", waiting_on: "", owner: "", next_step: "", last_action: "Status set", last_action_date: "2026-11-23", version: 2,
+    stage: "with_moove_legal", court: "us",
+  }), "Register last action is older than the latest saved record.");
+});
+
+test("a scope line drops a phrase that is already inside a longer one", () => {
+  assert.deepEqual(collapseContained([
+    "Operating c-store with gas and gaming",
+    "Operating c-store with gas and gaming; car wash out of service",
+  ]), ["Operating c-store with gas and gaming; car wash out of service"]);
 });
 
 test("register notes split only when a date starts an entry", () => {
@@ -268,6 +341,14 @@ test("register notes split only when a date starts an entry", () => {
   assert.deepEqual(noteEntries(kept), [kept]);
   const range = "Forms were agreed Oct 29-30, 2026 and nothing else was logged.";
   assert.deepEqual(noteEntries(range), [range]);
+  const stamped = "Nov 20: Sent the form.\n\nNov 18, 2026, 17:26 PT Called back.\nNov 18, 2026, 09:00 PT Opened the file.";
+  const times = noteEntries(stamped);
+  assert.deepEqual(times.map((entry) => entry.slice(0, 22)), [
+    "Nov 20: Sent the form.",
+    "Nov 18, 2026, 17:26 PT",
+    "Nov 18, 2026, 09:00 PT",
+  ]);
+  assert.equal(times.every((entry) => !entry.startsWith("\n") && !entry.endsWith("\n")), true);
 });
 
 function commsRow(partial: Partial<CommsRecord>): CommsRecord {
@@ -314,7 +395,9 @@ test("NDA activity dedupes, groups a thread, and reads a matching contact email"
   assert.equal(activity.items[0]?.direction, "in");
   assert.equal(activity.items[0]?.thread, activity.items[0]?.id);
   assert.equal(activity.items.some((item) => /abcdef|1234abcd/.test(item.thread + item.id)), false);
-  assert.equal(activity.contact_email, "person@example.com");
+  assert.equal(activity.contact_email, "");
+  assert.equal(emailFromComms([{ ...rows[2], email: "person@example.com", summary: "Noted." }], "Sample Person"), "person@example.com");
+  assert.equal(senderIsContact("Other Counsel <other@example.com>", "Sample Person"), false);
   assert.equal(emailFromComms(rows, "Someone Else"), "");
   const byFirm = ndaActivity([commsRow({ comms_id: "CM-904", at: "2026-11-02 08:15", summary: "Noted." })], {
     ...query,
@@ -324,6 +407,12 @@ test("NDA activity dedupes, groups a thread, and reads a matching contact email"
   });
   assert.equal(byFirm.items.length, 1);
   assert.equal(byFirm.items[0]?.at, "Nov 2, 8:15 AM");
+  const noSite = ndaActivity([
+    commsRow({ comms_id: "CM-905", site_ids: "", firm: "Sample", person: "Sample Person", summary: "Wrote from person@example.com.", subject: "Hello", at: "2026-11-09 15:04" }),
+  ], { ...query, sites: [], threads: [], ndaId: "NDA-902", firm: "Sample Firm" });
+  assert.equal(noSite.items.length, 1);
+  assert.equal(noSite.contact_email, "");
+  assert.equal(noSite.items[0]?.summary.includes("…"), false);
 });
 
 test("the card hides a closed NDA and prefixes an open one for signed-in readers", () => {

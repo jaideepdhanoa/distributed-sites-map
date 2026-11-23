@@ -13,6 +13,7 @@ import {
   type MergedLine,
 } from "@/lib/comms";
 import NoteBody from "../NoteBody";
+import { MentionChips, type MentionAccount } from "../actions/MentionField";
 import { ACTIVITY_TIMEOUT_MS, activityView } from "@/lib/timeline/load";
 import "./timeline.css";
 
@@ -106,7 +107,18 @@ async function loadPart<T>(url: string, signal: AbortSignal, accept: (body: T) =
   return body;
 }
 
-export default function Timeline({ recordId, relatedId }: { recordId: string; relatedId?: string }) {
+type NdaNote = {
+  id: string;
+  parentId?: string | null;
+  body: string;
+  authorId: string;
+  createdAt: string;
+  deleted?: boolean;
+  mentions?: MentionAccount[];
+  anchor?: { type?: string; line?: string };
+};
+
+export default function Timeline({ recordId, relatedId, ndaId = "", onOpenNda }: { recordId: string; relatedId?: string; ndaId?: string; onOpenNda?: (id: string) => void }) {
   const [timeline, setTimeline] = useState<TimelinePayload | null>(null);
   const [comms, setComms] = useState<CommsPayload | null>(null);
   const [showInternal, setShowInternal] = useState(false);
@@ -125,6 +137,8 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     router.replace(href, { scroll: false });
   }
   const [commsError, setCommsError] = useState(false);
+  const [ndaNotes, setNdaNotes] = useState<NdaNote[]>([]);
+  const [ndaNames, setNdaNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancel = false;
@@ -174,6 +188,33 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
     };
   }, [recordId, relatedId]);
 
+  useEffect(() => {
+    if (!/^NDA-\d{3,}$/i.test(ndaId)) {
+      setNdaNotes([]);
+      return undefined;
+    }
+    let cancel = false;
+    const query = new URLSearchParams({ targetKind: "nda", targetId: ndaId });
+    fetch(`/api/actions/notes?${query}`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { notes: [] }))
+      .then((body: { notes?: NdaNote[] }) => {
+        if (!cancel) setNdaNotes(body.notes || []);
+      })
+      .catch(() => undefined);
+    fetch("/api/actions/accounts", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { accounts: [] }))
+      .then((body: { accounts?: { id: string; name: string }[] }) => {
+        if (cancel) return;
+        const names: Record<string, string> = {};
+        for (const account of body.accounts || []) names[account.id] = account.name;
+        setNdaNames(names);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [ndaId]);
+
   const materials = timeline?.materials || [];
   const activity = (timeline?.items || []).filter((item) => KEPT_LINES.has(item.type) || timeline?.showActivityLines !== false);
   const commsRows = comms?.rows || [];
@@ -183,7 +224,7 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
   });
   const folderUrl = timeline?.folderUrl || "";
   const lastTouched = timeline?.lastTouched || "";
-  const empty = !pending && !timelineError && !commsError && !folderUrl && materials.length === 0 && !lastTouched && merged.length === 0;
+  const empty = !pending && !timelineError && !commsError && !folderUrl && materials.length === 0 && !lastTouched && merged.length === 0 && ndaNotes.length === 0;
 
   return (
     <section className="tl" data-testid="activity">
@@ -215,8 +256,19 @@ export default function Timeline({ recordId, relatedId }: { recordId: string; re
         </ul>
       ) : null}
       {lastTouched ? <p className="note">Last touched {lastTouched}</p> : null}
-      {merged.length ? (
+      {merged.length || ndaNotes.length ? (
         <ol className="tl-list">
+          {ndaNotes.filter((note) => !note.parentId && !note.deleted && note.anchor?.type === "nda").map((note) => (
+            <li key={note.id} data-testid="timeline-entry" data-nda-comment={ndaId}>
+              <p className="tl-title">
+                <time dateTime={note.createdAt}>{formatActivityWhen(note.createdAt).label}</time>
+                <span>{ndaNames[note.authorId] || note.authorId}</span>
+              </p>
+              <NoteBody text={note.body} />
+              {note.mentions?.length ? <p className="note">Mentioned <MentionChips mentions={note.mentions} /></p> : null}
+              <button type="button" className="chip" data-testid="nda-activity-chip" onClick={() => onOpenNda?.(note.anchor?.line || ndaId)}>on {note.anchor?.line || ndaId}</button>
+            </li>
+          ))}
           {merged.map((item, index) => (item.kind === "comms" ? commsLine(item, index, msg, openMessage) : activityLine(item, index)))}
         </ol>
       ) : null}

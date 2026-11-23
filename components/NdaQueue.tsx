@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import NdaDetail from "./NdaDetail";
-import { counterpartyLine, coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
+import { collapseContained, counterpartyLine, coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
 
 type Payload = {
   queue?: NdaQueueItem[];
@@ -27,9 +27,17 @@ function todayIso(): string {
 function coveredLabel(row: NdaQueueItem, names: Record<string, string>): string {
   const covered = coveredSites(row.site_ids || "");
   if (covered.ids.length > 2) return `${covered.ids.length} sites`;
-  if (covered.ids.length) return covered.ids.map((id) => names[id] || "Covered site").join(" · ");
+  if (covered.ids.length) return collapseContained(covered.ids.map((id) => names[id] || "Covered site")).join(" · ");
   const refs = row.covered_refs || [];
   return covered.note || refs.find((item) => !/^(?:PIPE|LAND|L)-/.test(item)) || row.scope || "No covered listing";
+}
+
+function queueLine(row: NdaQueueItem, names: Record<string, string>): string {
+  const contact = row.counterparty_person || row.contact_name || "No contact";
+  const stage = stageLabel(row.stage) || row.nda_status || "—";
+  const scope = coveredLabel(row, names);
+  const distinct = scope && scope !== "No covered listing" ? scope : "";
+  return collapseContained([contact, stage, distinct]).join(" · ");
 }
 
 function CourtPill({ court, label }: { court: string; label: string }) {
@@ -80,7 +88,7 @@ export default function NdaQueue({
 
   useEffect(() => {
     let cancel = false;
-    fetch("/api/data/nda").then(async (response) => {
+    fetch("/api/data/nda", { cache: "no-store" }).then(async (response) => {
       const body = (await response.json().catch(() => ({}))) as Payload;
       if (cancel) return;
       if (!response.ok) {
@@ -203,8 +211,8 @@ export default function NdaQueue({
                     <strong>{row.counterparty_firm || row.nda_id}</strong>
                     <CourtPill court={row.court} label={row.court_pill} />
                   </span>
-                  <span>{[row.counterparty_person || row.contact_name || "No contact", stageLabel(row.stage) || row.nda_status || "—"].join(" · ")}</span>
-                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""} · ${coveredLabel(row, names)}`}</span>
+                  <span>{queueLine(row, names)}</span>
+                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""}`}</span>
                 </button>
               </li>
             );
@@ -212,7 +220,7 @@ export default function NdaQueue({
         </ul>
         {open ? (
           <NdaDetail
-            key={open.nda_id}
+            key={`${open.nda_id}:${open.version}:${open.contact_email || ""}:${open.contact_phone || ""}`}
             row={open}
             today={today}
             names={names}

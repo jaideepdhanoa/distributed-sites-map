@@ -46,6 +46,7 @@ export default function CommentThread({
   compact = false,
   onClose,
   onReload,
+  onCount,
 }: {
   siteId: string;
   anchor: CommentAnchor;
@@ -56,6 +57,7 @@ export default function CommentThread({
   compact?: boolean;
   onClose?: () => void;
   onReload?: () => void;
+  onCount?: (count: number) => void;
 }) {
   const status = useActionStatus();
   const [loaded, setLoaded] = useState<ThreadNote[]>(notes || []);
@@ -113,6 +115,9 @@ export default function CommentThread({
   }, [preview]);
 
   const roots = loaded.filter((note) => !note.parentId && note.anchor && sameAnchor(note.anchor, anchor) && !note.deleted);
+  useEffect(() => {
+    onCount?.(roots.length);
+  }, [onCount, roots.length]);
   const name = (id: string) => accounts.find((account) => account.id === id)?.name || id;
 
   async function save(input: {

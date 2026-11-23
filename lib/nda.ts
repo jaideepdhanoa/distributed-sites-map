@@ -311,6 +311,19 @@ export type NdaStateRow = {
   last_action: string;
   last_action_date: string;
   version: number;
+  stage?: string;
+  court?: string;
+  court_detail?: string;
+  court_since?: string;
+  next_step_due?: string;
+  document_url?: string;
+  document_kind?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  gmail_thread_ids?: string[];
+  covered_refs?: string[];
+  source_ref?: string;
 };
 
 export type NdaQueueItem = NdaAgreement & {
@@ -319,6 +332,22 @@ export type NdaQueueItem = NdaAgreement & {
   last_action: string;
   version: number;
   history: NdaHistoryItem[];
+  stage: string;
+  court: string;
+  court_detail: string;
+  court_since: string;
+  next_step_due: string;
+  document_url: string;
+  document_kind: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  gmail_thread_ids: string[];
+  covered_refs: string[];
+  source_ref: string;
+  conflict: string;
+  court_pill: string;
+  days_court: number | null;
 };
 
 export function registerHistory(row: Pick<NdaAgreement, "nda_status" | "nda_last_action_date" | "nda_opened_date">): NdaHistoryItem {
@@ -330,8 +359,91 @@ export function registerHistory(row: Pick<NdaAgreement, "nda_status" | "nda_last
   };
 }
 
-export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, history: NdaHistoryItem[] = []): NdaQueueItem {
+const STAGE_LABEL: Record<string, string> = {
+  requested: "Requested",
+  our_form_sent: "Our form sent",
+  their_form_received: "Their form received",
+  redline_with_them: "Redline with them",
+  redline_with_us: "Redline with us",
+  with_moove_legal: "With Moove legal",
+  routing_for_signature: "Routing for signature",
+  counterparty_signed: "Counterparty signed",
+  executed: "Executed",
+  financials_requested: "Financials requested",
+  financials_received: "Financials received",
+  deferred: "Deferred",
+  declined: "Declined",
+  not_required: "Not required",
+  expired: "Expired",
+};
+
+/** Suggested stage from a free-text register status. The original wording stays visible. */
+export function suggestStage(status: string): string {
+  const raw = status.toLowerCase();
+  if (/not required|not started/.test(raw)) return "not_required";
+  if (/executed/.test(raw)) return "executed";
+  if (/declined/.test(raw)) return "declined";
+  if (/expired/.test(raw)) return "expired";
+  if (/financials received/.test(raw)) return "financials_received";
+  if (/financials requested|proof of funds/.test(raw)) return "financials_requested";
+  if (/deferred/.test(raw)) return "deferred";
+  if (/moove legal/.test(raw)) return "with_moove_legal";
+  if (/counterparty legal|their legal|redline with them/.test(raw)) return "redline_with_them";
+  if (/our legal|redline with us/.test(raw)) return "redline_with_us";
+  if (/form sent|our form/.test(raw)) return "our_form_sent";
+  if (/their form|form received/.test(raw)) return "their_form_received";
+  if (/signature|routing/.test(raw)) return "routing_for_signature";
+  if (/counterparty signed/.test(raw)) return "counterparty_signed";
+  if (raw) return "requested";
+  return "";
+}
+
+export function stageLabel(stage: string): string {
+  return STAGE_LABEL[stage] || stage;
+}
+
+export function courtFromWaiting(waiting: string): string {
+  const raw = waiting.toLowerCase();
+  if (!raw || raw === "—" || raw === "none") return "none";
+  if (/\bus\b|moove|our/.test(raw)) return "us";
+  if (/seller/.test(raw)) return "seller";
+  if (/them|their|counterparty|broker|signer/.test(raw)) return "them";
+  return "none";
+}
+
+export function courtPill(court: string, days: number | null): string {
+  const count = days == null ? "" : ` ${days}d`;
+  if (court === "us") return `Our court${count}`;
+  if (court === "them" || court === "seller") return `Their court${count}`;
+  return "";
+}
+
+function addressIn(value: string): string {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0] : "";
+}
+
+function phoneIn(value: string): string {
+  const match = value.match(/(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}/);
+  return match ? match[0] : "";
+}
+
+function listOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => text(item)).filter(Boolean);
+  return [];
+}
+
+export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, history: NdaHistoryItem[] = [], today = ""): NdaQueueItem {
   const written = history.filter((item) => item.status || item.note);
+  const stage = state?.stage || suggestStage(displayStatus(row.nda_status, true));
+  const court = state?.court || courtFromWaiting(state?.waiting_on || row.nda_waiting_on);
+  const since = text(state?.court_since) || text(row.nda_waiting_on_since) || text(row.nda_opened_date);
+  const day = today ? daysSince(since.slice(0, 10), today) : null;
+  const savedDate = text(state?.last_action_date);
+  const registerDate = text(row.nda_last_action_date);
+  const conflict = savedDate && registerDate && registerDate < savedDate
+    ? "Register last action is older than the latest saved record."
+    : "";
   return {
     ...row,
     nda_status: state?.status || displayStatus(row.nda_status, true),
@@ -342,10 +454,26 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
     last_action: state?.last_action || "",
     version: state ? Number(state.version) || 0 : 0,
     history: [registerHistory(row), ...written],
+    stage,
+    court,
+    court_detail: text(state?.court_detail),
+    court_since: since,
+    next_step_due: text(state?.next_step_due),
+    document_url: text(state?.document_url),
+    document_kind: text(state?.document_kind),
+    contact_name: text(state?.contact_name) || text(row.counterparty_person),
+    contact_email: text(state?.contact_email) || addressIn(`${row.notes || ""} ${row.source || ""}`),
+    contact_phone: text(state?.contact_phone) || phoneIn(`${row.notes || ""} ${row.source || ""}`),
+    gmail_thread_ids: listOf(state?.gmail_thread_ids),
+    covered_refs: listOf(state?.covered_refs),
+    source_ref: text(state?.source_ref),
+    conflict,
+    court_pill: courtPill(court, day),
+    days_court: day,
   };
 }
 
-export function presentQueue(rows: NdaAgreement[], states: NdaStateRow[] = [], history: (NdaHistoryItem & { nda_id: string })[] = []): NdaQueueItem[] {
+export function presentQueue(rows: NdaAgreement[], states: NdaStateRow[] = [], history: (NdaHistoryItem & { nda_id: string })[] = [], today = ""): NdaQueueItem[] {
   const byId = new Map(states.map((row) => [row.nda_id, row]));
   const notes = new Map<string, NdaHistoryItem[]>();
   for (const row of history) {
@@ -354,7 +482,7 @@ export function presentQueue(rows: NdaAgreement[], states: NdaStateRow[] = [], h
     notes.set(row.nda_id, list);
   }
   return openNdaQueue(rows)
-    .map((row) => presentNda(row, byId.get(row.nda_id), notes.get(row.nda_id) || []))
+    .map((row) => presentNda(row, byId.get(row.nda_id), notes.get(row.nda_id) || [], today))
     .filter((row) => isOpenAgreement(row));
 }
 

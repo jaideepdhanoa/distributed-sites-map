@@ -10,6 +10,7 @@ import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
+import AppLoading from "./AppLoading";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
@@ -379,6 +380,19 @@ export default function Explorer() {
   const loopsAllowed = Boolean(me?.actionRole && ndaQueueAllowed(me.actionRole));
   const loopsVisible = loopsParam && loopsAllowed;
   const ndaVisible = ndaParam && !loopsVisible;
+  const [ndaOpenCount, setNdaOpenCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!loopsAllowed) return undefined;
+    let cancel = false;
+    fetch("/api/data/nda").then(async (response) => {
+      if (!response.ok || cancel) return;
+      const body = await response.json() as { queue?: unknown[] };
+      if (!cancel) setNdaOpenCount((body.queue || []).length);
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [loopsAllowed, ndaVisible]);
   const sortParam = params.get("sort") || "site:asc";
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
@@ -1589,7 +1603,7 @@ export default function Explorer() {
     return (
       <main className="empty">
         <Wordmark level="p" />
-        <p>Loading</p>
+        <AppLoading />
       </main>
     );
   }
@@ -2076,9 +2090,6 @@ export default function Explorer() {
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-            {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-              <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
-            ) : null}
           </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
@@ -2105,6 +2116,11 @@ export default function Explorer() {
               }}
             >
               Ask
+            </button>
+          ) : null}
+          {loopsAllowed ? (
+            <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
+              NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
             </button>
           ) : null}
           <div className="user-menu only-desktop">
@@ -2161,9 +2177,6 @@ export default function Explorer() {
         <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
           <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
           <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-          {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-            <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>NDA</button>
-          ) : null}
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
@@ -2456,7 +2469,7 @@ export default function Explorer() {
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
               {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-                <button className={ndaVisible ? "chip on" : "chip"} type="button" data-testid="nda-queue-tab" aria-label="NDA queue" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDA</button>
+                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
               ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">
@@ -2708,10 +2721,18 @@ export default function Explorer() {
         {ndaVisible ? (
           <NdaQueue
             openId={ndaId}
-            onOpen={choose}
-            onPick={(id) => write({ nda: id || "1" })}
+            names={Object.fromEntries([...dealRows.map((deal) => [deal.deal_id, deal.name || deal.address || ""]), ...sites.map((site) => [site.site_id, site.name || site.address || ""])])}
+            onOpen={(id) => {
+              const patch = selectionPatch(id);
+              const site = typeof patch.site === "string" && patch.site ? patch.site : id;
+              placedSite.current = site;
+              setSelected(site);
+              write({ ...patch, site, nda: null, ndafrom: ndaId || "1" }, true);
+            }}
+            onPick={(id) => { if (/^NDA-\d{3,}$/i.test(id)) write({ nda: id.toUpperCase() }, true); }}
             onClose={() => write({ nda: null })}
             onBack={() => write(params.get("site") ? { nda: null } : { nda: "1" })}
+            onMenu={() => setMenuOpen(true)}
             backLabel={params.get("site") ? "Back to site" : "Back to queue"}
           />
         ) : null}
@@ -2917,7 +2938,8 @@ export default function Explorer() {
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={() => choose(null)}
+            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
+            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             compared={compareIds.includes(selectedDeal.deal_id)}
@@ -2962,7 +2984,8 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={() => choose(null)}
+            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
+            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             onOpenNda={(id) => write({ nda: id })}

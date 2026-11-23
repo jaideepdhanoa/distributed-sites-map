@@ -11,20 +11,20 @@ async function ready(page: Page) {
 }
 
 for (const size of sizes) {
-  test(`NDA is a tab and the view line is plain at ${size.width}`, async ({ page }, info) => {
+  test(`NDAs open from the header and the view line is plain at ${size.width}`, async ({ page }, info) => {
     test.skip(info.project.name !== size.project, size.project);
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     await expect(page.getByTestId("view-help")).toHaveCount(0);
-    if (size.width < 768) await page.getByRole("button", { name: "Menu" }).click();
-    const tab = page.getByRole("button", { name: "NDA queue" });
-    await expect(tab).toBeVisible();
-    await tab.click();
+    if (size.width < 768) {
+      await page.getByRole("button", { name: "Menu" }).click();
+      await page.getByTestId("nda-queue-menu").click();
+    } else {
+      await page.getByTestId("nda-queue-tab").click();
+    }
     await expect(page).toHaveURL(/nda=1/);
     await expect(page.getByTestId("nda-queue")).toBeVisible();
-    await expect(page.getByTestId("nda-export")).toBeVisible();
-    if (size.width < 768) await expect(page.getByTestId("nda-cards")).toBeVisible();
-    else await expect(page.getByRole("button", { name: "NDA id", exact: true })).toBeVisible();
+    await expect(page.getByTestId("nda-cards")).toBeVisible();
   });
 
   test(`Dropped keeps the market and the zoom at ${size.width}`, async ({ page }, info) => {

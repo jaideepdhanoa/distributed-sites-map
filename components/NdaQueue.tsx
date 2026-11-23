@@ -1,84 +1,53 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import SheetGrid from "./SheetGrid";
 import NdaDetail from "./NdaDetail";
-import {
-  counterpartyLine,
-  courtDayCount,
-  coveredSites,
-  dayCount,
-  lastActionLine,
-  queueCourt,
-  type NdaQueueItem,
-} from "@/lib/nda";
-import { defaultLayout, type ListLayout, type SheetColumn } from "@/lib/listLayout";
+import { counterpartyLine, coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
 
 type Payload = {
-  source?: string;
-  as_of?: string;
-  label?: string;
   queue?: NdaQueueItem[];
   error?: string;
 };
 
-const COLUMN_IDS = ["id", "sites", "party", "status", "court", "daysOpen", "daysCourt", "last", "owner", "next"] as const;
+let remembered: NdaQueueItem[] = [];
 
-function columns(): SheetColumn<NdaQueueItem>[] {
-  return [
-    { id: "id", label: "NDA id", text: (row) => row.nda_id },
-    { id: "sites", label: "Covered sites", text: (row) => coveredSites(row.site_ids || "").ids.join(", ") || "—" },
-    { id: "party", label: "Counterparty", text: (row) => counterpartyLine(row) || "—" },
-    { id: "status", label: "Status", text: (row) => row.nda_status || "—" },
-    { id: "court", label: "Waiting on", text: (row) => queueCourt(row) },
-    { id: "daysOpen", label: "Days open", text: (row) => dayCount(row.nda_days_open) == null ? "—" : String(dayCount(row.nda_days_open)), sortValue: (row) => dayCount(row.nda_days_open) },
-    { id: "daysCourt", label: "Days waiting on them", text: (row) => courtDayCount(row.nda_days_in_court) == null ? "—" : String(courtDayCount(row.nda_days_in_court)), sortValue: (row) => courtDayCount(row.nda_days_in_court) },
-    { id: "last", label: "Last action", text: (row) => lastActionLine(row) },
-    { id: "owner", label: "Owner", text: (row) => row.owner || "—" },
-    { id: "next", label: "Next step", text: (row) => row.next_step || "—" },
-  ];
+type Tab = "us" | "them" | "open" | "all";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "us", label: "Our court" },
+  { id: "them", label: "Their court" },
+  { id: "open", label: "Unassigned" },
+  { id: "all", label: "All" },
+];
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function filtered(rows: NdaQueueItem[], cols: SheetColumn<NdaQueueItem>[], layout: ListLayout): NdaQueueItem[] {
-  const visible = rows.filter((row) => {
-    for (const [id, raw] of Object.entries(layout.filters)) {
-      const column = cols.find((item) => item.id === id);
-      if (!column) continue;
-      if (!column.text(row).toLowerCase().includes(raw.trim().toLowerCase())) return false;
-    }
-    return true;
-  });
-  const sort = layout.sort;
-  if (!sort) return visible;
-  const column = cols.find((item) => item.id === sort.id);
-  if (!column) return visible;
-  return visible.slice().sort((left, right) => {
-    const a = column.sortValue?.(left);
-    const b = column.sortValue?.(right);
-    if (a != null || b != null) {
-      if (a == null) return 1;
-      if (b == null) return -1;
-      if (a !== b) return sort.desc ? b - a : a - b;
-    }
-    const cmp = column.text(left).localeCompare(column.text(right));
-    return sort.desc ? -cmp : cmp;
-  });
+function coveredLabel(row: NdaQueueItem, names: Record<string, string>): string {
+  const covered = coveredSites(row.site_ids || "");
+  if (covered.ids.length > 2) return `${covered.ids.length} sites`;
+  if (covered.ids.length) return covered.ids.map((id) => names[id] || "Covered site").join(" · ");
+  const refs = row.covered_refs || [];
+  return covered.note || refs.find((item) => !/^(?:PIPE|LAND|L)-/.test(item)) || row.scope || "No covered listing";
+}
+
+function CourtPill({ court, label }: { court: string; label: string }) {
+  if (!label) return null;
+  const aged = /(?:^|\s)(\d+)d/.exec(label);
+  const strong = court === "us" && aged && Number(aged[1]) >= 14;
+  return <span className={`court-pill ${court === "us" ? "us" : "them"}${strong ? " aged" : ""}`}>{label}</span>;
+}
+
+function inTab(row: NdaQueueItem, tab: Tab): boolean {
+  if (tab === "all") return true;
+  if (tab === "open") return !row.owner;
+  if (tab === "us") return row.court === "us";
+  return row.court === "them" || row.court === "seller";
 }
 
 function csvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
-}
-
-function download(cols: SheetColumn<NdaQueueItem>[], rows: NdaQueueItem[]) {
-  const header = cols.map((column) => csvCell(column.label)).join(",");
-  const body = rows.map((row) => cols.map((column) => csvCell(column.text(row))).join(",")).join("\n");
-  const blob = new Blob([`${header}\n${body}\n`], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "nda-queue.csv";
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 export default function NdaQueue({
@@ -87,23 +56,27 @@ export default function NdaQueue({
   onPick,
   onClose,
   onBack,
+  onMenu,
   backLabel,
+  names = {},
 }: {
   openId: string;
   onOpen: (id: string) => void;
   onPick: (id: string) => void;
   onClose: () => void;
   onBack: () => void;
+  onMenu: () => void;
   backLabel: string;
+  names?: Record<string, string>;
 }) {
-  const [payload, setPayload] = useState<Payload | null>(null);
+  const [rows, setRows] = useState<NdaQueueItem[]>(remembered);
+  const [loaded, setLoaded] = useState(remembered.length > 0);
   const [failed, setFailed] = useState("");
   const [tick, setTick] = useState(0);
-  const cols = useMemo(() => columns(), []);
-  const [layout, setLayout] = useState<ListLayout>(() => ({
-    ...defaultLayout([...COLUMN_IDS], ["id"]),
-    sort: { id: "daysCourt", desc: true },
-  }));
+  const [tab, setTab] = useState<Tab>("all");
+  const [menu, setMenu] = useState(false);
+  const [picked, setPicked] = useState(openId);
+  const today = todayIso();
 
   useEffect(() => {
     let cancel = false;
@@ -112,104 +85,142 @@ export default function NdaQueue({
       if (cancel) return;
       if (!response.ok) {
         setFailed(body.error || "The NDA queue could not be loaded.");
+        setLoaded(true);
         return;
       }
       setFailed("");
-      setPayload(body);
+      remembered = body.queue || [];
+      setRows(remembered);
+      setLoaded(true);
     }).catch(() => {
-      if (!cancel) setFailed("The NDA queue could not be loaded.");
+      if (!cancel) {
+        setFailed("The NDA queue could not be loaded.");
+        setLoaded(true);
+      }
     });
     return () => {
       cancel = true;
     };
   }, [tick]);
 
-  const rows = payload?.queue || [];
-  const shown = filtered(rows, cols, layout);
-  const visibleColumns = cols.filter((column) => !layout.hidden.includes(column.id));
-  const open = rows.find((row) => row.nda_id === openId) || null;
+  useEffect(() => {
+    setPicked(openId);
+    setMenu(false);
+  }, [openId]);
+
+  useEffect(() => {
+    if (!menu) return undefined;
+    function close(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".more-wrap")) return;
+      setMenu(false);
+    }
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menu]);
+
+  function pick(id: string) {
+    setMenu(false);
+    setPicked(id);
+    onPick(id);
+  }
+
+  const counts = useMemo(() => ({
+    us: rows.filter((row) => inTab(row, "us")).length,
+    them: rows.filter((row) => inTab(row, "them")).length,
+    open: rows.filter((row) => inTab(row, "open")).length,
+    all: rows.length,
+  }), [rows]);
+  const shown = useMemo(() => rows.filter((row) => inTab(row, tab)).slice().sort((left, right) => {
+    const a = left.days_court;
+    const b = right.days_court;
+    if (a == null && b == null) return left.nda_id.localeCompare(right.nda_id);
+    if (a == null) return 1;
+    if (b == null) return -1;
+    if (a !== b) return b - a;
+    return left.nda_id.localeCompare(right.nda_id);
+  }), [rows, tab]);
+  const open = rows.find((row) => row.nda_id === (picked || openId)) || null;
+
+  function download() {
+    const header = ["NDA", "Firm", "Listings", "Stage", "Court", "Owner", "Next step", "Due"].map(csvCell).join(",");
+    const body = shown.map((row) => [
+      row.nda_id,
+      counterpartyLine(row),
+      coveredLabel(row, names),
+      stageLabel(row.stage) || row.nda_status,
+      row.court_pill,
+      row.owner,
+      row.next_step,
+      row.next_step_due,
+    ].map((value) => csvCell(value || "")).join(",")).join("\n");
+    const blob = new Blob([`${header}\n${body}\n`], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "nda-queue.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setMenu(false);
+  }
 
   return (
     <aside className="nda-pane" data-testid="nda-queue" aria-label="NDA queue">
       <div className="layers-bar nda-bar">
-        <div>
-          <p className="eyebrow" id="nda-queue-title">NDA queue</p>
-          {payload?.label ? <p className="note">{payload.label}</p> : null}
+        <p className="eyebrow" id="nda-queue-title">NDAs</p>
+        <div className="more-wrap">
+          <button type="button" className="paper-btn" aria-label="NDA actions" aria-expanded={menu} onClick={() => setMenu((value) => !value)}>⋯</button>
+          {menu ? (
+            <div className="menu" role="menu">
+              <button type="button" className="menu-item" data-testid="nda-export" onClick={download}>Export CSV</button>
+            </div>
+          ) : null}
         </div>
-        <button type="button" className="paper-btn" data-testid="nda-export" onClick={() => download(visibleColumns, shown)}>Export CSV</button>
         <button type="button" className="close" aria-label="Close NDA queue" onClick={onClose}><span aria-hidden="true">×</span></button>
+      </div>
+      <div className="nda-tabs" role="tablist" aria-label="Whose court">
+        {TABS.map((item) => (
+          <button key={item.id} type="button" role="tab" className={tab === item.id ? "chip on" : "chip"} aria-selected={tab === item.id} onClick={() => setTab(item.id)}>{item.label} {loaded ? counts[item.id] : ""}</button>
+        ))}
       </div>
       <div className="nda-work">
         {failed ? <p className="note">{failed}</p> : null}
-        {!failed && payload && rows.length === 0 ? <p className="note">No open NDAs.</p> : null}
-        {!payload && !failed ? <p className="note">Loading</p> : null}
-        <div className="nda-sheet" data-testid="nda-sheet">
-          <div className="list-bar">
-            <p>{shown.length.toLocaleString()} shown</p>
-          </div>
-          <SheetGrid
-            rows={shown}
-            rowId={(row) => row.nda_id}
-            columns={visibleColumns}
-            layout={layout}
-            onLayout={setLayout}
-            selectedId={openId}
-            onOpen={onPick}
-            onClose={() => onPick("")}
-            labelledBy="nda-queue-title"
-            renderCell={(row, columnId) => {
-              if (columnId === "sites") {
-                const ids = coveredSites(row.site_ids || "").ids;
-                if (!ids.length) return "—";
-                return ids.map((id) => (
-                  <button key={id} type="button" className="text-link" onClick={() => onOpen(id)}>{id}</button>
-                ));
-              }
-              const column = cols.find((item) => item.id === columnId);
-              return column ? column.text(row) : "";
-            }}
-          />
-        </div>
-        <div className="nda-cards" data-testid="nda-cards">
-          <label>
-            Sort
-            <select
-              className="secondary"
-              aria-label="Sort NDAs"
-              value={`${layout.sort?.id || "daysCourt"}:${layout.sort?.desc ? "desc" : "asc"}`}
-              onChange={(event) => {
-                const [id, dir] = event.target.value.split(":");
-                setLayout({ ...layout, sort: { id, desc: dir === "desc" }, touched: true });
-              }}
-            >
-              <option value="daysCourt:desc">Days waiting on them</option>
-              <option value="daysOpen:desc">Days open</option>
-              <option value="id:asc">NDA id</option>
-              <option value="status:asc">Status</option>
-            </select>
-          </label>
-          <ul>
-            {shown.map((row) => (
+        {!loaded && !failed ? (
+          <ul className="nda-list" data-testid="nda-loading" aria-busy="true" aria-label="Loading NDAs">
+            {[0, 1, 2, 3].map((item) => <li key={item} className="nda-row nda-hold"><span className="skeleton nda-skel" /><span className="skeleton nda-skel wide" /></li>)}
+          </ul>
+        ) : null}
+        {loaded && !failed && rows.length === 0 ? <p className="note">No open NDAs.</p> : null}
+        {picked && loaded && !open ? <p className="note">That NDA is not in the open list.</p> : null}
+        <ul className="nda-list" data-testid="nda-cards">
+          {shown.map((row) => {
+            const overdue = Boolean(row.next_step_due && row.next_step_due < today);
+            const next = row.next_step || "No next step";
+            return (
               <li key={row.nda_id}>
-                <button type="button" className="list-row nda-card" data-testid={`nda-card-${row.nda_id}`} onClick={() => onPick(row.nda_id)}>
-                  <span className="phone-card-name">{row.nda_id}</span>
-                  <span>{counterpartyLine(row) || "—"}</span>
-                  <span>{row.nda_status || "—"} · {queueCourt(row)}</span>
-                  <span>{coveredSites(row.site_ids || "").ids.join(", ") || "No covered site"}</span>
-                  <span>{lastActionLine(row)}</span>
-                  <span>Owner {row.owner || "—"} · {row.next_step || "No next step"}</span>
+                <button type="button" className="list-row nda-row" data-testid={`nda-card-${row.nda_id}`} onClick={() => pick(row.nda_id)}>
+                  <span className="nda-line">
+                    <strong>{row.counterparty_firm || row.nda_id}</strong>
+                    <CourtPill court={row.court} label={row.court_pill} />
+                  </span>
+                  <span>{[row.counterparty_person || row.contact_name || "No contact", stageLabel(row.stage) || row.nda_status || "—"].join(" · ")}</span>
+                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""} · ${coveredLabel(row, names)}`}</span>
                 </button>
               </li>
-            ))}
-          </ul>
-        </div>
+            );
+          })}
+        </ul>
         {open ? (
           <NdaDetail
+            key={open.nda_id}
             row={open}
-            onClose={() => onPick("")}
-            onOpenSite={onOpen}
+            today={today}
+            names={names}
+            onOpenSite={(id) => { setMenu(false); onOpen(id); }}
             onSaved={() => setTick((value) => value + 1)}
             onBack={onBack}
+            onClose={onClose}
+            onMenu={onMenu}
             backLabel={backLabel}
           />
         ) : null}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import AppLoading from "@/components/AppLoading";
 import Explorer from "@/components/Explorer";
-import Wordmark from "@/components/Wordmark";
 
 export const metadata: Metadata = {
   title: { absolute: "Map · Distributed Sites" },
@@ -11,10 +11,7 @@ export default function HomePage() {
   return (
     <Suspense
       fallback={
-        <main className="empty">
-          <Wordmark level="p" />
-          <p>Loading</p>
-        </main>
+        <AppLoading />
       }
     >
       <Explorer />

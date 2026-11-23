@@ -296,7 +296,7 @@ test("a reviewer accepting a stage change overlays the map and leaves the workbo
     .find((row) => row?.kind === "pipeline" && row.deal_id && row.stage && row.stage !== "Dropped");
   expect(openDeal?.deal_id, "a pipeline deal that is not already Dropped").toBeTruthy();
   const targetId = openDeal!.deal_id!;
-  const beforeStage = openDeal!.stage!;
+  const fileStage = generatedDeal(targetId)?.stage;
   const proposed = "Dropped";
   const created = await request.post("/api/actions/suggestions", {
     data: {
@@ -317,13 +317,13 @@ test("a reviewer accepting a stage change overlays the map and leaves the workbo
   const decision = (await accepted.json()) as { suggestion: { status: string } };
   expect(decision.suggestion.status).toBe("accepted");
   const stored = generatedDeal(targetId);
-  expect(stored?.stage).toBe(beforeStage);
+  expect(stored?.stage).toBe(fileStage);
   const after = await request.get("/api/data/deals");
   const live = dealProps(await after.json(), targetId);
   expect(live?.stage).toBe("Dropped");
   expect(live?.stage_group).toBe("dropped");
   expect(live?.stage_pending).toMatch(/Moved to Dropped by Reviewer, waiting for workbook/);
-  expect(generatedDeal(targetId)?.stage).toBe(beforeStage);
+  expect(generatedDeal(targetId)?.stage).toBe(fileStage);
 
   await openAs(page, "reviewer", `/?site=${targetId}`);
   await page.getByTestId("panel-tab-discussion").click();

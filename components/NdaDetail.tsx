@@ -297,7 +297,7 @@ export default function NdaDetail({
           <span className="note">{row.nda_id}</span>
         </div>
         <div className="nda-bar-actions">
-          <button type="button" className="text-link" data-testid="nda-discussion-jump" onClick={() => document.getElementById("nda-discussion")?.scrollIntoView({ block: "start" })}>Discussion{discussCount ? ` ${discussCount}` : ""}</button>
+          <button type="button" className="text-link nda-discussion-jump" data-testid="nda-discussion-jump" onClick={() => document.getElementById("nda-discussion")?.scrollIntoView({ block: "start" })}>Discussion{discussCount ? ` ${discussCount}` : ""}</button>
           <button type="button" className="icon-btn only-mobile" aria-label="Menu" onClick={onMenu}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
           <button type="button" className="paper-btn" data-testid="nda-edit" onClick={() => setEditing(true)}>Edit</button>
           <button type="button" className="close" aria-label="Close NDA queue" onClick={onClose}><span aria-hidden="true">×</span></button>

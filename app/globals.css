@@ -1060,6 +1060,7 @@ button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { backgroun
   .nda-backline { flex: 1; min-width: 0; overflow: hidden; }
   .nda-backline h2 { flex: 1 1 auto; min-width: 0; }
   .nda-backline .note { flex: none; white-space: nowrap; }
+  .nda-discussion-jump { display: none; }
 }
 .shell.nda-open .nda-pane, .shell.loops-open .nda-pane { display: flex; }
 .shell.nda-open.drawer-open .nda-pane, .shell.loops-open.drawer-open .nda-pane { right: var(--drawer-width); }

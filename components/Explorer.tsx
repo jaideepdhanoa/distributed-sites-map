@@ -156,11 +156,15 @@ export default function Explorer() {
     const width = Math.ceil(layers.getBoundingClientRect().width);
     shell.style.setProperty("--layers-clear", `${Math.max(width, 1) + 22}px`);
   });
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [listingsReady, setListingsReady] = useState(false);
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionRole?: string; actionsEnabled?: boolean } | null>(null);
+  const [askList, setAskList] = useState<string[]>([]);
   const [askOpen, setAskOpen] = useState(false);
   const [askSite, setAskSite] = useState<{ id: string; name: string } | null>(null);
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
@@ -172,6 +176,9 @@ export default function Explorer() {
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [loadedQueueKey, setLoadedQueueKey] = useState("");
+  const reviewRequest = useRef(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
   const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
@@ -326,6 +333,7 @@ export default function Explorer() {
       window.removeEventListener(COMMENT_CHANGED, onChanged);
     };
   }, [markedSpaces]);
+  const [unplacedScope, setUnplacedScope] = useState(false);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
@@ -521,13 +529,57 @@ export default function Explorer() {
     setBasemap(next);
   }
 
+  const workOrigin = useRef<{ query: string; top: number; left: number; cell: string; row: string } | null>(null);
+  const lastCell = useRef({ row: "", cell: "" });
+  const listSelection = useRef<Record<string, string[]>>({ pipeline: [], universe: [] });
+  const listScope = useRef<string[]>([]);
+  const rememberScope = useCallback((ids: string[]) => { listScope.current = ids; }, []);
+  const queryString = params.toString();
+  useEffect(() => {
+    const updateSearch = () => rememberSearch(window.location.pathname + window.location.search);
+    window.addEventListener("popstate", updateSearch);
+    return () => window.removeEventListener("popstate", updateSearch);
+  }, []);
+  useEffect(() => {
+    const origin = workOrigin.current;
+    if (!origin || origin.query !== queryString || !data) return;
+    const frame = requestAnimationFrame(() => {
+      const scroller = document.querySelector<HTMLElement>(".list-x, .list-pane .list-scroll:not(:has(.list-x))");
+      if (scroller) scroller.scrollTo(origin.left, origin.top);
+      requestAnimationFrame(() => {
+        const row = origin.row && document.querySelector<HTMLElement>(`[data-site-row="${CSS.escape(origin.row)}"]`);
+        if (row) (row.querySelector<HTMLElement>(`[data-col="${CSS.escape(origin.cell)}"], button.list-row`) || row).focus({ preventScroll: true });
+      });
+      workOrigin.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [queryString, data]);
+
+  function restoreOrigin() {
+    const origin = workOrigin.current;
+    if (!origin) return false;
+    wantedReview.current = "";
+    leaveSite.current = "";
+    setSelected(new URLSearchParams(origin.query).get("site"));
+    replaceSearch(origin.query, {});
+    return true;
+  }
+
   function write(next: Record<string, string | null>, history = false) {
     const live = typeof window === "undefined" ? params.toString() : currentSearch();
+    const prior = new URLSearchParams(live);
+    const enteringWork = next.review === "1" || Boolean(next.nda) || next.loops === "1";
+    if (enteringWork && !prior.has("nda") && !prior.has("loops") && prior.get("review") !== "1" && prior.get("view") !== "review" && !prior.has("ndafrom")) {
+      const scroller = document.querySelector<HTMLElement>(".list-x, .list-pane .list-scroll:not(:has(.list-x))");
+      workOrigin.current = { query: prior.toString(), top: scroller?.scrollTop || 0, left: scroller?.scrollLeft || 0, ...lastCell.current };
+      history = true;
+    }
     const patch = next.site ? { q: null, ...next } : next;
     replaceSearch(live, patch, history);
   }
 
   function stopReview(next: Record<string, string | null> = {}) {
+    if (reviewing && Object.keys(next).length === 0 && restoreOrigin()) return;
     wantedReview.current = "";
     leaveSite.current = "";
     write({ review: null, view: null, i: null, rsite: null, nda: null, loops: null, ...next });
@@ -557,79 +609,82 @@ export default function Explorer() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
+  const batchKeys = useRef(new Map<string, string>());
   async function postSelection(ids: string[], bodyFor: (id: string) => Record<string, string>, path = "/api/actions/notes") {
-    const errors: string[] = [];
+    const failed: string[] = [];
     for (const id of ids) {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(bodyFor(id)),
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({})) as { error?: string };
-        errors.push(payload.error || "That could not be saved.");
+      const body = JSON.stringify(bodyFor(id));
+      const fingerprint = path + body;
+      const key = batchKeys.current.get(fingerprint) || crypto.randomUUID();
+      batchKeys.current.set(fingerprint, key);
+      try {
+        const response = await fetch(path, {
+          method: "POST", headers: { "content-type": "application/json", "Idempotency-Key": key }, body,
+        });
+        if (!response.ok) throw new Error();
+        batchKeys.current.delete(fingerprint);
+      } catch {
+        failed.push(id);
       }
     }
-    if (errors.length) throw new Error(errors[0]);
+    return failed;
   }
 
   const dataGen = useRef(0);
   useEffect(() => {
     let cancel = false;
     const token = ++dataGen.current;
-    Promise.all([
-      fetch(`/api/data/sites?city=${city}`),
-      fetch("/api/data/areas"),
-      fetch("/api/data/depots"),
-      fetch(`/api/data/parcels?city=${city}`),
-      fetch("/api/data/funnel"),
-      fetch("/api/data/deals"),
-      fetch("/api/data/unscreened"),
-      fetch("/api/data/timeline/summary"),
-      fetch("/api/me"),
-    ]).then(async ([sitesRes, areasRes, depotsRes, parcelsRes, funnelRes, dealsRes, unscreenedRes, summaryRes, meRes]) => {
-      if (sitesRes.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      if (!sitesRes.ok || !areasRes.ok || !depotsRes.ok || !parcelsRes.ok || !funnelRes.ok || !dealsRes.ok || !unscreenedRes.ok) {
-        if (!cancel && token === dataGen.current) setError("The site data could not be loaded.");
-        return;
-      }
-      const [sitesBody, areasBody, depotsBody, parcelsBody, funnelPayload, dealsBody] = await Promise.all([
-        sitesRes.json(),
-        areasRes.json(),
-        depotsRes.json(),
-        parcelsRes.json(),
-        funnelRes.json(),
-        dealsRes.json(),
-      ]);
-      if (!cancel && token === dataGen.current) {
-        setData((current) => ({
+    const controller = new AbortController();
+    const read = async (path: string) => {
+      const response = await fetch(path, { signal: controller.signal });
+      if (response.status === 401) window.location.assign("/login");
+      if (!response.ok) throw new Error("Unavailable");
+      return response.json();
+    };
+    const empty = { type: "FeatureCollection" as const, features: [] };
+    setError("");
+    setUnavailable([]);
+    setListingsReady(false);
+    const noteFailure = (name: string) => {
+      if (!cancel) setUnavailable(current => current.includes(name) ? current : [...current, name]);
+    };
+    async function load() {
+      try {
+        const [sitesBody, dealsBody, funnelPayload, user] = await Promise.all([
+          read(`/api/data/sites?city=${city}`), read("/api/data/deals"), read("/api/data/funnel"), read("/api/me"),
+        ]);
+        if (cancel || token !== dataGen.current) return;
+        setMe(user);
+        setData(current => ({
           sites: current ? preservePendingStage(current.sites, guardFeatures(sitesBody)) : guardFeatures(sitesBody),
-          areas: areasBody,
-          depots: depotsBody,
-          parcels: parcelsBody,
           deals: current ? preservePendingStage(current.deals, guardFeatures(dealsBody)) : guardFeatures(dealsBody),
-          funnel: funnelPayload.funnel,
+          funnel: funnelPayload.funnel, areas: empty, depots: empty, parcels: empty,
         }));
-        const unscreenedPayload = await unscreenedRes.json();
-        setUnscreened(Array.isArray(unscreenedPayload.features) ? unscreenedPayload.features : []);
-        setMe(meRes.ok ? await meRes.json() : null);
-        if (summaryRes.ok) {
-          const summary = (await summaryRes.json()) as { records?: ActivitySummary };
-          setActivity(summary.records || {});
-        }
         const changes = funnelPayload.meta?.changes;
         if (changes && typeof changes.new_sites === "number") {
           setChangesNote(`Since the previous published build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`);
         }
+        for (const layer of ["areas", "depots", "parcels"] as const) {
+          const path = layer === "parcels" ? `/api/data/parcels?city=${city}` : `/api/data/${layer}`;
+          void read(path).then(payload => {
+            if (!cancel) setData(current => current ? { ...current, [layer]: payload } : current);
+          }).catch(() => noteFailure(layer));
+        }
+        void read("/api/data/unscreened").then(payload => {
+          if (cancel) return;
+          setUnscreened(Array.isArray(payload.features) ? payload.features : []);
+          setListingsReady(true);
+        }).catch(() => noteFailure("unscreened listings"));
+        void read("/api/data/timeline/summary").then(payload => {
+          if (!cancel) setActivity(payload.records || {});
+        }).catch(() => noteFailure("activity summary"));
+      } catch {
+        if (!cancel) setError("Your workspace could not be loaded.");
       }
-    });
-    return () => {
-      cancel = true;
-    };
-  }, [city]);
+    }
+    void load();
+    return () => { cancel = true; controller.abort(); };
+  }, [city, loadAttempt]);
 
   const catalogOn = useRef(false);
   catalogOn.current = Boolean(catalog);
@@ -1105,7 +1160,13 @@ export default function Explorer() {
     const has = compareIds.includes(id);
     const want = on ?? !has;
     if (want === has) return;
-    const next = want ? (compareIds.length >= 4 ? compareIds : [...compareIds, id]) : compareIds.filter((item) => item !== id);
+    if (want && compareIds.length >= 4) {
+      const remove = document.querySelector<HTMLButtonElement>(".compare-bar button.menu-item");
+      remove?.focus();
+      remove?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    const next = want ? [...compareIds, id] : compareIds.filter((item) => item !== id);
     write({ compare: next.length ? next.join("|") : null });
   }
 
@@ -1417,10 +1478,11 @@ export default function Explorer() {
     }
     const known = dealRows.some((deal) => deal.deal_id === id)
       || sites.some((site) => site.site_id === id)
-      || (catalog ?? []).some((feature) => feature.properties.site_id === id);
-    const waiting = linked.kind === "universe" && !catalog && !known;
+      || (catalog ?? []).some((feature) => feature.properties.site_id === id)
+      || unscreened.some(feature => feature.properties.listing_id === id);
+    const waiting = (linked.kind === "universe" && !catalog && !known) || (!listingsReady && /^L-/i.test(id));
     setMissingSite(!waiting && !known ? "Site not found" : "");
-  }, [data, params, catalog]);
+  }, [data, params, catalog, unscreened, listingsReady]);
 
   useEffect(() => {
     if (!data || !selected || reviewing) return;
@@ -1595,11 +1657,12 @@ export default function Explorer() {
     return (
       <main className="empty">
         <Wordmark level="p" />
-        <p>{error}</p>
+        <p role="alert">{error}</p>
+        <button type="button" className="paper-btn" onClick={() => setLoadAttempt(value => value + 1)}>Retry workspace</button>
       </main>
     );
   }
-  if (!data) return <AppLoading />;
+  if (!data) return <AppLoading destination={ndaParam ? "NDAs" : reviewing ? "Review" : listView ? "Shortlist" : "Map"} />;
 
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const home = marketFocus(allCities ? "all" : city);
@@ -1848,6 +1911,10 @@ export default function Explorer() {
     return true;
   }
 
+  const unplacedInView = funnel === "pipeline"
+    ? pipelineStepRows.filter(deal => !dealPoint(deal)).map(deal => ({ id: deal.deal_id, name: deal.name || deal.address || deal.deal_id }))
+    : [...visibleSites.filter(site => !featureById.get(site.site_id)?.geometry).map(site => ({ id: site.site_id, name: site.name || site.address || site.site_id })),
+       ...(landSites ? landDeals.filter(deal => !dealPoint(deal)).map(deal => ({ id: deal.deal_id, name: deal.name || deal.address || deal.deal_id })) : [])];
   function summaryText() {
     if (funnel !== "pipeline") return "";
     const stageView = !outsideGroup && !allPipes && !pipelineWide && !who;
@@ -1877,15 +1944,33 @@ export default function Explorer() {
     write({ review: "1", i: String(next + 1), view: null, q: null });
   }
 
+  async function saveReview(body: { siteId: string; undo?: boolean; previous?: string | null }) {
+    if (reviewRequest.current) return null;
+    reviewRequest.current = true;
+    setReviewSaving(true);
+    setReviewError("");
+    try {
+      const response = await fetch("/api/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error();
+      return await response.json() as { previous?: string | null };
+    } catch {
+      setReviewError(body.undo ? "Undo could not be confirmed. Check the item and try Undo again." : "Review could not be confirmed. Check the item and try again.");
+      window.dispatchEvent(new Event("queue-refresh"));
+      return null;
+    } finally {
+      reviewRequest.current = false;
+      setReviewSaving(false);
+    }
+  }
+
   async function markCurrentReviewed() {
     if (!reviewCurrent || reviewCurrent.status === "reviewed") return;
-    const response = await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ siteId: reviewCurrent.siteId }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { previous?: string | null };
-    if (!response.ok) return;
+    const payload = await saveReview({ siteId: reviewCurrent.siteId });
+    if (!payload) return;
     const previous = payload.previous ?? null;
     const siteId = reviewCurrent.siteId;
     setFeed((items) => items.map((item) => item.siteId === siteId ? { ...item, status: "reviewed", previous } : item));
@@ -1906,11 +1991,8 @@ export default function Explorer() {
 
   async function undoReviewMark() {
     if (!undo) return;
-    await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ undo: true, siteId: undo.siteId, previous: undo.previous }),
-    });
+    const saved = await saveReview({ undo: true, siteId: undo.siteId, previous: undo.previous });
+    if (!saved) return;
     setFeed((items) => items.map((item) => item.siteId === undo.siteId ? { ...item, status: "open" } : item));
     goReview(undo.index);
     setUndo(null);
@@ -2035,13 +2117,17 @@ export default function Explorer() {
   const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
-    <div ref={bindShell} className={`shell ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <div ref={bindShell} onFocusCapture={event => {
+      const target = event.target as HTMLElement;
+      const row = target.closest<HTMLElement>("[data-site-row]");
+      if (row) lastCell.current = { row: row.dataset.siteRow || "", cell: target.closest<HTMLElement>("[data-col]")?.dataset.col || "" };
+    }} className={`shell ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
       {alertsOpen ? <AlertSettings onClose={() => setAlertsOpen(false)} /> : null}
       {askOpen && me?.u ? (
-        <AskPanel open site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
+        <AskPanel open shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
       <CommandSearch
         open={commandOpen}
@@ -2076,10 +2162,9 @@ export default function Explorer() {
             })()}
           </div>
           <div className="search-wrap only-desktop">
-            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }}>Search name, address, broker, APN, id</button>
-            <kbd aria-hidden="true">/</kbd>
+            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search everything" onClick={() => setCommandOpen(true)}>Search</button>
+            <kbd data-testid="command-search-open" aria-hidden="true">{appleShortcut ? "⌘K" : "Ctrl K"}</kbd>
           </div>
-          <button type="button" className="chip command-open only-desktop" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
@@ -2089,7 +2174,7 @@ export default function Explorer() {
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
               Review{(() => {
                 const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
                 return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
@@ -2097,7 +2182,7 @@ export default function Explorer() {
             </button>
           ) : null}
           {loopsAllowed ? (
-            <button type="button" className={`paper-btn nda-launch ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
+            <button type="button" className={`paper-btn nda-launch ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => ndaVisible && restoreOrigin() ? undefined : write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
               NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
             </button>
           ) : null}
@@ -2110,6 +2195,7 @@ export default function Explorer() {
                 if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
                 else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
                 else setAskSite(null);
+                setAskList(listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
                 setAskOpen(true);
               }}
             >
@@ -2150,7 +2236,7 @@ export default function Explorer() {
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
-          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
+          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onClick={() => setCommandOpen(true)} />
           <button
             type="button"
             className="icon-btn filter-launch"
@@ -2172,7 +2258,8 @@ export default function Explorer() {
           <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
           <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
-        {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
+        {unavailable.length > 0 && <div role="status" className="workspace-warning">Unavailable · {unavailable.join(", ")} <button type="button" className="text-link" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></div>}
+        {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite} <button type="button" className="text-link" onClick={() => { setSelected(null); write({ site: null, view: "list" }); }}>Back to listings</button></p> : null}
         <div className="funnel-row">
           <div className="funnel-sheet-head only-mobile">
             <p className="eyebrow">Steps</p>
@@ -2257,7 +2344,7 @@ export default function Explorer() {
               </button>
             ) : null}
             {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
+              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" data-testid="needs-location" onClick={() => { setUnplacedScope(false); setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
                 Needs location ({unplacedDeals.length.toLocaleString()})
               </button>
             ) : null}
@@ -2270,7 +2357,7 @@ export default function Explorer() {
               return <button className="aside" type="button" onClick={() => write({ stage: "universe" }, true)}>{more.toLocaleString()} more at other steps</button>;
             })()
           ) : null}
-          {summaryText() ? (
+          {!listView && summaryText() ? (
             <span className="summary-chip" title={SUMMARY_NOTES.pipeline}>
               {summaryText()}
             </span>
@@ -2464,7 +2551,7 @@ export default function Explorer() {
             </div>
             <div className="menu-group" role="group" aria-label="NDA and Ask">
               {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
+                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); if (ndaVisible && restoreOrigin()) return; write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
               ) : null}
               {me?.u ? (
                 <button type="button" className="menu-item ask-launch" data-testid="ask-menu" onClick={() => {
@@ -2472,7 +2559,8 @@ export default function Explorer() {
                   if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
                   else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
                   else setAskSite(null);
-                  setAskOpen(true);
+                  setAskList(listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
+                setAskOpen(true);
                 }}>Ask</button>
               ) : null}
             </div>
@@ -2485,7 +2573,7 @@ export default function Explorer() {
               {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMenuOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
               <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }} className="menu-item">How to read this</button>
               {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedDeals.length.toLocaleString()})</button>
+                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedScope(false); setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedDeals.length.toLocaleString()})</button>
               ) : null}
             </div>
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
@@ -2522,7 +2610,9 @@ export default function Explorer() {
               <button type="button" className="close" aria-label="Close" onClick={() => setUnplacedOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <ul className="unplaced-list">
-              {unplacedDeals.map((deal) => (
+              {unplacedScope ? unplacedInView.map(row => <li key={row.id}>
+                <button type="button" className="text-link" onClick={() => { choose(row.id); setUnplacedOpen(false); }}>{row.name}</button>
+              </li>) : unplacedDeals.map((deal) => (
                 <li key={deal.deal_id}>
                   <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
                   {" · "}{stageTitle(deal.stage_group)}
@@ -2541,6 +2631,7 @@ export default function Explorer() {
       ) : null}
       {inReview && me?.actionsEnabled && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
         <ReviewBar
+          saving={reviewSaving}
           index={reviewIndex}
           total={reviewList.length}
           reviewed={feed.filter((site) => site.status === "reviewed").length}
@@ -2597,10 +2688,11 @@ export default function Explorer() {
           </div>
         ) : null}
         {inReview && reviewCurrent && !reviewCoords ? <p className="review-noloc" data-testid="review-noloc">No exact location yet</p> : null}
+        {reviewError ? <p className="undo-bar" role="alert">{reviewError}</p> : null}
         {undo ? (
           <div className="review-toast" role="status">
             Marked reviewed.
-            <button type="button" onClick={() => void undoReviewMark()} className="menu-item">Undo</button>
+            <button type="button" disabled={reviewSaving} onClick={() => void undoReviewMark()} className="menu-item">Undo</button>
           </div>
         ) : null}
         {feedSheet ? (
@@ -2734,16 +2826,17 @@ export default function Explorer() {
               write({ ...patch, site, nda: null, ndafrom: ndaId || "1" }, true);
             }}
             onPick={(id) => { if (/^NDA-\d{3,}$/i.test(id)) write({ nda: id.toUpperCase() }, true); }}
-            onClose={() => write({ nda: null })}
+            onClose={() => { if (!restoreOrigin()) write({ nda: null }); }}
             onBack={() => write(params.get("site") ? { nda: null } : { nda: "1" })}
             onMenu={() => setMenuOpen(true)}
             backLabel={params.get("site") ? "Back to site" : "Back to queue"}
           />
         ) : null}
-        {loopsVisible ? <OpenLoops onOpen={choose} onClose={() => write({ loops: null })} /> : null}
+        {loopsVisible ? <OpenLoops onOpen={choose} onClose={() => { if (!restoreOrigin()) write({ loops: null }); }} /> : null}
         <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
+            initialSelection={listSelection.current.pipeline} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
             rows={pipelineRows}
             outsideRow={outsideRow}
             unreadIds={openQueueIds}
@@ -2768,7 +2861,7 @@ export default function Explorer() {
               write({ cols: value === defaults ? null : value });
             }}
             onResetColumns={() => write({ cols: null, sort: null })}
-            onBroker={(name) => write({ who: name, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list" })}
+            onBroker={openParty}
             onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: "list" })}
             onCopyLink={async (ids) => {
               const next = new URL(window.location.href);
@@ -2790,6 +2883,7 @@ export default function Explorer() {
           />
         ) : listView && !ndaVisible && !loopsVisible ? (
           <ListView
+            initialSelection={listSelection.current.universe} onSelection={ids => { listSelection.current.universe = ids; }} onScope={rememberScope}
             rows={listRows}
             selectedId={selected}
             sort={{ id: sortKey, desc: sortDesc }}
@@ -2895,12 +2989,7 @@ export default function Explorer() {
                 <button type="button" className="paper-btn" onClick={() => frameRings.current?.()}>Show rings</button>
               </div>
             ) : null}
-            {(() => {
-              const missing = funnel === "pipeline"
-                ? pipelineStepRows.length - pipelineSquares.length
-                : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
-              return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
-            })()}
+            {unplacedInView.length > 0 && <button className="paper-btn location-note" type="button" onClick={() => { setUnplacedScope(true); setUnplacedOpen(true); }}>{unplacedInView.length.toLocaleString()} without a location</button>}
             <aside className="map-key" aria-label="Key">
               <ul>
                 <li><i className="swatch cleared" /> Cleared</li>
@@ -2933,6 +3022,7 @@ export default function Explorer() {
         <PanelBoundary name="Record">
         {selectedDeal ? (
           <DealDetail
+            decisionFirst={listView || inReview}
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
             universeSite={selectedDeal.universe_id ? siteById.get(selectedDeal.universe_id) : null}
@@ -2972,6 +3062,7 @@ export default function Explorer() {
           />
         ) : selectedSite ? (
           <Detail
+            decisionFirst={listView || inReview}
             site={selectedSite}
             lng={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
             lat={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}
@@ -3019,6 +3110,7 @@ export default function Explorer() {
               return site ? [site] : [];
             })}
             contextSites={sites}
+            contextDeals={dealRows}
             signedIn={Boolean(me)}
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}

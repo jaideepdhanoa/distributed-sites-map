@@ -127,7 +127,11 @@ for (const size of sizes) {
 test("an unknown id shows Site not found and a protected id stays closed", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop");
   await page.goto("/?site=WB-LAS-9999", { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("site-missing")).toHaveText("Site not found");
+  const missing = page.getByTestId("site-missing");
+  await expect(missing).toContainText("Site not found");
+  await missing.getByRole("button", { name: "Back to listings" }).click();
+  await expect(page).not.toHaveURL(/site=WB-LAS-9999/);
+  await expect(page).toHaveURL(/view=list/);
   await page.goto("/?site=PIPE-PHX-0006", { waitUntil: "domcontentloaded" });
   await expect(page).not.toHaveURL(/PIPE-PHX-0006/);
   await expect(page.locator("aside.drawer")).toHaveCount(0);

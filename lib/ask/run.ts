@@ -5,9 +5,9 @@ import type { ActionRole } from "@/lib/actions/roles";
 import { estimateCost } from "./cost";
 import { EMPTY_ANSWER, TIMEOUT_ANSWER, UPSTREAM_ANSWER } from "./empty";
 import { liveAskModel, type AskModelInput, type AskModelOutput } from "./model";
-import { applyWordingTier, withCitations, type AskSource } from "./policy";
-import { askPrefix } from "./prompt";
-import { siteScopeLine } from "./tools";
+import { collectSources, applyWordingTier, withCitations, type AskSource } from "./policy";
+import { ASK_SYSTEM, askPrefix } from "./prompt";
+import { runAskTool, siteScopeLine } from "./tools";
 import { logUpstream, isAbortError } from "./upstream";
 
 export type AskRunner = (input: AskModelInput) => Promise<AskModelOutput>;
@@ -66,6 +66,7 @@ export async function answerQuestion(input: {
   question: string;
   siteId: string | null;
   signal?: AbortSignal;
+  siteIds?: string[];
   runner?: AskRunner;
 }): Promise<AskAnswer> {
   const question = input.question.trim().slice(0, 2000);
@@ -90,13 +91,16 @@ export async function answerQuestion(input: {
     let upstream = false;
     let timedOut = false;
     try {
+      const shortlist = input.siteIds?.length ? await Promise.all(input.siteIds.map(id => runAskTool("getSite", { id }, input.role, input.userId))) : null;
       draft = await runner({
-        system: await askPrefix(),
-        prompt: `${audience}\n${scopeLine}\nQuestion: ${question}`,
+        system: shortlist ? ASK_SYSTEM + " This request is scoped to the supplied shortlist. Use only these authorized records and cite their site links." : await askPrefix(),
+        suppliedFactsOnly: Boolean(shortlist),
+        prompt: `${audience}\n${shortlist ? "Shortlist records: " + JSON.stringify(shortlist) : scopeLine}\nQuestion: ${question}`,
         role: input.role,
         userId: input.userId,
         signal: input.signal,
       });
+      if (shortlist) draft.sources = collectSources(shortlist);
     } catch (error) {
       logUpstream(error);
       timedOut = isAbortError(error);
@@ -153,7 +157,7 @@ export async function answerQuestion(input: {
   }
   await remember({
     userId: input.userId,
-    scope: input.siteId ? "site" : "portfolio",
+    scope: input.siteIds?.length ? "shortlist" : input.siteId ? "site" : "portfolio",
     siteId: input.siteId,
     question,
     answer,

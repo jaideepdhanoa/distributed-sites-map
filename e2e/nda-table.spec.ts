@@ -21,6 +21,7 @@ test("a site card opens its NDA and can come back", async ({ page }, info) => {
   await expect(page.getByTestId("nda-view-all")).toHaveCount(0);
   const card = page.getByTestId("nda-card-line");
   await expect(card).toBeVisible();
+  if (info.project.name !== "mobile") await page.mouse.move(0, 0);
   const rest = await card.evaluate((node) => getComputedStyle(node).backgroundColor);
   await card.hover();
   const hovered = await card.evaluate((node) => {
@@ -29,7 +30,7 @@ test("a site card opens its NDA and can come back", async ({ page }, info) => {
   });
   expect(hovered.cursor).toBe("pointer");
   if (info.project.name !== "mobile") {
-    expect(hovered.background).not.toBe(rest);
+    await expect.poll(() => card.evaluate(node => getComputedStyle(node).backgroundColor)).not.toBe(rest);
     await card.screenshot({ path: "review-shots/nda-card-hover.png" });
   }
   await card.focus();

@@ -112,7 +112,7 @@ async function withMentions(sql: Sql, notes: Note[]): Promise<Note[]> {
 
 const NDA_ID = /^NDA-\d{3,}$/;
 
-async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): Promise<string> {
+async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string, lookup?: RecordLookup): Promise<string> {
   if (targetKind === "nda") return targetId;
   if (targetKind === "site_space") {
     const found = await sql.query<{ site_id: string }>(`SELECT site_id FROM site_spaces WHERE id = $1`, [targetId]);
@@ -127,9 +127,9 @@ async function queueSiteId(sql: Sql, targetKind: ThreadKind, targetId: string): 
     );
     const row = found.rows[0];
     if (!row) return targetId;
-    return permanentSiteId(row.target_kind, row.target_id, await fileLookup());
+    return permanentSiteId(row.target_kind, row.target_id, lookup ?? await fileLookup());
   }
-  return permanentSiteId(targetKind, targetId, await fileLookup());
+  return permanentSiteId(targetKind, targetId, lookup ?? await fileLookup());
 }
 
 async function loadNote(sql: Sql, id: string): Promise<NoteRow | null> {
@@ -231,7 +231,7 @@ export async function createNote(
     const saved = await loadNote(sql, duplicateId);
     const note = saved ? present(saved) : null;
     if (!note) throw new InputError("That note could not be saved.");
-    const siteId = await queueSiteId(sql, targetKind, targetId);
+    const siteId = await queueSiteId(sql, targetKind, targetId, lookup);
     await recordAppEvent(sql, {
       siteId,
       type: parentId ? "reply" : "note",
@@ -260,7 +260,7 @@ export async function createNote(
     targetId,
     after: { id, parentId, body, mentions: mentionIds, recommendationId: attached.recommendationId, draftedByAgent: attached.draftedByAgent },
   });
-  const siteId = await queueSiteId(sql, targetKind, targetId);
+  const siteId = await queueSiteId(sql, targetKind, targetId, lookup);
   await replaceMentions(sql, { userIds: mentionIds, siteId, sourceKind: "note", sourceId: id });
   await recordAppEvent(sql, {
     siteId,
@@ -280,6 +280,7 @@ export async function createNote(
     noteId: id,
     siteId,
     recordId: targetId,
+    siteName: sql.afterCommit ? String(lookup("deal", siteId)?.name || lookup("site", siteId)?.name || "").trim().slice(0, 160) : undefined,
     body,
     authorId: input.authorId,
     parentId,

@@ -6,12 +6,14 @@ export function ColumnPicker({
   resetLabel,
   columns,
   hidden,
+  onPreset,
   onToggle,
   onReset,
 }: {
   resetLabel: string;
   columns: { id: string; label: string }[];
   hidden: string[];
+  onPreset?: () => void;
   onToggle: (id: string) => void;
   onReset: () => void;
 }) {
@@ -22,6 +24,7 @@ export function ColumnPicker({
       {open ? (
         <div className="menu" role="group" aria-label="Columns">
           <button type="button" className="text-link" onClick={() => { onReset(); setOpen(false); }}>{resetLabel}</button>
+          {onPreset && <button type="button" className="text-link" onClick={() => { onPreset(); setOpen(false); }}>Financial screen columns</button>}
           {columns.map((column) => (
             <label key={column.id}>
               <input className="check" type="checkbox" checked={!hidden.includes(column.id)} disabled={column.id === "site"} onChange={() => onToggle(column.id)} />

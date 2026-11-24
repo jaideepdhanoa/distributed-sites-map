@@ -123,8 +123,10 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     await expect(page.locator(".list-pane thead")).toContainText("County check");
     await expect(page.getByTestId("type-chip").first()).toBeVisible();
   } else {
-    await expect(page.getByTestId("phone-cards")).toBeVisible();
-    await expect(page.getByTestId("type-chip").first()).toBeVisible();
+    const cards = page.getByTestId("phone-cards");
+    await expect(cards).toBeVisible();
+    await expect(cards.getByTestId("stage-chip").first()).toBeVisible();
+    await expect(cards.locator(".phone-card-meta").first()).toContainText(/listed|listing/i);
   }
   await page.screenshot({ path: `review-shots/${name}-universe-list.png`, fullPage: false });
   await page.goto("/?newlist=1&city=PHX&site=L-239", { waitUntil: "domcontentloaded" });
@@ -162,4 +164,47 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.locator(".drawer-scroll").evaluate((node) => { node.scrollTop = 0; });
   await expect(stars.locator("h2")).toBeInViewport();
   await page.screenshot({ path: `review-shots/${name}-mia-0080.png`, fullPage: false });
+});
+
+test("screening queue separates court, owner and due date on both layouts", async ({ page }, info) => {
+  const queue = [
+    { nda_id: "NDA-910", counterparty_firm: "Sample agreement A", court: "us", court_pill: "Our court", days_court: 2, owner: "", stage: "draft", next_step: "Review draft", next_step_due: "2000-01-01" },
+    { nda_id: "NDA-911", counterparty_firm: "Sample agreement B", court: "them", court_pill: "Their court", days_court: 30, owner: "reviewer", stage: "draft", next_step: "", next_step_due: "" },
+  ];
+  await page.route("**/api/data/nda", route => route.fulfill({ json: { queue } }));
+  await page.goto("/?nda=1", { waitUntil: "domcontentloaded" });
+  const panel = page.getByTestId("nda-queue");
+  await expect(panel.getByRole("heading", { name: "Overdue" })).toBeVisible();
+  const rows = panel.locator(".nda-row");
+  await expect(rows.first()).toContainText("Sample agreement A");
+  await expect(rows.last()).toContainText("Sample agreement B");
+  await panel.getByLabel("Owner", { exact: true }).selectOption("unassigned");
+  await expect(rows).toHaveCount(1);
+  await panel.getByRole("tab", { name: /^Their court/ }).click();
+  await expect(panel.getByText("No agreements match these filters.")).toBeVisible();
+  await panel.getByRole("button", { name: "Clear NDA filters" }).click();
+  await expect(rows).toHaveCount(2);
+  await panel.screenshot({ path: `review-shots/${info.project.name}-screening-queue.png` });
+});
+
+test("an incomplete search can recover without losing the query", async ({ page }, info) => {
+  let available = false;
+  await page.route("**/api/search?*", route => route.fulfill(available
+    ? { json: { mode: "index", groups: { sites: [], brokers: [], conversations: [] } } }
+    : { status: 503, json: {} }));
+  await page.goto("/?view=list&funnel=pipeline", { waitUntil: "domcontentloaded" });
+  const trigger = page.getByTestId("scope-search").filter({ visible: true }).first();
+  await trigger.click();
+  const dialog = page.getByTestId("command-search");
+  const input = dialog.getByRole("textbox");
+  await input.fill("zzqfixture");
+  await expect(dialog.getByRole("status")).toContainText("Full search is unavailable");
+  await dialog.screenshot({ path: `review-shots/${info.project.name}-screening-search.png` });
+  available = true;
+  await dialog.getByRole("button", { name: "Retry search" }).click();
+  await expect(input).toHaveValue("zzqfixture");
+  await expect(dialog.getByTestId("command-empty")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
 });

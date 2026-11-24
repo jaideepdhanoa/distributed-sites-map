@@ -8,6 +8,7 @@ export type PhoneCard = {
   stage: string;
   stageNote?: string;
   tone?: string;
+  action?: string;
   facts: string[];
   chips?: ReactNode;
   selected?: boolean;
@@ -21,7 +22,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
       {rows.map((row) => {
         const facts = row.facts.map((fact) => fact.trim()).filter(Boolean);
         return (
-          <li key={row.id} className={row.selected ? "on" : undefined}>
+          <li data-site-row={row.id} key={row.id} className={row.selected ? "on" : undefined}>
             {row.check}
             <button type="button" className="list-row" onClick={row.onOpen}>
               <span className="phone-card-name" title={row.name}>{row.name}</span>
@@ -30,6 +31,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
                 <ChipFace className={`stage-pill tone-${row.tone || "pine"}`} testId="stage-chip" label={row.stage} detail={row.stageNote} />
                 {row.chips}
               </span>
+              {row.action && <span className="mobile-next-action"><b>Next</b> {row.action}</span>}
               {facts.length ? (
                 <span className="phone-card-meta">
                   {facts.map((fact, index) => (

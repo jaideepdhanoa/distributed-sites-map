@@ -162,6 +162,7 @@ export function NextStepCard({
   const [ownerId, setOwnerId] = useState("");
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
+  const lastCreate = useRef({ draft: "", key: "" });
   const [pending, setPending] = useState(false);
   const [dropHidden, setDropHidden] = useState(false);
   const dropKey = `sites-drop-hide:${kind}:${id}`;
@@ -383,17 +384,28 @@ export function NextStepCard({
   async function submit(path: string, body: unknown, method = "POST") {
     setPending(true);
     setError("");
-    const response = await fetch(path, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (path === "/api/actions/suggestions" && method === "POST") {
+      const draft = JSON.stringify(body);
+      if (lastCreate.current.draft !== draft) lastCreate.current = { draft, key: crypto.randomUUID() };
+      headers["Idempotency-Key"] = lastCreate.current.key;
+    }
+    let response: Response;
+    try {
+      response = await fetch(path, { method, headers, body: JSON.stringify(body) });
+    } catch {
+      setPending(false);
+      setError("Save could not be confirmed. Your draft is here. Check the refreshed record before submitting again.");
+      await reload();
+      return;
+    }
     const payload = (await response.json().catch(() => ({}))) as { error?: string; suggestion?: Step };
     setPending(false);
     if (!response.ok) {
       setError(payload.error || "That could not be saved.");
       return;
     }
+    lastCreate.current = { draft: "", key: "" };
     const saved = payload.suggestion;
     const refresh = saved ? refreshFromSuggestion(kind, id, saved) : null;
     if (saved && refresh) {

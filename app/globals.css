@@ -7,7 +7,7 @@
   --line-2: #d6cebe;
   --ink: #1c1914;
   --ink-2: #5b554b;
-  --ink-3: #8a8273;
+  --ink-3: #6f675b;
   --green: #1e4636;
   --green-deep: #153e2e;
   --green-tint: #e3efe7;
@@ -1101,7 +1101,7 @@ button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { backgroun
 .nda-site-thread { margin: 0 16px 12px; min-width: 0; }
 .nda-site-thread .note-copy, .nda-detail .note-copy { overflow-wrap: anywhere; }
 .nda-pane .nda-list { list-style: none; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 6px; width: min(100%, 880px); }
-.nda-pane > .nda-bar, .nda-pane > .nda-tabs { width: min(100%, 880px); margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
+.nda-pane > .nda-bar, .nda-pane > .nda-tabs, .nda-pane > .nda-filters { width: min(100%, 880px); margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
 .nda-pane .nda-row { width: 100%; overflow: hidden; padding: 8px 12px; }
 .nda-pane .nda-row > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nda-pane .nda-row > span.nda-line { display: flex; align-items: center; justify-content: flex-start; gap: 16px; overflow: visible; text-overflow: unset; white-space: normal; }
@@ -1274,8 +1274,6 @@ button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { backgroun
   align-items: center;
   justify-content: flex-end;
   background: transparent;
-  opacity: 0;
-  pointer-events: none;
 }
 th:hover .col-grip, th:focus-within .col-grip,
 th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity: 1; pointer-events: auto; }
@@ -3876,3 +3874,44 @@ button.paper-btn.on,
 }
 button.scope-search,
 button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.comparison-scroll { overflow: auto; max-height: 56vh; }
+.comparison-table { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+.comparison-table th, .comparison-table td { text-align: left; vertical-align: top; min-width: 9rem; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--paper-card); }
+.comparison-table thead th { position: sticky; top: 0; z-index: 1; background: var(--green-tint); }
+.comparison-table tr > th:first-child { position: sticky; left: 0; min-width: 6rem; max-width: 10rem; background: var(--cream); }
+.comparison-table thead th:first-child { z-index: 2; }
+
+.pnl-table td[data-linked] { outline: 2px solid var(--green); outline-offset: -2px; }
+.pnl-phone-line[data-linked] { border-left: 3px solid var(--green); background: var(--green-tint); }
+
+.mobile-next-action { display: block; color: var(--ink); line-height: 1.4; }
+.mobile-next-action b { color: var(--green); }
+@media (min-width: 768px) and (max-width: 1480px) {
+  .bar .top { height: auto; min-height: 44px; max-height: none; flex-wrap: wrap; gap: 6px; }
+  .bar .top .search-wrap { min-width: 6.5rem; max-width: 10rem; }
+  .bar { height: auto; max-height: none; }
+}
+@media (max-width: 767px) {
+  .shell:has(.layers.open) .map-corner { display: none; }
+  .summary-row > div small { color: var(--ink-2); }
+}
+.comparison-table td, .summary-row strong, .metric-label { font-variant-numeric: tabular-nums; }
+
+
+.hero-frame:has([data-testid="street-view-error"]) { height: auto; min-height: 0; aspect-ratio: auto; padding: 12px; background: var(--cream); }
+.hero-frame:has([data-testid="street-view-error"]) .map-fail { position: static; }
+.column-settings { display: grid; gap: 4px; }
+
+
+.nda-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+.nda-filters label { display: grid; gap: 3px; color: var(--ink-2); font-size: 12px; }
+
+.workspace-loading { margin: 1.25rem; padding: 1.25rem; border: 1px solid var(--line); background: var(--paper-card); border-radius: 12px; }
+.workspace-loading .skeleton { display: block; margin: 12px 0; }
+.workspace-warning { color: var(--ink); background: var(--amber-tint); padding: 6px 12px; }
+
+.nda-priority { margin: 12px 12px 4px; font-size: .8rem; color: var(--muted); }
+
+.nda-pane .nda-row > .nda-action-line { white-space: normal; overflow-wrap: anywhere; }
+.nda-pane:has(.nda-detail) > .nda-filters { display: none; }

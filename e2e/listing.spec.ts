@@ -55,6 +55,9 @@ test("a deal with a site folder shows it next to the map and listing links", asy
     next.searchParams.set("sheet", "half");
     await page.goto(next.toString());
   }
+  const imagery = page.locator("details.record-imagery");
+  await expect(imagery).not.toHaveAttribute("open", "");
+  await imagery.locator("summary").click();
   const photos = page.getByTestId("site-photos");
   await expect(photos).toBeVisible();
   const thumb = page.getByTestId("photo-thumb").first();
@@ -67,5 +70,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   const siteFolder = page.getByTestId("site-folder-link");
   await expect(siteFolder).toBeVisible();
   await expect(siteFolder).toHaveAttribute("href", "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ");
+  await expect(imagery).not.toHaveAttribute("open", "");
+  await imagery.locator("summary").click();
   await expect(page.getByTestId("site-photos")).toBeVisible();
 });

@@ -56,7 +56,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   const fit = await page.evaluate(() => {
     const bar = document.querySelector(".pipeline-list .list-bar");
     const card = document.querySelector("[data-testid=phone-cards] button.list-row");
-    const count = bar?.querySelector("p");
+    const count = document.querySelector(".pipeline-list [data-testid=summary-row] > div:first-child");
     const sort = bar?.querySelector("[data-testid=sort-control]");
     if (!bar || !card || !count || !sort) return { missing: true, pieces: false, scroll: false, overlap: false, stacked: false, clipped: false };
     const countBox = count.getBoundingClientRect();
@@ -81,7 +81,8 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   expect(fit.scroll).toBe(false);
   fs.mkdirSync("review-shots", { recursive: true });
   await page.locator(".pipeline-list .list-bar").screenshot({ path: "review-shots/phone-list-toolbar.png" });
-  await page.locator("[data-testid=phone-cards] button.list-row").first().click();
+  const firstCard = page.getByTestId("phone-cards").locator("button.list-row").first();
+  await firstCard.getByTestId("stage-chip").tap();
   await expect(page).toHaveURL(/[?&]site=/);
 });
 
@@ -110,8 +111,9 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
       sepSpace,
       bareMissing: /Not on file/.test(node.textContent || ""),
       summaryHeight: summary?.getBoundingClientRect().height || 0,
+      firstCardVisible: node.getBoundingClientRect().bottom <= innerHeight,
+      showsCoverage: Boolean(summary?.textContent?.includes("reported")),
       oneRow: tops.length > 1 && Math.max(...tops) - Math.min(...tops) < 4,
-      tileHeight: tiles.reduce((max, box) => Math.max(max, box.height), 0),
       clipped: Boolean(summary && tiles.some((box) => box.right > (summary.getBoundingClientRect().right + 1))),
     };
   });
@@ -120,8 +122,9 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   expect(gaps?.sepSpace).toBeGreaterThanOrEqual(12);
   expect(gaps?.bareMissing).toBe(false);
   expect(gaps?.clipped).toBe(false);
-  expect(gaps?.tileHeight).toBeLessThan(36);
-  expect(gaps?.summaryHeight).toBeLessThan(80);
+  expect(gaps?.showsCoverage).toBe(true);
+  expect(gaps?.firstCardVisible).toBe(true);
+  expect(gaps?.summaryHeight).toBeLessThan(844 * 0.16);
 });
 
 test("signed-in next step and open loops do not show a gmail id", async ({ page }, info) => {

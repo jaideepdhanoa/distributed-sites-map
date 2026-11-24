@@ -546,8 +546,10 @@ export default function Detail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  decisionFirst = false,
   onOpenNda,
 }: {
+  decisionFirst?: boolean;
   site: SiteProps | null;
   depotMiles?: number | null;
   lat?: number | null;
@@ -634,7 +636,7 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />
+      {!decisionFirst && <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />}
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
         <NextStepCard
@@ -681,6 +683,7 @@ export default function Detail({
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
+      {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
@@ -875,8 +878,10 @@ export function DealDetail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  decisionFirst = false,
   onOpenNda,
 }: {
+  decisionFirst?: boolean;
   deal: DealProps;
   peers?: DealProps[];
   universeSite?: SiteProps | null;
@@ -911,6 +916,7 @@ export function DealDetail({
   const figuresPending = !pnl.settled;
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
+  const aerial = aerialTile(lat, lng);
   const cash = cashTile(deal);
   const revenue = revenueTile(deal);
   const cue = listingCue(deal);
@@ -952,7 +958,7 @@ export function DealDetail({
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
-      <SitePhotos card={photos} />
+      {!decisionFirst && <SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} />}
       <section className="decision-block" data-testid="decision-block">
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
         <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
@@ -987,6 +993,7 @@ export function DealDetail({
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
+      {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections

@@ -57,11 +57,11 @@ function photoKey(photo: SitePhoto, index: number) {
 
 type HeroMode = "street" | "photos" | "aerial";
 
-/** Photos when the gallery has slides, otherwise Street View, otherwise the aerial. Same order as a pipeline card. */
+/** Prefer captured photos and aerial imagery when available. */
 function firstHero(showGallery: boolean, embed: string, aerial: string): HeroMode {
   if (showGallery) return "photos";
-  if (embed) return "street";
   if (aerial) return "aerial";
+  if (embed) return "street";
   return "photos";
 }
 
@@ -122,7 +122,11 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
     }
     let opened = false;
     const timer = window.setTimeout(() => {
-      if (!opened) setStreetFailed(true);
+      if (!opened) {
+        if (slides.length) setHero("photos");
+        else if (aerialUrl) setHero("aerial");
+        else setStreetFailed(true);
+      }
     }, 8000);
     const frame = document.querySelector<HTMLIFrameElement>("[data-testid='street-view-frame']");
     const onLoad = () => {
@@ -134,7 +138,7 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
       window.clearTimeout(timer);
       frame?.removeEventListener("load", onLoad);
     };
-  }, [hero, embed]);
+  }, [hero, embed, slides.length, aerialUrl]);
   useEffect(() => {
     const dialog = streetRef.current;
     if (!dialog) return;
@@ -146,7 +150,10 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
   }, [streetOpen]);
 
   const credits = Array.from(new Set(slides.map((item) => item.photo.attribution || esriCredit(item.photo)).filter(Boolean)));
-  if (!model.visible) {
+  if (streetFailed && !slides.length && !aerialUrl) return (
+    <section className="site-photos"><p className="note">Street View unavailable. <a className="text-link" href={model.frontageUrl} target="_blank" rel="noopener noreferrer">Open in Maps</a></p>{between}</section>
+  );
+  if ((!model.visible || (!slides.length && !embed)) && !aerialUrl) {
     if (emptyNote) {
       return (
         <section className="site-photos">
@@ -157,10 +164,7 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
     }
     return (
       <section className="site-photos">
-        <div className="hero-frame empty-hero">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M8 12h8M12 8v8" /></svg>
-          <p>No street view or photos on file</p>
-        </div>
+        <p className="note" data-testid="photo-empty">No imagery on file</p>
         {between}
       </section>
     );
@@ -200,7 +204,7 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
     <section className="site-photos card-hero" data-testid="site-photos">
       <div className="hero-slot">
         <div className="hero-frame">
-          {embed && hero === "street" ? (
+          {embed && hero === "street" && !streetFailed ? (
             <iframe
               title="Street View"
               data-testid="street-view-frame"

@@ -7,6 +7,7 @@ import { ASK_SERVER_BUDGET_MS, answeredByStageTable } from "./wait";
 
 export type AskModelInput = {
   system: string;
+  suppliedFactsOnly?: boolean;
   prompt: string;
   role: ActionRole;
   userId?: string;
@@ -173,7 +174,7 @@ export async function liveAskModel(input: AskModelInput): Promise<AskModelOutput
   const budget = new AbortController();
   const timer = setTimeout(() => budget.abort(), ASK_SERVER_BUDGET_MS);
   const abortSignal = input.signal ? AbortSignal.any([budget.signal, input.signal]) : budget.signal;
-  const fromTable = answeredByStageTable(input.prompt);
+  const fromTable = input.suppliedFactsOnly || answeredByStageTable(input.prompt);
   const shared = {
     model: xai(askModelName()),
     system: input.system,

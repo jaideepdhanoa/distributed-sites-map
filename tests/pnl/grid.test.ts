@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { formatCapturedDate } from "../../lib/pnl/dateLabel.ts";
 import { sampleStatement } from "../../lib/pnl/fixture.ts";
-import { buildPnlGrid, columnSummary } from "../../lib/pnl/grid.ts";
+import { buildPnlGrid, columnSummary, matchesColumnPeriod } from "../../lib/pnl/grid.ts";
 
 function row(id: string, mode: "months" | "years" = "months") {
   const grid = buildPnlGrid(sampleStatement(), mode);
@@ -87,4 +87,14 @@ test("years view uses one column per year and does not invent a second year", ()
   const revenue = grid.rows.find((item) => item.id === "total-revenue")?.cells[0];
   assert.equal(revenue?.kind, "value");
   if (revenue?.kind === "value") assert.equal(revenue.amount, "$1,000,000");
+});
+
+
+test("a financial link resolves the same month even when the package has no figure", () => {
+  const monthly = buildPnlGrid(sampleStatement(), "months", 2024);
+  const february = monthly.columns[1];
+  assert.equal(matchesColumnPeriod(february, "2024-02"), true);
+  assert.equal(matchesColumnPeriod(february, "2024-02-01/2024-02-29"), true);
+  assert.equal(matchesColumnPeriod(february, "2023-02"), false);
+  assert.equal(matchesColumnPeriod(february, "Feb"), true);
 });

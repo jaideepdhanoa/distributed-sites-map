@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import NdaDetail from "./NdaDetail";
-import { collapseContained, counterpartyLine, coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
+import { isOpenAgreement, collapseContained, counterpartyLine, coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
 
 type Payload = {
   queue?: NdaQueueItem[];
@@ -11,17 +11,17 @@ type Payload = {
 
 let remembered: NdaQueueItem[] = [];
 
-type Tab = "us" | "them" | "open" | "all";
+type Tab = "us" | "them" | "all";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "us", label: "Our court" },
   { id: "them", label: "Their court" },
-  { id: "open", label: "Unassigned" },
   { id: "all", label: "All" },
 ];
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
 }
 
 function coveredLabel(row: NdaQueueItem, names: Record<string, string>): string {
@@ -49,7 +49,6 @@ function CourtPill({ court, label }: { court: string; label: string }) {
 
 function inTab(row: NdaQueueItem, tab: Tab): boolean {
   if (tab === "all") return true;
-  if (tab === "open") return !row.owner;
   if (tab === "us") return row.court === "us";
   return row.court === "them" || row.court === "seller";
 }
@@ -82,6 +81,9 @@ export default function NdaQueue({
   const [failed, setFailed] = useState("");
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>("all");
+  const [owner, setOwner] = useState("");
+  const [status, setStatus] = useState("all");
+  const [order, setOrder] = useState("due");
   const [menu, setMenu] = useState(false);
   const [picked, setPicked] = useState(openId);
   const today = todayIso();
@@ -133,13 +135,26 @@ export default function NdaQueue({
     onPick(id);
   }
 
-  const counts = useMemo(() => ({
-    us: rows.filter((row) => inTab(row, "us")).length,
-    them: rows.filter((row) => inTab(row, "them")).length,
-    open: rows.filter((row) => inTab(row, "open")).length,
-    all: rows.length,
-  }), [rows]);
-  const shown = useMemo(() => rows.filter((row) => inTab(row, tab)).slice().sort((left, right) => {
+  const closed = (row: NdaQueueItem) => !isOpenAgreement(row) || ["declined", "executed", "expired", "not_required"].includes(row.stage);
+  function priority(row: NdaQueueItem) {
+    if (closed(row)) return "Closed";
+    if (!row.next_step_due) return "No due date";
+    if (row.next_step_due < today) return "Overdue";
+    return row.next_step_due === today ? "Due today" : "Upcoming";
+  }
+  const population = rows.filter(row =>
+    (!owner || (owner === "unassigned" ? !row.owner : row.owner === owner))
+    && (status === "all" || (status === "closed" ? closed(row) : !closed(row)))
+    && (order !== "missing" || !row.next_step));
+  const counts = { us: population.filter(row => inTab(row, "us")).length,
+    them: population.filter(row => inTab(row, "them")).length, all: population.length };
+  const owners = Array.from(new Map(rows.filter(row => row.owner).map(row => [row.owner, row.owner_name || row.owner])).entries());
+  const shown = population.filter(row => inTab(row, tab)).sort((left, right) => {
+    if (order === "due") {
+      if (closed(left) !== closed(right)) return Number(closed(left)) - Number(closed(right));
+      const byDate = (left.next_step_due || "9999").localeCompare(right.next_step_due || "9999");
+      if (byDate) return byDate;
+    }
     const a = left.days_court;
     const b = right.days_court;
     if (a == null && b == null) return left.nda_id.localeCompare(right.nda_id);
@@ -147,7 +162,7 @@ export default function NdaQueue({
     if (b == null) return -1;
     if (a !== b) return b - a;
     return left.nda_id.localeCompare(right.nda_id);
-  }), [rows, tab]);
+  });
   const open = rows.find((row) => row.nda_id === (picked || openId)) || null;
 
   function download() {
@@ -191,6 +206,17 @@ export default function NdaQueue({
           <button key={item.id} type="button" role="tab" className={tab === item.id ? "chip on" : "chip"} aria-selected={tab === item.id} onClick={() => setTab(item.id)}>{item.label} {loaded ? counts[item.id] : ""}</button>
         ))}
       </div>
+      <div className="nda-filters">
+        <label>Owner<select aria-label="Owner" className="secondary" value={owner} onChange={e => setOwner(e.target.value)}>
+          <option value="">All owners</option><option value="unassigned">Unassigned</option>{owners.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select></label>
+        <label>Status<select aria-label="Status" className="secondary" value={status} onChange={e => setStatus(e.target.value)}>
+          <option value="all">All records</option><option value="active">Active</option><option value="closed">Closed</option>
+        </select></label>
+        <label>Priority<select aria-label="Priority" className="secondary" value={order} onChange={e => setOrder(e.target.value)}>
+          <option value="due">Next due first</option><option value="wait">Longest wait</option><option value="missing">Missing next step</option>
+        </select></label>
+      </div>
       <div className="nda-work">
         {failed ? <p className="note">{failed}</p> : null}
         {!loaded && !failed ? (
@@ -198,21 +224,24 @@ export default function NdaQueue({
             {[0, 1, 2, 3].map((item) => <li key={item} className="nda-row nda-hold"><span className="skeleton nda-skel" /><span className="skeleton nda-skel wide" /></li>)}
           </ul>
         ) : null}
-        {loaded && !failed && rows.length === 0 ? <p className="note">No open NDAs.</p> : null}
+        {loaded && !failed && !shown.length && <div className="note">{!rows.length ? "No agreements on file." : owner === "unassigned" && !rows.some(row => !row.owner) ? "Every agreement has an owner." : "No agreements match these filters."}
+          {rows.length > 0 && <button className="text-link" type="button" onClick={() => { setOwner(""); setTab("all"); setOrder("due"); setStatus("all"); }}>Clear NDA filters</button>}
+        </div>}
         {picked && loaded && !open ? <p className="note">That NDA is not in the open list.</p> : null}
         <ul className="nda-list" data-testid="nda-cards">
-          {shown.map((row) => {
-            const overdue = Boolean(row.next_step_due && row.next_step_due < today);
+          {shown.map((row, index) => {
+            const overdue = !closed(row) && Boolean(row.next_step_due && row.next_step_due < today);
             const next = row.next_step || "No next step";
             return (
               <li key={row.nda_id}>
+                {order === "due" && (!index || priority(row) !== priority(shown[index - 1])) && <h3 className="nda-priority">{priority(row)}</h3>}
                 <button type="button" className="list-row nda-row" data-testid={`nda-card-${row.nda_id}`} onClick={() => pick(row.nda_id)}>
                   <span className="nda-line">
                     <strong>{row.counterparty_firm || row.nda_id}</strong>
                     <CourtPill court={row.court} label={row.court_pill} />
                   </span>
                   <span>{queueLine(row, names)}</span>
-                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${row.next_step_due}` : ""}`}</span>
+                  <span className={`nda-action-line ${overdue ? "nda-overdue" : "note"}`}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${overdue ? "Overdue" : "Due"} ${row.next_step_due}` : ""}`}</span>
                 </button>
               </li>
             );

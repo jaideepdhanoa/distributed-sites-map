@@ -12,21 +12,20 @@ import { isOwnerAccount } from "./owner";
 import { deliveryMode, loadPreferences, type AlertCategory } from "./preferences";
 import { deliveryRecipients } from "./recipients";
 
-async function siteLabel(siteId: string): Promise<string> {
-  const hit = (await loadCatalog()).find((item) => item.id === siteId);
-  const name = hit?.name?.trim();
+async function siteLabel(siteId: string, knownName?: string): Promise<string> {
+  const name = knownName ?? (await loadCatalog()).find(item => item.id === siteId)?.name?.trim();
   if (name && name !== siteId) return `${name} (${siteId})`;
   return siteId;
 }
 
 async function flushQueued(sql: Sql): Promise<void> {
-  // A zero window has nothing to coalesce. Send before the response so the row is logged.
-  // Any longer window waits in the background, measured from the oldest unsent item.
-  if (batchWindowMs() === 0) {
-    await flushInstant(sql);
-    return;
-  }
-  scheduleInstantFlush();
+  const flush = async () => {
+    if (batchWindowMs() === 0) await flushInstant(sql);
+    else scheduleInstantFlush();
+  };
+  // The outbox and receipt must be durable before delivery claims its own transaction.
+  if (sql.afterCommit) sql.afterCommit(flush);
+  else await flush();
 }
 
 async function queueFor(
@@ -40,6 +39,7 @@ async function queueFor(
     href: string;
     refId: string;
     channel?: "instant" | "digest";
+    siteName?: string;
     force?: boolean;
   },
 ): Promise<boolean> {
@@ -62,7 +62,7 @@ async function queueFor(
       category: input.category,
       channel,
       siteId: input.siteId,
-      siteLabel: await siteLabel(input.siteId),
+      siteLabel: await siteLabel(input.siteId, input.siteName),
       summary: input.summary,
       authorId: input.actorId,
       href: input.href,
@@ -162,7 +162,7 @@ async function followAllIds(sql: Sql): Promise<string[]> {
 
 export async function notifyNote(
   sql: Sql,
-  input: { noteId: string; siteId: string; recordId?: string; body: string; authorId: string; parentId: string | null; mentionIds: string[] },
+  input: { siteName?: string; noteId: string; siteId: string; recordId?: string; body: string; authorId: string; parentId: string | null; mentionIds: string[] },
 ): Promise<void> {
   const anchor = await noteAnchor(sql, input.noteId);
   const recordId = input.recordId || "";
@@ -178,6 +178,7 @@ export async function notifyNote(
       userIds: followers,
       category: "comments",
       siteId: input.siteId,
+      siteName: input.siteName,
       summary: input.body,
       href,
       refId: input.noteId,
@@ -197,6 +198,7 @@ export async function notifyNote(
       userIds: participants,
       category: "replies",
       siteId: input.siteId,
+      siteName: input.siteName,
       summary: input.body,
       href,
       refId: input.noteId,
@@ -207,6 +209,7 @@ export async function notifyNote(
       userIds: also,
       category: "comments",
       siteId: input.siteId,
+      siteName: input.siteName,
       summary: input.body,
       href,
       refId: input.noteId,
@@ -217,6 +220,7 @@ export async function notifyNote(
     userIds: input.mentionIds,
     category: "mentions",
     siteId: input.siteId,
+    siteName: input.siteName,
     summary: input.body,
     href,
     refId: input.noteId,
@@ -227,7 +231,7 @@ export async function notifyNote(
 
 export async function notifySuggestion(
   sql: Sql,
-  input: { id: string; siteId: string; authorId: string; field: string; summary: string; ownerId: string | null; mentionIds: string[] },
+  input: { siteName?: string; id: string; siteId: string; authorId: string; field: string; summary: string; ownerId: string | null; mentionIds: string[] },
 ): Promise<void> {
   const approval = input.field === "proposed_next_step" || input.field === "document_request";
   let instant = false;
@@ -237,6 +241,7 @@ export async function notifySuggestion(
       userIds: reviewerIds(),
       category: "approvals",
       siteId: input.siteId,
+      siteName: input.siteName,
       summary: input.summary,
       href: proposalHref(input.siteId),
       refId: input.id,
@@ -246,6 +251,7 @@ export async function notifySuggestion(
       userIds: [input.ownerId],
       category: "assignments",
       siteId: input.siteId,
+      siteName: input.siteName,
       summary: input.summary,
       href: proposalHref(input.siteId),
       refId: input.id,
@@ -256,6 +262,7 @@ export async function notifySuggestion(
     userIds: input.mentionIds,
     category: "mentions",
     siteId: input.siteId,
+    siteName: input.siteName,
     summary: input.summary,
     href: discussionHref(input.siteId),
     refId: input.id,
@@ -267,6 +274,7 @@ export async function notifySuggestion(
     userIds: followers,
     category: "proposals",
     siteId: input.siteId,
+    siteName: input.siteName,
     summary: input.summary,
     href: proposalHref(input.siteId),
     refId: input.id,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { withoutGmail } from "@/lib/displayText";
-import { columnPeriodKey, type GridCell, type GridColumn, type PnlGrid, type ValueCell } from "@/lib/pnl/grid";
+import { columnPeriodKey, matchesColumnPeriod, type GridCell, type GridColumn, type PnlGrid, type ValueCell } from "@/lib/pnl/grid";
 import { sourceView } from "@/lib/pnl/sourceLink";
 import PnlLinePopover from "./PnlLinePopover";
 
@@ -187,13 +187,12 @@ export default function PnlGrid({
     }
   }
 
+  const linkedColumn = focusPeriod ? grid.columns.findIndex(column => matchesColumnPeriod(column, focusPeriod)) : 0;
   useEffect(() => {
-    if (!focusLine) return;
-    const period = focusPeriod || "";
-    const cell = scrollRef.current?.querySelector<HTMLElement>(`[data-line="${CSS.escape(focusLine)}"][data-period="${CSS.escape(period)}"]`);
-    if (!cell) return;
-    reveal(Number(cell.dataset.row || 0), Number(cell.dataset.colindex || 0), cell);
-  }, [focusLine, focusPeriod, grid.columns.length, grid.rows.length]);
+    if (!focusLine || linkedColumn < 0 || !scrollRef.current?.getClientRects().length) return;
+    const cell = scrollRef.current.querySelector<HTMLElement>(`[data-line="${CSS.escape(focusLine)}"][data-colindex="${linkedColumn}"]`);
+    cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [focusLine, linkedColumn, grid.rows.length]);
 
   const popover = open ? focusable[open.row]?.cells[open.col] : null;
   const popoverRow = open ? focusable[open.row] : null;
@@ -255,6 +254,7 @@ export default function PnlGrid({
                       role="gridcell"
                       data-cell={`${index}:${col}`}
                       data-line={row.id}
+                      data-linked={row.id === focusLine && col === linkedColumn || undefined}
                       data-row={index}
                       data-colindex={col}
                       data-period={grid.columns[col] ? columnPeriodKey(grid.columns[col]) : ""}

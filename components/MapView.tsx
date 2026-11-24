@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
+import { GeoJSONSource, Map, Marker, NavigationControl, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Pentagon, Ruler } from "lucide-react";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
@@ -28,6 +28,7 @@ type Props = {
   unscreened?: UnscreenedFeature[];
   selectedId: string | null;
   mapScope: string;
+  previewName: string;
   showAreas: boolean;
   showDepots: boolean;
   showSites: boolean;
@@ -289,6 +290,7 @@ export default function MapView(props: Props) {
   const freezeCamera = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const holdCamera = useRef(false);
+  const previousScope = useRef(props.mapScope);
   const pinOrigin = useRef<{
     scope: string; id: string; center: [number, number]; zoom: number;
     bearing: number; pitch: number; padding: ReturnType<Map["getPadding"]>;
@@ -1592,7 +1594,7 @@ export default function MapView(props: Props) {
       const drawing = Boolean(propsRef.current.spaceDrawing);
       const phonePad = phone && !reviewing && !drawing;
       const padKey = phonePad ? "clear" : "flush";
-      map.setPadding(phonePad && !props.selectedId ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
+      map.setPadding(phonePad && !props.previewName ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
       const drawFly = propsRef.current.spaceFly;
       if (drawing && drawFly && map.getZoom() < 17) {
         map.jumpTo({ center: [drawFly.lng, drawFly.lat], zoom: 18, padding: pointPadding(map) });
@@ -1602,10 +1604,16 @@ export default function MapView(props: Props) {
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
         if (map.getLayer("areas-priority")) map.setPaintProperty("areas-priority", "fill-opacity", phone ? 0.16 : 0.24);
       }
+      const changedScope = previousScope.current !== props.mapScope;
+      previousScope.current = props.mapScope;
+      if (changedScope) {
+        pinOrigin.current = null;
+        holdCamera.current = false;
+      }
       const clearedSelection = Boolean(sawSelection.current) && !props.selectedId;
       if (props.selectedId) sawSelection.current = props.selectedId;
       else if (clearedSelection) {
-        holdCamera.current = true;
+        holdCamera.current = !changedScope;
         const origin = pinOrigin.current;
         if (origin?.scope === props.mapScope && origin.id === sawSelection.current) {
           map.stop();
@@ -1656,7 +1664,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.preserveCamera, props.mapScope, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.preserveCamera, props.mapScope, props.previewName, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1750,6 +1758,26 @@ export default function MapView(props: Props) {
       map.off("idle", check);
     };
   }, [mapGeneration, props.showRings, props.depots]);
+
+  const previewPoint = props.previewName ? (
+    props.deals.find(row => row.properties.deal_id === props.selectedId)?.geometry ||
+    props.sites.find(row => row.properties.site_id === props.selectedId)?.geometry ||
+    props.offMarket.find(row => row.properties.site_id === props.selectedId)?.geometry ||
+    props.unscreened?.find(row => row.properties.listing_id === props.selectedId)?.geometry
+  )?.coordinates : null;
+  const previewLng = previewPoint?.[0];
+  const previewLat = previewPoint?.[1];
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || previewLng == null || previewLat == null || !props.previewName) return;
+    const label = document.createElement("span");
+    label.className = "selected-pin-name";
+    label.textContent = props.previewName;
+    label.setAttribute("aria-hidden", "true");
+    const marker = new Marker({ element: label, anchor: "bottom", offset: [0, -22] })
+      .setLngLat([previewLng, previewLat]).addTo(map);
+    return () => { marker.remove(); };
+  }, [mapGeneration, props.previewName, previewLng, previewLat]);
 
   const selectedOnMap =
     props.sites.some((feature) => feature.properties.site_id === props.selectedId) ||

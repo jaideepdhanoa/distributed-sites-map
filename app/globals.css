@@ -4034,3 +4034,9 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .comparison-mode { padding-block: 0; }
   .comparison-mode .text-link { min-height: 44px; }
 }
+.selected-pin-name {
+  pointer-events: none; max-width: min(185px, 37vw); padding: 4px 9px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-radius: 6px; border: 1px solid #fffdf8; background: #1e4636; color: #fffdf8;
+  box-shadow: 0 2px 6px #171a1460; font: 600 12px/1.35 var(--font-sans, sans-serif);
+}

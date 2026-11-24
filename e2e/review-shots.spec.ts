@@ -322,6 +322,7 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
     else await page.mouse.click(click.x, click.y);
     const preview = page.locator(".map-preview");
     await expect(preview).toHaveAttribute("data-record", pin.id);
+    await expect(page.locator(".selected-pin-name")).toHaveText(await preview.getByRole("heading").innerText());
     const action = preview.getByRole("button", { name: "Open site record" });
     await expect(action).toBeInViewport({ ratio: 1 });
     await expect(preview.getByText("Next check", { exact: true })).toBeVisible();

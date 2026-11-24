@@ -171,7 +171,7 @@ NOTE_FIELDS = (
 _NOTE_INTERNAL = re.compile(
     r"(?i)("
     r"\b(?:muse|torque|indie|grok)\b"
-    r"|\blive\b"
+    r"|(?<!-)\blive\b(?!-)"
     r"|rounding"
     r"|source diff"
     r"|\bscreens?\b"

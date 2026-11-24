@@ -220,6 +220,7 @@ test("the All count matches the list, and a zoomed width uses cards", async ({ p
   test.skip(info.project.name !== "desktop", "counts and zoom");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.waitForSelector("[data-testid=all-stages]");
   const counts = await page.evaluate(() => {
     const all = document.querySelector("[data-testid=all-stages] strong")?.textContent?.replace(/,/g, "").trim() || "";

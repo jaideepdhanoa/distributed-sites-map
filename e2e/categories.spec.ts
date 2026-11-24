@@ -35,6 +35,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(list).toContainText("Majestic Car Wash");
   await expect(page).not.toHaveURL(/[?&]cats=/);
 
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.locator("button.tool", { hasText: "Filters" }).click();
   const panel = page.getByRole("dialog", { name: "Filters" });
   await expect(panel.getByTestId("wash-category")).toBeChecked();

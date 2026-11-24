@@ -1160,7 +1160,13 @@ export default function Explorer() {
     const has = compareIds.includes(id);
     const want = on ?? !has;
     if (want === has) return;
-    const next = want ? (compareIds.length >= 4 ? compareIds : [...compareIds, id]) : compareIds.filter((item) => item !== id);
+    if (want && compareIds.length >= 4) {
+      const remove = document.querySelector<HTMLButtonElement>(".compare-bar button.menu-item");
+      remove?.focus();
+      remove?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    const next = want ? [...compareIds, id] : compareIds.filter((item) => item !== id);
     write({ compare: next.length ? next.join("|") : null });
   }
 

@@ -47,7 +47,7 @@ export default function PnlPhone({
   const targetPeriod = focus?.period || "";
   const appliedLink = useRef("");
   useEffect(() => {
-    const link = [targetPeriod, focus?.line, grain, year].join("|");
+    const link = [targetPeriod, focus?.line, grain].join("|");
     if (!targetPeriod || appliedLink.current === link) return;
     const at = grid.columns.findIndex(column => [column.label, columnPeriodKey(column), column.periodStart + "/" + column.periodEnd].some(key => periodChip(key) === periodChip(targetPeriod)));
     if (at < 0) return;

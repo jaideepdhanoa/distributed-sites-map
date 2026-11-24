@@ -346,6 +346,10 @@ export default function PipelineList({
   }, [activeLayout, mapArea, rows, sheetColumns, visible]);
   const summary = useMemo(() => summaryOf(ordered.map((row) => row.deal)), [ordered]);
   const compMedian = useMemo(() => compMedianOf(ordered.map((row) => row.deal)), [ordered]);
+  const marketComps = new Map<string, number>();
+  for (const { deal } of ordered) {
+    if (signedIn && deal.city && deal.comp_median_per_acre != null) marketComps.set(deal.city, deal.comp_median_per_acre);
+  }
   const strips = useMemo(() => ({
     asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
     acres: stripStats(ordered.map((row) => row.deal.land_acres)),
@@ -482,7 +486,7 @@ export default function PipelineList({
       <div><span className="only-desktop">Matching sites</span><span className="only-mobile">Shown</span><strong>{summary.count.toLocaleString()}</strong></div>
       <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
       <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{summary.count === 0 ? "No matching sites" : summary.withAcres ? acresTotal(summary.totalAcres) : "Acreage unknown"}</strong>{summary.withAcres > 0 && <small>{summary.withAcres} of {summary.count} reported</small>}</div>
-      <div><span className="only-desktop">Market land comps / acre</span><span className="only-mobile">Land comps / acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong>{signedIn && <details className="disclosure"><summary className="disclosure">Market basis</summary><p>{compMedian.tip}</p></details>}</div>
+      <div><span className="only-desktop">Market land comps / acre</span><span className="only-mobile">Land comps / acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong>{signedIn && <details className="disclosure"><summary className="disclosure">Market basis</summary><p>{compMedian.tip}</p>{Array.from(marketComps, ([market, value]) => <p key={market}>{market} · {fullMoney(value)} per acre</p>)}</details>}</div>
     </div>
   );
   const outside = outsideRow ? (
@@ -566,7 +570,7 @@ export default function PipelineList({
               stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
-              action: signedIn ? row.deal.next_step?.trim() || undefined : undefined,
+              action: signedIn ? stripGmailIds(row.deal.next_step || "").trim() || undefined : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
                 if (row.deal.next_step && signedIn) return null;

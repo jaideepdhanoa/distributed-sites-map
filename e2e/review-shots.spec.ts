@@ -123,8 +123,10 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     await expect(page.locator(".list-pane thead")).toContainText("County check");
     await expect(page.getByTestId("type-chip").first()).toBeVisible();
   } else {
-    await expect(page.getByTestId("phone-cards")).toBeVisible();
-    await expect(page.getByTestId("type-chip").first()).toBeVisible();
+    const cards = page.getByTestId("phone-cards");
+    await expect(cards).toBeVisible();
+    await expect(cards.getByTestId("stage-chip").first()).toBeVisible();
+    await expect(cards.locator(".phone-card-meta").first()).toContainText(/listed|listing/i);
   }
   await page.screenshot({ path: `review-shots/${name}-universe-list.png`, fullPage: false });
   await page.goto("/?newlist=1&city=PHX&site=L-239", { waitUntil: "domcontentloaded" });

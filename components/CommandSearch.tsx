@@ -144,7 +144,7 @@ export default function CommandSearch({
         .then((body: { mode?: string; groups?: Groups } | null) => {
           if (ctrl.signal.aborted) return;
           setStatus("ready");
-          const remote = body?.groups || EMPTY;
+          const remote = { ...EMPTY, ...body?.groups };
           const useRemote = (body?.mode === "index" || body?.mode === "records") && count(remote) > 0;
           setGroups(useRemote ? filled(remote, fallbackRef.current?.(needle) || EMPTY) : (fallbackRef.current?.(needle) || EMPTY));
         })

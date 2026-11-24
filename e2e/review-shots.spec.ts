@@ -232,8 +232,33 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   const matrix = page.getByRole("table", { name: "Site comparison" });
   for (const name of ["Site fit", "Financials", "Diligence"]) await expect(matrix.getByRole("rowgroup", { name })).toBeAttached();
   await expect(matrix.getByText("Not on file", { exact: true }).first()).toBeAttached();
+  await page.getByTestId("compare-tray").screenshot({ path: `review-shots/${info.project.name}-shortlist-compare.png` });
   await page.getByRole("button", { name: "Close compare" }).click();
+  await expect(page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true })).toBeFocused();
   const restored = await firstFive();
   expect(restored.length === 5 && restored.every((id, index) => id === before[index])).toBe(true);
   for (const i of [0, 1]) await expect(rows.nth(i).getByRole("checkbox")).toBeChecked();
+});
+
+test("the record shows the action, owner and deadline together", async ({ page }, info) => {
+  await page.route("**/api/data/financials/PIPE-MIA-0080", route => route.fulfill({
+    json: { workbookStep: { text: "Confirm available power with the utility.", owner: "Site team", due: "2027-01-12" } },
+  }));
+  await page.goto("/?funnel=pipeline&view=list&site=PIPE-MIA-0080&sheet=full", { waitUntil: "domcontentloaded" });
+  const drawer = page.locator("aside.drawer");
+  const action = drawer.getByTestId("workbook-step");
+  await expect(action).toContainText("Confirm available power");
+  await expect(action).toContainText("Site team");
+  await expect(action).toContainText("Jan 12");
+  await drawer.locator(".drawer-scroll").evaluate(el => { el.scrollTop = 0; });
+  const header = await drawer.getByTestId("panel-top").boundingBox();
+  const last = await action.boundingBox();
+  expect(header && last).toBeTruthy();
+  if (header && last) {
+    const y = Math.max(0, header.y);
+    const bottom = Math.min(page.viewportSize()!.height, last.y + last.height + 8);
+    await page.screenshot({ path: `review-shots/${info.project.name}-record-action.png`, clip: {
+      x: Math.max(0, header.x), y, width: Math.min(header.width, page.viewportSize()!.width - Math.max(0, header.x)), height: bottom - y,
+    } });
+  }
 });

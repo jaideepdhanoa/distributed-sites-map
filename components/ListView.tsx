@@ -60,13 +60,13 @@ export type ListRow = {
 
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id" | "lng" | "lat" | "nda" | "ndaId" | "near" | "nearShort" | "address" | "listingUrl" | "folderUrl" | "packageUrl" | "lead" | "tier" | "zoning" | "city">; label: string }[] = [
   { id: "site", label: "Site" },
-  { id: "stage", label: "Stage" },
+  { id: "stage", label: "Stage / type" },
   { id: "county", label: "County check" },
   { id: "score", label: "Score" },
   { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
   { id: "traffic", label: "Traffic" },
-  { id: "listed", label: "Asking" },
+  { id: "listed", label: "Listing" },
 ];
 
 type ListColumnId = (typeof LIST_COLUMNS)[number]["id"];

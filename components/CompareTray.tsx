@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress, shownPriceSource } from "@/lib/format";
 import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, openLandLabel, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
@@ -130,6 +130,16 @@ export default function CompareTray({
 }) {
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
+  const matrixRef = useRef<HTMLDivElement>(null);
+  const hasMatrix = count >= 2;
+  useEffect(() => {
+    if (!hasMatrix) return;
+    const trigger = document.activeElement;
+    matrixRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [hasMatrix]);
   if (!count) return null;
   const columns = [
     ...deals.map(deal => ({ id: deal.deal_id, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
@@ -157,7 +167,7 @@ export default function CompareTray({
         {children}
       </div>
       {count >= 2 ? (
-        <div className="comparison-scroll" tabIndex={0} aria-label="Comparison facts">
+        <div className="comparison-scroll" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
           <table className="comparison-table">
             <caption className="sr">Site comparison</caption>
             <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>

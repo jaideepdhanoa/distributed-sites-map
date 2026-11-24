@@ -1,3 +1,4 @@
+import { isWriteAgent } from "@/lib/agent/identity";
 import type { Sql } from "@/lib/actions/db";
 import { countOpenThreads } from "@/lib/comments/record";
 import { isAgentStageDecision } from "@/lib/changes/schema";
@@ -74,7 +75,6 @@ export function isWorkbookWrite(source: string, actor: string): boolean {
   return blob.includes("workbook") || blob.includes("import") || blob.includes("workbook-copy");
 }
 
-const BEARER_AGENTS = new Set(["indie", "muse"]);
 
 export function isRealStageChange(payload: Record<string, unknown>, source: string, actor: string): boolean {
   if (isWorkbookWrite(source, actor)) return false;
@@ -163,7 +163,7 @@ async function approvedSites(sql: Sql): Promise<Set<string>> {
 }
 
 function agentStageIsApproved(actor: string, siteId: string, stage: string, approved: Set<string>): boolean {
-  if (!BEARER_AGENTS.has(actor.trim().toLowerCase())) return true;
+  if (!isWriteAgent(actor.trim().toLowerCase())) return true;
   return approved.has(`${siteId}\n${stage}`) || (stage === "Dropped" && approved.has(`${siteId}\nDropped`));
 }
 

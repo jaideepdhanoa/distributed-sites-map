@@ -58,16 +58,17 @@ Current rows live in `site_stages`, `activities`, `comms_entries`, and `sites`, 
 
 `POST /api/changes` takes one batch. Send `Idempotency-Key` and `Authorization: Bearer` with that agent's token. The same key and the same body return the original ids. The same key and a different body return 409. A version mismatch returns 409 and the batch rolls back.
 
-The server stores two agent bearers (`lib/changes/auth.ts`):
+The server recognizes three agent bearers (`lib/agent/auth.ts`):
 
 | Env name | Actor on the event |
 | --- | --- |
 | `AGENT_WRITE_TOKEN_INDIE` | `indie` |
 | `AGENT_WRITE_TOKEN_MUSE` | `muse` |
+| `AGENT_WRITE_TOKEN_CHATGPT` | `chatgpt` |
 
-There is no third bearer in the code. Do not add one, and do not print either value. A signed-in session cookie is a person. Activity, comms, and site content need contributor access. Stage changes need a reviewer, except the one agent stage move below. Payload shapes are in `docs/agent-api.md`.
+Use one independently generated secret per actor. A signed-in session cookie is a person. Activity, comms, and site content need contributor access. Stage changes need a reviewer, except the one agent stage move below. Payload shapes are in `docs/agent-api.md`.
 
-An agent can write activity, comms, and the site fields its token is allowed to touch (`assertSiteOwnership` in `lib/changes/schema.ts`). Capture activity, P&L lines, P&L retracts, and `data_conflict` rows are Muse's. Indie can update the site fields that function allows, including segment, with a source. A new site does not accept Folder, photos, land evidence, typed power, check statuses, or financial claims. Every numeric fact needs its own source.
+An agent can write activity, comms, and the site fields its token is allowed to touch (`assertSiteOwnership` in `lib/changes/schema.ts`). Capture activity, P&L lines, P&L retracts, and `data_conflict` rows are available to the capture role. ChatGPT has both capture and site maintenance permissions. Indie can update the site fields that function allows, including segment, with a source. A new site does not accept Folder, photos, land evidence, typed power, check statuses, or financial claims. Every numeric fact needs its own source.
 
 The only agent stage write is Desk screen to Financial screen, with a package receipt. Anything else, including Dropped, is refused for an agent.
 
@@ -77,9 +78,9 @@ The only agent stage write is Desk screen to Financial screen, with a package re
 
 NDA overlay rows are `nda_state` and `nda_history`, created by `db/migrations/033_nda_queue.sql` and extended by `db/migrations/034_nda_dossier.sql`. The register snapshot stays the baseline. `lib/ndaStore.ts` reads the overlay for a signed-in session and for an agent bearer. A database without the tables keeps the snapshot.
 
-Muse and Indie write an NDA with `POST /api/changes` (`entity_type: "nda"`) and read it back with `GET /api/data/nda` and the same bearer. Field rules are in `docs/nda-capture.md`. Unknown payload fields are refused. `payload.at` is an ISO-8601 time with a zone offset.
+Muse, Indie and ChatGPT capture an NDA with `POST /api/changes` (`entity_type: "nda"`) and read it back with `GET /api/data/nda` and the same bearer. Field rules are in `docs/nda-capture.md`. Unknown payload fields are refused. `payload.at` is an ISO-8601 time with a zone offset.
 
-`parseNda` admits Muse, Indie, or a human with content-write access. Do not widen that check. Do not set `owner`, and do not send `action: "assign"`. The server currently accepts `owner` on an agent payload (`tests/changes/nda-agent.test.ts`). Leave the owner for a person on the signed-in dossier.
+`parseNda` admits the three registered agents or a human with content-write access. Do not widen that check. Do not set `owner`, and do not send `action: "assign"`. The two legacy agent tokens still accept `owner` on a payload (`tests/changes/nda-agent.test.ts`). Leave the owner for a person on the signed-in dossier.
 
 ### Ask and mail
 
@@ -89,13 +90,13 @@ Alert mail goes to app accounts through Resend. Brokers and sellers are not mail
 
 ## Migrations
 
-SQL files live in `db/migrations/` and sort by filename (`001_actions.sql` through `034_nda_dossier.sql`). `lib/actions/migrate.ts` runs each pending file in its own transaction and records the filename in `schema_migrations`.
+SQL files live in `db/migrations/` and sort by filename (`001_actions.sql` through `035_chatgpt_stage_guard.sql`). `lib/actions/migrate.ts` runs each pending file in its own transaction and records the filename in `schema_migrations`.
 
 | Path | What it does |
 | --- | --- |
 | Local, or a preview database that is not the production host | `npm run db:migrate`, and the first request that needs the schema. `scripts/db-migrate.ts` exits when `DATABASE_URL` is unset. |
 | Production app | Skips. A deploy does not migrate. |
-| Production database | **Production migrations** (`.github/workflows/production-migrate.yml`), by hand, on `main`. Type `migrate-production`. The job sets `ALLOW_PRODUCTION_MIGRATE=1` and uses the GitHub secret `NEON_DATABASE_URL`. `scripts/production-migrate.ts` refuses any other caller. |
+| Production database | **Production migrations** (`.github/workflows/production-migrate.yml`), by hand, on `main`. Type `migrate-production`. For a single-file approval, enter its exact filename in `only_pending`. The workflow stops if another file is pending. The job sets `ALLOW_PRODUCTION_MIGRATE=1` and uses the GitHub secret `NEON_DATABASE_URL`. `scripts/production-migrate.ts` refuses any other caller. |
 | Neon branch `preview` | **Preview migrations**. Type `migrate-preview`. Uses `NEON_API_KEY` and `NEON_PROJECT_ID`. It does not read the production connection string, and it refuses when the preview host is the production host. |
 
 Pull-request jobs cannot migrate production. Workbook sync does not apply pending files. If `snapshots` is missing, the sync stops and names the Production migrations workflow.
@@ -152,7 +153,7 @@ Set in both Vercel Production and GitHub repository variables: `CHANGES_API_ENAB
 | `GITHUB_DISPATCH_TOKEN` | Fine-grained GitHub token. Vercel Cron uses it to start Workbook sync and Alert flush. Vercel only. |
 | `SNAPSHOT_READ` | `off` ignores Neon and serves `data/generated`. |
 | `AGENT_INBOX_SECRET` | Bearer for the agent feed. Not `CRON_SECRET`. |
-| `AGENT_WRITE_TOKEN_INDIE`, `AGENT_WRITE_TOKEN_MUSE` | Write bearers. Production only. Do not copy them to Preview. |
+| `AGENT_WRITE_TOKEN_INDIE`, `AGENT_WRITE_TOKEN_MUSE`, `AGENT_WRITE_TOKEN_CHATGPT` | Write bearers. Production only. Do not copy them to Preview. |
 | `XAI_API_KEY` | Ask. Direct xAI key. |
 | `ASK_MODEL`, `ASK_DAILY_LIMIT` | Optional Ask overrides. |
 | `GMAIL_LINK_VIEWERS` | Optional allow-list for the Open in Gmail link. |
@@ -200,13 +201,13 @@ Workflow-only flags, set by the workflow file rather than stored as env: `ALLOW_
 | --- | --- |
 | Muse | Broker comms, capture, and the related data entry. The workbook logs this agent as Torque. Write token actor is `muse`. |
 | Indie | Schema, sync, mirror, verification, and code. Write token actor is `indie`. |
-| ChatGPT / Codex | Code across that full scope, including schema, sync, and verification. 24 Nov 2026: Jaideep does not require an Indie review. Open the PR and merge it when CI is green. |
+| ChatGPT / Codex | Code across that full scope, including schema, sync, and verification. The app attributes authorized capture and maintenance writes to `chatgpt`. 24 Nov 2026: Jaideep does not require an Indie review. Open the PR and merge it when CI is green. |
 
 Data entry stays with the agent that owns the row. Muse still writes capture, P&L, and conflicts. Do not take a row someone else is writing.
 
 Coordinate on the workbook Run Log and in the PR description. One writer per row. Record provenance: every change sends `source`. Capture-import rows keep a `provenance` line; the HTTP API does not set that field (`lib/changes/schema.ts`). After a write, use the returned id and version, and read the row back before the next edit. For an NDA that read is `GET /api/data/nda`.
 
-The feed (`GET /api/agent/inbox`) uses `AGENT_INBOX_SECRET`, the Muse token, or the Indie token. `CRON_SECRET` is not accepted. Muse reads the feed and writes drafts. Posting, approving, rejecting, resolving, and assigning stay on the signed-in routes.
+The feed (`GET /api/agent/inbox`) accepts the three individual write credentials or the shared inbox credential. `CRON_SECRET` is not accepted. Muse reads the capture feed and writes drafts. ChatGPT can read both feeds, write drafts, and acknowledge rows. Posting, approving, rejecting, resolving, and assigning stay on the signed-in routes.
 
 ## Where the rest of the context lives
 

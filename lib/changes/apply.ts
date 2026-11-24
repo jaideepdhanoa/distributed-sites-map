@@ -1,3 +1,4 @@
+import { canMaintainSites } from "@/lib/agent/identity";
 import { createHash, randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/actions/db";
 import { InputError } from "@/lib/actions/text";
@@ -626,7 +627,7 @@ async function writeSite(
     }
     if (incoming.asking_price === "") delete facts.asking_price_source;
     if (incoming.acreage === "") delete facts.land_acres_basis;
-    if (actorId === "indie" && previous) {
+    if (canMaintainSites(actorId) && previous) {
       const nextSegment = incoming.category;
       const priorSegment = priorFields.category || "";
       if (nextSegment && priorSegment && priorSegment !== nextSegment) {
@@ -638,7 +639,7 @@ async function writeSite(
           period: "",
           sources: [
             { value: priorSegment, document: textOf(priorSources.category) || textOf(priorSources.segment) || "on file", page: "prior" },
-            { value: nextSegment, document: textOf(payload.sources?.segment) || textOf(payload.sources?.segment_group) || textOf(payload.sources?.category) || "indie", page: "update" },
+            { value: nextSegment, document: textOf(payload.sources?.segment) || textOf(payload.sources?.segment_group) || textOf(payload.sources?.category) || actorId, page: "update" },
           ],
           valueInUse: nextSegment,
           status: "open",
@@ -660,7 +661,7 @@ async function writeSite(
           period: "",
           sources: [
             { value: prior, document: textOf(priorSources[field]) || "on file", page: "prior" },
-            { value: next, document: textOf(payload.sources?.[field]) || "indie", page: "update" },
+            { value: next, document: textOf(payload.sources?.[field]) || actorId, page: "update" },
           ],
           valueInUse: next,
           status: "open",

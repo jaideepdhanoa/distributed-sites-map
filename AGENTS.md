@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Start here
 
-Distributed Sites is the private team map at `distributedsites.com` (public GitHub repo `jaideepdhanoa/distributed-sites-map`). Neon is the record. The Pipeline workbook is a mirror. Code, schema, sync, and verification are shared; Muse still owns broker comms and capture. Full guide: `docs/agent-onboarding.md`.
+Distributed Sites is the private team map at `distributedsites.com` (public GitHub repo `jaideepdhanoa/distributed-sites-map`). Neon is the record. The Pipeline workbook is a mirror. Code, schema, sync, and verification are shared; Muse still owns broker comms and capture. ChatGPT has its own app bearer with both the capture and verification permissions. Events record `chatgpt`. Full guide: `docs/agent-onboarding.md`.
 
 As of 24 Nov 2026 Jaideep does not require an Indie review. Open a PR, get the checks below green, and squash-merge it yourself. Production data and Vercel secret env vars still need Jaideep's explicit approval.
 

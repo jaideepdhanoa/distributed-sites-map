@@ -23,7 +23,8 @@ async function main(): Promise<void> {
     console.error("NEON_DATABASE_URL is not set. Add the repository secret: the Neon production pooled connection string.");
     process.exit(1);
   }
-  const applied = await withConnectionString(url, (sql) => migrate(sql, { connectionString: url }));
+  const onlyPending = process.env.ONLY_PENDING?.trim() || undefined;
+  const applied = await withConnectionString(url, (sql) => migrate(sql, { connectionString: url, onlyPending }));
   console.log(JSON.stringify({ applied }));
 }
 

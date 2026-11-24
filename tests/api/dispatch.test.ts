@@ -160,8 +160,10 @@ test("ask streams from the catch-all instead of its own function", () => {
 test("changes is on the catch-all and rejects a writer with no credential", async () => {
   const indie = process.env.AGENT_WRITE_TOKEN_INDIE;
   const muse = process.env.AGENT_WRITE_TOKEN_MUSE;
+  const chatgpt = process.env.AGENT_WRITE_TOKEN_CHATGPT;
   delete process.env.AGENT_WRITE_TOKEN_INDIE;
   delete process.env.AGENT_WRITE_TOKEN_MUSE;
+  delete process.env.AGENT_WRITE_TOKEN_CHATGPT;
   try {
     assert.equal((await call("GET", "/api/changes")).status, 405);
     const missing = await call("POST", "/api/changes");
@@ -177,6 +179,8 @@ test("changes is on the catch-all and rejects a writer with no credential", asyn
   } finally {
     if (indie === undefined) delete process.env.AGENT_WRITE_TOKEN_INDIE;
     else process.env.AGENT_WRITE_TOKEN_INDIE = indie;
+    if (chatgpt === undefined) delete process.env.AGENT_WRITE_TOKEN_CHATGPT;
+    else process.env.AGENT_WRITE_TOKEN_CHATGPT = chatgpt;
     if (muse === undefined) delete process.env.AGENT_WRITE_TOKEN_MUSE;
     else process.env.AGENT_WRITE_TOKEN_MUSE = muse;
   }

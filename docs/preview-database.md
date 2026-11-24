@@ -82,6 +82,7 @@ Checked against the Vercel project. Names only.
 | `READ_SITES_FROM_DB` | Production only | Stays production only. |
 | `AGENT_WRITE_TOKEN_INDIE` | Production only | Must not be copied to Preview. |
 | `AGENT_WRITE_TOKEN_MUSE` | Production only | Must not be copied to Preview. |
+| `AGENT_WRITE_TOKEN_CHATGPT` | Production only | Must not be copied to Preview. |
 | `CRON_SECRET` | Production only, and a GitHub secret | Stays off Preview. Digest and flush refuse to run when `VERCEL_ENV` is not `production`. Vercel cron runs on production deployments. |
 | `WORKBOOK_MIRROR_ENABLED` | GitHub variable | Off for any `VERCEL_ENV`, including when the variable is `1`. The mirror also refuses every Vercel environment. Previews do not write the workbook. |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | GitHub secret | Not a Vercel env. Mirror and protect refuse to run when `VERCEL_ENV` is set. |

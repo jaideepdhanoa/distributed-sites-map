@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const after = url.searchParams.get("after");
   const limitRaw = Number(url.searchParams.get("limit") || "");
   const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? limitRaw : 50;
-  const audience = caller.id === "shared" ? "all" : caller.id;
+  const audience = caller.id === "shared" || caller.id === "chatgpt" ? "all" : caller.id;
   const result = await withAgentDb((sql) => listInbox(sql, { after, limit, audience }));
   if (isResponse(result)) return result;
   const origin = feedOrigin(request);

@@ -1,37 +1,10 @@
-import { timingSafeEqual } from "node:crypto";
+import { agentFromAuthorization } from "@/lib/agent/auth";
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/actions/http";
 import { SESSION_COOKIE, readSession } from "@/lib/session";
 import type { Actor } from "./schema";
 
-const AGENTS = [
-  { env: "AGENT_WRITE_TOKEN_INDIE", id: "indie" },
-  { env: "AGENT_WRITE_TOKEN_MUSE", id: "muse" },
-] as const;
-
-function bearerMatches(secret: string, header: string): boolean {
-  const expected = Buffer.from(`Bearer ${secret}`);
-  const actual = Buffer.from(header);
-  if (expected.length !== actual.length) {
-    timingSafeEqual(expected, expected);
-    return false;
-  }
-  return timingSafeEqual(actual, expected);
-}
-
-export function agentFromAuthorization(header: string): Actor | "missing-env" | "nomatch" | "absent" {
-  const value = header.trim();
-  if (!value) return "absent";
-  if (!value.toLowerCase().startsWith("bearer ")) return "nomatch";
-  const configured = AGENTS.filter((agent) => process.env[agent.env]?.trim());
-  if (!configured.length) return "missing-env";
-  let matched: Actor | null = null;
-  for (const agent of configured) {
-    const secret = process.env[agent.env]?.trim() || "";
-    if (secret && bearerMatches(secret, value) && !matched) matched = { id: agent.id, kind: "agent" };
-  }
-  return matched ?? "nomatch";
-}
+export { agentFromAuthorization };
 
 function cookieValue(request: Request, name: string): string | undefined {
   const header = request.headers.get("cookie") || "";
@@ -59,7 +32,7 @@ export async function actorFromRequest(request: Request): Promise<Actor | NextRe
   if (header && header.trim()) {
     const matched = agentFromAuthorization(header);
     if (matched === "missing-env") {
-      return jsonError("Agent writes are off until AGENT_WRITE_TOKEN_INDIE or AGENT_WRITE_TOKEN_MUSE is set.", 401);
+      return jsonError("Agent writes are off until AGENT_WRITE_TOKEN_INDIE, AGENT_WRITE_TOKEN_MUSE or AGENT_WRITE_TOKEN_CHATGPT is set.", 401);
     }
     if (matched === "nomatch" || matched === "absent") return jsonError("Unauthorized", 401);
     return matched;

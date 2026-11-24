@@ -2740,7 +2740,7 @@ export default function Explorer() {
           unscreened={showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && feature.geometry) : []}
           selectedId={selected}
           mapScope={selectedMarket + "/" + funnel}
-          previewName={showingPreview ? (selectedDeal?.name || selectedSite?.name || selectedUnscreened?.name || selectedDeal?.address || selectedSite?.address || selected || "") : ""}
+          previewName={showingPreview ? (selectedDeal?.name || selectedSite?.name || selectedUnscreened?.name || displayAddress(selectedDeal?.address || selectedSite?.address || selectedUnscreened?.address) || selected || "") : ""}
           showAreas={showAreas}
           showDepots={showDepots}
           showSites={showUniverse}

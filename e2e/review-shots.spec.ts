@@ -231,6 +231,7 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   await page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true }).click();
   const matrix = page.getByRole("table", { name: "Site comparison" });
   const measureRows = matrix.locator("[data-compare-row]");
+  await expect(measureRows.first()).toBeVisible();
   const compactCount = await measureRows.count();
   expect(compactCount).toBeGreaterThan(0);
   for (const cells of await measureRows.evaluateAll(rows => rows.map(row => Array.from(row.querySelectorAll("td"), cell => cell.textContent)))) {
@@ -345,6 +346,6 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
     const query = new URL(page.url()).searchParams;
     expect(query.get("city")).toBe("PHX");
     expect(query.get("stage")).toBe("in_area");
-    expect(query.has("site")).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has("site")).toBe(false);
   }
 });

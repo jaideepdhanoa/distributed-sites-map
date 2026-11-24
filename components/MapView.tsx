@@ -1007,7 +1007,7 @@ export default function MapView(props: Props) {
       const pickPin = (id: string) => {
         const current = propsRef.current;
         if (!current.reviewFocus) {
-          if (!pinOrigin.current || !current.selectedId || pinOrigin.current.scope !== current.mapScope) {
+          if (!pinOrigin.current || pinOrigin.current.scope !== current.mapScope) {
             pinOrigin.current = {
               scope: current.mapScope, id, center: map.getCenter().toArray(), zoom: map.getZoom(),
               bearing: map.getBearing(), pitch: map.getPitch(), padding: map.getPadding(),
@@ -1378,6 +1378,27 @@ export default function MapView(props: Props) {
   const appliedReview = useRef("");
   const appliedFit = useRef("");
   const appliedPad = useRef("");
+  // Dismissal can happen while imagery is loading. Camera restoration must not
+  // wait for a style or source event, which may never fire for this selection.
+  useEffect(() => {
+    const map = mapRef.current;
+    const changedScope = previousScope.current !== props.mapScope;
+    previousScope.current = props.mapScope;
+    if (changedScope) {
+      pinOrigin.current = null;
+      holdCamera.current = false;
+    }
+    if (!props.selectedId && sawSelection.current) {
+      holdCamera.current = !changedScope;
+      const origin = pinOrigin.current;
+      if (map && origin?.scope === props.mapScope && origin.id === sawSelection.current) {
+        map.stop();
+        map.jumpTo({ center: origin.center, zoom: origin.zoom, bearing: origin.bearing, pitch: origin.pitch, padding: origin.padding });
+      }
+      pinOrigin.current = null;
+    }
+    sawSelection.current = props.selectedId;
+  }, [mapGeneration, props.selectedId, props.mapScope]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1604,24 +1625,6 @@ export default function MapView(props: Props) {
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
         if (map.getLayer("areas-priority")) map.setPaintProperty("areas-priority", "fill-opacity", phone ? 0.16 : 0.24);
       }
-      const changedScope = previousScope.current !== props.mapScope;
-      previousScope.current = props.mapScope;
-      if (changedScope) {
-        pinOrigin.current = null;
-        holdCamera.current = false;
-      }
-      const clearedSelection = Boolean(sawSelection.current) && !props.selectedId;
-      if (props.selectedId) sawSelection.current = props.selectedId;
-      else if (clearedSelection) {
-        holdCamera.current = !changedScope;
-        const origin = pinOrigin.current;
-        if (origin?.scope === props.mapScope && origin.id === sawSelection.current) {
-          map.stop();
-          map.jumpTo({ center: origin.center, zoom: origin.zoom, bearing: origin.bearing, pitch: origin.pitch, padding: origin.padding });
-        }
-        pinOrigin.current = null;
-        sawSelection.current = null;
-      }
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
@@ -1823,8 +1826,8 @@ export default function MapView(props: Props) {
       const pin = geometry.coordinates as [number, number];
       const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
       markCentered(map, props.selectedId || "", pin[0], pin[1]);
-      if (!extra.length) {
-        glide(map, pin, 16);
+      if (props.previewName || !extra.length) {
+        glide(map, pin, props.previewName ? Math.max(map.getZoom(), 13) : 16);
         return;
       }
       const points = [pin, ...extra];
@@ -1852,7 +1855,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [mapGeneration, props.selectedId, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, gridToken]);
+  }, [mapGeneration, props.selectedId, props.previewName, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, gridToken]);
 
   useEffect(() => {
     const map = mapRef.current;

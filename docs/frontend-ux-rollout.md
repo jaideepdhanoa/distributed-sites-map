@@ -53,3 +53,18 @@ The IDs match the two frontend reviews. These are observable acceptance criteria
 Run the repository checks and review the desktop and mobile screenshots on the candidate commit. The two synthetic screening captures in the screenshot workflow exercise the NDA filters and search recovery without including live counterparty details. Use the preview for keyboard focus, scroll restoration and readable layout. Keep review actions and injected failures in an isolated test database.
 
 For the first team walkthrough, give reviewers the same five-site shortlist. Observe whether they can identify which records have figures, explain the comparison basis, identify the next owner, and return to their selection unaided. Record task completion, elapsed time, backtracks, and any mistaken reading of the financial basis. Compare these observations with a baseline before claiming a speed or comprehension improvement.
+
+
+## Shortlist walkthrough
+
+Use Phoenix, Universe, Open land, and Site ascending for both versions. Follow the first five rows in that order on desktop and phone. Keep the same five records across sessions. If the data changes, pin the cohort before comparing results.
+
+| Task for the reviewer | Observation to record |
+| --- | --- |
+| Name the market, stage and number of matching sites. | Correct answer, time to answer, and where the reviewer looked first. |
+| Choose two of the five sites for diligence and compare them. | Task completion, backtracks, and which site-fit or financial evidence drove the choice. |
+| Explain one missing figure. Open a record to identify the next action and its owner. | Whether missing was mistaken for zero, and whether the reviewer distinguished an unassigned action. |
+| Close the record and comparison. Find the original two sites again. | Whether the reviewer recovered their shortlist and selection without help. |
+| Open NDAs and locate an overdue agreement. | Whether the reviewer can identify the next action, owner, and due date without opening the agreement. |
+
+The release walkthrough measures first-row position and checks selection on both viewports. Record team task times and observations separately.

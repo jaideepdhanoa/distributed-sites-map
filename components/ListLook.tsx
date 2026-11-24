@@ -47,6 +47,7 @@ export function StageTypeCell({
   detail,
   type,
   quiet,
+  hideStage,
   land,
   extra,
 }: {
@@ -55,12 +56,13 @@ export function StageTypeCell({
   detail?: string;
   type?: string;
   quiet?: boolean;
+  hideStage?: boolean;
   land?: boolean;
   extra?: ReactNode;
 }) {
   return (
     <span className="stage-cell">
-      {quiet ? <StageChip stage={UNIVERSE_STAGE_LABEL} group="" quiet /> : <StageChip stage={stage} group={group} detail={detail} />}
+      {!hideStage && (quiet ? <StageChip stage={UNIVERSE_STAGE_LABEL} group="" quiet /> : <StageChip stage={stage} group={group} detail={detail} />)}
       {type ? <TypeChip value={type} /> : null}
       {land ? <LandPausedChip /> : null}
       {extra}

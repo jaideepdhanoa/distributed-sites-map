@@ -592,6 +592,19 @@ export default function Detail({
   const next = nextStepText(site);
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   const waitingChip = linkedDeal ? visibleChips(linkedDeal, signedIn).find((chip) => chip.family === "waiting_on" && chip.code !== "nothing") || null : null;
+  const nextCard = (
+    <NextStepCard
+      kind="site"
+      id={site.site_id}
+      stageGroup={linkedDeal?.stage_group}
+      stage={linkedDeal?.stage || site.pipeline_stage}
+      signedIn={signedIn}
+      workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
+      suggestedDrop={linkedDeal?.suggested_drop}
+      blocker={linkedDeal}
+      waitingShown={Boolean(waitingChip)}
+    />
+  );
   return (
     <aside
       data-record={site.site_id}
@@ -638,18 +651,9 @@ export default function Detail({
       </div>
       {!decisionFirst && <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />}
       <section className="decision-block" data-testid="decision-block">
+        {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
-        <NextStepCard
-          kind="site"
-          id={site.site_id}
-          stageGroup={linkedDeal?.stage_group}
-          stage={linkedDeal?.stage || site.pipeline_stage}
-          signedIn={signedIn}
-          workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
-          suggestedDrop={linkedDeal?.suggested_drop}
-          blocker={linkedDeal}
-          waitingShown={Boolean(waitingChip)}
-        />
+        {!decisionFirst && nextCard}
       </section>
       <div className="card-chips">
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
@@ -925,6 +929,19 @@ export function DealDetail({
   const gap = chips.find((chip) => chip.family === "biggest_gap");
   const recordChips = sectionChips(chips, ["drop_reason", "advance_reason", "package", "listing", "lead_source", "business_check", "photos", "nda"]);
   const diligence = sectionChips(chips, DILIGENCE_FAMILIES);
+  const nextCard = (
+    <NextStepCard
+      kind="deal"
+      id={deal.deal_id}
+      stageGroup={deal.stage_group}
+      stage={deal.stage}
+      signedIn={signedIn}
+      suggestedDrop={deal.suggested_drop}
+      blocker={deal}
+      chips={chips}
+      waitingShown={Boolean(waiting)}
+    />
+  );
   return (
     <aside
       data-record={deal.deal_id}
@@ -960,22 +977,13 @@ export function DealDetail({
       </div>
       {!decisionFirst && <SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} />}
       <section className="decision-block" data-testid="decision-block">
+        {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
         <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
         {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
           <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
         ) : null}
-        <NextStepCard
-          kind="deal"
-          id={deal.deal_id}
-          stageGroup={deal.stage_group}
-          stage={deal.stage}
-          signedIn={signedIn}
-          suggestedDrop={deal.suggested_drop}
-          blocker={deal}
-          chips={chips}
-          waitingShown={Boolean(waiting)}
-        />
+        {!decisionFirst && nextCard}
       </section>
       <ChipRow chips={diligence} testId="diligence-home" titled />
       {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}

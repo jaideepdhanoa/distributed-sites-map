@@ -11,7 +11,7 @@ import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
 import type { StoredScoreInput } from "@/lib/scoreDisplay";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
+import { ColumnPicker, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
 import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
 import { stageChipLabel } from "@/lib/chips";
 import {
@@ -60,13 +60,13 @@ export type ListRow = {
 
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id" | "lng" | "lat" | "nda" | "ndaId" | "near" | "nearShort" | "address" | "listingUrl" | "folderUrl" | "packageUrl" | "lead" | "tier" | "zoning" | "city">; label: string }[] = [
   { id: "site", label: "Site" },
-  { id: "stage", label: "Stage" },
+  { id: "stage", label: "Stage / type" },
   { id: "county", label: "County check" },
   { id: "score", label: "Score" },
   { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
   { id: "traffic", label: "Traffic" },
-  { id: "listed", label: "Asking" },
+  { id: "listed", label: "Listing" },
 ];
 
 type ListColumnId = (typeof LIST_COLUMNS)[number]["id"];
@@ -81,6 +81,7 @@ export function listCsv(rows: ListRow[]) {
 }
 
 export default function ListView({
+  title,
   rows,
   selectedId, initialSelection, onSelection, onScope,
   sort,
@@ -88,6 +89,7 @@ export default function ListView({
   onOpen,
   onShowMap,
   onExport,
+  onCompare,
   note,
   signedIn = false,
   userId = "",
@@ -96,6 +98,7 @@ export default function ListView({
   onClearArea,
   onDismiss,
 }: {
+  title: string;
   rows: ListRow[];
   initialSelection?: string[];
   onSelection?: (ids: string[]) => void;
@@ -106,6 +109,7 @@ export default function ListView({
   onOpen: (id: string) => void;
   onShowMap: (id: string) => void;
   onExport: () => void;
+  onCompare: (ids: string[]) => void;
   note?: string;
   signedIn?: boolean;
   userId?: string;
@@ -140,6 +144,7 @@ export default function ListView({
     return prepareRows(scoped, columns, activeLayout, visible);
   }, [activeLayout, columns, mapArea, rows, visible]);
 
+  const commonStage = sharedStage(ordered.map(row => row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || "")));
   const showChecks = !phone || selecting;
   const visibleIds = ordered.map((row) => row.id);
   useEffect(() => { onScope?.(visibleIds); }, [visibleIds, onScope]);
@@ -167,15 +172,13 @@ export default function ListView({
 
   return (
     <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length}>
-      <div className="summary-row" data-testid="summary-row">
-        <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{ordered.length.toLocaleString()}</strong></div>
+      <ShortlistSummary title={title} count={ordered.length} commonStage={commonStage}>
         <div><span className="only-desktop">Listed</span><span className="only-mobile">Listed</span><strong>{ordered.filter((row) => /^yes/i.test(row.listed)).length.toLocaleString()}</strong></div>
         <div><span className="only-desktop">Land OK</span><span className="only-mobile">Land OK</span><strong>{ordered.filter((row) => row.county === "Land OK").length.toLocaleString()}</strong></div>
         <div><span className="only-desktop">Not reviewed</span><span className="only-mobile">Unchecked</span><strong>{ordered.filter((row) => row.county === "Unchecked").length.toLocaleString()}</strong></div>
-      </div>
+      </ShortlistSummary>
       {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">
-        <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
         <SortControl
           columns={visible.flatMap((id) => {
@@ -207,7 +210,7 @@ export default function ListView({
       </div>
       {phone ? (
         <div className="list-scroll">
-          <PhoneCards rows={ordered.map((row) => ({
+          <PhoneCards commonStage={commonStage} rows={ordered.map((row) => ({
             id: row.id,
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
@@ -215,6 +218,7 @@ export default function ListView({
             chips: row.landPaused ? <LandPausedChip /> : row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null,
             facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
+            check: showChecks ? <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null,
             onOpen: () => onOpen(row.id),
           }))} />
         </div>
@@ -234,7 +238,7 @@ export default function ListView({
         ) : null}
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
-            {showChecks ? <RowCheck label={`Select ${row.site || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null}
+            {showChecks ? <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null}
             <span className="site-title">
               <span className="site-name-text" title={row.site || row.id}>{row.site || "—"}</span>
               <span className="site-meta">
@@ -246,6 +250,7 @@ export default function ListView({
           </span>
         ) : column === "stage" ? (
           <StageTypeCell
+            hideStage={Boolean(commonStage)}
             stage={row.stage}
             group={row.stageGroup || ""}
             detail={row.stageDetail}
@@ -265,6 +270,11 @@ export default function ListView({
           <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
         )}
       />}
+      {pickedSet.size > 0 && <div className="selection-bar" data-testid="selection-bar">
+        <p>{pickedSet.size} selected{pickedSet.size < 2 ? " · Select one more to compare" : pickedSet.size > 4 ? " · Choose up to 4 to compare" : ""}</p>
+        <button type="button" className="paper-btn" disabled={pickedSet.size < 2 || pickedSet.size > 4} onClick={() => onCompare([...pickedSet])}>Compare</button>
+        <button type="button" className="text-link" onClick={() => setPicked([])}>Clear selection</button>
+      </div>}
     </div>
   );
 }

@@ -66,7 +66,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
     const meta = card.querySelector(".phone-card-meta");
     return {
       missing: false,
-      pieces: Boolean(card.querySelector(".phone-card-name") && card.querySelector(".phone-card-stage") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
+      pieces: Boolean(card.querySelector(".phone-card-name") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
       scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth > 1 || bar.scrollWidth - bar.clientWidth > 1,
       overlap: overlapX > 1 && overlapY > 1,
       stacked: countBox.bottom <= sortBox.top + 1,
@@ -82,7 +82,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   fs.mkdirSync("review-shots", { recursive: true });
   await page.locator(".pipeline-list .list-bar").screenshot({ path: "review-shots/phone-list-toolbar.png" });
   const firstCard = page.getByTestId("phone-cards").locator("button.list-row").first();
-  await firstCard.getByTestId("stage-chip").tap();
+  await firstCard.locator(".phone-card-name").tap();
   await expect(page).toHaveURL(/[?&]site=/);
 });
 
@@ -94,7 +94,7 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   await expect(card).toBeVisible();
   await page.locator("[data-testid=phone-cards]").screenshot({ path: "review-shots/mobile-card-gaps.png" });
   const gaps = await card.evaluate((node) => {
-    const stage = node.querySelector(".phone-card-stage");
+    const stage = node.querySelector(".phone-card-stage") || node.querySelector(".mobile-next-action") || node.querySelector(".phone-card-name");
     const meta = node.querySelector(".phone-card-meta");
     const facts = [...node.querySelectorAll(".phone-fact")];
     const sep = node.querySelector(".phone-sep");
@@ -125,6 +125,8 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   expect(gaps?.showsCoverage).toBe(true);
   expect(gaps?.firstCardVisible).toBe(true);
   expect(gaps?.summaryHeight).toBeLessThan(844 * 0.16);
+  await page.getByRole("button", { name: "Figures", exact: true }).click();
+  await expect(page.locator(".shortlist-figures")).toBeVisible();
 });
 
 test("signed-in next step and open loops do not show a gmail id", async ({ page }, info) => {
@@ -218,6 +220,7 @@ test("the All count matches the list, and a zoomed width uses cards", async ({ p
   test.skip(info.project.name !== "desktop", "counts and zoom");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.waitForSelector("[data-testid=all-stages]");
   const counts = await page.evaluate(() => {
     const all = document.querySelector("[data-testid=all-stages] strong")?.textContent?.replace(/,/g, "").trim() || "";

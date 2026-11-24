@@ -3915,3 +3915,78 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 
 .nda-pane .nda-row > .nda-action-line { white-space: normal; overflow-wrap: anywhere; }
 .nda-pane:has(.nda-detail) > .nda-filters { display: none; }
+
+/* The shortlist puts the current scope above its evidence and tools. */
+.pipeline-list .shortlist-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-card);
+}
+.pipeline-list .shortlist-summary > div {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.shortlist-heading h1 {
+  margin: 0;
+  color: var(--green);
+  font: 600 clamp(1.25rem, 1.65vw, 1.6rem)/1.12 Georgia, serif;
+  overflow-wrap: anywhere;
+}
+.shortlist-heading p { margin: 3px 0 0; color: var(--ink-2); font-size: var(--type-cap); }
+.pipeline-list .shortlist-heading p strong { display: inline; margin: 0; color: inherit; font: inherit; }
+.pipeline-list .shortlist-figures { display: flex; align-items: flex-start; gap: 12px 24px; }
+.shortlist-figures > div { min-width: 0; }
+.shortlist-figures strong { display: block; color: var(--ink); }
+.shortlist-figures .only-desktop, .shortlist-figures small { color: var(--ink-2); font-size: var(--type-cap); }
+.figures-toggle { display: none; }
+.pipeline-list .list-bar { justify-content: flex-start; gap: 8px; padding: 4px 16px; }
+.pipeline-list .list-table .site-name-text, .phone-card-name { font-weight: 700; letter-spacing: -.012em; }
+.pipeline-list .site-address { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ink-2); }
+.pipeline-list .stage-pill { box-shadow: none; }
+.pipeline-list .mobile-next-action { margin-top: 6px; }
+.pipeline-list .list-table .col-head { grid-template-rows: auto auto; row-gap: 0; }
+.comparison-table .comparison-section th:first-child {
+  position: static;
+  background: var(--green-tint);
+  color: var(--green);
+  font-weight: 700;
+  padding-block: 6px;
+}
+.nda-pane .nda-row > .nda-line strong { white-space: normal; overflow-wrap: anywhere; }
+.nda-pane .nda-row > .nda-counterparty { color: var(--ink); font-weight: 550; }
+.nda-pane .nda-row > .nda-context { color: var(--ink-2); font-size: var(--type-cap); }
+.nda-pane .nda-row > .nda-assignment, .step-assignment {
+  display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: baseline;
+  margin: 4px 0 0; overflow: visible; white-space: normal;
+}
+.nda-assignment > span { min-width: 0; overflow-wrap: anywhere; }
+.nda-assignment small, .step-assignment span { color: var(--ink-2); font-size: var(--type-cap); }
+.nda-assignment small { display: block; }
+.nda-assignment time { white-space: nowrap; }
+.step-assignment b { color: var(--ink); }
+.drawer .decision-block .workbook-step h3 { color: var(--green); margin: 0 0 3px; font-size: var(--type-cap); }
+.drawer .decision-block .next-line { font-weight: 650; }
+@media (min-width: 768px) {
+  .shell.list-open:not(.steps-open) .funnel-row nav.funnel { display: none; }
+  .shell.list-open .funnel-row { min-height: 32px; gap: 6px 12px; padding-block: 2px; }
+  .shell.list-open .funnel-row > .paper-btn { min-height: 28px; }
+  .shell.list-open .funnel-row > .as-of { margin-left: auto; }
+  .pipeline-list .list-table thead th { padding-block: 3px; }
+}
+@media (max-width: 767px) {
+  .pipeline-list .shortlist-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 4px 12px; }
+  .pipeline-list .shortlist-heading { display: block; }
+  .pipeline-list .shortlist-summary .figures-toggle { display: inline-flex; align-items: center; min-height: 44px; }
+  .pipeline-list .shortlist-figures { display: none; grid-column: 1 / -1; }
+  .pipeline-list .shortlist-figures[data-expanded="true"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 8px; padding: 8px 0; }
+  .pipeline-list .list-bar { padding: 2px 12px; justify-content: space-between; }
+  .phone-card-name { font-size: 1rem; }
+}

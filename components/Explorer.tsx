@@ -1718,7 +1718,7 @@ export default function Explorer() {
     const pipeline = Boolean(deal && (deal.kind === "pipeline" || deal.kind === "land") && deal.stage_group);
     return {
       id: site.site_id,
-      site: site.name || site.address || site.site_id,
+      site: site.name && site.name.trim().toLowerCase() !== (site.address || "").trim().toLowerCase() ? site.name : displayAddress(site.address) || site.site_id,
       type: siteTypeLabel(site),
       city: site.city,
       stage: pipeline && deal ? (deal.stage || "") : UNIVERSE_STAGE_LABEL,
@@ -2055,6 +2055,21 @@ export default function Explorer() {
     return [...byId.values()];
   }
   const marketView = shownMarketCounts(funnel === "pipeline" ? pipelineViewDeals : universeCountSites(), selectedMarket);
+  const activeStepLabel = funnel === "pipeline"
+    ? outsideGroup ? "Outside service area" : allPipes || pipelineWide ? "All deals" : PIPE_STEPS.find(item => item.id === pipeStage)?.label || "Desk screen"
+    : allStages || universeWide ? "All sites" : STEPS.find(item => item.id === stage)?.label || "Open land";
+  const shortlistTitle = `${selectedMarket === "other" ? "Other markets" : marketLabel(selectedMarket)} · ${activeStepLabel}`;
+  const desktopFilters = (
+    <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => {
+      setFiltersOpen(!filtersOpen);
+      if (!filtersOpen) setLayersOpen(false);
+      setMoreOpen(false);
+      setUserOpen(false);
+      setUnplacedOpen(false);
+    }}>
+      Filters{activeFilters.length > 0 && <span className="count-badge">{activeFilters.length}</span>}
+    </button>
+  );
   const shownCount = marketView.shown;
   const allCount = pipelineAllCount(shownCount, hiddenDropped);
   const outsideCount = countOutsideServiceArea(marketDeals);
@@ -2173,6 +2188,7 @@ export default function Explorer() {
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
+          {listView && desktopFilters}
           {me?.actionsEnabled ? (
             <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
               Review{(() => {
@@ -2217,19 +2233,18 @@ export default function Explorer() {
             ) : null}
           </div>
           <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
-            {funnel === "pipeline"
-              ? (outsideGroup ? "Outside service area" : allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
-              : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
+            {activeStepLabel}
           </button>
         </div>
         <div className="phone-view-row only-mobile">
           <label className="city-pick">
             <span className="sr">City</span>
-            <select aria-label="City" value={allCities ? "all" : city} onChange={(event) => jump(event.target.value)} className="secondary">
+            <select aria-label="City" value={selectedMarket} onChange={(event) => jump(event.target.value)} className="secondary">
               <option value="all">All markets</option>
               <option value="PHX">Phoenix</option>
               <option value="LAS">Las Vegas</option>
               <option value="MIA">Miami</option>
+              {(selectedMarket === "other" || marketView.totals.Other > 0) && <option value="other">Other markets</option>}
             </select>
           </label>
           <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
@@ -2261,11 +2276,12 @@ export default function Explorer() {
         {unavailable.length > 0 && <div role="status" className="workspace-warning">Unavailable · {unavailable.join(", ")} <button type="button" className="text-link" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></div>}
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite} <button type="button" className="text-link" onClick={() => { setSelected(null); write({ site: null, view: "list" }); }}>Back to listings</button></p> : null}
         <div className="funnel-row">
+          {listView && <button type="button" className="paper-btn only-desktop" aria-expanded={stepsOpen} aria-controls="workspace-funnel" onClick={() => setStepsOpen(value => !value)}>Stages</button>}
           <div className="funnel-sheet-head only-mobile">
             <p className="eyebrow">Steps</p>
             <button className="close" type="button" aria-label="Close steps" onClick={() => setStepsOpen(false)}><span aria-hidden="true">×</span></button>
           </div>
-          <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
+          <nav id="workspace-funnel" className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? null : (
               <>
                 <span className="step">
@@ -2364,10 +2380,7 @@ export default function Explorer() {
           ) : null}
           {stageUnmapped > 0 ? <span className="summary-chip" data-testid="unmapped-note">{stageUnmapped.toLocaleString()} without a location</span> : null}
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
-          <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
-            Filters
-            {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
-          </button>
+          {!listView && desktopFilters}
           <div className="more-wrap only-desktop">
             <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
             {moreOpen ? (
@@ -2836,6 +2849,7 @@ export default function Explorer() {
         <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
+            title={shortlistTitle}
             initialSelection={listSelection.current.pipeline} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
             rows={pipelineRows}
             outsideRow={outsideRow}
@@ -2883,6 +2897,8 @@ export default function Explorer() {
           />
         ) : listView && !ndaVisible && !loopsVisible ? (
           <ListView
+            title={shortlistTitle}
+            onCompare={ids => write({ compare: ids.join("|"), view: "list" })}
             initialSelection={listSelection.current.universe} onSelection={ids => { listSelection.current.universe = ids; }} onScope={rememberScope}
             rows={listRows}
             selectedId={selected}
@@ -3106,7 +3122,7 @@ export default function Explorer() {
             })}
             sites={compareIds.flatMap((id) => {
               if (dealRows.some((item) => item.deal_id === id)) return [];
-              const site = sites.find((item) => item.site_id === id);
+              const site = siteById.get(id);
               return site ? [site] : [];
             })}
             contextSites={sites}

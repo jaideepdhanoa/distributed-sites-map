@@ -232,6 +232,13 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   const matrix = page.getByRole("table", { name: "Site comparison" });
   const measureRows = matrix.locator("[data-compare-row]");
   await expect(measureRows.first()).toBeVisible();
+  if (phone) {
+    const fits = await matrix.evaluate(table => {
+      const end = table.querySelector("thead th:last-child")!.getBoundingClientRect().right;
+      return end <= table.parentElement!.getBoundingClientRect().right + 1;
+    });
+    expect(fits, "both sites fit side by side on a phone").toBe(true);
+  }
   const compactCount = await measureRows.count();
   expect(compactCount).toBeGreaterThan(0);
   for (const cells of await measureRows.evaluateAll(rows => rows.map(row => Array.from(row.querySelectorAll("td"), cell => cell.textContent)))) {
@@ -331,6 +338,11 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
     if (index === 0) {
       await page.mouse.move(1, 1);
       await waitForBasemap(page);
+      if (info.project.name === "mobile") {
+        const zoom = await page.locator(".maplibregl-ctrl-zoom-in").boundingBox();
+        const tools = await page.locator(".measure-row").boundingBox();
+        expect(zoom && tools && tools.x + tools.width <= zoom.x, "map tools leave zoom reachable").toBe(true);
+      }
       await page.screenshot({ path: `review-shots/${info.project.name}-map-preview.png` });
     }
     if (index % 2 === 0) {

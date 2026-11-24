@@ -4040,3 +4040,13 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   border-radius: 6px; border: 1px solid #fffdf8; background: #1e4636; color: #fffdf8;
   box-shadow: 0 2px 6px #171a1460; font: 600 12px/1.35 var(--font-sans, sans-serif);
 }
+@media (max-width: 767px) {
+  .shell:not(.space-marking) .map-float { right: 60px; }
+  .selected-pin-name { max-width: min(200px, 54vw); }
+  .map-preview .primary.preview-open { min-height: 44px; }
+  .comparison-table[data-sites="2"] { table-layout: fixed; }
+  .comparison-table[data-sites="2"] th, .comparison-table[data-sites="2"] td {
+    min-width: 0; max-width: none; padding: 7px 6px; overflow-wrap: anywhere; white-space: normal; font-size: 13px; line-height: 1.35;
+  }
+  .comparison-table[data-sites="2"] thead th:first-child { width: 24%; }
+}

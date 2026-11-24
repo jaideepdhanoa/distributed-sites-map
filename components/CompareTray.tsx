@@ -190,7 +190,7 @@ export default function CompareTray({
             )}
           </div>
           <div className="comparison-scroll" id="comparison-facts" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
-            <table className="comparison-table">
+            <table className="comparison-table" data-sites={columns.length}>
               <caption className="sr">Site comparison</caption>
               <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
               {compareSections.map(section => {

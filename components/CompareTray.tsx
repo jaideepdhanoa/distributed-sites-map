@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
 import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, openLandLabel, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
@@ -97,20 +97,6 @@ function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): Compa
   ];
 }
 
-function CompareCard({ title, rows }: { title: string; rows: CompareRow[] }) {
-  return (
-    <article style={{ gridRow: `span ${rows.length + 1}` }}>
-      <h3>{title}</h3>
-      {rows.map((row) => (
-        <p key={row.label} data-compare-row={row.label}>
-          <span>{row.label}</span>
-          <strong>{row.value}</strong>
-        </p>
-      ))}
-    </article>
-  );
-}
-
 export default function CompareTray({
   deals,
   sites,
@@ -131,6 +117,11 @@ export default function CompareTray({
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
   if (!count) return null;
+  const columns = [
+    ...deals.map(deal => ({ id: deal.deal_id, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
+    ...sites.map(site => ({ id: site.site_id, title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, deals, signedIn) })),
+  ];
+  const measures = Array.from(new Set(columns.flatMap(column => column.rows.map(row => row.label))));
   return (
     <aside className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
@@ -147,20 +138,25 @@ export default function CompareTray({
             <span aria-hidden="true"> ×</span>
           </button>
         ))}
-        <button type="button" className="compare-go" disabled={count < 2}>
-          Compare {count}
-        </button>
+        <span className="layer-meta">{count} of 4 selected{count === 1 ? " · Select another site" : count === 4 ? " · Remove one to add another" : ""}</span>
         <button type="button" className="close" aria-label="Close compare" onClick={onClose}><span aria-hidden="true">×</span></button>
         {children}
       </div>
       {count >= 2 ? (
-        <div className="compare-grid" style={{ "--compare-cols": String(count) } as CSSProperties}>
-          {deals.map((deal) => (
-            <CompareCard key={deal.deal_id} title={deal.name || displayAddress(deal.address) || deal.deal_id} rows={dealRows(deal, lookup, signedIn)} />
-          ))}
-          {sites.map((site) => (
-            <CompareCard key={site.site_id} title={site.name || displayAddress(site.address) || site.site_id} rows={siteRows(site, deals, signedIn)} />
-          ))}
+        <div className="comparison-scroll" tabIndex={0} aria-label="Comparison facts">
+          <table className="comparison-table">
+            <caption className="sr">Site comparison</caption>
+            <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
+            <tbody>{measures.map(label => (
+              <tr key={label} data-compare-row={label}>
+                <th scope="row">{label}</th>
+                {columns.map(column => {
+                  const value = column.rows.find(row => row.label === label)?.value;
+                  return <td key={column.id}>{value && value !== "—" ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}</td>;
+                })}
+              </tr>
+            ))}</tbody>
+          </table>
         </div>
       ) : null}
     </aside>

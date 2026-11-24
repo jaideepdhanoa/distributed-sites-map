@@ -37,7 +37,7 @@ A panel dismisses with one quiet round ✕: class `close`, 32px on desktop (44px
 
 ## Checkbox, select, and text fields
 
-A checkbox uses class `check`: 18px, box `#d6cebe` and fill `#fffdf8` when off, fill `#1e4636` with a `#fffdf8` check when on, `appearance: none`. That includes Compare, the column menu, and Layers. Labels are 14px. A count caption uses `layer-meta`: 12px, color `#8a8273` (`--ink-3`).
+A checkbox uses class `check`: 18px, box `#d6cebe` and fill `#fffdf8` when off, fill `#1e4636` with a `#fffdf8` check when on, `appearance: none`. That includes Compare, the column menu, and Layers. Labels are 14px. A count caption uses `layer-meta`: 12px, color `#6f675b` (`--ink-3`).
 
 A `<select>` uses class `secondary`: fill `#fffdf8`, 1px `#d6cebe`, radius 999, and the custom chevron. Do not leave the native arrow.
 

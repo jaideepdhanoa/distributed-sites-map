@@ -207,14 +207,7 @@ export default function ListView({
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
             stage: row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || ""),
-            chips: (
-              <>
-                <TypeChip value={row.type} />
-                {row.landPaused ? <LandPausedChip /> : null}
-                {row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null}
-                {row.scoreInput ? <ScoreCell input={row.scoreInput} /> : null}
-              </>
-            ),
+            chips: row.landPaused ? <LandPausedChip /> : row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null,
             facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
             onOpen: () => onOpen(row.id),
@@ -293,8 +286,12 @@ export function listCellText(row: ListRow, id: ListColumnId, signedIn: boolean) 
 }
 
 export function universeCardFacts(row: ListRow, signedIn: boolean): string[] {
-  return [listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
-    .filter((fact) => fact && fact !== "—" && fact !== "Not on file");
+  const listing = listCellText(row, "listed", signedIn);
+  const spare = listCellText(row, "spare", signedIn);
+  return [
+    listing === "No" ? "Not listed" : listing === "Yes" ? "Listed" : listing && listing !== "—" ? "Listing · " + listing : "Listing unknown",
+    spare && spare !== "—" && spare !== "Not on file" ? "Spare land " + spare : "",
+  ].filter(Boolean);
 }
 
 function shownText(row: ListRow, id: ListColumnId, signedIn: boolean) {

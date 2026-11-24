@@ -1,3 +1,4 @@
+import { createWithReceipt } from "@/lib/actions/createReceipt";
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 import { createNote, listNotes, type ThreadKind } from "@/lib/actions/notes";
 import { roleAllows } from "@/lib/actions/roles";
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     return jsonError("You do not have permission for that.", 403);
   }
   const note = await runWrite(session, { action: "note", targetKind: target.targetKind, targetId: target.targetId }, (sql) =>
-    createNote(sql, {
+    createWithReceipt(sql, request, session.u, body, () => createNote(sql, {
       targetKind: target.targetKind,
       targetId: target.targetId,
       body: String(body.body || ""),
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
       parentId: body.parentId,
       mentions: body.mentions,
       recommendationId: body.recommendationId,
-    }),
+    })),
   );
   if (isResponse(note)) return note;
   return jsonOk({ note }, 201);

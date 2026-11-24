@@ -44,7 +44,9 @@ export default function PnlOverlay({
   }, [initialGrain]);
   const [year, setYear] = useState(years[0] || 0);
   const [thread, setThread] = useState<CommentAnchor | null>(null);
-  const grid = useMemo(() => buildPnlGrid(shown, mode, year, conflicts, comments), [shown, mode, year, conflicts, comments]);
+  
+  const effectiveYear = years.includes(year) ? year : years[0] || 0;
+  const grid = useMemo(() => buildPnlGrid(shown, mode, effectiveYear, conflicts, comments), [shown, mode, effectiveYear, conflicts, comments]);
   const business = shown.years.find((item) => item.year === year)?.businessLabel || shown.years[0]?.businessLabel || "";
 
   const focusType = focus?.type || "";
@@ -96,9 +98,9 @@ export default function PnlOverlay({
             <button type="button" className={percent ? "segmented" : "segmented on"} onClick={() => setPercent(false)}>Dollars</button>
             <button type="button" className={percent ? "segmented on" : "segmented"} onClick={() => setPercent(true)}>% of revenue</button>
           </div>
-          {statement.hasNormalized ? <PnlBasis basis={basis} onChange={setBasis} /> : null}
+          
           {mode === "months" && years.length > 1 ? (
-            <select className="secondary" aria-label="Year" value={year} onChange={(event) => setYear(Number(event.target.value))}>
+            <select className="secondary" aria-label="Year" value={effectiveYear} onChange={(event) => setYear(Number(event.target.value))}>
               {years.map((item) => {
                 const label = shown.years.find((view) => view.year === item)?.columnLabel || String(item);
                 return <option key={item} value={item}>{label}</option>;
@@ -106,6 +108,7 @@ export default function PnlOverlay({
             </select>
           ) : null}
         </div>
+        {statement.hasNormalized ? <PnlBasis basis={basis} onChange={setBasis} /> : <span className="layer-meta">Stated figures</span>}
         {onChecklist ? <button type="button" className="text-link" onClick={onChecklist}>Package checklist</button> : null}
         <button type="button" className="close" data-overlay-dismiss="true" aria-label="Close profit and loss" onClick={onClose}><span aria-hidden="true">×</span></button>
       </header>
@@ -114,7 +117,7 @@ export default function PnlOverlay({
           <div className="pnl-desktop">
             <PnlGrid grid={grid} percent={percent} onComment={siteId ? openThread : undefined} focusLine={focus?.line} focusPeriod={focus?.type === "pnl_line" ? "" : focus?.period} />
           </div>
-          <PnlPhone statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
+          <PnlPhone mode={mode} onMode={setMode} year={effectiveYear} onYear={setYear} focus={focus} statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
         </>
       )}
       {thread ? (

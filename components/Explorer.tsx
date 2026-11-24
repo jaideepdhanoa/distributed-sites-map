@@ -172,6 +172,9 @@ export default function Explorer() {
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [loadedQueueKey, setLoadedQueueKey] = useState("");
+  const reviewRequest = useRef(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
   const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
@@ -557,20 +560,25 @@ export default function Explorer() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
+  const batchKeys = useRef(new Map<string, string>());
   async function postSelection(ids: string[], bodyFor: (id: string) => Record<string, string>, path = "/api/actions/notes") {
-    const errors: string[] = [];
+    const failed: string[] = [];
     for (const id of ids) {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(bodyFor(id)),
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({})) as { error?: string };
-        errors.push(payload.error || "That could not be saved.");
+      const body = JSON.stringify(bodyFor(id));
+      const fingerprint = path + body;
+      const key = batchKeys.current.get(fingerprint) || crypto.randomUUID();
+      batchKeys.current.set(fingerprint, key);
+      try {
+        const response = await fetch(path, {
+          method: "POST", headers: { "content-type": "application/json", "Idempotency-Key": key }, body,
+        });
+        if (!response.ok) throw new Error();
+        batchKeys.current.delete(fingerprint);
+      } catch {
+        failed.push(id);
       }
     }
-    if (errors.length) throw new Error(errors[0]);
+    return failed;
   }
 
   const dataGen = useRef(0);
@@ -1417,10 +1425,11 @@ export default function Explorer() {
     }
     const known = dealRows.some((deal) => deal.deal_id === id)
       || sites.some((site) => site.site_id === id)
-      || (catalog ?? []).some((feature) => feature.properties.site_id === id);
+      || (catalog ?? []).some((feature) => feature.properties.site_id === id)
+      || unscreened.some(feature => feature.properties.listing_id === id);
     const waiting = linked.kind === "universe" && !catalog && !known;
     setMissingSite(!waiting && !known ? "Site not found" : "");
-  }, [data, params, catalog]);
+  }, [data, params, catalog, unscreened]);
 
   useEffect(() => {
     if (!data || !selected || reviewing) return;
@@ -1877,15 +1886,33 @@ export default function Explorer() {
     write({ review: "1", i: String(next + 1), view: null, q: null });
   }
 
+  async function saveReview(body: { siteId: string; undo?: boolean; previous?: string | null }) {
+    if (reviewRequest.current) return null;
+    reviewRequest.current = true;
+    setReviewSaving(true);
+    setReviewError("");
+    try {
+      const response = await fetch("/api/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error();
+      return await response.json() as { previous?: string | null };
+    } catch {
+      setReviewError(body.undo ? "Undo could not be confirmed. Check the item and try Undo again." : "Review could not be confirmed. Check the item and try again.");
+      window.dispatchEvent(new Event("queue-refresh"));
+      return null;
+    } finally {
+      reviewRequest.current = false;
+      setReviewSaving(false);
+    }
+  }
+
   async function markCurrentReviewed() {
     if (!reviewCurrent || reviewCurrent.status === "reviewed") return;
-    const response = await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ siteId: reviewCurrent.siteId }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { previous?: string | null };
-    if (!response.ok) return;
+    const payload = await saveReview({ siteId: reviewCurrent.siteId });
+    if (!payload) return;
     const previous = payload.previous ?? null;
     const siteId = reviewCurrent.siteId;
     setFeed((items) => items.map((item) => item.siteId === siteId ? { ...item, status: "reviewed", previous } : item));
@@ -1906,11 +1933,8 @@ export default function Explorer() {
 
   async function undoReviewMark() {
     if (!undo) return;
-    await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ undo: true, siteId: undo.siteId, previous: undo.previous }),
-    });
+    const saved = await saveReview({ undo: true, siteId: undo.siteId, previous: undo.previous });
+    if (!saved) return;
     setFeed((items) => items.map((item) => item.siteId === undo.siteId ? { ...item, status: "open" } : item));
     goReview(undo.index);
     setUndo(null);
@@ -2076,10 +2100,9 @@ export default function Explorer() {
             })()}
           </div>
           <div className="search-wrap only-desktop">
-            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }}>Search name, address, broker, APN, id</button>
-            <kbd aria-hidden="true">/</kbd>
+            <button type="button" className="search scope-search" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>Search</button>
+            <kbd aria-hidden="true">{appleShortcut ? "⌘K" : "Ctrl K"}</kbd>
           </div>
-          <button type="button" className="chip command-open only-desktop" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
           <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
             <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
             <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
@@ -2270,7 +2293,7 @@ export default function Explorer() {
               return <button className="aside" type="button" onClick={() => write({ stage: "universe" }, true)}>{more.toLocaleString()} more at other steps</button>;
             })()
           ) : null}
-          {summaryText() ? (
+          {!listView && summaryText() ? (
             <span className="summary-chip" title={SUMMARY_NOTES.pipeline}>
               {summaryText()}
             </span>
@@ -2541,6 +2564,7 @@ export default function Explorer() {
       ) : null}
       {inReview && me?.actionsEnabled && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
         <ReviewBar
+          saving={reviewSaving}
           index={reviewIndex}
           total={reviewList.length}
           reviewed={feed.filter((site) => site.status === "reviewed").length}
@@ -2597,10 +2621,11 @@ export default function Explorer() {
           </div>
         ) : null}
         {inReview && reviewCurrent && !reviewCoords ? <p className="review-noloc" data-testid="review-noloc">No exact location yet</p> : null}
+        {reviewError ? <p className="undo-bar" role="alert">{reviewError}</p> : null}
         {undo ? (
           <div className="review-toast" role="status">
             Marked reviewed.
-            <button type="button" onClick={() => void undoReviewMark()} className="menu-item">Undo</button>
+            <button type="button" disabled={reviewSaving} onClick={() => void undoReviewMark()} className="menu-item">Undo</button>
           </div>
         ) : null}
         {feedSheet ? (

@@ -569,6 +569,7 @@ export function summaryOf(deals: DealProps[]) {
     count: deals.length,
     withAsking: asking.length,
     medianAsking: median(asking),
+    withAcres: acres.length,
     totalAcres: acres.reduce((sum, value) => sum + value, 0),
     medianPerAcre: median(perAcre),
   };

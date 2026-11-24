@@ -104,6 +104,7 @@ function chips(reasons: QueueReason[]) {
 }
 
 export function ReviewBar({
+  saving,
   index,
   total,
   reviewed,
@@ -125,6 +126,7 @@ export function ReviewBar({
 }: {
   index: number;
   total: number;
+  saving?: boolean;
   reviewed: number;
   summary: string;
   onPrev: () => void;
@@ -201,7 +203,7 @@ export function ReviewBar({
           </ul>
         ) : null}
       </span>
-      <button type="button" className="primary" data-testid="queue-reviewed" onClick={onReviewed}>
+      <button type="button" className="primary" disabled={saving} aria-busy={saving} data-testid="queue-reviewed" onClick={onReviewed}>
         <span className="review-long">Mark reviewed</span>
         <span className="review-short">Mark reviewed</span>
       </button>

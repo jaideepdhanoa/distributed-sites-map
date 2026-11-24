@@ -67,6 +67,8 @@ export default function CommandSearch({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<Groups>(EMPTY);
+  const [status, setStatus] = useState<"loading" | "ready" | "partial">("ready");
+  const [attempt, setAttempt] = useState(0);
   const [active, setActive] = useState(0);
   const queryKey = useRef("");
   const input = useRef<HTMLInputElement>(null);
@@ -93,8 +95,12 @@ export default function CommandSearch({
 
   useEffect(() => {
     if (!open) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => input.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    };
   }, [open]);
 
   useEffect(() => {
@@ -130,18 +136,21 @@ export default function CommandSearch({
     }
     const local = fallbackRef.current?.(needle) || EMPTY;
     setGroups(local);
+    setStatus("loading");
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(needle)}`, { signal: ctrl.signal })
-        .then((response) => (response.ok ? response.json() : null))
+        .then(response => { if (!response.ok) throw new Error(); return response.json(); })
         .then((body: { mode?: string; groups?: Groups } | null) => {
           if (ctrl.signal.aborted) return;
+          setStatus("ready");
           const remote = body?.groups || EMPTY;
           const useRemote = (body?.mode === "index" || body?.mode === "records") && count(remote) > 0;
           setGroups(useRemote ? filled(remote, fallbackRef.current?.(needle) || EMPTY) : (fallbackRef.current?.(needle) || EMPTY));
         })
         .catch(() => {
           if (ctrl.signal.aborted) return;
+          setStatus("partial");
           setGroups(fallbackRef.current?.(needle) || EMPTY);
         });
     }, 160);
@@ -149,7 +158,7 @@ export default function CommandSearch({
       ctrl.abort();
       window.clearTimeout(timer);
     };
-  }, [open, query]);
+  }, [open, query, attempt]);
 
   useEffect(() => {
     if (!open) return;
@@ -203,7 +212,11 @@ export default function CommandSearch({
         }}
       />
       <div className="command-results">
-      {query.trim().length >= 2 && any === 0 ? <p className="layer-meta" data-testid="command-empty">No matches.</p> : null}
+      <div className="layer-meta" role="status">
+        {query.trim().length < 2 ? "Enter at least 2 characters." : status === "loading" ? "Searching all sources…" : status === "partial" ? "Showing local results. Full search is unavailable." : any ? `${any} results. ${current?.title || ""}` : ""}
+      </div>
+      {query.trim().length >= 2 && status === "partial" && <button type="button" className="text-link" onClick={() => setAttempt(value => value + 1)}>Retry search</button>}
+      {query.trim().length >= 2 && status === "ready" && any === 0 ? <p className="layer-meta" data-testid="command-empty">No matches.</p> : null}
       {sections.map((section) => (
         <section key={section.label} data-testid={`command-group-${section.label.toLowerCase()}`}>
           <p className="eyebrow">{section.label}</p>
@@ -218,15 +231,12 @@ export default function CommandSearch({
               className={selected ? "menu-item is-active" : "menu-item"}
               data-testid="command-hit"
               data-active={selected ? "true" : undefined}
-              aria-selected={selected}
+              aria-current={selected ? "true" : undefined}
               onMouseMove={() => {
                 const at = flat.indexOf(item);
                 if (at >= 0) setActive(at);
               }}
-              onMouseDown={(event) => {
-                event.preventDefault();
-                choose(item);
-              }}
+              onClick={() => choose(item)}
             >
               <span className="hit-title">{title}</span>
               {meta ? <span className="hit-meta">{meta}</span> : null}

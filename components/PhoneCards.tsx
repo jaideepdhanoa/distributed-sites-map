@@ -8,6 +8,7 @@ export type PhoneCard = {
   stage: string;
   stageNote?: string;
   tone?: string;
+  action?: string;
   facts: string[];
   chips?: ReactNode;
   selected?: boolean;
@@ -30,6 +31,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
                 <ChipFace className={`stage-pill tone-${row.tone || "pine"}`} testId="stage-chip" label={row.stage} detail={row.stageNote} />
                 {row.chips}
               </span>
+              {row.action && <span className="mobile-next-action"><b>Next</b> {row.action}</span>}
               {facts.length ? (
                 <span className="phone-card-meta">
                   {facts.map((fact, index) => (

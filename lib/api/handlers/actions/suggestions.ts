@@ -1,3 +1,4 @@
+import { createWithReceipt } from "@/lib/actions/createReceipt";
 import { listOpenNeeds } from "@/lib/actions/blockers";
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 import { createSuggestion, listSuggestions, reconcileSuggestions } from "@/lib/actions/suggestions";
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     session,
     { action: "suggestion", targetKind: body.targetKind, targetId: body.targetId },
     (sql) =>
-      createSuggestion(sql, {
+      createWithReceipt(sql, request, session.u, body, () => createSuggestion(sql, {
         targetKind: body.targetKind as "site",
         targetId: String(body.targetId || ""),
         field: String(body.field || ""),
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
         targetOn: body.targetOn,
         ownerId: body.ownerId,
         mentions: body.mentions,
-      }),
+      })),
   );
   if (isResponse(suggestion)) return suggestion;
   return jsonOk({ suggestion }, 201);

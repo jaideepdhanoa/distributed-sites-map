@@ -1274,8 +1274,6 @@ button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { backgroun
   align-items: center;
   justify-content: flex-end;
   background: transparent;
-  opacity: 0;
-  pointer-events: none;
 }
 th:hover .col-grip, th:focus-within .col-grip,
 th:hover .col-tools, th:focus-within .col-tools, .col-tools.has-active { opacity: 1; pointer-events: auto; }

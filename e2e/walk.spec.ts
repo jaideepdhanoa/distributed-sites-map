@@ -81,7 +81,8 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   expect(fit.scroll).toBe(false);
   fs.mkdirSync("review-shots", { recursive: true });
   await page.locator(".pipeline-list .list-bar").screenshot({ path: "review-shots/phone-list-toolbar.png" });
-  await page.locator("[data-testid=phone-cards] button.list-row").first().click();
+  const firstCard = page.getByTestId("phone-cards").locator("button.list-row").first();
+  await firstCard.getByTestId("stage-chip").tap();
   await expect(page).toHaveURL(/[?&]site=/);
 });
 

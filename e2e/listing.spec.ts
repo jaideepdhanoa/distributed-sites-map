@@ -70,5 +70,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   const siteFolder = page.getByTestId("site-folder-link");
   await expect(siteFolder).toBeVisible();
   await expect(siteFolder).toHaveAttribute("href", "https://drive.google.com/drive/folders/1xv4HiB8wZ7MVatRBfquRLScog4nByhqQ");
+  await expect(imagery).not.toHaveAttribute("open", "");
+  await imagery.locator("summary").click();
   await expect(page.getByTestId("site-photos")).toBeVisible();
 });

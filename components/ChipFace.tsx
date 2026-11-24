@@ -86,7 +86,7 @@ export function TipTrigger({
         onFocus={() => place(true)}
         onBlur={hide}
         onClick={(event) => {
-          if (!tip) return;
+          if (!tip || event.currentTarget.closest("button, a[href]")) return;
           event.stopPropagation();
           place(!open);
         }}

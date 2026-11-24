@@ -45,6 +45,11 @@ test("an agent can write NDA dossier fields and an unknown field is refused", as
   };
   assert.doesNotThrow(() => edit(muse, payload));
   assert.doesNotThrow(() => edit(indie, payload, "NDA-902"));
+  const chatgpt: Actor = { id: "chatgpt", kind: "agent" };
+  const { owner, ...capture } = payload;
+  assert.doesNotThrow(() => edit(chatgpt, capture));
+  assert.throws(() => edit(chatgpt, { ...capture, owner }), /person sets the NDA owner/);
+  assert.throws(() => edit(chatgpt, { ...capture, action: "assign", owner }), /person sets the NDA owner/);
   assert.throws(() => edit(stranger, payload), /permission/);
   assert.throws(() => edit(muse, { ...payload, surprise: "no" }), /not accepted/);
   const sql = await memorySql();

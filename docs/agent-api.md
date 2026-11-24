@@ -1,6 +1,14 @@
 # Agent write API
 
-`POST /api/changes` stores one batch. Send `Idempotency-Key`. Muse sends `Authorization: Bearer` with `AGENT_WRITE_TOKEN_MUSE`. A contributor or reviewer session can write a line. Indie cannot. The line is not mirrored to the workbook.
+Send each batch to `POST /api/changes` with an `Idempotency-Key` and the calling agent's own bearer. The event records the authenticated agent ID.
+
+| Credential (Vercel Production) | Actor | App permissions |
+| --- | --- | --- |
+| `AGENT_WRITE_TOKEN_MUSE` | `muse` | Capture, comms, activity, P&L, conflicts, NDA capture and capture-owned site facts and tags. |
+| `AGENT_WRITE_TOKEN_INDIE` | `indie` | Site verification, photos, checks, sourced identity corrections and maintenance-owned tags, plus shared agent operations. |
+| `AGENT_WRITE_TOKEN_CHATGPT` | `chatgpt` | Both agents' documented operations, with the same per-field provenance, mint, stage and reviewer restrictions. The feed includes both audiences and accepts acknowledgements. |
+
+NDA owner assignment and drop decisions belong to a person. Production deployments and database migrations use the repository workflows. Each agent has a unique secret.
 
 The figures in this file are fake. They are not a site, a broker package, or a stored deal.
 
@@ -318,7 +326,7 @@ No amount. The month column says Missing. A month that was never sent stays blan
 
 ### Retract
 
-An agent cannot delete a line. Muse, the owner of the lines, can retract one through `POST /api/changes`. Send the line id, the version from the previous response, a required `reason`, and `at`, an ISO-8601 time with a numeric offset or `Z`. The row stays, including the captured amount. The change log keeps the event with the reason, the actor, and that exact time. A retracted line is left out of the statement and its totals. A reviewer cannot retract a line.
+An agent cannot delete a line. Muse or ChatGPT can retract one through `POST /api/changes`. Send the line id, the version from the previous response, a required `reason`, and `at`, an ISO-8601 time with a numeric offset or `Z`. The row stays, including the captured amount. The change log keeps the event with the reason, the actor, and that exact time. A retracted line is left out of the statement and its totals. A reviewer cannot retract a line.
 
 ```json
 {
@@ -339,7 +347,7 @@ Tables: `pnl_periods` and `pnl_lines`, created in `db/migrations/014_pnl.sql` an
 
 ### Data conflict
 
-When two sources disagree about one site field or one P&L line for the same period, log a conflict instead of picking one quietly. Muse writes it through `POST /api/changes`. Send exactly two sources. Each source has a string `value`, a `document`, and a `page`. `value_in_use` must be one of those two values. `status` is `open`, `asked_broker`, or `resolved`. A resolved conflict needs `resolution_note`. `at` is required and must be an ISO-8601 time with a numeric offset or `Z`. A bad timestamp is rejected. The row keeps `created_by`, `updated_by`, and both times. Each write appends an event. A second open conflict for the same site, field, and period is rejected so the first record is updated. Signed-in financials show a marker on the matching P&L cell. The popover lists both sources and the status. The site's open loops gain one entry, and the morning brief counts open conflicts. Neither of those surfaces includes the source values.
+When two sources disagree about one site field or one P&L line for the same period, log a conflict instead of picking one quietly. Muse or ChatGPT writes it through `POST /api/changes`. Send exactly two sources. Each source has a string `value`, a `document`, and a `page`. `value_in_use` must be one of those two values. `status` is `open`, `asked_broker`, or `resolved`. A resolved conflict needs `resolution_note`. `at` is required and must be an ISO-8601 time with a numeric offset or `Z`. A bad timestamp is rejected. The row keeps `created_by`, `updated_by`, and both times. Each write appends an event. A second open conflict for the same site, field, and period is rejected so the first record is updated. Signed-in financials show a marker on the matching P&L cell. The popover lists both sources and the status. The site's open loops gain one entry, and the morning brief counts open conflicts. Neither of those surfaces includes the source values.
 
 ```json
 {
@@ -446,7 +454,7 @@ A move with no receipt is `400`. A move to any other stage is `403` with `An age
 
 ## Trade area
 
-Muse and Indie may write these nine facts on a site. Send them in `facts` or at the top level. `trade_area_checked` is not one of them. The mirror derives it: any non-empty `trade_*` value copies `Yes` into Trade-area checked. Do not post `trade_area_checked`.
+All three agents may write these nine facts on a site. Send them in `facts` or at the top level. `trade_area_checked` is not one of them. The mirror derives it: any non-empty `trade_*` value copies `Yes` into Trade-area checked. Do not post `trade_area_checked`.
 
 | Key | Unit |
 | --- | --- |

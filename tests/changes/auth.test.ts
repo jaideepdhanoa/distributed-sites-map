@@ -2,19 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { POST } from "../../lib/api/handlers/changes";
 import { actorFromRequest, agentFromAuthorization, isActor } from "../../lib/changes/auth";
+import { authorizeAgent } from "../../lib/agent/auth";
 import { signSession } from "../../lib/session";
 
 test("agent tokens name the actor and a session is a human", async () => {
   const saved = {
     indie: process.env.AGENT_WRITE_TOKEN_INDIE,
     muse: process.env.AGENT_WRITE_TOKEN_MUSE,
+    chatgpt: process.env.AGENT_WRITE_TOKEN_CHATGPT,
     users: process.env.AUTH_USERS,
     secret: process.env.AUTH_SECRET,
   };
   try {
     delete process.env.AGENT_WRITE_TOKEN_INDIE;
     delete process.env.AGENT_WRITE_TOKEN_MUSE;
+    delete process.env.AGENT_WRITE_TOKEN_CHATGPT;
     assert.equal(agentFromAuthorization("Bearer anything"), "missing-env");
+    const sample = crypto.randomUUID();
+    process.env.AGENT_WRITE_TOKEN_CHATGPT = sample;
+    const header = `Bearer ${sample}`;
+    assert.deepEqual(agentFromAuthorization(header), { id: "chatgpt", kind: "agent" });
+    assert.deepEqual(authorizeAgent(new Request("http://localhost/api/agent/inbox", {
+      headers: { authorization: header },
+    })), { id: "chatgpt", canAck: true });
+    process.env.AGENT_WRITE_TOKEN_INDIE = sample;
+    assert.equal(agentFromAuthorization(header), "nomatch");
     process.env.AGENT_WRITE_TOKEN_INDIE = "indie-test-token";
     process.env.AGENT_WRITE_TOKEN_MUSE = "muse-test-token";
     assert.deepEqual(agentFromAuthorization("Bearer indie-test-token"), { id: "indie", kind: "agent" });
@@ -111,6 +123,7 @@ test("agent tokens name the actor and a session is a human", async () => {
     for (const [key, value] of [
       ["AGENT_WRITE_TOKEN_INDIE", saved.indie],
       ["AGENT_WRITE_TOKEN_MUSE", saved.muse],
+      ["AGENT_WRITE_TOKEN_CHATGPT", saved.chatgpt],
       ["AUTH_USERS", saved.users],
       ["AUTH_SECRET", saved.secret],
     ] as const) {

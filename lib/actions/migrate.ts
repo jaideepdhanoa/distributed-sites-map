@@ -25,7 +25,7 @@ function migrationFiles(): string[] {
 
 export async function migrate(
   sql: Sql,
-  options?: { connectionString?: string | null; onProduction?: "skip"; onPreview?: "skip" },
+  options?: { connectionString?: string | null; onProduction?: "skip"; onPreview?: "skip"; onlyPending?: string },
 ): Promise<string[]> {
   const url = options && "connectionString" in options ? options.connectionString : databaseUrl();
   let decision = migrationDecision(url);
@@ -49,7 +49,7 @@ export async function migrate(
     }
     return [];
   }
-  await sql.exec(`
+  if (!options?.onlyPending) await sql.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()
@@ -59,9 +59,13 @@ export async function migrate(
   const applied = new Set(
     (await sql.query<{ id: string }>("SELECT id FROM schema_migrations")).rows.map((row) => row.id),
   );
+  const pending = files.filter((file) => !applied.has(file));
+  const only = options?.onlyPending;
+  if (only && (!files.includes(only) || pending.some((file) => file !== only))) {
+    throw new Error("Pending migrations differ from the authorized filename. No migration was applied.");
+  }
   const ran: string[] = [];
-  for (const file of files) {
-    if (applied.has(file)) continue;
+  for (const file of pending) {
     const body = readFileSync(join(migrationDir(), file), "utf8");
     const script = `BEGIN;\n${body}\nINSERT INTO schema_migrations (id) VALUES ('${file}');\nCOMMIT;`;
     try {

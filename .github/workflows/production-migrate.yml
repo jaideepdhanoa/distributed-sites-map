@@ -11,6 +11,11 @@ on:
         required: true
         type: string
 
+      only_pending:
+        description: "Optional exact migration filename. Stop if any other migration is pending."
+        required: false
+        type: string
+
 permissions:
   contents: read
 
@@ -29,4 +34,5 @@ jobs:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           ALLOW_PRODUCTION_MIGRATE: "1"
           CONFIRM: ${{ inputs.confirm }}
+          ONLY_PENDING: ${{ inputs.only_pending }}
         run: npx tsx scripts/production-migrate.ts

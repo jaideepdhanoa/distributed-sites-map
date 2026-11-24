@@ -67,6 +67,7 @@ async function ready() {
     "032_segment_conflicts.sql",
     "033_nda_queue.sql",
     "034_nda_dossier.sql",
+    "035_chatgpt_stage_guard.sql",
   ]);
   assert.deepEqual(await migrate(sql), []);
   return sql;

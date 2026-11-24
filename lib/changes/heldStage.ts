@@ -1,3 +1,4 @@
+import { WRITE_AGENTS } from "@/lib/agent/identity";
 import type { Sql } from "@/lib/actions/db";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import type { RecordLookup } from "@/lib/actions/records";
@@ -16,7 +17,7 @@ import { SITE_ID } from "./vocab";
  * A workbook sync or a snapshot does not replace it. A newer decision does.
  */
 
-const NON_HUMAN = new Set(["system", "workbook-sync", "workbook-mirror", "muse", "indie"]);
+const NON_HUMAN = new Set(["system", "workbook-sync", "workbook-mirror", ...WRITE_AGENTS]);
 
 export type HeldStage = {
   siteId: string;

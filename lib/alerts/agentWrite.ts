@@ -1,3 +1,4 @@
+import { isWriteAgent } from "@/lib/agent/identity";
 import type { Sql } from "@/lib/actions/db";
 import { isAgentStageDecision, type Actor } from "@/lib/changes/schema";
 import { isExcludedSite } from "./excluded";
@@ -5,16 +6,15 @@ import { discussionHref, homeHref, proposalHref, reviewHref } from "./links";
 import { queueAgentAlert, reviewerRecipients } from "./notify";
 import { isWorkbookWrite } from "./summary";
 
-const AGENTS = new Set(["indie", "muse"]);
 export const JAIDEEP_ID = "jaideep";
 
 export function isBearerAgent(actor: { id: string; kind?: string }): boolean {
-  return actor.kind === "agent" && AGENTS.has(actor.id.trim().toLowerCase());
+  return actor.kind === "agent" && isWriteAgent(actor.id.trim().toLowerCase());
 }
 
 function agentActorId(model: string): string {
   const id = model.trim().toLowerCase();
-  return AGENTS.has(id) ? id : "muse";
+  return isWriteAgent(id) ? id : "muse";
 }
 
 function asObject(value: unknown): Record<string, unknown> {

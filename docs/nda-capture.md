@@ -1,6 +1,6 @@
 # NDA capture
 
-Muse and Indie write an NDA with `POST /api/changes` and their agent bearer token. The same call reads back with `GET /api/data/nda`. A human reviewer uses the same payload. Unknown payload fields are refused.
+Muse, Indie and ChatGPT capture an NDA with `POST /api/changes` and their agent bearer token. The same call reads back with `GET /api/data/nda`. A human reviewer uses the same payload. Unknown payload fields are refused.
 
 The change `source` is required. `payload.at` is an ISO-8601 time with a numeric offset. `payload.source_ref` names the message the fields came from. `expected_version` is the NDA's current version, or `0` when the overlay row does not exist yet. A stage or status write includes `note`.
 
@@ -12,7 +12,7 @@ The change `source` is required. `payload.at` is an ISO-8601 time with a numeric
 | `court` | `us` when we owe the next move, `them` when they do, `seller` when the seller's side does, `none` when nobody is in court. |
 | `court_detail` | A short place name such as `signer` or `legal`. |
 | `court_since` | The time the court changed. Use the email's sent time. |
-| `owner` | The account id the thread assigns. |
+| `owner` | Set by a person in the signed-in dossier. Omit on agent writes. |
 | `next_step` | The next concrete action the email asks for. |
 | `next_step_due` | `YYYY-MM-DD` when the email gives a date. |
 | `document_url` | An `https` link to the form. |
@@ -59,7 +59,6 @@ Days in court are computed from `court_since`. Do not copy a day count from a sh
         "court": "them",
         "court_detail": "signer",
         "court_since": "2026-11-23T18:00:00-08:00",
-        "owner": "sample-owner",
         "next_step": "Wait for a reply.",
         "next_step_due": "2026-11-30",
         "document_url": "https://example.com/sample-doc",

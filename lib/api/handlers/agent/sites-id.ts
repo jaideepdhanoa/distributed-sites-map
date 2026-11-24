@@ -1,3 +1,4 @@
+import { canCapture } from "@/lib/agent/identity";
 import { canonicalUrl } from "@/lib/agent/links";
 import { agentOk, isAgentCaller, requireAgent, withAgentDb } from "@/lib/agent/http";
 import { isResponse, jsonError } from "@/lib/actions/http";
@@ -55,7 +56,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       url: canonicalUrl({ siteId }),
     };
     if (chips.length) body.chips = chips;
-    if (caller.id === "muse" || caller.id === "shared") {
+    if (canCapture(caller.id) || caller.id === "shared") {
       const lines = await sql.query<{ n: string }>(`SELECT count(*)::text AS n FROM pnl_lines WHERE site_id = $1`, [siteId]);
       const count = Number(lines.rows[0]?.n || 0);
       body.financials = {

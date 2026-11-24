@@ -65,6 +65,19 @@ test("Indie can set a Drive folder and identity fields, and Muse cannot", () => 
   );
 });
 
+test("ChatGPT combines capture and verification on an existing site, with provenance", () => {
+  const agent: Actor = { id: "chatgpt", kind: "agent" };
+  const payload = {
+    address: "Sample site address", open_land_sqft: 1200, folder_url: FOLDER,
+    sources: { address: "Sample parcel", open_land_sqft: "Sample aerial" },
+  };
+  const verified = fieldsOf(agent, "combined", payload);
+  assert.equal(verified.facts.open_land_sqft, "1200");
+  assert.equal(verified.sources.address, "Sample parcel");
+  assert.throws(() => fieldsOf(agent, "missing-source", { address: payload.address }), /needs a source/);
+  assert.throws(() => fieldsOf(muse, "capture-only", payload), /cannot write/);
+});
+
 test("a top-level spare area is stored as a fact, and an unknown key is rejected", () => {
   const top = fieldsOf(muse, "top-spare", {
     open_land_sqft: 1200,

@@ -74,7 +74,7 @@ export async function GET(request: Request) {
   if (header.trim()) {
     const actor = agentFromAuthorization(header);
     if (actor === "missing-env") {
-      return NextResponse.json({ error: "Agent reads are off until AGENT_WRITE_TOKEN_INDIE or AGENT_WRITE_TOKEN_MUSE is set." }, { status: 401, headers: privateHeaders });
+      return NextResponse.json({ error: "Agent reads are off until AGENT_WRITE_TOKEN_INDIE, AGENT_WRITE_TOKEN_MUSE or AGENT_WRITE_TOKEN_CHATGPT is set." }, { status: 401, headers: privateHeaders });
     }
     if (actor === "nomatch" || actor === "absent" || typeof actor === "string") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders });

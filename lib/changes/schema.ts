@@ -1,3 +1,4 @@
+import { canCapture, canMaintainSites, isWriteAgent } from "@/lib/agent/identity";
 import { z } from "zod";
 import type { ActionRole } from "@/lib/actions/roles";
 import { canDecide, canWriteContent } from "@/lib/actions/roles";
@@ -863,8 +864,8 @@ function parsePnlLine(
   if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
   const raw = rawRecord(payload);
   if (raw && raw.retract === true) return parsePnlRetract(actor, index, raw, identity);
-  if (actor.kind === "agent" && actor.id.trim().toLowerCase() !== "muse") {
-    throw new InputError(`Change ${index + 1}: Only Muse can write a P&L line.`, 403);
+  if (actor.kind === "agent" && !canCapture(actor.id.trim().toLowerCase())) {
+    throw new InputError(`Change ${index + 1}: Only Muse or ChatGPT can write a P&L line.`, 403);
   }
   assertContentActor(actor, index);
   if (raw && "amount" in raw && typeof raw.amount === "number") pnlError(index, "amount", `${AMOUNT_FORM}, not a number`);
@@ -956,8 +957,8 @@ function parsePnlRetract(
   raw: Record<string, unknown>,
   identity: { entityId?: string; expectedVersion: number },
 ): PnlRetractPayload {
-  if (actor.kind !== "agent" || actor.id.trim().toLowerCase() !== "muse") {
-    pnlError(index, "retract", "Only Muse can retract a P&L line.", 403);
+  if (actor.kind !== "agent" || !canCapture(actor.id.trim().toLowerCase())) {
+    pnlError(index, "retract", "Only Muse or ChatGPT can retract a P&L line.", 403);
   }
   if (!identity.entityId || identity.expectedVersion < 1) {
     pnlError(index, "entity_id", "A retract needs the line id and its version");
@@ -984,8 +985,8 @@ function sourceValueIsNumber(payload: unknown): boolean {
 
 function parseDataConflict(actor: Actor, index: number, siteId: string, payload: unknown): ConflictPayload {
   if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
-  if (actor.kind !== "agent" || actor.id.trim().toLowerCase() !== "muse") {
-    throw new InputError(`Change ${index + 1}: Only Muse can record a data conflict.`, 403, "actor");
+  if (actor.kind !== "agent" || !canCapture(actor.id.trim().toLowerCase())) {
+    throw new InputError(`Change ${index + 1}: Only Muse or ChatGPT can record a data conflict.`, 403, "actor");
   }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
@@ -1093,7 +1094,6 @@ const NDA_STAGES = new Set([
 
 const NDA_COURTS = new Set(["us", "them", "seller", "none"]);
 const NDA_DOC_KINDS = new Set(["docusign", "clm", "drive", "email", "other"]);
-const NDA_AGENTS = new Set(["muse", "indie"]);
 
 type NdaPresence = "absent" | "clear" | "set";
 
@@ -1136,7 +1136,7 @@ function ndaList(raw: Record<string, unknown>, key: string, index: number): { va
 }
 
 function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
-  const agent = actor.kind === "agent" && NDA_AGENTS.has(actor.id.trim().toLowerCase());
+  const agent = actor.kind === "agent" && isWriteAgent(actor.id.trim().toLowerCase());
   const human = actor.kind === "human" && Boolean(actor.role && canWriteContent(actor.role));
   if (!agent && !human) {
     throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
@@ -1149,6 +1149,9 @@ function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
     if (!NDA_PAYLOAD_FIELDS.has(key)) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
   }
   const action = raw.action;
+  if (agent && actor.id === "chatgpt" && (action === "assign" || "owner" in raw)) {
+    throw new InputError(`Change ${index + 1}: A person sets the NDA owner.`, 403, "owner");
+  }
   if (action !== "status" && action !== "assign" && action !== "next_step" && action !== "edit") {
     throw new InputError(`Change ${index + 1}: That NDA action is not accepted.`, 400, "action");
   }
@@ -1442,8 +1445,8 @@ export function isAgentStageDecision(payload: Record<string, unknown>): boolean 
 
 function assertActivityActor(actor: Actor, index: number, type: string): void {
   assertContentActor(actor, index);
-  // Capture rows are Muse's activity write. Other agent tokens stay on their own fields.
-  if (type === "capture" && actor.kind === "agent" && actor.id !== "muse") {
+  // Capture rows require a capture-capable agent.
+  if (type === "capture" && actor.kind === "agent" && !canCapture(actor.id)) {
     throw new InputError(`Change ${index + 1}: An agent cannot write that activity.`, 403);
   }
 }
@@ -1590,11 +1593,11 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class, mint);
   for (const key of Object.keys(data.sources || {})) {
     const identitySource = mint && (CREATE_IDENTITY_FIELDS as readonly string[]).includes(key);
-    const indieIdentity = !mint && actor.kind === "agent" && actor.id === "indie" && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
+    const maintenanceIdentity = !mint && actor.kind === "agent" && canMaintainSites(actor.id) && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
     const quickSource = (QUICK_LUBE_FIELDS as readonly string[]).includes(key);
     const roadSource = key === "trade_aadt_road";
     const segmentSource = key === "segment" || key === "segment_group" || key === "category";
-    if (!identitySource && !indieIdentity && !quickSource && !roadSource && !segmentSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    if (!identitySource && !maintenanceIdentity && !quickSource && !roadSource && !segmentSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1623,13 +1626,13 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     cleanText(source);
     sources[field] = source;
   }
-  if (!mint && actor.kind === "agent" && actor.id === "indie" && fields.category && (data.segment !== undefined || data.segment_group !== undefined || data.category !== undefined)) {
+  if (!mint && actor.kind === "agent" && canMaintainSites(actor.id) && fields.category && (data.segment !== undefined || data.segment_group !== undefined || data.category !== undefined)) {
     const source = data.sources?.segment?.trim() || data.sources?.segment_group?.trim() || data.sources?.category?.trim() || "";
     if (!source) throw new InputError(`Change ${index + 1}: segment needs a source.`);
     cleanText(source);
     sources.segment = source;
   }
-  if (!mint && actor.kind === "agent" && actor.id === "indie") {
+  if (!mint && actor.kind === "agent" && canMaintainSites(actor.id)) {
     for (const field of INDIE_IDENTITY_FIELDS) {
       const value = fields[field as SiteField];
       if (value === undefined || value === "") continue;
@@ -1703,11 +1706,14 @@ function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, 
   if (serviceArea === "edge_legacy" || serviceArea === "unknown") {
     throw new InputError(`Change ${index + 1}: An agent cannot set that service area.`);
   }
-  const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS, ...TRADE_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
+  const allowed = new Set<string>([
+    ...(canCapture(actor.id) ? MUSE_FIELDS : []),
+    ...(canMaintainSites(actor.id) ? [...PHOTO_FIELDS, ...CHECK_FIELDS, ...TRADE_FIELDS] : []),
+  ]);
   const createAllowed = mint ? new Set<string>([...CREATE_IDENTITY_FIELDS, "segment", "segment_group"]) : new Set<string>();
-  const indieUpdate = new Set<string>(actor.id === "indie" && !mint ? ["folder_url", "category", "segment", "segment_group", ...INDIE_IDENTITY_FIELDS] : []);
+  const maintenanceUpdate = new Set<string>(canMaintainSites(actor.id) && !mint ? ["folder_url", "category", "segment", "segment_group", ...INDIE_IDENTITY_FIELDS] : []);
   for (const key of touched) {
-    if (createAllowed.has(key) || indieUpdate.has(key)) continue;
+    if (createAllowed.has(key) || maintenanceUpdate.has(key)) continue;
     if ((SCHEMA_FIELDS as readonly string[]).includes(key) || !allowed.has(key)) {
       throw new InputError(`Change ${index + 1}: An agent cannot write that field.`);
     }

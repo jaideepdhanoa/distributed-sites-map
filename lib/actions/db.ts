@@ -1,6 +1,7 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 export type Sql = {
+  afterCommit?: (effect: () => Promise<void>) => void;
   query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
   exec(text: string): Promise<void>;
 };

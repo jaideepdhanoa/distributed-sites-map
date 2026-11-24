@@ -221,7 +221,7 @@ export default function CommandSearch({
       />
       <div className="command-results">
       <div className="layer-meta" role="status">
-        {query.trim().length < 2 ? "Enter at least 2 characters." : status === "loading" ? "Searching all sources…" : status === "partial" ? "Showing local results. Full search is unavailable." : any ? `${any} results. ${current?.title || ""}` : ""}
+        {query.trim().length < 2 ? "Enter at least 2 characters." : status === "loading" ? "Searching all sources…" : status === "partial" ? (any ? "Showing local results. Full search is unavailable." : "Full search is unavailable. No local matches.") : any ? `${any} results. ${current?.title || ""}` : ""}
       </div>
       {query.trim().length >= 2 && status === "partial" && <button type="button" className="text-link" onClick={() => setAttempt(value => value + 1)}>Retry search</button>}
       {query.trim().length >= 2 && status === "ready" && any === 0 ? <p className="layer-meta" data-testid="command-empty">No matches.</p> : null}

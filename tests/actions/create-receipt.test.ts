@@ -13,11 +13,20 @@ test("a retried creation replays its result and a failed creation rolls back", a
   const request = () => new Request(url, { headers: { "Idempotency-Key": randomUUID() } });
   const original = request();
   const insert = async () => (await sql.query<{ id: number }>("INSERT INTO sample_writes DEFAULT VALUES RETURNING id")).rows[0];
-  const result = await createWithReceipt(sql, original, "writer", { text: "Draft" }, insert);
+  let delivered = 0;
+  const result = await createWithReceipt(sql, original, "writer", { text: "Draft" }, async tx => {
+    tx.afterCommit?.(async () => {
+      assert.equal((await sql.query("SELECT actor FROM change_receipts")).rows.length, 1);
+      delivered++;
+    });
+    return insert();
+  });
+  assert.equal(delivered, 1);
   assert.deepEqual(await createWithReceipt(sql, original, "writer", { text: "Draft" }, insert), result);
   await assert.rejects(createWithReceipt(sql, original, "writer", { text: "Edited" }, insert), /draft changed/i);
   const retry = request();
-  await assert.rejects(createWithReceipt(sql, retry, "writer", {}, async () => {
+  await assert.rejects(createWithReceipt(sql, retry, "writer", {}, async tx => {
+    tx.afterCommit?.(async () => { delivered++; });
     await insert();
     throw new Error("interrupted");
   }), /interrupted/);
@@ -25,4 +34,5 @@ test("a retried creation replays its result and a failed creation rolls back", a
   await createWithReceipt(sql, retry, "writer", {}, insert);
   await createWithReceipt(sql, original, "another-writer", { text: "Draft" }, insert);
   assert.equal((await sql.query("SELECT id FROM sample_writes")).rows.length, 3);
+  assert.equal(delivered, 1);
 });

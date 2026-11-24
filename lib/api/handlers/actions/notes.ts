@@ -1,3 +1,4 @@
+import { fileLookup } from "@/lib/actions/records";
 import { createWithReceipt } from "@/lib/actions/createReceipt";
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
 import { createNote, listNotes, type ThreadKind } from "@/lib/actions/notes";
@@ -57,8 +58,9 @@ export async function POST(request: Request) {
   if (target.targetKind !== "site_space" && !roleAllows(session.actionRole, "contributor")) {
     return jsonError("You do not have permission for that.", 403);
   }
-  const note = await runWrite(session, { action: "note", targetKind: target.targetKind, targetId: target.targetId }, (sql) =>
-    createWithReceipt(sql, request, session.u, body, () => createNote(sql, {
+  const note = await runWrite(session, { action: "note", targetKind: target.targetKind, targetId: target.targetId }, async (sql) => {
+    const lookup = await fileLookup();
+    return createWithReceipt(sql, request, session.u, body, tx => createNote(tx, {
       targetKind: target.targetKind,
       targetId: target.targetId,
       body: String(body.body || ""),
@@ -66,8 +68,8 @@ export async function POST(request: Request) {
       parentId: body.parentId,
       mentions: body.mentions,
       recommendationId: body.recommendationId,
-    })),
-  );
+    }, lookup));
+  });
   if (isResponse(note)) return note;
   return jsonOk({ note }, 201);
 }

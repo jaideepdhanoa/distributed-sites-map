@@ -241,7 +241,7 @@ export default function NdaQueue({
                     <CourtPill court={row.court} label={row.court_pill} />
                   </span>
                   <span>{queueLine(row, names)}</span>
-                  <span className={overdue ? "nda-overdue" : "note"}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${overdue ? "Overdue" : "Due"} ${row.next_step_due}` : ""}`}</span>
+                  <span className={`nda-action-line ${overdue ? "nda-overdue" : "note"}`}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${overdue ? "Overdue" : "Due"} ${row.next_step_due}` : ""}`}</span>
                 </button>
               </li>
             );

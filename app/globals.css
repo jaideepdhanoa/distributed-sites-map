@@ -1101,7 +1101,7 @@ button.paper-btn.ask-launch:hover, button.menu-item.ask-launch:hover { backgroun
 .nda-site-thread { margin: 0 16px 12px; min-width: 0; }
 .nda-site-thread .note-copy, .nda-detail .note-copy { overflow-wrap: anywhere; }
 .nda-pane .nda-list { list-style: none; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 6px; width: min(100%, 880px); }
-.nda-pane > .nda-bar, .nda-pane > .nda-tabs { width: min(100%, 880px); margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
+.nda-pane > .nda-bar, .nda-pane > .nda-tabs, .nda-pane > .nda-filters { width: min(100%, 880px); margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
 .nda-pane .nda-row { width: 100%; overflow: hidden; padding: 8px 12px; }
 .nda-pane .nda-row > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nda-pane .nda-row > span.nda-line { display: flex; align-items: center; justify-content: flex-start; gap: 16px; overflow: visible; text-overflow: unset; white-space: normal; }
@@ -3913,3 +3913,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .workspace-warning { color: var(--ink); background: var(--amber-tint); padding: 6px 12px; }
 
 .nda-priority { margin: 12px 12px 4px; font-size: .8rem; color: var(--muted); }
+
+.nda-pane .nda-row > .nda-action-line { white-space: normal; overflow-wrap: anywhere; }
+.nda-pane:has(.nda-detail) > .nda-filters { display: none; }

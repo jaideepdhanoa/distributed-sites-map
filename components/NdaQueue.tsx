@@ -207,13 +207,13 @@ export default function NdaQueue({
         ))}
       </div>
       <div className="nda-filters">
-        <label>Owner<select className="secondary" value={owner} onChange={e => setOwner(e.target.value)}>
+        <label>Owner<select aria-label="Owner" className="secondary" value={owner} onChange={e => setOwner(e.target.value)}>
           <option value="">All owners</option><option value="unassigned">Unassigned</option>{owners.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select></label>
-        <label>Status<select className="secondary" value={status} onChange={e => setStatus(e.target.value)}>
+        <label>Status<select aria-label="Status" className="secondary" value={status} onChange={e => setStatus(e.target.value)}>
           <option value="all">All records</option><option value="active">Active</option><option value="closed">Closed</option>
         </select></label>
-        <label>Priority<select className="secondary" value={order} onChange={e => setOrder(e.target.value)}>
+        <label>Priority<select aria-label="Priority" className="secondary" value={order} onChange={e => setOrder(e.target.value)}>
           <option value="due">Next due first</option><option value="wait">Longest wait</option><option value="missing">Missing next step</option>
         </select></label>
       </div>

@@ -638,7 +638,6 @@ export default function Detail({
       </div>
       {!decisionFirst && <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />}
       <section className="decision-block" data-testid="decision-block">
-        <DecisionChips deal={linkedDeal} waiting={waitingChip} />
         <NextStepCard
           kind="site"
           id={site.site_id}
@@ -650,6 +649,7 @@ export default function Detail({
           blocker={linkedDeal}
           waitingShown={Boolean(waitingChip)}
         />
+        <DecisionChips deal={linkedDeal} waiting={waitingChip} />
       </section>
       <div className="card-chips">
         <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
@@ -960,11 +960,6 @@ export function DealDetail({
       </div>
       {!decisionFirst && <SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} />}
       <section className="decision-block" data-testid="decision-block">
-        <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
-        <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
-        {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
-          <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
-        ) : null}
         <NextStepCard
           kind="deal"
           id={deal.deal_id}
@@ -976,6 +971,11 @@ export function DealDetail({
           chips={chips}
           waitingShown={Boolean(waiting)}
         />
+        <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
+        <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
+        {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
+          <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
+        ) : null}
       </section>
       <ChipRow chips={diligence} testId="diligence-home" titled />
       {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}

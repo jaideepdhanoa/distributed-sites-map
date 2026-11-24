@@ -125,7 +125,9 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   } else {
     const cards = page.getByTestId("phone-cards");
     await expect(cards).toBeVisible();
-    await expect(cards.getByTestId("stage-chip").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Phoenix · Open land" })).toBeVisible();
+    await expect(page.locator(".shortlist-heading")).toContainText("Universe");
+    await expect(cards.getByTestId("stage-chip")).toHaveCount(0);
     await expect(cards.locator(".phone-card-meta").first()).toContainText(/listed|listing/i);
   }
   await page.screenshot({ path: `review-shots/${name}-universe-list.png`, fullPage: false });
@@ -207,4 +209,31 @@ test("an incomplete search can recover without losing the query", async ({ page 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
+});
+
+test("screen five sites in Phoenix and return to the same selection", async ({ page }, info) => {
+  const phone = info.project.name === "mobile";
+  await page.goto("/?funnel=universe&view=list&city=PHX&stage=land&sort=site:asc", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Phoenix · Open land" })).toBeVisible();
+  const rows = page.locator(".pipeline-list [data-site-row]");
+  await expect(rows.nth(4)).toBeVisible();
+  const firstFive = async () => rows.evaluateAll(elements => elements.slice(0, 5).map(element => element.getAttribute("data-site-row")));
+  const before = await firstFive();
+  const box = await rows.first().boundingBox();
+  expect(box).toBeTruthy();
+  console.log(`Shortlist first row at ${Math.round(box!.y)} CSS px (${info.project.name})`);
+  expect(box!.y).toBeLessThan(phone ? 255 : 340);
+  if (phone) {
+    await page.getByRole("button", { name: "More list actions" }).click();
+    await page.getByRole("menuitem", { name: "Select", exact: true }).click();
+  }
+  for (const i of [0, 1]) await rows.nth(i).getByRole("checkbox").check();
+  await page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true }).click();
+  const matrix = page.getByRole("table", { name: "Site comparison" });
+  for (const name of ["Site fit", "Financials", "Diligence"]) await expect(matrix.getByRole("rowgroup", { name })).toBeAttached();
+  await expect(matrix.getByText("Not on file", { exact: true }).first()).toBeAttached();
+  await page.getByRole("button", { name: "Close compare" }).click();
+  const restored = await firstFive();
+  expect(restored.length === 5 && restored.every((id, index) => id === before[index])).toBe(true);
+  for (const i of [0, 1]) await expect(rows.nth(i).getByRole("checkbox")).toBeChecked();
 });

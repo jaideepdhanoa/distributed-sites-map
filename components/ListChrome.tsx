@@ -1,6 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
+
+export function ShortlistSummary({ title, count, commonStage, children }: {
+  title: string;
+  count: number;
+  commonStage: string;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const figuresId = useId();
+  const showStage = commonStage && !title.toLowerCase().endsWith(" · " + commonStage.toLowerCase());
+  return (
+    <section className="summary-row shortlist-summary" data-testid="summary-row" aria-label="Shortlist">
+      <div className="shortlist-heading">
+        <h1>{title}</h1>
+        <p><strong data-testid="shortlist-count">{count.toLocaleString()}</strong> {count === 1 ? "site" : "sites"}{showStage && ` · ${commonStage}`}</p>
+      </div>
+      <button className="paper-btn figures-toggle" type="button" aria-expanded={expanded} aria-controls={figuresId} onClick={() => setExpanded(value => !value)}>Figures</button>
+      <div className="shortlist-figures" id={figuresId} data-expanded={expanded}>{children}</div>
+    </section>
+  );
+}
+
+export function sharedStage(labels: string[]) {
+  const first = labels[0];
+  return labels.length > 1 && labels.every(label => label === first) ? first : "";
+}
 
 export function ColumnPicker({
   resetLabel,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import NdaDetail from "./NdaDetail";
+import { contactDate } from "@/lib/cardStatus";
 import { isOpenAgreement, collapseContained, counterpartyLine, coveredSites, stageLabel, type NdaQueueItem } from "@/lib/nda";
 
 type Payload = {
@@ -237,11 +238,17 @@ export default function NdaQueue({
                 {order === "due" && (!index || priority(row) !== priority(shown[index - 1])) && <h3 className="nda-priority">{priority(row)}</h3>}
                 <button type="button" className="list-row nda-row" data-testid={`nda-card-${row.nda_id}`} onClick={() => pick(row.nda_id)}>
                   <span className="nda-line">
-                    <strong>{row.counterparty_firm || row.nda_id}</strong>
+                    <strong>{next}</strong>
                     <CourtPill court={row.court} label={row.court_pill} />
                   </span>
-                  <span>{queueLine(row, names)}</span>
-                  <span className={`nda-action-line ${overdue ? "nda-overdue" : "note"}`}>{`${row.owner_name || row.owner || "Unassigned"} · ${next}${row.next_step_due ? ` · ${overdue ? "Overdue" : "Due"} ${row.next_step_due}` : ""}`}</span>
+                  <span className="nda-counterparty">{row.counterparty_firm || row.nda_id}</span>
+                  <span className="nda-context">{queueLine(row, names)}</span>
+                  <span className="nda-assignment">
+                    <span><small>Owner</small>{row.owner_name || row.owner || "Unassigned"}</span>
+                    <span className={overdue ? "nda-overdue" : undefined}><small>{overdue ? "Overdue" : "Due"}</small>{row.next_step_due
+                      ? <time dateTime={row.next_step_due}>{contactDate(row.next_step_due)}{row.next_step_due.slice(0, 4) !== today.slice(0, 4) ? `, ${row.next_step_due.slice(0, 4)}` : ""}</time>
+                      : "No date"}</span>
+                  </span>
                 </button>
               </li>
             );

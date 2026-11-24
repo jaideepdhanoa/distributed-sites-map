@@ -354,8 +354,8 @@ export function NextStepCard({
     return (
       <section className="next-card" data-testid="next-step">
         {showDrop ? <div className="suggested-row" data-testid="suggested-drop"><p>{dropPhrase}</p></div> : null}
-        {context}
         {workbookBlock}
+        {context}
       </section>
     );
   }
@@ -688,9 +688,8 @@ export function NextStepCard({
         <p className="proposal-meta">
           Approved by {who(accounts, approved.decidedBy) || "the approver"}
           {approved.decidedAt ? ` · ${formatPacific(approved.decidedAt)}` : ""}
-          {approved.ownerName ? ` · Owner ${approved.ownerName}` : ""}
-          {approved.targetOn ? ` · Due ${shortDate(approved.targetOn)}` : ""}
         </p>
+        <p className="step-assignment"><span>Owner <b>{approved.ownerName || who(accounts, approved.ownerId) || "Unassigned"}</b></span>{approved.targetOn && <span>Due <b>{shortDate(approved.targetOn)}</b></span>}</p>
         <div className="act-row">
           {reviewer || approved.ownerId === status.username ? (
             <button type="button" className="propose" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${approved.id}/done`, {})}>Mark done</button>
@@ -773,9 +772,9 @@ export function NextStepCard({
           ) : null}
         </div>
       ) : null}
-      {context}
-      {tone === "empty" ? null : workbookBlock}
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
+      {tone === "empty" ? null : workbookBlock}
+      {context}
       {bringBack && !idle ? (
         <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
       ) : null}
@@ -787,14 +786,15 @@ export function NextStepCard({
 function WorkbookLine({ text, owner, due }: { text: string; owner: string; due: string }) {
   const plain = plainNextStep(text);
   const [open, setOpen] = useState(false);
-  const meta = [owner ? `Owner ${owner}` : "", due ? `Due ${due}` : ""].filter(Boolean).join(" · ");
+
   const more = Boolean(plain.full && plain.full !== plain.line);
-  if (!plain.line && !meta) return null;
+  if (!plain.line && !owner && !due) return null;
   return (
     <div className="workbook-step" data-testid="workbook-step" data-note={open ? "full" : "line"}>
+      <h3>Next action</h3>
       {plain.line && !open ? <p className="next-line" title={plain.full}>{plain.line}</p> : null}
       {open ? <p className="next-full">{plain.full}</p> : null}
-      {meta ? <p className="proposal-meta">{meta}</p> : null}
+      <p className="step-assignment"><span>Owner <b>{owner || "Unassigned"}</b></span>{due && <span>Due <b>{due}</b></span>}</p>
       {more ? (
         <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           {open ? "Hide full note" : "Show full note"}

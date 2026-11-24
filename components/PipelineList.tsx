@@ -39,7 +39,7 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
+import { ColumnPicker, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
@@ -232,6 +232,7 @@ export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], si
 }
 
 export default function PipelineList({
+  title,
   rows,
   outsideRow = null,
   columns,
@@ -257,6 +258,7 @@ export default function PipelineList({
   onClearArea,
   onDismiss,
 }: {
+  title: string;
   rows: PipelineRow[];
   outsideRow?: PipelineRow | null;
   columns: PipelineColumnId[];
@@ -371,6 +373,7 @@ export default function PipelineList({
   useEffect(() => { onScope?.(visibleIds); }, [visibleIds, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
+  const commonStage = sharedStage(ordered.map(row => stageChipLabel(row.deal.stage, row.deal.stage_group)));
   const showChecks = !phone || selecting;
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
 
@@ -483,12 +486,11 @@ export default function PipelineList({
   }
 
   const summaryBar = (
-    <div className="summary-row" data-testid="summary-row">
-      <div><span className="only-desktop">Matching sites</span><span className="only-mobile">Shown</span><strong>{summary.count.toLocaleString()}</strong></div>
+    <ShortlistSummary title={title} count={ordered.length} commonStage={commonStage}>
       <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
       <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{summary.count === 0 ? "No matching sites" : summary.withAcres ? acresTotal(summary.totalAcres) : "Acreage unknown"}</strong>{summary.withAcres > 0 && <small>{summary.withAcres} of {summary.count} reported</small>}</div>
       <div><span className="only-desktop">Market land comps / acre</span><span className="only-mobile">Land comps / acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong>{signedIn && <details className="disclosure"><summary className="disclosure">Market basis</summary><p>{compMedian.tip}</p>{Array.from(marketComps, ([market, value]) => <p key={market}>{market} · {fullMoney(value)} per acre</p>)}</details>}</div>
-    </div>
+    </ShortlistSummary>
   );
   const outside = outsideRow ? (
     <div className="outside-row" data-testid="outside-row">
@@ -560,7 +562,7 @@ export default function PipelineList({
       {phone ? (
         <div className="list-scroll">
           {outside}
-          <PhoneCards rows={ordered.map((row) => {
+          <PhoneCards commonStage={commonStage} rows={ordered.map((row) => {
             const id = row.deal.deal_id;
             const address = displayAddress(row.deal.address);
             return {
@@ -638,6 +640,7 @@ export default function PipelineList({
             const nda = signedIn ? dealChips(row.deal, signedIn).find((chip) => chip.family === "nda" && chip.code !== "not_required") : undefined;
             return (
               <StageTypeCell
+            hideStage={Boolean(commonStage)}
                 stage={row.deal.stage || ""}
                 group={row.deal.stage_group || ""}
                 detail={droppedDecisionLine(row.deal)}

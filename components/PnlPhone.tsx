@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { periodChip, type OpenPnlComment } from "@/lib/comments/anchor";
+import type { OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { MONTH_SHORT } from "@/lib/pnl/lines";
-import { buildPnlGrid, columnPeriodKey, columnSummary, type GridCell } from "@/lib/pnl/grid";
+import { buildPnlGrid, columnPeriodKey, matchesColumnPeriod, columnSummary, type GridCell } from "@/lib/pnl/grid";
 import type { PnlStatement } from "@/lib/pnl/statement";
 import PnlLinePopover from "./PnlLinePopover";
 
@@ -36,7 +36,7 @@ export default function PnlPhone({
   const grain = mode === "months" ? "month" : "year";
   const initialMonth = statement.years[0]?.months.findLastIndex((period) => period) ?? 0;
   const [month, setMonth] = useState(initialMonth < 0 ? 0 : initialMonth);
-  const [yearIndex, setYearIndex] = useState(0);
+  const [annualColumn, setAnnualColumn] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const anchor = useRef<HTMLElement | null>(null);
   const touch = useRef(0);
@@ -44,18 +44,36 @@ export default function PnlPhone({
     () => buildPnlGrid(statement, grain === "month" ? "months" : "years", year, conflicts, comments),
     [statement, grain, year, conflicts, comments],
   );
+  function columnYear(columnId: string) {
+    return statement.years.find(item => columnId === `year-${item.year}` || item.annual?.id === columnId || item.ranges?.some(range => range.id === columnId))?.year;
+  }
+  const selectedAnnual = grid.columns.findIndex(column => column.id === annualColumn && columnYear(column.id) === year);
+  const firstAnnual = grid.columns.findIndex(column => columnYear(column.id) === year);
+  const yearIndex = selectedAnnual >= 0 ? selectedAnnual : Math.max(firstAnnual, 0);
   const targetPeriod = focus?.period || "";
+  const linkKey = [focus?.line, targetPeriod].join("|");
   const appliedLink = useRef("");
   useEffect(() => {
-    const link = [targetPeriod, focus?.line, grain].join("|");
-    if (!targetPeriod || appliedLink.current === link) return;
-    const at = grid.columns.findIndex(column => [column.label, columnPeriodKey(column), column.periodStart + "/" + column.periodEnd].some(key => periodChip(key) === periodChip(targetPeriod)));
+    if (!targetPeriod || appliedLink.current === linkKey) return;
+    const at = grid.columns.findIndex(column => matchesColumnPeriod(column, targetPeriod));
     if (at < 0) return;
-    appliedLink.current = link;
+    appliedLink.current = linkKey;
     if (grain === "month") setMonth(at);
-    else setYearIndex(at);
-  }, [targetPeriod, focus?.line, grid, grain, year]);
+    else setAnnualColumn(grid.columns[at].id);
+  }, [targetPeriod, linkKey, grid, grain]);
   const index = grain === "month" ? month : yearIndex;
+
+  function selectPeriod(at: number) {
+    if (grain === "month") setMonth(at);
+    else {
+      const id = grid.columns[at]?.id;
+      if (!id) return;
+      setAnnualColumn(id);
+      const nextYear = columnYear(id);
+      if (nextYear) onYear(nextYear);
+    }
+    setOpen(null);
+  }
   const summary = columnSummary(grid, index);
   const periods = grain === "month" ? [...MONTH_SHORT, grid.columns[12]?.label || "YTD"] : grid.columns.map((column) => column.label);
   const periodTitle = grain === "month"
@@ -74,9 +92,7 @@ export default function PnlPhone({
 
   function step(delta: number) {
     const next = Math.min(Math.max(index + delta, 0), periods.length - 1);
-    if (grain === "month") setMonth(next);
-    else setYearIndex(next);
-    setOpen(null);
+    selectPeriod(next);
   }
 
   return (
@@ -104,11 +120,7 @@ export default function PnlPhone({
               className={selected ? "chip on" : "chip"}
               aria-pressed={selected}
               data-missing={missing ? "true" : "false"}
-              onClick={() => {
-                if (grain === "month") setMonth(item);
-                else setYearIndex(item);
-                setOpen(null);
-              }}
+              onClick={() => selectPeriod(item)}
             >
               {label}{missing ? " · Missing" : ""}
             </button>

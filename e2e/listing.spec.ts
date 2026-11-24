@@ -55,6 +55,9 @@ test("a deal with a site folder shows it next to the map and listing links", asy
     next.searchParams.set("sheet", "half");
     await page.goto(next.toString());
   }
+  const imagery = page.locator("details.record-imagery");
+  await expect(imagery).not.toHaveAttribute("open", "");
+  await imagery.locator("summary").click();
   const photos = page.getByTestId("site-photos");
   await expect(photos).toBeVisible();
   const thumb = page.getByTestId("photo-thumb").first();

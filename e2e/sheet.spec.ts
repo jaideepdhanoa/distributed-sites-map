@@ -29,10 +29,10 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   await cycleSort(stage);
   await expect(stage).toHaveAttribute("aria-sort", "ascending");
 
-  await page.getByRole("button", { name: "Columns" }).click();
-  await page.getByRole("group", { name: "Columns" }).getByText("Traffic", { exact: true }).click();
+  await page.getByRole("button", { name: "Columns", exact: true }).click();
+  await page.getByRole("group", { name: "Columns", exact: true }).getByText("Traffic", { exact: true }).click();
   await expect(page.locator('th[data-col="traffic"]')).toHaveCount(0);
-  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("button", { name: "Columns", exact: true }).click();
 
   const score = page.locator('th[data-col="score"]');
   const before = await score.boundingBox();
@@ -120,7 +120,7 @@ test("a phone list is cards and does not offer search this area", async ({ page 
   await page.waitForSelector("[data-testid=phone-cards]");
   await expect(page.locator("[data-testid=phone-cards] button.list-row").first()).toBeVisible();
   await expect(page.getByTestId("search-area")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Columns" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Columns", exact: true })).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await expect(page.locator(".shell")).not.toContainText("PIPE-PHX-0006");

@@ -43,6 +43,7 @@ import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
+import { plainNextStep } from "@/lib/nextStepLine";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily, tagFamily } from "@/lib/tags/vocab";
@@ -570,7 +571,7 @@ export default function PipelineList({
               stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
-              action: signedIn ? stripGmailIds(row.deal.next_step || "").trim() || undefined : undefined,
+              action: signedIn ? plainNextStep(row.deal.next_step || "").line || undefined : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
                 if (row.deal.next_step && signedIn) return null;

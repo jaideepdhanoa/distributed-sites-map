@@ -61,7 +61,7 @@ export default function PnlOverlay({
       if (!line) return;
       const selector = `[data-line="${CSS.escape(line)}"]`;
       const exact = period ? selector + `[data-period="${CSS.escape(period)}"]` : selector;
-      const evidence = [...document.querySelectorAll<HTMLElement>(exact + ", .pnl-phone " + selector)]
+      const evidence = [...document.querySelectorAll<HTMLElement>(selector + "[data-linked], " + exact)]
         .find(node => node.getClientRects().length)
         || [...document.querySelectorAll<HTMLElement>(selector)].find(node => node.getClientRects().length);
       evidence?.focus();

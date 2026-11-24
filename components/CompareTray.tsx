@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress, shownPriceSource } from "@/lib/format";
 import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, openLandLabel, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
@@ -52,7 +52,7 @@ function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): Compa
     { label: "Power", value: powerSummary(factsForDeal(deal)) || "—" },
     { label: "3-mile population", value: population ? population.replace("3-mile population ", "") : MISSING },
     { label: "Washes", value: washes ? washes.replace(/^Washes /, "") : MISSING },
-    { label: "Depot", value: depotLine(deal.miles_to_depot, deal.miles_to_depot != null) },
+    { label: "Depot", value: depotLine(deal.miles_to_depot) },
     { label: "Zoning", value: shown(linked?.zoning) },
     { label: "Property owner", value: shown(linked?.owner) },
     { label: "Cash flow", value: signedIn ? shown(cashValue) : "—" },
@@ -100,7 +100,7 @@ function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): Compa
     { label: "Power", value: powerSummary(factsForSite(site, linked)) || "—" },
     { label: "3-mile population", value: linked?.trade_population != null ? Math.round(linked.trade_population).toLocaleString() : MISSING },
     { label: "Washes", value: linked && (linked.trade_washes_1mi != null || linked.trade_washes_3mi != null) ? [linked.trade_washes_1mi != null ? `${linked.trade_washes_1mi} within 1 mile` : "", linked.trade_washes_3mi != null ? `${linked.trade_washes_3mi} within 3 miles` : ""].filter(Boolean).join(" · ") : MISSING },
-    { label: "Depot", value: depotLine(site.miles_to_depot, site.miles_to_depot != null) },
+    { label: "Depot", value: depotLine(site.miles_to_depot) },
     { label: "Zoning", value: shown(site.zoning) },
     { label: "Property owner", value: shown(site.owner) },
     { label: "Cash flow", value: signedIn ? shown(cashValue) : "—" },
@@ -128,6 +128,7 @@ export default function CompareTray({
   children?: ReactNode;
   signedIn?: boolean;
 }) {
+  const [showAll, setShowAll] = useState(false);
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -145,7 +146,19 @@ export default function CompareTray({
     ...deals.map(deal => ({ id: deal.deal_id, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
     ...sites.map(site => ({ id: site.site_id, title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
   ];
-  const measures = Array.from(new Set(columns.flatMap(column => column.rows.map(row => row.label))));
+  const labels = Array.from(new Set(columns.flatMap(column => column.rows.map(row => row.label))));
+  const measures = labels.map(label => {
+    const values = columns.map(column => {
+      const value = column.rows.find(row => row.label === label)?.value;
+      return !value || value === "Not on file" ? MISSING : value;
+    });
+    const kind = values.every(value => value === MISSING) ? "empty" : new Set(values).size > 1 ? "different" : "shared";
+    return { label, values, kind };
+  });
+  const differences = measures.filter(row => row.kind === "different").length;
+  const empty = measures.filter(row => row.kind === "empty").length;
+  const shared = measures.length - differences - empty;
+  const visible = showAll ? measures : measures.filter(row => row.kind === (differences ? "different" : "shared"));
   return (
     <aside className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
@@ -167,26 +180,42 @@ export default function CompareTray({
         {children}
       </div>
       {count >= 2 ? (
-        <div className="comparison-scroll" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
-          <table className="comparison-table">
-            <caption className="sr">Site comparison</caption>
-            <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
-            {compareSections.map(section => (
-              <tbody key={section} aria-label={section}>
-                <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
-                {measures.filter(label => sectionFor(label) === section).map(label => (
-              <tr key={label} data-compare-row={label}>
-                <th scope="row">{label}</th>
-                {columns.map(column => {
-                  const value = column.rows.find(row => row.label === label)?.value;
-                  return <td key={column.id}>{value && value !== "—" ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}</td>;
-                })}
-              </tr>
-                ))}
-              </tbody>
-            ))}
-          </table>
-        </div>
+        <>
+          <div className="comparison-mode">
+            <span role="status">{differences} {differences === 1 ? "difference" : "differences"} · {shared} shared · {empty} empty</span>
+            {((differences > 0 && shared > 0) || empty > 0) && (
+              <button type="button" className="text-link" aria-expanded={showAll} aria-controls="comparison-facts" onClick={() => setShowAll(value => !value)}>
+                {showAll ? (differences ? "Show differences" : "Hide empty measures") : "Show all measures"}
+              </button>
+            )}
+          </div>
+          <div className="comparison-scroll" id="comparison-facts" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
+            <table className="comparison-table">
+              <caption className="sr">Site comparison</caption>
+              <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
+              {compareSections.map(section => {
+                const group = visible.filter(row => sectionFor(row.label) === section);
+                if (!group.length) return null;
+                return (
+                  <tbody key={section} aria-label={section}>
+                    <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
+                    {group.map(({ label, values }) => (
+                      <tr key={label} data-compare-row={label}>
+                        <th scope="row">{label}</th>
+                        {values.map((value, i) => (
+                          <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
+                            {value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                );
+              })}
+            </table>
+            {!visible.length && <p className="note">No measures on file for these sites.</p>}
+          </div>
+        </>
       ) : null}
     </aside>
   );

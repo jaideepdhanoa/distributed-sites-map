@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Pentagon, Ruler } from "lucide-react";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
@@ -26,6 +27,7 @@ type Props = {
   offMarket: SiteFeature[];
   unscreened?: UnscreenedFeature[];
   selectedId: string | null;
+  mapScope: string;
   showAreas: boolean;
   showDepots: boolean;
   showSites: boolean;
@@ -118,6 +120,13 @@ function drawerInset(map: Map) {
 }
 
 function pointPadding(map: Map) {
+  const shell = map.getContainer().closest(".shell");
+  const preview = shell?.querySelector(".map-preview");
+  if (preview && window.matchMedia("(max-width: 767px)").matches) {
+    const bounds = map.getContainer().getBoundingClientRect();
+    const headerBottom = shell?.querySelector(".bar")?.getBoundingClientRect().bottom || bounds.top;
+    return { top: Math.max(0, headerBottom - bounds.top), bottom: Math.max(0, bounds.bottom - preview.getBoundingClientRect().top), left: 0, right: 0 };
+  }
   return { top: 0, bottom: 0, left: 0, right: drawerInset(map) };
 }
 
@@ -280,6 +289,10 @@ export default function MapView(props: Props) {
   const freezeCamera = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const holdCamera = useRef(false);
+  const pinOrigin = useRef<{
+    scope: string; id: string; center: [number, number]; zoom: number;
+    bearing: number; pitch: number; padding: ReturnType<Map["getPadding"]>;
+  } | null>(null);
   const preserveCamera = useRef<string | undefined>(undefined);
   const sawSelection = useRef<string | null>(null);
   const [measure, setMeasure] = useState(false);
@@ -989,55 +1002,67 @@ export default function MapView(props: Props) {
         propsRef.current.onSpaceSelect?.(id);
         return true;
       };
+      const pickPin = (id: string) => {
+        const current = propsRef.current;
+        if (!current.reviewFocus) {
+          if (!pinOrigin.current || !current.selectedId || pinOrigin.current.scope !== current.mapScope) {
+            pinOrigin.current = {
+              scope: current.mapScope, id, center: map.getCenter().toArray(), zoom: map.getZoom(),
+              bearing: map.getBearing(), pitch: map.getPitch(), padding: map.getPadding(),
+            };
+          } else pinOrigin.current.id = id;
+        }
+        current.onSelect(id);
+      };
       map.on("click", "pin-singles", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         const props = event.features?.[0]?.properties;
         const id = props?.site_id || props?.deal_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "focus-pin", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         const props = event.features?.[0]?.properties;
         const id = props?.site_id || props?.deal_id || props?.listing_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "sites", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         if (lotAt(event)) return;
         const feature = event.features?.[0];
         const id = feature?.properties?.site_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "offmarket", (event: MapLayerMouseEvent) => {
         if (measureRef.current || groupAt(event.point) != null) return;
         if (lotAt(event)) return;
         const id = event.features?.[0]?.properties?.site_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "review-marks", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const id = event.features?.[0]?.properties?.id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "deals-pipe", (event: MapLayerMouseEvent) => {
         if (measureRef.current || groupAt(event.point) != null) return;
         const id = event.features?.[0]?.properties?.deal_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "deals-land", (event: MapLayerMouseEvent) => {
         if (measureRef.current || groupAt(event.point) != null) return;
         const id = event.features?.[0]?.properties?.deal_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "unscreened", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const id = event.features?.[0]?.properties?.listing_id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       map.on("click", "nearby-washes", (event: MapLayerMouseEvent) => {
         if (measureRef.current) return;
         const id = event.features?.[0]?.properties?.id;
-        if (typeof id === "string") propsRef.current.onSelect(id);
+        if (typeof id === "string") pickPin(id);
       });
       const tip = document.createElement("div");
       tip.className = "map-tip-fixed";
@@ -1567,7 +1592,7 @@ export default function MapView(props: Props) {
       const drawing = Boolean(propsRef.current.spaceDrawing);
       const phonePad = phone && !reviewing && !drawing;
       const padKey = phonePad ? "clear" : "flush";
-      map.setPadding(phonePad ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
+      map.setPadding(phonePad && !props.selectedId ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
       const drawFly = propsRef.current.spaceFly;
       if (drawing && drawFly && map.getZoom() < 17) {
         map.jumpTo({ center: [drawFly.lng, drawFly.lat], zoom: 18, padding: pointPadding(map) });
@@ -1579,7 +1604,16 @@ export default function MapView(props: Props) {
       }
       const clearedSelection = Boolean(sawSelection.current) && !props.selectedId;
       if (props.selectedId) sawSelection.current = props.selectedId;
-      else if (clearedSelection) holdCamera.current = true;
+      else if (clearedSelection) {
+        holdCamera.current = true;
+        const origin = pinOrigin.current;
+        if (origin?.scope === props.mapScope && origin.id === sawSelection.current) {
+          map.stop();
+          map.jumpTo({ center: origin.center, zoom: origin.zoom, bearing: origin.bearing, pitch: origin.pitch, padding: origin.padding });
+        }
+        pinOrigin.current = null;
+        sawSelection.current = null;
+      }
       const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
@@ -1622,7 +1656,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.preserveCamera, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.preserveCamera, props.mapScope, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1720,7 +1754,8 @@ export default function MapView(props: Props) {
   const selectedOnMap =
     props.sites.some((feature) => feature.properties.site_id === props.selectedId) ||
     props.offMarket.some((feature) => feature.properties.site_id === props.selectedId) ||
-    props.deals.some((feature) => feature.properties.deal_id === props.selectedId);
+    props.deals.some((feature) => feature.properties.deal_id === props.selectedId) ||
+    props.unscreened?.some(feature => feature.properties.listing_id === props.selectedId);
   const gridToken = (props.gridFeatures || []).map((feature) => String(feature.properties?.deal_id || feature.properties?.site_id || "")).join(",");
   useEffect(() => {
     const map = mapRef.current;
@@ -1754,7 +1789,8 @@ export default function MapView(props: Props) {
       const site = propsRef.current.sites.find((feature) => feature.properties.site_id === props.selectedId);
       const off = propsRef.current.offMarket.find((feature) => feature.properties.site_id === props.selectedId);
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === props.selectedId);
-      const geometry = site?.geometry || off?.geometry || deal?.geometry;
+      const listing = propsRef.current.unscreened?.find(feature => feature.properties.listing_id === props.selectedId);
+      const geometry = site?.geometry || off?.geometry || deal?.geometry || listing?.geometry;
       if (!geometry || geometry.type !== "Point") return;
       const pin = geometry.coordinates as [number, number];
       const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
@@ -1998,7 +2034,7 @@ export default function MapView(props: Props) {
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Map</button>
         </div>
-        <div className="measure-row">
+        <div className="measure-row" role="group" aria-label="Map tools">
           {props.spaceDrawing ? (
             <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
               <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>
@@ -2007,7 +2043,7 @@ export default function MapView(props: Props) {
               {props.selectedSpaceId ? <button type="button" className="paper-btn" data-testid="space-draw-delete" onClick={() => setDeleteAsk((value) => value + 1)}>Delete</button> : null}
             </div>
           ) : props.canDrawLots ? (
-            <button type="button" className="primary" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}>Draw available lots</button>
+            <button type="button" className="tool draw-tool" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}><Pentagon size={16} aria-hidden="true" />Draw available lots</button>
           ) : null}
           {measure ? (
             <div className="measure-bar">
@@ -2016,7 +2052,7 @@ export default function MapView(props: Props) {
               <button type="button" className="paper-btn" data-testid="measure-done" onClick={() => setMeasure(false)}>Done</button>
             </div>
           ) : null}
-          <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" onClick={() => setMeasure((value) => !value)}>Measure</button>
+          <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" aria-pressed={measure} onClick={() => setMeasure((value) => !value)}><Ruler size={16} aria-hidden="true" />Measure</button>
         </div>
       </div>
       <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>

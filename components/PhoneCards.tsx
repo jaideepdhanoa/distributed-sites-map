@@ -22,7 +22,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
       {rows.map((row) => {
         const facts = row.facts.map((fact) => fact.trim()).filter(Boolean);
         return (
-          <li key={row.id} className={row.selected ? "on" : undefined}>
+          <li data-site-row={row.id} key={row.id} className={row.selected ? "on" : undefined}>
             {row.check}
             <button type="button" className="list-row" onClick={row.onOpen}>
               <span className="phone-card-name" title={row.name}>{row.name}</span>

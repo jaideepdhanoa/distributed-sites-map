@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       outcome = "not_ready";
       return NextResponse.json({ error: NOT_READY }, { status: 503, headers: privateHeaders });
     }
-    let body: { question?: string; siteId?: string | null };
+    let body: { question?: string; siteId?: string | null; siteIds?: unknown };
     try {
       body = (await request.json()) as typeof body;
     } catch {
@@ -42,6 +42,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Write a question." }, { status: 400, headers: privateHeaders });
     }
     const siteId = String(body.siteId || "").trim();
+    const ids = body.siteIds;
+    if (ids !== undefined && (!Array.isArray(ids) || ids.length === 0 || ids.length > 20 || siteId || ids.some(id => typeof id !== "string" || !/^[a-z0-9_-]{1,80}$/i.test(id)))) {
+      return NextResponse.json({ error: "Choose up to 20 sites in one shortlist." }, { status: 400, headers: privateHeaders });
+    }
     const credit = await consumeAskCredit(session.u);
     if (!credit.ok) {
       outcome = credit.reason === "limit" ? "limit" : "unavailable";
@@ -53,6 +57,7 @@ export async function POST(request: Request) {
       role: session.actionRole,
       question,
       siteId: siteId || null,
+      siteIds: ids ? Array.from(new Set(ids as string[])) : undefined,
       signal: request.signal,
     });
     toolRounds = answer.toolsCalled.length;

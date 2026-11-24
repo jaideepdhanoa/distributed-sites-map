@@ -101,6 +101,7 @@ export default function CompareTray({
   deals,
   sites,
   contextSites,
+  contextDeals,
   onRemove,
   onClose,
   children,
@@ -109,6 +110,7 @@ export default function CompareTray({
   deals: DealProps[];
   sites: SiteProps[];
   contextSites?: SiteProps[];
+  contextDeals?: DealProps[];
   onRemove: (id: string) => void;
   onClose: () => void;
   children?: ReactNode;
@@ -119,7 +121,7 @@ export default function CompareTray({
   if (!count) return null;
   const columns = [
     ...deals.map(deal => ({ id: deal.deal_id, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
-    ...sites.map(site => ({ id: site.site_id, title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, deals, signedIn) })),
+    ...sites.map(site => ({ id: site.site_id, title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
   ];
   const measures = Array.from(new Set(columns.flatMap(column => column.rows.map(row => row.label))));
   return (
@@ -127,18 +129,18 @@ export default function CompareTray({
       <div className="compare-bar">
         <strong>Compare</strong>
         {deals.map((deal) => (
-          <button key={deal.deal_id} type="button" onClick={() => onRemove(deal.deal_id)} className="menu-item">
+          <button key={deal.deal_id} type="button" aria-label={`Remove ${deal.name || deal.address} from comparison`} onClick={() => onRemove(deal.deal_id)} className="menu-item">
             {deal.name || deal.address}
             <span aria-hidden="true"> ×</span>
           </button>
         ))}
         {sites.map((site) => (
-          <button key={site.site_id} type="button" onClick={() => onRemove(site.site_id)} className="menu-item">
+          <button key={site.site_id} type="button" aria-label={`Remove ${site.name || site.address} from comparison`} onClick={() => onRemove(site.site_id)} className="menu-item">
             {site.name || site.address}
             <span aria-hidden="true"> ×</span>
           </button>
         ))}
-        <span className="layer-meta">{count} of 4 selected{count === 1 ? " · Select another site" : count === 4 ? " · Remove one to add another" : ""}</span>
+        <span className="layer-meta" role="status">{count} of 4 selected{count === 1 ? " · Select another site" : count === 4 ? " · Remove one to add another" : ""}</span>
         <button type="button" className="close" aria-label="Close compare" onClick={onClose}><span aria-hidden="true">×</span></button>
         {children}
       </div>

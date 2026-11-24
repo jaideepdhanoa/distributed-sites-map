@@ -3904,3 +3904,12 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .hero-frame:has([data-testid="street-view-error"]) .map-fail { position: static; }
 .column-settings { display: grid; gap: 4px; }
 
+
+.nda-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+.nda-filters label { display: grid; gap: 3px; color: var(--ink-2); font-size: 12px; }
+
+.workspace-loading { margin: 1.25rem; padding: 1.25rem; border: 1px solid var(--line); background: var(--paper-card); border-radius: 12px; }
+.workspace-loading .skeleton { display: block; margin: 12px 0; }
+.workspace-warning { color: var(--ink); background: var(--amber-tint); padding: 6px 12px; }
+
+.nda-priority { margin: 12px 12px 4px; font-size: .8rem; color: var(--muted); }

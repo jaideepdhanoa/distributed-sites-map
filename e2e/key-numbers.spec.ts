@@ -148,6 +148,6 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
   await expect(page.getByTestId("key-strip")).toContainText("Attractiveness");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&compare=LAND-PHX-0035|PIPE-PHX-0067");
-  await expect(page.getByTestId("compare-tray")).toContainText("Compare 2");
+  await expect(page.getByTestId("compare-tray")).toContainText("2 of 4 selected");
   await expect(page.getByTestId("compare-tray")).toContainText("$478,044");
 });

@@ -57,7 +57,7 @@ function photoKey(photo: SitePhoto, index: number) {
 
 type HeroMode = "street" | "photos" | "aerial";
 
-/** Photos when the gallery has slides, otherwise Street View, otherwise the aerial. Same order as a pipeline card. */
+/** Prefer captured photos and aerial imagery when available. */
 function firstHero(showGallery: boolean, embed: string, aerial: string): HeroMode {
   if (showGallery) return "photos";
   if (aerial) return "aerial";
@@ -150,6 +150,9 @@ export default function SitePhotos({ card, between, allowStreetEmbed = true, emp
   }, [streetOpen]);
 
   const credits = Array.from(new Set(slides.map((item) => item.photo.attribution || esriCredit(item.photo)).filter(Boolean)));
+  if (streetFailed && !slides.length && !aerialUrl) return (
+    <section className="site-photos"><p className="note">Street View unavailable. <a className="text-link" href={model.frontageUrl} target="_blank" rel="noopener noreferrer">Open in Maps</a></p>{between}</section>
+  );
   if ((!model.visible || (!slides.length && !embed)) && !aerialUrl) {
     if (emptyNote) {
       return (

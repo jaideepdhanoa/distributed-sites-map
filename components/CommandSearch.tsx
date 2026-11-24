@@ -163,6 +163,14 @@ export default function CommandSearch({
   useEffect(() => {
     if (!open) return;
     function onKey(event: KeyboardEvent) {
+      if (event.key === "Tab" && panel.current) {
+        const items = [...panel.current.querySelectorAll<HTMLElement>("button:enabled, input:enabled")];
+        const first = items[0];
+        const last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        return;
+      }
       if (event.key !== "Escape") return;
       event.preventDefault();
       onClose();
@@ -186,7 +194,7 @@ export default function CommandSearch({
   return createPortal(
     <>
     <button type="button" className="backdrop command-backdrop" aria-label="Close search" onClick={onClose} />
-    <div ref={panel} className="command-search" role="dialog" aria-label="Search everything" data-testid="command-search">
+    <div ref={panel} className="command-search" role="dialog" aria-modal="true" aria-label="Search everything" data-testid="command-search">
       <header className="command-head">
         <p className="eyebrow">Search</p>
         <button type="button" className="close" aria-label="Close search" onClick={onClose}><span aria-hidden="true">×</span></button>

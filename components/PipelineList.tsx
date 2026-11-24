@@ -234,7 +234,7 @@ export default function PipelineList({
   rows,
   outsideRow = null,
   columns,
-  selectedId,
+  selectedId, initialSelection, onSelection, onScope,
   sort,
   onSort,
   onOpen,
@@ -259,6 +259,9 @@ export default function PipelineList({
   rows: PipelineRow[];
   outsideRow?: PipelineRow | null;
   columns: PipelineColumnId[];
+  initialSelection?: string[];
+  onSelection?: (ids: string[]) => void;
+  onScope?: (ids: string[]) => void;
   selectedId: string | null;
   sort: { id: PipelineColumnId; desc: boolean };
   onSort: (id: PipelineColumnId, desc?: boolean) => void;
@@ -302,8 +305,9 @@ export default function PipelineList({
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
-  const [selecting, setSelecting] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
+  const [selecting, setSelecting] = useState(Boolean(initialSelection?.length));
+  const [picked, setPicked] = useState<string[]>(initialSelection || []);
+  useEffect(() => { onSelection?.(picked); }, [picked, onSelection]);
   const [commentOpen, setCommentOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -359,6 +363,7 @@ export default function PipelineList({
     capacity: stripStats(ordered.map((row) => row.deal.cap_a_substation_mi)),
   }), [ordered, signedIn]);
   const visibleIds = ordered.map((row) => row.deal.deal_id);
+  useEffect(() => { onScope?.(visibleIds); }, [visibleIds, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
   const showChecks = !phone || selecting;
@@ -516,6 +521,11 @@ export default function PipelineList({
         })}
         <ColumnPicker
           resetLabel="Pipeline default"
+          onPreset={signedIn ? () => {
+            const preferred = ["site", "stage", "asking", "revenue", "cashFlow", "askingCash", "nextStep"].filter(id => allowed.includes(id));
+            const rest = allowed.filter(id => !preferred.includes(id));
+            commit({ ...activeLayout, order: [...preferred, ...rest], hidden: rest, touched: true });
+          } : undefined}
           columns={PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => ({ id: column.id, label: column.label }))}
           hidden={activeLayout.hidden}
           onToggle={(id) => toggleColumn(id as PipelineColumnId)}

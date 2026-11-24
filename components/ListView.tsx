@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NdaChip } from "./NdaChip";
 import { PhoneCards } from "./PhoneCards";
 import { useNarrowList } from "./useNarrowList";
@@ -82,7 +82,7 @@ export function listCsv(rows: ListRow[]) {
 
 export default function ListView({
   rows,
-  selectedId,
+  selectedId, initialSelection, onSelection, onScope,
   sort,
   onSort,
   onOpen,
@@ -97,6 +97,9 @@ export default function ListView({
   onDismiss,
 }: {
   rows: ListRow[];
+  initialSelection?: string[];
+  onSelection?: (ids: string[]) => void;
+  onScope?: (ids: string[]) => void;
   selectedId: string | null;
   sort: { id: string; desc: boolean };
   onSort: (id: ListColumnId | "", desc?: boolean) => void;
@@ -119,8 +122,9 @@ export default function ListView({
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
-  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>(initialSelection || []);
+  useEffect(() => { onSelection?.(picked); }, [picked, onSelection]);
+  const [selecting, setSelecting] = useState(Boolean(initialSelection?.length));
   const scrollRef = useRef<HTMLDivElement>(null);
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
@@ -138,6 +142,7 @@ export default function ListView({
 
   const showChecks = !phone || selecting;
   const visibleIds = ordered.map((row) => row.id);
+  useEffect(() => { onScope?.(visibleIds); }, [visibleIds, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
   function toggleRow(id: string) {

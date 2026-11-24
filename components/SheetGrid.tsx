@@ -445,6 +445,7 @@ export default function SheetGrid<Row>({
               <tr
                 key={id}
                 role="row"
+                data-site-row={id}
                 data-index={item.index}
                 ref={virtualizer.measureElement}
                 className={id === selectedId ? "list-row on" : "list-row"}

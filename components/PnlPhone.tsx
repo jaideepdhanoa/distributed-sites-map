@@ -45,13 +45,16 @@ export default function PnlPhone({
     [statement, grain, year, conflicts, comments],
   );
   const targetPeriod = focus?.period || "";
+  const appliedLink = useRef("");
   useEffect(() => {
-    if (!targetPeriod) return;
+    const link = [targetPeriod, focus?.line, grain, year].join("|");
+    if (!targetPeriod || appliedLink.current === link) return;
     const at = grid.columns.findIndex(column => [column.label, columnPeriodKey(column), column.periodStart + "/" + column.periodEnd].some(key => periodChip(key) === periodChip(targetPeriod)));
     if (at < 0) return;
+    appliedLink.current = link;
     if (grain === "month") setMonth(at);
     else setYearIndex(at);
-  }, [targetPeriod, grid, grain]);
+  }, [targetPeriod, focus?.line, grid, grain, year]);
   const index = grain === "month" ? month : yearIndex;
   const summary = columnSummary(grid, index);
   const periods = grain === "month" ? [...MONTH_SHORT, grid.columns[12]?.label || "YTD"] : grid.columns.map((column) => column.label);
@@ -142,6 +145,8 @@ export default function PnlPhone({
               <button
                 type="button"
                 className="list-row"
+                data-line={row.id}
+                data-period={period}
                 aria-expanded={open === row.id}
                 data-pnl-anchor={open === row.id ? "open" : undefined}
                 onClick={(event) => {

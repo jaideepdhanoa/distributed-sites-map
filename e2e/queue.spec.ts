@@ -938,6 +938,7 @@ for (const width of [1440, 390]) {
       await brief.getByLabel("Reason").fill("Hold both sites pending a service quote.");
       await brief.getByRole("button", { name:"Save decision" }).click();
       await expect(brief.getByRole("heading")).toHaveText("Hold all sites");
+      await expect(brief).toContainText("Reviewed Canyon Wash · Power");
       await brief.getByRole("link", { name:"Back to My work" }).click();
       await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
 

@@ -105,7 +105,9 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
         {focusedKey && <Link href="/?loops=work&workFilter=decisions" prefetch={false} className="text-link">Back to My work</Link>}
         <small>Diligence decision · {decision.author} · {new Date(decision.at).toLocaleDateString()}</small>
       <h3>{decision.preferred ? "Prefer " + (sites.find(s=>s.id===decision.preferred)?.title || decision.preferred) : "Hold all sites"}</h3>
-      <p>{decision.rationale}</p></header>
+      <p>{decision.rationale}</p>
+      {decision.reviewedChange && <small>Reviewed {sites.find(site => site.id === decision.reviewedChange?.site)?.title || decision.reviewedChange.site} · {decision.reviewedChange.measure}</small>}
+      </header>
       <ul>{decision.citations.map(c=>{
         const live=byKey.get(figureKey(c));
         const followUp = c.followUp;

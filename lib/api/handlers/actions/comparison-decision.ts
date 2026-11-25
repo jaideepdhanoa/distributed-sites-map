@@ -55,6 +55,7 @@ export async function POST(request: Request) {
           const live = catalog.figure(c);
           if (!live || evidenceChanged(c, live)) throw new InputError("A cited figure changed. Refresh before revising.", 409);
         }
+        return saveDecision(tx, body.view, session.u, body.decision, body.version || "", item);
       }
       return saveDecision(tx, body.view, session.u, body.decision, body.version || "");
     }));

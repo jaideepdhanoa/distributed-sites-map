@@ -60,7 +60,10 @@ test("review scopes, stale writes, independent citations, later evidence and com
   const later = (await queue(other)).find(r=>r.site==="alpha")!;
   assert.equal(later.reason, "Figure changed");
   assert.equal(later.previous.value, "LINE 480.0 ft");
-  await saveDecision(sql, team.id, owner, { ...draft, preferred:"bravo", citations:[{ ...second, value:values.bravo }] }, decision!.version);
+  const revised = await saveDecision(sql, team.id, owner, { ...draft, preferred:"bravo", citations:[{ ...second, value:values.bravo }] }, decision!.version, later);
+  assert.equal(revised.decision?.author, owner);
+  assert.equal(revised.decision?.reviewedChange?.key, later.key);
+  assert.equal(revised.decision?.reviewedChange?.version, decision!.version);
   assert.deepEqual(await queue(other), []);
   const revision = await saveDecision(sql, personal.id, owner, { ...draft, citations:[base] },
     (await decisionReviews(sql,owner,load,personal.id))[0].version);

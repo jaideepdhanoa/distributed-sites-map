@@ -4,6 +4,7 @@ export type CitedFigure = EvidenceTarget & { value: string };
 export type DecisionDraft = { preferred: string | null; rationale: string; citations: CitedFigure[] };
 export type DecisionRecord = Omit<DecisionDraft, "citations"> & {
   version: string; author: string; at: string;
+  reviewedChange?: Pick<CitationReview, "version" | "key" | "site" | "measure" | "previous" | "current" | "reason">;
   citations: (CitedFigure & { followUp: EvidenceRequest | null })[];
 };
 export type DecisionAccess = { editable: boolean; decision: DecisionRecord | null; reviews?: CitationReview[] };

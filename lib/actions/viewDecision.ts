@@ -1,6 +1,6 @@
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { assertClean } from "@/lib/policy/banned";
-import type { CitedFigure, DecisionAccess, DecisionDraft } from "@/lib/comparisonDecision";
+import type { CitedFigure, CitationReview, DecisionAccess, DecisionDraft, DecisionRecord } from "@/lib/comparisonDecision";
 import { figureKey } from "@/lib/comparisonDecision";
 import { audit } from "./audit";
 import type { Sql } from "./db";
@@ -9,7 +9,7 @@ import { InputError, parseBody, stamp } from "./text";
 
 export type StoredFigure = CitedFigure & { note: string; closed?: string };
 type Entry = { id: string; actor_id: string; at: Date | string;
-  after_json: Omit<DecisionDraft, "citations"> & { citations: StoredFigure[] } };
+  after_json: Omit<DecisionDraft, "citations"> & { citations: StoredFigure[]; reviewedChange?: DecisionRecord["reviewedChange"] } };
 
 export async function viewFor(sql: Sql, id: string, actor: string, lock = false) {
   const result = await sql.query<{ owner_id: string; url_query: string }>(
@@ -40,7 +40,7 @@ export async function readDecision(sql: Sql, id: string, actor: string, canWrite
   return { editable, decision: { ...choice, citations: current, version: row.id, author: row.actor_id, at: stamp(row.at).replace(/Z$/, "+00:00") } };
 }
 
-export async function saveDecision(sql: Sql, id: string, actor: string, input: DecisionDraft, version: string) {
+export async function saveDecision(sql: Sql, id: string, actor: string, input: DecisionDraft, version: string, reviewed?: CitationReview) {
   const view = await viewFor(sql, id, actor, true);
   if (view.owner !== actor) throw new InputError("Only the comparison owner can record its decision.", 403);
   const previous = await latest(sql, id);
@@ -63,6 +63,9 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
     citations.push({ targetId: target.targetId, targetKind: target.targetKind, measure: figure.measure,
       period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "", closed: followUp?.closedAt || "" });
   }
-  await audit(sql, { actorId: actor, action: "view.decision", targetKind: "view", targetId: id, after: { preferred: input.preferred, rationale, citations } });
+  const reviewedChange = reviewed && { version: reviewed.version, key: reviewed.key, site: reviewed.site, measure: reviewed.measure,
+    previous: reviewed.previous, current: reviewed.current, reason: reviewed.reason };
+  await audit(sql, { actorId: actor, action: "view.decision", targetKind: "view", targetId: id,
+    after: { preferred: input.preferred, rationale, citations, ...(reviewedChange ? { reviewedChange } : {}) } });
   return readDecision(sql, id, actor, true);
 }

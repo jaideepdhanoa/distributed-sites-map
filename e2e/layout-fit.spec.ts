@@ -113,7 +113,7 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
       const pill = track?.querySelector("button.on");
       const neighbor = document.querySelector(".phone-view-row .mobile-search");
       const sheet = document.querySelector(".drawer-scroll");
-      const city = document.querySelector(".top .phone-step");
+      const city = document.querySelector(".phone-view-row .phone-step");
       const search = document.querySelector(".phone-view-row .mobile-search");
       const menu = document.querySelector(".phone-view-row [aria-label='Menu']");
       const filters = document.querySelector(".phone-view-row [aria-label='Filters']");
@@ -130,7 +130,7 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
       const filtersBox = filters.getBoundingClientRect();
       const rowBox = row.getBoundingClientRect();
       const list = track.querySelectorAll("button")[1]?.getBoundingClientRect();
-      const tops = [trackBox.top, searchBox.top, filtersBox.top, menuBox.top];
+      const tops = [cityBox.top, trackBox.top, searchBox.top, filtersBox.top, menuBox.top];
       const past = [...document.querySelectorAll(".top > *, .phone-view-row > *")].filter((el) => {
         const box = el.getBoundingClientRect();
         if (box.width < 2 || box.height < 2) return false;

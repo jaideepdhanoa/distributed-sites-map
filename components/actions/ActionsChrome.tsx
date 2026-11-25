@@ -94,6 +94,7 @@ function SuggestionsDialog() {
       return;
     }
     await load();
+    window.dispatchEvent(new Event("queue-refresh"));
   }
 
   return (

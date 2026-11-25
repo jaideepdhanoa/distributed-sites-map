@@ -110,7 +110,16 @@ export default function RecordFinding({ kind, id, source, review, dealId, nextSt
     return () => controller.abort();
   }, [status.enabled, kind, id, dealId, retry]);
 
-  const entries = saved ? [saved, ...history.filter(row => row.id !== saved.id)] : history;
+  useEffect(() => {
+    const refresh = () => setRetry(n => n + 1);
+    window.addEventListener("queue-refresh", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("queue-refresh", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+  const entries = saved && !history.some(row => row.id === saved.id) ? [saved, ...history] : history;
   const confirmation = entries[0];
   const needsWorkbook = Boolean(status.enabled && dealId && !approved && entries.some(row => row.gap));
   useEffect(() => {

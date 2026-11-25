@@ -501,6 +501,8 @@ for (const width of [1440, 390]) {
       } else {
         await page.reload();
         await expect(brief.getByRole("status")).toContainText(title);
+        await expect(brief.getByRole("status")).toContainText("Example county assessment map");
+        if (index === 1) await expect(brief.getByRole("status")).toContainText("Unassigned");
         if (index === 2) {
           const res = await request.get(`/api/actions/suggestions?targetKind=site&targetId=${id}`);
           expect((await res.json()).suggestions.some((entry: { status: string; reason: string }) => entry.status === "open" && entry.reason.includes("Example county assessment map"))).toBe(true);
@@ -515,7 +517,7 @@ for (const width of [1440, 390]) {
 }
 
 for (const width of [1440, 390]) {
-  test(`five-site comparison reopens with its evidence and reviewer handoff at ${width}px`, async ({ page, request }) => {
+  test(`five-site comparison reopens with its evidence and reviewer handoff at ${width}px`, async ({ page, request }, info) => {
     test.slow();
     await login(request, "reviewer");
     const catalog = await (await request.get("/api/data/sites?city=PHX")).json();
@@ -579,7 +581,8 @@ for (const width of [1440, 390]) {
     await drawer.getByRole("button", { name: /Back to comparison/ }).click();
     await expect(figure).toBeFocused();
     await tray.getByRole("button", { name: "Save comparison" }).click();
-    const name = "Phoenix finalists " + width;
+    const title = width === 390 ? "Phoenix field review" : "Phoenix finalists";
+    const name = info.retry ? title + " · retry " + info.retry : title;
     const form = tray.getByRole("form", { name: "Save comparison" });
     await form.getByLabel("Comparison name").fill(name);
     await page.route("**/api/actions/views", async route => {

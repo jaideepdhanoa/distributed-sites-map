@@ -178,6 +178,7 @@ export default function Explorer() {
   const [stepsOpen, setStepsOpen] = useState(false);
   useEffect(() => {
     if (!stepsOpen) return;
+    shellRef.current?.querySelector<HTMLButtonElement>("#workspace-scope .close")?.focus({ preventScroll: true });
     const closeKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); dismissScope(); }
     };
@@ -589,6 +590,8 @@ export default function Explorer() {
     query.set("compare", compareIds.join("|"));
     query.set("city", selectedMarket);
     query.set("funnel", funnel);
+    if (funnel === "universe" && !query.has("stage")) query.set("stage", stage);
+    if (funnel === "pipeline" && !query.has("pstage")) query.set("pstage", "all");
     if (listView && listLayout.current) {
       const layout = listLayout.current;
       query.set(funnel + "Layout", JSON.stringify(layout));
@@ -2341,11 +2344,11 @@ export default function Explorer() {
               </div>
             ) : null}
           </div>
+        </div>
+        <div className="phone-view-row only-mobile">
           <button className="phone-step workspace-scope only-mobile" type="button" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
             {scopeLabel}
           </button>
-        </div>
-        <div className="phone-view-row only-mobile">
           <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>

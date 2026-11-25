@@ -56,14 +56,14 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(page.locator("nav.funnel")).toContainText("Universe");
   if (name === "mobile") {
     const header = await page.evaluate(() => {
-      const city = document.querySelector(".top .phone-step");
+      const city = document.querySelector(".phone-view-row .phone-step");
       const search = document.querySelector(".phone-view-row .mobile-search");
       const menu = document.querySelector(".phone-view-row [aria-label='Menu']");
       const filters = document.querySelector(".phone-view-row [aria-label='Filters']");
       const row = document.querySelector(".phone-view-row");
       if (!city || !search || !menu || !filters || !row) return "the phone header is missing a control";
       if (row.querySelector(".reach-pick")) return "service area is still in the header";
-      const tops = [search, filters, menu].map((node) => node.getBoundingClientRect().top);
+      const tops = [city, search, filters, menu].map((node) => node.getBoundingClientRect().top);
       if (Math.max(...tops) - Math.min(...tops) > 4) return "the header controls wrapped";
       const cityBox = city.getBoundingClientRect();
       const rowBox = row.getBoundingClientRect();

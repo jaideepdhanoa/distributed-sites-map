@@ -56,7 +56,10 @@ function FindingEntry({ item, steps, targetId, writable, unavailable }: { item: 
     <dl className="finding-details"><div><dt>Source</dt><dd>{link ? <a href={item.source} target="_blank" rel="noopener noreferrer">Open source ↗</a> : item.source || "Not recorded"}</dd></div>
       {item.gap && <>
         {linked.length ? linked.map(step => <div key={step.id}><dt>Gap action</dt><dd>{step.title || step.proposedValue}
-          <small>{step.doneAt ? "Completed" : actionLabels[step.status]} · {step.ownerName || step.ownerId || "Unassigned"} · {step.targetOn ? "Due " + step.targetOn : "No due date"}</small>
+          <small className="gap-assignment"><span>{step.doneAt ? "Completed" : actionLabels[step.status]}</span>
+            <span>Owner · {step.ownerName || step.ownerId || "Unassigned"}</span>
+            {step.targetOn ? <span>Due · <time dateTime={step.targetOn}>{step.targetOn}</time></span> : <span>No due date</span>}
+          </small>
         </dd></div>) : <div><dt>Gap owner</dt><dd>{unavailable ? "Unavailable" : "Unassigned"}</dd></div>}
         {item.resolvedAt && <div><dt>Resolved</dt><dd>{item.resolvedBy} · <time dateTime={item.resolvedAt}>{formatPacific(item.resolvedAt)}</time></dd></div>}
       </>}

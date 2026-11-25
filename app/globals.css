@@ -4167,3 +4167,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 @media (max-width: 767px) {
   .gap-actions .text-link, .compare-bar .text-link, .ask-prompt { min-height: 44px; }
 }
+
+.record-brief .gap-assignment { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; }
+.gap-assignment time { white-space: nowrap; }

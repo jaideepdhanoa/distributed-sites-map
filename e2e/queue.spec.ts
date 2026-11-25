@@ -646,6 +646,8 @@ for (const width of [1440, 390]) {
     expect((await request.post("/api/actions/suggestions/" + linked.id, { data: { status: "accepted" } })).ok()).toBe(true);
     await page.reload();
     await expect(gap).toContainText("Approved");
+    await gap.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    await capture("gap-action", gap);
     await expect(drawer.getByTestId("next-step").getByRole("link", { name: "Open evidence thread" })).toHaveAttribute("href", new RegExp("note=" + gapId));
     await gap.getByRole("button", { name: "Open evidence thread" }).click();
     const thread = drawer.locator('[data-note-id="' + gapId + '"]');

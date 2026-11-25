@@ -584,7 +584,7 @@ export default function Explorer() {
   function returnComparison() {
     if (comparisonOrigin.current !== null) {
       setSelected(new URLSearchParams(comparisonOrigin.current).get("site"));
-      replaceSearch(comparisonOrigin.current, {});
+      replaceSearch(comparisonOrigin.current, { measure: null });
       comparisonOrigin.current = null;
     } else {
       setSelected(null);
@@ -672,7 +672,12 @@ export default function Explorer() {
     // An empty `/?` does not clear a lone search param. `/` does, and it stays a client navigation.
     const href = query ? `/?${query}` : "/";
     rememberSearch(href);
-    if (history) router.push(href, { scroll: false });
+    // The comparison is client state. The homepage server component reads no query
+    // parameters, and Next synchronizes these history changes with useSearchParams.
+    if ("compare" in next || "measure" in next) {
+      if (history) window.history.pushState(null, "", href);
+      else window.history.replaceState(null, "", href);
+    } else if (history) router.push(href, { scroll: false });
     else router.replace(href, { scroll: false });
   }
 

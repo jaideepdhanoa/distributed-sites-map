@@ -573,6 +573,11 @@ for (const width of [1440, 390]) {
     }
     await rows.nth(0).getByRole("checkbox").check();
     await rows.nth(1).getByRole("checkbox").check();
+    const serverNavigations: string[] = [];
+    page.on("request", req => {
+      const url = new URL(req.url());
+      if (url.pathname === "/" && url.searchParams.has("compare") && req.headers().rsc === "1") serverNavigations.push(url.search);
+    });
     await page.getByTestId("selection-bar").getByRole("button", { name: "Compare" }).click();
     const tray = page.getByTestId("compare-tray");
     const figure = tray.getByRole("button", { name: "Inspect Open land for Canyon Wash" });
@@ -600,6 +605,7 @@ for (const width of [1440, 390]) {
     await capture("evidence", drawer);
     await drawer.getByRole("button", { name: /Back to comparison/ }).click();
     await expect(figure).toBeFocused();
+    expect(serverNavigations).toHaveLength(0);
     await tray.getByRole("button", { name: "Save comparison" }).click();
     const title = width === 390 ? "Phoenix field review" : "Phoenix finalists";
     const name = info.retry ? title + " · retry " + info.retry : title;

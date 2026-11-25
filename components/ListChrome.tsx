@@ -20,6 +20,14 @@ export function ShortlistSummary({ title, count, commonStage, children }: {
   );
 }
 
+export function EmptyShortlist({ clearFilters, clearArea }: { clearFilters?: () => void; clearArea?: () => void }) {
+  return <p role="status" className="note empty-filter" data-testid="empty-filter">
+    {clearFilters ? <>No sites match these column filters. <button type="button" className="text-link" onClick={clearFilters}>Clear column filters</button></>
+      : clearArea ? <>No matching sites in this map area. <button type="button" className="text-link" onClick={clearArea}>Clear map area</button></>
+      : "No sites match this shortlist. Choose another market or stage."}
+  </p>;
+}
+
 export function sharedStage(labels: string[]) {
   const first = labels[0];
   return labels.length > 1 && labels.every(label => label === first) ? first : "";

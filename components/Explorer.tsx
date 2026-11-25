@@ -2371,7 +2371,7 @@ export default function Explorer() {
             ) : null}
           </div>
         </div>
-        <nav className="workspace-jobs" aria-label="Acquisition workspace">
+        <nav className="workspace-jobs" aria-label="Acquisition workspace" aria-description="Discover sites in Explore, screen sites in Pipeline, open assignments in My work, or review the site queue.">
           {(["universe","pipeline"] as const).map(job => {
             const active = funnel === job && !inReview && !loopsVisible && !ndaVisible;
             return <button type="button" key={job} className={active ? "chip on" : "chip"} aria-current={active ? "page" : undefined} onClick={()=>{if (!active) {setSelected(null); chooseFunnel(job,true);}}}>{job === "universe" ? "Explore" : "Pipeline"}</button>;

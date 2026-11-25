@@ -49,6 +49,22 @@ async function hideDevOverlay(page: Page) {
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
+test("empty My work opens Explore on a short phone screen", async ({page}) => {
+  await page.setViewportSize({width:390,height:440});
+  await page.route("**/api/actions/work",route=>route.fulfill({json:{rows:[]}}));
+  await page.route("**/api/data/nda",route=>route.fulfill({json:{queue:[]}}));
+  await openAs(page,"contributor","/?loops=work&city=PHX");
+  const hub = page.getByRole("region",{name:"My work"});
+  const empty = hub.getByRole("status").filter({hasText:"no open assignments"});
+  await expect(empty).toBeVisible();
+  await mkdir("review-shots",{recursive:true});
+  await empty.screenshot({path:"review-shots/390-empty-my-work.png"});
+  await empty.getByRole("link",{name:"Explore sites"}).click();
+  const nav = page.getByRole("navigation",{name:"Acquisition workspace"});
+  await expect(nav.getByRole("button",{name:"Explore",exact:true})).toHaveAttribute("aria-current","page");
+  expect(new URL(page.url()).searchParams.get("city")).toBe("PHX");
+});
+
 async function queue(request: APIRequestContext, query = "market=all&stage=any&viable=1") {
   const response = await request.get(`/api/queue?${query}`);
   expect(response.ok()).toBeTruthy();

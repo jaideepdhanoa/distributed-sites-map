@@ -504,9 +504,7 @@ export default function SheetGrid<Row>({
           ) : null}
         </tbody>
       </table>
-      {rows.length === 0 ? (
-        <p className="note empty-filter" data-testid="empty-filter">No sites match this filter.</p>
-      ) : null}
+
       </div>
     </div>
   );

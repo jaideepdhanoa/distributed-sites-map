@@ -81,6 +81,27 @@ export default function CompareTray({
   const gaps = measures.filter(row => row.kind === "gap").length;
   const basis = measures.filter(row => row.kind === "basis").length;
   const visible = showAll ? measures : measures.filter(row => acquisitionCriteria.includes(row.label) || ["different", "gap", "basis"].includes(row.kind));
+
+  function renderCell(column: typeof columns[number], label: string, kind: string, value: string) {
+    if (value === MISSING) {
+      const target = evidenceEnabled && evidenceTarget(column.targetKind, column.id, label, column.deal);
+      if (!target) return label === "Suggested drop" ? "None recorded" : "Not on file";
+      return <button className="text-link compare-evidence" type="button"
+        aria-label={`Not on file · Check missing ${label} for ${column.title}`}
+        onClick={event => {
+          inspectedCell.current = event.currentTarget;
+          setGap({target, title:column.title, label});
+        }}>Not on file</button>;
+    }
+    if (!onInspect || kind === "detail" || ["Unavailable", "Checking…", "Not applicable"].includes(value)) return value;
+    return <button className="text-link compare-evidence" type="button"
+      aria-label={`${value} · Inspect ${label} for ${column.title}`}
+      onClick={event => {
+        inspectedCell.current = event.currentTarget;
+        onInspect(column.id, label);
+      }}>{value}</button>;
+  }
+
   return (
     <aside hidden={inspecting} className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
@@ -142,20 +163,11 @@ export default function CompareTray({
                     {group.map(({ label, values, kind }) => (
                       <tr key={label} data-compare-row={label} data-state={kind}>
                         <th scope="row">{label}{kind === "basis" && <small>Different bases</small>}{kind === "gap" && <small>Evidence gap</small>}</th>
-                        {values.map((value, i) => {
-                          const column = columns[i];
-                          const target = value === MISSING && evidenceEnabled ? evidenceTarget(column.targetKind,column.id,label,column.deal) : undefined;
-                          return (
+                        {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {target ? <button className="text-link compare-evidence" type="button" aria-label={`Not on file · Check missing ${label} for ${column.title}`} onClick={event=>{
-                              inspectedCell.current = event.currentTarget;
-                              setGap({target,title:column.title,label});
-                            }}>Not on file</button> : kind !== "detail" && value !== MISSING && !["Unavailable","Checking…","Not applicable"].includes(value) && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`${value} · Inspect ${label} for ${columns[i].title}`} onClick={event => {
-                              inspectedCell.current = event.currentTarget;
-                              onInspect(columns[i].id, label);
-                            }}>{value}</button> : value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}
+                            {renderCell(columns[i], label, kind, value)}
                           </td>
-                        );})}
+                        ))}
                       </tr>
                     ))}
                   </tbody>

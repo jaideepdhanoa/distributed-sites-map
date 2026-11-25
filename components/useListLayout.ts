@@ -1,5 +1,7 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import { useEffect, useRef, useState } from "react";
 import { layoutStorageKey, sanitizeLayout, type LayoutSurface, type ListLayout } from "@/lib/listLayout";
 
@@ -12,6 +14,9 @@ export function useListLayout(options: {
   fallback: ListLayout;
 }) {
   const { surface, signedIn, userId, allowed, seed, fallback } = options;
+  const params = useSearchParams();
+  const snapshotKey = surface + "Layout";
+  const snapshot = params.get(snapshotKey);
   const allowedKey = allowed.join(",");
   const key = layoutStorageKey(surface, signedIn ? userId : "anon");
   const [layout, setLayout] = useState<ListLayout>(() => sanitizeLayout(fallback, allowed));
@@ -75,6 +80,14 @@ export function useListLayout(options: {
   function update(next: ListLayout) {
     dirty.current = true;
     const clean = sanitizeLayout({ ...next, touched: true }, allowed);
+    if (snapshot !== null) {
+      const query = new URLSearchParams(currentSearch());
+      query.set(snapshotKey, JSON.stringify(clean));
+      const href = "/?" + query;
+      rememberSearch(href);
+      window.history.replaceState(null, "", href);
+      return;
+    }
     setLayout(clean);
     try {
       window.localStorage.setItem(key, JSON.stringify(clean));
@@ -83,5 +96,9 @@ export function useListLayout(options: {
     }
   }
 
+  if (snapshot !== null) {
+    try { return { layout: sanitizeLayout(JSON.parse(snapshot), allowed), update, ready: true }; }
+    catch { /* An old or incomplete link falls back to the personal layout. */ }
+  }
   return { layout, update, ready };
 }

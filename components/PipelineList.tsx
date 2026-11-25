@@ -264,7 +264,7 @@ export default function PipelineList({
   columns: PipelineColumnId[];
   initialSelection?: string[];
   onSelection?: (ids: string[]) => void;
-  onScope?: (ids: string[]) => void;
+  onScope?: (ids: string[], layout: ListLayout) => void;
   selectedId: string | null;
   sort: { id: PipelineColumnId; desc: boolean };
   onSort: (id: PipelineColumnId, desc?: boolean) => void;
@@ -370,7 +370,7 @@ export default function PipelineList({
     capacity: stripStats(ordered.map((row) => row.deal.cap_a_substation_mi)),
   }), [ordered, signedIn]);
   const visibleIds = ordered.map((row) => row.deal.deal_id);
-  useEffect(() => { onScope?.(visibleIds); }, [visibleIds, onScope]);
+  useEffect(() => { onScope?.(visibleIds, activeLayout); }, [visibleIds, activeLayout, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
   const commonStage = sharedStage(ordered.map(row => stageChipLabel(row.deal.stage, row.deal.stage_group)));

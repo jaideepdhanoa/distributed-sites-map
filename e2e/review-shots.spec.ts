@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { cityPipelineCounts } from "./pipeline-counts";
 
 async function showFunnel(page: Page, project: string) {
-  if (project === "mobile") await page.locator(".phone-step").click();
+  await page.locator(".workspace-scope:visible").click();
   await expect(page.locator("nav.funnel")).toBeVisible();
 }
 
@@ -56,14 +56,14 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(page.locator("nav.funnel")).toContainText("Universe");
   if (name === "mobile") {
     const header = await page.evaluate(() => {
-      const city = document.querySelector(".phone-view-row .city-pick select");
+      const city = document.querySelector(".top .phone-step");
       const search = document.querySelector(".phone-view-row .mobile-search");
       const menu = document.querySelector(".phone-view-row [aria-label='Menu']");
       const filters = document.querySelector(".phone-view-row [aria-label='Filters']");
       const row = document.querySelector(".phone-view-row");
       if (!city || !search || !menu || !filters || !row) return "the phone header is missing a control";
       if (row.querySelector(".reach-pick")) return "service area is still in the header";
-      const tops = [city, search, filters, menu].map((node) => node.getBoundingClientRect().top);
+      const tops = [search, filters, menu].map((node) => node.getBoundingClientRect().top);
       if (Math.max(...tops) - Math.min(...tops) > 4) return "the header controls wrapped";
       const cityBox = city.getBoundingClientRect();
       const rowBox = row.getBoundingClientRect();
@@ -125,8 +125,8 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   } else {
     const cards = page.getByTestId("phone-cards");
     await expect(cards).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Phoenix · Open land" })).toBeVisible();
-    await expect(page.locator(".shortlist-heading")).toContainText("Universe");
+    await expect(page.locator(".workspace-scope:visible")).toContainText("Phoenix · Open land");
+    await expect(page.locator(".shortlist-stage")).toContainText("Universe");
     await expect(cards.getByTestId("stage-chip")).toHaveCount(0);
     await expect(cards.locator(".phone-card-meta").first()).toContainText(/listed|listing/i);
   }
@@ -214,7 +214,7 @@ test("an incomplete search can recover without losing the query", async ({ page 
 test("screen five sites in Phoenix and return to the same selection", async ({ page }, info) => {
   const phone = info.project.name === "mobile";
   await page.goto("/?funnel=universe&view=list&city=PHX&stage=land&sort=site:asc", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Phoenix · Open land" })).toBeVisible();
+  await expect(page.locator(".workspace-scope:visible")).toContainText("Phoenix · Open land");
   const rows = page.locator(".pipeline-list [data-site-row]");
   await expect(rows.nth(4)).toBeVisible();
   const firstFive = async () => rows.evaluateAll(elements => elements.slice(0, 5).map(element => element.getAttribute("data-site-row")));

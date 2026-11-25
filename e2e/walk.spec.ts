@@ -56,7 +56,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   const fit = await page.evaluate(() => {
     const bar = document.querySelector(".pipeline-list .list-bar");
     const card = document.querySelector("[data-testid=phone-cards] button.list-row");
-    const count = document.querySelector(".pipeline-list [data-testid=summary-row] > div:first-child");
+    const count = document.querySelector(".phone-step [data-testid=scope-count]");
     const sort = bar?.querySelector("[data-testid=sort-control]");
     if (!bar || !card || !count || !sort) return { missing: true, pieces: false, scroll: false, overlap: false, stacked: false, clipped: false };
     const countBox = count.getBoundingClientRect();
@@ -195,7 +195,7 @@ test("a land deeplink does not turn the land filter on", async ({ page }, info) 
   await expect(page.locator(".chip.removable", { hasText: /^Land$/ })).toHaveCount(0);
   const after = Number(await page.locator(".shell").getAttribute("data-list-count"));
   expect(after).toBe(before);
-  const filterCount = await page.evaluate(() => document.querySelector("[data-testid=summary-row] strong")?.textContent?.replace(/,/g, "").trim() || "");
+  const filterCount = await page.evaluate(() => document.querySelector("[data-testid=map-scope] [data-testid=scope-count]")?.textContent?.replace(/,/g, "").split(" ")[0] || "");
   expect(filterCount).toBe(String(before));
   await expect(page.getByTestId("outside-row")).toBeVisible();
   const cardLeak = await page.evaluate(() => {
@@ -220,7 +220,7 @@ test("the All count matches the list, and a zoomed width uses cards", async ({ p
   test.skip(info.project.name !== "desktop", "counts and zoom");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Stages", exact: true }).click();
+  await page.getByTestId("map-scope").click();
   await page.waitForSelector("[data-testid=all-stages]");
   const counts = await page.evaluate(() => {
     const all = document.querySelector("[data-testid=all-stages] strong")?.textContent?.replace(/,/g, "").trim() || "";

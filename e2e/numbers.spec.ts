@@ -4,6 +4,7 @@ test("pipeline counts name the set, and score issue is a filter", async ({ page 
   test.skip(info.project.name !== "desktop", "desktop funnel");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("map-scope").click();
   const all = page.getByTestId("all-stages");
   await expect(all).toBeVisible();
   await expect(all).toContainText("All");
@@ -74,6 +75,7 @@ test("the Phoenix chip matches All after Phoenix is selected", async ({ page }, 
   test.skip(info.project.name !== "desktop", "desktop market chips");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?funnel=pipeline", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("map-scope").click();
   const phoenix = page.getByTestId("market-PHX");
   await expect(phoenix).toBeVisible();
   await phoenix.click();

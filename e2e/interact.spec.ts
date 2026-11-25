@@ -59,10 +59,10 @@ test("mobile layers and the menu are not open together", async ({ page }, info) 
 test("Back returns to the previous city and step", async ({ page }, info) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
+  await page.locator(".workspace-scope:visible").click();
   if (info.project.name === "mobile") await page.locator("select[aria-label='City']").selectOption("MIA");
   else await page.getByRole("button", { name: "Miami" }).click();
   await page.waitForURL(/city=MIA/);
-  if (info.project.name === "mobile") await page.locator(".phone-step").click();
   await page.locator(".funnel .step button", { hasText: "Desk screen" }).first().click();
   await page.waitForURL(/pstage=desk/);
   await page.goBack();

@@ -102,7 +102,7 @@ export default function ListView({
   rows: ListRow[];
   initialSelection?: string[];
   onSelection?: (ids: string[]) => void;
-  onScope?: (ids: string[]) => void;
+  onScope?: (ids: string[], layout: ListLayout) => void;
   selectedId: string | null;
   sort: { id: string; desc: boolean };
   onSort: (id: ListColumnId | "", desc?: boolean) => void;
@@ -147,7 +147,7 @@ export default function ListView({
   const commonStage = sharedStage(ordered.map(row => row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || "")));
   const showChecks = !phone || selecting;
   const visibleIds = ordered.map((row) => row.id);
-  useEffect(() => { onScope?.(visibleIds); }, [visibleIds, onScope]);
+  useEffect(() => { onScope?.(visibleIds, activeLayout); }, [visibleIds, activeLayout, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
   function toggleRow(id: string) {

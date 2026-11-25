@@ -18,11 +18,12 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
     await page.locator(".phone-step").click();
   } else {
     await expect(page.getByRole("button", { name: "Pipeline", exact: true }).first()).toHaveClass(/on/);
+    await page.getByTestId("map-scope").click();
   }
   await expect(page.locator("nav.funnel")).toBeVisible();
   await expect(page.locator("nav.funnel")).toContainText("Desk screen");
   await expect(page.locator("nav.funnel")).not.toContainText("Open land");
-  if (mobile) await page.getByRole("button", { name: "Close steps" }).click();
+  await page.getByRole("button", { name: "Close steps" }).click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator("aside.layers.open")).toContainText("Universe sites");
   await page.goto("/?funnel=universe", { waitUntil: "domcontentloaded" });

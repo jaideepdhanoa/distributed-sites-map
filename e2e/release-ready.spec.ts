@@ -69,6 +69,7 @@ for (const size of sizes) {
       await page.getByRole("button", { name: "Menu" }).click();
       await page.getByRole("button", { name: /Needs location/ }).click();
     } else {
+      await page.getByTestId("map-scope").click();
       const opener = page.getByTestId("needs-location");
       if (await opener.count()) await opener.click();
     }

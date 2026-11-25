@@ -115,6 +115,8 @@ export default function CompareTray({
   contextSites,
   contextDeals,
   onRemove,
+  inspecting = false,
+  onInspect,
   onClose,
   children,
   signedIn = false,
@@ -123,6 +125,8 @@ export default function CompareTray({
   sites: SiteProps[];
   contextSites?: SiteProps[];
   contextDeals?: DealProps[];
+  inspecting?: boolean;
+  onInspect?: (id: string, measure: string) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
   children?: ReactNode;
@@ -132,6 +136,13 @@ export default function CompareTray({
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
   const matrixRef = useRef<HTMLDivElement>(null);
+  const inspectedCell = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!inspecting && inspectedCell.current?.isConnected) {
+      inspectedCell.current.focus({ preventScroll: true });
+      inspectedCell.current.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [inspecting]);
   const hasMatrix = count >= 2;
   useEffect(() => {
     if (!hasMatrix) return;
@@ -160,7 +171,7 @@ export default function CompareTray({
   const shared = measures.length - differences - empty;
   const visible = showAll ? measures : measures.filter(row => row.kind === (differences ? "different" : "shared"));
   return (
-    <aside className="compare-tray" data-testid="compare-tray">
+    <aside hidden={inspecting} className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
         <strong>Compare</strong>
         {deals.map((deal) => (
@@ -199,12 +210,15 @@ export default function CompareTray({
                 return (
                   <tbody key={section} aria-label={section}>
                     <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
-                    {group.map(({ label, values }) => (
+                    {group.map(({ label, values, kind }) => (
                       <tr key={label} data-compare-row={label}>
                         <th scope="row">{label}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}
+                            {kind === "different" && value !== MISSING && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
+                              inspectedCell.current = event.currentTarget;
+                              onInspect(columns[i].id, label);
+                            }}>{value}</button> : value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}
                           </td>
                         ))}
                       </tr>

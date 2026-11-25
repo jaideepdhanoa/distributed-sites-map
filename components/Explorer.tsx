@@ -957,7 +957,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "finding" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
+      const linked = panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;

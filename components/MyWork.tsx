@@ -11,11 +11,13 @@ const labels: Record<string, string> = {
   ready: "Ready for approval",
 };
 export default function MyWork({
+  explore,
   username,
   names,
   open,
   close,
 }: {
+  explore: () => void;
   username: string;
   names: Record<string, string>;
   open: (row: WorkRow) => void;
@@ -150,7 +152,7 @@ export default function MyWork({
         ) : !visible.length && !errors.length ? (
           <p role="status">
             {filter === "Assigned to me"
-              ? "You have no open assignments."
+              ? <>You have no open assignments. <button className="text-link" type="button" onClick={explore}>Explore sites</button></>
               : "No open items in this view."}
           </p>
         ) : null}

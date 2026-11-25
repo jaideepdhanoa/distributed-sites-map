@@ -25,6 +25,7 @@ jobs:
         with:
           name: review-change-screenshots
           path: |
+            review-shots/*-empty-my-work.png
             review-shots/*-review-change.png
             review-shots/*-finding-*.png
           if-no-files-found: error

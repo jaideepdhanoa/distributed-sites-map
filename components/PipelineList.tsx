@@ -39,7 +39,7 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
+import { ColumnPicker, EmptyShortlist, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
@@ -554,6 +554,9 @@ export default function PipelineList({
           ) : null}
         </div>
       </div>
+      {!ordered.length && <EmptyShortlist
+        clearFilters={Object.values(activeLayout.filters).some(Boolean) ? ()=>commit({...activeLayout,filters:{},touched:true}) : undefined}
+        clearArea={mapArea ? onClearArea : undefined} />}
       {phone ? (
         <div className="list-scroll">
           {outside}

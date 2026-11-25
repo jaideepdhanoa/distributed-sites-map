@@ -4177,6 +4177,16 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .workspace-jobs .chip.on, .workspace-jobs .review-launch.on, .workspace-jobs button:hover { color:white; background:transparent; box-shadow:inset 0 -3px #dfb986; }
 .workspace-jobs .split { display:none; }
 .workspace-jobs button:focus-visible { outline:2px solid white; outline-offset:-3px; }
+.empty-filter { overflow-wrap:anywhere; }
+@media(max-width:767px) {
+  .empty-filter .text-link, .work-hub [role="status"] .text-link { min-height:44px; }
+  .work-page li { min-width:0; overflow-wrap:anywhere; }
+}
+@media(max-height:540px) and (max-width:767px) {
+  .bar .workspace-jobs { overflow-x:auto; justify-content:flex-start; }
+  .workspace-jobs .chip, .workspace-jobs .review-launch { flex-shrink:0; }
+  .work-page { padding-bottom:max(1rem,env(safe-area-inset-bottom)); }
+}
 .work-hub { overflow:auto; }
 .work-page { width:min(100%,1080px); margin:0 auto; padding:24px clamp(14px,4vw,54px); }
 .work-page header, .work-page nav { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }

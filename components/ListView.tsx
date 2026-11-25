@@ -11,7 +11,7 @@ import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
 import type { StoredScoreInput } from "@/lib/scoreDisplay";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
+import { ColumnPicker, EmptyShortlist, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
 import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
 import { stageChipLabel } from "@/lib/chips";
 import {
@@ -205,6 +205,9 @@ export default function ListView({
           ) : null}
         </div>
       </div>
+      {!ordered.length && <EmptyShortlist
+        clearFilters={Object.values(activeLayout.filters).some(Boolean) ? ()=>commit({...activeLayout,filters:{},touched:true}) : undefined}
+        clearArea={mapArea ? onClearArea : undefined} />}
       {phone ? (
         <div className="list-scroll">
           <PhoneCards commonStage={commonStage} rows={ordered.map((row) => ({

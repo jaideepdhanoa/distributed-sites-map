@@ -2367,11 +2367,11 @@ export default function Explorer() {
         <nav className="workspace-jobs" aria-label="Acquisition workspace">
           {(["universe","pipeline"] as const).map(job => {
             const active = funnel === job && !inReview && !loopsVisible && !ndaVisible;
-            return <button type="button" key={job} className={active ? "chip on" : "chip"} aria-current={active ? "page" : undefined} onClick={()=>{if (!active) {setSelected(null); chooseFunnel(job,true);}}}>{job === "universe" ? "Explore" : "Pipeline"}</button>;
+            return <button type="button" key={job} title={job === "universe" ? "Discover sites on the map" : "Screen the pipeline shortlist"} className={active ? "chip on" : "chip"} aria-current={active ? "page" : undefined} onClick={()=>{if (!active) {setSelected(null); chooseFunnel(job,true);}}}>{job === "universe" ? "Explore" : "Pipeline"}</button>;
           })}
-          {me?.actionsEnabled && loopsAllowed && <button type="button" className={loopsVisible || ndaVisible ? "chip on" : "chip"} aria-current={myWork ? "page" : undefined} onClick={()=>{if (!myWork) {setSelected(null);write({loops:"work",nda:null,view:null,table:null,review:null,i:null,site:null,measure:null,compare:null});}}}>My work</button>}
+          {me?.actionsEnabled && loopsAllowed && <button type="button" className={loopsVisible || ndaVisible ? "chip on" : "chip"} title="Open assignments and evidence requests" aria-current={myWork ? "page" : undefined} onClick={()=>{if (!myWork) {setSelected(null);write({loops:"work",nda:null,view:null,table:null,review:null,i:null,site:null,measure:null,compare:null});}}}>My work</button>}
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} aria-current={inReview ? "page" : undefined} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} aria-current={inReview ? "page" : undefined} title="Review queued sites" type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
               Review{(() => {
                 const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
                 return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
@@ -2994,7 +2994,7 @@ export default function Explorer() {
             backLabel={params.get("site") ? "Back to site" : "Back to queue"}
           />
         ) : null}
-        {loopsVisible && myWork && me?.u ? <MyWork username={me.u} names={Object.fromEntries([...dealRows.map(d=>[d.deal_id,d.name]), ...sites.map(s=>[s.site_id,s.name])])} close={()=>{if (!restoreOrigin()) write({loops:null});}} open={row=>{if (row.kind === "NDA") write({nda:row.id,loops:null},true); else {setSelected(row.site);write({site:row.site,panel:row.note ? "discussion" : "proposal",note:row.note || null,workItem:row.note ? null : row.id,sheet:"full"},true);}}} /> : loopsVisible ? <OpenLoops onOpen={choose} onClose={() => { if (!restoreOrigin()) write({ loops: null }); }} /> : null}
+        {loopsVisible && myWork && me?.u ? <MyWork explore={()=>{setSelected(null);chooseFunnel("universe",true);}} username={me.u} names={Object.fromEntries([...dealRows.map(d=>[d.deal_id,d.name]), ...sites.map(s=>[s.site_id,s.name])])} close={()=>{if (!restoreOrigin()) write({loops:null});}} open={row=>{if (row.kind === "NDA") write({nda:row.id,loops:null},true); else {setSelected(row.site);write({site:row.site,panel:row.note ? "discussion" : "proposal",note:row.note || null,workItem:row.note ? null : row.id,sheet:"full"},true);}}} /> : loopsVisible ? <OpenLoops onOpen={choose} onClose={() => { if (!restoreOrigin()) write({ loops: null }); }} /> : null}
         <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList

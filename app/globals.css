@@ -4180,6 +4180,7 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .empty-filter { overflow-wrap:anywhere; }
 @media(max-width:767px) {
   .empty-filter .text-link, .work-hub [role="status"] .text-link { min-height:44px; }
+  .work-hub [role="status"] a.text-link { display:inline-flex; align-items:center; }
   .work-page li { min-width:0; overflow-wrap:anywhere; }
 }
 @media(max-height:540px) and (max-width:767px) {

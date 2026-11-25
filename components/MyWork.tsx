@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { isOpenAgreement, type NdaQueueItem } from "@/lib/nda";
 import type { WorkRow } from "@/lib/api/handlers/actions/work";
 import { pacificToday } from "@/lib/queue/today";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const labels: Record<string, string> = {
   open: "Awaiting approval",
@@ -11,13 +13,11 @@ const labels: Record<string, string> = {
   ready: "Ready for approval",
 };
 export default function MyWork({
-  explore,
   username,
   names,
   open,
   close,
 }: {
-  explore: () => void;
   username: string;
   names: Record<string, string>;
   open: (row: WorkRow) => void;
@@ -87,6 +87,12 @@ export default function MyWork({
       window.removeEventListener("focus", reload);
     };
   }, [username, attempt]);
+  const search = useSearchParams();
+  const explore = new URLSearchParams({funnel:"universe"});
+  for (const key of ["city","stage"]) {
+    const value = search.get(key);
+    if (value) explore.set(key,value);
+  }
   const today = pacificToday();
   function matches(row: WorkRow, group: string) {
     if (group === "Team evidence gaps") return row.kind === "Evidence gap";
@@ -152,7 +158,7 @@ export default function MyWork({
         ) : !visible.length && !errors.length ? (
           <p role="status">
             {filter === "Assigned to me"
-              ? <>You have no open assignments. <button className="text-link" type="button" onClick={explore}>Explore sites</button></>
+              ? <>You have no open assignments. <Link className="text-link" href={"/?"+explore}>Explore sites</Link></>
               : "No open items in this view."}
           </p>
         ) : null}

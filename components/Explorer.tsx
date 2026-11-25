@@ -187,7 +187,7 @@ export default function Explorer() {
       if (event.key === "Escape") { event.preventDefault(); dismissScope(); }
     };
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Element && !event.target.closest("#workspace-scope, .workspace-scope")) setStepsOpen(false);
+      if (event.target instanceof Element && !event.target.closest("#workspace-scope, .workspace-scope, .market-marker")) setStepsOpen(false);
     };
     document.addEventListener("keydown", closeKey);
     document.addEventListener("pointerdown", outside);
@@ -363,7 +363,6 @@ export default function Explorer() {
       window.removeEventListener(COMMENT_CHANGED, onChanged);
     };
   }, [markedSpaces]);
-  const [unplacedScope, setUnplacedScope] = useState(false);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [withheldOpen, setWithheldOpen] = useState(false);
 
@@ -1345,8 +1344,7 @@ export default function Explorer() {
   const handoffCopy = handoffStep
     ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "Service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
     : handoff;
-  const areaDeals = (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
-    if (funnel === "pipeline" && dealCategory(feature.properties) === "wash" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
+  const areaDeals = funnel === "pipeline" ? pipelineSquares : (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
     if (!mapArea) return true;
     const coords = feature.geometry?.coordinates;
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
@@ -1409,7 +1407,7 @@ export default function Explorer() {
   const washPoints = (() => {
     if (!overlaysOn.includes("washes") || (!selectedDeal && !selectedSite)) return [];
     const origin = selectedDeal ? dealPoint(selectedDeal) : (() => {
-      const coords = featureById.get(selectedSite?.site_id || "")?.geometry?.coordinates;
+      const coords = poolById.get(selectedSite?.site_id || "")?.geometry?.coordinates;
       return coords ? [coords[0], coords[1]] as [number, number] : null;
     })();
     if (!origin) return [];
@@ -1805,7 +1803,6 @@ export default function Explorer() {
     onSnap: setSheetSnap,
     onStep: (direction: "more" | "less") => setSheetSnap((snap) => stepSheet(snap, direction)),
   };
-  const unplacedDeals = dealRows.filter((deal) => !isProtectedId(deal.deal_id) && (deal.kind === "pipeline" || deal.kind === "land") && shownInMarket(deal.city) && !dealPoint(deal) && inReach(deal, reach) && dealAllowed(deal));
   const locationFix = params.get("fix") === "location"
     ? (me?.actionRole === "reviewer" ? "edit" : me?.actionRole === "contributor" ? "propose" : null)
     : null;
@@ -2212,10 +2209,10 @@ export default function Explorer() {
   const shownCount = marketView.shown;
   const resultCount = listView && !ndaVisible && !loopsVisible ? listCount ?? shownCount : locationRows.length;
   const scopeLabel = <><span>{shortlistTitle}</span><small data-testid="scope-count">{resultCount.toLocaleString("en-US")} {resultCount === 1 ? "site" : "sites"}</small></>;
-  const mapCoverage = <div className="map-coverage" aria-label="Mapped shortlist">
+  const mapCoverage = <div className="shortlist-map-coverage" aria-label="Mapped shortlist">
     <span>{mappedCount.toLocaleString("en-US")} mapped</span>
     {unplacedInView.length > 0 && <button type="button" className="text-link" onClick={() => {
-      closeMenus(); setUnplacedScope(true); setUnplacedOpen(true);
+      closeMenus(); setUnplacedOpen(true);
     }}>{unplacedInView.length.toLocaleString("en-US")} need{unplacedInView.length === 1 ? "s" : ""} location</button>}
   </div>;
   const allCount = pipelineAllCount(shownCount, hiddenDropped);
@@ -2231,7 +2228,7 @@ export default function Explorer() {
     if (!selected) return null;
     const deal = dealRows.find((row) => row.deal_id === selected);
     if (deal) return dealPoint(deal);
-    const coords = featureById.get(selected)?.geometry?.coordinates;
+    const coords = poolById.get(selected)?.geometry?.coordinates;
     return coords ? [coords[0], coords[1]] : null;
   }
 
@@ -2532,9 +2529,9 @@ export default function Explorer() {
                 {withheldHere.length.toLocaleString()} address withheld
               </button>
             ) : null}
-            {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" data-testid="needs-location" onClick={() => { setUnplacedScope(false); setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
-                Needs location ({unplacedDeals.length.toLocaleString()})
+            {funnel === "pipeline" && unplacedInView.length > 0 ? (
+              <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
+                Needs location ({unplacedInView.length.toLocaleString()})
               </button>
             ) : null}
           {query && funnel === "universe" && stage !== "universe" ? (
@@ -2741,8 +2738,8 @@ export default function Explorer() {
               <ActionsMenuButtons close={() => setMenuOpen(false)} />
               {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMenuOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
               <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }} className="menu-item">How to read this</button>
-              {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedScope(false); setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedDeals.length.toLocaleString()})</button>
+              {funnel === "pipeline" && unplacedInView.length > 0 ? (
+                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedInView.length.toLocaleString()})</button>
               ) : null}
             </div>
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
@@ -2779,13 +2776,12 @@ export default function Explorer() {
               <button type="button" className="close" aria-label="Close" onClick={() => setUnplacedOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <ul className="unplaced-list">
-              {unplacedScope ? unplacedInView.map(row => <li key={row.id}>
-                <button type="button" className="text-link" onClick={() => { choose(row.id); setUnplacedOpen(false); }}>{row.name}</button>
-              </li>) : unplacedDeals.map((deal) => (
-                <li key={deal.deal_id}>
-                  <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
-                  {" · "}{stageTitle(deal.stage_group)}
-                  <button type="button" className="chip" data-testid="fix-location" onClick={() => { setSelected(deal.deal_id); write({ site: deal.deal_id, fix: "location" }); setUnplacedOpen(false); }}>Fix</button>
+              {unplacedInView.map(row => (
+                <li key={row.id}>
+                  <button type="button" className="text-link" onClick={() => { choose(row.id); setUnplacedOpen(false); }}>{row.name}</button>
+                  {dealBundle.byId.has(row.id) && <button type="button" className="chip" data-testid="fix-location" onClick={() => {
+                    setSelected(row.id); write({ site: row.id, fix: "location" }); setUnplacedOpen(false);
+                  }}>Fix</button>}
                 </li>
               ))}
             </ul>
@@ -3054,7 +3050,7 @@ export default function Explorer() {
             }}
             onResetColumns={() => write({ cols: null, sort: null })}
             onBroker={openParty}
-            onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: "list" })}
+            onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: recoveringMap ? null : "list" })}
             onCopyLink={async (ids) => {
               const next = new URL(window.location.href);
               next.searchParams.set("view", "list");
@@ -3076,7 +3072,7 @@ export default function Explorer() {
         ) : listView && !ndaVisible && !loopsVisible ? (
           <ListView
             title={shortlistTitle}
-            onCompare={ids => write({ compare: ids.join("|"), view: "list" })}
+            onCompare={ids => write({ compare: ids.join("|"), view: recoveringMap ? null : "list" })}
             initialSelection={listSelection.current.universe.length ? listSelection.current.universe : params.has("universeLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.universe = ids; }} onScope={rememberScope}
             rows={listRows}
             selectedId={selected}
@@ -3303,10 +3299,10 @@ export default function Explorer() {
           <Detail
             decisionFirst={listView || inReview}
             site={selectedSite}
-            lng={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
-            lat={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}
+            lng={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
+            lat={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}
             depotMiles={(() => {
-              const feature = featureById.get(selectedSite.site_id);
+              const feature = poolById.get(selectedSite.site_id);
               const coords = feature?.geometry?.coordinates;
               if (!coords || !data) return selectedSite.miles_to_depot;
               return nearestDepot(coords[0], coords[1], data.depots.features)?.miles ?? selectedSite.miles_to_depot;

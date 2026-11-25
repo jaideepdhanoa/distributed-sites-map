@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 import type { Map as SiteMap } from "maplibre-gl";
 
 type MapWindow = Window & { __sitesMap: SiteMap };
@@ -31,7 +32,10 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
   await page.goto("/?city=all&funnel=universe&stage=in_area");
   const market = page.getByRole("button", { name: /^Phoenix ·/ });
   await expect(market).toBeInViewport({ ratio: 1 });
+  await page.waitForFunction(() => (window as unknown as MapWindow).__sitesMap?.loaded());
   const scope = page.locator(".workspace-scope:visible");
+  await mkdir("review-shots", { recursive: true });
+  await page.screenshot({ path: `review-shots/${info.project.name}-market-overview.png` });
   await scope.click();
   await expect(market).toBeInViewport({ ratio: 1 });
   await expect(market).toBeVisible();
@@ -52,6 +56,7 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
   let previous: { id: string; x: number; y: number } | undefined;
   const ids: string[] = [];
   for (let i = 0; i < 2; i++) {
+    await expect.poll(async () => (await visiblePins(page)).length).toBeGreaterThan(1);
     let pins = await visiblePins(page);
     if (previous) {
       const first = previous;
@@ -84,7 +89,7 @@ test("map failure immediately exposes the same shortlist and a retry preserves s
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, kind, ...args) {
-      if (kind === "webgl" || kind === "webgl2") return null;
+      if ((kind === "webgl" || kind === "webgl2") && !sessionStorage.getItem("graphics-restored")) return null;
       return Reflect.apply(original, this, [kind, ...args]);
     } as typeof original;
   });
@@ -100,4 +105,53 @@ test("map failure immediately exposes the same shortlist and a retry preserves s
   await expect(list).toBeVisible();
   await expect(page.locator(".workspace-scope:visible small")).toHaveText(count);
   expect(new URL(page.url()).search).toBe(scope);
+  const rows = list.locator("[data-site-row]");
+  for (const index of [0, 1]) await rows.nth(index).getByRole("checkbox").check();
+  await list.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true }).click();
+  const tray = page.getByTestId("compare-tray");
+  await expect(tray.getByRole("table")).toBeVisible();
+  await tray.getByRole("button", { name: "Close compare" }).click();
+  await expect(retry).toBeVisible();
+  const row = rows.first();
+  const selected = await row.getAttribute("data-site-row");
+  await row.locator("button.list-row, td[data-col=site]").first().click();
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", selected!);
+  await page.evaluate(() => sessionStorage.setItem("graphics-restored", "1"));
+  await retry.click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await page.waitForFunction(() => (window as unknown as MapWindow).__sitesMap?.getLayer("sites") !== undefined);
+  await expect(page.locator("aside.drawer")).toHaveAttribute("data-record", selected!);
+  expect(new URL(page.url()).searchParams.get("pstage")).toBe("desk");
+});
+
+
+test("national mapped and missing counts reconcile with the shortlist", async ({ page }) => {
+  const locations = [
+    { city: "PHX", point: [-112.08, 33.45] }, { city: "LAS", point: [-115.15, 36.17] },
+    { city: "MIA", point: [-80.19, 25.76] }, { city: "MIA", point: null },
+  ];
+  const features = locations.map(({ city, point }, index) => ({
+    type: "Feature", geometry: point ? { type: "Point", coordinates: point } : null,
+    properties: { site_id: city + "-QA-" + index, city, name: point ? "Test parcel " + index : "Map coverage example",
+      origin: "universe", counts_as_site: true, in_area: true, land_only: false },
+  }));
+  await page.route(/\/api\/data\/sites(?:\?city=[A-Z]+)?$/, route => {
+    const city = new URL(route.request().url()).searchParams.get("city");
+    return route.fulfill({ json: { type: "FeatureCollection", features: features.filter(f => !city || f.properties.city === city) } });
+  });
+  await page.goto("/?city=all&funnel=universe&stage=in_area", { waitUntil: "domcontentloaded" });
+  for (const market of ["Phoenix", "Las Vegas", "Miami"]) {
+    await expect(page.getByRole("button", { name: market + " · 1", exact: true })).toBeVisible();
+  }
+  const coverage = page.locator(".shortlist-map-coverage:visible");
+  await expect(coverage.locator("span")).toHaveText("3 mapped");
+  await expect(page.locator(".workspace-scope:visible small")).toHaveText("4 sites");
+  await coverage.getByRole("button", { name: "1 needs location" }).click();
+  const dialog = page.getByRole("dialog", { name: "Needs location" });
+  await expect(dialog.locator("li")).toHaveCount(1);
+  await expect(dialog.getByRole("button", { name: "Map coverage example" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("button", { name: "List", exact: true }).first().click();
+  await expect(page.locator("[data-site-row=MIA-QA-3]")).toBeVisible();
 });

@@ -833,6 +833,12 @@ export default function MapView(props: Props) {
     setMapFailed("");
     propsRef.current.onMapFailed?.("");
     active = map;
+    map.on("webglcontextlost", () => {
+      if (cancelled) return;
+      const message = "The map lost its graphics connection.";
+      setMapFailed(message);
+      propsRef.current.onMapFailed?.(message);
+    });
     keptCamera.current = null;
     heldView.current = kept;
     if (kept) {

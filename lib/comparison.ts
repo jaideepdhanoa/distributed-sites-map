@@ -41,7 +41,7 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean)
   const washes = trade.find((line) => line.startsWith("Washes "));
   const spare = spareLandSqft(deal.open_land_sqft, linked?.spare_ac_own, deal.open_land_basis);
   const cashBasis = basisBadge(deal.earnings_basis) || basisBadge(cash.basis);
-  const cashValue = cash.hidden || (deal.stated_cash_flow == null && !deal.stated_cash_flow_display) ? "" : [cash.value, cash.note, deal.earnings_period, cashBasis].filter(Boolean).join(" · ");
+  const cashValue = cash.hidden ? "" : deal.stated_cash_flow == null && !deal.stated_cash_flow_display ? (deal.figures_status === "withheld" ? cash.value : "") : [cash.value, cash.note, deal.earnings_period, cashBasis].filter(Boolean).join(" · ");
   return [
     { label: "Service area", value: shown(serviceAreaLabel(deal) || serviceAreaLabel(linked)) },
     { label: "Address", value: shown(displayAddress(deal.address)) },
@@ -70,10 +70,11 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean)
 
 function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
   if (!signedIn) return [];
-  if (deal.kind === "land" || cashTile(deal).hidden) return [
+  if (deal.kind === "land") return [
     ...["Revenue", "Asking / earnings"].map(label => ({label,value:"Not applicable"})),
     {label:"Land estimate",value:sheetMoney(deal.land_estimate,deal.land_estimate_display), key:deal.land_estimate ?? deal.land_estimate_display},
   ];
+  const operating = !cashTile(deal).hidden;
   const earnings = deal.earnings_multiple_which ? `Asking / ${deal.earnings_multiple_which}` : "Asking / cash flow";
   const land = deal.land_estimate;
   const asking = deal.asking_price;
@@ -82,13 +83,13 @@ function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
     : "—";
   return [
     { label: "Pricing", value: split },
-    { label: "Revenue", basis: [deal.revenue_period, deal.revenue_basis].map(value=>value?.trim().toLowerCase() || "").join("|"), key: deal.stated_revenue ?? deal.stated_revenue_display, value: signedIn ? withEvidence(deal.stated_revenue_display || (deal.stated_revenue != null ? fullMoney(deal.stated_revenue) : MISSING), deal.revenue_period, deal.revenue_basis, deal.figures_source) : "—" },
+    { label: "Revenue", basis: [deal.revenue_period, deal.revenue_basis].map(value=>value?.trim().toLowerCase() || "").join("|"), key: deal.stated_revenue ?? deal.stated_revenue_display, value: !operating ? "Not applicable" : signedIn ? withEvidence(deal.stated_revenue_display || (deal.stated_revenue != null ? fullMoney(deal.stated_revenue) : MISSING), deal.revenue_period, deal.revenue_basis, deal.figures_source) : "—" },
     { label: "Land estimate", key: deal.land_estimate ?? deal.land_estimate_display, value: deal.land_estimate_display ? `${deal.land_estimate_display} · Estimate` : deal.land_estimate != null ? fullMoney(deal.land_estimate) : (deal.land_estimate_reason || "—") },
     { label: "Business value", key: deal.business_value ?? deal.business_value_display, value: deal.business_value_display || deal.business_value_reason || "—" },
     { label: "County value (land + buildings)", key: deal.county_value ?? deal.county_value_display, value: deal.county_value_display || "—" },
-    { label: "Asking / revenue", key: deal.revenue_multiple ?? deal.revenue_multiple_display, value: deal.revenue_multiple_display && deal.revenue_multiple_display !== "—" ? [deal.revenue_multiple_display, deal.revenue_multiple_basis].filter(Boolean).join(" · ") : (deal.revenue_multiple_reason || "—") },
-    { label: "Asking / earnings", basis: earningsBasis(deal), key: deal.earnings_multiple ?? deal.earnings_multiple_display, value: deal.earnings_multiple_display && deal.earnings_multiple_display !== "—" ? [deal.earnings_multiple_display, earnings, deal.earnings_multiple_basis].filter(Boolean).join(" · ") : (deal.earnings_multiple_reason || "—") },
-    { label: "Business-only multiple", key: deal.business_multiple ?? deal.business_multiple_display, value: deal.business_multiple_display && deal.business_multiple_display !== "—" ? [deal.business_multiple_display, deal.business_multiple_basis].filter(Boolean).join(" · ") : (deal.business_multiple_reason || "—") },
+    { label: "Asking / revenue", key: deal.revenue_multiple ?? deal.revenue_multiple_display, value: !operating ? "Not applicable" : deal.revenue_multiple_display && deal.revenue_multiple_display !== "—" ? [deal.revenue_multiple_display, deal.revenue_multiple_basis].filter(Boolean).join(" · ") : (deal.revenue_multiple_reason || "—") },
+    { label: "Asking / earnings", basis: earningsBasis(deal), key: deal.earnings_multiple ?? deal.earnings_multiple_display, value: !operating ? "Not applicable" : deal.earnings_multiple_display && deal.earnings_multiple_display !== "—" ? [deal.earnings_multiple_display, earnings, deal.earnings_multiple_basis].filter(Boolean).join(" · ") : (deal.earnings_multiple_reason || "—") },
+    { label: "Business-only multiple", key: deal.business_multiple ?? deal.business_multiple_display, value: !operating ? "Not applicable" : deal.business_multiple_display && deal.business_multiple_display !== "—" ? [deal.business_multiple_display, deal.business_multiple_basis].filter(Boolean).join(" · ") : (deal.business_multiple_reason || "—") },
   ];
 }
 
@@ -98,7 +99,7 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean)
   const spare = spareLandSqft(linked?.open_land_sqft, site.spare_ac_own, linked?.open_land_basis);
   const cash = linked ? cashTile(linked) : null;
   const cashBasis = linked ? (basisBadge(linked.earnings_basis) || basisBadge(cash?.basis)) : "";
-  const cashValue = cash && !cash.hidden && (linked?.stated_cash_flow != null || linked?.stated_cash_flow_display) ? [cash.value, cash.note, linked?.earnings_period, cashBasis].filter(Boolean).join(" · ") : "";
+  const cashValue = cash && !cash.hidden && (linked?.stated_cash_flow != null || linked?.stated_cash_flow_display) ? [cash.value, cash.note, linked?.earnings_period, cashBasis].filter(Boolean).join(" · ") : linked?.figures_status === "withheld" ? cash?.value : "";
   return [
     { label: "Service area", value: shown(serviceAreaLabel(site)) },
     { label: "Address", value: shown(displayAddress(site.address)) },
@@ -117,9 +118,9 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean)
     { label: "Zoning", value: shown(site.zoning) },
     { label: "Property owner", value: shown(site.owner) },
     ...decisionRows(linked, signedIn),
-    ...ebitdaRows(linked, signedIn),
-    ...(signedIn && !linked ? ["Revenue","Asking / earnings","Land estimate","NDA","Blocker","Next check","Figure basis","Reporting period","Financial source"].map(label=>({label,value:MISSING})) : []),
-    { label: "Cash flow", key: signedIn && cash && !cash.hidden ? linked?.stated_cash_flow ?? linked?.stated_cash_flow_display : null, basis: earningsBasis(linked), value: signedIn && cash?.hidden ? "Not applicable" : signedIn ? shown(cashValue) : MISSING },
+    ...(signedIn && !linked && site.land_only ? [{label:"EBITDA",value:"Not applicable"}] : ebitdaRows(linked, signedIn)),
+    ...(signedIn && !linked ? ["Revenue","Asking / earnings","Land estimate","NDA","Blocker","Next check","Figure basis","Reporting period","Financial source"].map(label=>({label,value:site.land_only && ["Revenue","Asking / earnings","Figure basis","Reporting period","Financial source"].includes(label) ? "Not applicable" : MISSING})) : []),
+    { label: "Cash flow", key: signedIn && cash && !cash.hidden ? linked?.stated_cash_flow ?? linked?.stated_cash_flow_display : null, basis: earningsBasis(linked), value: signedIn && (cash?.hidden || (!linked && site.land_only)) ? "Not applicable" : signedIn ? shown(cashValue) : MISSING },
     { label: "Per acre", value: signedIn && linked?.price_per_acre != null ? sheetMoney(linked.price_per_acre, fullMoney(linked.price_per_acre)) : "—" },
     ...(linked ? pricingRows(linked, signedIn) : []),
   ];

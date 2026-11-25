@@ -63,3 +63,12 @@ test("coverage counts recorded zero and separates absent, inapplicable and incom
   assert.equal(row.kind,"basis");
   assert.deepEqual(row.values,["$0 · 2025","$30 · 2024","Not applicable","—"]);
 });
+
+test("operating evidence can be inapplicable while property valuation remains available", () => {
+  const closed = deal({financials_open:false,county_value:100,county_value_display:"$100"});
+  const rows = compare(closed,deal());
+  assert.equal(rows.get("Revenue")?.values[0],"Not applicable");
+  assert.equal(rows.get("County value (land + buildings)")?.values[0],"$100");
+  const withheld = deal({stated_cash_flow:null,stated_cash_flow_display:"",figures_status:"withheld"});
+  assert.match(compare(withheld,deal()).get("Cash flow")!.values[0],/not shown/i);
+});

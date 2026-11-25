@@ -7,7 +7,7 @@ async function ready(page: Page) {
   await page.waitForFunction(() => {
     const map = (window as unknown as { __sitesMap?: import("maplibre-gl").Map }).__sitesMap;
     const count = document.querySelector(".stage-map")?.getAttribute("data-group-count");
-    return Boolean(map?.loaded() && !map.isMoving() && count !== null && count !== undefined);
+    return Boolean(map?.getLayer("sites") && !map.isMoving() && Number(count) > 0);
   });
 }
 

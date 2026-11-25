@@ -6,7 +6,8 @@ on:
 
 permissions:
   contents: read
-  deployments: read
+  issues: read
+  pull-requests: read
 
 jobs:
   screenshots:
@@ -53,25 +54,24 @@ jobs:
         id: preview
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          for attempt in {1..12}; do
-            while read -r id; do
-              url=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --jq '[.[] | select(.state == "success")][0].environment_url // empty')
-              if [[ "$url" =~ ^https://distributed-sites-[a-z0-9]{9}-jaideepdhanoas-projects\.vercel\.app/?$ ]]; then
-                echo "url=$url" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-            done < <(gh api "repos/$GITHUB_REPOSITORY/deployments?sha=$HEAD_SHA" --jq '.[].id')
+          for attempt in {1..6}; do
+            comment=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --jq '.[] | select(.user.login == "vercel[bot]") | .body')
+            if [[ "$comment" =~ (https://distributed-sites-map-git-[a-z0-9-]+-jaideepdhanoas-projects\.vercel\.app)[/\?\)[:space:]] ]]; then
+              echo "url=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             sleep 10
           done
-          echo "No ready Vercel preview was reported for the pull request commit."
+          echo "Vercel has not posted a preview for this pull request."
           exit 1
       - if: steps.preview.outputs.url
         name: Walk the deployed preview on desktop and phone
         env:
           E2E_BASE_URL: ${{ steps.preview.outputs.url }}
           MAP_DEPLOYED_PREVIEW: "1"
+          E2E_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

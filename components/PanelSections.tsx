@@ -55,7 +55,8 @@ export default function PanelSections({
         }
       }
       const top = (target || node).getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-      const next = Math.max(0, top - 4);
+      const navigation = scroller.querySelector<HTMLElement>(":scope > .panel-tabs");
+      const next = Math.max(0, top - (navigation?.offsetHeight || 0) - 8);
       if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
     };
     const sizes = new ResizeObserver(() => {

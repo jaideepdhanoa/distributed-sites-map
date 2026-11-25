@@ -4226,3 +4226,9 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 @media (max-width:767px) {
   .list-cards .row-check { min-width:44px; justify-content:center; align-self:center; }
 }
+
+.drawer-scroll > .panel-tabs {
+  position:sticky; top:0; z-index:3; align-items:center;
+  padding-block:5px; margin-block:0 8px; background:var(--cream-0);
+  border-bottom:1px solid var(--line);
+}

@@ -302,7 +302,9 @@ export function NextStepCard({
   const pendingSteps = steps.filter((item) => item.status === "open" && !item.doneAt);
   const readySteps = steps.filter((item) => item.status === "ready" && !item.doneAt);
   const waitingSteps = steps.filter((item) => item.status === "agreed_waiting" && !item.doneAt);
-  const focus = readySteps[0] || pendingSteps[0] || waitingSteps[0] || null;
+  const workItem = proposal ? params.get("workItem") : null;
+  const requested = workItem ? steps.find(step=>step.id===workItem && !step.doneAt) : undefined;
+  const focus = (requested && ["ready","open","agreed_waiting"].includes(requested.status) ? requested : null) || readySteps[0] || pendingSteps[0] || waitingSteps[0] || null;
 
   useEffect(() => {
     if (!focus) return;
@@ -373,7 +375,7 @@ export function NextStepCard({
     );
   }
 
-  const approved = steps
+  const approved = (requested?.status === "accepted" ? requested : undefined) || steps
     .filter((item) => item.status === "accepted" && !item.doneAt)
     .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""))[0];
 

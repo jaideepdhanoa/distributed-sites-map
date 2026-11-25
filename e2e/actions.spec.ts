@@ -46,7 +46,7 @@ async function discussionInView(page: import("@playwright/test").Page, id: strin
   await expect(drawer).toHaveAttribute("data-record", id);
   await expect(page.getByTestId("key-strip")).toHaveCount(1);
   await page.waitForTimeout(1200);
-  const discussion = page.getByRole("tab", { name: "Discussion" });
+  const discussion = page.getByRole("tab", { name: "Diligence" });
   await expect(discussion).toHaveAttribute("aria-selected", "true");
   await expect(discussion).toBeInViewport();
 }

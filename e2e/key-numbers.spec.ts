@@ -32,7 +32,7 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
     await expect(page.locator(".phone-step")).toContainText("Open land");
     await page.locator(".phone-step").click();
   } else {
-    await expect(page.getByRole("button", { name: "Universe", exact: true }).first()).toHaveClass(/on/);
+    await expect(page.getByRole("navigation", {name:"Acquisition workspace"}).getByRole("button", {name:"Explore"})).toHaveClass(/on/);
   }
   await expect(page.locator("nav.funnel")).toContainText("Open land");
 });

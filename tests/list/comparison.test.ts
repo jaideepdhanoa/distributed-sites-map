@@ -32,3 +32,21 @@ test("financial comparison flags different periods and measures without exposing
   assert.deepEqual(hidden.get("Cash flow")?.values, ["—", "—"]);
   assert.ok(!hidden.has("Figure basis"));
 });
+
+
+test("shortlist claims require links to selected evidence", async () => {
+  const { citedShortlistAnswer } = await import("../../lib/ask/policy");
+  const sources = [{ label: "Parcel", href: "/?site=EXAMPLE-A" }];
+  assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=EXAMPLE-A).",sources).gap,false);
+  assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=OTHER).",sources).gap,true);
+  assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=EXAMPLE-A).\n\nRevenue is verified.",sources).gap,true);
+});
+
+test("EBITDA keeps normalized and stated bases explicit and never substitutes SDE", () => {
+  const rows = compare(deal({cash_flow_label:"Normalized EBITDA"}),deal({cash_flow_label:"SDE"}));
+  const ebitda = rows.get("EBITDA");
+  assert.match(ebitda!.values[0],/Normalized EBITDA/);
+  assert.equal(ebitda!.values[1],"—");
+  assert.equal(ebitda!.kind,"gap");
+  assert.equal(compare(deal({cash_flow_label:"Normalized EBITDA"}),deal({cash_flow_label:"EBITDA"})).get("EBITDA")?.kind,"basis");
+});

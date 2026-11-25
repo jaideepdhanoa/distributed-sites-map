@@ -5,7 +5,7 @@ import type { ActionRole } from "@/lib/actions/roles";
 import { estimateCost } from "./cost";
 import { EMPTY_ANSWER, TIMEOUT_ANSWER, UPSTREAM_ANSWER } from "./empty";
 import { liveAskModel, type AskModelInput, type AskModelOutput } from "./model";
-import { collectSources, applyWordingTier, withCitations, type AskSource } from "./policy";
+import { citedShortlistAnswer, collectSources, applyWordingTier, withCitations, type AskSource } from "./policy";
 import { ASK_SYSTEM, askPrefix } from "./prompt";
 import { runAskTool, siteScopeLine } from "./tools";
 import { logUpstream, isAbortError } from "./upstream";
@@ -91,9 +91,24 @@ export async function answerQuestion(input: {
     let upstream = false;
     let timedOut = false;
     try {
-      const shortlist = input.siteIds?.length ? await Promise.all(input.siteIds.map(id => runAskTool("getSite", { id }, input.role, input.userId))) : null;
+      const shortlist: unknown[] | null = input.siteIds?.length ? [] : null;
+      if (shortlist && input.siteIds) {
+        const needDiscussion = /diligence|blocker|outstanding|unresolved|assigned/i.test(question);
+        const needFinancials = /financial|economics|valuation|multiple|ebitda|cash flow|revenue|earnings|p&l/i.test(question);
+        for (let start = 0; start < input.siteIds.length; start += 4) {
+          const records = await Promise.all(input.siteIds.slice(start,start+4).map(async id => {
+            const site = await runAskTool("getSite", {id}, input.role, input.userId);
+            const [discussion,financials] = await Promise.all([
+              needDiscussion ? runAskTool("discussion",{id},input.role,input.userId) : undefined,
+              needFinancials ? runAskTool("financials",{id},input.role,input.userId) : undefined,
+            ]);
+            return {site,discussion,financials};
+          }));
+          shortlist.push(...records);
+        }
+      }
       draft = await runner({
-        system: shortlist ? ASK_SYSTEM + " This request is scoped to the supplied shortlist. Use only these authorized records and cite their site links." : await askPrefix(),
+        system: shortlist ? ASK_SYSTEM + " This request is scoped to the supplied shortlist. Use only the supplied records. Use one decision claim per paragraph or bullet and include an exact source link in each. Distinguish missing evidence, unlike earnings bases and resolved findings. Rank sites only against criteria the reviewer supplied." : await askPrefix(),
         suppliedFactsOnly: Boolean(shortlist),
         prompt: `${audience}\n${shortlist ? "Shortlist records: " + JSON.stringify(shortlist) : scopeLine}\nQuestion: ${question}`,
         role: input.role,
@@ -142,7 +157,8 @@ export async function answerQuestion(input: {
       };
     } else {
       const worded = applyWordingTier(draft.text, input.role, question);
-      const cited = withCitations(worded.text, worded.refused ? [] : draft.sources);
+      const cite = input.siteIds?.length ? citedShortlistAnswer : withCitations;
+      const cited = cite(worded.text, worded.refused ? [] : draft.sources);
       answer = {
         text: cited.empty ? EMPTY_ANSWER : cited.text,
         gap: cited.empty ? false : cited.gap,

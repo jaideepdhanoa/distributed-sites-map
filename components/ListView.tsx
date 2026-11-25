@@ -128,7 +128,6 @@ export default function ListView({
   const [moreOpen, setMoreOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>(initialSelection || []);
   useEffect(() => { onSelection?.(picked); }, [picked, onSelection]);
-  const [selecting, setSelecting] = useState(Boolean(initialSelection?.length));
   const scrollRef = useRef<HTMLDivElement>(null);
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
@@ -145,7 +144,6 @@ export default function ListView({
   }, [activeLayout, columns, mapArea, rows, visible]);
 
   const commonStage = sharedStage(ordered.map(row => row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || "")));
-  const showChecks = !phone || selecting;
   const visibleIds = ordered.map((row) => row.id);
   useEffect(() => { onScope?.(visibleIds, activeLayout); }, [visibleIds, activeLayout, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
@@ -200,8 +198,7 @@ export default function ListView({
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
-              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
+              {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); downloadVisible(columns, ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
             </div>
@@ -218,7 +215,7 @@ export default function ListView({
             chips: row.landPaused ? <LandPausedChip /> : row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null,
             facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
-            check: showChecks ? <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null,
+            check: <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} />,
             onOpen: () => onOpen(row.id),
           }))} />
         </div>
@@ -233,12 +230,12 @@ export default function ListView({
         onOpen={onOpen}
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
-        headerExtra={(id) => id === "site" && showChecks ? (
+        headerExtra={(id) => id === "site" ? (
           <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
         ) : null}
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
-            {showChecks ? <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null}
+            <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} />
             <span className="site-title">
               <span className="site-name-text" title={row.site || row.id}>{row.site || "—"}</span>
               <span className="site-meta">

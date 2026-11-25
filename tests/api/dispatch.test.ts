@@ -29,6 +29,7 @@ const expected = [
   "GET /api/actions/recommendations",
   "DELETE /api/actions/views/:id",
   "GET /api/actions/views",
+  "GET /api/actions/work",
   "POST /api/actions/views",
   "GET /api/alerts/digest",
   "GET /api/alerts/flush",

@@ -1,3 +1,4 @@
+import * as work from "@/lib/api/handlers/actions/work";
 import { notFound } from "next/navigation";
 import type { NextRequest } from "next/server";
 import * as accounts from "@/lib/api/handlers/actions/accounts";
@@ -93,6 +94,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/actions/notes/:id/reopen", { POST: notesReopen.POST as Handler }),
   route("/api/actions/notes/:id/resolve", { POST: notesResolve.POST as Handler }),
   route("/api/actions/notes/:id", { PATCH: notesId.PATCH as Handler, DELETE: notesId.DELETE as Handler }),
+  route("/api/actions/work", { GET: work.GET as Handler }),
   route("/api/actions/notes", { GET: notes.GET as Handler, POST: notes.POST as Handler }),
   route("/api/actions/status", { GET: status.GET as Handler }),
   route("/api/actions/suggestions/export", { GET: suggestionsExport.GET as Handler }),

@@ -1,40 +1,46 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { numberEvidence } from "@/lib/comparison";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
 const TABS = [
-  ["overview", "Summary"],
-  ["numbers", "Space and power"],
-  ["discussion", "Discussion"],
+  ["overview", "Record"],
+  ["numbers", "Site fit"],
+  ["economics", "Economics"],
+  ["discussion", "Diligence"],
   ["activity", "Activity"],
 ] as const;
 
 type TabId = (typeof TABS)[number][0];
 
+function recordTab(panel: string | null): TabId {
+  return panel === "open-land" ? "numbers" : panel === "economics" || panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
+}
+
 export default function PanelSections({
   overview,
+  economics,
   numbers,
   activity,
   discussion,
 }: {
   overview: ReactNode;
+  economics: ReactNode;
   numbers: ReactNode;
   activity: ReactNode;
   discussion: ReactNode;
 }) {
   const params = useSearchParams();
-  const router = useRouter();
   const site = params.get("site");
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
   const note = params.get("note");
   const measure = params.get("measure") || "";
-  const tab: TabId = panel === "open-land" ? "numbers" : panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
+  const tab = recordTab(panel);
   useEffect(() => {
-    if (panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    if (panel !== "economics" && panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
     const scroller = node?.closest(".drawer-scroll");
     if (!node || !(scroller instanceof HTMLElement)) return;
@@ -49,7 +55,8 @@ export default function PanelSections({
         }
       }
       const top = (target || node).getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-      const next = Math.max(0, top - 4);
+      const navigation = scroller.querySelector<HTMLElement>(":scope > .panel-tabs");
+      const next = Math.max(0, top - (navigation?.offsetHeight || 0) - 8);
       if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
     };
     const sizes = new ResizeObserver(() => {
@@ -76,6 +83,29 @@ export default function PanelSections({
       added.disconnect();
     };
   }, [site, panel, note, measure]);
+  const panels = { economics, overview, numbers, activity, discussion };
+  const intel = panel === "intel";
+  return (
+    <div className="panel-sections" ref={sections}>
+      {intel ? (
+        <section id="panel-intel" data-testid="intel-panel">
+          <p className="eyebrow">Intel</p>
+          <p className="layer-meta">No intel is recorded for this site.</p>
+        </section>
+      ) : null}
+      {TABS.filter(([id]) => id === tab || id === "numbers").map(([id]) => (
+        <div key={id} id={`panel-${id}`} role="tabpanel" aria-labelledby={`record-tab-${id}`} hidden={tab !== id}>
+          {panels[id]}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RecordNavigation() {
+  const params = useSearchParams();
+  const panel = params.get("panel");
+  const tab = recordTab(panel);
   function chooseTab(id: TabId) {
     const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
     const shown = next.get("panel") || "overview";
@@ -87,24 +117,25 @@ export default function PanelSections({
     else next.set("panel", id);
     const href = next.toString() ? `/?${next.toString()}` : "/";
     rememberSearch(href);
-    router.replace(href, { scroll: false });
+    window.history.replaceState(null, "", href);
   }
-  const panels = { overview, numbers, activity, discussion };
-  const intel = panel === "intel";
   return (
-    <div className="panel-sections" ref={sections}>
-      {intel ? (
-        <section id="panel-intel" data-testid="intel-panel">
-          <p className="eyebrow">Intel</p>
-          <p className="layer-meta">No intel is recorded for this site.</p>
-        </section>
-      ) : null}
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
-        {TABS.map(([id, label]) => (
+        {TABS.map(([id, label], index) => (
           <button
             key={id}
             type="button"
             role="tab"
+            id={`record-tab-${id}`}
+            tabIndex={tab === id ? 0 : -1}
+            onKeyDown={event => {
+              const next = event.key === "ArrowRight" ? (index+1)%TABS.length : event.key === "ArrowLeft" ? (index+TABS.length-1)%TABS.length : event.key === "Home" ? 0 : event.key === "End" ? TABS.length-1 : -1;
+              if (next < 0) return;
+              event.preventDefault();
+              const dest = TABS[next][0];
+              document.getElementById("record-tab-"+dest)?.focus();
+              chooseTab(dest);
+            }}
             aria-selected={tab === id}
             aria-controls={`panel-${id}`}
             className={tab === id ? "chip on" : "chip"}
@@ -115,11 +146,5 @@ export default function PanelSections({
           </button>
         ))}
       </div>
-      {TABS.filter(([id]) => id === tab || id === "numbers").map(([id]) => (
-        <div key={id} id={`panel-${id}`} role="tabpanel" hidden={tab !== id}>
-          {panels[id]}
-        </div>
-      ))}
-    </div>
   );
 }

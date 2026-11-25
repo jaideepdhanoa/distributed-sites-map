@@ -1,7 +1,8 @@
+import { csvCell } from "@/lib/actions/text";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
-import { compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
+import { acquisitionCriteria, compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
 
 export default function CompareTray({
   deals,
@@ -27,6 +28,7 @@ export default function CompareTray({
   signedIn?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [highlight, setHighlight] = useState(true);
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -38,6 +40,19 @@ export default function CompareTray({
     }
   }, [inspecting]);
   const hasMatrix = count >= 2;
+  const gapQuery = hasMatrix && signedIn ? new URLSearchParams([...deals.map(d=>d.deal_id),...sites.map(s=>s.site_id)].map(id=>["site",id])).toString() : "";
+  const [coverage,setCoverage] = useState<{query:string; counts:Record<string,number>|null}>();
+  const [refresh,setRefresh] = useState(0);
+  useEffect(()=>{
+    if (!gapQuery || inspecting) return;
+    const controller = new AbortController();
+    fetch("/api/actions/work?"+gapQuery,{signal:controller.signal,cache:"no-store"}).then(async response=>{
+      if (!response.ok) throw Error();
+      const {counts} = await response.json();
+      if (!controller.signal.aborted) setCoverage({query:gapQuery,counts});
+    }).catch(()=>{if (!controller.signal.aborted) setCoverage({query:gapQuery,counts:null});});
+    return ()=>controller.abort();
+  },[gapQuery,refresh,inspecting]);
   useEffect(() => {
     if (!hasMatrix) return;
     const trigger = document.activeElement;
@@ -51,11 +66,16 @@ export default function CompareTray({
     ...deals.map(deal => ({ id: deal.deal_id, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
     ...sites.map(site => ({ id: site.site_id, title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
   ];
+  if (gapQuery) for (const column of columns) {
+    const count = coverage?.query === gapQuery ? coverage.counts?.[column.id] : undefined;
+    const value = count != null ? String(count) : coverage?.query === gapQuery ? "Unavailable" : "Checking…";
+    column.rows.push({label:"Open evidence gaps",key:count,value});
+  }
   const measures = comparisonMeasures(columns);
   const differences = measures.filter(row => row.kind === "different").length;
   const gaps = measures.filter(row => row.kind === "gap").length;
   const basis = measures.filter(row => row.kind === "basis").length;
-  const visible = showAll ? measures : measures.filter(row => ["different", "gap", "basis"].includes(row.kind));
+  const visible = showAll ? measures : measures.filter(row => acquisitionCriteria.includes(row.label) || ["different", "gap", "basis"].includes(row.kind));
   return (
     <aside hidden={inspecting} className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
@@ -80,14 +100,32 @@ export default function CompareTray({
         <>
           <div className="comparison-mode">
             <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps} one-sided {gaps === 1 ? "gap" : "gaps"}{basis > 0 && ` · ${basis} with different bases`}</span>
+            {coverage?.query === gapQuery && coverage.counts === null && <button type="button" className="text-link" onClick={()=>setRefresh(n=>n+1)}>Retry gap counts</button>}
+            <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
+            <button type="button" className="text-link" onClick={()=>{
+              const capturedAt = new Date().toISOString();
+              const lines = [
+                ["Captured at", capturedAt],
+                ["Record ID", "", ...columns.map(column => column.id)],
+                ["Section", "Measure", ...columns.map(column => column.title)],
+                ...measures.map(row => [row.section, row.label, ...row.values.map(value => value === MISSING ? "Not on file" : value)]),
+              ];
+              const csv = lines.map(line=>line.map(csvCell).join(",")).join("\r\n");
+              const url = URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "site-comparison-"+capturedAt.slice(0,10)+".csv";
+              link.click();
+              window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }}>Download dated snapshot</button>
             {(showAll || visible.length < measures.length) && (
               <button type="button" className="text-link" aria-expanded={showAll} aria-controls="comparison-facts" onClick={() => setShowAll(value => !value)}>
-                {showAll ? "Show differences" : "Show all measures"}
+                {showAll ? "Show decision criteria" : "Show all measures"}
               </button>
             )}
           </div>
           <div className="comparison-scroll" id="comparison-facts" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
-            <table className="comparison-table" data-sites={columns.length}>
+            <table className="comparison-table" data-highlight={highlight} data-sites={columns.length}>
               <caption className="sr">Site comparison</caption>
               <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
               {compareSections.map(section => {
@@ -101,7 +139,7 @@ export default function CompareTray({
                         <th scope="row">{label}{kind === "basis" && <small>Different bases</small>}{kind === "gap" && <small>Evidence gap</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {kind !== "detail" && value !== MISSING && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
+                            {kind !== "detail" && value !== MISSING && !["Unavailable","Checking…","Not applicable"].includes(value) && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
                               inspectedCell.current = event.currentTarget;
                               onInspect(columns[i].id, label);
                             }}>{value}</button> : value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}

@@ -2,9 +2,11 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { openPanel } from "./panel";
+import { canReview, openPanel, useActionStatus } from "./panel";
 
 export default function SaveComparison({ query }: { query: () => string }) {
+  const { actionRole } = useActionStatus();
+  const [team,setTeam] = useState(false);
   const params = useSearchParams();
   const savedId = params.get("savedView");
   const [reopened, setReopened] = useState<{ id: string; name: string; query: string } | null>(null);
@@ -31,7 +33,7 @@ export default function SaveComparison({ query }: { query: () => string }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim() || sending.current) return;
-    const body = JSON.stringify({ name: name.trim(), query: query(), scope: "personal" });
+    const body = JSON.stringify({ name: name.trim(), query: query(), scope: canReview(actionRole) && team ? "team" : "personal" });
     if (receipt.current.body !== body) receipt.current = { body, key: crypto.randomUUID() };
     sending.current = true;
     setBusy(true);
@@ -52,10 +54,12 @@ export default function SaveComparison({ query }: { query: () => string }) {
     }
   }
   const shown = restored || (saved?.context === current.toString() ? saved.name : "");
-  if (shown) return <span className="comparison-receipt" role="status">Saved · {shown} <button className="text-link" type="button" onClick={() => openPanel("views")}>Saved views</button></span>;
+  if (shown) return <span className="comparison-receipt" role="status">Live comparison · {shown} <button className="text-link" type="button" onClick={() => openPanel("views")}>Saved views</button></span>;
   if (!editing) return <button className="paper-btn" type="button" onClick={() => setEditing(true)}>Save comparison</button>;
   return <form className="comparison-save" aria-label="Save comparison" onSubmit={submit}>
     <label>Comparison name<input autoFocus required className="field" maxLength={80} value={name} disabled={busy} onChange={event => setName(event.target.value)} /></label>
+    <small>Opens with the latest figures.</small>
+    {canReview(actionRole) && <label className="act-check"><input type="checkbox" className="check" checked={team} disabled={busy} onChange={event=>setTeam(event.target.checked)} />Share with the team</label>}
     <button className="primary" disabled={busy || !name.trim()} type="submit">{busy ? "Saving…" : "Save"}</button>
     <button className="text-link" disabled={busy} type="button" onClick={() => { setEditing(false); setError(""); }}>Cancel</button>
     {error && <p role="alert">{error}</p>}

@@ -239,12 +239,15 @@ async function discussion(id: string) {
       id,
       href: `${siteHref(id)}&panel=discussion`,
       label: "Discussion",
-      notes: notes.map((note) => ({ id: note.id, authorId: note.authorId, body: note.body, href: `${siteHref(id)}&panel=discussion` })),
+      notes: notes.filter(note => !note.deleted).map((note) => ({ id: note.id, authorId: note.authorId, body: note.body, resolved: Boolean(note.resolvedAt), href: `${siteHref(id)}&panel=discussion&note=${encodeURIComponent(note.parentId || note.id)}` })),
       suggestions: suggestions.map((item) => ({
         id: item.id,
         title: item.title,
         status: item.status,
         field: item.field,
+        owner: item.ownerName || item.ownerId || null,
+        due: item.targetOn,
+        completed: Boolean(item.doneAt),
         proposedValue: item.proposedValue,
         href: `${siteHref(id)}&panel=discussion`,
       })),
@@ -261,7 +264,7 @@ async function financials(id: string) {
   const panel = loadFinancialPanel(deal as unknown as DealProps, true);
   return {
     id,
-    href: siteHref(id),
+    href: siteHref(id) + "&panel=economics",
     label: "Financials",
     headline: panel.headline.text,
     figures: panel.figures.slice(0, 12).map((item) => ({ figure: item.figure, period: item.periodLabel, text: item.text })),

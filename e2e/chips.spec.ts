@@ -76,8 +76,6 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
   if (phone) {
     await expect(page.getByTestId("phone-cards")).toBeVisible();
     await page.getByTestId("phone-cards").screenshot({ path: shotPath(`chips-grid-${suffix}`) });
-    await page.getByRole("button", { name: "More list actions" }).click();
-    await page.getByRole("menuitem", { name: "Select", exact: true }).click();
     await page.locator("[data-testid=phone-cards] input.check").first().click();
   } else {
     const waiting = page.locator("th[data-col='chip_waiting']");

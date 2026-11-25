@@ -60,7 +60,7 @@ export function RowLinks({
         const testId = testIds === "card" ? copy.testId : `row-link-${item.kind}`;
         if (!item.href) {
           return (
-            <span key={item.kind} className="row-link muted" data-testid={testId} title={title} aria-label={title}>
+            <span key={item.kind} role="img" className="row-link muted" data-testid={testId} title={title} aria-label={title}>
               <Icon kind={item.kind} />
             </span>
           );

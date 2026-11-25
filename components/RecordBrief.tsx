@@ -26,6 +26,7 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
   const coverage = financial && pnl?.statement ? financialsCard(pnl.statement, pnl.sample)?.coverage : "";
   const land = check === "space";
   const first = financial || (land && missing) ? undefined : figures[0];
+  const fit = figures.find(fact => fact.label === "Usable bays" || fact.label === "Open land");
   const economics = figures.find(fact => fact.label === (input.deal?.cash_flow_label || "Cash flow")) || figures.find(fact => fact.label === "Asking price");
   const featuredEconomics = economics !== first ? economics : undefined;
   const others = figures.filter(fact => fact !== first && fact !== featuredEconomics);
@@ -37,6 +38,7 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
       <div className="brief-decision"><span>Screening decision</span><h3>{status}</h3></div>
       {reason && reason !== status && <p>{reason}</p>}
       <dl>
+        <div><dt>Site fit</dt><dd>{input.site?.verdict || (fit ? fit.label + " · " + fit.value : "Fit requires verification")}</dd></div>
         <div><dt>Next check</dt><dd>{evidence?.kind === "county"
           ? <a href={evidence.href} target="_blank" rel="noopener noreferrer">{review} <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>
           : evidence?.kind === "space" ? <button type="button" className="text-link" onClick={() => {
@@ -48,6 +50,7 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
         {financial ? <div><dt>Statement coverage</dt><dd>{coverage || (pnl?.settled ? "No statement coverage on file." : "Checking statement coverage…")}{coverage && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} loaded={pnl} compact="link" />}</dd></div>
           : land && missing ? <div><dt>Open land</dt><dd>{missing}</dd></div>
           : first ? <FigureRow fact={first} /> : <div><dt>Evidence</dt><dd>No screening figures on file.</dd></div>}
+        {input.signedIn && !economics && !cashGap && <div><dt>Economics</dt><dd>{cash?.hidden || input.deal?.kind === "land" ? "Operating income not applicable" : "No asking price or operating income on file"}</dd></div>}
         {featuredEconomics && <FigureRow fact={featuredEconomics} />}
         {cashGap && <div><dt>Cash flow</dt><dd>{cashGap}</dd></div>}
       </dl>

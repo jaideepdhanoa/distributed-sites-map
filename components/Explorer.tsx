@@ -20,6 +20,7 @@ import PipelineList, { type PipelineRow } from "./PipelineList";
 import { numberEvidence } from "@/lib/comparison";
 import SaveComparison from "./actions/SaveComparison";
 import type { ListLayout } from "@/lib/listLayout";
+import MyWork from "./MyWork";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
 import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/actions/quiet";
@@ -412,7 +413,8 @@ export default function Explorer() {
   const ndaRaw = params.get("nda") || "";
   const ndaId = /^NDA-\d{3,}$/i.test(ndaRaw) ? ndaRaw.toUpperCase() : "";
   const ndaParam = ndaRaw === "1" || Boolean(ndaId);
-  const loopsParam = params.get("loops") === "1";
+  const myWork = params.get("loops") === "work";
+  const loopsParam = myWork || params.get("loops") === "1";
   const loopsAllowed = Boolean(me?.actionRole && ndaQueueAllowed(me.actionRole));
   const loopsVisible = loopsParam && loopsAllowed;
   const ndaVisible = ndaParam && !loopsVisible;
@@ -551,11 +553,11 @@ export default function Explorer() {
     write({ pill: next });
   }
 
-  function chooseFunnel(next: FunnelMode) {
+  function chooseFunnel(next: FunnelMode, workspace = false) {
     window.localStorage.setItem(FUNNEL_STORAGE, next);
     window.localStorage.setItem(FUNNEL_VERSION_KEY, FUNNEL_VERSION);
     setFunnelPref({ version: FUNNEL_VERSION, value: next });
-    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null, nda: null, loops: null });
+    write({ ...(workspace ? { loops:null, nda:null, review:null, i:null, rsite:null, site:null, panel:null, note:null, compare:null, measure:null, slist:null, savedView:null, view:next === "pipeline" ? "list" : null } : {}), funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null, nda: null, loops: null });
   }
 
   function chooseBasemap(next: "positron" | "satellite") {
@@ -580,12 +582,12 @@ export default function Explorer() {
   useEffect(() => {
     if (inspecting) shellRef.current?.querySelector<HTMLButtonElement>(".comparison-back")?.focus({ preventScroll: true });
   }, [inspecting, selected]);
-  function inspectComparison(id: string, measure: string) {
+  function inspectComparison(id: string, measure: string, source?: URLSearchParams) {
     comparisonOrigin.current = currentSearch();
     setPreviewId(null);
     setSelected(id);
-    const panel = numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
-    replaceSearch(comparisonOrigin.current, { site: id, measure, panel, sheet: "full" }, true);
+    const panel = measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
+    replaceSearch(comparisonOrigin.current, { site: id, measure, panel:source?.get("panel") || panel, note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {
@@ -650,7 +652,7 @@ export default function Explorer() {
   function write(next: Record<string, string | null>, history = false) {
     const live = typeof window === "undefined" ? params.toString() : currentSearch();
     const prior = new URLSearchParams(live);
-    const enteringWork = next.review === "1" || Boolean(next.nda) || next.loops === "1";
+    const enteringWork = next.review === "1" || Boolean(next.nda) || Boolean(next.loops);
     if (enteringWork && !prior.has("nda") && !prior.has("loops") && prior.get("review") !== "1" && prior.get("view") !== "review" && !prior.has("ndafrom")) {
       const scroller = document.querySelector<HTMLElement>(".list-x, .list-pane .list-scroll:not(:has(.list-x))");
       workOrigin.current = { query: prior.toString(), top: scroller?.scrollTop || 0, left: scroller?.scrollLeft || 0, ...lastCell.current };
@@ -2275,7 +2277,7 @@ export default function Explorer() {
     const url = new URL(href, window.location.origin);
     const id = url.searchParams.get("site");
     setAskOpen(false);
-    if (id && url.pathname === "/" && compareIds.includes(id) && [...url.searchParams.keys()].every(key => key === "site")) inspectComparison(id, "Screening decision");
+    if (id && url.pathname === "/" && compareIds.includes(id) && [...url.searchParams.keys()].every(key => ["site","panel","note"].includes(key))) inspectComparison(id, "Screening decision",url.searchParams);
     else if (id && url.pathname === "/" && [...url.searchParams.keys()].every(key => key === "site")) choose(id);
     else router.push(href, { scroll: false });
   }
@@ -2307,7 +2309,7 @@ export default function Explorer() {
       <header className="bar">
         <ActionsQuietNotice />
         <div className="top">
-          <Wordmark view={tableOpen ? "list" : "map"} />
+          <Wordmark view={listView || tableOpen ? "list" : "map"} />
           <button className="paper-btn workspace-scope only-desktop" type="button" data-testid="map-scope" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
             {scopeLabel}
           </button>
@@ -2315,23 +2317,11 @@ export default function Explorer() {
             <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search everything" onClick={() => setCommandOpen(true)}>Search</button>
             <kbd data-testid="command-search-open" aria-hidden="true">{appleShortcut ? "⌘K" : "Ctrl K"}</kbd>
           </div>
-          <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
-            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
-            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-          </div>
           <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
           {desktopFilters}
-          {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
-              Review{(() => {
-                const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
-                return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
-              })()}
-            </button>
-          ) : null}
           {loopsAllowed ? (
             <button type="button" className={`paper-btn nda-launch ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => ndaVisible && restoreOrigin() ? undefined : write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
               NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
@@ -2374,6 +2364,21 @@ export default function Explorer() {
             ) : null}
           </div>
         </div>
+        <nav className="workspace-jobs" aria-label="Acquisition workspace">
+          {(["universe","pipeline"] as const).map(job => {
+            const active = funnel === job && !inReview && !loopsVisible && !ndaVisible;
+            return <button type="button" key={job} className={active ? "chip on" : "chip"} aria-current={active ? "page" : undefined} onClick={()=>{if (!active) {setSelected(null); chooseFunnel(job,true);}}}>{job === "universe" ? "Explore" : "Pipeline"}</button>;
+          })}
+          {me?.actionsEnabled && loopsAllowed && <button type="button" className={loopsVisible || ndaVisible ? "chip on" : "chip"} aria-current={myWork ? "page" : undefined} onClick={()=>{if (!myWork) {setSelected(null);write({loops:"work",nda:null,view:null,table:null,review:null,i:null,site:null,measure:null,compare:null});}}}>My work</button>}
+          {me?.actionsEnabled ? (
+            <button className={`review-launch ${inReview ? "on" : ""}`} aria-current={inReview ? "page" : undefined} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
+              Review{(() => {
+                const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
+                return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
+              })()}
+            </button>
+          ) : null}
+        </nav>
         <div className="phone-view-row only-mobile">
           <button className="phone-step workspace-scope only-mobile" type="button" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
             {scopeLabel}
@@ -2398,11 +2403,6 @@ export default function Explorer() {
           <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
-        </div>
-        <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
-          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
-          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-          <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
         </div>
         {unavailable.length > 0 && <div role="status" className="workspace-warning">Unavailable · {unavailable.join(", ")} <button type="button" className="text-link" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></div>}
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite} <button type="button" className="text-link" onClick={() => { setSelected(null); write({ site: null, view: "list" }); }}>Back to listings</button></p> : null}
@@ -2994,7 +2994,7 @@ export default function Explorer() {
             backLabel={params.get("site") ? "Back to site" : "Back to queue"}
           />
         ) : null}
-        {loopsVisible ? <OpenLoops onOpen={choose} onClose={() => { if (!restoreOrigin()) write({ loops: null }); }} /> : null}
+        {loopsVisible && myWork && me?.u ? <MyWork username={me.u} names={Object.fromEntries([...dealRows.map(d=>[d.deal_id,d.name]), ...sites.map(s=>[s.site_id,s.name])])} close={()=>{if (!restoreOrigin()) write({loops:null});}} open={row=>{if (row.kind === "NDA") write({nda:row.id,loops:null},true); else {setSelected(row.site);write({site:row.site,panel:row.note ? "discussion" : "proposal",note:row.note || null,workItem:row.note ? null : row.id,sheet:"full"},true);}}} /> : loopsVisible ? <OpenLoops onOpen={choose} onClose={() => { if (!restoreOrigin()) write({ loops: null }); }} /> : null}
         <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
@@ -3216,7 +3216,7 @@ export default function Explorer() {
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={inspecting ? returnComparison : () => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            onClose={inspecting ? returnComparison : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
             banner={comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
@@ -3264,7 +3264,7 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={inspecting ? returnComparison : () => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            onClose={inspecting ? returnComparison : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
             banner={comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}

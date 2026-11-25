@@ -1,4 +1,4 @@
-import { cashTile, acresText, spareLandSqft, universeTrafficLine, workbookTrafficLine } from "./keyNumbers";
+import { cashTile, sheetMoney, acresText, spareLandSqft, universeTrafficLine, workbookTrafficLine } from "./keyNumbers";
 import { nextStepText, stageTitle, statusOf } from "./labels";
 import type { DealProps, SiteProps, UnscreenedProps } from "./types";
 
@@ -42,8 +42,8 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   else if (site?.lot_ac != null) add("Parcel size", acresText(site.lot_ac), site.lot_ac_source);
   else if (listing) add("Parcel size", acresText(listing.acres), "Listing");
   if (signedIn) {
-    if (present(deal?.asking_price_display)) add("Asking price", deal?.asking_price_display, deal?.asking_price_source);
-    else if (present(site?.asking_price_display)) add("Asking price", site?.asking_price_display, site?.asking_price_source, site?.asking_price_date);
+    if (deal && (present(deal.asking_price_display) || deal.asking_price != null)) add("Asking price", sheetMoney(deal.asking_price,deal.asking_price_display), deal.asking_price_source);
+    else if (site && (present(site.asking_price_display) || site.asking_price != null)) add("Asking price", sheetMoney(site.asking_price,site.asking_price_display), site.asking_price_source, site.asking_price_date);
     else add("Asking price", listing?.asking_price_display, listing?.asking_price_source);
   }
   if (signedIn && deal && deal.kind !== "land" && deal.financials_open !== false) {

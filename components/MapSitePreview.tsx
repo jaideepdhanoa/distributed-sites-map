@@ -38,7 +38,7 @@ export default function MapSitePreview(props: PreviewProps) {
       <h2 id="pin-preview-title" ref={titleRef} tabIndex={-1}>{record.name || address || id}</h2>
       {record.name && address && address !== record.name && <p className="preview-address">{address}</p>}
       <dl className="preview-facts">
-        {fact && <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}</dd></div>}
+        {fact && <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div>}
         <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>
       <div className="preview-actions">

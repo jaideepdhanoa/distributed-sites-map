@@ -73,7 +73,7 @@ export default function CompareTray({
   }
   const measures = comparisonMeasures(columns);
   const differences = measures.filter(row => row.kind === "different").length;
-  const gaps = measures.filter(row => row.kind === "gap").length;
+  const gaps = measures.filter(row => row.partial).length;
   const basis = measures.filter(row => row.kind === "basis").length;
   const visible = showAll ? measures : measures.filter(row => acquisitionCriteria.includes(row.label) || ["different", "gap", "basis"].includes(row.kind));
   return (
@@ -99,7 +99,7 @@ export default function CompareTray({
       {count >= 2 ? (
         <>
           <div className="comparison-mode">
-            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps} one-sided {gaps === 1 ? "gap" : "gaps"}{basis > 0 && ` · ${basis} with different bases`}</span>
+            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps} {gaps === 1 ? "measure has" : "measures have"} missing figures{basis > 0 && ` · ${basis} with different bases`}</span>
             {coverage?.query === gapQuery && coverage.counts === null && <button type="button" className="text-link" onClick={()=>setRefresh(n=>n+1)}>Retry gap counts</button>}
             <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
             <button type="button" className="text-link" onClick={()=>{
@@ -134,9 +134,9 @@ export default function CompareTray({
                 return (
                   <tbody key={section} aria-label={section}>
                     <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
-                    {group.map(({ label, values, kind }) => (
+                    {group.map(({ label, values, kind, available, partial }) => (
                       <tr key={label} data-compare-row={label} data-state={kind}>
-                        <th scope="row">{label}{kind === "basis" && <small>Different bases</small>}{kind === "gap" && <small>Evidence gap</small>}</th>
+                        <th scope="row">{label}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{partial && <small>Available for {available} of {count} sites</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
                             {kind !== "detail" && value !== MISSING && !["Unavailable","Checking…","Not applicable"].includes(value) && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
@@ -151,7 +151,7 @@ export default function CompareTray({
                 );
               })}
             </table>
-            {!visible.length && <p className="note">No decision differences or one-sided gaps in the recorded measures.</p>}
+            {!visible.length && <p className="note">No differing figures to show.</p>}
           </div>
         </>
       ) : null}

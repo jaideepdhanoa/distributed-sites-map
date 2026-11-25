@@ -50,3 +50,16 @@ test("EBITDA keeps normalized and stated bases explicit and never substitutes SD
   assert.equal(ebitda!.kind,"gap");
   assert.equal(compare(deal({cash_flow_label:"Normalized EBITDA"}),deal({cash_flow_label:"EBITDA"})).get("EBITDA")?.kind,"basis");
 });
+
+test("coverage counts recorded zero and separates absent, inapplicable and incompatible figures", () => {
+  const samples = [
+    deal({stated_revenue:0,revenue_period:"2025"}),
+    deal({stated_revenue:30,revenue_period:"2024"}),
+    deal({kind:"land"}), deal({stated_revenue:null,stated_revenue_display:""}),
+  ];
+  const row = comparisonMeasures(samples.map((item,i)=>({id:String(i),title:"Example",rows:dealRows(item,[],true)}))).find(row=>row.label==="Revenue")!;
+  assert.equal(row.available,2);
+  assert.equal(row.partial,true);
+  assert.equal(row.kind,"basis");
+  assert.deepEqual(row.values,["$0 · 2025","$30 · 2024","Not applicable","—"]);
+});

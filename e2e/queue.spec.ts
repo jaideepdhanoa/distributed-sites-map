@@ -547,7 +547,7 @@ for (const width of [1440, 390]) {
     const cohort = (catalog.features as Site[]).filter(f => f.properties.city === "PHX" && f.properties.origin === "universe" && f.properties.counts_as_site && !f.properties.linked_deal_id).slice(0, 6).map((f, i) => ({
       ...f, properties: { ...f.properties, name: names[i], address: (100 + i) + " Example Ave", business_type: "Car wash", counts_as_site: true,
         land_only: false, duplicate_of: "", in_area: true, service_area_class: "inside", land_tier: i < 5 ? "L10" : "", tenure_fail: false,
-        spare_ac_own: i < 5 ? (i + 3) / 10 : null, spare_ac_own_text: "", verdict: "", owner: "", asking_price_display: "", summary_why: "" },
+        spare_ac_own: i < 5 ? (i + 3) / 10 : null, spare_ac_own_text: "", verdict: "", owner: "", asking_price: i === 0 ? 0 : null, asking_price_display: "", asking_price_source: "", summary_why: "" },
     }));
     expect(cohort).toHaveLength(6);
     const id = cohort[0].properties.site_id;
@@ -603,6 +603,12 @@ for (const width of [1440, 390]) {
     const gapCounts = tray.locator('[data-compare-row="Open evidence gaps"] td');
     await expect(gapCounts.first()).toHaveText("1");
     await expect(gapCounts.nth(1)).toHaveText("0");
+    const price = tray.locator('[data-compare-row="Asking"]');
+    await expect(price).toContainText("Available for 1 of 2 sites");
+    await expect(price.locator("td").first()).toContainText("$0");
+    await expect(price.locator("td").last()).toHaveText("Not on file");
+    await mkdir("review-shots", { recursive:true });
+    await price.screenshot({ path:"review-shots/"+width+"-comparison-coverage.png" });
     await capture("compare", tray);
     const downloaded = page.waitForEvent("download");
     await tray.getByRole("button",{name:"Download dated snapshot"}).click();

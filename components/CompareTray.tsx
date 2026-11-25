@@ -1,3 +1,4 @@
+import { csvCell } from "@/lib/actions/text";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
@@ -103,11 +104,17 @@ export default function CompareTray({
             <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
             <button type="button" className="text-link" onClick={()=>{
               const capturedAt = new Date().toISOString();
-              const data = { capturedAt, sites:columns.map(({id,title})=>({id,title})), measures:measures.map(({label,values,section,kind})=>({label,values,section,kind})) };
-              const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+              const lines = [
+                ["Captured at", capturedAt],
+                ["Record ID", "", ...columns.map(column => column.id)],
+                ["Section", "Measure", ...columns.map(column => column.title)],
+                ...measures.map(row => [row.section, row.label, ...row.values.map(value => value === MISSING ? "Not on file" : value)]),
+              ];
+              const csv = lines.map(line=>line.map(csvCell).join(",")).join("\r\n");
+              const url = URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
               const link = document.createElement("a");
               link.href = url;
-              link.download = "site-comparison-"+capturedAt.slice(0,10)+".json";
+              link.download = "site-comparison-"+capturedAt.slice(0,10)+".csv";
               link.click();
               window.setTimeout(()=>URL.revokeObjectURL(url),1000);
             }}>Download dated snapshot</button>

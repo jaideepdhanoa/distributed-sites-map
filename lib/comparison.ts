@@ -12,11 +12,11 @@ type CompareRow = { label: string; value: string; key?: string | number | null; 
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
 export const compareSections = ["Site fit", "Financials", "Evidence quality", "Diligence", "Record details"] as const;
-export const acquisitionCriteria = ["Open land", "Bays that fit", "Power", "Service area", "Zoning", "Asking", "Revenue", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "NDA", "Open evidence gaps", "Blocker", "Next check"];
+export const acquisitionCriteria = ["Open land", "Bays that fit", "Power", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
 
 function sectionFor(label: string): typeof compareSections[number] {
   if (["Address", "Property owner"].includes(label)) return "Record details";
-  if (["Financial package", "Cash flow coverage", "Figure basis", "Reporting period", "Land measurement"].includes(label)) return "Evidence quality";
+  if (["Financial package", "Cash flow coverage", "Figure basis", "Reporting period", "Financial source", "Land measurement"].includes(label)) return "Evidence quality";
 
   if (["Bays that fit", "Service area", "Traffic", "Land", "Open land", "Power", "3-mile population", "Washes", "Depot", "Zoning"].includes(label)) return "Site fit";
   if (["Stage", "Open evidence gaps", "NDA", "Suggested drop", "Next check", "Blocker"].includes(label)) return "Diligence";
@@ -61,6 +61,7 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean)
     { label: "Zoning", value: shown(linked?.zoning) },
     { label: "Property owner", value: shown(linked?.owner) },
     ...decisionRows(deal, signedIn),
+    ...ebitdaRows(deal, signedIn),
     { label: "Cash flow", key: signedIn && !cash.hidden ? deal.stated_cash_flow ?? deal.stated_cash_flow_display : null, basis: earningsBasis(deal), value: signedIn && cash.hidden ? "Not applicable" : signedIn ? shown(cashValue) : MISSING },
     { label: "Per acre", value: signedIn && deal.price_per_acre != null ? sheetMoney(deal.price_per_acre, fullMoney(deal.price_per_acre)) : "—" },
     ...pricingRows(deal, signedIn),
@@ -116,13 +117,23 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean)
     { label: "Zoning", value: shown(site.zoning) },
     { label: "Property owner", value: shown(site.owner) },
     ...decisionRows(linked, signedIn),
-    ...(signedIn && !linked ? ["Revenue","Asking / earnings","Land estimate","NDA","Blocker","Next check","Figure basis","Reporting period"].map(label=>({label,value:MISSING})) : []),
+    ...ebitdaRows(linked, signedIn),
+    ...(signedIn && !linked ? ["Revenue","Asking / earnings","Land estimate","NDA","Blocker","Next check","Figure basis","Reporting period","Financial source"].map(label=>({label,value:MISSING})) : []),
     { label: "Cash flow", key: signedIn && cash && !cash.hidden ? linked?.stated_cash_flow ?? linked?.stated_cash_flow_display : null, basis: earningsBasis(linked), value: signedIn && cash?.hidden ? "Not applicable" : signedIn ? shown(cashValue) : MISSING },
     { label: "Per acre", value: signedIn && linked?.price_per_acre != null ? sheetMoney(linked.price_per_acre, fullMoney(linked.price_per_acre)) : "—" },
     ...(linked ? pricingRows(linked, signedIn) : []),
   ];
 }
 
+
+function ebitdaRows(deal: DealProps | undefined, signedIn: boolean): CompareRow[] {
+  if (!signedIn) return [];
+  if (deal && cashTile(deal).hidden) return [{label:"EBITDA",value:"Not applicable"}];
+  if (!deal || !/\bebitda\b/i.test(deal.cash_flow_label || "")) return [{label:"EBITDA",value:MISSING}];
+  const amount = deal.stated_cash_flow_display || (deal.stated_cash_flow != null ? fullMoney(deal.stated_cash_flow) : MISSING);
+  return [{label:"EBITDA",key:deal.stated_cash_flow ?? deal.stated_cash_flow_display, basis:earningsBasis(deal),
+    value:withEvidence(amount,deal.cash_flow_label,deal.earnings_basis,deal.earnings_period,deal.figures_source)}];
+}
 
 function earningsBasis(deal?: DealProps) {
   return [deal?.cash_flow_label?.trim(), deal?.earnings_period?.trim(), deal?.earnings_basis?.trim()].join("|").toLowerCase();
@@ -132,6 +143,7 @@ function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRo
   if (!deal || !signedIn) return [];
   const applicable = deal.kind !== "land" && deal.financials_open !== false && deal.figures_status !== "vacant";
   return [
+    { label: "Financial source", value: applicable ? shown(deal.figures_source) : "Not applicable" },
     { label: "Financial package", value: applicable ? shown(packageLine(deal) || deal.package_status) : "Not applicable" },
     { label: "Cash flow coverage", value: !applicable ? "Not applicable" : deal.stated_cash_flow != null || deal.stated_cash_flow_display ? "Reported" : cashTile(deal).value },
     { label: "Figure basis", value: applicable ? shown(deal.earnings_basis || deal.figures_basis) : "Not applicable" },

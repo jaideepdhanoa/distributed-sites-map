@@ -41,3 +41,12 @@ test("shortlist claims require links to selected evidence", async () => {
   assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=OTHER).",sources).gap,true);
   assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=EXAMPLE-A).\n\nRevenue is verified.",sources).gap,true);
 });
+
+test("EBITDA keeps normalized and stated bases explicit and never substitutes SDE", () => {
+  const rows = compare(deal({cash_flow_label:"Normalized EBITDA"}),deal({cash_flow_label:"SDE"}));
+  const ebitda = rows.get("EBITDA");
+  assert.match(ebitda!.values[0],/Normalized EBITDA/);
+  assert.equal(ebitda!.values[1],"—");
+  assert.equal(ebitda!.kind,"gap");
+  assert.equal(compare(deal({cash_flow_label:"Normalized EBITDA"}),deal({cash_flow_label:"EBITDA"})).get("EBITDA")?.kind,"basis");
+});

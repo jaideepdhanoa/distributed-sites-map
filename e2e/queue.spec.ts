@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
@@ -604,6 +604,15 @@ for (const width of [1440, 390]) {
     await expect(gapCounts.first()).toHaveText("1");
     await expect(gapCounts.nth(1)).toHaveText("0");
     await capture("compare", tray);
+    const downloaded = page.waitForEvent("download");
+    await tray.getByRole("button",{name:"Download dated snapshot"}).click();
+    const snapshot = await downloaded;
+    expect(snapshot.suggestedFilename()).toMatch(/^site-comparison-.*\.csv$/);
+    const contents = await readFile((await snapshot.path())!,"utf8");
+    expect(contents).toContain('"Captured at"');
+    expect(contents).toContain('"EBITDA"');
+    expect(contents).toContain('"Canyon Wash","Desert Palm Wash"');
+
     await page.route("**/api/ask/status", route => route.fulfill({ json: { ready: true } }));
     await page.route("**/api/ask", route => {
       expect(route.request().postDataJSON().siteIds).toEqual(cohort.slice(0, 2).map(row => row.properties.site_id));

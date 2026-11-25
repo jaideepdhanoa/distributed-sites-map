@@ -21,10 +21,12 @@ export default function Economics({
       {[
         "Asking",
         "Revenue",
+        "EBITDA",
         "Cash flow",
         "Asking / earnings",
         "Land estimate",
         "Figure basis",
+        "Financial source",
         "Reporting period",
         "Financial package",
       ].map((label) => {

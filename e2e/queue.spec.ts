@@ -531,9 +531,14 @@ for (const width of [1440, 390]) {
     expect(cohort).toHaveLength(6);
     const id = cohort[0].properties.site_id;
     const source = "Example county assessment map";
-    const note = async (body: string) => expect((await request.post("/api/actions/notes", { data: { targetKind: "site", targetId: id, body } })).status()).toBe(201);
+    const note = async (body: string) => {
+      const response = await request.post("/api/actions/notes", { data: { targetKind: "site", targetId: id, body } });
+      expect(response.status()).toBe(201);
+      return (await response.json()).note.id as string;
+    };
     await note("Screening finding\nParcel boundary located.\nCheck: Verify parcel.\nSource: " + source);
-    await note("Missing evidence\nConfirm the usable area at the rear of the parcel.\nCheck: Verify usable land.\nSource: " + source);
+    const gapText = width === 390 ? "Confirm the rear parcel boundary." : "Confirm rear parcel access.";
+    const gapId = await note("Missing evidence\n" + gapText + "\nCheck: Verify usable land.\nSource: " + source);
     const created = await request.post("/api/actions/suggestions", { data: { targetKind: "site", targetId: id, field: "proposed_next_step", title: "Verify rear parcel access", proposedValue: "Verify rear parcel access", ownerId: "contributor" } });
     expect(created.status()).toBe(201);
     const step = (await created.json()).suggestion;
@@ -573,6 +578,21 @@ for (const width of [1440, 390]) {
     const figure = tray.getByRole("button", { name: "Inspect Open land for Canyon Wash" });
     await expect(figure).toBeVisible();
     await capture("compare", tray);
+    await page.route("**/api/ask/status", route => route.fulfill({ json: { ready: true } }));
+    await page.route("**/api/ask", route => {
+      expect(route.request().postDataJSON().siteIds).toEqual(cohort.slice(0, 2).map(row => row.properties.site_id));
+      return route.fulfill({ contentType: "text/event-stream", body: "data: " + JSON.stringify({
+        done: true, text: "Open land is recorded. [Parcel evidence](/?site=" + id + ")",
+      }) + "\n\n" });
+    });
+    await tray.getByRole("button", { name: "Ask about these sites" }).click();
+    const ask = page.getByTestId("ask-panel");
+    await expect(ask.getByRole("combobox")).toHaveValue("list");
+    await ask.getByRole("button", { name: "Compare fit and economics" }).click();
+    await ask.getByRole("button", { name: "Ask", exact: true }).click();
+    await ask.getByRole("link", { name: "Parcel evidence" }).click();
+    await page.getByRole("button", { name: /Back to comparison/ }).click();
+    await expect(tray).toBeVisible();
     await figure.click();
     const drawer = page.locator("aside.drawer");
     await expect(drawer).toHaveAttribute("data-record", id);
@@ -607,11 +627,38 @@ for (const width of [1440, 390]) {
     await figure.click();
     const brief = drawer.getByRole("region", { name: "Screening decision" });
     await expect(brief).toContainText(source);
-    await expect(brief).toContainText("Verify rear parcel access");
-    await expect(brief).toContainText(/OwnerContributor/i);
+    const gap = brief.getByRole("status");
+    await expect(gap).toContainText(gapText);
+    await expect(gap).toContainText("Unassigned");
+    await expect(gap).not.toContainText("Verify rear parcel access");
+    await gap.getByRole("button", { name: "Propose gap action" }).click();
+    const work = drawer.getByTestId("next-step-form");
+    await expect(work.getByLabel("Title")).toHaveValue(gapText);
+    await work.getByLabel("Owner", { exact: true }).selectOption("contributor");
+    await work.getByLabel("Due", { exact: true }).fill("2030-04-15");
+    await work.getByRole("button", { name: "Submit for approval" }).click();
+    await expect(gap).toContainText("Awaiting approval");
+    await expect(gap).toContainText("Contributor");
+    await expect(gap).toContainText("2030-04-15");
+    const proposals = (await (await request.get("/api/actions/suggestions?targetKind=site&targetId=" + id)).json()).suggestions;
+    const linked = proposals.find((p: { reason: string }) => p.reason.endsWith("note=" + gapId));
+    expect(linked.status).toBe("open");
+    expect((await request.post("/api/actions/suggestions/" + linked.id, { data: { status: "accepted" } })).ok()).toBe(true);
+    await page.reload();
+    await expect(gap).toContainText("Approved");
+    await gap.getByRole("button", { name: "Open evidence thread" }).click();
+    const thread = drawer.locator('[data-note-id="' + gapId + '"]');
+    await expect(thread).toContainText(gapText);
+    expect(new URL(page.url()).searchParams.get("note")).toBe(gapId);
     await expect(brief.getByRole("time").first()).toBeAttached();
     await brief.locator("summary").filter({ hasText: "Earlier findings" }).click();
     await expect(brief).toContainText("Parcel boundary located.");
     await capture("handoff", brief);
+    expect((await request.post("/api/actions/notes", { data: { targetKind: "site", targetId: id, parentId: gapId, body: "Field check confirmed the access line on the assessment map." } })).ok()).toBe(true);
+    expect((await request.post("/api/actions/notes/" + gapId + "/resolve", { data: {} })).ok()).toBe(true);
+    await page.reload();
+    await expect(gap).toContainText("Evidence gap resolved");
+    await expect(thread).toContainText("Field check confirmed");
+    await expect(gap.getByRole("button", { name: "Propose gap action" })).toHaveCount(0);
   });
 }

@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import type { Note } from "@/lib/actions/notes";
 import type { Suggestion } from "@/lib/actions/suggestions";
-import type { WorkbookStep } from "@/lib/workbookStep";
+import { gapReference } from "@/lib/actions/gapReference";
 import { formatPacific } from "@/lib/actions/time";
 import { canWrite, useActionStatus } from "./panel";
 
-type Finding = { id: string; title: string; text: string; source: string; author: string; at: string; gap: boolean };
-type NextAction = { text: string; owner: string };
+type Finding = { id: string; title: string; text: string; source: string; author: string; at: string; gap: boolean; resolvedAt?: string | null; resolvedBy?: string | null };
+
 function parseFinding(body: string) {
   const checkAt = body.lastIndexOf("\nCheck: ");
   if (checkAt < 0) return null;
@@ -21,10 +21,10 @@ function parseFinding(body: string) {
   return { text: body.slice(first + 1, checkAt), source: sourceAt < 0 ? "" : body.slice(sourceAt + "\nSource: ".length), gap: mode === "Missing evidence" };
 }
 function noteFinding(note: Note): Finding | null {
-  const parsed = !note.deleted && parseFinding(note.body);
+  const parsed = !note.deleted && !note.parentId && parseFinding(note.body);
   if (!parsed) return null;
   const gap = parsed.gap && !note.resolvedAt;
-  return { ...parsed, gap, id: note.id, title: parsed.gap ? gap ? "Evidence gap saved" : "Evidence gap resolved" : "Finding saved", author: note.authorId, at: note.createdAt };
+  return { ...parsed, gap: parsed.gap, resolvedAt: note.resolvedAt, resolvedBy: note.resolvedBy, id: note.id, title: parsed.gap ? gap ? "Evidence gap saved" : "Evidence gap resolved" : "Finding saved", author: note.authorId, at: note.createdAt };
 }
 function proposalFinding(item: Suggestion): Finding | null {
   const parsed = item.field === "correction" && parseFinding(item.reason);
@@ -32,15 +32,40 @@ function proposalFinding(item: Suggestion): Finding | null {
   const title = item.status === "open" ? "Change submitted for approval" : "Proposed change · " + item.status;
   return { ...parsed, gap: false, id: item.id, title, text: item.proposedValue + " · " + parsed.text, author: item.authorId, at: item.createdAt };
 }
-function FindingEntry({ item, action, checking }: { item: Finding; action: NextAction | null; checking: boolean }) {
+const actionLabels: Record<Suggestion["status"], string> = {
+  open: "Awaiting approval", accepted: "Approved", rejected: "Declined", applied: "Applied",
+  agreed_waiting: "Agreed, waiting", ready: "Ready for approval", overtaken: "Overtaken", superseded: "Superseded",
+};
+
+function FindingEntry({ item, steps, targetId, writable, unavailable }: { item: Finding; steps: Suggestion[]; targetId: string; writable: boolean; unavailable: boolean }) {
+  const router = useRouter();
   const link = /^https?:\/\//i.test(item.source);
+  const reference = gapReference(targetId, item.id);
+  const linked = steps.filter(step => step.reason === reference);
+  function openThread() {
+    const query = new URLSearchParams(currentSearch());
+    query.set("panel", "discussion");
+    query.set("note", item.id);
+    const href = "/?" + query;
+    rememberSearch(href);
+    router.replace(href, { scroll: false });
+  }
   return <>
     <strong>{item.title}</strong><p>{item.text}</p>
     <div className="finding-byline">{item.author} · <time dateTime={item.at}>{formatPacific(item.at)}</time></div>
     <dl className="finding-details"><div><dt>Source</dt><dd>{link ? <a href={item.source} target="_blank" rel="noopener noreferrer">Open source ↗</a> : item.source || "Not recorded"}</dd></div>
-      {item.gap && <><div><dt>Next action</dt><dd>{checking ? "Checking…" : action?.text || "No next action recorded"}</dd></div>
-      <div><dt>Owner</dt><dd>{checking ? "Checking…" : action?.owner || "Unassigned"}</dd></div></>}
+      {item.gap && <>
+        {linked.length ? linked.map(step => <div key={step.id}><dt>Gap action</dt><dd>{step.title || step.proposedValue}
+          <small>{step.doneAt ? "Completed" : actionLabels[step.status]} · {step.ownerName || step.ownerId || "Unassigned"} · {step.targetOn ? "Due " + step.targetOn : "No due date"}</small>
+        </dd></div>) : <div><dt>Gap owner</dt><dd>{unavailable ? "Unavailable" : "Unassigned"}</dd></div>}
+        {item.resolvedAt && <div><dt>Resolved</dt><dd>{item.resolvedBy} · <time dateTime={item.resolvedAt}>{formatPacific(item.resolvedAt)}</time></dd></div>}
+      </>}
     </dl>
+    {item.gap && <div className="gap-actions">
+      {writable && !item.resolvedAt && !unavailable && !linked.some(step => ["open", "accepted", "agreed_waiting", "ready"].includes(step.status) && !step.doneAt) &&
+        <button type="button" className="text-link" onClick={() => window.dispatchEvent(new CustomEvent("sites-prefill-work-item", { detail: { targetId, title: item.text, reason: reference } }))}>Propose gap action</button>}
+      <button type="button" className="text-link" onClick={openThread}>Open evidence thread</button>
+    </div>}
   </>;
 }
 
@@ -49,11 +74,9 @@ type FindingProps = {
   id: string;
   source: string;
   review: string;
-  dealId?: string;
-  nextStep?: string;
 };
 
-export default function RecordFinding({ kind, id, source, review, dealId, nextStep }: FindingProps) {
+export default function RecordFinding({ kind, id, source, review }: FindingProps) {
   const status = useActionStatus();
   const params = useSearchParams();
   const findingRequested = params.get("panel") === "finding";
@@ -67,9 +90,7 @@ export default function RecordFinding({ kind, id, source, review, dealId, nextSt
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<Finding | null>(null);
   const [history, setHistory] = useState<Finding[]>([]);
-  const [approved, setApproved] = useState<NextAction | null>(null);
-  const [workbook, setWorkbook] = useState<NextAction | null>(null);
-  const [loadingOwner, setLoadingOwner] = useState(false);
+  const [steps, setSteps] = useState<Suggestion[]>([]);
   const [historyError, setHistoryError] = useState(false);
   const [retry, setRetry] = useState(0);
   const submitting = useRef(false);
@@ -89,26 +110,23 @@ export default function RecordFinding({ kind, id, source, review, dealId, nextSt
     const controller = new AbortController();
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
     async function load() {
-      const get = async (path: string, search = query) => {
-        const response = await fetch("/api/actions/" + path + "?" + search, { signal: controller.signal, cache: "no-store" });
+      const get = async (path: string) => {
+        const response = await fetch("/api/actions/" + path + "?" + query, { signal: controller.signal, cache: "no-store" });
         if (!response.ok) throw new Error("Findings unavailable");
         return (await response.json())[path];
       };
-      const [notes, proposals, related] = await Promise.all([
+      const [notes, proposals] = await Promise.all([
         get("notes") as Promise<Note[]>, get("suggestions") as Promise<Suggestion[]>,
-        dealId && dealId !== id ? get("suggestions", new URLSearchParams({ targetKind: "deal", targetId: dealId })) as Promise<Suggestion[]> : [],
       ]);
       if (controller.signal.aborted) return;
       const rows = [...notes.map(noteFinding), ...proposals.map(proposalFinding)].filter((entry): entry is Finding => Boolean(entry));
       setHistory(rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)));
-      const step = [...proposals, ...related].filter(item => item.field === "proposed_next_step" && item.status === "accepted" && !item.doneAt)
-        .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""))[0];
-      setApproved(step ? { text: step.title || step.proposedValue, owner: step.ownerName || step.ownerId || "Unassigned" } : null);
+      setSteps(proposals.filter(item => item.field === "proposed_next_step"));
       setHistoryError(false);
     }
     void load().catch(() => { if (!controller.signal.aborted) setHistoryError(true); });
     return () => controller.abort();
-  }, [status.enabled, kind, id, dealId, retry]);
+  }, [status.enabled, kind, id, retry]);
 
   useEffect(() => {
     const refresh = () => setRetry(n => n + 1);
@@ -121,20 +139,6 @@ export default function RecordFinding({ kind, id, source, review, dealId, nextSt
   }, []);
   const entries = saved && !history.some(row => row.id === saved.id) ? [saved, ...history] : history;
   const confirmation = entries[0];
-  const needsWorkbook = Boolean(status.enabled && dealId && !approved && entries.some(row => row.gap));
-  useEffect(() => {
-    if (!needsWorkbook || !dealId) return;
-    const controller = new AbortController();
-    setLoadingOwner(true);
-    fetch("/api/data/financials/" + encodeURIComponent(dealId), { signal: controller.signal }).then(async response => {
-      if (!response.ok) throw new Error("Action unavailable");
-      const step: WorkbookStep | null = (await response.json()).workbookStep;
-      if (!controller.signal.aborted) setWorkbook(step ? { text: step.text || nextStep || review, owner: step.owner || "Unassigned" } : null);
-    }).catch(() => { if (!controller.signal.aborted) setWorkbook({ text: nextStep || review, owner: "Owner unavailable" }); })
-      .finally(() => { if (!controller.signal.aborted) setLoadingOwner(false); });
-    return () => controller.abort();
-  }, [needsWorkbook, dealId, nextStep, review, retry]);
-  const action = approved || workbook || { text: nextStep || review, owner: historyError ? "Owner unavailable" : "Unassigned" };
   const writable = status.enabled && canWrite(status.actionRole);
   if (!writable && !confirmation && !historyError) return null;
 
@@ -193,7 +197,7 @@ export default function RecordFinding({ kind, id, source, review, dealId, nextSt
   }
 
   return <div className="finding-work">
-    {confirmation && !(open && writable) && <div className="finding-confirmed" tabIndex={-1} ref={confirmed} role="status"><FindingEntry item={confirmation} action={action} checking={needsWorkbook && loadingOwner} />
+    {confirmation && !(open && writable) && <div className="finding-confirmed" tabIndex={-1} ref={confirmed} role="status"><FindingEntry item={confirmation} steps={steps} targetId={id} writable={writable} unavailable={historyError} />
       {reviewing && <button type="button" className="text-link" onClick={() => {
         const back = document.querySelector<HTMLButtonElement>(".review-evidence button");
         if (back) back.click();
@@ -201,7 +205,7 @@ export default function RecordFinding({ kind, id, source, review, dealId, nextSt
       }}>Return to review</button>}
     </div>}
     {entries.length > 1 && !open && <details className="disclosure finding-history"><summary className="disclosure">Earlier findings ({entries.length - 1})</summary>
-      <ol>{entries.slice(1).map(entry => <li key={entry.id}><FindingEntry item={entry} action={action} checking={needsWorkbook && loadingOwner} /></li>)}</ol>
+      <ol>{entries.slice(1).map(entry => <li key={entry.id}><FindingEntry item={entry} steps={steps} targetId={id} writable={writable} unavailable={historyError} /></li>)}</ol>
     </details>}
     {historyError && <p className="note">Finding history unavailable. <button type="button" className="text-link" onClick={() => setRetry(n => n + 1)}>Retry</button></p>}
     {writable && (open ? <form className="finding-form" aria-label="Record finding" onSubmit={save}>

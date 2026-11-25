@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { parseAskMarkdown, type AskInline } from "@/lib/ask/markdown";
 
 function Inline({ item, onSite }: { item: AskInline; onSite: (href: string) => void }) {
@@ -27,8 +26,7 @@ function Inline({ item, onSite }: { item: AskInline; onSite: (href: string) => v
   );
 }
 
-export function AskMarkdown({ text }: { text: string }) {
-  const router = useRouter();
+export function AskMarkdown({ text, onSite }: { text: string; onSite: (href: string) => void }) {
   const blocks = parseAskMarkdown(text);
   return (
     <div className="ask-md">
@@ -39,7 +37,7 @@ export function AskMarkdown({ text }: { text: string }) {
               {block.items.map((item, itemIndex) => (
                 <li key={itemIndex}>
                   {item.map((part, partIndex) => (
-                    <Inline key={partIndex} item={part} onSite={(href) => router.push(href, { scroll: false })} />
+                    <Inline key={partIndex} item={part} onSite={onSite} />
                   ))}
                 </li>
               ))}
@@ -49,7 +47,7 @@ export function AskMarkdown({ text }: { text: string }) {
         return (
           <p key={index}>
             {block.inlines.map((part, partIndex) => (
-              <Inline key={partIndex} item={part} onSite={(href) => router.push(href, { scroll: false })} />
+              <Inline key={partIndex} item={part} onSite={onSite} />
             ))}
           </p>
         );

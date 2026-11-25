@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, type FeedSite } from "./queue/QueueView";
-import { AskPanel } from "./agent/AskPanel";
+
 import { RecordActions } from "./actions/RecordActions";
 import type { QueueReason as ReviewChange } from "@/lib/queue/order";
 import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
@@ -123,6 +123,8 @@ function guardFeatures<T extends { features?: { properties?: Record<string, unkn
   });
   return { ...body, features };
 }
+
+const AskPanel = dynamic(() => import("./agent/AskPanel").then(module => module.AskPanel));
 
 export default function Explorer() {
   const params = useSearchParams();
@@ -259,7 +261,8 @@ export default function Explorer() {
     note.dataset.hidden = "0";
   }, [ringCursor]);
   const [copied, setCopied] = useState(false);
-  const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
+  const compareParam = params.get("compare") || "";
+  const compareIds = useMemo(() => Array.from(new Set(compareParam.split("|").filter(Boolean))).slice(0, 4), [compareParam]);
   const [changesNote, setChangesNote] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -2247,6 +2250,22 @@ export default function Explorer() {
   }
 
   const recordSpaces = markedSpaces.filter((space) => space.siteId === selected);
+  function openContextAsk(comparison = false) {
+    const site = selectedDeal ? { id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id }
+      : selectedSite ? { id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id } : null;
+    const comparing = comparison || (!inspecting && compareIds.length >= 2);
+    setAskSite(comparing ? null : site);
+    setAskList(comparing ? [...compareIds] : listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
+    setAskOpen(true);
+  }
+  function inspectAskSource(href: string) {
+    const url = new URL(href, window.location.origin);
+    const id = url.searchParams.get("site");
+    setAskOpen(false);
+    if (id && url.pathname === "/" && compareIds.includes(id) && [...url.searchParams.keys()].every(key => key === "site")) inspectComparison(id, "Screening decision");
+    else if (id && url.pathname === "/" && [...url.searchParams.keys()].every(key => key === "site")) choose(id);
+    else router.push(href, { scroll: false });
+  }
   const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
@@ -2260,7 +2279,7 @@ export default function Explorer() {
       ) : null}
       {alertsOpen ? <AlertSettings onClose={() => setAlertsOpen(false)} /> : null}
       {askOpen && me?.u ? (
-        <AskPanel open shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
+        <AskPanel open canPropose={me.actionRole === "contributor" || me.actionRole === "reviewer"} onSource={inspectAskSource} shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
       <CommandSearch
         open={commandOpen}
@@ -2310,13 +2329,7 @@ export default function Explorer() {
               type="button"
               className="paper-btn ask-launch"
               data-testid="ask-open"
-              onClick={() => {
-                if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
-                else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
-                else setAskSite(null);
-                setAskList(listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
-                setAskOpen(true);
-              }}
+              onClick={() => openContextAsk()}
             >
               Ask
             </button>
@@ -2688,11 +2701,7 @@ export default function Explorer() {
               {me?.u ? (
                 <button type="button" className="menu-item ask-launch" data-testid="ask-menu" onClick={() => {
                   setMenuOpen(false);
-                  if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
-                  else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
-                  else setAskSite(null);
-                  setAskList(listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
-                setAskOpen(true);
+                  openContextAsk();
                 }}>Ask</button>
               ) : null}
             </div>
@@ -3280,6 +3289,7 @@ export default function Explorer() {
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}
           >
+            {compareIds.length >= 2 && me?.u && <button type="button" className="text-link" onClick={() => openContextAsk(true)}>Ask about these sites</button>}
             {compareIds.length >= 2 && me?.actionsEnabled && <SaveComparison key={compareIds.join("|")} query={comparisonQuery} />}
           </CompareTray>
         ) : null}

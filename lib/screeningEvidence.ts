@@ -1,4 +1,4 @@
-import { acresText, spareLandSqft, universeTrafficLine, workbookTrafficLine } from "./keyNumbers";
+import { cashTile, acresText, spareLandSqft, universeTrafficLine, workbookTrafficLine } from "./keyNumbers";
 import { nextStepText, stageTitle, statusOf } from "./labels";
 import type { DealProps, SiteProps, UnscreenedProps } from "./types";
 
@@ -45,6 +45,12 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
     if (present(deal?.asking_price_display)) add("Asking price", deal?.asking_price_display, deal?.asking_price_source);
     else if (present(site?.asking_price_display)) add("Asking price", site?.asking_price_display, site?.asking_price_source, site?.asking_price_date);
     else add("Asking price", listing?.asking_price_display, listing?.asking_price_source);
+  }
+  if (signedIn && deal && deal.kind !== "land" && deal.financials_open !== false) {
+    const cash = cashTile(deal);
+    if (!cash.hidden && (deal.stated_cash_flow != null || present(deal.stated_cash_flow_display))) {
+      add(deal.cash_flow_label || "Cash flow", cash.value, [deal.earnings_basis || cash.basis, deal.figures_source].filter(Boolean).join(" · "), deal.earnings_period);
+    }
   }
   const status = deal ? stageTitle(deal.stage_group) : site ? statusOf(site).label : "Unscreened listing";
   const reason = (signedIn && present(deal?.decision_reason)) || present(site?.summary_why);

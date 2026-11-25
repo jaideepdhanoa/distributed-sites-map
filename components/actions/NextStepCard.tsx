@@ -208,10 +208,21 @@ export function NextStepCard({
       setOpen(true);
     }
     function onPrefill(event: Event) {
-      const detail = (event as CustomEvent<{ title?: string }>).detail;
+      const detail = (event as CustomEvent<{ title?: string; targetId?: string; reason?: string }>).detail;
+      if (detail?.targetId && detail.targetId !== id) return;
+      setEditing(null);
+      setReason(detail?.reason || "");
+      setOwnerId("");
+      setDue("");
+      setError("");
       setType("work_item");
       setOpen(true);
-      if (detail?.title) setTitle(detail.title.slice(0, 120));
+      setTitle((detail?.title || "").slice(0, 120));
+      requestAnimationFrame(() => {
+        const form = cardRef.current?.querySelector("form");
+        form?.scrollIntoView({ block: "center" });
+        form?.querySelector<HTMLElement>('[aria-label="Title"], input:not([type=date]), textarea')?.focus({ preventScroll: true });
+      });
     }
     window.addEventListener("sites-open-next-step", onOpen);
     window.addEventListener("sites-prefill-work-item", onPrefill);
@@ -219,7 +230,7 @@ export function NextStepCard({
       window.removeEventListener("sites-open-next-step", onOpen);
       window.removeEventListener("sites-prefill-work-item", onPrefill);
     };
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -463,7 +474,7 @@ export function NextStepCard({
       detail: stepType,
       title: stepType === "work_item" ? title : stepType === "knock_off" ? reason.trim() : undefined,
       proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : stepType === "mark_duplicate" ? survivor : title,
-      reason: picked || (stepType === "mark_duplicate" || stepType === "bring_back" ? reason : ""),
+      reason: picked || (stepType === "mark_duplicate" || stepType === "bring_back" || stepType === "work_item" ? reason : ""),
       ownerId: allowsAssignee(stepType) ? ownerId : "",
       targetOn: allowsDate(stepType) ? due : "",
     };

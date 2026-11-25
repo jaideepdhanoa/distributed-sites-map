@@ -285,6 +285,11 @@ test("screen power evidence and trace acquisition pricing", async ({page}) => {
 });
 
 test("power follow-up stays with the selected map pin", async ({ page }, info) => {
+  // Isolate the pin workflow from the external basemap tile service.
+  await page.route("https://tiles.openfreemap.org/styles/positron",route=>route.fulfill({json:{version:8,
+    glyphs:"https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",sources:{},
+    layers:[{id:"background",type:"background",paint:{"background-color":"#f2ede4"}}]}}));
+  await page.route("https://demotiles.maplibre.org/**",route=>route.fulfill({contentType:"application/x-protobuf",body:""}));
   await page.route("**/api/data/deals", async route => {
     const response = await route.fetch();
     const catalog = await response.json();
@@ -300,7 +305,7 @@ test("power follow-up stays with the selected map pin", async ({ page }, info) =
   await page.route("**/api/actions/notes?*", route => route.fulfill({json:{notes:[{
     id:"note-sample",body:"Confirm service at the parcel.",authorId:"reviewer",createdAt:"2026-01-02T12:00:00+00:00",mentions:[],
   }]}}));
-  await page.goto("/?city=PHX&funnel=pipeline");
+  await page.goto("/?city=PHX&funnel=pipeline&pstage=all");
   const nearby = page.getByRole("complementary",{name:"Nearby sites"});
   const toggle = nearby.getByRole("button",{name:/Nearby sites/});
   await expect(toggle).toBeVisible();

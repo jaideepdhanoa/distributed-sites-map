@@ -1,5 +1,7 @@
 "use client";
 
+import GapThreadLink from "./GapThreadLink";
+
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { canCloseProposal } from "@/lib/actions/proposalAccess";
@@ -588,6 +590,7 @@ export function NextStepCard({
         </div>
         {sameIdea(headline, kindLabel) ? null : <p className="proposal-kind">{kindLabel}</p>}
         <p className="proposal-title">{headline}</p>
+        <GapThreadLink targetId={id} reason={focus.reason} />
         <p className="proposal-meta">
           Proposed by {who(accounts, focus.authorId)} · {formatPacific(focus.createdAt)}
           {focus.ownerName ? ` · Assignee ${focus.ownerName}` : knock ? " · No assignee" : ""}
@@ -696,6 +699,7 @@ export function NextStepCard({
         <span className="badge checked">Approved</span>
         {sameIdea(headline, kindLabel) ? null : <p className="proposal-kind">{kindLabel}</p>}
         <p className="proposal-title">{headline}</p>
+        <GapThreadLink targetId={id} reason={approved.reason} />
         <p className="proposal-meta">
           Approved by {who(accounts, approved.decidedBy) || "the approver"}
           {approved.decidedAt ? ` · ${formatPacific(approved.decidedAt)}` : ""}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { numberEvidence } from "@/lib/comparison";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
 const TABS = [
@@ -30,6 +31,7 @@ export default function PanelSections({
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
   const note = params.get("note");
+  const measure = params.get("measure") || "";
   const tab: TabId = panel === "open-land" ? "numbers" : panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
   useEffect(() => {
     if (panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
@@ -38,7 +40,8 @@ export default function PanelSections({
     if (!node || !(scroller instanceof HTMLElement)) return;
     let frame = 0;
     const align = () => {
-      const target = panel === "open-land" ? node.querySelector<HTMLElement>('[data-evidence="open-land"]')
+      const evidence = panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
+      const target = evidence ? node.querySelector<HTMLElement>(`[data-evidence="${CSS.escape(evidence)}"]`)
         : panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
       if (target) {
         for (let parent: HTMLElement | null = target; parent && parent !== node; parent = parent.parentElement) {
@@ -72,7 +75,7 @@ export default function PanelSections({
       sizes.disconnect();
       added.disconnect();
     };
-  }, [site, panel, note]);
+  }, [site, panel, note, measure]);
   function chooseTab(id: TabId) {
     const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
     const shown = next.get("panel") || "overview";

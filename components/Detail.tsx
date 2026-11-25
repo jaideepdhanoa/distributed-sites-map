@@ -231,7 +231,7 @@ function QuickLubeFacts({ site, deal }: { site?: SiteProps | null; deal?: DealPr
         </div>
         <span>Bays</span><div>{text("bay_count") || "—"}</div>
         <span>Lifts</span><div>{text("lift_count") || "—"}</div>
-        <span>Lot</span><div>{text("lot_sqft") ? `${text("lot_sqft")} sq ft` : "—"}</div>
+        <span data-evidence="land">Lot</span><div>{text("lot_sqft") ? `${text("lot_sqft")} sq ft` : "—"}</div>
         <span>Outside</span><div>{text("outside_sqft") ? `${text("outside_sqft")} sq ft` : "—"}{text("outside_note") ? ` ${text("outside_note")}` : ""}</div>
         <span>Owner</span><div>{text("owner_of_record") || text("owner") || "—"}</div>
         <span>Owns the lot</span>
@@ -293,7 +293,7 @@ function DealHeadline({
     <div className="headline" data-testid="card-numbers">
       {showMoney ? (
         <div data-testid="overview-revenue">
-          <span>Revenue</span>
+          <span data-evidence="revenue">Revenue</span>
           {pending ? <PendingFigure /> : (
             <>
               <strong className={phrase(shownRevenue.text)} title={shownRevenue.title}>{shownRevenue.text}</strong>
@@ -304,7 +304,7 @@ function DealHeadline({
       ) : null}
       {showMoney ? (
         <div data-testid="overview-cash">
-          <span>Cash flow</span>
+          <span data-evidence="cash-flow">Cash flow</span>
           {pending ? <PendingFigure /> : (
             <>
               <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
@@ -319,7 +319,7 @@ function DealHeadline({
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div className="headline-wide">
-        <span>Power</span>
+        <span data-evidence="power">Power</span>
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
@@ -328,7 +328,7 @@ function DealHeadline({
         {land ? <small>{land}</small> : null}
       </div>
       <div>
-        <span>Traffic</span>
+        <span data-evidence="traffic">Traffic</span>
         <strong title={deal.trade_aadt == null ? "Not on file" : undefined}>{traffic}</strong>
         {deal.trade_aadt != null ? <small>vehicles/day</small> : null}
       </div>
@@ -346,7 +346,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
   return (
     <div className="headline" data-testid="card-numbers">
       <div>
-        <span>Cash flow</span>
+        <span data-evidence="cash-flow">Cash flow</span>
         <strong title="Not on file">—</strong>
       </div>
       <div>
@@ -355,7 +355,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div className="headline-wide">
-        <span>Power</span>
+        <span data-evidence="power">Power</span>
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
@@ -363,7 +363,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
         <strong title="Not on file">—</strong>
       </div>
       <div>
-        <span>Traffic</span>
+        <span data-evidence="traffic">Traffic</span>
         <strong>{traffic}</strong>
         {site.aadt_count ? <small>{year ? `vehicles/day · ${year}` : "vehicles/day"}</small> : null}
       </div>
@@ -815,18 +815,18 @@ export default function Detail({
           <>
             <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
             <div className="kv">
-              <span>Asking price</span>
+              <span data-evidence="asking">Asking price</span>
               <div>
                 {price || "—"}
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
-              <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
+              <span data-evidence="land">Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
               <span data-evidence="open-land">Open land</span><div title={isOpenLandBlank(spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span>Power</span>
+              <span data-evidence="power">Power</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
-              <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-              <span>Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
+              <span data-evidence="zoning">Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
+              <span data-evidence="traffic">Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
               <span>Flood</span><div>{site.flood_zone || "—"}</div>
               <span>Year built</span><div>{site.year_built || "—"}</div>
               <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
@@ -1058,20 +1058,20 @@ export function DealDetail({
             {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">
-              <span>Asking price</span>
+              <span data-evidence="asking">Asking price</span>
               <div>
                 {signedIn ? (deal.asking_price_display || "—") : "—"}
                 {signedIn && shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
               </div>
-              <span>Per acre</span>
+              <span data-evidence="per-acre">Per acre</span>
               <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
               <span data-evidence="open-land">Open land</span>
               <div title={isOpenLandBlank(spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span>Power</span>
+              <span data-evidence="power">Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
-              {signedIn && !cash.hidden ? <span>Revenue</span> : null}
+              {signedIn && !cash.hidden ? <span data-evidence="revenue">Revenue</span> : null}
               {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-revenue" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-revenue" title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div>) : null}
-              {signedIn && !cash.hidden ? <span>Cash flow</span> : null}
+              {signedIn && !cash.hidden ? <span data-evidence="cash-flow">Cash flow</span> : null}
               {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-cash" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-cash" title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div>) : null}
             </div>
           </>
@@ -1121,7 +1121,7 @@ export function UnscreenedDetail({
       <h3>Listing</h3>
       <div className="kv">
         <span>Type</span><div>{row.kind}</div>
-        <span>Asking price</span>
+        <span data-evidence="asking">Asking price</span>
         <div>
           {row.asking_price_display || "Not published"}
           {row.asking_price_source ? ` · ${row.asking_price_source}` : ""}

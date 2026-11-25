@@ -17,6 +17,7 @@ import AppLoading from "./AppLoading";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
+import { numberEvidence } from "@/lib/comparison";
 import SaveComparison from "./actions/SaveComparison";
 import type { ListLayout } from "@/lib/listLayout";
 import CompareTray from "./CompareTray";
@@ -577,7 +578,7 @@ export default function Explorer() {
     comparisonOrigin.current = currentSearch();
     setPreviewId(null);
     setSelected(id);
-    const panel = measure === "Open land" ? "open-land" : ["Power", "Land", "Bays that fit", "Traffic"].includes(measure) ? "numbers" : null;
+    const panel = numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
     replaceSearch(comparisonOrigin.current, { site: id, measure, panel, sheet: "full" }, true);
   }
   function returnComparison() {
@@ -2254,6 +2255,7 @@ export default function Explorer() {
     const site = selectedDeal ? { id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id }
       : selectedSite ? { id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id } : null;
     const comparing = comparison || (!inspecting && compareIds.length >= 2);
+    if (!comparing && site && showingPreview) setPreviewId(null);
     setAskSite(comparing ? null : site);
     setAskList(comparing ? [...compareIds] : listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
     setAskOpen(true);

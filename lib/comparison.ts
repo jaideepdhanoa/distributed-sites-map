@@ -11,7 +11,7 @@ type CompareRow = { label: string; value: string; key?: string | number | null; 
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
 export const compareSections = ["Site fit", "Financials", "Evidence quality", "Diligence", "Record details"] as const;
-export function sectionFor(label: string): typeof compareSections[number] {
+function sectionFor(label: string): typeof compareSections[number] {
   if (["Address", "Property owner"].includes(label)) return "Record details";
   if (["Financial package", "Cash flow coverage", "Figure basis", "Reporting period", "Land measurement"].includes(label)) return "Evidence quality";
 
@@ -126,7 +126,7 @@ function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRo
     { label: "Cash flow coverage", value: !applicable ? "Not applicable" : deal.stated_cash_flow != null || deal.stated_cash_flow_display ? "Reported" : cashTile(deal).value },
     { label: "Figure basis", value: applicable ? shown(deal.earnings_basis || deal.figures_basis) : "Not applicable" },
     { label: "Reporting period", value: applicable ? shown(deal.earnings_period || deal.revenue_period) : "Not applicable" },
-    { label: "Blocker", key: deal.stage_blocker && deal.stage_blocker !== MISSING ? "Blocked" : null, value: shown(deal.stage_blocker) },
+    { label: "Blocker", key: deal.stage_blocker === MISSING ? "clear" : deal.stage_blocker?.trim() ? "blocked" : null, value: deal.stage_blocker === MISSING ? "No blocker recorded" : shown(deal.stage_blocker) },
     { label: "Next check", value: shown(deal.next_step) },
   ];
 }
@@ -155,3 +155,10 @@ export function comparisonMeasures(columns: ComparisonColumn[]) {
     return { label, values, section, kind };
   });
 }
+
+/** The measure stays in the URL while the reviewer inspects the underlying record. */
+export const numberEvidence: Record<string, string> = {
+  Asking: "asking", Land: "land", "Open land": "open-land", "Land measurement": "open-land",
+  Power: "power", Traffic: "traffic", Zoning: "zoning", "Per acre": "per-acre",
+  Revenue: "revenue", "Cash flow": "cash-flow", "Cash flow coverage": "cash-flow",
+};

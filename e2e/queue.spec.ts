@@ -634,7 +634,7 @@ for (const width of [1440, 390]) {
     await gap.getByRole("button", { name: "Propose gap action" }).click();
     const work = drawer.getByTestId("next-step-form");
     await expect(work.getByLabel("Title")).toHaveValue(gapText);
-    await work.getByLabel("Owner", { exact: true }).selectOption("contributor");
+    await work.getByLabel("Assignee", { exact: true }).selectOption("contributor");
     await work.getByLabel("Due", { exact: true }).fill("2030-04-15");
     await work.getByRole("button", { name: "Submit for approval" }).click();
     await expect(gap).toContainText("Awaiting approval");
@@ -646,6 +646,7 @@ for (const width of [1440, 390]) {
     expect((await request.post("/api/actions/suggestions/" + linked.id, { data: { status: "accepted" } })).ok()).toBe(true);
     await page.reload();
     await expect(gap).toContainText("Approved");
+    await expect(drawer.getByTestId("next-step").getByRole("link", { name: "Open evidence thread" })).toHaveAttribute("href", new RegExp("note=" + gapId));
     await gap.getByRole("button", { name: "Open evidence thread" }).click();
     const thread = drawer.locator('[data-note-id="' + gapId + '"]');
     await expect(thread).toContainText(gapText);

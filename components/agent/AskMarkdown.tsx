@@ -17,6 +17,7 @@ function Inline({ item, onSite }: { item: AskInline; onSite: (href: string) => v
       className="text-link"
       href={item.href}
       onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
         onSite(item.href);
       }}

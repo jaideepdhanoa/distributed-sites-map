@@ -516,6 +516,27 @@ for (const width of [1440, 390]) {
   });
 }
 
+test("opening the shortlist defers the map and Show on map preserves the canvas on return", async ({ page }) => {
+  await login(page.request, "contributor");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?view=list&funnel=universe&city=PHX&stage=land");
+  await hideDevOverlay(page);
+  const row = page.locator(".pipeline-list [data-site-row]").first();
+  await expect(row).toBeVisible();
+  await expect(page.locator(".stage-map")).toHaveCount(0);
+  const id = await row.getAttribute("data-site-row");
+  await row.getByRole("button", { name: "Show on map" }).click();
+  await expect(page).toHaveURL(url => !url.searchParams.has("view") && url.searchParams.get("site") === id);
+  const canvas = page.locator(".maplibregl-canvas");
+  await expect(canvas).toBeVisible();
+  const firstCanvas = await canvas.elementHandle();
+  await page.getByRole("button", { name: "List", exact: true }).click();
+  await expect(row).toBeVisible();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(canvas).toBeVisible();
+  expect(await firstCanvas.evaluate(node => node.isConnected)).toBe(true);
+});
+
 for (const width of [1440, 390]) {
   test(`five-site comparison reopens with its evidence and reviewer handoff at ${width}px`, async ({ page, request }, info) => {
     test.slow();
@@ -559,6 +580,7 @@ for (const width of [1440, 390]) {
     await expect(scope).toContainText("5 sites");
     const rows = page.locator(".pipeline-list [data-site-row]");
     await expect(rows).toHaveCount(5);
+    await expect(page.locator(".stage-map")).toHaveCount(0);
     const capture = async (moment: string, surface = page.locator("body")) => {
       const dir = process.env.UX_REVIEW_DIR;
       if (!dir) return;

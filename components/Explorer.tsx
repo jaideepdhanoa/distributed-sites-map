@@ -433,6 +433,12 @@ export default function Explorer() {
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
+  // A direct shortlist visit covers the map. Keep the camera alive after the first map visit.
+  const needsMap = !listView || reviewing || followArea;
+  const [mapVisited, setMapVisited] = useState(false);
+  useEffect(() => {
+    if (needsMap) setMapVisited(true);
+  }, [needsMap]);
   const queueMarket = params.get("qmarket") || (reviewing ? "all" : city);
   const queueStage = params.get("qstage") || (reviewing || funnel !== "pipeline" || allPipes ? "any" : pipeStage);
   const queueViable = params.get("qviable") !== "0";
@@ -2847,7 +2853,7 @@ export default function Explorer() {
         {feedSheet ? (
           <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
-        <PanelBoundary name="Map">
+        {(needsMap || mapVisited) && <PanelBoundary name="Map">
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           coverage={funnel !== "pipeline" && showUniverse ? {
@@ -2947,7 +2953,7 @@ export default function Explorer() {
             if (meta?.user && listView && !window.matchMedia("(max-width: 767px)").matches) setFollowArea(true);
           }}
         />
-        </PanelBoundary>
+        </PanelBoundary>}
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty

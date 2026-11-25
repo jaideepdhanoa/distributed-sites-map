@@ -1788,7 +1788,12 @@ export default function MapView(props: Props) {
       button.type = "button";
       button.className = "paper-btn market-marker";
       button.dataset.market = city;
-      button.textContent = (names[city] || city) + " · " + count.toLocaleString();
+      const name = names[city] || city || "Other markets";
+      button.setAttribute("aria-label", name + " · " + count.toLocaleString());
+      const total = document.createElement("span");
+      total.className = "market-count";
+      total.textContent = count.toLocaleString();
+      button.append(name, total);
       button.addEventListener("click", event => {
         event.stopPropagation();
         if (names[city]) propsRef.current.onMarketPick?.(city);
@@ -1805,6 +1810,7 @@ export default function MapView(props: Props) {
       for (const marker of markers) marker.getElement().hidden = !country;
     };
     const setZoomRanges = () => {
+      if (map.getLayer("depots")) map.setLayerZoomRange("depots", rows.length ? nationalZoom : 0, 24);
       for (const layer of ["clusters", "clusters-halo", "cluster-count", "pin-singles"]) {
         if (map.getLayer(layer)) map.setLayerZoomRange(layer, rows.length ? nationalZoom : 0, PIN_SPLIT_ZOOM);
       }

@@ -5,8 +5,9 @@ type Spot = { x: number; y: number; id: string; count: number };
 async function ready(page: Page) {
   await page.waitForSelector(".maplibregl-canvas");
   await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { isStyleLoaded?: () => boolean } }).__sitesMap;
-    return Boolean(map?.isStyleLoaded?.());
+    const map = (window as unknown as { __sitesMap?: import("maplibre-gl").Map }).__sitesMap;
+    const count = document.querySelector(".stage-map")?.getAttribute("data-group-count");
+    return Boolean(map?.loaded() && !map.isMoving() && count !== null && count !== undefined);
   });
 }
 
@@ -14,7 +15,7 @@ async function jump(page: Page, center: [number, number], zoom: number) {
   await page.evaluate(({ center, zoom }) => {
     const map = (window as unknown as {
       __sitesMap: {
-        jumpTo: (camera: { center: [number, number]; zoom: number }) => void;
+        jumpTo: (camera: { center: [number, number]; zoom: number }, event: { originalEvent: Event }) => void;
         once: (name: string, fn: () => void) => void;
       };
     }).__sitesMap;
@@ -24,7 +25,7 @@ async function jump(page: Page, center: [number, number], zoom: number) {
         window.clearTimeout(stop);
         resolve();
       });
-      map.jumpTo({ center, zoom });
+      map.jumpTo({ center, zoom }, { originalEvent: new WheelEvent("wheel") });
     });
   }, { center, zoom });
 }

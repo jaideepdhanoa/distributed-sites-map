@@ -4263,7 +4263,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 }
 
 /* Market overview and parcel inspection */
-.market-marker { z-index: 1; color: var(--pine-700); font-weight: 700; white-space: nowrap; }
+.market-marker { z-index: 1; display: inline-flex; align-items: center; gap: 8px; padding: 4px 5px 4px 12px; color: var(--pine-700); border-color: #9cb3a4; font-weight: 700; white-space: nowrap; }
+.market-count { padding: 3px 7px; border-radius: 12px; background: #e4eee7; font-variant-numeric: tabular-nums; }
 .market-marker[hidden], .parcel-toggle { display: none; }
 .shortlist-map-coverage, .map-retry { display: flex; align-items: center; gap: 8px; }
 .shortlist-map-coverage { color: var(--ink-2); font-size: 12px; white-space: nowrap; }

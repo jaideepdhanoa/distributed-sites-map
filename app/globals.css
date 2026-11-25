@@ -4340,3 +4340,11 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .nearby-sites:has([aria-expanded=true]) { width: min(320px, calc(100vw - 24px)); }
   #nearby-results { max-height: min(26vh, 200px); }
 }
+
+.nearby-map-ring { pointer-events: none; width: 29px; height: 29px; border-radius: 50%; border: 3px solid var(--green); box-shadow: 0 0 0 3px #fffdf8; }
+.nearby-sites li button:is(:focus-visible,:hover) { background: var(--cream-0); }
+.decision-brief li[data-focused-citation=true] { border-left: 3px solid var(--green); padding-left: 10px; }
+.decision-brief .review-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.decision-work-row span { display: block; color: var(--ink-2); }
+.decision-summary > .text-link { display: block; width: fit-content; margin-bottom: 6px; }
+.decision-brief li > .text-link { text-align: left; }

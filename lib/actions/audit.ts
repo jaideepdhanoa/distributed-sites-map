@@ -71,7 +71,7 @@ export async function listAudit(sql: Sql, limit = 100, target?: AuditTarget): Pr
   }>(
     `SELECT id, at, actor_id, action, target_kind, target_id, before_json, after_json
      FROM audit_log
-     WHERE action <> 'view.decision'
+     WHERE action NOT IN ('view.decision', 'view.decision.review')
      ${target ? "AND target_kind = $2 AND target_id = $3" : ""}
      ORDER BY at DESC, id DESC LIMIT $1`,
     values,

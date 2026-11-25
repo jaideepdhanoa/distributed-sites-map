@@ -912,6 +912,36 @@ for (const width of [1440, 390]) {
       await page.getByRole("button", { name: /Back to comparison/ }).click();
       await brief.getByRole("button", { name: /Follow-up/ }).click();
       await expect(page).toHaveURL(new RegExp("note=" + followUp.note));
+      await login(page.request, "reviewer");
+      await page.goto("/?loops=work&workFilter=decisions");
+      const hub = page.getByRole("region", { name:"My work" });
+      const change = hub.locator(".decision-work-row").filter({ hasText:`Field survey ${width} ${info.retry}` });
+      await expect(change).toContainText("New evidence");
+      await expect(change).toContainText("Line 420 ft");
+      await hub.screenshot({path:`review-shots/${width}-decision-queue.png`});
+      await change.getByRole("link", { name:"Canyon Wash · Power" }).click();
+      const citation = brief.locator("[data-focused-citation=true]");
+      await expect(citation).toBeFocused();
+      await expect(citation).toContainText("Example field survey");
+      await brief.screenshot({ path:`review-shots/${width}-decision-to-revisit.png` });
+      await citation.getByRole("button", { name:"Keep decision" }).click();
+      await expect(citation).toContainText("Kept by reviewer");
+      await brief.getByRole("link", { name:"Back to My work" }).click();
+      await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
+      Object.assign(sites[0].properties, { cap_a_line_ft: 510 });
+      await publish();
+      await page.reload();
+      await expect(change).toContainText("Line 420 ft → Line 510 ft");
+      await change.getByRole("link").click();
+      await citation.getByRole("button", { name:"Revise decision" }).click();
+      await brief.getByRole("combobox", { name:"Decision", exact:true }).selectOption("hold");
+      await brief.getByLabel("Reason").fill("Hold both sites pending a service quote.");
+      await brief.getByRole("button", { name:"Save decision" }).click();
+      await expect(brief.getByRole("heading")).toHaveText("Hold all sites");
+      await expect(brief).toContainText("Reviewed Canyon Wash · Power");
+      await brief.getByRole("link", { name:"Back to My work" }).click();
+      await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
+
     } finally {
       await withConnectionString(database, async sql => {
         for (const id of published) await sql.query("DELETE FROM snapshots WHERE id = $1", [id]);

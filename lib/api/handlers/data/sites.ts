@@ -132,6 +132,11 @@ export async function GET(request: NextRequest) {
   const session = await requireUser();
   if (!isSession(session)) return session;
   const city = request.nextUrl.searchParams.get("city");
+  console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
+  return NextResponse.json(await loadMapSites(city), { headers: privateHeaders });
+}
+
+export async function loadMapSites(city: string | null) {
   const full = readGenerated("sites.geojson") as { features: SiteFeature[] };
   const visible = omitProtectedSites(full.features);
   const chosen = city ? visible.filter((feature) => feature.properties.city === city) : visible;
@@ -142,7 +147,6 @@ export async function GET(request: NextRequest) {
   });
   const withCensus = await overlayQuickLubeCensus({ type: "FeatureCollection", features });
   const staged = await overlayUniverseMedia(await overlayHeldStages(await overlayStageFile(withCensus, "site"), "site"));
-  console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
   // Live decisions can change while the published workbook snapshot stays the same.
-  return NextResponse.json(redactGmailPayload(staged), { headers: privateHeaders });
+  return redactGmailPayload(staged);
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ArrowRight, LocateFixed } from "lucide-react";
 import { displayAddress } from "@/lib/format";
-import { screeningEvidence } from "@/lib/screeningEvidence";
+import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
 import { canWrite, useActionStatus } from "./actions/panel";
 import FinancialsEntry from "./FinancialsEntry";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
@@ -30,9 +30,7 @@ export default function MapSitePreview(props: PreviewProps) {
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }); }, [id]);
   if (!record) return null;
   const { figures, status, review, evidence, missing } = screeningEvidence({ site, deal: deal || props.linkedDeal, listing, signedIn: props.signedIn });
-  const fact = ["Open land", "Usable bays", "Parcel size", "Traffic"]
-    .map(label => figures.find(figure => figure.label === label)).find(Boolean)
-    || figures.find(figure => figure.label !== "Parcel number");
+  const fact = previewFitFigure(figures);
   const address = displayAddress(record.address);
   return (
     <aside className="drawer map-preview" aria-labelledby="pin-preview-title" data-record={id}

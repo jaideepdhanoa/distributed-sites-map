@@ -194,6 +194,18 @@ test("browse two nearby sites and keep the city camera", async ({ page }, info) 
   for (let i = 0; i < 2; i++) {
     if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
     await expect(nearby.locator("[data-nearby-id]").nth(1)).toBeVisible();
+    const first = nearby.locator("[data-nearby-id]").first();
+    await expect(first.locator("small")).toHaveText(/.+/);
+    if (!i && info.project.name === "desktop") {
+      const ring = page.locator(".nearby-map-ring");
+      await first.hover();
+      await expect(ring).toBeVisible();
+      await page.mouse.move(0, 0);
+      await expect(ring).toHaveCount(0);
+      await first.focus();
+      await expect(ring).toBeVisible();
+      await expect.poll(() => camera(page)).toEqual(origin);
+    }
     if (!i && !process.env.MAP_PRODUCTION_CHECK) {
       await mkdir("review-shots", { recursive: true });
       const prefix = process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";
@@ -214,4 +226,28 @@ test("browse two nearby sites and keep the city camera", async ({ page }, info) 
   await tray.getByRole("button", { name: "Close compare" }).click();
   await expect(toggle).toBeVisible();
   await expect.poll(() => camera(page)).toEqual(origin);
+});
+
+test("the released My work queue opens with its real review state", async ({ page }) => {
+  test.skip(!process.env.MAP_PRODUCTION_CHECK, "Runs with a signed-in account against the release.");
+  const response = page.waitForResponse(r => {
+    const url = new URL(r.url());
+    return url.pathname === "/api/actions/comparison-decision" && url.searchParams.get("queue") === "1";
+  });
+  await page.goto("/?loops=work&workFilter=decisions");
+  const hub = page.getByRole("region", { name: "My work" });
+  await expect(hub.getByRole("button", { name: /Decisions to revisit/ })).toHaveAttribute("aria-pressed", "true");
+  const read = await response;
+  expect(read.status()).toBe(200);
+  const { items } = await read.json();
+  expect(Array.isArray(items)).toBe(true);
+  const rows = hub.locator(".decision-work-row");
+  await expect(rows).toHaveCount(items.length);
+  if (!items.length) {
+    await expect(hub.getByText("Your saved decisions are up to date.", { exact: true })).toBeVisible();
+    return;
+  }
+  await rows.first().getByRole("link").click();
+  await expect(page.locator('[data-focused-citation="true"]')).toBeFocused();
+  await expect(page.getByRole("region", { name:"Comparison decision" }).getByRole("link", { name:"Back to My work" })).toBeVisible();
 });

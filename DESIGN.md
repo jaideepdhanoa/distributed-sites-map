@@ -147,3 +147,5 @@ A selected pin's preview leads with a sourced spatial fact where available, the 
 At city zoom, Nearby sites follows the visible map and orders matching records by distance from its center. Its phone sheet starts collapsed. A row and its pin open the same parcel preview and preserve the same return camera.
 
 Saved comparisons place the decision beside its source figures. Keep the original value, basis and reporting period legible when a current figure changes. Link each citation to the underlying record and any matching evidence follow-up.
+
+Decisions to revisit links directly to one changed citation. Show its original and current figures, the source, and the owner’s review action alongside the decision rationale. Keep and Revise create dated records. Nearby rows show one parcel fact and highlight its map position on hover or keyboard focus. The ring lets pointer events reach the map.

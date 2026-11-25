@@ -1,17 +1,17 @@
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { assertClean } from "@/lib/policy/banned";
-import type { CitedFigure, DecisionAccess, DecisionDraft } from "@/lib/comparisonDecision";
+import type { CitedFigure, CitationReview, DecisionAccess, DecisionDraft, DecisionRecord } from "@/lib/comparisonDecision";
 import { figureKey } from "@/lib/comparisonDecision";
 import { audit } from "./audit";
 import type { Sql } from "./db";
 import { findRequest, parseEvidenceTarget } from "./evidenceLookup";
 import { InputError, parseBody, stamp } from "./text";
 
-type StoredFigure = CitedFigure & { note: string };
+export type StoredFigure = CitedFigure & { note: string; closed?: string };
 type Entry = { id: string; actor_id: string; at: Date | string;
-  after_json: Omit<DecisionDraft, "citations"> & { citations: StoredFigure[] } };
+  after_json: Omit<DecisionDraft, "citations"> & { citations: StoredFigure[]; reviewedChange?: DecisionRecord["reviewedChange"] } };
 
-async function viewFor(sql: Sql, id: string, actor: string, lock = false) {
+export async function viewFor(sql: Sql, id: string, actor: string, lock = false) {
   const result = await sql.query<{ owner_id: string; url_query: string }>(
     "SELECT owner_id,url_query FROM saved_views WHERE id=$1 AND (owner_id=$2 OR scope='team')" + (lock ? " FOR UPDATE" : ""), [id, actor]);
   if (!result.rows[0]) throw new InputError("Comparison unavailable.", 404);
@@ -33,17 +33,18 @@ export async function readDecision(sql: Sql, id: string, actor: string, canWrite
   const row = await latest(sql, id);
   if (!row) return { editable, decision: null };
   const { citations, ...choice } = row.after_json;
-  const current = await Promise.all(citations.map(async ({ note, ...figure }) => {
+  const current = await Promise.all(citations.map(async ({ note, closed, ...figure }) => {
     const target = parseEvidenceTarget(new URLSearchParams(figure));
     return { ...figure, followUp: await findRequest(sql, target, note, row.at) };
   }));
   return { editable, decision: { ...choice, citations: current, version: row.id, author: row.actor_id, at: stamp(row.at).replace(/Z$/, "+00:00") } };
 }
 
-export async function saveDecision(sql: Sql, id: string, actor: string, input: DecisionDraft, version: string) {
+export async function saveDecision(sql: Sql, id: string, actor: string, input: DecisionDraft, version: string, reviewed?: CitationReview) {
   const view = await viewFor(sql, id, actor, true);
   if (view.owner !== actor) throw new InputError("Only the comparison owner can record its decision.", 403);
-  if (((await latest(sql, id))?.id || "") !== version) throw new InputError("A newer decision was saved. Reopen it before recording a revision.", 409);
+  const previous = await latest(sql, id);
+  if ((previous?.id || "") !== version) throw new InputError("A newer decision was saved. Reopen it before recording a revision.", 409);
   if (!input || (input.preferred !== null && !view.ids.includes(input.preferred))) throw new InputError("Choose a compared site or hold all sites.");
   const rationale = parseBody(input.rationale, "reason", 600);
   assertClean(rationale);
@@ -56,10 +57,15 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
     if (["Unavailable", "Checking…", "Not applicable"].includes(value)) throw new InputError("Choose an applicable figure.");
     assertClean([value, figure.period, figure.basis].join(" "));
     if (citations.some(other => figureKey(other) === figureKey(figure))) throw new InputError("Choose each figure once.");
-    const followUp = await findRequest(sql, target);
+    const original = previous?.after_json.citations.find(c => figureKey(c) === figureKey(figure) &&
+      c.period.trim().toLowerCase() === figure.period.trim().toLowerCase() && c.basis.trim().toLowerCase() === figure.basis.trim().toLowerCase());
+    const followUp = await findRequest(sql, target, original?.note, original ? previous!.at : null);
     citations.push({ targetId: target.targetId, targetKind: target.targetKind, measure: figure.measure,
-      period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "" });
+      period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "", closed: followUp?.closedAt || "" });
   }
-  await audit(sql, { actorId: actor, action: "view.decision", targetKind: "view", targetId: id, after: { preferred: input.preferred, rationale, citations } });
+  const reviewedChange = reviewed && { version: reviewed.version, key: reviewed.key, site: reviewed.site, measure: reviewed.measure,
+    previous: reviewed.previous, current: reviewed.current, reason: reviewed.reason };
+  await audit(sql, { actorId: actor, action: "view.decision", targetKind: "view", targetId: id,
+    after: { preferred: input.preferred, rationale, citations, ...(reviewedChange ? { reviewedChange } : {}) } });
   return readDecision(sql, id, actor, true);
 }

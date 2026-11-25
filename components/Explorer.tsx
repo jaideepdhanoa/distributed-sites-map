@@ -10,6 +10,7 @@ import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, typ
 import { RecordActions } from "./actions/RecordActions";
 import type { QueueReason as ReviewChange } from "@/lib/queue/order";
 import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
+import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
 import NearbySites from "./NearbySites";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
@@ -228,6 +229,8 @@ export default function Explorer() {
   const [tip, setTip] = useState("");
   const [ringCursor, setRingCursor] = useState<{ x: number; y: number } | null>(null);
   const [ringsOutside, setRingsOutside] = useState(false);
+  const nearbyHighlight = useRef<((point: [number, number] | null) => void) | null>(null);
+  const highlightNearby = useCallback((point: [number, number] | null) => nearbyHighlight.current?.(point), []);
   const nearbyPicker = useRef<((id: string) => void) | null>(null);
   const [mapZoom, setMapZoom] = useState(0);
   const frameRings = useRef<(() => void) | null>(null);
@@ -613,7 +616,7 @@ export default function Explorer() {
   }
   function comparisonQuery() {
     const query = new URLSearchParams(currentSearch());
-    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView"]) query.delete(key);
+    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView", "reviewCitation", "workFilter"]) query.delete(key);
     query.set("compare", compareIds.join("|"));
     query.set("city", selectedMarket);
     query.set("funnel", funnel);
@@ -2871,7 +2874,7 @@ export default function Explorer() {
         <MapView key={mapAttempt}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           deals={drawnDeals}
-          nearbyPicker={nearbyPicker}
+          nearbyHighlight={nearbyHighlight} nearbyPicker={nearbyPicker}
           shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
@@ -3173,7 +3176,14 @@ export default function Explorer() {
           <div className="map-corner">
             {mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
               <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
-                onPick={id => nearbyPicker.current?.(id)} />
+                onSpot={highlightNearby} fact={id => {
+                  const site = siteById.get(id);
+                  const deal = site ? dealForSite(site) : dealRows.find(row => row.deal_id === id);
+                  const listing = !site && !deal ? listingScope.find(row => row.properties.listing_id === id)?.properties : undefined;
+                  const evidence = screeningEvidence({ site: site || siteById.get(deal?.universe_id || ""), deal, listing, signedIn: Boolean(me) });
+                  const fact = previewFitFigure(evidence.figures);
+                  return fact ? fact.label + " · " + fact.value : me ? "Asking price not on file" : "Site fit not on file";
+                }} onPick={id => nearbyPicker.current?.(id)} />
             )}
             {ringsOutside ? (
               <div className="rings-outside" role="status">

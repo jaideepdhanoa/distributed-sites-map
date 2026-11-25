@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { evidenceMeasures } from "@/lib/actions/comparisonEvidence";
-import { figureKey, figureLabel, type CitedFigure, type DecisionAccess, type FigureOption } from "@/lib/comparisonDecision";
+import { reviewValue, evidenceChanged, figureKey, figureLabel, type CitationReview, type CitedFigure, type DecisionAccess, type FigureOption } from "@/lib/comparisonDecision";
 
 type Props = {
   view: string; sites: { id: string; title: string }[]; figures: FigureOption[];
@@ -10,10 +12,6 @@ type Props = {
   inspect: (id: string, measure: string, source?: URLSearchParams) => void;
 };
 const statusNames: Record<string,string> = { open:"Awaiting approval", accepted:"Approved", ready:"Ready for approval", agreed_waiting:"Waiting", completed:"Completed", rejected:"Declined", superseded:"Superseded", resolved:"Resolved" };
-function valueText(figure: CitedFigure) {
-  return [figure.value === "—" ? "Not on file" : figure.value, figure.period, figure.basis].filter(Boolean).join(" · ");
-}
-
 export default function ComparisonDecision({view,sites,figures,inspect,checkGap,revision}: Props) {
   const [access,setAccess] = useState<DecisionAccess>();
   const [attempt,setAttempt] = useState(0);
@@ -37,9 +35,19 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
     return ()=>controller.abort();
   },[endpoint,attempt,revision]);
   const decision = access?.decision;
+  const focusedKey = useSearchParams().get("reviewCitation");
+  const focusRow = useRef<HTMLLIElement>(null);
+  const selectedReview = access?.reviews?.find(item => item.key === focusedKey);
+  const [editingReview,setEditingReview] = useState<CitationReview>();
+  useEffect(() => {
+    if (!focusedKey || editing || !focusRow.current) return;
+    focusRow.current.focus({ preventScroll:true });
+    focusRow.current.scrollIntoView({ block:"nearest" });
+  }, [focusedKey, decision?.version, editing]);
   const byKey = new Map(figures.map(figure => [figureKey(figure), figure]));
   const selectable = figures.filter(figure => !["Unavailable", "Checking…", "Not applicable"].includes(figure.value));
-  function edit() {
+  function edit(review?: CitationReview) {
+    setEditingReview(review?.reason ? review : undefined);
     setChoice(decision ? decision.preferred || "hold" : "");
     setReason(decision?.rationale || "");
     setKeys(decision?.citations.map(figureKey) || []);
@@ -56,7 +64,12 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
       citations.push(citation);
     }
     if (citations.length !== keys.length) { setError("A cited figure is unavailable. Review your citations."); return; }
-    const body = JSON.stringify({view,version:decision?.version || "",decision:{ preferred:choice==="hold" ? null : choice, rationale:reason.trim(),citations }});
+    await submit({ decision: { preferred: choice === "hold" ? null : choice, rationale: reason.trim(), citations },
+      ...(editingReview ? { review: { key:editingReview.key, token:editingReview.token } } : {}) });
+  }
+  async function submit(change: { decision?: unknown; keep?: boolean; review?: { key: string; token: string } }) {
+    if (pending) return;
+    const body = JSON.stringify({ view, version:decision?.version || "", ...change });
     if (receipt.current.body !== body) receipt.current={body,key:crypto.randomUUID()};
     setPending(true); setError("");
     try {
@@ -67,12 +80,14 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
       if (!read.ok) throw Error("Couldn’t confirm the save. Retry with your draft.");
       const confirmed:DecisionAccess=await read.json();
       if (!confirmed.decision || confirmed.decision.version !== data.decision?.version) throw Error("Couldn’t confirm the decision.");
-      setAccess(confirmed); setEditing(false);
+      if (change.keep && !confirmed.reviews?.find(item => item.key === change.review?.key)?.reviewedAt) throw Error("Couldn’t confirm the review. Retry.");
+      setAccess(confirmed); setEditing(false); setEditingReview(undefined);
+      window.dispatchEvent(new Event("queue-refresh"));
     } catch(e) { setError(e instanceof Error ? e.message : "Couldn’t confirm the decision."); }
     finally { setPending(false); }
   }
   if (!access) return error ? <p role="alert">{error} <button className="text-link" onClick={()=>setAttempt(n=>n+1)}>Retry decision</button></p> : <small role="status">Loading decision…</small>;
-  if (!decision && !editing) return access.editable ? <button className="paper-btn" onClick={edit}>Record decision</button> : <small>No decision recorded</small>;
+  if (!decision && !editing) return access.editable ? <button className="paper-btn" onClick={() => edit()}>Record decision</button> : <small>No decision recorded</small>;
   return <section className="decision-brief" aria-label="Comparison decision">
     {editing ? <form onSubmit={save}>
       <label>Decision<select required className="secondary" value={choice} onChange={e=>setChoice(e.target.value)}>
@@ -86,22 +101,37 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
       {error && <p role="alert">{error} <button className="text-link" type="button" onClick={()=>{setEditing(false);setAccess(undefined);setAttempt(n=>n+1);}}>Refresh decision</button></p>}
       <div><button className="primary" disabled={pending || !choice || !reason.trim() || !keys.length}>{pending ? "Saving…" : "Save decision"}</button> <button className="text-link" type="button" disabled={pending} onClick={()=>setEditing(false)}>Cancel</button></div>
     </form> : decision && <>
-      <header className="decision-summary"><small>Diligence decision · {decision.author} · {new Date(decision.at).toLocaleDateString()}</small>
+      <header className="decision-summary">
+        {focusedKey && <Link href="/?loops=work&workFilter=decisions" prefetch={false} className="text-link">Back to My work</Link>}
+        <small>Diligence decision · {decision.author} · {new Date(decision.at).toLocaleDateString()}</small>
       <h3>{decision.preferred ? "Prefer " + (sites.find(s=>s.id===decision.preferred)?.title || decision.preferred) : "Hold all sites"}</h3>
-      <p>{decision.rationale}</p></header>
+      <p>{decision.rationale}</p>
+      {decision.reviewedChange && <small>Reviewed {sites.find(site => site.id === decision.reviewedChange?.site)?.title || decision.reviewedChange.site} · {decision.reviewedChange.measure}</small>}
+      </header>
       <ul>{decision.citations.map(c=>{
         const live=byKey.get(figureKey(c));
         const followUp = c.followUp;
         const label=evidenceMeasures[c.measure];
-        const changed=live && (c.value!==live.value || c.period!==live.period || c.basis!==live.basis);
-        return <li key={figureKey(c)}><strong>{sites.find(s=>s.id===c.targetId)?.title || c.targetId} · {label}</strong>
-          {changed ? <><small className="decision-change">Changed since decision</small><span>{valueText(c)} → {valueText(live)}</span></> : <span>{live ? valueText(c) : "Current figure unavailable · At decision · " + valueText(c)}</span>}
+        const review = access.reviews?.find(item => item.key === figureKey(c));
+        const current = review?.current || live;
+        const changed = current && evidenceChanged(c, current);
+        const focused = focusedKey === figureKey(c);
+        return <li key={figureKey(c)} data-focused-citation={focused} tabIndex={focused ? -1 : undefined} ref={focused ? focusRow : undefined}><strong>{sites.find(s=>s.id===c.targetId)?.title || c.targetId} · {label}</strong>
+          {changed ? <><small className="decision-change">Changed since decision</small><span>{reviewValue(c)} → {reviewValue(current)}</span></> : <span>{live ? reviewValue(c) : "Current figure unavailable · At decision · " + reviewValue(c)}</span>}
+          {review?.reviewedAt && <small>Kept by {review.reviewedBy} · {new Date(review.reviewedAt).toLocaleString()}</small>}
+          {review?.reason && (review.reviewedAt || review.reason.includes("completed")) && <span>{review.reason}{review.reviewedAt && " · Last reviewed " + reviewValue(review.previous)}</span>}
+          {review?.source && <small>Source · {review.source}</small>}
           <button className="text-link" onClick={()=>inspect(c.targetId,label)}>Inspect {label.toLowerCase()}</button>
           {!followUp && live?.value === "—" && <button className="text-link" onClick={() => checkGap(live)}>Check missing evidence</button>}
           {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · Owner "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
+          {review?.reason && access.editable && <div className="review-actions">
+            <button type="button" className="paper-btn" disabled={pending} onClick={() => submit({ keep:true, review:{ key:review.key, token:review.token } })}>Keep decision</button>
+            {focused && <button type="button" className="text-link" onClick={() => edit(review)}>Revise decision</button>}
+          </div>}
         </li>;
       })}</ul>
-      {access.editable && <button className="text-link" onClick={edit}>Revise decision</button>}
+      {access.editable && !selectedReview?.reason && <button className="text-link" onClick={() => edit(access.reviews?.find(item => item.reason))}>Revise decision</button>}
+      {error && <p role="alert">{error} <button className="text-link" onClick={() => setAttempt(n => n + 1)}>Refresh decision</button></p>}
     </>}
   </section>;
 }

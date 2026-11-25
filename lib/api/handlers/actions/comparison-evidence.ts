@@ -25,15 +25,16 @@ export async function POST(request: Request) {
   const result = await runWrite(session, { action: "comparison.evidence.request" }, async sql => {
     const target = parseEvidenceTarget(new URL(request.url).searchParams);
     return createWithReceipt(sql, request, session.u, { target, body }, async tx => {
-      await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [JSON.stringify([target.targetKind,target.targetId,target.source])]);
+      const owner = target.linked?.targetKind === "deal" ? target.linked : target;
+      await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [JSON.stringify([owner.targetKind,owner.targetId,target.source])]);
       const existing = await findRequest(tx,target);
       if (existing) return existing;
       const title = ("Verify " + target.context).slice(0,120);
-      const note = await createNote(tx, { targetKind:target.targetKind, targetId:target.targetId, authorId:session.u,
+      const note = await createNote(tx, { targetKind:owner.targetKind, targetId:owner.targetId, authorId:session.u,
         body: "Missing evidence\n" + body.description.trim() + "\nCheck: " + target.context + target.source,
         openOnly: true });
-      await createSuggestion(tx, { targetKind:target.targetKind, targetId:target.targetId, authorId:session.u,
-        field:"proposed_next_step", detail:"work_item", title, proposedValue:title, reason:gapReference(target.targetId,note.id),
+      await createSuggestion(tx, { targetKind:owner.targetKind, targetId:owner.targetId, authorId:session.u,
+        field:"proposed_next_step", detail:"work_item", title, proposedValue:title, reason:gapReference(owner.targetId,note.id),
         ownerId:body.owner, targetOn:body.due });
       return await findRequest(tx,target);
     });

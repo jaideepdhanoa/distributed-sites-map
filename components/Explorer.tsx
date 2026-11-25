@@ -593,16 +593,17 @@ export default function Explorer() {
   }, []);
   const comparisonOrigin = useRef<string | null>(null);
   const inspectMeasure = params.get("measure");
-  const inspecting = Boolean(inspectMeasure && selected && compareIds.includes(selected));
+  const inspecting = Boolean(inspectMeasure && selected && (compareIds.includes(selected) || comparisonOrigin.current !== null));
   useEffect(() => {
     if (inspecting) shellRef.current?.querySelector<HTMLButtonElement>(".comparison-back")?.focus({ preventScroll: true });
   }, [inspecting, selected]);
   function inspectComparison(id: string, measure: string, source?: URLSearchParams) {
     comparisonOrigin.current = currentSearch();
     setPreviewId(null);
-    setSelected(id);
+    const inspectedId = source?.get("site") || id;
+    setSelected(inspectedId);
     const panel = measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
-    replaceSearch(comparisonOrigin.current, { site: id, measure, panel:source?.get("panel") || panel, note:source?.get("note") || null, sheet: "full" }, true);
+    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || panel, note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {

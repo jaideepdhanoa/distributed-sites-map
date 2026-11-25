@@ -1339,7 +1339,7 @@ export default function MapView(props: Props) {
       const pin = geometry.coordinates as [number, number];
       if (!Number.isFinite(pin[0]) || !Number.isFinite(pin[1])) return;
       markCentered(map, id, pin[0], pin[1]);
-      if (preserveView || !map.isStyleLoaded()) return;
+      if (preserveView || (propsRef.current.previewName && pinOrigin.current?.id === id) || !map.isStyleLoaded()) return;
       map.resize();
       if (propsRef.current.spaceDrawing) return;
       const center = map.getCenter();
@@ -1911,6 +1911,8 @@ export default function MapView(props: Props) {
       const pin = geometry.coordinates as [number, number];
       const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
       markCentered(map, props.selectedId || "", pin[0], pin[1]);
+      // This pin was selected on the visible map. Keep the geographic context while its evidence is open.
+      if (props.previewName && pinOrigin.current?.id === props.selectedId) return;
       if (props.previewName || !extra.length) {
         glide(map, pin, props.previewName ? Math.max(map.getZoom(), 13) : 16);
         return;

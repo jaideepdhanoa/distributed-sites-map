@@ -81,8 +81,9 @@ function fieldLabel(id: string) {
   return FIELDS.find((item) => item.id === id)?.label || COLUMNS.find((item) => item.id === id)?.label || id;
 }
 
-export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "deal" | "nda"; id: string; variant?: "card" | "queue" }) {
+export function RecordActions({ kind, id, variant = "card", threadId }: { threadId?: string; kind: "site" | "deal" | "nda"; id: string; variant?: "card" | "queue" }) {
   const status = useActionStatus();
+  const [threadStatus,setThreadStatus] = useState<"loading"|"ready"|"failed">("loading");
   const [notes, setNotes] = useState<Note[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [note, setNote] = useState("");
@@ -123,9 +124,10 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
     ]).then(async ([notesRes, suggestionsRes, accountsRes]) => {
       if (cancel) return;
       if (notesRes.ok) setNotes(((await notesRes.json()) as { notes: Note[] }).notes || []);
+      setThreadStatus(notesRes.ok ? "ready" : "failed");
       if (suggestionsRes?.ok) setSuggestions(((await suggestionsRes.json()) as { suggestions: Suggestion[] }).suggestions || []);
       if (accountsRes.ok) setAccounts(((await accountsRes.json()) as { accounts: Account[] }).accounts || []);
-    }).catch(() => undefined);
+    }).catch(() => { if (!cancel) setThreadStatus("failed"); });
     return () => {
       cancel = true;
     };
@@ -181,7 +183,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   const currentStep = approvedSteps[0];
   const seenNote = new Set<string>();
   const roots = notes.filter((item) => {
-    if (item.parentId || seenNote.has(item.id)) return false;
+    if ((threadId && item.id !== threadId) || item.parentId || seenNote.has(item.id)) return false;
     seenNote.add(item.id);
     return true;
   });
@@ -208,6 +210,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
         <NoteThread
           key={item.id}
           note={item}
+          expanded={Boolean(threadId)}
           replies={notes.filter((reply) => reply.parentId === item.id)}
           writable={writable}
           reviewer={reviewer}
@@ -228,6 +231,8 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
   ) : (
     <p className="note">No discussion yet. Notes added here stay on this record.</p>
   );
+
+  if (threadId) return <>{error && <p role="alert">{error}</p>}{roots.length ? threads : <p role="status">{threadStatus === "loading" ? "Opening follow-up…" : "This follow-up is unavailable."}</p>}</>;
 
   const noteForm = writable ? (
     <form
@@ -441,7 +446,7 @@ function FollowSite({ siteId }: { siteId: string }) {
 }
 
 function NoteThread({
-  note,
+  note, expanded,
   replies,
   writable,
   reviewer,
@@ -458,6 +463,7 @@ function NoteThread({
   onOpen,
 }: {
   note: Note;
+  expanded?: boolean;
   replies: Note[];
   writable: boolean;
   reviewer: boolean;
@@ -486,7 +492,7 @@ function NoteThread({
   return (
     <details
       className="act-thread"
-      open={!note.resolvedAt && !mentionedMe}
+      open={expanded || (!note.resolvedAt && !mentionedMe)}
       data-testid="note-thread"
       data-note-id={note.id}
       onToggle={(event) => { if (event.currentTarget.open) onOpen(note.id); }}

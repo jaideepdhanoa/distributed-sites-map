@@ -45,3 +45,30 @@ test("saved decision preserves its cited value, follows its original request, an
   await assert.rejects(readDecision(sql, privateView.id, "teammate", true), /unavailable/);
   assert.equal((await listAudit(sql)).some(entry => entry.action === "view.decision"), false);
 });
+
+test("linked power records recover an earlier site thread with its owner and due date", async () => {
+  const { indexPowerLinks } = await import("../../lib/actions/powerLinks");
+  const { findRequest } = await import("../../lib/actions/evidenceLookup");
+  const { createSuggestion } = await import("../../lib/actions/suggestions");
+  const { gapReference } = await import("../../lib/actions/gapReference");
+  const pairs = indexPowerLinks([["deal-a","site-a"],["deal-b","ambiguous"],["deal-c","ambiguous"]]);
+  assert.equal(pairs.has("deal:deal-b"), false);
+  const target = (kind: "site" | "deal") => {
+    const id = kind + "-a";
+    return { ...parseEvidenceTarget(new URLSearchParams({targetKind:kind,targetId:id,measure:"power"})), linked:pairs.get(kind+":"+id) };
+  };
+  const sql = await memorySql();
+  await migrate(sql);
+  for (const kind of ["site","deal"] as const) {
+    const record = target(kind);
+    const note = await createNote(sql,{targetKind:kind,targetId:record.targetId,authorId:"reviewer",body:"Missing evidence\nConfirm service." + record.source}, () => ({}));
+    const suggestion = await createSuggestion(sql,{targetKind:kind,targetId:record.targetId,authorId:"reviewer",field:"proposed_next_step",detail:"work_item",
+      title:"Confirm service",proposedValue:"Confirm service",targetOn:"2030-03-15",reason:gapReference(record.targetId,note.id)}, () => ({}));
+    await sql.query("UPDATE suggestions SET owner_id=$1 WHERE id=$2",["reviewer",suggestion.id]);
+    const other = target(kind === "deal" ? "site" : "deal");
+    const found = await findRequest(sql,other);
+    assert.deepEqual([found?.note,found?.owner,found?.due,found?.targetId],[note.id,"reviewer","2030-03-15",record.targetId]);
+    await resolveNote(sql,{id:note.id,actorId:"reviewer"});
+    assert.equal((await findRequest(sql,other,note.id))?.status,"resolved");
+  }
+});

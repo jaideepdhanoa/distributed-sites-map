@@ -6,13 +6,13 @@ import { useActionStatus } from "./actions/panel";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
-export function PowerFollowUp({ deal, site }: { deal?: DealProps | null; site?: SiteProps | null }) {
+export function PowerFollowUp({ deal, site, primary = false }: { primary?: boolean; deal?: DealProps | null; site?: SiteProps | null }) {
   const [open, setOpen] = useState(false);
   const access = useActionStatus();
   const record = deal || site;
   if (!record || !access.enabled || deal?.kind === "land" || site?.land_only || deal?.stage_group === "dropped") return null;
   return <>
-    <button type="button" className="text-link" onClick={() => setOpen(true)}>Open power follow-up</button>
+    <button type="button" className={primary ? "primary preview-open" : "text-link"} onClick={() => setOpen(true)}>Open power follow-up</button>
     {open && <ComparisonEvidence title={record.name || record.address || "Site"} target={{ targetKind: deal ? "deal" : "site", targetId: deal?.deal_id || site!.site_id, measure: "power", period: "", basis: "" }}
       context="Confirm on-site power" close={() => setOpen(false)} saved={() => {}} inspect={note => {
         const query = new URLSearchParams(currentSearch());

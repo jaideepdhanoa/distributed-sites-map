@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { evidenceMeasures, type EvidenceTarget, type EvidenceRequest } from "@/lib/actions/comparisonEvidence";
 import { canWrite, useActionStatus } from "./panel";
 
+import { RecordActions } from "./RecordActions";
+
 type Lookup = { followUp: EvidenceRequest | null; accounts: { id: string; name: string }[] };
 const statuses: Record<string,string> = { open:"Awaiting approval", accepted:"Approved", ready:"Ready for approval", agreed_waiting:"Waiting", completed:"Completed", rejected:"Declined", superseded:"Superseded" };
 
@@ -12,6 +14,7 @@ export default function ComparisonEvidence({target, title, context = "Not on fil
   const dialog = useRef<HTMLDialogElement>(null);
   const access = useActionStatus();
   const [lookup,setLookup] = useState<Lookup>();
+  const [showThread,setShowThread] = useState(false);
   const [attempt,setAttempt] = useState(0);
   const [readFailed,setReadFailed] = useState(false);
   const [pending,setPending] = useState(false);
@@ -64,7 +67,8 @@ export default function ComparisonEvidence({target, title, context = "Not on fil
     : !lookup ? <p role="status">Checking for a follow-up…</p>
     : item ? <section aria-label="Existing follow-up">
       <p role="status">{statuses[item.status] || item.status} · {item.owner || "Unassigned"}{item.due && " · Due " + item.due}</p>
-      <button type="button" className="primary" onClick={()=>inspect(item.note)}>View follow-up</button>
+      {showThread ? <RecordActions kind={item.targetKind || target.targetKind} id={item.targetId || target.targetId} threadId={item.note} />
+        : <button type="button" className="primary" onClick={()=>target.measure === "power" ? setShowThread(true) : inspect(item.note)}>View follow-up</button>}
     </section> : canWrite(access.actionRole) ? <form onSubmit={submit}>
       <label>Evidence needed<textarea className="field" required maxLength={500} value={description} disabled={pending} onChange={e=>setDescription(e.target.value)} /></label>
       <label>Owner<select className="secondary" value={owner} disabled={pending} onChange={e=>setOwner(e.target.value)}><option value="">Unassigned</option>

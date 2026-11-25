@@ -567,6 +567,9 @@ export default function Explorer() {
   const comparisonOrigin = useRef<string | null>(null);
   const inspectMeasure = params.get("measure");
   const inspecting = Boolean(inspectMeasure && selected && compareIds.includes(selected));
+  useEffect(() => {
+    if (inspecting) shellRef.current?.querySelector<HTMLButtonElement>(".comparison-back")?.focus({ preventScroll: true });
+  }, [inspecting, selected]);
   function inspectComparison(id: string, measure: string) {
     comparisonOrigin.current = currentSearch();
     setPreviewId(null);
@@ -586,7 +589,7 @@ export default function Explorer() {
   }
   function comparisonQuery() {
     const query = new URLSearchParams(currentSearch());
-    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist"]) query.delete(key);
+    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView"]) query.delete(key);
     query.set("compare", compareIds.join("|"));
     query.set("city", selectedMarket);
     query.set("funnel", funnel);
@@ -602,7 +605,7 @@ export default function Explorer() {
     }
     return query.toString();
   }
-  const comparisonBack = inspecting && <button className="text-link comparison-back" type="button" onClick={returnComparison}>Back to comparison · {inspectMeasure}</button>;
+  const comparisonBack = inspecting && <button className="text-link comparison-back" data-measure={inspectMeasure} type="button" onClick={returnComparison}>Back to comparison · {inspectMeasure}</button>;
   const queryString = params.toString();
   useEffect(() => {
     const updateSearch = () => rememberSearch(window.location.pathname + window.location.search);

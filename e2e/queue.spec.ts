@@ -594,7 +594,6 @@ for (const width of [1440, 390]) {
     await expect(form.getByRole("alert")).toBeVisible();
     await form.getByRole("button", { name: "Save", exact: true }).click();
     await expect(tray.getByRole("status").filter({ hasText: name })).toBeVisible();
-    await capture("saved", tray);
     await tray.getByRole("button", { name: "Saved views" }).click();
     const row = page.getByTestId("views-panel").getByRole("listitem").filter({ hasText: name });
     await expect(row).toHaveCount(1);
@@ -602,6 +601,8 @@ for (const width of [1440, 390]) {
     await expect(scope).toContainText("5 sites");
     await expect(page).toHaveURL(/stage=land/);
     expect(new URL(page.url()).searchParams.get("sort")).toBe("site:asc");
+    await expect(tray.getByRole("status").filter({ hasText: name })).toBeVisible();
+    await capture("saved", tray);
     await expect(figure).toBeVisible();
     await figure.click();
     const brief = drawer.getByRole("region", { name: "Screening decision" });

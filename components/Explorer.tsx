@@ -3297,6 +3297,7 @@ export default function Explorer() {
             contextSites={sites}
             contextDeals={dealRows}
             signedIn={Boolean(me)}
+            evidenceEnabled={Boolean(me?.actionsEnabled)}
             inspecting={inspecting}
             onInspect={inspectComparison}
             onRemove={(id) => setCompared(id, false)}

@@ -731,3 +731,54 @@ for (const width of [1440, 390]) {
     await expect(gap.getByRole("button", { name: "Propose gap action" })).toHaveCount(0);
   });
 }
+
+for (const width of [1440,390]) {
+  test(`request missing evidence from Compare at ${width}px`, async ({page,request}) => {
+    await login(request,"reviewer");
+    const catalog = await (await request.get("/api/data/sites?city=PHX")).json();
+    const sites = catalog.features.filter((f:{properties:{origin:string;linked_deal_id?:string}})=>f.properties.origin==="universe" && !f.properties.linked_deal_id).slice(width===390?2:0,width===390?4:2);
+    sites.forEach((f:{properties:Record<string,unknown>},i:number)=>Object.assign(f.properties,{name:["Example North","Example South"][i],zoning:"",address:"Example street"}));
+    const ids = sites.map((f:{properties:{site_id:string}})=>f.properties.site_id);
+    await page.route("**/api/data/sites?**",route=>route.fulfill({json:{...catalog,features:sites}}));
+    await page.setViewportSize({width,height:width===390?844:900});
+    await openAs(page,"contributor","/?funnel=universe&city=PHX&view=list&compare="+ids.join("|"));
+    const cell = page.getByRole("button",{name:"Check missing Zoning for Example North"});
+    await page.route("**/api/actions/comparison-evidence?**",route=>route.fulfill({status:503,json:{}}),{times:1});
+    await cell.click();
+    const sheet = page.getByRole("dialog",{name:"Zoning"});
+    await expect(sheet.getByRole("button",{name:"Request evidence"})).toHaveCount(0);
+    await sheet.getByRole("button",{name:"Retry"}).click();
+    await sheet.getByLabel("Owner").selectOption("reviewer");
+    await sheet.getByLabel("Evidence needed").fill("Confirm permitted use.");
+    await mkdir("review-shots",{recursive:true});
+    await sheet.screenshot({path:"review-shots/"+width+"-comparison-request.png"});
+    await page.route("**/api/actions/comparison-evidence?**", async route=>{
+      await route.fetch();
+      await route.abort("failed");
+    },{times:1});
+    await sheet.getByRole("button",{name:"Request evidence"}).click();
+    await expect(sheet.getByRole("alert")).toBeVisible();
+    await expect(sheet.getByLabel("Evidence needed")).toHaveValue("Confirm permitted use.");
+    await sheet.getByRole("button",{name:"Request evidence"}).click();
+    await expect(sheet).toContainText("reviewer");
+    await sheet.getByRole("button",{name:"Close evidence request"}).click();
+    await expect(cell).toBeFocused();
+    await cell.click();
+    await expect(sheet.getByRole("button",{name:"View follow-up"})).toBeVisible();
+    const query = new URLSearchParams({targetKind:"site",targetId:ids[0],measure:"zoning"});
+    const api = "/api/actions/comparison-evidence?"+query;
+    const existing = (await (await request.get(api)).json()).followUp;
+    const draft = {data:{description:"Check again"},headers:{"Idempotency-Key":crypto.randomUUID()}};
+    expect((await (await request.post(api,draft)).json()).followUp.note).toBe(existing.note);
+    const work = (await (await request.get("/api/actions/work")).json()).rows;
+    expect(work.filter((r:{note:string})=>r.note===existing.note)).toHaveLength(1);
+    query.set("measure","power");
+    expect((await (await request.get("/api/actions/comparison-evidence?"+query)).json()).followUp).toBeNull();
+    await login(request,"viewer");
+    expect((await request.post(api,draft)).status()).toBe(403);
+    await sheet.getByRole("button",{name:"View follow-up"}).click();
+    await expect(page).toHaveURL(new RegExp("note="+existing.note));
+    await page.getByRole("button",{name:/Back to comparison/}).click();
+    await expect(cell).toBeFocused();
+  });
+}

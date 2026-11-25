@@ -176,7 +176,7 @@ export async function listNotes(sql: Sql, targetKind: ThreadKind, targetId: stri
 
 export async function createNote(
   sql: Sql,
-  input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; parentId?: string | null; mentions?: unknown; recommendationId?: string | null },
+  input: { targetKind: ThreadKind; targetId: string; body: string; authorId: string; openOnly?: boolean; parentId?: string | null; mentions?: unknown; recommendationId?: string | null },
   lookup?: RecordLookup,
 ): Promise<Note> {
   lookup = lookup ?? await fileLookup();
@@ -221,10 +221,10 @@ export async function createNote(
     `SELECT id FROM notes
      WHERE target_kind = $1 AND target_id = $2 AND author_id = $3 AND body = $4
        AND deleted_at IS NULL
-       AND parent_id IS NOT DISTINCT FROM $5
+       AND parent_id IS NOT DISTINCT FROM $5 AND (NOT $6::boolean OR resolved_at IS NULL)
      ORDER BY created_at ASC
      LIMIT 1`,
-    [targetKind, targetId, input.authorId, body, parentId],
+    [targetKind, targetId, input.authorId, body, parentId, Boolean(input.openOnly)],
   );
   const duplicateId = duplicate.rows[0]?.id;
   if (duplicateId) {

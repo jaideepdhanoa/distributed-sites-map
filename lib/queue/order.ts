@@ -1,6 +1,7 @@
 import { inReach, type Reach } from "@/lib/reach";
 
 export type QueueReason = {
+  noteId?: string;
   at: string;
   summary: string;
   type: string;

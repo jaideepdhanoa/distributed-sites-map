@@ -9,7 +9,8 @@ import { listScoreText } from "@/lib/keyNumbers";
 import { reviewSentence } from "@/lib/queue/since";
 import "./queue.css";
 
-export type QueueReason = { at: string; summary: string; type: string };
+import type { QueueReason } from "@/lib/queue/order";
+import { changeDestination } from "./ReviewEvidence";
 
 export type FeedSite = {
   siteId: string;
@@ -114,6 +115,7 @@ export function ReviewBar({
   onReviewed,
   onExit,
   onOpenFeed,
+  onEvidence,
   onSnooze,
   siteId,
   followed,
@@ -134,6 +136,7 @@ export function ReviewBar({
   onReviewed: () => void;
   onExit: () => void;
   onOpenFeed: () => void;
+  onEvidence: (reason: QueueReason, index: number) => void;
   onSnooze: () => void;
   siteId: string;
   followed: boolean;
@@ -194,9 +197,12 @@ export function ReviewBar({
         </button>
         {sinceOpen && since.lines.length ? (
           <ul className="review-since-list" data-testid="review-since-list">
-            {since.lines.map((line) => (
-              <li key={`${line.at}-${line.text}`}>
-                <span>{line.text}</span>
+            {since.lines.map((line, index) => (
+              <li key={`${line.at}-${index}`}>
+                <button type="button" className="text-link" data-change-index={index}
+                  onClick={() => { setSinceOpen(false); onEvidence(reasons[index], index); }}>
+                  {line.text}<small>{changeDestination(reasons[index].type).label} →</small>
+                </button>
                 <time dateTime={line.at}>{line.when}</time>
               </li>
             ))}

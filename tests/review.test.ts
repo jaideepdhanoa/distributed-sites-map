@@ -3,6 +3,7 @@ import test from "node:test";
 import { contactDate, serviceAreaChip } from "../lib/cardStatus";
 import { leadSourceLine } from "../lib/format";
 import { plainVerdict, stageDetail, stageTitle, statusOf, uncheckedNote } from "../lib/labels";
+import { screeningEvidence } from "../lib/screeningEvidence";
 import { reviewSentence } from "../lib/queue/since";
 import type { DealProps, SiteProps } from "../lib/types";
 
@@ -158,4 +159,23 @@ test("review changes collapse to one sentence", () => {
   assert.equal(since.sentence, "Since Nov 10: stage moved to Financial screen · 2 new notes · +1 more");
   assert.equal(since.lines.length, 4);
   assert.equal(since.lines[3]?.when, "Nov 12");
+});
+
+test("screening actions follow the recorded check and its actual evidence", () => {
+  const parcel = site({ county_url: "https://example.org/parcels/1", aadt_count: "20", aadt_year: "2025", aadt_source: "Traffic survey" });
+  const evidence = screeningEvidence({ site: parcel, signedIn: false });
+  assert.deepEqual(evidence.evidence, { kind: "county", href: parcel.county_url });
+  assert.equal(evidence.figures.find(f => f.label === "Traffic")?.date, "2025");
+  assert.equal(evidence.figures.find(f => f.label === "Traffic")?.source, "Traffic survey");
+  const missing = screeningEvidence({ site: { ...parcel, county_url: "" }, signedIn: false });
+  assert.equal(missing.evidence, undefined);
+  assert.match(missing.missing, /not on file/);
+  const space = deal({ stage_group: "desk", stage_blocker: "Confirm open land", open_land_basis: "Estimated", open_land_sqft: 100 });
+  assert.equal(screeningEvidence({ deal: space, signedIn: true }).evidence?.kind, "space");
+  assert.equal(screeningEvidence({ deal: { ...space, open_land_sqft: 0 }, signedIn: true }).evidence, undefined);
+  const financial = deal({ stage_group: "financial", stage_blocker: "Check financials" });
+  assert.equal(screeningEvidence({ deal: financial, signedIn: true }).evidence?.kind, "financials");
+  assert.equal(screeningEvidence({ deal: { ...financial, stage_blocker: "" }, signedIn: true }).evidence?.kind, "financials");
+  assert.notEqual(screeningEvidence({ deal: financial, signedIn: false }).evidence?.kind, "financials");
+  assert.equal(screeningEvidence({ deal: { ...financial, stage_group: "dropped" }, signedIn: true }).evidence, undefined);
 });

@@ -960,13 +960,15 @@ export default function MapView(props: Props) {
       };
       raiseGroups();
       let hideGroupTip = () => undefined as void;
-      const openGroup = (clusterId: number) => {
+      const openGroup = (clusterId: number, center: [number, number]) => {
         holdCamera.current = true;
         hideGroupTip();
+        const nextZoom = Math.min(map.getMaxZoom(), map.getZoom() + 2);
+        const zoomToGroup = () => glide(map, center, nextZoom);
         const source = map.getSource("pins") as GeoJSONSource;
         source.getClusterLeaves(clusterId, 10000, 0).then((leaves) => {
           const bounds = leafBounds(leaves as PinFeature[]);
-          if (!bounds) return;
+          if (!bounds) { zoomToGroup(); return; }
           const phone = window.matchMedia("(max-width: 767px)").matches;
           const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
           fitMap(map, bounds, {
@@ -976,7 +978,7 @@ export default function MapView(props: Props) {
             maxZoom: 16,
             duration: reduce ? 0 : 450,
           });
-        }).catch(() => undefined);
+        }).catch(zoomToGroup);
       };
       const groupAt = (point: { x: number; y: number }) => {
         const layers = ["clusters", "cluster-count", "clusters-halo"].filter((id) => map.getLayer(id));
@@ -990,7 +992,7 @@ export default function MapView(props: Props) {
         const clusterId = groupAt(point);
         if (clusterId == null) return;
         (event as MapMouseEvent).originalEvent?.preventDefault();
-        openGroup(clusterId);
+        openGroup(clusterId, [event.lngLat.lng, event.lngLat.lat]);
       });
       map.on("dragstart", () => {
         holdCamera.current = true;
@@ -1615,7 +1617,13 @@ export default function MapView(props: Props) {
       const drawing = Boolean(propsRef.current.spaceDrawing);
       const phonePad = phone && !reviewing && !drawing;
       const padKey = phonePad ? "clear" : "flush";
-      map.setPadding(phonePad && !props.previewName ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map));
+      const padding = phonePad && !props.previewName ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map);
+      const currentPadding = map.getPadding();
+      // setPadding calls jumpTo, which stops an in-progress cluster zoom even if the padding is identical.
+      if (padding.top !== currentPadding.top || padding.bottom !== currentPadding.bottom ||
+          padding.left !== currentPadding.left || padding.right !== currentPadding.right) {
+        map.setPadding(padding);
+      }
       const drawFly = propsRef.current.spaceFly;
       if (drawing && drawFly && map.getZoom() < 17) {
         map.jumpTo({ center: [drawFly.lng, drawFly.lat], zoom: 18, padding: pointPadding(map) });

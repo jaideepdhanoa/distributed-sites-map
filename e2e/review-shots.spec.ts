@@ -301,7 +301,8 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
     if (data.type !== "FeatureCollection") return [];
     const sites = data.features.flatMap(feature => feature.geometry?.type === "Point" && feature.properties?.city === "PHX"
       ? [{ id: String(feature.properties.site_id), center: feature.geometry.coordinates as [number, number] }] : []);
-    sites.sort((a, b) => Number(b.id === "PHX-U189") - Number(a.id === "PHX-U189"));
+    const priority = (id: string) => id === "PHX-U189" ? 2 : id === "PHX-U645" ? 1 : 0;
+    sites.sort((a, b) => priority(b.id) - priority(a.id));
     return sites.filter((site, i) => !sites.slice(0, i).some(other =>
       Math.abs(other.center[0] - site.center[0]) + Math.abs(other.center[1] - site.center[1]) < 0.002)).slice(0, 5);
   });
@@ -336,6 +337,17 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
     await expect(preview.getByText("Next check", { exact: true })).toBeVisible();
     await expect(preview.locator("dd").last()).not.toBeEmpty();
     if (index === 0) {
+      const county = preview.getByRole("link", { name: /Open county record/ });
+      const site = await (await page.request.get(`/api/data/sites/${pin.id}`)).json();
+      await expect(county).toHaveAttribute("href", new URL(site.county_url).href);
+      // Confirm a single tap opens the recorded destination without relying on county uptime.
+      await page.context().route(site.county_url, route => route.fulfill({ contentType: "text/plain", body: "Parcel record" }));
+      const opened = page.waitForEvent("popup");
+      await county.click();
+      const parcel = await opened;
+      await expect(parcel).toHaveURL(site.county_url);
+      await parcel.close();
+      await expect(preview).toBeVisible();
       await page.mouse.move(1, 1);
       await waitForBasemap(page);
       if (info.project.name === "mobile") {
@@ -345,11 +357,23 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
       }
       await page.screenshot({ path: `review-shots/${info.project.name}-map-preview.png` });
     }
-    if (index % 2 === 0) {
+    if (pin.id === "PHX-U645") {
+      await expect(preview.getByText("County record link not on file.")).toBeVisible();
+      await expect(preview.getByRole("link", { name: /Open county record/ })).toHaveCount(0);
+    }
+    if (index % 2 === 0 || pin.id === "PHX-U645") {
       await action.click();
       const record = page.locator("aside.drawer");
       await expect(record).toHaveAttribute("data-record", pin.id);
+      const brief = record.getByRole("region", { name: "Screening decision" });
+      await expect(brief).toBeInViewport();
       await expect(record.locator(".card-hero")).toBeAttached();
+      if (index === 0) {
+        await expect(brief).toContainText("2025");
+        const aerial = record.locator("img.hero-aerial");
+        if (await aerial.count()) await aerial.evaluate(async img => { await (img as HTMLImageElement).decode(); });
+        await page.screenshot({ path: `review-shots/${info.project.name}-record-brief.png` });
+      }
       if (info.project.name === "mobile") await expect(record).toHaveClass(/snap-full/);
       await record.getByRole("button", { name: "Close", exact: true }).click();
     } else await preview.getByRole("button", { name: "Close site preview" }).click();
@@ -360,4 +384,19 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
     expect(query.get("stage")).toBe("in_area");
     await expect.poll(() => new URL(page.url()).searchParams.has("site")).toBe(false);
   }
+});
+
+test("screen a site without a linked county record", async ({ page }, info) => {
+  await page.goto("/?funnel=universe&city=PHX&stage=in_area&site=PHX-U645&sheet=full", { waitUntil: "domcontentloaded" });
+  const brief = page.getByRole("region", { name: "Screening decision" });
+  await expect(brief).toContainText("County record link not on file.");
+  await expect(brief).toBeInViewport();
+  await brief.screenshot({ path: `review-shots/${info.project.name}-missing-evidence.png` });
+});
+
+test("open-land evidence links show the measurement in the viewport", async ({ page }) => {
+  await page.goto("/?site=PIPE-MIA-0080&funnel=pipeline&panel=open-land&sheet=full", { waitUntil: "domcontentloaded" });
+  const label = page.locator('#panel-numbers [data-evidence="open-land"]');
+  await expect(label).toBeInViewport();
+  await expect(label.locator("xpath=following-sibling::div[1]")).toBeInViewport();
 });

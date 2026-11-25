@@ -30,15 +30,16 @@ export default function PanelSections({
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
   const note = params.get("note");
-  const tab: TabId = panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
+  const tab: TabId = panel === "open-land" ? "numbers" : panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
   useEffect(() => {
-    if (panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    if (panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
     const scroller = node?.closest(".drawer-scroll");
     if (!node || !(scroller instanceof HTMLElement)) return;
     let frame = 0;
     const align = () => {
-      const target = panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
+      const target = panel === "open-land" ? node.querySelector<HTMLElement>('[data-evidence="open-land"]')
+        : panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
       if (target) {
         for (let parent: HTMLElement | null = target; parent && parent !== node; parent = parent.parentElement) {
           if (parent instanceof HTMLDetailsElement && !parent.open) parent.open = true;

@@ -175,6 +175,7 @@ test("screening actions follow the recorded check and its actual evidence", () =
   assert.equal(screeningEvidence({ deal: { ...space, open_land_sqft: 0 }, signedIn: true }).evidence, undefined);
   const financial = deal({ stage_group: "financial", stage_blocker: "Check financials" });
   assert.equal(screeningEvidence({ deal: financial, signedIn: true }).evidence?.kind, "financials");
+  assert.equal(screeningEvidence({ deal: { ...financial, stage_blocker: "" }, signedIn: true }).evidence?.kind, "financials");
   assert.notEqual(screeningEvidence({ deal: financial, signedIn: false }).evidence?.kind, "financials");
   assert.equal(screeningEvidence({ deal: { ...financial, stage_group: "dropped" }, signedIn: true }).evidence, undefined);
 });

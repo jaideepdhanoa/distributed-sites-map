@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
 import { COMMENT_CHANGED } from "@/lib/comments/nav";
@@ -107,6 +107,7 @@ export default function FinancialsEntry({
   const comments = loaded ? loaded.comments ?? [] : own.comments;
   const sample = loaded ? loaded.sample : own.sample;
   const settled = loaded ? loaded.settled : own.settled;
+  const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     setOpen(false);
@@ -126,9 +127,9 @@ export default function FinancialsEntry({
   }
   return (
     <>
-      {compact ? (card ? <button type="button" className="primary preview-open" onClick={() => setOpen(true)}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
+      {compact ? (card ? <button type="button" className="primary preview-open" ref={trigger} onClick={() => setOpen(true)}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
         <article className="fin-entry">
-          <button type="button" className="fin-tile" data-testid="financials-entry" onClick={() => setOpen(true)}>
+          <button type="button" className="fin-tile" ref={trigger} data-testid="financials-entry" onClick={() => setOpen(true)}>
             <span>Financials</span>
             <strong>{card.revenue} revenue</strong>
             <small>{card.cashLabel} {card.cash} · {card.margin} margin</small>
@@ -139,7 +140,7 @@ export default function FinancialsEntry({
       ) : packageOnFile ? (
         <p className="fin-quiet" data-testid="financials-quiet">Financials: package not yet broken into line items</p>
       ) : null}
-      {open && card ? createPortal(<PnlOverlay statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => setOpen(false)} />, document.body) : null}
+      {open && card ? createPortal(<PnlOverlay statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true })); }} />, document.body) : null}
     </>
   );
 }

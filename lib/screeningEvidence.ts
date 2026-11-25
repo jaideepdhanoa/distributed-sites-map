@@ -54,6 +54,7 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   let evidence: Evidence | undefined;
   let missing = "";
   if (deal?.stage_group === "dropped") review = "No further review scheduled.";
+  else if (!gap && signedIn && deal?.stage_group === "financial" && deal.kind !== "land" && deal.financials_open !== false) review = "Review the financial statement.";
   else if (!gap && site?.verdict) review = nextStepText(site);
   else if (!gap && listing?.approximate) review = "Confirm the exact location.";
   else if (!gap && site && !deal) review = "Check the county parcel record.";
@@ -65,7 +66,7 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   } else if (/open land|usable land|spare land|usable space|bay fit/i.test(review)) {
     if (present(spare.value) && (site || deal)) evidence = { kind: "space" };
     else missing = "Open-land measurement not on file.";
-  } else if (signedIn && deal && deal.kind !== "land" && /financial|p\s*&\s*l|cash flow|revenue|profit and loss/i.test(review)) {
+  } else if (signedIn && deal && deal.kind !== "land" && deal.financials_open !== false && /financial|p\s*&\s*l|cash flow|revenue|profit and loss/i.test(review)) {
     evidence = { kind: "financials", id: deal.deal_id };
   }
   return { status, reason, figures, evidence, missing, review: review || "Review the site evidence." };

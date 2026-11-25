@@ -12,7 +12,7 @@ type PreviewProps = {
   linkedDeal?: DealProps | null;
   signedIn: boolean;
   loading: boolean;
-  onOpen: (panel?: "numbers") => void;
+  onOpen: (panel?: "open-land") => void;
   onClose: () => void;
 };
 
@@ -28,7 +28,7 @@ export default function MapSitePreview(props: PreviewProps) {
   const address = displayAddress(record.address);
   return (
     <aside className="drawer map-preview" aria-labelledby="pin-preview-title" data-record={id}
-      onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>
+      onKeyDown={event => { if (event.key === "Escape" && !document.querySelector(".pnl-overlay")) { event.stopPropagation(); onClose(); } }}>
       <div className="preview-topline">
         <span className="preview-stage"><LocateFixed size={17} aria-hidden="true" />{status}</span>
         <button className="close" type="button" aria-label="Close site preview" onClick={onClose}>×</button>
@@ -41,7 +41,7 @@ export default function MapSitePreview(props: PreviewProps) {
       </dl>
       <div className="preview-actions">
       {evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}
-      {evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("numbers")}>Check open land</button>}
+      {evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("open-land")}>Check open land</button>}
       {evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} compact />}
       <button type="button" className={evidence ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
       </div>

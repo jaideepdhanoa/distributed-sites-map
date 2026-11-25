@@ -393,3 +393,10 @@ test("screen a site without a linked county record", async ({ page }, info) => {
   await expect(brief).toBeInViewport();
   await brief.screenshot({ path: `review-shots/${info.project.name}-missing-evidence.png` });
 });
+
+test("open-land evidence links show the measurement in the viewport", async ({ page }) => {
+  await page.goto("/?site=PIPE-MIA-0080&funnel=pipeline&panel=open-land&sheet=full", { waitUntil: "domcontentloaded" });
+  const label = page.locator('#panel-numbers [data-evidence="open-land"]');
+  await expect(label).toBeInViewport();
+  await expect(label.locator("xpath=following-sibling::div[1]")).toBeInViewport();
+});

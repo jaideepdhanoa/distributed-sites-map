@@ -13,7 +13,9 @@ export default async function globalSetup() {
   let browser: Browser | undefined;
   try {
     browser = await chromium.launch();
-    const context = await browser.newContext({ baseURL, extraHTTPHeaders: headers });
+    const context = await browser.newContext({ baseURL });
+    // Vercel sets a deployment-scoped cookie. Third-party tile requests use normal browser headers.
+    if (bypass) await context.request.get("/login", { headers, maxRedirects: 0 });
     const page = await context.newPage();
     await page.goto("/login", { waitUntil: "domcontentloaded" });
     const status = await page.evaluate(async (body) => {

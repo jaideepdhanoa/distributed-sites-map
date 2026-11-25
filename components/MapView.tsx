@@ -43,7 +43,6 @@ type Props = {
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   pinLabel?: PinLabel;
   onPinLabel?: (mode: PinLabel) => void;
-  coverage?: { listed: number; missingPoint: number } | null;
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
@@ -58,7 +57,7 @@ type Props = {
     },
     meta?: { user: boolean },
   ) => void;
-  fitPoints?: [number, number][];
+  shortlistPoints: { city: string; point: [number, number] }[];
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
   overlayPoints?: { label: string; coordinates: [number, number] }[];
@@ -1636,7 +1635,7 @@ export default function MapView(props: Props) {
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
         if (map.getLayer("areas-priority")) map.setPaintProperty("areas-priority", "fill-opacity", phone ? 0.16 : 0.24);
       }
-      const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+      const finiteFit = props.shortlistPoints.map(row => row.point);
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
       if (reviewToken) {
@@ -1678,7 +1677,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.scopeOpen, props.preserveCamera, props.mapScope, props.previewName, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.shortlistPoints, props.fitAll, props.scopeOpen, props.preserveCamera, props.mapScope, props.previewName, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1773,12 +1772,8 @@ export default function MapView(props: Props) {
     };
   }, [mapGeneration, props.showRings, props.depots]);
 
-  const marketPins = props.fitAll ? countedPins({ group: props.groupPins || "sites", sites: props.sites, offMarket: props.offMarket, deals: props.deals }) : [];
   const markets = new globalThis.Map<string, { count: number; lng: number; lat: number }>();
-  for (const pin of marketPins) {
-    const city = String(pin.properties?.city || "other");
-    const point = pin.geometry?.coordinates as [number, number];
-    if (!Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
+  for (const { city, point } of props.fitAll ? props.shortlistPoints : []) {
     const row = markets.get(city) || { count: 0, lng: 0, lat: 0 };
     markets.set(city, { count: row.count + 1, lng: row.lng + point[0], lat: row.lat + point[1] });
   }

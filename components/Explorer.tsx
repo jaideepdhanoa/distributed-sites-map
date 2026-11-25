@@ -2027,10 +2027,11 @@ export default function Explorer() {
   }
 
   const locationRows = funnel === "pipeline"
-    ? pipelineRows.map(row => ({ id: row.deal.deal_id, name: row.deal.name || row.deal.address || row.deal.deal_id, placed: !row.noPin }))
-    : listRows.map(row => ({ id: row.id, name: row.site, placed: row.lng != null && row.lat != null }));
-  const unplacedInView = locationRows.filter(row => !row.placed);
-  const mappedCount = locationRows.length - unplacedInView.length;
+    ? pipelineRows.map(row => ({ id: row.deal.deal_id, name: row.deal.name || row.deal.address || row.deal.deal_id, city: row.deal.city, point: row.point }))
+    : listRows.map(row => ({ id: row.id, name: row.site, city: row.city, point: row.lng != null && row.lat != null ? [row.lng, row.lat] as [number, number] : null }));
+  const unplacedInView = locationRows.filter(row => !row.point);
+  const mappedShortlist = locationRows.flatMap(row => row.point ? [{ city: row.city, point: row.point }] : []);
+  const mappedCount = mappedShortlist.length;
   function summaryText() {
     if (funnel !== "pipeline") return "";
     const home = !outsideGroup && (allPipes || pipelineWide || Boolean(who));
@@ -2867,15 +2868,8 @@ export default function Explorer() {
         {(needsMap || mapVisited) && <PanelBoundary name="Map">
         <MapView key={mapAttempt}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
-          coverage={funnel !== "pipeline" && showUniverse ? {
-            listed: shownFeatures.length,
-            missingPoint: shownFeatures.filter((feature) => !feature.geometry).length,
-          } : null}
           deals={drawnDeals}
-          fitPoints={[
-            ...((funnel === "pipeline" ? [] : shownFeatures).flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : [])),
-            ...drawnDeals.flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : []),
-          ]}
+          shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
           overlayPoints={overlayPoints}

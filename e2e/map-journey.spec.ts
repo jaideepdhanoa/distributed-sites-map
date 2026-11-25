@@ -35,7 +35,8 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
   await page.waitForFunction(() => (window as unknown as MapWindow).__sitesMap?.loaded());
   const scope = page.locator(".workspace-scope:visible");
   await mkdir("review-shots", { recursive: true });
-  await page.screenshot({ path: `review-shots/${info.project.name}-market-overview.png` });
+  const prefix = process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";
+  await page.screenshot({ path: `review-shots/${info.project.name}-${prefix}market-overview.png` });
   await scope.click();
   await expect(market).toBeInViewport({ ratio: 1 });
   await expect(market).toBeVisible();
@@ -154,4 +155,25 @@ test("national mapped and missing counts reconcile with the shortlist", async ({
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "List", exact: true }).first().click();
   await expect(page.locator("[data-site-row=MIA-QA-3]")).toBeVisible();
+});
+
+
+test("the map key reflects the workspace and enabled layers", async ({ page }) => {
+  await page.goto("/?city=PHX&funnel=pipeline&pstage=desk", { waitUntil: "domcontentloaded" });
+  const key = page.getByRole("complementary", { name: "Key" });
+  const open = key.getByRole("button", { name: "Map key" });
+  await open.click();
+  await expect(key.getByText("Desk screen", { exact: true })).toBeVisible();
+  await expect(key.getByText("Cleared", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  const rings = page.getByRole("checkbox", { name: "Depot rings" });
+  await rings.click();
+  await expect(rings).toBeChecked();
+  await page.getByRole("button", { name: "Close layers" }).click();
+  if (await open.getAttribute("aria-expanded") !== "true") await open.click();
+  await expect(key.getByText("Depot rings", { exact: true })).toBeVisible();
+  await page.goto("/?city=PHX&funnel=universe&stage=in_area", { waitUntil: "domcontentloaded" });
+  if (await open.getAttribute("aria-expanded") !== "true") await open.click();
+  await expect(key.getByText("Cleared", { exact: true })).toBeVisible();
+  await expect(key.getByText("Desk screen", { exact: true })).toHaveCount(0);
 });

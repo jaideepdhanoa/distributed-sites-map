@@ -25,6 +25,7 @@ jobs:
         with:
           name: review-change-screenshots
           path: |
+            review-shots/*-comparison-coverage.png
             review-shots/*-review-change.png
             review-shots/*-finding-*.png
             review-shots/*-comparison-request.png

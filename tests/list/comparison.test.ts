@@ -50,3 +50,25 @@ test("EBITDA keeps normalized and stated bases explicit and never substitutes SD
   assert.equal(ebitda!.kind,"gap");
   assert.equal(compare(deal({cash_flow_label:"Normalized EBITDA"}),deal({cash_flow_label:"EBITDA"})).get("EBITDA")?.kind,"basis");
 });
+
+test("coverage counts recorded zero and separates absent, inapplicable and incompatible figures", () => {
+  const samples = [
+    deal({stated_revenue:0,revenue_period:"2025"}),
+    deal({stated_revenue:30,revenue_period:"2024"}),
+    deal({kind:"land"}), deal({stated_revenue:null,stated_revenue_display:""}),
+  ];
+  const row = comparisonMeasures(samples.map((item,i)=>({id:String(i),title:"Example",rows:dealRows(item,[],true)}))).find(row=>row.label==="Revenue")!;
+  assert.equal(row.available,2);
+  assert.equal(row.partial,true);
+  assert.equal(row.kind,"basis");
+  assert.deepEqual(row.values,["$0 · 2025","$30 · 2024","Not applicable","—"]);
+});
+
+test("operating evidence can be inapplicable while property valuation remains available", () => {
+  const closed = deal({financials_open:false,county_value:100,county_value_display:"$100"});
+  const rows = compare(closed,deal());
+  assert.equal(rows.get("Revenue")?.values[0],"Not applicable");
+  assert.equal(rows.get("County value (land + buildings)")?.values[0],"$100");
+  const withheld = deal({stated_cash_flow:null,stated_cash_flow_display:"",figures_status:"withheld"});
+  assert.match(compare(withheld,deal()).get("Cash flow")!.values[0],/not shown/i);
+});

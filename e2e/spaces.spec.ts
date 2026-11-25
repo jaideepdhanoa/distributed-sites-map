@@ -64,6 +64,7 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
   await expect(page.getByTestId("space-summary")).toContainText("1 lot");
   await expect(page.getByTestId("space-summary")).toContainText("sq ft");
   await expect(page.getByTestId("space-summary")).toContainText("slots");
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.getByTestId("spaces-layer")).toBeChecked();
   await closeLayers(page);
   await page.getByTestId("mark-space").click();

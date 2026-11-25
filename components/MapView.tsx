@@ -2074,6 +2074,7 @@ export default function MapView(props: Props) {
           <button type="button" className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Map</button>
         </div>
         <div className="measure-row" role="group" aria-label="Map tools">
+          {!props.spaceDrawing && !measure && <span className="map-tools-label" aria-hidden="true">Map tools</span>}
           {props.spaceDrawing ? (
             <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
               <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>
@@ -2082,7 +2083,7 @@ export default function MapView(props: Props) {
               {props.selectedSpaceId ? <button type="button" className="paper-btn" data-testid="space-draw-delete" onClick={() => setDeleteAsk((value) => value + 1)}>Delete</button> : null}
             </div>
           ) : props.canDrawLots ? (
-            <button type="button" className="tool draw-tool" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}><Pentagon size={16} aria-hidden="true" />Draw available lots</button>
+            <button type="button" className="tool draw-tool" aria-label="Draw available lots" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}><Pentagon size={16} aria-hidden="true" />Draw</button>
           ) : null}
           {measure ? (
             <div className="measure-bar">

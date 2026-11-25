@@ -23,7 +23,7 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
   await expect(page.locator("nav.funnel")).toContainText("Desk screen");
   await expect(page.locator("nav.funnel")).not.toContainText("Open land");
   if (mobile) await page.getByRole("button", { name: "Close steps" }).click();
-  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator("aside.layers.open")).toContainText("Universe sites");
   await page.goto("/?funnel=universe", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
@@ -48,7 +48,7 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
   const mobile = info.project.name === "mobile";
   const chooser = mobile ? page.getByTestId("basemap") : page.getByTestId("basemap-desktop");
-  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(chooser).toBeVisible();
   if (!mobile) {
     const close = page.getByRole("button", { name: "Close layers" });
@@ -96,7 +96,7 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
   await chooser.getByRole("button", { name: "Map", exact: true }).click();
   await page.reload();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
-  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Close layers" })).toBeVisible();
   await expect(chooser.getByRole("button", { name: "Map", exact: true })).toHaveClass(/on/);
   await page.evaluate(() => window.localStorage.removeItem("basemap"));
   await page.goto("/?review=1");

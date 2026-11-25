@@ -24,5 +24,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: review-change-screenshots
-          path: review-shots/*-review-change.png
+          path: |
+            review-shots/*-review-change.png
+            review-shots/*-finding-*.png
           if-no-files-found: error

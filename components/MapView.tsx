@@ -43,7 +43,6 @@ type Props = {
   reviewFocus?: { lng: number; lat: number; zoom: number } | null;
   pinLabel?: PinLabel;
   onPinLabel?: (mode: PinLabel) => void;
-  coverage?: { listed: number; missingPoint: number } | null;
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
@@ -58,7 +57,7 @@ type Props = {
     },
     meta?: { user: boolean },
   ) => void;
-  fitPoints?: [number, number][];
+  shortlistPoints: { city: string; point: [number, number] }[];
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
   overlayPoints?: { label: string; coordinates: [number, number] }[];
@@ -78,6 +77,8 @@ type Props = {
   onSpaceDelete?: (space: SpaceShape) => void;
   onSpaceDone?: () => void;
   fitAll?: boolean;
+  scopeOpen?: boolean;
+  onMarketPick?: (market: string) => void;
   /** When this token changes, keep the current center and zoom. */
   preserveCamera?: string;
   canDrawLots?: boolean;
@@ -192,12 +193,18 @@ function fitMap(
     glide(map, center, options.maxZoom ?? 12);
     return;
   }
-  const cover = Math.max(drawerInset(map), reserved.right ?? 0);
+  const canvas = box.getBoundingClientRect();
+  const scope = box.closest(".shell")?.querySelector("#workspace-scope")?.getBoundingClientRect();
+  const occupied = { top: 0, bottom: 0, left: 0, right: drawerInset(map) };
+  if (scope && scope.height && scope.bottom > canvas.top && scope.top < canvas.bottom) {
+    if (scope.top < canvas.top + canvas.height / 2) occupied.top = scope.bottom - canvas.top;
+    else occupied.bottom = canvas.bottom - scope.top;
+  }
+  const edge = (side: keyof typeof occupied, room: number) =>
+    Math.min(Math.max(0, Math.max(options.padding[side], occupied[side] + 28) - (reserved[side] || 0)), Math.max(0, room * 0.66));
   const padding = {
-    top: Math.min(options.padding.top, Math.floor(roomHeight / 5)),
-      bottom: Math.min(options.padding.bottom, Math.floor(roomHeight / 5)),
-    left: Math.min(options.padding.left, Math.floor(roomWidth / 6)),
-    right: Math.min(Math.max(0, cover - (reserved.right ?? 0)), Math.max(0, roomWidth - 48)),
+    top: edge("top", roomHeight), bottom: edge("bottom", roomHeight),
+    left: edge("left", roomWidth), right: edge("right", roomWidth),
   };
   const fitted = { ...options, padding };
   if (!map.cameraForBounds(bounds, fitted)) {
@@ -218,7 +225,7 @@ function frameSites(map: Map, points: [number, number][], phone: boolean) {
     {
       padding: phone
         ? { top: 176, bottom: 120, left: 28, right: 28 }
-        : { top: 72, bottom: 64, left: 48, right: 260 },
+        : { top: 72, bottom: 64, left: 80, right: 88 },
       maxZoom: 10.5,
       duration: 0,
     },
@@ -297,6 +304,8 @@ export default function MapView(props: Props) {
   } | null>(null);
   const preserveCamera = useRef<string | undefined>(undefined);
   const sawSelection = useRef<string | null>(null);
+  const [parcelTools, setParcelTools] = useState(false);
+  useEffect(() => { setParcelTools(false); }, [props.selectedId]);
   const [measure, setMeasure] = useState(false);
   const [measureDone, setMeasureDone] = useState(false);
   const [draftPoints, setDraftPoints] = useState(0);
@@ -583,22 +592,6 @@ export default function MapView(props: Props) {
             layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
-            id: "deal-site-badge",
-            type: "symbol",
-            source: "deals",
-            minzoom: PIN_SPLIT_ZOOM,
-            filter: ["all", ["==", ["get", "kind"], "pipeline"], ["has", "universe_id"], ["!=", ["get", "universe_id"], ""]],
-            layout: {
-              "text-field": "Site",
-              "text-font": ["Noto Sans Regular"],
-              "text-size": 9,
-              "text-offset": [1.1, 0.15],
-              "text-anchor": "left",
-              "text-allow-overlap": true,
-            },
-            paint: { "text-color": "#1c1914", "text-halo-color": "#f4efe6", "text-halo-width": 1.2 },
-          },
-          {
             id: "unscreened",
             type: "circle",
             source: "unscreened",
@@ -635,7 +628,7 @@ export default function MapView(props: Props) {
               "text-size": 12,
               "text-offset": [0, 1.6],
               "text-anchor": "top",
-              "text-allow-overlap": true,
+              "text-allow-overlap": false,
             },
             paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 8 },
           },
@@ -793,16 +786,6 @@ export default function MapView(props: Props) {
     let areaDwell = 0;
     let cancelled = false;
     const boot = async () => {
-    const basemap = propsRef.current.basemap || "satellite";
-    let style: StyleSpecification | string = satelliteStyle;
-    if (basemap !== "satellite") {
-      try {
-        style = await mutedPositronStyle();
-      } catch {
-        style = "https://tiles.openfreemap.org/styles/positron";
-      }
-    }
-    if (cancelled || !node.current) return;
     let canDraw = false;
     try {
       const canvas = document.createElement("canvas");
@@ -815,7 +798,23 @@ export default function MapView(props: Props) {
       propsRef.current.onMapFailed?.("This browser cannot draw the map. Try the latest Chrome, Edge, or Safari.");
       return;
     }
-    const kept = keptCamera.current;
+    const basemap = propsRef.current.basemap || "positron";
+    let style: StyleSpecification | string = satelliteStyle;
+    if (basemap !== "satellite") {
+      try {
+        style = await mutedPositronStyle();
+      } catch {
+        if (cancelled) return;
+        const message = "The street map could not load.";
+        setMapFailed(message);
+        propsRef.current.onMapFailed?.(message);
+        return;
+      }
+    }
+    if (cancelled || !node.current) return;
+    const draw = propsRef.current.spaceDrawing ? propsRef.current.spaceFly : null;
+    // Drawing has its own parcel camera, including during the Streets-to-Satellite remount.
+    const kept = draw ? { center: [draw.lng, draw.lat] as [number, number], zoom: 18 } : keptCamera.current;
     let map: Map;
     try {
       map = new Map({
@@ -835,6 +834,12 @@ export default function MapView(props: Props) {
     setMapFailed("");
     propsRef.current.onMapFailed?.("");
     active = map;
+    map.on("webglcontextlost", () => {
+      if (cancelled) return;
+      const message = "The map lost its graphics connection.";
+      setMapFailed(message);
+      propsRef.current.onMapFailed?.(message);
+    });
     keptCamera.current = null;
     heldView.current = kept;
     if (kept) {
@@ -906,13 +911,13 @@ export default function MapView(props: Props) {
       sourced: pinColors.stone,
       desk: pinColors.amber,
       financial: pinColors.moss,
-      checks: pinColors.moss,
-      close: pinColors.moss,
+      checks: [56, 90, 122],
+      close: [108, 79, 116],
       contacted: pinColors.moss,
-      later: pinColors.moss,
+      later: [108, 79, 116],
       dropped: pinColors.clay,
     };
-    for (const [name, rgb] of Object.entries(squares)) icons[`sq-${name}`] = square(rgb);
+    for (const [name, rgb] of Object.entries(squares)) icons[`sq-${name}`] = ["financial", "contacted", "close", "later"].includes(name) ? marker("diamond", rgb) : square(rgb);
     const triangle = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
@@ -1208,13 +1213,13 @@ export default function MapView(props: Props) {
           setReadout(coords.length === 2 ? "Add one more corner" : "Tap the corners");
         }
       });
-      const satelliteOn = (propsRef.current.basemap || "satellite") === "satellite";
+      const satelliteOn = (propsRef.current.basemap || "positron") === "satellite";
       const paint = (id: string, prop: "circle-color" | "circle-opacity" | "circle-stroke-color" | "circle-stroke-opacity" | "circle-stroke-width" | "fill-opacity" | "line-color" | "line-width" | "text-color" | "text-halo-color" | "text-halo-width", value: string | number) => {
         if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
       };
       const phoneScreen = window.matchMedia("(max-width: 767px)").matches;
       if (!satelliteOn) {
-        paint("areas-current", "fill-opacity", 0.38);
+        paint("areas-current", "fill-opacity", 0.09);
         paint("areas-current-line", "line-color", AREA_PAINT.currentLine);
         paint("areas-current-line", "line-width", 2.4);
         paint("areas-launch", "fill-opacity", 0.46);
@@ -1300,7 +1305,6 @@ export default function MapView(props: Props) {
         paint("cluster-count", "text-halo-width", 1);
         paint("deal-pills", "text-halo-color", "#fffdf8");
         paint("deal-pills", "text-halo-width", 4);
-        paint("deal-site-badge", "text-halo-width", 1.6);
         paint("unscreened", "circle-stroke-width", 3);
         paint("missing-parcel", "circle-stroke-color", "#f3d48a");
         paint("missing-parcel", "circle-stroke-width", 3);
@@ -1465,9 +1469,9 @@ export default function MapView(props: Props) {
           source: "queue-dots",
           minzoom: PIN_SPLIT_ZOOM,
           paint: {
-            "circle-radius": (props.basemap || "satellite") === "satellite" ? 4 : 3.5,
-            "circle-color": (props.basemap || "satellite") === "satellite" ? "#1c1914" : "#8d7350",
-            "circle-stroke-width": (props.basemap || "satellite") === "satellite" ? 2 : 1,
+            "circle-radius": (props.basemap || "positron") === "satellite" ? 4 : 3.5,
+            "circle-color": (props.basemap || "positron") === "satellite" ? "#1c1914" : "#8d7350",
+            "circle-stroke-width": (props.basemap || "positron") === "satellite" ? 2 : 1,
             "circle-stroke-color": "#fffdf8",
             "circle-translate": [8, -8],
           },
@@ -1580,7 +1584,7 @@ export default function MapView(props: Props) {
             "text-size": 13,
             "text-offset": [0, 1.55],
             "text-anchor": "top",
-            "text-allow-overlap": true,
+            "text-allow-overlap": false,
           },
           paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 10 },
         });
@@ -1616,7 +1620,7 @@ export default function MapView(props: Props) {
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
       const drawing = Boolean(propsRef.current.spaceDrawing);
       const phonePad = phone && !reviewing && !drawing;
-      const padKey = phonePad ? "clear" : "flush";
+      const padKey = (phonePad ? "clear" : "flush") + (props.scopeOpen ? "-scope" : "");
       const padding = phonePad && !props.previewName ? { top: 176, bottom: 168, left: 16, right: 20 } : pointPadding(map);
       const currentPadding = map.getPadding();
       // setPadding calls jumpTo, which stops an in-progress cluster zoom even if the padding is identical.
@@ -1628,12 +1632,12 @@ export default function MapView(props: Props) {
       if (drawing && drawFly && map.getZoom() < 17) {
         map.jumpTo({ center: [drawFly.lng, drawFly.lat], zoom: 18, padding: pointPadding(map) });
       }
-      if ((props.basemap || "satellite") === "satellite") {
+      if ((props.basemap || "positron") === "satellite") {
         if (map.getLayer("areas-current")) map.setPaintProperty("areas-current", "fill-opacity", phone ? 0.1 : 0.18);
         if (map.getLayer("areas-launch")) map.setPaintProperty("areas-launch", "fill-opacity", phone ? 0.22 : 0.32);
         if (map.getLayer("areas-priority")) map.setPaintProperty("areas-priority", "fill-opacity", phone ? 0.16 : 0.24);
       }
-      const finiteFit = (props.fitPoints || []).filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+      const finiteFit = props.shortlistPoints.map(row => row.point);
       const fitKey = finiteFit.map((point) => point.join(",")).join("|");
       if (!props.fitAll && String(appliedFit.current).startsWith("all:")) appliedFit.current = "";
       if (reviewToken) {
@@ -1675,7 +1679,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("load", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.fitPoints, props.fitAll, props.preserveCamera, props.mapScope, props.previewName, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.shortlistPoints, props.fitAll, props.scopeOpen, props.preserveCamera, props.mapScope, props.previewName, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1769,6 +1773,60 @@ export default function MapView(props: Props) {
       map.off("idle", check);
     };
   }, [mapGeneration, props.showRings, props.depots]);
+
+  const markets = new globalThis.Map<string, { count: number; lng: number; lat: number }>();
+  for (const { city, point } of props.fitAll ? props.shortlistPoints : []) {
+    const row = markets.get(city) || { count: 0, lng: 0, lat: 0 };
+    markets.set(city, { count: row.count + 1, lng: row.lng + point[0], lat: row.lat + point[1] });
+  }
+  const marketKey = JSON.stringify(Array.from(markets, ([city, row]) => [city, row.count, row.lng / row.count, row.lat / row.count]));
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const rows = JSON.parse(marketKey) as [string, number, number, number][];
+    const names: Record<string, string> = { PHX: "Phoenix", LAS: "Las Vegas", MIA: "Miami" };
+    const markers = rows.map(([city, count, lng, lat]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "paper-btn market-marker";
+      button.dataset.market = city;
+      const name = names[city] || city || "Other markets";
+      button.setAttribute("aria-label", name + " · " + count.toLocaleString());
+      const total = document.createElement("span");
+      total.className = "market-count";
+      total.textContent = count.toLocaleString();
+      button.append(name, total);
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        if (names[city]) propsRef.current.onMarketPick?.(city);
+        else glide(map, [lng, lat], 10);
+      });
+      const east = city === "MIA";
+      return new Marker({ element: button, anchor: east ? "right" : "left",
+        offset: [0, city === "LAS" ? -25 : city === "PHX" ? 25 : 0] })
+        .setLngLat([lng, lat]).addTo(map);
+    });
+    const nationalZoom = 6;
+    const update = () => {
+      const country = map.getZoom() < nationalZoom;
+      for (const marker of markers) marker.getElement().hidden = !country;
+    };
+    const setZoomRanges = () => {
+      if (map.getLayer("depots")) map.setLayerZoomRange("depots", rows.length ? nationalZoom : 0, 24);
+      for (const layer of ["clusters", "clusters-halo", "cluster-count", "pin-singles"]) {
+        if (map.getLayer(layer)) map.setLayerZoomRange(layer, rows.length ? nationalZoom : 0, PIN_SPLIT_ZOOM);
+      }
+    };
+    if (map.getLayer("clusters")) setZoomRanges();
+    else map.once("load", setZoomRanges);
+    update();
+    map.on("zoom", update);
+    return () => {
+      map.off("load", setZoomRanges);
+      map.off("zoom", update);
+      markers.forEach(marker => marker.remove());
+    };
+  }, [marketKey, mapGeneration]);
 
   const previewPoint = props.previewName ? (
     props.deals.find(row => row.properties.deal_id === props.selectedId)?.geometry ||
@@ -1940,7 +1998,6 @@ export default function MapView(props: Props) {
       set("unscreened", "circle-stroke-opacity", dimmed ? 0.3 : 1);
       set("deals-pipe", "icon-opacity", dimmed ? 0 : 1);
       set("deals-land", "icon-opacity", dimmed ? 0 : 1);
-      set("deal-site-badge", "text-opacity", dimmed ? 0 : 1);
     };
     apply();
     const timer = window.setInterval(apply, 200);
@@ -2039,7 +2096,7 @@ export default function MapView(props: Props) {
   }
 
   return (
-      <div className={`stage-map${mapFailed ? " map-unavailable" : ""}`} data-basemap={props.basemap || "satellite"}>
+      <div className={`stage-map${mapFailed ? " map-unavailable" : ""}`} data-basemap={props.basemap || "positron"}>
       <div ref={node} className="map" />
       {mapGeneration && mapRef.current ? (
         <SpaceTools
@@ -2070,10 +2127,11 @@ export default function MapView(props: Props) {
       ) : null}
       <div className="map-float">
         <div className="segmented map-basemap only-desktop" role="group" aria-label="Basemap" data-testid="basemap-desktop">
-          <button type="button" className={`segmented ${(props.basemap || "satellite") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
-          <button type="button" className={`segmented ${(props.basemap || "satellite") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Map</button>
+          <button type="button" className={`segmented ${(props.basemap || "positron") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
+          <button type="button" className={`segmented ${(props.basemap || "positron") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Streets</button>
         </div>
-        <div className="measure-row" role="group" aria-label="Map tools">
+        <div className={`measure-row${props.previewName ? " parcel-selected" : ""}${parcelTools ? " parcel-tools-open" : ""}`} role="group" aria-label="Map tools">
+          {props.previewName && !props.spaceDrawing && !measure && <button type="button" className="tool parcel-toggle" aria-expanded={parcelTools} onClick={() => setParcelTools(open => !open)}>Parcel tools</button>}
           {!props.spaceDrawing && !measure && <span className="map-tools-label" aria-hidden="true">Map tools</span>}
           {props.spaceDrawing ? (
             <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
@@ -2095,7 +2153,7 @@ export default function MapView(props: Props) {
           {!props.spaceDrawing && <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" aria-pressed={measure} onClick={() => setMeasure((value) => !value)}><Ruler size={16} aria-hidden="true" />Measure</button>}
         </div>
       </div>
-      <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
+      <div className="map-attrib">{(props.basemap || "positron") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>
     </div>
   );
 }

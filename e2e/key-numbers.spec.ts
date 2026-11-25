@@ -37,7 +37,7 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
   await expect(page.locator("nav.funnel")).toContainText("Open land");
 });
 
-test("satellite is the default basemap and a switch is remembered", async ({ page }, info) => {
+test("Streets is the default basemap and a switch is remembered", async ({ page }, info) => {
   await page.addInitScript(() => {
     if (!window.sessionStorage.getItem("basemap-init")) {
       window.localStorage.removeItem("basemap");
@@ -46,7 +46,7 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
   });
   if (info.project.name !== "mobile") await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk");
-  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
   const mobile = info.project.name === "mobile";
   const chooser = mobile ? page.getByTestId("basemap") : page.getByTestId("basemap-desktop");
   await page.getByRole("button", { name: "Layers", exact: true }).click();
@@ -58,7 +58,7 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     const bounds = await chooser.boundingBox();
     expect(bounds && bounds.width > 20 && bounds.height > 20).toBeTruthy();
   }
-  await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
+  await expect(chooser.getByRole("button", { name: "Streets" })).toHaveClass(/on/);
   await page.waitForFunction(() => {
     const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
     return Boolean(map?.isStyleLoaded());
@@ -80,13 +80,6 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     expect(Math.abs(camera.lng - before.lng)).toBeLessThan(0.03);
     expect(Math.abs(camera.lat - before.lat)).toBeLessThan(0.03);
   };
-  await chooser.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
-  await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
-    return Boolean(map?.isStyleLoaded());
-  });
-  await stillThere();
   await chooser.getByRole("button", { name: "Satellite", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
   await page.waitForFunction(() => {
@@ -94,14 +87,21 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     return Boolean(map?.isStyleLoaded());
   });
   await stillThere();
-  await chooser.getByRole("button", { name: "Map", exact: true }).click();
-  await page.reload();
+  await chooser.getByRole("button", { name: "Streets", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
+    return Boolean(map?.isStyleLoaded());
+  });
+  await stillThere();
+  await chooser.getByRole("button", { name: "Satellite", exact: true }).click();
+  await page.reload();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
   await expect(page.getByRole("button", { name: "Close layers" })).toBeVisible();
-  await expect(chooser.getByRole("button", { name: "Map", exact: true })).toHaveClass(/on/);
+  await expect(chooser.getByRole("button", { name: "Satellite", exact: true })).toHaveClass(/on/);
   await page.evaluate(() => window.localStorage.removeItem("basemap"));
   await page.goto("/?review=1");
-  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
 });
 
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {

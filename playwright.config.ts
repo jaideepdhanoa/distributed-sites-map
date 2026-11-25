@@ -1,10 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const actionsOnly = process.env.E2E_ACTIONS === "1";
-const authHeaders: Record<string, string> = bypass
-  ? { "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" }
-  : {};
 
 export default defineConfig({
   testDir: "e2e",
@@ -25,7 +21,6 @@ export default defineConfig({
     : {
         baseURL: process.env.E2E_BASE_URL || "http://localhost:3456",
         storageState: "e2e/.auth.json",
-        extraHTTPHeaders: authHeaders,
       },
   projects: actionsOnly
     ? [{ name: "actions", testMatch: /(?:actions|queue|spaces)\.spec\.ts/ }]

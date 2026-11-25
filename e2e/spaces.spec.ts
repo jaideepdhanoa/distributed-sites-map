@@ -67,14 +67,15 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.getByTestId("spaces-layer")).toBeChecked();
   await closeLayers(page);
+  const preferredBefore = await page.evaluate(() => localStorage.getItem("basemap"));
   await page.getByTestId("mark-space").click();
   await expect(page.getByTestId("space-draw-bar")).toBeVisible();
-  const zoom = await page.evaluate(async () => {
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect.poll(() => page.evaluate(() => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return map ? map.getZoom() : -1;
-  });
-  if (zoom < 17) throw new Error(`map zoom stayed at ${zoom}`);
+    return map?.getZoom() ?? -1;
+  })).toBeGreaterThanOrEqual(17);
+  expect(await page.evaluate(() => localStorage.getItem("basemap"))).toBe(preferredBefore);
   const canvas = page.locator(".stage-map canvas");
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();

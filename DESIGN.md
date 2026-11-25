@@ -20,7 +20,7 @@ Use one primary action per view. The other actions are pills or links.
 
 ## Segmented control
 
-An either/or pair, such as Satellite / Map, is a segmented control. Not two separate pills, and not a `<select>`.
+An either/or pair, such as Streets / Satellite, is a segmented control. Not two separate pills, and not a `<select>`.
 
 ```tsx
 <div className="segmented" role="group" aria-label="Basemap">
@@ -77,13 +77,13 @@ Do not put chrome in a `<details>` or `<summary>`. A closed `<details>` drops it
 
 ## Map
 
-Satellite is the default basemap. The choice is remembered in `localStorage` under `basemap` (`satellite` or `positron`). Street is the muted Positron style.
+Streets is the default basemap. The choice is remembered in `localStorage` under `basemap` (`satellite` or `positron`). Street is the muted Positron style.
 
 On desktop the switch is one segmented control under the zoom buttons, always visible while the map is the view. On a phone it is only at the top of the Layers sheet. List view hides the map controls, including Measure.
 
 A first visit, and the saved market when none was chosen, fits the map to every site in Phoenix, Las Vegas, and Miami. The market switcher is All markets / Phoenix / Las Vegas / Miami. A shared link that names a site or a market still opens there, and choosing a site still flies to it.
 
-Zoomed out, nearby Pipeline and Universe pins share one green bubble (`#1e4636`) with a cream count and a cream stroke, plus a dark rim so it stays readable on satellite and on the map. The count is the only label. It stays on one line and under 28 characters. A click fits the bubble to the pins it holds. From city level, about zoom 10 and closer, the pins split back into their own colors and labels. A shared link to one site keeps that pin on its own. The bubbles stay above the phone sheet, and on a phone the bubble is at least 44px.
+Below national scale, nearby Pipeline and Universe pins share one green bubble (`#1e4636`) with a cream count and a cream stroke, plus a dark rim so it stays readable on satellite and on the map. Neighborhood bubbles show the count. National buttons show the market name and count. It stays on one line and under 28 characters. A click fits the bubble to the pins it holds. From city level, about zoom 10 and closer, the pins split back into their own colors and labels. A shared link to one site keeps that pin on its own. The bubbles stay above the phone sheet, and on a phone the bubble is at least 44px.
 
 Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, Measure, and, when a site is selected, Draw available lots. Draw and Measure share a secondary tool group. The accent fill belongs to Open site record in the selected pin preview. Its tooltip is “Outline open land or parking a charger could use.” The record keeps a one-line lot summary whose link opens the same tool. While drawing, a floating toolbar offers Undo point, Cancel, and Finish. Escape cancels and discards the shape that is not finished yet. A finished lot’s popover has Edit and Delete; Delete asks before it removes the lot. On a phone the button stays in the map controls, and drawing uses the full map with the toolbar at the bottom. They stay inside the screen, clear of the zoom control.
 
@@ -131,9 +131,15 @@ Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`,
 - [ ] Desktop chrome is not a closed `<details>`.
 - [ ] Phone targets are at least 44px, a new overlay sheet opens at the half snap, and its menu stacks above the sheet.
 - [ ] Focus shows the cream gap and the `#1e4636` ring.
-- [ ] Satellite is still the default, and pins stay legible on it.
+- [ ] Streets is the first-visit default, and pins stay legible on it.
 - [ ] The Layers Playwright check and the Layers screenshot crop still cover the panel when that panel changed.
 
 ## Acquisition workspace
 
 The pine navigation bar groups work by Explore, Pipeline, My work and Review. Map and List switch the representation of a shortlist. My work reads assignments, unresolved evidence threads and NDA deadlines from their existing systems. Team gaps include unassigned findings. The record separates site fit, economics, diligence and activity, with source links returning to the originating comparison.
+
+### Market map and parcel preview
+
+Start a new browser on Streets. Restore the last explicit basemap. At national scale, label markets with their mapped count and leave room for the open scope sheet. At city scale, show filtered acquisition records and a key for the current workspace. Count contextual layers separately from the shortlist. The missing-location link opens the exact records behind its count.
+
+A selected pin's preview leads with a sourced spatial fact where available, the next check, and its evidence action. Keep the site record, comparison and satellite view reachable. Parcel tools groups Draw and Measure on a phone. A rendering failure opens the same shortlist with Retry map. Keep URL filters and the selected record across retry.

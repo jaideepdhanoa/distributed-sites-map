@@ -143,3 +143,7 @@ The pine navigation bar groups work by Explore, Pipeline, My work and Review. Ma
 Start a new browser on Streets. Restore the last explicit basemap. At national scale, label markets with their mapped count and leave room for the open scope sheet. At city scale, show filtered acquisition records and a key for the current workspace. Count contextual layers separately from the shortlist. The missing-location link opens the exact records behind its count.
 
 A selected pin's preview leads with a sourced spatial fact where available, the next check, and its evidence action. Keep the site record, comparison and satellite view reachable. Parcel tools groups Draw and Measure on a phone. A rendering failure opens the same shortlist with Retry map. Keep URL filters and the selected record across retry.
+
+At city zoom, Nearby sites follows the visible map and orders matching records by distance from its center. Its phone sheet starts collapsed. A row and its pin open the same parcel preview and preserve the same return camera.
+
+Saved comparisons place the decision beside its source figures. Keep the original value, basis and reporting period legible when a current figure changes. Link each citation to the underlying record and any matching evidence follow-up.

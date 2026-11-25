@@ -179,3 +179,39 @@ test("the map key reflects the workspace and enabled layers", async ({ page }) =
   await expect(key.getByText("Cleared", { exact: true })).toBeVisible();
   await expect(key.getByText("Desk screen", { exact: true })).toHaveCount(0);
 });
+
+test("browse two nearby sites and keep the city camera", async ({ page }, info) => {
+  await page.goto("/?city=PHX&funnel=universe&stage=in_area");
+  const nearby = page.getByRole("complementary", { name: "Nearby sites" });
+  const toggle = nearby.getByRole("button", { name: /Nearby sites/ });
+  await expect(toggle).toBeVisible();
+  await page.waitForFunction(() => {
+    const map = (window as unknown as MapWindow).__sitesMap;
+    return map?.getLayer("sites") && !map.isMoving();
+  });
+  const origin = await camera(page);
+  const ids: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
+    await expect(nearby.locator("[data-nearby-id]").nth(1)).toBeVisible();
+    if (!i && !process.env.MAP_PRODUCTION_CHECK) {
+      await mkdir("review-shots", { recursive: true });
+      const prefix = process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";
+      await page.screenshot({ path: `review-shots/${info.project.name}-${prefix}nearby-sites.png` });
+    }
+    const row = nearby.locator("[data-nearby-id]").nth(i);
+    const id = (await row.getAttribute("data-nearby-id"))!;
+    ids.push(id);
+    await row.click();
+    const preview = page.locator(".map-preview");
+    await expect(preview).toHaveAttribute("data-record", id);
+    await preview.getByRole("button", { name: "Add to comparison" }).click();
+    await expect.poll(() => camera(page)).toEqual(origin);
+  }
+  const tray = page.getByTestId("compare-tray");
+  await expect(tray.getByRole("table")).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("compare")?.split("|")).toEqual(ids);
+  await tray.getByRole("button", { name: "Close compare" }).click();
+  await expect(toggle).toBeVisible();
+  await expect.poll(() => camera(page)).toEqual(origin);
+});

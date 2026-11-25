@@ -1,6 +1,10 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
+import { withConnectionString } from "../lib/actions/db";
+import { migrate } from "../lib/actions/migrate";
+import { publishSnapshot, selectLive } from "../lib/snapshot/store";
+
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
 
 type DealProps = {
@@ -818,5 +822,102 @@ for (const width of [1440,390]) {
     await expect(page).toHaveURL(new RegExp("note="+existing.note));
     await page.getByRole("button",{name:/Back to comparison/}).click();
     await expect(cell).toBeFocused();
+  });
+}
+
+for (const width of [1440, 390]) {
+  test(`team comparison preserves a cited gap after sourced evidence arrives at ${width}px`, async ({ page, request }, info) => {
+    test.slow();
+    await login(request, "reviewer");
+    const catalog = JSON.parse(await readFile("data/generated/sites.geojson", "utf8"));
+    type Fixture = { properties: Record<string, unknown> & { site_id: string } };
+    const start = width === 390 ? 12 : 10;
+    const ids: string[] = catalog.features.filter((f: Fixture) => f.properties.city === "PHX" &&
+      f.properties.origin === "universe" && !f.properties.linked_deal_id && f.properties.counts_as_site)
+      .slice(start, start + 2).map((f: Fixture) => f.properties.site_id);
+    expect(ids).toHaveLength(2);
+    const sites = ids.map((id, i) => ({
+      type: "Feature", geometry: { type: "Point", coordinates: [-112.07 + i * 0.01, 33.45] },
+      properties: { site_id: id, city: "PHX", origin: "universe", counts_as_site: true, in_area: true,
+        service_area_class: "inside", business_type: "Car wash", land_only: false, coord_status: "located",
+        name: ["Canyon Wash", "Mesa Wash"][i], address: "Example avenue" },
+    }));
+    // Only the isolated Actions test database is writable. Use the ordinary catalog
+    // and detail endpoints so a projection that drops a sourced field fails this test.
+    const database = "postgres://postgres:postgres@127.0.0.1:55433/postgres";
+    const previous = await withConnectionString(database, async sql => {
+      await migrate(sql, { connectionString: database });
+      return selectLive(sql);
+    });
+    const published: string[] = [];
+    const refresh = async () => {
+      const result = await request.post("/api/data/revalidate", { headers: { authorization: "Bearer e2e-snapshot-secret-not-for-production" } });
+      expect(result.ok()).toBeTruthy();
+    };
+    const publish = async () => {
+      const snapshot = await withConnectionString(database, sql => publishSnapshot(sql, {
+        sourceRunId: `decision-test-${width}-${info.retry}-${published.length}`,
+        workbookModifiedAt: null, gitSha: "test",
+        files: [{ name: "sites.geojson", body: JSON.stringify({ type: "FeatureCollection", features: sites }) },
+          { name: "deals.geojson", body: JSON.stringify({ type: "FeatureCollection", features: [] }) }],
+      }));
+      published.push(snapshot.id);
+      await refresh();
+    };
+    try {
+      await publish();
+      const target = new URLSearchParams({ targetKind: "site", targetId: ids[0], measure: "power" });
+      const response = await request.post("/api/actions/comparison-evidence?" + target, {
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        data: { description: "Verify service with the field survey.", owner: "contributor", due: "2030-04-15" },
+      });
+      expect(response.ok()).toBeTruthy();
+      const { followUp } = await response.json();
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await openAs(page, "reviewer", "/?city=PHX&stage=universe&funnel=universe&view=list&compare=" + ids.join("|"));
+      const tray = page.getByTestId("compare-tray");
+      const power = tray.locator('[data-compare-row="Power"]');
+      await expect(power).toContainText("Missing for every applicable site");
+      await tray.getByRole("button", { name: "Save comparison" }).click();
+      const form = tray.getByRole("form", { name: "Save comparison" });
+      await form.getByLabel("Comparison name").fill(`Field survey ${width} ${info.retry}`);
+      await form.getByLabel("Share with the team").check();
+      await form.getByRole("button", { name: "Save", exact: true }).click();
+      await tray.getByRole("button", { name: "Record decision" }).click();
+      const brief = tray.getByRole("region", { name: "Comparison decision" });
+      await brief.getByRole("combobox", { name: "Decision", exact: true }).selectOption(ids[0]);
+      await brief.getByLabel("Reason").fill("Prefer Canyon Wash pending confirmation of line proximity.");
+      await brief.getByLabel("Cite a figure").selectOption({ label: "Canyon Wash · Power" });
+      await brief.getByRole("button", { name: "Add citation" }).click();
+      await brief.getByRole("button", { name: "Save decision" }).click();
+      await expect(brief).toContainText("Awaiting approval");
+      const savedUrl = new URL(page.url());
+      expect(savedUrl.searchParams.get("savedView")).toBeTruthy();
+      const proposals = await (await request.get("/api/actions/suggestions?targetKind=site&targetId=" + ids[0])).json();
+      const proposal = proposals.suggestions.find((p: { reason: string }) => p.reason.endsWith("note=" + followUp.note));
+      expect((await request.post("/api/actions/suggestions/" + proposal.id, { data: { status: "accepted" } })).ok()).toBeTruthy();
+      Object.assign(sites[0].properties, { cap_a_line_ft: 420, cap_a_source: "Example field survey" });
+      await publish();
+      await login(page.request, "viewer");
+      await page.goto(savedUrl.pathname + savedUrl.search);
+      await expect(brief).toContainText("Prefer Canyon Wash");
+      await expect(brief).toContainText("Not on file → Line 420 ft");
+      await expect(brief).toContainText("Approved");
+      await expect(brief).toContainText("2030-04-15");
+      await expect(brief.getByRole("button", { name: "Revise decision" })).toHaveCount(0);
+      await mkdir("review-shots", { recursive: true });
+      await brief.screenshot({ path: `review-shots/${width}-comparison-decision.png` });
+      await brief.getByRole("button", { name: "Inspect power" }).click();
+      await expect(page.locator("aside.drawer")).toContainText("Example field survey");
+      await page.getByRole("button", { name: /Back to comparison/ }).click();
+      await brief.getByRole("button", { name: /Follow-up/ }).click();
+      await expect(page).toHaveURL(new RegExp("note=" + followUp.note));
+    } finally {
+      await withConnectionString(database, async sql => {
+        for (const id of published) await sql.query("DELETE FROM snapshots WHERE id = $1", [id]);
+        if (previous) await sql.query("UPDATE snapshots SET status = 'live' WHERE id = $1", [previous.id]);
+      });
+      await refresh();
+    }
   });
 }

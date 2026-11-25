@@ -177,7 +177,7 @@ export function comparisonMeasures(columns: ComparisonColumn[]) {
       : available && missing ? "gap"
       : !available ? "empty"
       : new Set(keys).size > 1 ? "different" : "shared";
-    return { label, values, section, kind, available, partial: available > 0 && missing > 0 };
+    return { label, values, section, kind, available, missing, allMissing: missing > 0 && values.every(value => value === MISSING || value === "Not applicable"), partial: available > 0 && missing > 0 };
   });
 }
 

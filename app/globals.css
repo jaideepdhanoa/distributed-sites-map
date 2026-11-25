@@ -4288,3 +4288,55 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .preview-facts { margin-block: 6px; }
   .map-preview .preview-actions { gap: 2px 8px; }
 }
+
+.nearby-sites {
+  width: 250px;
+  max-width: calc(100vw - 24px);
+  color: var(--ink);
+  background: var(--paper-card);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #25201816;
+  overflow: hidden;
+}
+.nearby-toggle, .nearby-sites li button {
+  width: 100%; display: flex; align-items: center; gap: 8px; text-align: left;
+  color: inherit; background: transparent; border: 0; padding: 9px 12px;
+}
+.nearby-toggle { font-weight: 650; white-space: nowrap; }
+.nearby-count { margin-left: auto; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.nearby-toggle[aria-expanded=true] svg { transform: rotate(180deg); }
+#nearby-results { max-height: min(30vh, 240px); overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); }
+#nearby-results > small, #nearby-results > p, #nearby-results > .text-link { display: block; margin: 8px 12px; }
+.nearby-sites ul, .decision-brief ul { list-style: none; padding: 0; margin: 0; }
+.nearby-sites li + li, .decision-brief li + li { border-top: 1px solid var(--line); }
+.nearby-sites li button { justify-content: space-between; min-height: 44px; }
+.nearby-sites li small { display: block; }
+.nearby-sites small, .decision-brief small { color: var(--ink-3); }
+.nearby-sites button:hover { background: var(--paper); }
+.nearby-sites button:focus-visible { outline-offset: -3px; }
+.decision-brief {
+  flex: 1 1 100%; min-width: 0; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--cream-0); color: var(--ink);
+}
+.decision-summary h3 { font: 600 1.35rem/1.2 var(--font-serif), Georgia, serif; color: var(--green); }
+.decision-summary p { max-width: 52ch; }
+.decision-brief ul { margin-top: 8px; }
+.decision-brief li { overflow-wrap: anywhere; }
+@media (min-width: 900px) {
+  .decision-brief:has(.decision-summary) { display: grid; grid-template-columns: minmax(240px, 0.8fr) minmax(280px, 1.2fr); gap: 4px 24px; }
+  .decision-brief:has(.decision-summary) ul { grid-column: 2; grid-row: 1 / 3; margin: 0; border-left: 1px solid var(--line); padding-left: 20px; }
+  .decision-brief > .text-link { justify-self: start; align-self: start; }
+}
+.decision-brief form { display: grid; gap: 8px; max-width: 42rem; }
+.decision-brief label, .decision-brief li { display: grid; gap: 4px; }
+.decision-brief li { padding: 8px 0; justify-items: start; }
+.decision-brief select, .decision-brief textarea { max-width: 100%; width: 100%; }
+.decision-brief h3, .decision-brief p { margin: 4px 0; }
+.decision-brief .decision-change { font-weight: 650; color: var(--green); }
+@media (max-width: 767px) {
+  .nearby-toggle { min-height: 44px; }
+  .nearby-sites { width: auto; }
+  .nearby-sites:has([aria-expanded=true]) { width: min(320px, calc(100vw - 24px)); }
+  #nearby-results { max-height: min(26vh, 200px); }
+}

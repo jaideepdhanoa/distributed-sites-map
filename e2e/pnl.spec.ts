@@ -317,6 +317,7 @@ test("power follow-up stays with the selected map pin", async ({ page }, info) =
     const map = (window as unknown as {__sitesMap:import("maplibre-gl").Map}).__sitesMap;
     return [...map.getCenter().toArray(),map.getZoom()];
   });
+  await page.waitForFunction(() => !(window as unknown as {__sitesMap:import("maplibre-gl").Map}).__sitesMap.isMoving());
   const original = await camera();
   await pin.getByRole("button",{name:"Open power follow-up"}).click();
   const sheet = page.locator("dialog[open]");

@@ -951,3 +951,67 @@ for (const width of [1440, 390]) {
     }
   });
 }
+
+for (const width of [390,1440]) {
+  test(`cite a partial-year statement separately from the deal record at ${width}px`, async ({page,request}, info) => {
+    test.slow();
+    await login(request,"reviewer");
+    const ids = (await pipelineDeals(request)).slice(0,2);
+    const database = "postgres://postgres:postgres@127.0.0.1:55433/postgres";
+    const periodId = "PP-citation-" + width;
+    const lineId = "PL-citation-" + width;
+    const year = width === 390 ? 2031 : 2032;
+    const start = year + "-01-01";
+    await withConnectionString(database, async sql => {
+      await migrate(sql,{connectionString:database});
+      await sql.query(`INSERT INTO pnl_periods(entity_id,site_id,grain,period_start,period_end,year,month,business_type,version,updated_by)
+        VALUES($1,$2,'monthly',$3,$4,$5,1,'car_wash',1,'fixture') ON CONFLICT DO NOTHING`,[periodId,ids[0],start,year+"-01-31",year]);
+      await sql.query(`INSERT INTO pnl_lines(entity_id,period_id,site_id,line_code,amount,amount_text,status,source_document,source_page,captured_at,captured_at_iso,version,updated_by)
+        VALUES($1,$2,$3,'ebitda',42000,'42000','reported','Example operating statement','2',now(),'2026-11-25T12:00:00+00:00',1,'fixture') ON CONFLICT DO NOTHING`,[lineId,periodId,ids[0]]);
+    });
+    try {
+      await page.route("**/api/data/deals",async route=>{
+        const response=await route.fetch(),data=await response.json();
+        const row=data.features.find((f:{properties:{deal_id:string}})=>f.properties.deal_id===ids[0]);
+        Object.assign(row.properties,{name:"Example Wash",address:"Example parcel",kind:"pipeline",financials_open:true,
+          stated_cash_flow:97000,stated_cash_flow_display:"$97,000",cash_flow_label:"SDE",earnings_period:"Prior fiscal year",figures_source:"Example broker record"});
+        await route.fulfill({response,json:data});
+      });
+      await page.setViewportSize({width,height:width === 390 ? 844 : 900});
+      await openAs(page,"reviewer","/?funnel=pipeline&view=list&compare="+ids.join("|"));
+      const tray=page.getByTestId("compare-tray");
+      await expect(tray.locator('[data-compare-row="Cash flow"]')).toContainText("$97,000");
+      const statement=tray.locator('[data-compare-row="Statement EBITDA"]');
+      await expect(statement).toContainText("$42,000");
+      await tray.getByRole("button",{name:"Save comparison"}).click();
+      const form=tray.getByRole("form",{name:"Save comparison"});
+      await form.getByLabel("Comparison name").fill("Statement review "+width+" "+info.retry);
+      await form.getByRole("button",{name:"Save",exact:true}).click();
+      await tray.getByRole("button",{name:"Record decision"}).click();
+      const brief=tray.getByRole("region",{name:"Comparison decision"});
+      await brief.getByRole("combobox",{name:"Decision",exact:true}).selectOption(ids[0]);
+      await brief.getByLabel("Reason").fill("Use the captured operating statement for this review.");
+      await brief.getByLabel("Cite a figure").selectOption({value:ids[0]+"|statement_ebitda|"+year+"|monthly|1-1"});
+      await brief.getByRole("button",{name:"Add citation"}).click();
+      await brief.getByRole("button",{name:"Save decision"}).click();
+      await expect(brief.getByRole("button",{name:"Inspect statement EBITDA"})).toBeVisible();
+      await page.reload();
+      await expect(brief).toContainText("$42,000");
+      await expect(brief).toContainText("Example operating statement");
+      await brief.getByRole("button",{name:"Inspect statement EBITDA"}).click();
+      const linked=page.locator(width===390 ? ".pnl-phone-line[data-linked=true] button" : ".pnl-desktop td[data-linked=true]").first();
+      await expect(linked).toContainText("$42,000");
+      await page.getByRole("button",{name:"Close profit and loss"}).click();
+      await mkdir("review-shots",{recursive:true});
+      await brief.screenshot({path:"review-shots/"+width+"-statement-citation.png"});
+      const missing=tray.locator('[data-compare-row="Statement SDE"] td').first();
+      await missing.getByRole("button").click();
+      await expect(page.locator("dialog[open]")).toContainText("Statement SDE");
+    } finally {
+      await withConnectionString(database, async sql => {
+        await sql.query("DELETE FROM pnl_lines WHERE entity_id=$1",[lineId]);
+        await sql.query("DELETE FROM pnl_periods WHERE entity_id=$1",[periodId]);
+      });
+    }
+  });
+}

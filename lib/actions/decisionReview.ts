@@ -9,7 +9,7 @@ import { evidenceMeasures } from "./comparisonEvidence";
 import { InputError, stamp } from "./text";
 import { viewFor, type StoredFigure } from "./viewDecision";
 
-type Catalog = ReturnType<typeof decisionCatalog>;
+type Catalog = Pick<ReturnType<typeof decisionCatalog>, "name" | "figure"> & Partial<Pick<ReturnType<typeof decisionCatalog>,"prepareStatements">>;
 type Decision = {
   view: string; name: string; url_query: string; version: string; at: Date | string;
   draft: { preferred: string | null; citations: StoredFigure[] };
@@ -30,6 +30,7 @@ export async function decisionReviews(sql: Sql, actor: string, catalog: () => Pr
   });
   if (!citations.length) return [];
   const records = await catalog();
+  await records.prepareStatements?.(sql,citations.map(({c}) => c));
   const reviews = await sql.query<Review>(
     `SELECT DISTINCT ON (target_id,after_json->>'version',after_json->>'key')
        target_id AS view,id::text,after_json->>'key' AS key,after_json->>'version' AS version,actor_id,at,after_json->'evidence' AS evidence

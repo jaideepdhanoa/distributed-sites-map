@@ -25,7 +25,7 @@ export default function Economics({
     <section className="investment-economics"><h3>What does the asking price buy?</h3>
       {deal && deal.kind !== "land" && <PricingSection deal={deal} />}
       <h4>Savings versus hub at screening price</h4><p>{deal?.saving_vs_hub?.trim() || "Screening comparison not on file"}</p>
-      <h4>Financial evidence</h4>
+      <h4>Financial evidence · deal record</h4>
       {deal && deal.kind !== "land" && pnl?.statement?.status === "ready" && <FinancialsEntry dealId={deal.deal_id} loaded={pnl} compact="link" />}
       <dl className="record-economics">
       {[
@@ -41,7 +41,7 @@ export default function Economics({
       ].map((label) => {
         const row = rows.find((item) => item.label === label);
         return (
-          <div key={label}>
+          <div key={label} data-financial-measure={label}>
             <dt>{label}</dt>
             <dd>
               {row?.value && row.value !== MISSING ? row.value : "Not on file"}

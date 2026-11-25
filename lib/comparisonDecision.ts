@@ -1,6 +1,6 @@
 import { evidenceMeasures, type EvidenceRequest, type EvidenceTarget } from "./actions/comparisonEvidence";
 
-export type CitedFigure = EvidenceTarget & { value: string };
+export type CitedFigure = EvidenceTarget & { value: string; source?: string; anchor?: string };
 export type DecisionDraft = { preferred: string | null; rationale: string; citations: CitedFigure[] };
 export type DecisionRecord = Omit<DecisionDraft, "citations"> & {
   version: string; author: string; at: string;
@@ -9,11 +9,11 @@ export type DecisionRecord = Omit<DecisionDraft, "citations"> & {
 };
 export type DecisionAccess = { editable: boolean; decision: DecisionRecord | null; reviews?: CitationReview[] };
 export type FigureOption = CitedFigure & { siteName: string };
-export function figureKey(figure: EvidenceTarget) {
-  return figure.targetId + "|" + figure.measure;
+export function figureKey(figure: EvidenceTarget & {anchor?:string}) {
+  return figure.targetId + "|" + figure.measure + (figure.anchor ? "|" + figure.anchor : "");
 }
 export function figureLabel(figure: FigureOption) {
-  return figure.siteName + " · " + evidenceMeasures[figure.measure];
+  return figure.siteName + " · " + evidenceMeasures[figure.measure] + (figure.anchor ? " · " + figure.period : "");
 }
 
 export type ReviewEvidence = { value: string; period: string; basis: string; closed: string };

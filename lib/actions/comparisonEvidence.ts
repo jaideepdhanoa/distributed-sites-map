@@ -2,6 +2,7 @@ import type { DealProps } from "@/lib/types";
 
 /** Identifiers persist in the finding's source even if a display label changes. */
 export const evidenceMeasures = {
+  statement_revenue: "Statement revenue", statement_sde: "Statement SDE", statement_ebitda: "Statement EBITDA",
   open_land: "Open land", bays: "Bays that fit", power: "Power", zoning: "Zoning",
   asking: "Asking", revenue: "Revenue", ebitda: "EBITDA", cash_flow: "Cash flow",
   land_estimate: "Land estimate", reporting_period: "Reporting period",

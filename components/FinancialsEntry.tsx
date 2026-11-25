@@ -7,6 +7,9 @@ import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { financialsCard, shownYear, statementTiles, type StatementTile } from "@/lib/pnl/cue";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import ComparisonEvidence from "./actions/ComparisonEvidence";
+import { useActionStatus } from "./actions/panel";
+import { statementFigures, type StatementMeasure } from "@/lib/pnl/citation";
 import PnlOverlay from "./PnlOverlay";
 
 export type PnlTiles = { revenue: StatementTile; cash: StatementTile };
@@ -114,6 +117,10 @@ export default function FinancialsEntry({
   }, [dealId]);
   const card = settled && statement ? financialsCard(statement, sample) : null;
   const year = statement && card ? shownYear(statement) : null;
+  const access = useActionStatus();
+  const [missing,setMissing] = useState<StatementMeasure | null>(null);
+  const lines = card && statement ? statementFigures(statement,sample) : [];
+  const missingLine = lines.find(f => f.measure === missing);
   const [selectedLine,setSelectedLine] = useState("");
   if (!settled && compact) return <small role="status">Checking for financials…</small>;
   if (!settled) {
@@ -145,13 +152,22 @@ export default function FinancialsEntry({
               const label = month + (year.months[i] ? " on file" : " not on file");
               return <abbr key={month} title={label} aria-label={label} data-present={Boolean(year.months[i])}>{month}{year.months[i] && <sup aria-hidden="true">✓</sup>}</abbr>;
             })}</div>
-            {[["total-revenue","Revenue"],[card.cashLabel.toLowerCase(),card.cashLabel]].map(([line,label]) =>
-              <button className="text-link" type="button" key={line} onClick={event => {trigger.current = event.currentTarget;setSelectedLine(line);setOpen(true);}}>View {label} line</button>)}
+            {lines.filter(f => f.measure === "statement_revenue" || f.measure === (card.cashLabel === "SDE" ? "statement_sde" : "statement_ebitda")).map(f => {
+              const label = f.measure === "statement_revenue" ? "Revenue" : card.cashLabel;
+              if (f.value === "—") return access.enabled ? <button className="text-link" type="button" key={f.measure}
+                onClick={()=>setMissing(f.measure)}>Request {label} document</button> : null;
+              return <button className="text-link" type="button" key={f.measure} onClick={event => {
+                trigger.current = event.currentTarget; setSelectedLine(f.selection.line); setOpen(true);
+              }}>View {label} line</button>;
+            })}
           </div>}
         </article>
       ) : packageOnFile ? (
         <p className="fin-quiet" data-testid="financials-quiet">Financials: package not yet broken into line items</p>
       ) : null}
+      {missingLine && <ComparisonEvidence target={{targetKind:"deal",targetId:dealId,measure:missingLine.measure,period:missingLine.period,basis:missingLine.basis}}
+        title="Financial statement" context="Supporting document needed" close={()=>setMissing(null)} saved={()=>{}}
+        inspect={note=>{const url=new URL(window.location.href); url.searchParams.set("site",dealId); url.searchParams.set("panel","discussion"); url.searchParams.set("note",note); window.location.assign(url.href);}} />}
       {open && card ? createPortal(<PnlOverlay initialGrain={selectedLine ? card.grain : null} selection={selectedLine ? {line:selectedLine,period:card.period,year:card.year} : undefined} statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => { setOpen(false); setSelectedLine(""); requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true })); }} />, document.body) : null}
     </>
   );

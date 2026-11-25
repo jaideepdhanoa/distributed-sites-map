@@ -3,6 +3,7 @@ import { createWithReceipt } from "@/lib/actions/createReceipt";
 import { readDecision, saveDecision } from "@/lib/actions/viewDecision";
 import { decisionReviews, keepDecision, verifyDecisionReview } from "@/lib/actions/decisionReview";
 import { loadDecisionCatalog } from "@/lib/actions/decisionCatalog";
+import { isStatementMeasure } from "@/lib/pnl/citation";
 import { evidenceChanged } from "@/lib/comparisonDecision";
 import { InputError } from "@/lib/actions/text";
 import type { CitedFigure } from "@/lib/comparisonDecision";
@@ -37,11 +38,25 @@ export async function POST(request: Request) {
   if (isResponse(session)) return session;
   const body = await request.json().catch(() => null);
   if (!body || typeof body.view !== "string" || !request.headers.get("Idempotency-Key")) return jsonError("Invalid decision or save reference.", 400);
-  const catalog = body.review || body.keep ? await loadDecisionCatalog(session.actionRole).catch(() => null) : undefined;
+  const draft = body.decision?.citations;
+  const financial = (c:CitedFigure) => isStatementMeasure(c?.measure) || (Boolean(c?.source) && ["cash_flow","revenue","ebitda"].includes(c?.measure));
+  const hasFinancial = Array.isArray(draft) && draft.some(financial);
+  if (hasFinancial && draft.length > 6) return jsonError("Cite one to six figures.",400);
+  const catalog = body.review || body.keep || hasFinancial ? await loadDecisionCatalog(session.actionRole).catch(() => null) : undefined;
   if (catalog === null) return jsonError("Current decision evidence is unavailable.", 503);
   const result = await runWrite(session, { action:"view.decision" }, sql =>
     createWithReceipt(sql, request, session.u, body, async tx => {
-      if (catalog) {
+      if (catalog && hasFinancial) {
+        if (draft.some(c => !c || typeof c.measure !== "string")) throw new InputError("Invalid citation.");
+        await catalog.prepareStatements(tx,draft);
+        for (const c of draft.filter(financial)) {
+          const live = catalog.figure(c);
+          const wrongPeriod = isStatementMeasure(c.measure) && (!live || !("anchor" in live) || !c.anchor || c.anchor !== live.anchor || c.value === "—");
+          if (!live || wrongPeriod || c.source !== (live.source || "Deal record") || evidenceChanged(c,live))
+            throw new InputError("The financial figure changed. Reload the comparison.",409);
+        }
+      }
+      if (catalog && (body.review || body.keep)) {
         if (typeof body.review?.key !== "string" || typeof body.review?.token !== "string") throw new InputError("Choose a change to review.");
         const item = await verifyDecisionReview(tx, session.u, body.view, body.review.key, body.review.token, async () => catalog);
         if (body.keep) {

@@ -52,6 +52,7 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
   const citations: StoredFigure[] = [];
   for (const figure of input.citations) {
     if (!figure || typeof figure.value !== "string" || typeof figure.period !== "string" || typeof figure.basis !== "string" || !view.ids.includes(figure.targetId)) throw new InputError("Citations must belong to the saved comparison.");
+    if (figure.anchor && !figure.measure.startsWith("statement_")) throw new InputError("Only statement figures have a statement period.");
     const target = parseEvidenceTarget(new URLSearchParams(figure));
     const value = parseBody(figure.value, "cited figure", 1200);
     if (["Unavailable", "Checking…", "Not applicable"].includes(value)) throw new InputError("Choose an applicable figure.");
@@ -61,7 +62,7 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
       c.period.trim().toLowerCase() === figure.period.trim().toLowerCase() && c.basis.trim().toLowerCase() === figure.basis.trim().toLowerCase());
     const followUp = await findRequest(sql, target, original?.note, original ? previous!.at : null);
     citations.push({ targetId: target.targetId, targetKind: target.targetKind, measure: figure.measure,
-      period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "", closed: followUp?.closedAt || "" });
+      period: figure.period.trim(), basis: figure.basis.trim(), value, ...(figure.source ? {source:parseBody(figure.source,"source",1200)} : {}), ...(figure.anchor ? {anchor:parseBody(figure.anchor,"statement period",220)} : {}), note: followUp?.note || "", closed: followUp?.closedAt || "" });
   }
   const reviewedChange = reviewed && { version: reviewed.version, key: reviewed.key, site: reviewed.site, measure: reviewed.measure,
     previous: reviewed.previous, current: reviewed.current, reason: reviewed.reason };

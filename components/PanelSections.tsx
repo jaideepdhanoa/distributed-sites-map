@@ -48,6 +48,7 @@ export default function PanelSections({
     const align = () => {
       const evidence = panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
       const target = evidence ? node.querySelector<HTMLElement>(`[data-evidence="${CSS.escape(evidence)}"]`)
+        : panel === "economics" && measure ? node.querySelector<HTMLElement>(`[data-financial-measure="${CSS.escape(measure)}"]`)
         : panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
       if (target) {
         for (let parent: HTMLElement | null = target; parent && parent !== node; parent = parent.parentElement) {

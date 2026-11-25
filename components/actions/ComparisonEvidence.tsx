@@ -24,7 +24,7 @@ export default function ComparisonEvidence({target, title, context = "Not on fil
   const [owner,setOwner] = useState("");
   const [due,setDue] = useState("");
   const receipt = useRef({ draft:"", key:"" });
-  const endpoint = "/api/actions/comparison-evidence?" + new URLSearchParams(target);
+  const endpoint = "/api/actions/comparison-evidence?" + new URLSearchParams({targetId:target.targetId,targetKind:target.targetKind,measure:target.measure,period:target.period,basis:target.basis});
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();

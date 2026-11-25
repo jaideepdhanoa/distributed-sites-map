@@ -84,6 +84,29 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
   expect(note.status()).toBe(201);
   const again = await queue(request);
   expect(again.items.find((item) => item.siteId === deal)?.reasons.some((reason) => reason.summary === "New note.")).toBeTruthy();
+  const { note: { id } } = await note.json() as { note: { id: string } };
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto(`/?review=1&rsite=${deal}&qmarket=all&qstage=any`);
+    const changes = page.getByTestId("review-since");
+    await changes.click();
+    const position = await page.getByTestId("review-position").innerText();
+    const line = page.getByTestId("review-since-list").getByRole("button", { name: /New note/ }).first();
+    await line.click();
+    const banner = page.getByRole("region", { name: "Selected review change" });
+    await expect(banner).toContainText("New note");
+    await expect(page.getByRole("tab", { name: "Discussion" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator(`[data-note-id="${id}"]`)).toBeInViewport();
+    await mkdir("review-shots", { recursive: true });
+    await banner.screenshot({ path: `review-shots/${width === 390 ? "mobile" : "desktop"}-review-change.png` });
+    await banner.getByRole("button", { name: "Back to review" }).click();
+    await expect(line).toBeFocused();
+    await expect(page.getByTestId("review-position")).toHaveText(position);
+    const query = new URL(page.url()).searchParams;
+    expect(query.get("rsite")).toBe(deal);
+    expect(query.get("qmarket")).toBe("all");
+    expect(query.get("qstage")).toBe("any");
+  }
 });
 
 test("flagging shows the site to the other account, and snooze hides it until the date", async ({ request }) => {

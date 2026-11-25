@@ -8,6 +8,8 @@ import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, type FeedSite } from "./queue/QueueView";
 import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
+import type { QueueReason as ReviewChange } from "@/lib/queue/order";
+import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -178,6 +180,7 @@ export default function Explorer() {
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [loadedQueueKey, setLoadedQueueKey] = useState("");
   const reviewRequest = useRef(false);
+  const [reviewChange, setReviewChange] = useState<{ site: string; reason: ReviewChange; index: number; panel: string | null; note: string | null; msg: string | null; snap: SheetSnap } | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
@@ -582,10 +585,11 @@ export default function Explorer() {
   }
 
   function stopReview(next: Record<string, string | null> = {}) {
+    setReviewChange(null);
     if (reviewing && Object.keys(next).length === 0 && restoreOrigin()) return;
     wantedReview.current = "";
     leaveSite.current = "";
-    write({ review: null, view: null, i: null, rsite: null, nda: null, loops: null, ...next });
+    write({ review: null, view: null, i: null, rsite: null, nda: null, loops: null, ...(reviewChange ? { panel: null, note: null, msg: null } : {}), ...next });
   }
 
   function replaceSearch(base: string, next: Record<string, string | null>, history = false) {
@@ -1947,8 +1951,34 @@ export default function Explorer() {
   function goReview(index: number) {
     const count = Math.max(reviewList.length, 1);
     const next = Math.min(Math.max(index, 0), count - 1);
-    write({ review: "1", i: String(next + 1), view: null, q: null });
+    setReviewChange(null);
+    write({ review: "1", i: String(next + 1), view: null, q: null, panel: null, note: null, msg: null });
   }
+
+  function openReviewEvidence(reason: ReviewChange, index: number) {
+    if (!reviewCurrent) return;
+    setReviewChange({ site: reviewCurrent.siteId, reason, index, panel: params.get("panel"), note: params.get("note"), msg: params.get("msg"), snap: sheetSnap });
+    setSheetSnap("full");
+    write({ panel: changeDestination(reason.type).panel || "overview", note: reason.noteId || null, msg: null });
+  }
+
+  function returnToReview() {
+    if (!reviewChange) return;
+    const { panel, note, msg, snap, index } = reviewChange;
+    setReviewChange(null);
+    setSheetSnap(snap);
+    write({ panel, note, msg });
+    shellRef.current?.querySelector<HTMLElement>(".drawer-scroll")?.scrollTo({ top: 0 });
+    const changes = shellRef.current?.querySelector<HTMLButtonElement>('[data-testid="review-since"]');
+    if (changes?.getAttribute("aria-expanded") !== "true") changes?.click();
+    requestAnimationFrame(() => {
+      const line = shellRef.current?.querySelector<HTMLButtonElement>(`[data-change-index="${index}"]`);
+      (line || changes)?.focus({ preventScroll: true });
+    });
+  }
+
+  const changeBanner = inReview && reviewCurrent && reviewChange?.site === reviewCurrent.siteId
+    ? <ReviewEvidence reason={reviewChange.reason} onReturn={returnToReview} /> : null;
 
   async function saveReview(body: { siteId: string; undo?: boolean; previous?: string | null }) {
     if (reviewRequest.current) return null;
@@ -2661,6 +2691,7 @@ export default function Explorer() {
           onReviewed={() => void markCurrentReviewed()}
           onExit={() => stopReview()}
           onOpenFeed={() => setFeedSheet(true)}
+          onEvidence={openReviewEvidence}
           onSnooze={snoozeCurrent}
           reasons={reviewCurrent?.reasons || []}
           firstVisit={Boolean(reviewCurrent?.firstVisit)}
@@ -3052,13 +3083,14 @@ export default function Explorer() {
         ) : null}
         <PanelBoundary name="Record">
         {showingPreview ? (
-          <MapSitePreview site={selectedSite} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
-            onOpen={() => {
+          <MapSitePreview site={selectedSite || (selectedDeal?.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null)} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
+            onOpen={(panel) => {
+              if (panel) write({ panel });
               setPreviewId(null);
               setSheetSnap("full");
               requestAnimationFrame(() => {
                 const title = shellRef.current?.querySelector<HTMLElement>(".drawer h2");
-                if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+                if (!panel && title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
               });
             }}
             onClose={() => {
@@ -3071,15 +3103,15 @@ export default function Explorer() {
             decisionFirst={listView || inReview}
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
-            universeSite={selectedDeal.universe_id ? siteById.get(selectedDeal.universe_id) : null}
+            universeSite={selectedDeal.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null}
             universeName={siteById.get(selectedDeal.universe_id)?.name}
             depotMiles={selectedDeal.miles_to_depot}
             lng={dealPoint(selectedDeal)?.[0]}
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
-            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
+            onClose={() => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             compared={compareIds.includes(selectedDeal.deal_id)}
@@ -3125,8 +3157,8 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
-            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
+            onClose={() => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             onOpenNda={(id) => write({ nda: id })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
@@ -29,10 +29,8 @@ export default function PanelSections({
   const site = params.get("site");
   const panel = params.get("panel");
   const sections = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<TabId>(panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview");
-  useEffect(() => {
-    if (panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "overview") setTab(panel);
-  }, [site, panel]);
+  const note = params.get("note");
+  const tab: TabId = panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
   useEffect(() => {
     if (panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
@@ -40,7 +38,13 @@ export default function PanelSections({
     if (!node || !(scroller instanceof HTMLElement)) return;
     let frame = 0;
     const align = () => {
-      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      const target = panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
+      if (target) {
+        for (let parent: HTMLElement | null = target; parent && parent !== node; parent = parent.parentElement) {
+          if (parent instanceof HTMLDetailsElement && !parent.open) parent.open = true;
+        }
+      }
+      const top = (target || node).getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
       const next = Math.max(0, top - 4);
       if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
     };
@@ -67,22 +71,20 @@ export default function PanelSections({
       sizes.disconnect();
       added.disconnect();
     };
-  }, [site, panel, tab]);
+  }, [site, panel, note]);
   function chooseTab(id: TabId) {
-    setTab(id);
-  }
-  useEffect(() => {
     const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
     const shown = next.get("panel") || "overview";
-    if (shown === tab && (tab === "activity" || !next.get("msg"))) return;
+    if (shown === id && (id === "activity" || !next.get("msg"))) return;
     next.delete("q");
-    if (tab !== "activity") next.delete("msg");
-    if (tab === "overview") next.delete("panel");
-    else next.set("panel", tab);
+    if (id !== "activity") next.delete("msg");
+    if (id !== "discussion") next.delete("note");
+    if (id === "overview") next.delete("panel");
+    else next.set("panel", id);
     const href = next.toString() ? `/?${next.toString()}` : "/";
     rememberSearch(href);
     router.replace(href, { scroll: false });
-  }, [tab, router]);
+  }
   const panels = { overview, numbers, activity, discussion };
   const intel = panel === "intel";
   return (

@@ -1,0 +1,72 @@
+import { acresText, spareLandSqft, universeTrafficLine, workbookTrafficLine } from "./keyNumbers";
+import { nextStepText, stageTitle, statusOf } from "./labels";
+import type { DealProps, SiteProps, UnscreenedProps } from "./types";
+
+type RecordInput = {
+  site?: SiteProps | null;
+  deal?: DealProps | null;
+  listing?: UnscreenedProps | null;
+  signedIn: boolean;
+};
+
+type Figure = { label: string; value: string; source: string; date: string };
+type Evidence = { kind: "county"; href: string } | { kind: "space" } | { kind: "financials"; id: string };
+
+function present(value?: string | null) {
+  const text = value?.trim();
+  return text && !/^(—|-|unknown|not on file|n\/a)$/i.test(text) ? text : "";
+}
+
+function countyLink(value?: string) {
+  try {
+    const url = new URL(value || "");
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput) {
+  const spare = spareLandSqft(deal?.open_land_sqft, site?.spare_ac_own, deal?.open_land_basis);
+  const figures: Figure[] = [];
+  function add(label: string, value?: string | null, source?: string, date?: string) {
+    const text = present(value);
+    if (text) figures.push({ label, value: text, source: present(source), date: present(date) });
+  }
+  if (deal?.bays_that_fit != null) add("Usable bays", String(deal.bays_that_fit), "Pipeline workbook");
+  add("Open land", spare.value, spare.note);
+  if (deal?.trade_aadt != null) add("Traffic", workbookTrafficLine(deal).replace(/ · Workbook trade area$/, ""), "Workbook trade area");
+  else if (site?.aadt_count) add("Traffic", universeTrafficLine({ ...site, aadt_year: "" }), site.aadt_source, site.aadt_year);
+  if (deal?.land_acres != null) add("Parcel size", acresText(deal.land_acres), ["Pipeline workbook", present(deal.land_acres_basis)].filter(Boolean).join(" · "));
+  else if (site?.parcel_acres != null) add("Parcel size", acresText(site.parcel_acres), site.assessor_source);
+  else if (site?.lot_ac != null) add("Parcel size", acresText(site.lot_ac), site.lot_ac_source);
+  else if (listing) add("Parcel size", acresText(listing.acres), "Listing");
+  if (signedIn) {
+    if (present(deal?.asking_price_display)) add("Asking price", deal?.asking_price_display, deal?.asking_price_source);
+    else if (present(site?.asking_price_display)) add("Asking price", site?.asking_price_display, site?.asking_price_source, site?.asking_price_date);
+    else add("Asking price", listing?.asking_price_display, listing?.asking_price_source);
+  }
+  const status = deal ? stageTitle(deal.stage_group) : site ? statusOf(site).label : "Unscreened listing";
+  const reason = (signedIn && present(deal?.decision_reason)) || present(site?.summary_why);
+  const gap = signedIn ? present(deal?.stage_blocker) || present(deal?.next_step) : "";
+  const county = countyLink(site?.county_url);
+  let review = gap;
+  let evidence: Evidence | undefined;
+  let missing = "";
+  if (deal?.stage_group === "dropped") review = "No further review scheduled.";
+  else if (!gap && site?.verdict) review = nextStepText(site);
+  else if (!gap && listing?.approximate) review = "Confirm the exact location.";
+  else if (!gap && site && !deal) review = "Check the county parcel record.";
+  else if (!gap && !present(spare.value)) review = "Confirm how much open land is usable.";
+  else if (!gap && present(spare.value)) review = "Verify the usable open land.";
+  if (/county|parcel record|assessor|\bapn\b/i.test(review)) {
+    if (county) evidence = { kind: "county", href: county };
+    else missing = "County record link not on file.";
+  } else if (/open land|usable land|spare land|usable space|bay fit/i.test(review)) {
+    if (present(spare.value) && (site || deal)) evidence = { kind: "space" };
+    else missing = "Open-land measurement not on file.";
+  } else if (signedIn && deal && deal.kind !== "land" && /financial|p\s*&\s*l|cash flow|revenue|profit and loss/i.test(review)) {
+    evidence = { kind: "financials", id: deal.deal_id };
+  }
+  return { status, reason, figures, evidence, missing, review: review || "Review the site evidence." };
+}

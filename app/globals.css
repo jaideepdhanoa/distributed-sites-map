@@ -4055,3 +4055,19 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
      receive pointer input above the later-painted record and its imagery. */
   .shell > .bar:has(.more-wrap .menu, .user-menu .menu, .popover) { z-index: 12; }
 }
+
+.record-brief {
+  border: 1px solid var(--line); border-left: 3px solid var(--green);
+  border-radius: 8px; padding: 10px 12px; margin: 8px 0 12px;
+  background: var(--cream-0); overflow-wrap: anywhere;
+}
+.brief-decision { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.brief-decision span, .record-brief dt { color: var(--ink-3); font-size: var(--type-cap); }
+.brief-decision strong { color: var(--green); text-align: right; }
+.drawer .record-brief p { margin: 4px 0 8px; font-size: 14px; }
+.record-brief dl { display: grid; gap: 5px; margin: 0; border-top: 1px solid var(--line); padding-top: 7px; }
+.record-brief dl > div { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.record-brief dd { margin: 0; font-size: 14px; line-height: 1.4; }
+.record-brief small, .preview-missing { display: block; color: var(--ink-3); font-size: 12px; }
+.preview-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.preview-actions a { text-decoration: none; }

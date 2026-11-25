@@ -93,10 +93,12 @@ export function usePnlTiles(dealId: string) {
 export default function FinancialsEntry({
   dealId,
   packageOnFile = false,
+  compact = false,
   loaded,
 }: {
   dealId: string;
   packageOnFile?: boolean;
+  compact?: boolean;
   loaded?: { statement: PnlStatement | null; sample: boolean; settled: boolean; conflicts?: DataConflict[]; comments?: OpenPnlComment[] };
 }) {
   const own = usePnlTiles(loaded ? "" : dealId);
@@ -110,6 +112,7 @@ export default function FinancialsEntry({
     setOpen(false);
   }, [dealId]);
   const card = settled && statement ? financialsCard(statement, sample) : null;
+  if (!settled && compact) return <small role="status">Checking for financials…</small>;
   if (!settled) {
     return (
       <article className="fin-entry" data-testid="financials-loading" aria-busy="true">
@@ -123,7 +126,7 @@ export default function FinancialsEntry({
   }
   return (
     <>
-      {card ? (
+      {compact ? (card ? <button type="button" className="primary preview-open" onClick={() => setOpen(true)}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
         <article className="fin-entry">
           <button type="button" className="fin-tile" data-testid="financials-entry" onClick={() => setOpen(true)}>
             <span>Financials</span>

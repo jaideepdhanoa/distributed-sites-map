@@ -229,7 +229,8 @@ export default function Explorer() {
   const [tip, setTip] = useState("");
   const [ringCursor, setRingCursor] = useState<{ x: number; y: number } | null>(null);
   const [ringsOutside, setRingsOutside] = useState(false);
-  const [nearbySpot, setNearbySpot] = useState<[number, number] | null>(null);
+  const nearbyHighlight = useRef<((point: [number, number] | null) => void) | null>(null);
+  const highlightNearby = useCallback((point: [number, number] | null) => nearbyHighlight.current?.(point), []);
   const nearbyPicker = useRef<((id: string) => void) | null>(null);
   const [mapZoom, setMapZoom] = useState(0);
   const frameRings = useRef<(() => void) | null>(null);
@@ -2873,7 +2874,7 @@ export default function Explorer() {
         <MapView key={mapAttempt}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           deals={drawnDeals}
-          nearbySpot={nearbySpot} nearbyPicker={nearbyPicker}
+          nearbyHighlight={nearbyHighlight} nearbyPicker={nearbyPicker}
           shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
@@ -3175,7 +3176,7 @@ export default function Explorer() {
           <div className="map-corner">
             {mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
               <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
-                onSpot={setNearbySpot} fact={id => {
+                onSpot={highlightNearby} fact={id => {
                   const site = siteById.get(id);
                   const deal = site ? dealForSite(site) : dealRows.find(row => row.deal_id === id);
                   const listing = !site && !deal ? listingScope.find(row => row.properties.listing_id === id)?.properties : undefined;

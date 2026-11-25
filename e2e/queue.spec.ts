@@ -918,6 +918,7 @@ for (const width of [1440, 390]) {
       const change = hub.locator(".decision-work-row").filter({ hasText:`Field survey ${width} ${info.retry}` });
       await expect(change).toContainText("New evidence");
       await expect(change).toContainText("Line 420 ft");
+      await hub.screenshot({path:`review-shots/${width}-decision-queue.png`});
       await change.getByRole("link", { name:"Canyon Wash · Power" }).click();
       const citation = brief.locator("[data-focused-citation=true]");
       await expect(citation).toBeFocused();

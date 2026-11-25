@@ -62,5 +62,9 @@ test("review scopes, stale writes, independent citations, later evidence and com
   assert.equal(later.previous.value, "LINE 480.0 ft");
   await saveDecision(sql, team.id, owner, { ...draft, preferred:"bravo", citations:[{ ...second, value:values.bravo }] }, decision!.version);
   assert.deepEqual(await queue(other), []);
+  const revision = await saveDecision(sql, personal.id, owner, { ...draft, citations:[base] },
+    (await decisionReviews(sql,owner,load,personal.id))[0].version);
+  assert.equal(revision.decision?.citations[0].followUp?.status, "resolved");
+  assert.equal((await decisionReviews(sql,owner,load,personal.id))[0].reason, "");
   assert.ok((await listAudit(sql)).every(e=>!e.action.startsWith("view.decision")));
 });

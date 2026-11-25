@@ -46,7 +46,7 @@ type Props = {
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
-  nearbySpot: [number, number] | null;
+  nearbyHighlight: { current: ((point: [number, number] | null) => void) | null };
   nearbyPicker: { current: ((id: string) => void) | null };
   onShowList?: () => void;
   onBounds: (
@@ -1382,16 +1382,21 @@ export default function MapView(props: Props) {
 
   const reviewFocusRef = useRef(props.reviewFocus);
   reviewFocusRef.current = props.reviewFocus;
-  const nearbyLng = props.nearbySpot?.[0], nearbyLat = props.nearbySpot?.[1];
+  // A transient DOM marker keeps keyboard/pointer feedback independent of map data updates.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || nearbyLng == null || nearbyLat == null || props.selectedId) return;
+    if (!map) return;
+    const highlight = props.nearbyHighlight;
     const ring = document.createElement("div");
     ring.className = "nearby-map-ring";
     ring.setAttribute("aria-hidden", "true");
-    const marker = new Marker({ element:ring }).setLngLat([nearbyLng, nearbyLat]).addTo(map);
-    return () => { marker.remove(); };
-  }, [mapGeneration, nearbyLng, nearbyLat, props.selectedId]);
+    const marker = new Marker({ element: ring });
+    highlight.current = point => {
+      if (point) marker.setLngLat(point).addTo(map);
+      else marker.remove();
+    };
+    return () => { highlight.current = null; marker.remove(); };
+  }, [mapGeneration, props.nearbyHighlight]);
   const focusToken = `${props.focusLng},${props.focusLat},${props.focusZoom}`;
   const reviewToken = props.reviewFocus ? `${props.reviewFocus.lng},${props.reviewFocus.lat},${props.reviewFocus.zoom}` : "";
   const appliedFocus = useRef("");

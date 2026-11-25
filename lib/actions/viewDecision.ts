@@ -43,7 +43,8 @@ export async function readDecision(sql: Sql, id: string, actor: string, canWrite
 export async function saveDecision(sql: Sql, id: string, actor: string, input: DecisionDraft, version: string) {
   const view = await viewFor(sql, id, actor, true);
   if (view.owner !== actor) throw new InputError("Only the comparison owner can record its decision.", 403);
-  if (((await latest(sql, id))?.id || "") !== version) throw new InputError("A newer decision was saved. Reopen it before recording a revision.", 409);
+  const previous = await latest(sql, id);
+  if ((previous?.id || "") !== version) throw new InputError("A newer decision was saved. Reopen it before recording a revision.", 409);
   if (!input || (input.preferred !== null && !view.ids.includes(input.preferred))) throw new InputError("Choose a compared site or hold all sites.");
   const rationale = parseBody(input.rationale, "reason", 600);
   assertClean(rationale);
@@ -56,7 +57,9 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
     if (["Unavailable", "Checking…", "Not applicable"].includes(value)) throw new InputError("Choose an applicable figure.");
     assertClean([value, figure.period, figure.basis].join(" "));
     if (citations.some(other => figureKey(other) === figureKey(figure))) throw new InputError("Choose each figure once.");
-    const followUp = await findRequest(sql, target);
+    const original = previous?.after_json.citations.find(c => figureKey(c) === figureKey(figure) &&
+      c.period.trim().toLowerCase() === figure.period.trim().toLowerCase() && c.basis.trim().toLowerCase() === figure.basis.trim().toLowerCase());
+    const followUp = await findRequest(sql, target, original?.note, original ? previous!.at : null);
     citations.push({ targetId: target.targetId, targetKind: target.targetKind, measure: figure.measure,
       period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "", closed: followUp?.closedAt || "" });
   }

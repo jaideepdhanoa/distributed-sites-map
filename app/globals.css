@@ -4346,3 +4346,5 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .decision-brief li[data-focused-citation=true] { border-left: 3px solid var(--green); padding-left: 10px; }
 .decision-brief .review-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .decision-work-row span { display: block; color: var(--ink-2); }
+.decision-summary > .text-link { display: block; width: fit-content; margin-bottom: 6px; }
+.decision-brief li > .text-link { text-align: left; }

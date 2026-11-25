@@ -264,7 +264,7 @@ async function financials(id: string) {
   const panel = loadFinancialPanel(deal as unknown as DealProps, true);
   return {
     id,
-    href: siteHref(id),
+    href: siteHref(id) + "&panel=economics",
     label: "Financials",
     headline: panel.headline.text,
     figures: panel.figures.slice(0, 12).map((item) => ({ figure: item.figure, period: item.periodLabel, text: item.text })),

@@ -600,6 +600,9 @@ for (const width of [1440, 390]) {
     const tray = page.getByTestId("compare-tray");
     const figure = tray.getByRole("button", { name: "Inspect Open land for Canyon Wash" });
     await expect(figure).toBeVisible();
+    const gapCounts = tray.locator('[data-compare-row="Open evidence gaps"] td');
+    await expect(gapCounts.first()).toHaveText("1");
+    await expect(gapCounts.nth(1)).toHaveText("0");
     await capture("compare", tray);
     await page.route("**/api/ask/status", route => route.fulfill({ json: { ready: true } }));
     await page.route("**/api/ask", route => {
@@ -621,6 +624,15 @@ for (const width of [1440, 390]) {
     await expect(drawer).toHaveAttribute("data-record", id);
     await expect(drawer.locator('[data-evidence="open-land"]')).toBeInViewport();
     await capture("evidence", drawer);
+    await drawer.getByRole("tab",{name:"Site fit"}).focus();
+    await page.keyboard.press("ArrowRight");
+    const economics = drawer.getByRole("tab",{name:"Economics"});
+    await expect(economics).toBeFocused();
+    await expect(economics).toHaveAttribute("aria-selected","true");
+    await expect(drawer.getByRole("tabpanel",{name:"Economics"})).toContainText("Reporting period");
+    await drawer.locator(".drawer-scroll").evaluate(node=>node.scrollTo({top:0,behavior:"instant"}));
+    await capture("record",drawer);
+
     await drawer.getByRole("button", { name: /Back to comparison/ }).click();
     await expect(figure).toBeFocused();
     expect(serverNavigations).toHaveLength(0);

@@ -39,6 +39,19 @@ export default function CompareTray({
     }
   }, [inspecting]);
   const hasMatrix = count >= 2;
+  const gapQuery = hasMatrix && signedIn ? new URLSearchParams([...deals.map(d=>d.deal_id),...sites.map(s=>s.site_id)].map(id=>["site",id])).toString() : "";
+  const [coverage,setCoverage] = useState<{query:string; counts:Record<string,number>|null}>();
+  const [refresh,setRefresh] = useState(0);
+  useEffect(()=>{
+    if (!gapQuery || inspecting) return;
+    const controller = new AbortController();
+    fetch("/api/actions/work?"+gapQuery,{signal:controller.signal,cache:"no-store"}).then(async response=>{
+      if (!response.ok) throw Error();
+      const {counts} = await response.json();
+      if (!controller.signal.aborted) setCoverage({query:gapQuery,counts});
+    }).catch(()=>{if (!controller.signal.aborted) setCoverage({query:gapQuery,counts:null});});
+    return ()=>controller.abort();
+  },[gapQuery,refresh,inspecting]);
   useEffect(() => {
     if (!hasMatrix) return;
     const trigger = document.activeElement;
@@ -52,6 +65,11 @@ export default function CompareTray({
     ...deals.map(deal => ({ id: deal.deal_id, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
     ...sites.map(site => ({ id: site.site_id, title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
   ];
+  if (gapQuery) for (const column of columns) {
+    const count = coverage?.query === gapQuery ? coverage.counts?.[column.id] : undefined;
+    const value = count != null ? String(count) : coverage?.query === gapQuery ? "Unavailable" : "Checking…";
+    column.rows.push({label:"Open evidence gaps",key:count,value});
+  }
   const measures = comparisonMeasures(columns);
   const differences = measures.filter(row => row.kind === "different").length;
   const gaps = measures.filter(row => row.kind === "gap").length;
@@ -81,6 +99,7 @@ export default function CompareTray({
         <>
           <div className="comparison-mode">
             <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps} one-sided {gaps === 1 ? "gap" : "gaps"}{basis > 0 && ` · ${basis} with different bases`}</span>
+            {coverage?.query === gapQuery && coverage.counts === null && <button type="button" className="text-link" onClick={()=>setRefresh(n=>n+1)}>Retry gap counts</button>}
             <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
             <button type="button" className="text-link" onClick={()=>{
               const capturedAt = new Date().toISOString();
@@ -113,7 +132,7 @@ export default function CompareTray({
                         <th scope="row">{label}{kind === "basis" && <small>Different bases</small>}{kind === "gap" && <small>Evidence gap</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {kind !== "detail" && value !== MISSING && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
+                            {kind !== "detail" && value !== MISSING && !["Unavailable","Checking…","Not applicable"].includes(value) && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
                               inspectedCell.current = event.currentTarget;
                               onInspect(columns[i].id, label);
                             }}>{value}</button> : value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { numberEvidence } from "@/lib/comparison";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
@@ -103,7 +103,6 @@ export default function PanelSections({
 
 export function RecordNavigation() {
   const params = useSearchParams();
-  const router = useRouter();
   const panel = params.get("panel");
   const tab = recordTab(panel);
   function chooseTab(id: TabId) {
@@ -117,7 +116,7 @@ export function RecordNavigation() {
     else next.set("panel", id);
     const href = next.toString() ? `/?${next.toString()}` : "/";
     rememberSearch(href);
-    router.replace(href, { scroll: false });
+    window.history.replaceState(null, "", href);
   }
   return (
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">

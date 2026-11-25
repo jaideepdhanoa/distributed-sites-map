@@ -586,7 +586,7 @@ export default function Explorer() {
     comparisonOrigin.current = currentSearch();
     setPreviewId(null);
     setSelected(id);
-    const panel = numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
+    const panel = measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
     replaceSearch(comparisonOrigin.current, { site: id, measure, panel:source?.get("panel") || panel, note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {

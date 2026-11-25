@@ -12,14 +12,14 @@ type CompareRow = { label: string; value: string; key?: string | number | null; 
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
 export const compareSections = ["Site fit", "Financials", "Evidence quality", "Diligence", "Record details"] as const;
-export const acquisitionCriteria = ["Open land", "Bays that fit", "Power", "Service area", "Zoning", "Asking", "Revenue", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "NDA", "Blocker", "Next check"];
+export const acquisitionCriteria = ["Open land", "Bays that fit", "Power", "Service area", "Zoning", "Asking", "Revenue", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "NDA", "Open evidence gaps", "Blocker", "Next check"];
 
 function sectionFor(label: string): typeof compareSections[number] {
   if (["Address", "Property owner"].includes(label)) return "Record details";
   if (["Financial package", "Cash flow coverage", "Figure basis", "Reporting period", "Land measurement"].includes(label)) return "Evidence quality";
 
   if (["Bays that fit", "Service area", "Traffic", "Land", "Open land", "Power", "3-mile population", "Washes", "Depot", "Zoning"].includes(label)) return "Site fit";
-  if (["Stage", "NDA", "Suggested drop", "Next check", "Blocker"].includes(label)) return "Diligence";
+  if (["Stage", "Open evidence gaps", "NDA", "Suggested drop", "Next check", "Blocker"].includes(label)) return "Diligence";
   return "Financials";
 }
 
@@ -81,7 +81,7 @@ function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
     : "—";
   return [
     { label: "Pricing", value: split },
-    { label: "Revenue", basis: [deal.revenue_period, deal.revenue_basis].map(value=>value?.trim().toLowerCase() || "").join("|"), key: deal.stated_revenue ?? deal.stated_revenue_display, value: signedIn ? withEvidence(deal.stated_revenue_display || MISSING, deal.revenue_period, deal.revenue_basis, deal.figures_source) : "—" },
+    { label: "Revenue", basis: [deal.revenue_period, deal.revenue_basis].map(value=>value?.trim().toLowerCase() || "").join("|"), key: deal.stated_revenue ?? deal.stated_revenue_display, value: signedIn ? withEvidence(deal.stated_revenue_display || (deal.stated_revenue != null ? fullMoney(deal.stated_revenue) : MISSING), deal.revenue_period, deal.revenue_basis, deal.figures_source) : "—" },
     { label: "Land estimate", key: deal.land_estimate ?? deal.land_estimate_display, value: deal.land_estimate_display ? `${deal.land_estimate_display} · Estimate` : (deal.land_estimate_reason || "—") },
     { label: "Business value", key: deal.business_value ?? deal.business_value_display, value: deal.business_value_display || deal.business_value_reason || "—" },
     { label: "County value (land + buildings)", key: deal.county_value ?? deal.county_value_display, value: deal.county_value_display || "—" },
@@ -170,5 +170,5 @@ export function comparisonMeasures(columns: ComparisonColumn[]) {
 export const numberEvidence: Record<string, string> = {
   Asking: "asking", Land: "land", "Open land": "open-land", "Land measurement": "open-land",
   Power: "power", Traffic: "traffic", Zoning: "zoning", "Per acre": "per-acre",
-  Revenue: "revenue", "Cash flow": "cash-flow", "Cash flow coverage": "cash-flow",
+  EBITDA: "cash-flow", Revenue: "revenue", "Cash flow": "cash-flow", "Cash flow coverage": "cash-flow",
 };

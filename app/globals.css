@@ -4219,3 +4219,10 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .shortlist-title h2 { font-size:20px; }
   .shortlist-title p { display:none; }
 }
+
+.shortlist-title { display:grid; grid-template-columns:auto auto; justify-content:start; align-items:baseline; column-gap:8px; }
+.shortlist-title p { grid-column:1/-1; grid-row:2; }
+.shortlist-title .shortlist-stage { font-size:12px; color:var(--ink-2); }
+@media (max-width:767px) {
+  .list-cards .row-check { min-width:44px; justify-content:center; align-self:center; }
+}

@@ -94,12 +94,15 @@ export async function answerQuestion(input: {
       const shortlist: unknown[] | null = input.siteIds?.length ? [] : null;
       if (shortlist && input.siteIds) {
         const needDiscussion = /diligence|blocker|outstanding|unresolved|assigned/i.test(question);
+        const needFinancials = /financial|economics|valuation|multiple|ebitda|cash flow|revenue|earnings|p&l/i.test(question);
         for (let start = 0; start < input.siteIds.length; start += 4) {
           const records = await Promise.all(input.siteIds.slice(start,start+4).map(async id => {
             const site = await runAskTool("getSite", {id}, input.role, input.userId);
-            if (!needDiscussion) return site;
-            const discussion = await runAskTool("discussion", {id}, input.role, input.userId);
-            return {site, discussion};
+            const [discussion,financials] = await Promise.all([
+              needDiscussion ? runAskTool("discussion",{id},input.role,input.userId) : undefined,
+              needFinancials ? runAskTool("financials",{id},input.role,input.userId) : undefined,
+            ]);
+            return {site,discussion,financials};
           }));
           shortlist.push(...records);
         }

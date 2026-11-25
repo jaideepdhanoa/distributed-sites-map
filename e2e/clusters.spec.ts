@@ -113,10 +113,14 @@ test("All view groups nearby pins, and a group opens onto its pins", async ({ pa
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?funnel=universe&city=all&stage=all", { waitUntil: "domcontentloaded" });
   await ready(page);
+  await expect(page.getByRole("button", { name: /^Phoenix ·/ })).toBeVisible();
+  await jump(page, [-112.05, 33.48], 7.2);
   await countryGroups(page, "site");
 
   await page.goto("/?funnel=pipeline&city=all", { waitUntil: "domcontentloaded" });
   await ready(page);
+  await expect(page.getByRole("button", { name: /^Phoenix ·/ })).toBeVisible();
+  await jump(page, [-112.05, 33.48], 7.2);
   const pipeline = await countryGroups(page, "deal");
   const mapBox = await page.locator(".map").boundingBox();
   expect(mapBox).toBeTruthy();
@@ -177,6 +181,7 @@ test("phone bubbles clear the sheet and stay large enough to tap", async ({ page
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.goto("/?funnel=pipeline&city=all", { waitUntil: "domcontentloaded" });
   await ready(page);
+  await jump(page, [-112.05, 33.48], 7.2);
   await page.waitForFunction(() => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures: (options: { layers: string[] }) => unknown[] } }).__sitesMap;
     return Boolean(map && map.getZoom() < 10 && map.queryRenderedFeatures({ layers: ["clusters"] }).length > 0);

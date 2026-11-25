@@ -4261,3 +4261,29 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .compare-evidence-sheet { inset:auto 0 0; margin:0; width:100%; max-width:100%; max-height:50dvh; border-radius:14px 14px 0 0; padding-bottom:max(1rem,env(safe-area-inset-bottom)); }
   .compare-evidence-sheet .primary, .compare-evidence-sheet .field, .compare-evidence-sheet .secondary { min-height:44px; }
 }
+
+/* Market overview and parcel inspection */
+.market-marker { z-index: 1; color: var(--pine-700); font-weight: 700; white-space: nowrap; }
+.market-marker[hidden], .parcel-toggle { display: none; }
+.map-coverage, .map-retry { display: flex; align-items: center; gap: 8px; }
+.map-coverage { color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+.map-coverage .text-link { font-size: inherit; }
+.map-retry { justify-content: center; background: var(--cream-0); padding: 6px 12px; font-size: 14px; }
+.map-key .pipeline-pin { border-radius: 50%; background: #8a8173; box-shadow: none; }
+.map-key .stage-desk { background: #a8711b; }
+.map-key .stage-financial, .map-key .stage-close { border-radius: 1px; transform: rotate(45deg); }
+.map-key .stage-financial { background: #387156; }
+.map-key .stage-checks { background: #385a7a; }
+.map-key .stage-close { background: #6c4f74; }
+.map-key .stage-dropped { background: #9e4b3e; }
+@media (max-width: 767px) {
+  .market-marker { min-height: 44px; }
+  .map-coverage { width: fit-content; padding: 0 10px; min-height: 32px; border-radius: 8px; background: var(--cream-0); }
+  .map-coverage .text-link { min-height: 44px; }
+  .measure-row.parcel-selected .map-tools-label { display: none; }
+  .measure-row.parcel-selected .parcel-toggle { display: inline-flex; }
+  .measure-row.parcel-selected:not(.parcel-tools-open):has(.parcel-toggle) .tool:not(.parcel-toggle) { display: none; }
+  .measure-row.parcel-tools-open { flex-wrap: wrap; max-width: calc(100vw - 72px); }
+  .preview-facts { margin-block: 6px; }
+  .map-preview .preview-actions { gap: 2px 8px; }
+}

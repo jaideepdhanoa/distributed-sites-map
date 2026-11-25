@@ -812,7 +812,9 @@ export default function MapView(props: Props) {
       }
     }
     if (cancelled || !node.current) return;
-    const kept = keptCamera.current;
+    const draw = propsRef.current.spaceDrawing ? propsRef.current.spaceFly : null;
+    // Drawing has its own parcel camera, including during the Streets-to-Satellite remount.
+    const kept = draw ? { center: [draw.lng, draw.lat] as [number, number], zoom: 18 } : keptCamera.current;
     let map: Map;
     try {
       map = new Map({

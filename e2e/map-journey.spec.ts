@@ -34,9 +34,11 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
   await expect(market).toBeInViewport({ ratio: 1 });
   await page.waitForFunction(() => (window as unknown as MapWindow).__sitesMap?.loaded());
   const scope = page.locator(".workspace-scope:visible");
-  await mkdir("review-shots", { recursive: true });
-  const prefix = process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";
-  await page.screenshot({ path: `review-shots/${info.project.name}-${prefix}market-overview.png` });
+  if (!process.env.MAP_PRODUCTION_CHECK) {
+    await mkdir("review-shots", { recursive: true });
+    const prefix = process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";
+    await page.screenshot({ path: `review-shots/${info.project.name}-${prefix}market-overview.png` });
+  }
   await scope.click();
   await expect(market).toBeInViewport({ ratio: 1 });
   await expect(market).toBeVisible();

@@ -464,7 +464,8 @@ export default function Explorer() {
   const pipelineColumns = parseColumns(params.get("cols"));
   const pillParam = params.get("pill");
   const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
-  const [basemap, setBasemap] = useState<"positron" | "satellite">("positron");
+  const [preferredBasemap, setBasemap] = useState<"positron" | "satellite">("positron");
+  const basemap = marking ? "satellite" : preferredBasemap;
   const [marketPref, setMarketPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [marketReady, setMarketReady] = useState(false);
   const appliedMarket = useRef(false);
@@ -2267,7 +2268,6 @@ export default function Explorer() {
     if (mapNote) return;
     const point = spacePoint();
     if (!selected || !point) return;
-    chooseBasemap("satellite");
     setShowSpaces(true);
     if (listView) write({ view: null });
     setMarking({ siteId: selected, lng: point[0], lat: point[1], nonce: Date.now() });

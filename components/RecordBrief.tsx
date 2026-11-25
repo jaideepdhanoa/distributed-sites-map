@@ -44,7 +44,7 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
           : land && missing ? <div><dt>Open land</dt><dd>{missing}</dd></div>
           : first ? <FigureRow fact={first} /> : <div><dt>Evidence</dt><dd>No screening figures on file.</dd></div>}
       </dl>
-      {target && input.signedIn && <RecordFinding key={target.kind + target.id} kind={target.kind} id={target.id} source={source} review={review} />}
+      {target && input.signedIn && <RecordFinding key={target.kind + target.id} kind={target.kind} id={target.id} source={source} review={review} dealId={input.deal?.deal_id} nextStep={input.deal?.next_step} />}
       {others.length > 0 && <details className="disclosure brief-figures">
         <summary className="disclosure">More figures ({others.length})</summary>
         <dl>{others.map(fact => <FigureRow key={fact.label} fact={fact} />)}</dl>

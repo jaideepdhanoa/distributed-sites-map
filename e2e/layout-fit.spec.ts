@@ -46,7 +46,7 @@ test("the phone funnel keeps the service-area split off the listed line", async 
     const split = step?.querySelector("[data-testid=service-area-split]");
     const listed = [...(step?.querySelectorAll(".sub") || [])].find((el) => /listed/.test(el.textContent || ""));
     const row = document.querySelector(".funnel-row");
-    const head = row?.querySelector(".funnel-sheet-head");
+    const head = row?.querySelector(".scope-sheet-title");
     const close = head?.querySelector(".close");
     const first = row?.querySelector(".funnel .step");
     if (!step || !split || !listed || !row || !head || !close || !first) return "missing funnel pieces";
@@ -85,6 +85,7 @@ test("the desk list keeps the location note out of the stage tabs", async ({ pag
   await page.goto("/?funnel=pipeline&pstage=desk&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=pipeline-list]");
   await expect(page.locator("nav.funnel").getByText("without a location")).toHaveCount(0);
+  await page.getByTestId("map-scope").click();
   const note = page.getByTestId("unmapped-note");
   if (await note.count()) {
     await expect(note).toBeVisible();
@@ -110,9 +111,9 @@ test("phone chrome stays inside the viewport and the map pill sits in its track"
       const doc = document.documentElement;
       const track = document.querySelector(".phone-view-row .funnel-switch.map-switch");
       const pill = track?.querySelector("button.on");
-      const neighbor = document.querySelector(".phone-view-row select.secondary");
+      const neighbor = document.querySelector(".phone-view-row .mobile-search");
       const sheet = document.querySelector(".drawer-scroll");
-      const city = document.querySelector(".phone-view-row .city-pick select");
+      const city = document.querySelector(".phone-view-row .phone-step");
       const search = document.querySelector(".phone-view-row .mobile-search");
       const menu = document.querySelector(".phone-view-row [aria-label='Menu']");
       const filters = document.querySelector(".phone-view-row [aria-label='Filters']");

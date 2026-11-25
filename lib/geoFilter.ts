@@ -46,3 +46,13 @@ export function areaQuery(area: MapArea | null): { ring: string | null; poly: st
   }
   return { ring: null, poly: area.points.map(([lng, lat]) => `${lng.toFixed(5)},${lat.toFixed(5)}`).join(";") };
 }
+
+/** A saved shortlist can carry the visible rectangle used by Search this area. */
+export function savedListArea(value: string | null): MapArea | null {
+  if (!value) return null;
+  const coordinates = value.split(",").map(Number);
+  if (coordinates.length !== 4 || !coordinates.every(Number.isFinite)) return null;
+  const [west, south, east, north] = coordinates;
+  if (south < -90 || north > 90 || north <= south || east <= west) return null;
+  return { kind: "polygon", points: [[west, south], [east, south], [east, north], [west, north]] };
+}

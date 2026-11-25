@@ -12,11 +12,8 @@ export function ShortlistSummary({ title, count, commonStage, children }: {
   const figuresId = useId();
   const showStage = commonStage && !title.toLowerCase().endsWith(" · " + commonStage.toLowerCase());
   return (
-    <section className="summary-row shortlist-summary" data-testid="summary-row" aria-label="Shortlist">
-      <div className="shortlist-heading">
-        <h1>{title}</h1>
-        <p><strong data-testid="shortlist-count">{count.toLocaleString()}</strong> {count === 1 ? "site" : "sites"}{showStage && ` · ${commonStage}`}</p>
-      </div>
+    <section className="summary-row shortlist-summary" data-testid="summary-row" aria-label={`${title}, ${count} sites, shortlist figures`}>
+      {showStage && <p className="shortlist-stage">{commonStage}</p>}
       <button className="paper-btn figures-toggle" type="button" aria-expanded={expanded} aria-controls={figuresId} onClick={() => setExpanded(value => !value)}>Figures</button>
       <div className="shortlist-figures" id={figuresId} data-expanded={expanded}>{children}</div>
     </section>

@@ -94,6 +94,7 @@ function SuggestionsDialog() {
       return;
     }
     await load();
+    window.dispatchEvent(new Event("queue-refresh"));
   }
 
   return (
@@ -229,7 +230,11 @@ function ViewsDialog() {
               <li key={view.id}>
                 <p><strong>{view.name}</strong> {view.scope === "team" ? <span className="badge checked">Team</span> : null}</p>
                 <div className="act-row">
-                  <button type="button" onClick={() => { window.location.assign(view.query ? `/?${view.query}` : "/"); }} className="menu-item">Open</button>
+                  <button type="button" onClick={() => {
+                    const query = new URLSearchParams(view.query);
+                    if (query.has("compare")) query.set("savedView", view.id);
+                    window.location.assign(query.size ? "/?" + query : "/");
+                  }} className="menu-item">Open</button>
                   <button
                     type="button"
                     onClick={async () => {

@@ -501,6 +501,8 @@ for (const width of [1440, 390]) {
       } else {
         await page.reload();
         await expect(brief.getByRole("status")).toContainText(title);
+        await expect(brief.getByRole("status")).toContainText("Example county assessment map");
+        if (index === 1) await expect(brief.getByRole("status")).toContainText("Unassigned");
         if (index === 2) {
           const res = await request.get(`/api/actions/suggestions?targetKind=site&targetId=${id}`);
           expect((await res.json()).suggestions.some((entry: { status: string; reason: string }) => entry.status === "open" && entry.reason.includes("Example county assessment map"))).toBe(true);
@@ -511,5 +513,105 @@ for (const width of [1440, 390]) {
     await openAs(page, "viewer", "/?site=PHX-U189&sheet=full");
     await expect(page.getByRole("region", { name: "Screening decision" }).getByRole("status")).toContainText("Finding saved");
     await expect(page.getByRole("button", { name: "Record finding", exact: true })).toHaveCount(0);
+  });
+}
+
+for (const width of [1440, 390]) {
+  test(`five-site comparison reopens with its evidence and reviewer handoff at ${width}px`, async ({ page, request }, info) => {
+    test.slow();
+    await login(request, "reviewer");
+    const catalog = await (await request.get("/api/data/sites?city=PHX")).json();
+    type Site = { properties: { site_id: string; name: string; counts_as_site: boolean; linked_deal_id?: string; city: string; origin: string } };
+    const names = ["Canyon Wash", "Desert Palm Wash", "Mesa Wash", "North Valley Wash", "Sonoran Wash", "Valley Wash"];
+    const cohort = (catalog.features as Site[]).filter(f => f.properties.city === "PHX" && f.properties.origin === "universe" && f.properties.counts_as_site && !f.properties.linked_deal_id).slice(0, 6).map((f, i) => ({
+      ...f, properties: { ...f.properties, name: names[i], address: (100 + i) + " Example Ave", business_type: "Car wash", counts_as_site: true,
+        land_only: false, duplicate_of: "", in_area: true, service_area_class: "inside", land_tier: i < 5 ? "L10" : "", tenure_fail: false,
+        spare_ac_own: i < 5 ? (i + 3) / 10 : null, spare_ac_own_text: "", verdict: "", owner: "", asking_price_display: "", summary_why: "" },
+    }));
+    expect(cohort).toHaveLength(6);
+    const id = cohort[0].properties.site_id;
+    const source = "Example county assessment map";
+    const note = async (body: string) => expect((await request.post("/api/actions/notes", { data: { targetKind: "site", targetId: id, body } })).status()).toBe(201);
+    await note("Screening finding\nParcel boundary located.\nCheck: Verify parcel.\nSource: " + source);
+    await note("Missing evidence\nConfirm the usable area at the rear of the parcel.\nCheck: Verify usable land.\nSource: " + source);
+    const created = await request.post("/api/actions/suggestions", { data: { targetKind: "site", targetId: id, field: "proposed_next_step", title: "Verify rear parcel access", proposedValue: "Verify rear parcel access", ownerId: "contributor" } });
+    expect(created.status()).toBe(201);
+    const step = (await created.json()).suggestion;
+    expect((await request.post("/api/actions/suggestions/" + step.id, { data: { status: "accepted" } })).ok()).toBeTruthy();
+    await page.route("**/api/data/sites**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/api/data/sites") return route.fulfill({ json: { ...catalog, features: cohort } });
+      const site = cohort.find(row => path.endsWith("/" + row.properties.site_id));
+      if (site) return route.fulfill({ json: site.properties });
+      return route.continue();
+    });
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await openAs(page, "contributor", "/?funnel=universe&city=PHX&stage=in_area&view=list&sort=site:asc");
+    const scope = page.locator(".workspace-scope:visible");
+    await expect(scope).toContainText("6 sites");
+    await scope.click();
+    await page.getByRole("navigation", { name: "Funnel" }).getByRole("button", { name: /Open land/ }).click();
+    await expect(scope).toContainText("5 sites");
+    const rows = page.locator(".pipeline-list [data-site-row]");
+    await expect(rows).toHaveCount(5);
+    const capture = async (moment: string, surface = page.locator("body")) => {
+      const dir = process.env.UX_REVIEW_DIR;
+      if (!dir) return;
+      await mkdir(dir, { recursive: true });
+      await page.addStyleTag({ content: "nextjs-portal { display:none !important }" });
+      await surface.screenshot({ path: dir + "/" + width + "-" + moment + ".png", animations: "disabled" });
+    };
+    await capture("shortlist");
+    if (width === 390) {
+      await page.getByRole("button", { name: "More list actions" }).click();
+      await page.getByRole("menuitem", { name: "Select", exact: true }).click();
+    }
+    await rows.nth(0).getByRole("checkbox").check();
+    await rows.nth(1).getByRole("checkbox").check();
+    await page.getByTestId("selection-bar").getByRole("button", { name: "Compare" }).click();
+    const tray = page.getByTestId("compare-tray");
+    const figure = tray.getByRole("button", { name: "Inspect Open land for Canyon Wash" });
+    await expect(figure).toBeVisible();
+    await capture("compare", tray);
+    await figure.click();
+    const drawer = page.locator("aside.drawer");
+    await expect(drawer).toHaveAttribute("data-record", id);
+    await expect(drawer.locator('[data-evidence="open-land"]')).toBeInViewport();
+    await capture("evidence", drawer);
+    await drawer.getByRole("button", { name: /Back to comparison/ }).click();
+    await expect(figure).toBeFocused();
+    await tray.getByRole("button", { name: "Save comparison" }).click();
+    const title = width === 390 ? "Phoenix field review" : "Phoenix finalists";
+    const name = info.retry ? title + " · retry " + info.retry : title;
+    const form = tray.getByRole("form", { name: "Save comparison" });
+    await form.getByLabel("Comparison name").fill(name);
+    await page.route("**/api/actions/views", async route => {
+      if (route.request().method() !== "POST") return route.continue();
+      await route.fetch();
+      return route.abort("failed");
+    }, { times: 1 });
+    await form.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(form.getByRole("alert")).toBeVisible();
+    await form.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(tray.getByRole("status").filter({ hasText: name })).toBeVisible();
+    await tray.getByRole("button", { name: "Saved views" }).click();
+    const row = page.getByTestId("views-panel").getByRole("listitem").filter({ hasText: name });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "Open", exact: true }).click();
+    await expect(scope).toContainText("5 sites");
+    await expect(page).toHaveURL(/stage=land/);
+    expect(new URL(page.url()).searchParams.get("sort")).toBe("site:asc");
+    await expect(tray.getByRole("status").filter({ hasText: name })).toBeVisible();
+    await capture("saved", tray);
+    await expect(figure).toBeVisible();
+    await figure.click();
+    const brief = drawer.getByRole("region", { name: "Screening decision" });
+    await expect(brief).toContainText(source);
+    await expect(brief).toContainText("Verify rear parcel access");
+    await expect(brief).toContainText(/OwnerContributor/i);
+    await expect(brief.getByRole("time").first()).toBeAttached();
+    await brief.locator("summary").filter({ hasText: "Earlier findings" }).click();
+    await expect(brief).toContainText("Parcel boundary located.");
+    await capture("handoff", brief);
   });
 }

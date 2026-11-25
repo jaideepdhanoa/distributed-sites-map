@@ -3,15 +3,45 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
+import type { Note } from "@/lib/actions/notes";
+import type { Suggestion } from "@/lib/actions/suggestions";
+import type { WorkbookStep } from "@/lib/workbookStep";
+import { formatPacific } from "@/lib/actions/time";
 import { canWrite, useActionStatus } from "./panel";
 
-type FindingSummary = { title: string; text: string };
-type StoredNote = { body: string; createdAt: string; deleted: boolean };
-type StoredProposal = { reason: string; status: string; proposedValue: string; createdAt: string };
-
-function findingText(body: string) {
-  const match = /^(Screening finding|Missing evidence)\n([\s\S]+?)\nCheck: /.exec(body);
-  return match ? { title: match[1] === "Missing evidence" ? "Evidence gap saved" : "Finding saved", text: match[2] } : null;
+type Finding = { id: string; title: string; text: string; source: string; author: string; at: string; gap: boolean };
+type NextAction = { text: string; owner: string };
+function parseFinding(body: string) {
+  const checkAt = body.lastIndexOf("\nCheck: ");
+  if (checkAt < 0) return null;
+  const first = body.indexOf("\n");
+  const mode = body.slice(0, first);
+  if (mode !== "Missing evidence" && mode !== "Screening finding") return null;
+  const sourceAt = body.indexOf("\nSource: ", checkAt);
+  return { text: body.slice(first + 1, checkAt), source: sourceAt < 0 ? "" : body.slice(sourceAt + "\nSource: ".length), gap: mode === "Missing evidence" };
+}
+function noteFinding(note: Note): Finding | null {
+  const parsed = !note.deleted && parseFinding(note.body);
+  if (!parsed) return null;
+  const gap = parsed.gap && !note.resolvedAt;
+  return { ...parsed, gap, id: note.id, title: parsed.gap ? gap ? "Evidence gap saved" : "Evidence gap resolved" : "Finding saved", author: note.authorId, at: note.createdAt };
+}
+function proposalFinding(item: Suggestion): Finding | null {
+  const parsed = item.field === "correction" && parseFinding(item.reason);
+  if (!parsed) return null;
+  const title = item.status === "open" ? "Change submitted for approval" : "Proposed change · " + item.status;
+  return { ...parsed, gap: false, id: item.id, title, text: item.proposedValue + " · " + parsed.text, author: item.authorId, at: item.createdAt };
+}
+function FindingEntry({ item, action, checking }: { item: Finding; action: NextAction | null; checking: boolean }) {
+  const link = /^https?:\/\//i.test(item.source);
+  return <>
+    <strong>{item.title}</strong><p>{item.text}</p>
+    <div className="finding-byline">{item.author} · <time dateTime={item.at}>{formatPacific(item.at)}</time></div>
+    <dl className="finding-details"><div><dt>Source</dt><dd>{link ? <a href={item.source} target="_blank" rel="noopener noreferrer">Open source ↗</a> : item.source || "Not recorded"}</dd></div>
+      {item.gap && <><div><dt>Next action</dt><dd>{checking ? "Checking…" : action?.text || "No next action recorded"}</dd></div>
+      <div><dt>Owner</dt><dd>{checking ? "Checking…" : action?.owner || "Unassigned"}</dd></div></>}
+    </dl>
+  </>;
 }
 
 type FindingProps = {
@@ -19,9 +49,11 @@ type FindingProps = {
   id: string;
   source: string;
   review: string;
+  dealId?: string;
+  nextStep?: string;
 };
 
-export default function RecordFinding({ kind, id, source, review }: FindingProps) {
+export default function RecordFinding({ kind, id, source, review, dealId, nextStep }: FindingProps) {
   const status = useActionStatus();
   const params = useSearchParams();
   const findingRequested = params.get("panel") === "finding";
@@ -33,8 +65,13 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState<FindingSummary | null>(null);
-  const [recent, setRecent] = useState<FindingSummary | null>(null);
+  const [saved, setSaved] = useState<Finding | null>(null);
+  const [history, setHistory] = useState<Finding[]>([]);
+  const [approved, setApproved] = useState<NextAction | null>(null);
+  const [workbook, setWorkbook] = useState<NextAction | null>(null);
+  const [loadingOwner, setLoadingOwner] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const submitting = useRef(false);
   const receipt = useRef({ draft: "", key: "" });
   const trigger = useRef<HTMLButtonElement>(null);
@@ -51,33 +88,55 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
     if (!status.enabled) return;
     const controller = new AbortController();
     const query = new URLSearchParams({ targetKind: kind, targetId: id });
-    async function history() {
-      const get = async (path: string) => {
-        const response = await fetch(`/api/actions/${path}?${query}`, { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) return [];
-        const result = await response.json();
-        return Array.isArray(result[path]) ? result[path] : [];
+    async function load() {
+      const get = async (path: string, search = query) => {
+        const response = await fetch("/api/actions/" + path + "?" + search, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("Findings unavailable");
+        return (await response.json())[path];
       };
-      const [notes, proposals] = await Promise.all([get("notes"), get("suggestions")]);
-      const items = (notes as StoredNote[]).flatMap(note => {
-        const finding = !note.deleted && findingText(note.body);
-        return finding ? [{ ...finding, at: note.createdAt }] : [];
-      });
-      for (const item of proposals as StoredProposal[]) {
-        if (!findingText(item.reason)) continue;
-        const title = item.status === "open" ? "Change submitted for approval" : `Proposed change · ${item.status}`;
-        items.push({ title, text: item.proposedValue, at: item.createdAt });
-      }
-      items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-      if (!controller.signal.aborted) setRecent(items[0] || null);
+      const [notes, proposals, related] = await Promise.all([
+        get("notes") as Promise<Note[]>, get("suggestions") as Promise<Suggestion[]>,
+        dealId && dealId !== id ? get("suggestions", new URLSearchParams({ targetKind: "deal", targetId: dealId })) as Promise<Suggestion[]> : [],
+      ]);
+      if (controller.signal.aborted) return;
+      const rows = [...notes.map(noteFinding), ...proposals.map(proposalFinding)].filter((entry): entry is Finding => Boolean(entry));
+      setHistory(rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)));
+      const step = [...proposals, ...related].filter(item => item.field === "proposed_next_step" && item.status === "accepted" && !item.doneAt)
+        .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""))[0];
+      setApproved(step ? { text: step.title || step.proposedValue, owner: step.ownerName || step.ownerId || "Unassigned" } : null);
+      setHistoryError(false);
     }
-    void history().catch(() => undefined);
+    void load().catch(() => { if (!controller.signal.aborted) setHistoryError(true); });
     return () => controller.abort();
-  }, [status.enabled, kind, id]);
+  }, [status.enabled, kind, id, dealId, retry]);
 
+  useEffect(() => {
+    const refresh = () => setRetry(n => n + 1);
+    window.addEventListener("queue-refresh", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("queue-refresh", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+  const entries = saved && !history.some(row => row.id === saved.id) ? [saved, ...history] : history;
+  const confirmation = entries[0];
+  const needsWorkbook = Boolean(status.enabled && dealId && !approved && entries.some(row => row.gap));
+  useEffect(() => {
+    if (!needsWorkbook || !dealId) return;
+    const controller = new AbortController();
+    setLoadingOwner(true);
+    fetch("/api/data/financials/" + encodeURIComponent(dealId), { signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error("Action unavailable");
+      const step: WorkbookStep | null = (await response.json()).workbookStep;
+      if (!controller.signal.aborted) setWorkbook(step ? { text: step.text || nextStep || review, owner: step.owner || "Unassigned" } : null);
+    }).catch(() => { if (!controller.signal.aborted) setWorkbook({ text: nextStep || review, owner: "Owner unavailable" }); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingOwner(false); });
+    return () => controller.abort();
+  }, [needsWorkbook, dealId, nextStep, review, retry]);
+  const action = approved || workbook || { text: nextStep || review, owner: historyError ? "Owner unavailable" : "Unassigned" };
   const writable = status.enabled && canWrite(status.actionRole);
-  const confirmation = saved || recent;
-  if (!writable && !confirmation) return null;
+  if (!writable && !confirmation && !historyError) return null;
 
   function closeEditor() {
     setOpen(false);
@@ -116,8 +175,12 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
       const item = Array.isArray(rows) && rows.find(row => row.id === key);
       if (!item) throw new Error("Could not confirm the save. Retry to check this same submission.");
       if (!live.current) return;
+      const entry = proposal ? proposalFinding(item) : noteFinding(item);
+      if (!entry) throw new Error("Could not read the saved finding. Try again.");
       receipt.current = { draft: "", key: "" };
-      setSaved({ title: proposal ? "Change submitted for approval" : outcome === "missing" ? "Evidence gap saved" : "Finding saved", text: proposal ? item.proposedValue : findingText(item.body)?.text || body.trim() });
+      setSaved(entry);
+      setHistory(rows => [entry, ...rows.filter(row => row.id !== entry.id)]);
+      setRetry(attempt => attempt + 1);
       closeEditor();
       setBody(""); setValue(""); setCitation(null); setOutcome("finding");
       if (!reviewing) window.dispatchEvent(new Event("queue-refresh"));
@@ -130,13 +193,17 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
   }
 
   return <div className="finding-work">
-    {confirmation && !(open && writable) && <div className="finding-confirmed" tabIndex={-1} ref={confirmed} role="status"><strong>{confirmation.title}</strong><p>{confirmation.text}</p>
+    {confirmation && !(open && writable) && <div className="finding-confirmed" tabIndex={-1} ref={confirmed} role="status"><FindingEntry item={confirmation} action={action} checking={needsWorkbook && loadingOwner} />
       {reviewing && <button type="button" className="text-link" onClick={() => {
         const back = document.querySelector<HTMLButtonElement>(".review-evidence button");
         if (back) back.click();
         else document.querySelector<HTMLButtonElement>('[data-testid="review-since"]')?.focus();
       }}>Return to review</button>}
     </div>}
+    {entries.length > 1 && !open && <details className="disclosure finding-history"><summary className="disclosure">Earlier findings ({entries.length - 1})</summary>
+      <ol>{entries.slice(1).map(entry => <li key={entry.id}><FindingEntry item={entry} action={action} checking={needsWorkbook && loadingOwner} /></li>)}</ol>
+    </details>}
+    {historyError && <p className="note">Finding history unavailable. <button type="button" className="text-link" onClick={() => setRetry(n => n + 1)}>Retry</button></p>}
     {writable && (open ? <form className="finding-form" aria-label="Record finding" onSubmit={save}>
       <label>Record as<select className="secondary" value={outcome} disabled={pending} onChange={event => setOutcome(event.target.value)}>
         <option value="finding">Finding</option><option value="missing">Missing evidence</option><option value="proposal">Proposed correction</option>

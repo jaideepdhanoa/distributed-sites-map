@@ -17,13 +17,15 @@ import AppLoading from "./AppLoading";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
+import SaveComparison from "./actions/SaveComparison";
+import type { ListLayout } from "@/lib/listLayout";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
 import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/actions/quiet";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { initialSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
-import { areaQuery, inMapArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
+import { areaQuery, inMapArea, savedListArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
 import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
 import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
@@ -174,6 +176,22 @@ export default function Explorer() {
   const [handoff, setHandoff] = useState("");
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
+  useEffect(() => {
+    if (!stepsOpen) return;
+    shellRef.current?.querySelector<HTMLButtonElement>("#workspace-scope .close")?.focus({ preventScroll: true });
+    const closeKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); dismissScope(); }
+    };
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest("#workspace-scope, .workspace-scope")) setStepsOpen(false);
+    };
+    document.addEventListener("keydown", closeKey);
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      document.removeEventListener("keydown", closeKey);
+      document.removeEventListener("pointerdown", outside);
+    };
+  }, [stepsOpen]);
   const [queueCount, setQueueCount] = useState(0);
   const [queueTick, setQueueTick] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
@@ -385,7 +403,7 @@ export default function Explorer() {
   const listView = params.get("view") === "list";
   const [liveArea, setLiveArea] = useState<MapArea | null>(null);
   const [followArea, setFollowArea] = useState(false);
-  const mapAreaLive = followArea ? liveArea : null;
+  const mapAreaLive = followArea ? liveArea : savedListArea(params.get("listArea"));
   const reach: Reach = parseReach(params.get("reach"));
   const ndaRaw = params.get("nda") || "";
   const ndaId = /^NDA-\d{3,}$/i.test(ndaRaw) ? ndaRaw.toUpperCase() : "";
@@ -539,7 +557,55 @@ export default function Explorer() {
   const lastCell = useRef({ row: "", cell: "" });
   const listSelection = useRef<Record<string, string[]>>({ pipeline: [], universe: [] });
   const listScope = useRef<string[]>([]);
-  const rememberScope = useCallback((ids: string[]) => { listScope.current = ids; }, []);
+  const [listCount, setListCount] = useState<number | null>(null);
+  const listLayout = useRef<ListLayout | null>(null);
+  const rememberScope = useCallback((ids: string[], layout: ListLayout) => {
+    listScope.current = ids;
+    listLayout.current = layout;
+    setListCount(ids.length);
+  }, []);
+  const comparisonOrigin = useRef<string | null>(null);
+  const inspectMeasure = params.get("measure");
+  const inspecting = Boolean(inspectMeasure && selected && compareIds.includes(selected));
+  useEffect(() => {
+    if (inspecting) shellRef.current?.querySelector<HTMLButtonElement>(".comparison-back")?.focus({ preventScroll: true });
+  }, [inspecting, selected]);
+  function inspectComparison(id: string, measure: string) {
+    comparisonOrigin.current = currentSearch();
+    setPreviewId(null);
+    setSelected(id);
+    const panel = measure === "Open land" ? "open-land" : ["Power", "Land", "Bays that fit", "Traffic"].includes(measure) ? "numbers" : null;
+    replaceSearch(comparisonOrigin.current, { site: id, measure, panel, sheet: "full" }, true);
+  }
+  function returnComparison() {
+    if (comparisonOrigin.current !== null) {
+      setSelected(new URLSearchParams(comparisonOrigin.current).get("site"));
+      replaceSearch(comparisonOrigin.current, {});
+      comparisonOrigin.current = null;
+    } else {
+      setSelected(null);
+      write({ site: null, measure: null, panel: null, sheet: null });
+    }
+  }
+  function comparisonQuery() {
+    const query = new URLSearchParams(currentSearch());
+    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView"]) query.delete(key);
+    query.set("compare", compareIds.join("|"));
+    query.set("city", selectedMarket);
+    query.set("funnel", funnel);
+    if (funnel === "universe" && !query.has("stage")) query.set("stage", stage);
+    if (funnel === "pipeline" && !query.has("pstage")) query.set("pstage", "all");
+    if (listView && listLayout.current) {
+      const layout = listLayout.current;
+      query.set(funnel + "Layout", JSON.stringify(layout));
+      query.set("sort", layout.sort ? layout.sort.id + ":" + (layout.sort.desc ? "desc" : "asc") : "none");
+      if (mapAreaLive?.kind === "polygon" && mapAreaLive.points.length === 4) {
+        query.set("listArea", [...mapAreaLive.points[0], ...mapAreaLive.points[2]].join(","));
+      }
+    }
+    return query.toString();
+  }
+  const comparisonBack = inspecting && <button className="text-link comparison-back" data-measure={inspectMeasure} type="button" onClick={returnComparison}>Back to comparison · {inspectMeasure}</button>;
   const queryString = params.toString();
   useEffect(() => {
     const updateSearch = () => rememberSearch(window.location.pathname + window.location.search);
@@ -1899,7 +1965,19 @@ export default function Explorer() {
   });
   if (allStages && funnel !== "pipeline" && !who) activeFilters.push({ id: "all-stages", label: "All stages", clear: () => write({ stage: null }) });
 
+  function dismissScope() {
+    setStepsOpen(false);
+    shellRef.current?.querySelector<HTMLButtonElement>(window.matchMedia("(max-width: 767px)").matches ? ".phone-step" : '[data-testid="map-scope"]')?.focus();
+  }
+
+  function toggleScope() {
+    const open = !stepsOpen;
+    closeMenus();
+    setStepsOpen(open);
+  }
+
   function closeMenus() {
+    setStepsOpen(false);
     setFiltersOpen(false);
     setMoreOpen(false);
     setUserOpen(false);
@@ -2109,6 +2187,8 @@ export default function Explorer() {
     </button>
   );
   const shownCount = marketView.shown;
+  const resultCount = listView && !ndaVisible && !loopsVisible ? listCount ?? shownCount : shownCount;
+  const scopeLabel = <><span>{shortlistTitle}</span><small data-testid="scope-count">{resultCount.toLocaleString("en-US")} {resultCount === 1 ? "site" : "sites"}</small></>;
   const allCount = pipelineAllCount(shownCount, hiddenDropped);
   const outsideCount = countOutsideServiceArea(marketDeals);
   const reviewMarkers = inReview && !reviewMiss ? reviewList.flatMap((site, index) => {
@@ -2196,24 +2276,9 @@ export default function Explorer() {
         <ActionsQuietNotice />
         <div className="top">
           <Wordmark view={tableOpen ? "list" : "map"} />
-          <div className="cities only-desktop" role="group" aria-label="Market">
-            {(() => {
-              const totals = marketView.totals;
-              return (
-                <>
-                  <button type="button" className={selectedMarket === "all" ? "chip on" : "chip"} data-testid="market-all" onClick={() => jump("all")}>All {totals.All.toLocaleString("en-US")}</button>
-                  {CITIES.map((item) => (
-                    <button key={item} className={selectedMarket === item ? "chip on" : "chip"} type="button" data-testid={`market-${item}`} onClick={() => jump(item)}>
-                      {item === "PHX" ? "Phoenix" : item === "LAS" ? "Las Vegas" : "Miami"} {totals[item].toLocaleString("en-US")}
-                    </button>
-                  ))}
-                  {totals.Other > 0 ? (
-                    <button type="button" className={selectedMarket === "other" ? "chip on" : "chip"} data-testid="market-other" onClick={() => jump("other")}>Other {totals.Other.toLocaleString("en-US")}</button>
-                  ) : null}
-                </>
-              );
-            })()}
-          </div>
+          <button className="paper-btn workspace-scope only-desktop" type="button" data-testid="map-scope" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
+            {scopeLabel}
+          </button>
           <div className="search-wrap only-desktop">
             <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search everything" onClick={() => setCommandOpen(true)}>Search</button>
             <kbd data-testid="command-search-open" aria-hidden="true">{appleShortcut ? "⌘K" : "Ctrl K"}</kbd>
@@ -2256,6 +2321,18 @@ export default function Explorer() {
               Ask
             </button>
           ) : null}
+          <div className="more-wrap only-desktop">
+            <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
+            {moreOpen ? (
+              <div className="menu" role="menu">
+                <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
+                <ActionsMenuButtons close={() => setMoreOpen(false)} />
+                {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMoreOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
+                <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
+                {changesNote ? <p className="menu-note">{changesNote}</p> : null}
+              </div>
+            ) : null}
+          </div>
           <div className="user-menu only-desktop">
             <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
               {(me?.u || "?").slice(0, 1).toUpperCase()}
@@ -2270,21 +2347,11 @@ export default function Explorer() {
               </div>
             ) : null}
           </div>
-          <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
-            <span>{activeStepLabel}</span><small>{selectedMarket === "other" ? "Other markets" : marketLabel(selectedMarket)} · {shownCount.toLocaleString("en-US")} {shownCount === 1 ? "site" : "sites"}</small>
-          </button>
         </div>
         <div className="phone-view-row only-mobile">
-          <label className="city-pick">
-            <span className="sr">City</span>
-            <select aria-label="City" value={selectedMarket} onChange={(event) => jump(event.target.value)} className="secondary">
-              <option value="all">All markets</option>
-              <option value="PHX">Phoenix</option>
-              <option value="LAS">Las Vegas</option>
-              <option value="MIA">Miami</option>
-              {(selectedMarket === "other" || marketView.totals.Other > 0) && <option value="other">Other markets</option>}
-            </select>
-          </label>
+          <button className="phone-step workspace-scope only-mobile" type="button" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
+            {scopeLabel}
+          </button>
           <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
@@ -2313,12 +2380,38 @@ export default function Explorer() {
         </div>
         {unavailable.length > 0 && <div role="status" className="workspace-warning">Unavailable · {unavailable.join(", ")} <button type="button" className="text-link" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></div>}
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite} <button type="button" className="text-link" onClick={() => { setSelected(null); write({ site: null, view: "list" }); }}>Back to listings</button></p> : null}
-        <div className="funnel-row">
-          {listView && <button type="button" className="paper-btn only-desktop" aria-expanded={stepsOpen} aria-controls="workspace-funnel" onClick={() => setStepsOpen(value => !value)}>Stages</button>}
-          <div className="funnel-sheet-head only-mobile">
-            <p className="eyebrow">Steps</p>
-            <button className="close" type="button" aria-label="Close steps" onClick={() => setStepsOpen(false)}><span aria-hidden="true">×</span></button>
+        <section className="funnel-row" id="workspace-scope" aria-label="Market and stage">
+          <div className="scope-sheet-title"><h2>Market and stage</h2>
+            <button className="close" type="button" aria-label="Close steps" onClick={dismissScope}><span aria-hidden="true">×</span></button>
           </div>
+          <div className="cities only-desktop" role="group" aria-label="Market">
+            {(() => {
+              const totals = marketView.totals;
+              return (
+                <>
+                  <button type="button" className={selectedMarket === "all" ? "chip on" : "chip"} data-testid="market-all" onClick={() => jump("all")}>All {totals.All.toLocaleString("en-US")}</button>
+                  {CITIES.map((item) => (
+                    <button key={item} className={selectedMarket === item ? "chip on" : "chip"} type="button" data-testid={`market-${item}`} onClick={() => jump(item)}>
+                      {item === "PHX" ? "Phoenix" : item === "LAS" ? "Las Vegas" : "Miami"} {totals[item].toLocaleString("en-US")}
+                    </button>
+                  ))}
+                  {totals.Other > 0 ? (
+                    <button type="button" className={selectedMarket === "other" ? "chip on" : "chip"} data-testid="market-other" onClick={() => jump("other")}>Other {totals.Other.toLocaleString("en-US")}</button>
+                  ) : null}
+                </>
+              );
+            })()}
+          </div>
+          <label className="city-pick only-mobile">
+            <span className="sr">City</span>
+            <select aria-label="City" value={selectedMarket} onChange={(event) => jump(event.target.value)} className="secondary">
+              <option value="all">All markets ({marketView.totals.All})</option>
+              <option value="PHX">Phoenix ({marketView.totals.PHX})</option>
+              <option value="LAS">Las Vegas ({marketView.totals.LAS})</option>
+              <option value="MIA">Miami ({marketView.totals.MIA})</option>
+              {(selectedMarket === "other" || marketView.totals.Other > 0) && <option value="other">Other markets ({marketView.totals.Other})</option>}
+            </select>
+          </label>
           <nav id="workspace-funnel" className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? null : (
               <>
@@ -2418,19 +2511,8 @@ export default function Explorer() {
           ) : null}
           {stageUnmapped > 0 ? <span className="summary-chip" data-testid="unmapped-note">{stageUnmapped.toLocaleString()} without a location</span> : null}
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
-          <div className="more-wrap only-desktop">
-            <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
-            {moreOpen ? (
-              <div className="menu" role="menu">
-                <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
-                <ActionsMenuButtons close={() => setMoreOpen(false)} />
-                {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMoreOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
-                <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
-                {changesNote ? <p className="menu-note">{changesNote}</p> : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
+
+        </section>
         {activeFilters.length ? (
           <div className="active-row" aria-label="Active filters">
             {activeFilters.map((item) => (
@@ -2895,7 +2977,7 @@ export default function Explorer() {
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
             title={shortlistTitle}
-            initialSelection={listSelection.current.pipeline} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
+            initialSelection={listSelection.current.pipeline.length ? listSelection.current.pipeline : params.has("pipelineLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
             rows={pipelineRows}
             outsideRow={outsideRow}
             unreadIds={openQueueIds}
@@ -2913,7 +2995,7 @@ export default function Explorer() {
             userId={me?.u || ""}
             mapArea={mapAreaLive}
             onSearchArea={() => setFollowArea(true)}
-            onClearArea={() => setFollowArea(false)}
+            onClearArea={() => { setFollowArea(false); write({ listArea: null }); }}
             onColumns={(next) => {
               const defaults = defaultColumnIds().join(",");
               const value = next.join(",");
@@ -2944,7 +3026,7 @@ export default function Explorer() {
           <ListView
             title={shortlistTitle}
             onCompare={ids => write({ compare: ids.join("|"), view: "list" })}
-            initialSelection={listSelection.current.universe} onSelection={ids => { listSelection.current.universe = ids; }} onScope={rememberScope}
+            initialSelection={listSelection.current.universe.length ? listSelection.current.universe : params.has("universeLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.universe = ids; }} onScope={rememberScope}
             rows={listRows}
             selectedId={selected}
             sort={{ id: sortKey, desc: sortDesc }}
@@ -2959,7 +3041,7 @@ export default function Explorer() {
             sortQuery={params.has("sort") ? params.get("sort") : null}
             mapArea={mapAreaLive}
             onSearchArea={() => setFollowArea(true)}
-            onClearArea={() => setFollowArea(false)}
+            onClearArea={() => { setFollowArea(false); write({ listArea: null }); }}
           />
         ) : null}
         </PanelBoundary>
@@ -3044,9 +3126,6 @@ export default function Explorer() {
         </aside>
         {!listView ? (
           <div className="map-corner">
-            {!inReview && <div className="map-scope only-desktop" aria-label="Current map results" data-testid="map-scope">
-              <span>{shortlistTitle}</span><strong>{shownCount.toLocaleString("en-US")} {shownCount === 1 ? "site" : "sites"}</strong>
-            </div>}
             {ringsOutside ? (
               <div className="rings-outside" role="status">
                 <p>5- and 10-mile rings are outside this view.</p>
@@ -3115,8 +3194,8 @@ export default function Explorer() {
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={() => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
-            banner={changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
+            onClose={inspecting ? returnComparison : () => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             compared={compareIds.includes(selectedDeal.deal_id)}
@@ -3163,8 +3242,8 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={() => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
-            banner={changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
+            onClose={inspecting ? returnComparison : () => { setSelected(null); write({ site: null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             onOpenNda={(id) => write({ nda: id })}
@@ -3196,16 +3275,12 @@ export default function Explorer() {
             contextSites={sites}
             contextDeals={dealRows}
             signedIn={Boolean(me)}
+            inspecting={inspecting}
+            onInspect={inspectComparison}
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}
           >
-            {compareIds.length >= 2 && me?.u ? (
-              <button type="button" className="paper-btn" onClick={() => void fetch("/api/actions/views", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ name: `Compare ${compareIds.length}`, query: `compare=${compareIds.join("|")}`, scope: "personal" }),
-              })}>Save view</button>
-            ) : null}
+            {compareIds.length >= 2 && me?.actionsEnabled && <SaveComparison key={compareIds.join("|")} query={comparisonQuery} />}
           </CompareTray>
         ) : null}
         </PanelBoundary>

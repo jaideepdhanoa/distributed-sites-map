@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isOpenAgreement, type NdaQueueItem } from "@/lib/nda";
 import type { WorkRow } from "@/lib/api/handlers/actions/work";
 import { pacificToday } from "@/lib/queue/today";
@@ -10,18 +10,25 @@ const labels: Record<string, string> = {
   agreed_waiting: "Waiting",
   ready: "Ready for approval",
 };
+export type WorkPosition = { filter: string; key: string; index: number; top: number; proposal: boolean };
+
 export default function MyWork({
   username,
   names,
   open,
   close,
+  position,
 }: {
   username: string;
   names: Record<string, string>;
-  open: (row: WorkRow) => void;
+  open: (row: WorkRow, position: WorkPosition) => void;
+  position: WorkPosition | null;
   close: () => void;
 }) {
-  const [filter, setFilter] = useState("Assigned to me");
+  const [filter, setFilter] = useState(position?.filter || "Assigned to me");
+  const shell = useRef<HTMLElement>(null);
+  const returning = useRef(position);
+  const [announcement,setAnnouncement] = useState("");
   const [rows, setRows] = useState<WorkRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(true);
@@ -96,11 +103,27 @@ export default function MyWork({
         : true;
   }
   const visible = rows.filter((row) => matches(row, filter));
+  useEffect(() => {
+    const saved = returning.current;
+    if (busy || errors.length || !saved || !shell.current) return;
+    returning.current = null;
+    const items = Array.from(shell.current.querySelectorAll<HTMLLIElement>("[data-work-row]"));
+    const exact = items.find(item => item.dataset.workRow === saved.key);
+    const next = exact || items[Math.min(saved.index, items.length - 1)];
+    shell.current.scrollTop = saved.top;
+    const button = next?.querySelector<HTMLButtonElement>(exact && saved.proposal ? "[data-work-proposal]" : "button");
+    (button || shell.current.querySelector<HTMLElement>("h2"))?.focus({preventScroll:true});
+    button?.scrollIntoView({block:"nearest"});
+    if (!exact) setAnnouncement("This item has left the queue.");
+  }, [busy, errors]);
+  function inspect(row: WorkRow, index:number, proposal=false) {
+    open(row,{filter,key:row.kind+row.id,index,top:shell.current?.scrollTop || 0,proposal});
+  }
   return (
-    <section className="nda-pane work-hub" aria-label="My work">
+    <section ref={shell} className="nda-pane work-hub" aria-label="My work">
       <div className="work-page">
         <header>
-          <h2>My work</h2>
+          <h2 tabIndex={-1}>My work</h2>
           <button
             className="close"
             aria-label="Return to workspace"
@@ -154,9 +177,10 @@ export default function MyWork({
               : "No open items in this view."}
           </p>
         ) : null}
+        <span role="status" className="sr">{announcement}</span>
         <ul>
-          {visible.map((row) => (
-            <li key={row.kind + row.id}>
+          {visible.map((row,index) => (
+            <li key={row.kind + row.id} data-work-row={row.kind + row.id}>
               <div>
                 <small>
                   {row.kind} · {names[row.site] || row.site}
@@ -164,7 +188,7 @@ export default function MyWork({
                 <button
                   type="button"
                   className="text-link"
-                  onClick={() => open(row)}
+                  onClick={() => inspect(row,index)}
                 >
                   {row.title}
                 </button>
@@ -172,6 +196,7 @@ export default function MyWork({
               <div>
                 <strong>{row.owner || "Unassigned"}</strong>
                 <small>{labels[row.status] || row.status}</small>
+                {row.note && row.note !== row.id && <button type="button" className="text-link" data-work-proposal onClick={()=>inspect(row,index,true)}>View proposal</button>}
               </div>
               <time data-overdue={Boolean(row.due && row.due < today)}>
                 {row.due

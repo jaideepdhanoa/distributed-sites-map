@@ -14,6 +14,7 @@ import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
 import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import {financialsCard} from "@/lib/pnl/cue";
 import PnlOverlay from "./PnlOverlay";
 import { listingCue, shownPriceSource } from "@/lib/format";
 import FinancialsPanel from "./FinancialsPanel";
@@ -142,6 +143,7 @@ export default function KeyStrip({
   const deepFinancials = params.get("panel") === "financials";
   const grain = params.get("pl") === "monthly" ? "monthly" : params.get("pl") === "annual" ? "annual" : null;
   const [financialsOpen, setFinancialsOpen] = useState(false);
+  const [figure, setFigure] = useState<"revenue" | "earnings" | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [financials, setFinancials] = useState<FinancialPanel | null>(null);
   const [conflicts, setConflicts] = useState<DataConflict[]>([]);
@@ -154,6 +156,7 @@ export default function KeyStrip({
   }, []);
   const showFinancials = showsFinancials(deal);
   useEffect(() => {
+    setFigure(null);
     setFinancialsOpen(deepFinancials && signedIn === true && showFinancials);
     setFinancials(null);
     setConflicts([]);
@@ -182,6 +185,8 @@ export default function KeyStrip({
   }, [signedIn, showFinancials, deal.deal_id, commentTick]);
   const fallbackPanel = useMemo(() => panelFromDeal(deal), [deal]);
   const shownPanel = showFinancials ? (financials ?? fallbackPanel) : null;
+  const card = figure && tiles && shownPanel?.pnl ? financialsCard(shownPanel.pnl) : null;
+  const selection = card ? {year:card.year, period:card.period, line:figure === "revenue" ? "total-revenue" : card.cashLabel.toLowerCase()} : undefined;
   const population = trade.find((line) => line.startsWith("3-mile population"));
   const washes = trade.find((line) => line.startsWith("Washes "));
   const growth = trade.find((line) => line.startsWith("Growth "));
@@ -214,7 +219,7 @@ export default function KeyStrip({
                 <PendingFigure />
               </div>
             ) : (
-              <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => setFinancialsOpen(true)}>
+              <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => {setFigure("revenue"); setFinancialsOpen(true);}}>
                 <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
                 <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
                 <small className="figure-hold">{tiles ? tiles.revenue.note : (deal.revenue_period || "")}</small>
@@ -231,7 +236,7 @@ export default function KeyStrip({
                 <PendingFigure />
               </div>
             ) : (
-              <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
+              <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => {setFigure("earnings"); setFinancialsOpen(true);}}>
                 <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
                 <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
                 <small className="figure-hold">{tiles ? tiles.cash.note : cashNote}</small>
@@ -247,7 +252,7 @@ export default function KeyStrip({
         {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
       </div>
       {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
-        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={signedIn ? deal.deal_id : ""} initialGrain={grain} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={signedIn ? deal.deal_id : ""} initialGrain={card?.grain || grain} selection={selection} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
         document.body,
       ) : null}
       {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (

@@ -695,7 +695,7 @@ export default function Detail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
-        economics={<Economics deal={linkedDeal} site={site} signedIn={signedIn} />}
+        economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
             <details className="disclosure">
@@ -1012,7 +1012,7 @@ export function DealDetail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
-        economics={<Economics deal={deal} site={universeSite} signedIn={signedIn} />}
+        economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>
             <details className="disclosure">

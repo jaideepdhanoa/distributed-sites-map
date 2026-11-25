@@ -1,3 +1,5 @@
+import FinancialsEntry from "./FinancialsEntry";
+import type { ComponentProps } from "react";
 import PricingSection from "./PricingSection";
 import { dealRows, MISSING, siteRows } from "@/lib/comparison";
 import type { SiteProps, DealProps } from "@/lib/types";
@@ -6,10 +8,12 @@ export default function Economics({
   deal,
   site,
   signedIn,
+  pnl,
 }: {
   deal?: DealProps | null;
   site?: SiteProps | null;
   signedIn?: boolean;
+  pnl?: ComponentProps<typeof FinancialsEntry>["loaded"];
 }) {
   if (!signedIn) return <p>Sign in to view financial evidence.</p>;
   const rows = deal
@@ -21,7 +25,9 @@ export default function Economics({
     <section className="investment-economics"><h3>What does the asking price buy?</h3>
       {deal && deal.kind !== "land" && <PricingSection deal={deal} />}
       <h4>Savings versus hub at screening price</h4><p>{deal?.saving_vs_hub?.trim() || "Screening comparison not on file"}</p>
-      <h4>Financial evidence</h4><dl className="record-economics">
+      <h4>Financial evidence</h4>
+      {deal && deal.kind !== "land" && pnl?.statement?.status === "ready" && <FinancialsEntry dealId={deal.deal_id} loaded={pnl} compact="link" />}
+      <dl className="record-economics">
       {[
         "Asking",
         "Revenue",

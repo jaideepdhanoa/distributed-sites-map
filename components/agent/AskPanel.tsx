@@ -14,12 +14,16 @@ export function AskPanel({
   open,
   shortlist = [],
   site,
+  canPropose,
+  onSource,
   onClearSite,
   onClose,
 }: {
   open: boolean;
   shortlist?: string[];
   site: { id: string; name: string } | null;
+  canPropose: boolean;
+  onSource: (href: string) => void;
   onClearSite: () => void;
   onClose: () => void;
 }) {
@@ -36,9 +40,9 @@ export function AskPanel({
   const flight = useRef<AbortController | null>(null);
   const alive = useRef(true);
 
-  useEffect(() => () => {
-    alive.current = false;
-    flight.current?.abort();
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; flight.current?.abort(); };
   }, []);
 
   useEffect(() => {
@@ -154,7 +158,7 @@ export function AskPanel({
       setNotice("Open a site to file this as a work item.");
       return;
     }
-    window.dispatchEvent(new CustomEvent("sites-prefill-work-item", { detail: { title: text.slice(0, 120) } }));
+    window.dispatchEvent(new CustomEvent("sites-prefill-work-item", { detail: { targetId: site.id, title: text.slice(0, 120) } }));
     onClose();
   }
 
@@ -174,16 +178,20 @@ export function AskPanel({
         <button type="button" className="close" aria-label="Close Ask" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {site ? (
-        <button type="button" className="removable" data-testid="ask-chip" onClick={onClearSite}>
+        <button type="button" className="removable" data-testid="ask-chip" disabled={pending || turns.length > 0} onClick={onClearSite}>
           {site.name}<span aria-hidden="true">×</span>
         </button>
       ) : null}
       {unset ? <p data-testid="ask-unset">Ask isn&apos;t set up yet</p> : null}
       <div className="ask-log" ref={logRef}>
+        {!unset && !turns.length && (site || scoped) && <button type="button" className="paper-btn ask-prompt" onClick={() => {
+          setQuestion(site ? "Which evidence is missing for this site’s next decision?" : "Which differences in fit and economics are supported by the records for these sites?");
+          composerRef.current?.focus();
+        }}>{site ? "Check missing evidence" : "Compare fit and economics"}</button>}
         {turns.map((turn, index) => (
           <div key={`${turn.role}-${index}`}>
             {turn.role === "ask" && turn.pending && !turn.text ? <AskThinking slow={turn.slow} /> : null}
-            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} /> : null}
+            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} onSite={onSource} /> : null}
             {turn.role === "user" ? <p className="ask-bubble">{turn.text}</p> : null}
             {turn.error && turn.linkRetry ? (
               <button type="button" className="text-link" data-testid="ask-retry" disabled={pending} onClick={() => void send(turns[index - 1]?.text || question)}>
@@ -195,7 +203,7 @@ export function AskPanel({
                 Try again
               </button>
             ) : null}
-            {turn.gap ? (
+            {turn.gap && canPropose ? (
               <button type="button" className="paper-btn" data-testid="ask-work-item" onClick={() => makeWorkItem(turns[index - 1]?.text || turn.text)}>
                 Make it a work item
               </button>

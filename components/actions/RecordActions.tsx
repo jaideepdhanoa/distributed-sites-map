@@ -1,5 +1,7 @@
 "use client";
 
+import GapThreadLink from "./GapThreadLink";
+
 import { useEffect, useState } from "react";
 import { quietActionsFetch } from "@/lib/actions/quiet";
 import { formatPacific } from "@/lib/actions/time";
@@ -330,6 +332,7 @@ export function RecordActions({ kind, id, variant = "card" }: { kind: "site" | "
                     {" "}
                     <span className={`badge ${item.status === "open" ? "pending" : "checked"}`}>{item.status === "accepted" ? "Approved" : "Open"}</span>
                   </p>
+                  <GapThreadLink targetId={id} reason={item.reason} />
                   <MentionChips mentions={item.mentions} />
                   <div className="act-row">
                     {canFinish(item) ? (

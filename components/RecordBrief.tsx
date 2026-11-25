@@ -3,6 +3,7 @@ import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import FinancialsEntry from "./FinancialsEntry";
 import { screeningEvidence } from "@/lib/screeningEvidence";
 import { financialsCard } from "@/lib/pnl/cue";
+import { cashTile } from "@/lib/keyNumbers";
 import type { PnlStatement } from "@/lib/pnl/statement";
 import RecordFinding from "./actions/RecordFinding";
 
@@ -25,11 +26,15 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
   const coverage = financial && pnl?.statement ? financialsCard(pnl.statement, pnl.sample)?.coverage : "";
   const land = check === "space";
   const first = financial || (land && missing) ? undefined : figures[0];
-  const others = first ? figures.slice(1) : figures;
+  const economics = figures.find(fact => fact.label === (input.deal?.cash_flow_label || "Cash flow")) || figures.find(fact => fact.label === "Asking price");
+  const featuredEconomics = economics !== first ? economics : undefined;
+  const others = figures.filter(fact => fact !== first && fact !== featuredEconomics);
+  const cash = input.signedIn && input.deal ? cashTile(input.deal) : null;
+  const cashGap = !economics && cash && !cash.hidden ? (cash.value === "—" ? "Cash flow not on file" : cash.value) : "";
   const source = evidence?.kind === "county" ? evidence.href : financial && coverage ? `Financial statement · ${coverage}` : land && first?.label === "Open land" ? first.source : "";
   return (
     <section className="record-brief" aria-label="Screening decision">
-      <div className="brief-decision"><span>Screening decision</span><strong>{status}</strong></div>
+      <div className="brief-decision"><span>Screening decision</span><h3>{status}</h3></div>
       {reason && reason !== status && <p>{reason}</p>}
       <dl>
         <div><dt>Next check</dt><dd>{evidence?.kind === "county"
@@ -43,8 +48,10 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
         {financial ? <div><dt>Statement coverage</dt><dd>{coverage || (pnl?.settled ? "No statement coverage on file." : "Checking statement coverage…")}{coverage && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} loaded={pnl} compact="link" />}</dd></div>
           : land && missing ? <div><dt>Open land</dt><dd>{missing}</dd></div>
           : first ? <FigureRow fact={first} /> : <div><dt>Evidence</dt><dd>No screening figures on file.</dd></div>}
+        {featuredEconomics && <FigureRow fact={featuredEconomics} />}
+        {cashGap && <div><dt>Cash flow</dt><dd>{cashGap}</dd></div>}
       </dl>
-      {target && input.signedIn && <RecordFinding key={target.kind + target.id} kind={target.kind} id={target.id} source={source} review={review} dealId={input.deal?.deal_id} nextStep={input.deal?.next_step} />}
+      {target && input.signedIn && <RecordFinding key={target.kind + target.id} kind={target.kind} id={target.id} source={source} review={review} />}
       {others.length > 0 && <details className="disclosure brief-figures">
         <summary className="disclosure">More figures ({others.length})</summary>
         <dl>{others.map(fact => <FigureRow key={fact.label} fact={fact} />)}</dl>

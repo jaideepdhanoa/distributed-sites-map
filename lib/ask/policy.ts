@@ -37,12 +37,12 @@ export function withCitations(text: string, sources: AskSource[]): { text: strin
   if (text === REFUSAL) return { text, gap: false, empty: false };
   const linked = hasCitation(text);
   if (!sources.length && !linked) return { text: UNKNOWN, gap: true, empty: false };
+  const gap = /\bi (?:don't|don’t|do not) know\b/i.test(text);
   if (!linked && sources.length) {
     const lines = sources.slice(0, 6).map((source) => `- [${source.label}](${source.href})`);
-    return { text: `${text.trim()}\n\nSources:\n${lines.join("\n")}`, gap: false, empty: false };
+    return { text: `${text.trim()}\n\nSources:\n${lines.join("\n")}`, gap, empty: false };
   }
-  if (/i don't know/i.test(text) && !linked) return { text: UNKNOWN, gap: true, empty: false };
-  return { text, gap: false, empty: false };
+  return { text, gap, empty: false };
 }
 
 export function collectSources(value: unknown, into: AskSource[] = [], seen = new Set<string>()): AskSource[] {

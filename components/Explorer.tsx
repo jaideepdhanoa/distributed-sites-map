@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, type FeedSite } from "./queue/QueueView";
-import { AskPanel } from "./agent/AskPanel";
+
 import { RecordActions } from "./actions/RecordActions";
 import type { QueueReason as ReviewChange } from "@/lib/queue/order";
 import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
@@ -17,6 +17,7 @@ import AppLoading from "./AppLoading";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
+import { numberEvidence } from "@/lib/comparison";
 import SaveComparison from "./actions/SaveComparison";
 import type { ListLayout } from "@/lib/listLayout";
 import CompareTray from "./CompareTray";
@@ -123,6 +124,8 @@ function guardFeatures<T extends { features?: { properties?: Record<string, unkn
   });
   return { ...body, features };
 }
+
+const AskPanel = dynamic(() => import("./agent/AskPanel").then(module => module.AskPanel));
 
 export default function Explorer() {
   const params = useSearchParams();
@@ -259,7 +262,8 @@ export default function Explorer() {
     note.dataset.hidden = "0";
   }, [ringCursor]);
   const [copied, setCopied] = useState(false);
-  const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
+  const compareParam = params.get("compare") || "";
+  const compareIds = useMemo(() => Array.from(new Set(compareParam.split("|").filter(Boolean))).slice(0, 4), [compareParam]);
   const [changesNote, setChangesNote] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -429,6 +433,12 @@ export default function Explorer() {
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
+  // A direct shortlist visit covers the map. Keep the camera alive after the first map visit.
+  const needsMap = !listView || reviewing || followArea;
+  const [mapVisited, setMapVisited] = useState(false);
+  useEffect(() => {
+    if (needsMap) setMapVisited(true);
+  }, [needsMap]);
   const queueMarket = params.get("qmarket") || (reviewing ? "all" : city);
   const queueStage = params.get("qstage") || (reviewing || funnel !== "pipeline" || allPipes ? "any" : pipeStage);
   const queueViable = params.get("qviable") !== "0";
@@ -574,13 +584,13 @@ export default function Explorer() {
     comparisonOrigin.current = currentSearch();
     setPreviewId(null);
     setSelected(id);
-    const panel = measure === "Open land" ? "open-land" : ["Power", "Land", "Bays that fit", "Traffic"].includes(measure) ? "numbers" : null;
+    const panel = numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
     replaceSearch(comparisonOrigin.current, { site: id, measure, panel, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {
       setSelected(new URLSearchParams(comparisonOrigin.current).get("site"));
-      replaceSearch(comparisonOrigin.current, {});
+      replaceSearch(comparisonOrigin.current, { measure: null });
       comparisonOrigin.current = null;
     } else {
       setSelected(null);
@@ -668,7 +678,12 @@ export default function Explorer() {
     // An empty `/?` does not clear a lone search param. `/` does, and it stays a client navigation.
     const href = query ? `/?${query}` : "/";
     rememberSearch(href);
-    if (history) router.push(href, { scroll: false });
+    // The comparison is client state. The homepage server component reads no query
+    // parameters, and Next synchronizes these history changes with useSearchParams.
+    if ("compare" in next || "measure" in next) {
+      if (history) window.history.pushState(null, "", href);
+      else window.history.replaceState(null, "", href);
+    } else if (history) router.push(href, { scroll: false });
     else router.replace(href, { scroll: false });
   }
 
@@ -2247,6 +2262,23 @@ export default function Explorer() {
   }
 
   const recordSpaces = markedSpaces.filter((space) => space.siteId === selected);
+  function openContextAsk(comparison = false) {
+    const site = selectedDeal ? { id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id }
+      : selectedSite ? { id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id } : null;
+    const comparing = comparison || (!inspecting && compareIds.length >= 2);
+    if (!comparing && site && showingPreview) setPreviewId(null);
+    setAskSite(comparing ? null : site);
+    setAskList(comparing ? [...compareIds] : listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
+    setAskOpen(true);
+  }
+  function inspectAskSource(href: string) {
+    const url = new URL(href, window.location.origin);
+    const id = url.searchParams.get("site");
+    setAskOpen(false);
+    if (id && url.pathname === "/" && compareIds.includes(id) && [...url.searchParams.keys()].every(key => key === "site")) inspectComparison(id, "Screening decision");
+    else if (id && url.pathname === "/" && [...url.searchParams.keys()].every(key => key === "site")) choose(id);
+    else router.push(href, { scroll: false });
+  }
   const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
@@ -2260,7 +2292,7 @@ export default function Explorer() {
       ) : null}
       {alertsOpen ? <AlertSettings onClose={() => setAlertsOpen(false)} /> : null}
       {askOpen && me?.u ? (
-        <AskPanel open shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
+        <AskPanel open canPropose={me.actionRole === "contributor" || me.actionRole === "reviewer"} onSource={inspectAskSource} shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
       <CommandSearch
         open={commandOpen}
@@ -2310,13 +2342,7 @@ export default function Explorer() {
               type="button"
               className="paper-btn ask-launch"
               data-testid="ask-open"
-              onClick={() => {
-                if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
-                else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
-                else setAskSite(null);
-                setAskList(listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
-                setAskOpen(true);
-              }}
+              onClick={() => openContextAsk()}
             >
               Ask
             </button>
@@ -2688,11 +2714,7 @@ export default function Explorer() {
               {me?.u ? (
                 <button type="button" className="menu-item ask-launch" data-testid="ask-menu" onClick={() => {
                   setMenuOpen(false);
-                  if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
-                  else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
-                  else setAskSite(null);
-                  setAskList(listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
-                setAskOpen(true);
+                  openContextAsk();
                 }}>Ask</button>
               ) : null}
             </div>
@@ -2831,7 +2853,7 @@ export default function Explorer() {
         {feedSheet ? (
           <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
-        <PanelBoundary name="Map">
+        {(needsMap || mapVisited) && <PanelBoundary name="Map">
         <MapView
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           coverage={funnel !== "pipeline" && showUniverse ? {
@@ -2931,7 +2953,7 @@ export default function Explorer() {
             if (meta?.user && listView && !window.matchMedia("(max-width: 767px)").matches) setFollowArea(true);
           }}
         />
-        </PanelBoundary>
+        </PanelBoundary>}
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
@@ -3280,6 +3302,7 @@ export default function Explorer() {
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}
           >
+            {compareIds.length >= 2 && me?.u && <button type="button" className="text-link" onClick={() => openContextAsk(true)}>Ask about these sites</button>}
             {compareIds.length >= 2 && me?.actionsEnabled && <SaveComparison key={compareIds.join("|")} query={comparisonQuery} />}
           </CompareTray>
         ) : null}

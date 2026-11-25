@@ -223,10 +223,6 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   expect(box).toBeTruthy();
   console.log(`Shortlist first row at ${Math.round(box!.y)} CSS px (${info.project.name})`);
   expect(box!.y).toBeLessThan(phone ? 255 : 340);
-  if (phone) {
-    await page.getByRole("button", { name: "More list actions" }).click();
-    await page.getByRole("menuitem", { name: "Select", exact: true }).click();
-  }
   for (const i of [0, 1]) await rows.nth(i).getByRole("checkbox").check();
   await page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true }).click();
   const matrix = page.getByRole("table", { name: "Site comparison" });
@@ -241,15 +237,15 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   }
   const compactCount = await measureRows.count();
   expect(compactCount).toBeGreaterThan(0);
-  for (const cells of await measureRows.evaluateAll(rows => rows.map(row => Array.from(row.querySelectorAll("td"), cell => cell.textContent)))) {
-    expect(new Set(cells).size, "the default comparison shows differing values or a one-sided gap").toBeGreaterThan(1);
+  for (const label of ["Open land","Power","Asking","Cash flow","Reporting period","Next check"]) {
+    await expect(matrix.locator(`[data-compare-row="${label}"]`)).toBeAttached();
   }
   await page.getByTestId("compare-tray").screenshot({ path: `review-shots/${info.project.name}-shortlist-compare.png` });
   await page.getByRole("button", { name: "Show all measures" }).click();
   expect(await measureRows.count()).toBeGreaterThan(compactCount);
   for (const name of ["Site fit", "Financials", "Diligence"]) await expect(matrix.getByRole("rowgroup", { name })).toBeAttached();
   await expect(matrix.getByText("Not on file", { exact: true }).first()).toBeAttached();
-  await page.getByRole("button", { name: "Show differences" }).click();
+  await page.getByRole("button", { name: "Show decision criteria" }).click();
   await expect(measureRows).toHaveCount(compactCount);
   await page.getByRole("button", { name: "Close compare" }).click();
   await expect(page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true })).toBeFocused();

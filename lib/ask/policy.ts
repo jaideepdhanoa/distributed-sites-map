@@ -45,6 +45,19 @@ export function withCitations(text: string, sources: AskSource[]): { text: strin
   return { text, gap, empty: false };
 }
 
+/** A shortlist answer may only cite evidence returned for its selected records. */
+export function citedShortlistAnswer(text: string, sources: AskSource[]) {
+  if (!text.trim() || text === REFUSAL) return withCitations(text, sources);
+  const known = new Set(sources.map(source => source.href));
+  const passages = text.trim().split(/\n\s*\n|\n(?=[-*]\s)/).filter(line =>
+    !/^#{1,6}\s+[^\n]+$/.test(line.trim()));
+  const grounded = passages.length > 0 && passages.every(line => {
+    const links = Array.from(line.matchAll(/\[[^\]]+\]\(([^)]+)\)/g), match => match[1]);
+    return links.length > 0 && links.every(link => known.has(link));
+  });
+  return grounded ? withCitations(text,sources) : { text: UNKNOWN, gap:true, empty:false };
+}
+
 export function collectSources(value: unknown, into: AskSource[] = [], seen = new Set<string>()): AskSource[] {
   if (!value || typeof value !== "object") return into;
   if (Array.isArray(value)) {

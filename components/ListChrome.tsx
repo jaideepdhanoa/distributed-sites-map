@@ -13,7 +13,7 @@ export function ShortlistSummary({ title, count, commonStage, children }: {
   const showStage = commonStage && !title.toLowerCase().endsWith(" · " + commonStage.toLowerCase());
   return (
     <section className="summary-row shortlist-summary" data-testid="summary-row" aria-label={`${title}, ${count} sites, shortlist figures`}>
-      {showStage && <p className="shortlist-stage">{commonStage}</p>}
+      <div className="shortlist-title"><h2>{title.split(" · ")[0]} shortlist</h2><p>{count.toLocaleString()} {count === 1 ? "site" : "sites"} · {title.split(" · ").slice(1).join(" · ") || commonStage}{showStage ? " · " + commonStage : ""}</p></div>
       <button className="paper-btn figures-toggle" type="button" aria-expanded={expanded} aria-controls={figuresId} onClick={() => setExpanded(value => !value)}>Figures</button>
       <div className="shortlist-figures" id={figuresId} data-expanded={expanded}>{children}</div>
     </section>

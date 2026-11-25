@@ -188,6 +188,10 @@ export function AskPanel({
           setQuestion(site ? "Which evidence is missing for this site’s next decision?" : "Which differences in fit and economics are supported by the records for these sites?");
           composerRef.current?.focus();
         }}>{site ? "Check missing evidence" : "Compare fit and economics"}</button>}
+        {!unset && !turns.length && (site || scoped) && <button type="button" className="paper-btn ask-prompt" onClick={()=>{
+          setQuestion("Which outstanding diligence items prevent a decision? Cite each blocker, the responsible owner and any missing evidence.");
+          composerRef.current?.focus();
+        }}>Explain blockers</button>}
         {turns.map((turn, index) => (
           <div key={`${turn.role}-${index}`}>
             {turn.role === "ask" && turn.pending && !turn.text ? <AskThinking slow={turn.slow} /> : null}

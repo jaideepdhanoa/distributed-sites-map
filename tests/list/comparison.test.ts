@@ -32,3 +32,12 @@ test("financial comparison flags different periods and measures without exposing
   assert.deepEqual(hidden.get("Cash flow")?.values, ["—", "—"]);
   assert.ok(!hidden.has("Figure basis"));
 });
+
+
+test("shortlist claims require links to selected evidence", async () => {
+  const { citedShortlistAnswer } = await import("../../lib/ask/policy");
+  const sources = [{ label: "Parcel", href: "/?site=EXAMPLE-A" }];
+  assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=EXAMPLE-A).",sources).gap,false);
+  assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=OTHER).",sources).gap,true);
+  assert.equal(citedShortlistAnswer("Recorded on the [parcel](/?site=EXAMPLE-A).\n\nRevenue is verified.",sources).gap,true);
+});

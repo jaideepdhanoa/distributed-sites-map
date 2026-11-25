@@ -21,7 +21,8 @@ import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import { aerialTile, streetViewHref } from "@/lib/aerial";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
-import PanelSections from "./PanelSections";
+import PanelSections, { RecordNavigation } from "./PanelSections";
+import Economics from "./Economics";
 import RecordBrief from "./RecordBrief";
 import SitePhotos from "./SitePhotos";
 import SpaceSummary from "./spaces/SpaceSummary";
@@ -650,6 +651,7 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
+      <RecordNavigation />
       <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
@@ -693,6 +695,7 @@ export default function Detail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        economics={<Economics deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
             <details className="disclosure">
@@ -977,6 +980,7 @@ export function DealDetail({
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
+      <RecordNavigation />
       <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
@@ -1008,6 +1012,7 @@ export function DealDetail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        economics={<Economics deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>
             <details className="disclosure">

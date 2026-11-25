@@ -87,7 +87,7 @@ Zoomed out, nearby Pipeline and Universe pins share one green bubble (`#1e4636`)
 
 Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo, and a light service-area fill (about 10% on desktop, 6% on a phone) so the ground shows through. Area labels sit below the phone header. The floating controls are the zoom buttons, the basemap switch, Layers, Measure, and, when a site is selected, Draw available lots. Draw and Measure share a secondary tool group. The accent fill belongs to Open site record in the selected pin preview. Its tooltip is “Outline open land or parking a charger could use.” The record keeps a one-line lot summary whose link opens the same tool. While drawing, a floating toolbar offers Undo point, Cancel, and Finish. Escape cancels and discards the shape that is not finished yet. A finished lot’s popover has Edit and Delete; Delete asks before it removes the lot. On a phone the button stays in the map controls, and drawing uses the full map with the toolbar at the bottom. They stay inside the screen, clear of the zoom control.
 
-A pin tap opens a compact preview with its screening status, strongest available fact, next check, and a single action to open the full record. Closing returns to the original map extent. Direct record links open the full record. The map key expands on request. Compare starts with differing measures, including one-sided gaps. Show all measures restores the complete matrix.
+A pin tap opens a compact preview with its screening status, strongest available fact, next check, and a single action to open the full record. Closing returns to the original map extent. Direct record links open the full record. The map key expands on request. Compare keeps acquisition criteria visible when values match or evidence is missing. Highlight differences distinguishes unlike values from evidence gaps and incompatible bases. Show all measures adds supporting information. Saved comparisons load current figures. Download dated snapshot captures the figures displayed to the signed-in reviewer.
 
 ## Chips
 
@@ -133,3 +133,7 @@ Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`,
 - [ ] Focus shows the cream gap and the `#1e4636` ring.
 - [ ] Satellite is still the default, and pins stay legible on it.
 - [ ] The Layers Playwright check and the Layers screenshot crop still cover the panel when that panel changed.
+
+## Acquisition workspace
+
+The pine navigation bar groups work by Explore, Pipeline, My work and Review. Map and List switch the representation of a shortlist. My work reads assignments, unresolved evidence threads and NDA deadlines from their existing systems. Team gaps include unassigned findings. The record separates site fit, economics, diligence and activity, with source links returning to the originating comparison.

@@ -95,7 +95,7 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
     await line.click();
     const banner = page.getByRole("region", { name: "Selected review change" });
     await expect(banner).toContainText("New note");
-    await expect(page.getByRole("tab", { name: "Discussion" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "Diligence" })).toHaveAttribute("aria-selected", "true");
     await expect(page.locator(`[data-note-id="${id}"]`)).toBeInViewport();
     await mkdir("review-shots", { recursive: true });
     await banner.screenshot({ path: `review-shots/${width === 390 ? "mobile" : "desktop"}-review-change.png` });
@@ -589,10 +589,6 @@ for (const width of [1440, 390]) {
       await surface.screenshot({ path: dir + "/" + width + "-" + moment + ".png", animations: "disabled" });
     };
     await capture("shortlist");
-    if (width === 390) {
-      await page.getByRole("button", { name: "More list actions" }).click();
-      await page.getByRole("menuitem", { name: "Select", exact: true }).click();
-    }
     await rows.nth(0).getByRole("checkbox").check();
     await rows.nth(1).getByRole("checkbox").check();
     const serverNavigations: string[] = [];
@@ -674,6 +670,17 @@ for (const width of [1440, 390]) {
     expect((await request.post("/api/actions/suggestions/" + linked.id, { data: { status: "accepted" } })).ok()).toBe(true);
     await page.reload();
     await expect(gap).toContainText("Approved");
+    const workNav = page.getByRole("navigation",{name:"Acquisition workspace"});
+    await workNav.getByRole("button",{name:"My work",exact:true}).click();
+    const personalWork = page.getByRole("region",{name:"My work"});
+    await expect(personalWork.getByRole("button",{name:gapText,exact:true})).toBeVisible();
+    await capture("assigned",personalWork.locator(".work-page"));
+    await personalWork.getByRole("button",{name:"Return to workspace"}).click();
+    await expect(gap).toContainText("Approved");
+    const activeWork = await request.get("/api/actions/work");
+    expect(activeWork.ok()).toBeTruthy();
+    expect((await activeWork.json()).rows).toEqual(expect.arrayContaining([expect.objectContaining({site:id,note:gapId,owner:"contributor",due:"2030-04-15"})]));
+
     await gap.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
     await capture("gap-action", gap);
     await expect(drawer.getByTestId("next-step").getByRole("link", { name: "Open evidence thread" })).toHaveAttribute("href", new RegExp("note=" + gapId));
@@ -690,6 +697,16 @@ for (const width of [1440, 390]) {
     await page.reload();
     await expect(gap).toContainText("Evidence gap resolved");
     await expect(thread).toContainText("Field check confirmed");
+    const jobs = page.getByRole("navigation",{name:"Acquisition workspace"});
+    await jobs.getByRole("button",{name:"My work",exact:true}).click();
+    const hub = page.getByRole("region",{name:"My work"});
+    await expect(hub).toBeVisible();
+    await hub.getByRole("button",{name:/Team evidence gaps/}).click();
+    await expect(hub.getByRole("button",{name:gapText,exact:true})).toHaveCount(0);
+    await capture("jobs",hub);
+    await hub.getByRole("button",{name:"Return to workspace"}).click();
+    await expect(thread).toContainText("Field check confirmed");
+
     await expect(gap.getByRole("button", { name: "Propose gap action" })).toHaveCount(0);
   });
 }

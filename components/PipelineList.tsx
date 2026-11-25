@@ -308,7 +308,6 @@ export default function PipelineList({
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
-  const [selecting, setSelecting] = useState(Boolean(initialSelection?.length));
   const [picked, setPicked] = useState<string[]>(initialSelection || []);
   useEffect(() => { onSelection?.(picked); }, [picked, onSelection]);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -374,7 +373,6 @@ export default function PipelineList({
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
   const commonStage = sharedStage(ordered.map(row => stageChipLabel(row.deal.stage, row.deal.stage_group)));
-  const showChecks = !phone || selecting;
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
 
   useEffect(() => {
@@ -453,7 +451,6 @@ export default function PipelineList({
       setCommentOpen(false);
       setNote("");
       setPicked([]);
-      setSelecting(false);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "The note could not be saved.");
     } finally {
@@ -477,7 +474,6 @@ export default function PipelineList({
       setDropOpen(false);
       setReason("");
       setPicked([]);
-      setSelecting(false);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "The drop could not be submitted.");
     } finally {
@@ -551,8 +547,7 @@ export default function PipelineList({
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
-              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
+              {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
             </div>
@@ -582,11 +577,11 @@ export default function PipelineList({
                 return priority ? <TagChip chip={priority} compact /> : null;
               })(),
               selected: id === selectedId,
-              check: showChecks ? (
+              check: (
                 <label className="row-check">
                   <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}, ${displayAddress(row.deal.address) || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
                 </label>
-              ) : null,
+              ),
               onOpen: () => onOpen(id),
             };
           })} />
@@ -603,7 +598,7 @@ export default function PipelineList({
         onOpen={onOpen}
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
-        headerExtra={(id) => id === "site" && showChecks ? (
+        headerExtra={(id) => id === "site" ? (
           <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
         ) : null}
         renderCell={(row, column) => {
@@ -655,9 +650,9 @@ export default function PipelineList({
           }
           if (column === "site") return (
             <span className="site-name">
-              {showChecks ? (
+              {(
                 <RowCheck label={`Select ${row.deal.name || id}, ${displayAddress(row.deal.address) || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
-              ) : null}
+              )}
               <span className="site-title">
                 <span className="site-name-text" title={String(cell(row, "site", signedIn) || row.deal.deal_id)}>
                   {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}

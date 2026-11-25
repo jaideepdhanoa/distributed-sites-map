@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
-import { compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
+import { acquisitionCriteria, compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
 
 export default function CompareTray({
   deals,
@@ -27,6 +27,7 @@ export default function CompareTray({
   signedIn?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [highlight, setHighlight] = useState(true);
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,7 @@ export default function CompareTray({
   const differences = measures.filter(row => row.kind === "different").length;
   const gaps = measures.filter(row => row.kind === "gap").length;
   const basis = measures.filter(row => row.kind === "basis").length;
-  const visible = showAll ? measures : measures.filter(row => ["different", "gap", "basis"].includes(row.kind));
+  const visible = showAll ? measures : measures.filter(row => acquisitionCriteria.includes(row.label) || ["different", "gap", "basis"].includes(row.kind));
   return (
     <aside hidden={inspecting} className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
@@ -80,14 +81,25 @@ export default function CompareTray({
         <>
           <div className="comparison-mode">
             <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps} one-sided {gaps === 1 ? "gap" : "gaps"}{basis > 0 && ` · ${basis} with different bases`}</span>
+            <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
+            <button type="button" className="text-link" onClick={()=>{
+              const capturedAt = new Date().toISOString();
+              const data = { capturedAt, sites:columns.map(({id,title})=>({id,title})), measures:measures.map(({label,values,section,kind})=>({label,values,section,kind})) };
+              const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "site-comparison-"+capturedAt.slice(0,10)+".json";
+              link.click();
+              window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }}>Download dated snapshot</button>
             {(showAll || visible.length < measures.length) && (
               <button type="button" className="text-link" aria-expanded={showAll} aria-controls="comparison-facts" onClick={() => setShowAll(value => !value)}>
-                {showAll ? "Show differences" : "Show all measures"}
+                {showAll ? "Show decision criteria" : "Show all measures"}
               </button>
             )}
           </div>
           <div className="comparison-scroll" id="comparison-facts" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
-            <table className="comparison-table" data-sites={columns.length}>
+            <table className="comparison-table" data-highlight={highlight} data-sites={columns.length}>
               <caption className="sr">Site comparison</caption>
               <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
               {compareSections.map(section => {

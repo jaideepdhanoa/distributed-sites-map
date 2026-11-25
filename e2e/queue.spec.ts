@@ -460,7 +460,7 @@ for (const width of [1440, 390]) {
       const brief = record.getByRole("region", { name: "Screening decision" });
       if (index !== 0) await brief.getByRole("button", { name: "Record finding", exact: true }).click();
       const form = brief.getByRole("form", { name: "Record finding" });
-      if (index === 0) await expect(form.getByLabel("Source")).toHaveValue(/^https?:/);
+      if (index === 0) await expect(form.getByRole("textbox", { name: "Source", exact: true })).toHaveValue(/^https?:/);
       if (index === 1) {
         await expect(brief).toContainText("County record link not on file.");
         await form.getByLabel("Record as").selectOption("missing");
@@ -472,7 +472,7 @@ for (const width of [1440, 390]) {
       }
       const finding = index === 1 ? "Parcel reference still needed." : "Parcel boundary checked against the source.";
       await form.getByRole("textbox", { name: index === 1 ? "What is still missing?" : "What did you find?" }).fill(finding);
-      await form.getByLabel("Source").fill("Example county assessment map");
+      await form.getByRole("textbox", { name: "Source", exact: true }).fill("Example county assessment map");
       if (index === 0) await form.screenshot({ path: `review-shots/${width}-finding-editor.png` });
       await form.getByRole("button", { name: index === 2 ? "Submit for approval" : index === 1 ? "Save evidence gap" : "Save finding" }).click();
       const title = index === 2 ? "Change submitted for approval" : index === 1 ? "Evidence gap saved" : "Finding saved";

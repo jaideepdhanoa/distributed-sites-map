@@ -29,11 +29,12 @@ export default function PowerEvidence({deal, site, signedIn}: {deal?: DealProps 
   const facts = deal ? factsForDeal(deal) : factsForSite(site);
   const rating = derivePowerRating({...record, market:record?.city});
   const siteCapacity = rating.inputs.find(input => input.layer === "C" && input.value.endsWith(" MW"));
+  const hasService = Boolean(siteCapacity || facts.some(item => item.id === "c"));
   const names = { c:"On-site service", b:"Utility hosting at street and nearby", a:"Grid proximity", d:"Load history" };
-  return <section className="power-evidence" data-evidence="power"><h3>Power</h3>
+  return <section className="power-evidence" data-evidence="power"><span className="eyebrow">Power</span><h3>{hasService ? "Recorded on-site service" : "On-site capacity unconfirmed"}</h3>
     <dl className="record-economics">{(["c","b","a","d"] as const).map(id => {
       const fact = facts.find(item => item.id === id);
-      if (!fact && id !== "c") return null;
+      if (!fact && !(id === "c" && siteCapacity)) return null;
       return <div key={id}><dt>{names[id]}</dt><dd>{[id === "c" && siteCapacity?.value, fact?.lines.join(" · ")].filter(Boolean).join(" · ") || "Unconfirmed"}{(fact || (id === "c" && siteCapacity)) && <small>{fact?.basis || [siteCapacity?.source,siteCapacity?.confidence,siteCapacity?.asOf].filter(Boolean).join(" · ") || "Source not recorded"}</small>}</dd></div>;
     })}</dl>
     <p><strong>Power rating</strong> · {rating.reason}</p>

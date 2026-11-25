@@ -139,11 +139,11 @@ export default function FinancialsEntry({
             <span className="fin-open">Open P&L <span aria-hidden="true">→</span></span>
           </button>
           {year && <div className="statement-evidence">
-            <small>Monthly statements · {year.year}</small>
+            <small>Monthly statements on file · {year.year}</small>
             <div className="month-coverage">{Array.from({length:12},(_,i) => {
               const month = new Date(Date.UTC(year.year,i,1)).toLocaleString("en-US",{month:"short",timeZone:"UTC"});
               const label = month + (year.months[i] ? " on file" : " not on file");
-              return <abbr key={month} title={label} aria-label={label} data-present={Boolean(year.months[i])}>{month}</abbr>;
+              return <abbr key={month} title={label} aria-label={label} data-present={Boolean(year.months[i])}>{month}{year.months[i] && <sup aria-hidden="true">✓</sup>}</abbr>;
             })}</div>
             {[["total-revenue","Revenue"],[card.cashLabel.toLowerCase(),card.cashLabel]].map(([line,label]) =>
               <button className="text-link" type="button" key={line} onClick={event => {trigger.current = event.currentTarget;setSelectedLine(line);setOpen(true);}}>View {label} line</button>)}

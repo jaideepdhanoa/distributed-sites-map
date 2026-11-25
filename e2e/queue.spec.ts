@@ -820,3 +820,72 @@ for (const width of [1440,390]) {
     await expect(cell).toBeFocused();
   });
 }
+
+for (const width of [1440, 390]) {
+  test(`team comparison preserves a cited gap after sourced evidence arrives at ${width}px`, async ({ page, request }, info) => {
+    test.slow();
+    await login(request, "reviewer");
+    const catalog = await (await request.get("/api/data/sites?city=PHX")).json();
+    type Fixture = { properties: Record<string, unknown> & { site_id: string } };
+    const start = width === 390 ? 12 : 10;
+    const sites: Fixture[] = catalog.features.filter((f: Fixture) =>
+      f.properties.origin === "universe" && !f.properties.linked_deal_id && f.properties.counts_as_site).slice(start, start + 2);
+    expect(sites).toHaveLength(2);
+    const ids = sites.map(s => s.properties.site_id);
+    sites.forEach(({ properties }, i) => {
+      for (const key of Object.keys(properties)) if (key.startsWith("cap_")) properties[key] = null;
+      Object.assign(properties, { name: ["Canyon Wash", "Mesa Wash"][i], address: "Example avenue" });
+    });
+    await page.route("**/api/data/sites**", route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/api/data/sites") return route.fulfill({ json: { ...catalog, features: sites } });
+      const site = sites.find(s => path.endsWith("/" + s.properties.site_id));
+      return site ? route.fulfill({ json: site.properties }) : route.continue();
+    });
+    const target = new URLSearchParams({ targetKind: "site", targetId: ids[0], measure: "power" });
+    const response = await request.post("/api/actions/comparison-evidence?" + target, {
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      data: { description: "Verify service with the field survey.", owner: "contributor", due: "2030-04-15" },
+    });
+    expect(response.ok()).toBeTruthy();
+    const { followUp } = await response.json();
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await openAs(page, "reviewer", "/?city=PHX&stage=universe&funnel=universe&view=list&compare=" + ids.join("|"));
+    const tray = page.getByTestId("compare-tray");
+    const power = tray.locator('[data-compare-row="Power"]');
+    await expect(power).toContainText("Missing for every applicable site");
+    await tray.getByRole("button", { name: "Save comparison" }).click();
+    const form = tray.getByRole("form", { name: "Save comparison" });
+    await form.getByLabel("Comparison name").fill(`Field survey ${width} ${info.retry}`);
+    await form.getByLabel("Share with the team").check();
+    await form.getByRole("button", { name: "Save", exact: true }).click();
+    await tray.getByRole("button", { name: "Record decision" }).click();
+    const brief = tray.getByRole("region", { name: "Comparison decision" });
+    await brief.getByLabel("Decision", { exact: true }).selectOption(ids[0]);
+    await brief.getByLabel("Reason").fill("Prefer Canyon Wash if the utility confirms the service rating.");
+    await brief.getByLabel("Cite a figure").selectOption({ label: "Canyon Wash · Power" });
+    await brief.getByRole("button", { name: "Add citation" }).click();
+    await brief.getByRole("button", { name: "Save decision" }).click();
+    await expect(brief).toContainText("Awaiting approval");
+    const savedUrl = new URL(page.url());
+    expect(savedUrl.searchParams.get("savedView")).toBeTruthy();
+    const proposals = await (await request.get("/api/actions/suggestions?targetKind=site&targetId=" + ids[0])).json();
+    const proposal = proposals.suggestions.find((p: { reason: string }) => p.reason.endsWith("note=" + followUp.note));
+    expect((await request.post("/api/actions/suggestions/" + proposal.id, { data: { status: "accepted" } })).ok()).toBeTruthy();
+    Object.assign(sites[0].properties, { cap_c_amps: 400, cap_c_source: "Example field survey" });
+    await login(page.request, "viewer");
+    await page.goto(savedUrl.pathname + savedUrl.search);
+    await expect(brief).toContainText("Prefer Canyon Wash");
+    await expect(brief).toContainText("Not on file → 400 amps");
+    await expect(brief).toContainText("Approved");
+    await expect(brief).toContainText("2030-04-15");
+    await expect(brief.getByRole("button", { name: "Revise decision" })).toHaveCount(0);
+    await mkdir("review-shots", { recursive: true });
+    await brief.screenshot({ path: `review-shots/${width}-comparison-decision.png` });
+    await brief.getByRole("button", { name: "Inspect power" }).click();
+    await expect(page.locator("aside.drawer")).toContainText("Example field survey");
+    await page.getByRole("button", { name: /Back to comparison/ }).click();
+    await brief.getByRole("button", { name: /Follow-up/ }).click();
+    await expect(page).toHaveURL(new RegExp("note=" + followUp.note));
+  });
+}

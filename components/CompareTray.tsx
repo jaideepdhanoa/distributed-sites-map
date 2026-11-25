@@ -1,5 +1,6 @@
+import SaveComparison from "./actions/SaveComparison";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
-import { evidenceTarget, type EvidenceTarget } from "@/lib/actions/comparisonEvidence";
+import { evidenceMeasures, evidenceTarget, type EvidenceTarget } from "@/lib/actions/comparisonEvidence";
 import { csvCell } from "@/lib/actions/text";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
@@ -16,6 +17,7 @@ export default function CompareTray({
   onInspect,
   onClose,
   children,
+  saveQuery,
   signedIn = false,
   evidenceEnabled = false,
 }: {
@@ -28,6 +30,7 @@ export default function CompareTray({
   onRemove: (id: string) => void;
   onClose: () => void;
   children?: ReactNode;
+  saveQuery?: () => string;
   signedIn?: boolean;
   evidenceEnabled?: boolean;
 }) {
@@ -78,7 +81,8 @@ export default function CompareTray({
   }
   const measures = comparisonMeasures(columns);
   const differences = measures.filter(row => row.kind === "different").length;
-  const gaps = measures.filter(row => row.partial).length;
+  const gaps = measures.filter(row => row.label !== "Suggested drop" && row.missing > 0);
+  const allMissing = gaps.filter(row => row.allMissing);
   const basis = measures.filter(row => row.kind === "basis").length;
   const visible = showAll ? measures : measures.filter(row => acquisitionCriteria.includes(row.label) || ["different", "gap", "basis"].includes(row.kind));
 
@@ -121,11 +125,18 @@ export default function CompareTray({
         <span className="layer-meta" role="status">{count} of 4 selected{count === 1 ? " · Select another site" : count === 4 ? " · Remove one to add another" : ""}</span>
         <button type="button" className="close" aria-label="Close compare" onClick={onClose}><span aria-hidden="true">×</span></button>
         {children}
+        {saveQuery && count >= 2 && onInspect && <SaveComparison key={columns.map(c => c.id).join("|")} query={saveQuery} sites={columns} inspect={onInspect} revision={refresh}
+          checkGap={figure => setGap({ target: figure, title: figure.siteName, label: evidenceMeasures[figure.measure] })}
+          figures={columns.flatMap(column => column.rows.flatMap(row => {
+            const target = evidenceTarget(column.targetKind, column.id, row.label, column.deal);
+            return target
+              ? [{ ...target, value: row.value, siteName: column.title }] : [];
+          }))} />}
       </div>
       {count >= 2 ? (
         <>
           <div className="comparison-mode">
-            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps} {gaps === 1 ? "measure has" : "measures have"} missing figures{basis > 0 && ` · ${basis} with different bases`}</span>
+            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "measure has" : "measures have"} missing figures{allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}{gaps.some(row => row.partial) && ` · ${gaps.filter(row => row.partial).length} partly recorded`}{basis > 0 && ` · ${basis} with different bases`}</span>
             {coverage?.query === gapQuery && coverage.counts === null && <button type="button" className="text-link" onClick={()=>setRefresh(n=>n+1)}>Retry gap counts</button>}
             <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
             <button type="button" className="text-link" onClick={()=>{
@@ -160,9 +171,9 @@ export default function CompareTray({
                 return (
                   <tbody key={section} aria-label={section}>
                     <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
-                    {group.map(({ label, values, kind, available, partial }) => (
+                    {group.map(({ label, values, kind, available, partial, allMissing }) => (
                       <tr key={label} data-compare-row={label} data-state={kind}>
-                        <th scope="row">{label}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{partial && <small>Available for {available} of {count} sites</small>}</th>
+                        <th scope="row">{label}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
                             {renderCell(columns[i], label, kind, value)}

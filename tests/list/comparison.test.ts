@@ -72,3 +72,17 @@ test("operating evidence can be inapplicable while property valuation remains av
   const withheld = deal({stated_cash_flow:null,stated_cash_flow_display:"",figures_status:"withheld"});
   assert.match(compare(withheld,deal()).get("Cash flow")!.values[0],/not shown/i);
 });
+
+test("coverage distinguishes zero, fully missing, unavailable and inapplicable measures", () => {
+  function row(...values: string[]) {
+    return comparisonMeasures(values.map((value, i) => ({
+      id: String(i), title: String(i), rows: [{ label: "Power", value }],
+    })))[0];
+  }
+  assert.equal(row("—", "Not on file").allMissing, true);
+  assert.equal(row("Not applicable", "—").allMissing, true);
+  assert.equal(row("0", "—").available, 1);
+  assert.equal(row("0", "—").partial, true);
+  assert.equal(row("Unavailable", "—").allMissing, false);
+  assert.equal(row("Checking…", "Unavailable", "Not applicable").missing, 0);
+});

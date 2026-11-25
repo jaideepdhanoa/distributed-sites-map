@@ -46,6 +46,7 @@ type Props = {
   basemap?: "positron" | "satellite";
   onBasemap?: (mode: "positron" | "satellite") => void;
   onSelect: (id: string) => void;
+  nearbyPicker: { current: ((id: string) => void) | null };
   onShowList?: () => void;
   onBounds: (
     bounds: {
@@ -55,7 +56,7 @@ type Props = {
       getEast?: () => number;
       getNorth?: () => number;
     },
-    meta?: { user: boolean },
+    meta?: { user: boolean; zoom: number },
   ) => void;
   shortlistPoints: { city: string; point: [number, number] }[];
   area?: MapArea | null;
@@ -1023,6 +1024,7 @@ export default function MapView(props: Props) {
         }
         current.onSelect(id);
       };
+      propsRef.current.nearbyPicker.current = pickPin;
       map.on("click", "pin-singles", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         const props = event.features?.[0]?.properties;
@@ -1316,11 +1318,11 @@ export default function MapView(props: Props) {
       map.on("moveend", (event) => {
         markZoomBand(map);
         const user = Boolean((event as { originalEvent?: Event }).originalEvent);
-        propsRef.current.onBounds(map.getBounds(), { user });
+        propsRef.current.onBounds(map.getBounds(), { user, zoom: map.getZoom() });
       });
       applyClusterChrome(map);
       markZoomBand(map);
-      propsRef.current.onBounds(map.getBounds(), { user: false });
+      propsRef.current.onBounds(map.getBounds(), { user: false, zoom: map.getZoom() });
     });
     const observed = node.current;
     const preserveView = Boolean(kept);
@@ -1368,6 +1370,7 @@ export default function MapView(props: Props) {
         keptCamera.current = { center: [center.lng, center.lat], zoom: active.getZoom() };
       }
       tipEl?.remove();
+      propsRef.current.nearbyPicker.current = null;
       active?.remove();
       mapRef.current = null;
       if (active && (window as Window & { __sitesMap?: Map }).__sitesMap === active) delete (window as Window & { __sitesMap?: Map }).__sitesMap;

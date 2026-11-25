@@ -10,6 +10,7 @@ import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, typ
 import { RecordActions } from "./actions/RecordActions";
 import type { QueueReason as ReviewChange } from "@/lib/queue/order";
 import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
+import NearbySites from "./NearbySites";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -18,7 +19,6 @@ import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
 import { numberEvidence } from "@/lib/comparison";
-import SaveComparison from "./actions/SaveComparison";
 import type { ListLayout } from "@/lib/listLayout";
 import MyWork, { type WorkPosition } from "./MyWork";
 import CompareTray from "./CompareTray";
@@ -228,6 +228,8 @@ export default function Explorer() {
   const [tip, setTip] = useState("");
   const [ringCursor, setRingCursor] = useState<{ x: number; y: number } | null>(null);
   const [ringsOutside, setRingsOutside] = useState(false);
+  const nearbyPicker = useRef<((id: string) => void) | null>(null);
+  const [mapZoom, setMapZoom] = useState(0);
   const frameRings = useRef<(() => void) | null>(null);
   const registerFrameRings = useCallback((frame: (() => void) | null) => {
     frameRings.current = frame;
@@ -2869,6 +2871,7 @@ export default function Explorer() {
         <MapView key={mapAttempt}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           deals={drawnDeals}
+          nearbyPicker={nearbyPicker}
           shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
@@ -2956,6 +2959,7 @@ export default function Explorer() {
             const east = bounds.getEast();
             const north = bounds.getNorth();
             if (![west, south, east, north].every((value) => Number.isFinite(value))) return;
+            setMapZoom(meta?.zoom ?? 0);
             setLiveArea({ kind: "polygon", points: [[west, south], [east, south], [east, north], [west, north]] });
             if (meta?.user && listView && !window.matchMedia("(max-width: 767px)").matches) setFollowArea(true);
           }}
@@ -3167,6 +3171,10 @@ export default function Explorer() {
         </aside>
         {!listView ? (
           <div className="map-corner">
+            {mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
+              <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
+                onPick={id => nearbyPicker.current?.(id)} />
+            )}
             {ringsOutside ? (
               <div className="rings-outside" role="status">
                 <p>5- and 10-mile rings are outside this view.</p>
@@ -3328,7 +3336,7 @@ export default function Explorer() {
         </PanelBoundary>
         <PanelBoundary name="Compare">
         {compareIds.length ? (
-          <CompareTray
+          <CompareTray saveQuery={me?.actionsEnabled ? comparisonQuery : undefined}
             deals={compareIds.flatMap((id) => {
               const deal = dealRows.find((item) => item.deal_id === id);
               return deal ? [deal] : [];
@@ -3348,7 +3356,6 @@ export default function Explorer() {
             onClose={() => write({ compare: null, slist: null })}
           >
             {compareIds.length >= 2 && me?.u && <button type="button" className="text-link" onClick={() => openContextAsk(true)}>Ask about these sites</button>}
-            {compareIds.length >= 2 && me?.actionsEnabled && <SaveComparison key={compareIds.join("|")} query={comparisonQuery} />}
           </CompareTray>
         ) : null}
         </PanelBoundary>

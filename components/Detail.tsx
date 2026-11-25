@@ -1087,12 +1087,14 @@ export function DealDetail({
 
 export function UnscreenedDetail({
   row,
+  signedIn = false,
   lat,
   lng,
   onClose,
   sheet,
 }: {
   row: UnscreenedProps;
+  signedIn?: boolean;
   lat?: number | null;
   lng?: number | null;
   onClose?: () => void;
@@ -1113,7 +1115,7 @@ export function UnscreenedDetail({
       </div>
       <h2>{row.name}</h2>
       <p className="note">{row.address}</p>
-      <RecordBrief listing={row} signedIn={false} />
+      <RecordBrief listing={row} signedIn={signedIn} />
       <p className="note">{row.listing_id}</p>
       {mapsLinks(lat, lng)}
       <h3>Listing</h3>

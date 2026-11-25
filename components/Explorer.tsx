@@ -3134,6 +3134,7 @@ export default function Explorer() {
         ) : selectedUnscreened ? (
           <UnscreenedDetail
             row={selectedUnscreened}
+            signedIn={Boolean(me)}
             lng={unscreened.find((feature) => feature.properties.listing_id === selectedUnscreened.listing_id)?.geometry?.coordinates?.[0]}
             lat={unscreened.find((feature) => feature.properties.listing_id === selectedUnscreened.listing_id)?.geometry?.coordinates?.[1]}
             onClose={() => choose(null)}

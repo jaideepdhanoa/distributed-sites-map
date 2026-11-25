@@ -101,7 +101,7 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
     await banner.screenshot({ path: `review-shots/${width === 390 ? "mobile" : "desktop"}-review-change.png` });
     await banner.getByRole("button", { name: "Back to review" }).click();
     await expect(line).toBeFocused();
-    await expect(page.getByTestId("review-position")).toHaveText(position);
+    await expect(page.getByTestId("review-position")).toHaveText(position, { useInnerText: true });
     const query = new URL(page.url()).searchParams;
     expect(query.get("rsite")).toBe(deal);
     expect(query.get("qmarket")).toBe("all");

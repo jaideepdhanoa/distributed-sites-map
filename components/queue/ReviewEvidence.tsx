@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { QueueReason } from "@/lib/queue/order";
-import { reviewWhen } from "@/lib/queue/since";
+import { reviewWhen } from "@/lib/queue/when";
 
 export function changeDestination(type: string) {
   if (["note", "reply", "mention"].includes(type)) return { label: "Discussion", panel: "discussion" };
@@ -34,7 +34,7 @@ export default function ReviewEvidence({ reason, onReturn }: { reason: QueueReas
   }, [reason]);
   return (
     <div ref={heading} tabIndex={-1} className="review-evidence" role="region" aria-label="Selected review change">
-      <div><strong>{destination.label}</strong> <time dateTime={reason.at}>{reviewWhen(reason.at)}</time></div>
+      <div><strong>{destination.label}</strong> <time dateTime={reason.at}>{reviewWhen(reason)}</time></div>
       <p>{reason.summary}</p>
       <button className="text-link" type="button" onClick={onReturn}>Back to review</button>
     </div>

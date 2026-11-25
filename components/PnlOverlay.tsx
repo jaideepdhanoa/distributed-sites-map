@@ -17,6 +17,7 @@ export default function PnlOverlay({
   comments = [],
   siteId = "",
   focus = null,
+  selection,
   previewNotes,
   onClose,
   onChecklist,
@@ -27,6 +28,7 @@ export default function PnlOverlay({
   comments?: OpenPnlComment[];
   siteId?: string;
   focus?: { type: "pnl_cell" | "pnl_line"; line: string; period: string } | null;
+  selection?: { line: string; period: string; year: number };
   previewNotes?: ThreadNote[];
   onClose: () => void;
   onChecklist?: () => void;
@@ -42,7 +44,7 @@ export default function PnlOverlay({
     if (initialGrain === "annual") setMode("years");
     if (initialGrain === "monthly") setMode("months");
   }, [initialGrain]);
-  const [year, setYear] = useState(years[0] || 0);
+  const [year, setYear] = useState(selection?.year || years[0] || 0);
   const [thread, setThread] = useState<CommentAnchor | null>(null);
 
   const effectiveYear = years.includes(year) ? year : years[0] || 0;
@@ -136,9 +138,9 @@ export default function PnlOverlay({
       {statement.status !== "ready" ? <p className="pnl-empty" data-testid="pnl-empty">{statement.message}</p> : (
         <>
           <div className="pnl-desktop">
-            <PnlGrid grid={grid} percent={percent} onComment={siteId ? openThread : undefined} focusLine={focus?.line} focusPeriod={focus?.type === "pnl_line" ? "" : focus?.period} />
+            <PnlGrid grid={grid} percent={percent} onComment={siteId ? openThread : undefined} focusLine={focus?.line || selection?.line} focusPeriod={focus?.type === "pnl_line" ? "" : focus?.period || selection?.period} />
           </div>
-          <PnlPhone mode={mode} onMode={setMode} year={effectiveYear} onYear={setYear} focus={focus} statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
+          <PnlPhone mode={mode} onMode={setMode} year={effectiveYear} onYear={setYear} focus={focus || selection} statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
         </>
       )}
       {thread ? (

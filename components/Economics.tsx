@@ -1,3 +1,4 @@
+import PricingSection from "./PricingSection";
 import { dealRows, MISSING, siteRows } from "@/lib/comparison";
 import type { SiteProps, DealProps } from "@/lib/types";
 
@@ -17,14 +18,16 @@ export default function Economics({
       ? siteRows(site, [], true)
       : [];
   return (
-    <dl className="record-economics">
+    <section className="investment-economics"><h3>What does the asking price buy?</h3>
+      {deal && deal.kind !== "land" && <PricingSection deal={deal} />}
+      <h4>Savings versus hub at screening price</h4><p>{deal?.saving_vs_hub?.trim() || "Screening comparison not on file"}</p>
+      <h4>Financial evidence</h4><dl className="record-economics">
       {[
         "Asking",
         "Revenue",
         "EBITDA",
         "Cash flow",
-        "Asking / earnings",
-        "Land estimate",
+        ...(deal && deal.kind !== "land" ? [] : ["Asking / earnings", "Land estimate"]),
         "Figure basis",
         "Financial source",
         "Reporting period",
@@ -40,6 +43,6 @@ export default function Economics({
           </div>
         );
       })}
-    </dl>
+    </dl></section>
   );
 }

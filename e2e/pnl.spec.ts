@@ -223,7 +223,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   await siteDrawer.waitFor({ state: "attached", timeout: 45_000 });
   const siteNumbers = siteDrawer.getByTestId("card-numbers");
   await expect(siteNumbers.locator("div").filter({ hasText: "Revenue" }).first().locator("strong")).toHaveText("$1,000,000");
-  await expect(siteNumbers.locator("div").filter({ hasText: "Cash flow" }).first().locator("strong")).toHaveText("$520,000");
+  await expect(siteNumbers.getByTestId("overview-cash").locator("strong")).toHaveText("$520,000");
   await expect(page.getByTestId("financials-entry")).toContainText("SDE $520,000");
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });

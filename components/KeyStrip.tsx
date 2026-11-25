@@ -5,10 +5,10 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { Banknote, LandPlot, Ruler, Trees, Wallet } from "lucide-react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { baysLine, basisLabel, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
+import { baysLine, basisLabel, cashTile, depotLine, fullMoney, isOpenLandBlank, revenueTile, sheetMoney, showsFinancials, spareLandSqft, tradeAreaLines, workbookTrafficLine, type CapacityFact } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { stripGmailIds } from "@/lib/displayText";
-import PricingSection from "./PricingSection";
+import PowerEvidence from "./PowerEvidence";
 import { panelFromDeal, type FinancialPanel } from "@/lib/financials";
 import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
 import { COMMENT_CHANGED } from "@/lib/comments/nav";
@@ -74,14 +74,6 @@ function readPnl(value: unknown): PnlStatement {
   return row;
 }
 
-function capacityTiles(facts: { lines: string[] }[]) {
-  const capacityLabels = ["Peak load", "Year load", "Frontage hosting", "Nearby hosting", "Substation", "Line", "Feeder", "Horizon", "Phase"];
-  return facts.flatMap((fact) => fact.lines.map((line) => {
-    const label = capacityLabels.find((item) => line.startsWith(`${item} `));
-    if (!label) return { label: "Service", value: line };
-    return { label, value: line.slice(label.length + 1) };
-  }));
-}
 
 export function SitePacket({
   site,
@@ -99,8 +91,6 @@ export function SitePacket({
   pending?: boolean;
 }) {
   if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} tiles={tiles} pending={pending} />;
-  const facts = factsForSite(site);
-  const capacity = capacityTiles(facts);
   const asking = site.asking_price_display || "";
   const spare = spareLandSqft(null, site.spare_ac_own);
   const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
@@ -111,12 +101,7 @@ export function SitePacket({
         {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
       </div>
-      <h3 className="job">Power</h3>
-      {capacity.length ? (
-        <div className="metrics">
-          {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
-        </div>
-      ) : <p className="note" title="Not on file">—</p>}
+      <PowerEvidence site={site} signedIn={signedIn} />
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="—" title="Not on file" />}
@@ -150,7 +135,6 @@ export default function KeyStrip({
     : { text: cash.value || "—", title: cash.value || "—" };
   const revenue = revenueTile(deal);
   const revenueBasis = deal.stated_revenue != null ? basisBadge(deal.revenue_basis) : "";
-  const capacity = capacityTiles(factsForDeal(deal));
   const bays = baysLine(deal);
   const traffic = workbookTrafficLine(deal);
   const trade = tradeAreaLines(deal);
@@ -219,12 +203,7 @@ export default function KeyStrip({
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
         <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
-      <h3 className="job">Power</h3>
-      {capacity.length ? (
-        <div className="metrics">
-          {capacity.map((item) => <Metric key={`${item.label}-${item.value}`} icon={Ruler} label={item.label} value={item.value} />)}
-        </div>
-      ) : <p className="note" title="Not on file">—</p>}
+      <PowerEvidence deal={deal} signedIn={signedIn} />
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         {signedIn && showFinancials ? (
@@ -248,12 +227,12 @@ export default function KeyStrip({
           <article className="wide">
             {pending ? (
               <div className="fin-tile" data-testid="cash-flow-tile" aria-busy="true">
-                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
+                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
                 <PendingFigure />
               </div>
             ) : (
               <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => setFinancialsOpen(true)}>
-                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Cash flow</span>
+                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
                 <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
                 <small className="figure-hold">{tiles ? tiles.cash.note : cashNote}</small>
                 {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
@@ -274,7 +253,7 @@ export default function KeyStrip({
       {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (
         <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setChecklistOpen(false)} />
       ) : null}
-      {signedIn && deal.kind !== "land" ? <PricingSection deal={deal} /> : null}
+
       <div className="supporting">
         {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
         {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}

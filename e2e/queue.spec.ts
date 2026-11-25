@@ -702,7 +702,7 @@ for (const width of [1440, 390]) {
     await drawer.getByRole("button",{name:"Back to My work"}).click();
     await expect(assignment).toBeFocused();
     await expect(personalWork.getByRole("button",{name:/Team evidence gaps/})).toHaveAttribute("aria-pressed","true");
-    const item = personalWork.getByRole("listitem").filter({has:assignment});
+    const item = personalWork.getByRole("listitem").filter({has:page.getByRole("button",{name:gapText,exact:true})});
     await mkdir("review-shots",{recursive:true});
     await item.screenshot({path:"review-shots/"+width+"-work-handoff.png"});
     await item.getByRole("button",{name:"View proposal"}).click();

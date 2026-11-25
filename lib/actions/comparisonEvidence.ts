@@ -12,7 +12,7 @@ export type EvidenceMeasure = keyof typeof evidenceMeasures;
 export type EvidenceTarget = {
   targetKind: "deal" | "site"; targetId: string; measure: EvidenceMeasure; period: string; basis: string;
 };
-export type EvidenceRequest = { note: string; status: string; owner: string; due: string; closedAt?: string };
+export type EvidenceRequest = { targetId?: string; targetKind?: "site" | "deal"; note: string; status: string; owner: string; due: string; closedAt?: string };
 export function evidenceTarget(targetKind: "deal" | "site", targetId: string, label: string, deal?: DealProps): EvidenceTarget | undefined {
   const measure = (Object.keys(evidenceMeasures) as EvidenceMeasure[]).find(key => evidenceMeasures[key] === label);
   if (!measure) return;

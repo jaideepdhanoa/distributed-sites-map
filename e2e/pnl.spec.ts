@@ -283,3 +283,43 @@ test("screen power evidence and trace acquisition pricing", async ({page}) => {
   await expect(page.locator(".investment-economics")).toContainText("18%");
   await expect(page.locator(".investment-economics")).toContainText("Implied business price");
 });
+
+test("power follow-up stays with the selected map pin", async ({ page }, info) => {
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const catalog = await response.json();
+    for (const {properties} of catalog.features) Object.assign(properties, {
+      name:"Example service site", address:"Example parcel", stage_group:"desk", stage_blocker:"Confirm on-site power.", kind:"pipeline",
+    });
+    await route.fulfill({response,json:catalog});
+  });
+  await page.route("**/api/actions/status", route => route.fulfill({json:{enabled:true,actionRole:"viewer"}}));
+  await page.route("**/api/actions/comparison-evidence?*", route => route.fulfill({json:{accounts:[],followUp:{
+    note:"note-sample",status:"accepted",owner:"Field team",due:"2030-03-15",targetKind:"site",targetId:"example-site",
+  }}}));
+  await page.route("**/api/actions/notes?*", route => route.fulfill({json:{notes:[{
+    id:"note-sample",body:"Confirm service at the parcel.",authorId:"reviewer",createdAt:"2026-01-02T12:00:00+00:00",mentions:[],
+  }]}}));
+  await page.goto("/?city=PHX&funnel=pipeline");
+  const nearby = page.getByRole("complementary",{name:"Nearby sites"});
+  const toggle = nearby.getByRole("button",{name:/Nearby sites/});
+  await expect(toggle).toBeVisible();
+  if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
+  await nearby.locator("[data-nearby-id]").first().click();
+  const pin = page.locator(".map-preview");
+  const id = await pin.getAttribute("data-record");
+  const camera = () => page.evaluate(() => {
+    const map = (window as unknown as {__sitesMap:import("maplibre-gl").Map}).__sitesMap;
+    return [...map.getCenter().toArray(),map.getZoom()];
+  });
+  const original = await camera();
+  await pin.getByRole("button",{name:"Open power follow-up"}).click();
+  const sheet = page.locator("dialog[open]");
+  await expect(sheet).toContainText("Field team · Due 2030-03-15");
+  await sheet.getByRole("button",{name:"View follow-up"}).click();
+  await expect(sheet.locator("[data-note-id=note-sample]")).toContainText("Confirm service at the parcel.");
+  await sheet.screenshot({path:"review-shots/"+info.project.name+"-linked-power.png"});
+  await sheet.getByRole("button",{name:"Close evidence request"}).click();
+  await expect(pin).toHaveAttribute("data-record",id!);
+  await expect.poll(camera).toEqual(original);
+});

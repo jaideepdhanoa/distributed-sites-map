@@ -123,7 +123,7 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
           {review?.source && <small>Source · {review.source}</small>}
           <button className="text-link" onClick={()=>inspect(c.targetId,label)}>Inspect {label.toLowerCase()}</button>
           {!followUp && live?.value === "—" && <button className="text-link" onClick={() => checkGap(live)}>Check missing evidence</button>}
-          {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · Owner "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
+          {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note,site:followUp.targetId || c.targetId}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · Owner "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
           {review?.reason && access.editable && <div className="review-actions">
             <button type="button" className="paper-btn" disabled={pending} onClick={() => submit({ keep:true, review:{ key:review.key, token:review.token } })}>Keep decision</button>
             {focused && <button type="button" className="text-link" onClick={() => edit(review)}>Revise decision</button>}

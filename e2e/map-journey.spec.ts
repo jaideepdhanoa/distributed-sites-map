@@ -227,3 +227,27 @@ test("browse two nearby sites and keep the city camera", async ({ page }, info) 
   await expect(toggle).toBeVisible();
   await expect.poll(() => camera(page)).toEqual(origin);
 });
+
+test("the released My work queue opens with its real review state", async ({ page }) => {
+  test.skip(!process.env.MAP_PRODUCTION_CHECK, "Runs with a signed-in account against the release.");
+  const response = page.waitForResponse(r => {
+    const url = new URL(r.url());
+    return url.pathname === "/api/actions/comparison-decision" && url.searchParams.get("queue") === "1";
+  });
+  await page.goto("/?loops=work&workFilter=decisions");
+  const hub = page.getByRole("region", { name: "My work" });
+  await expect(hub.getByRole("button", { name: /Decisions to revisit/ })).toHaveAttribute("aria-pressed", "true");
+  const read = await response;
+  expect(read.status()).toBe(200);
+  const { items } = await read.json();
+  expect(Array.isArray(items)).toBe(true);
+  const rows = hub.locator(".decision-work-row");
+  await expect(rows).toHaveCount(items.length);
+  if (!items.length) {
+    await expect(hub.getByText("Your saved decisions are up to date.", { exact: true })).toBeVisible();
+    return;
+  }
+  await rows.first().getByRole("link").click();
+  await expect(page.locator('[data-focused-citation="true"]')).toBeFocused();
+  await expect(page.getByRole("region", { name:"Comparison decision" }).getByRole("link", { name:"Back to My work" })).toBeVisible();
+});

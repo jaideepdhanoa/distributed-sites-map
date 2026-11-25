@@ -370,6 +370,8 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
       await expect(record.locator(".card-hero")).toBeAttached();
       if (index === 0) {
         await expect(brief).toContainText("2025");
+        const aerial = record.locator("img.hero-aerial");
+        if (await aerial.count()) await aerial.evaluate(async img => { await (img as HTMLImageElement).decode(); });
         await page.screenshot({ path: `review-shots/${info.project.name}-record-brief.png` });
       }
       if (info.project.name === "mobile") await expect(record).toHaveClass(/snap-full/);

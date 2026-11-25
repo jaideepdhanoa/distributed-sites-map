@@ -11,6 +11,7 @@ type PreviewProps = {
   listing?: UnscreenedProps | null;
   linkedDeal?: DealProps | null;
   signedIn: boolean;
+  loading: boolean;
   onOpen: (panel?: "numbers") => void;
   onClose: () => void;
 };
@@ -36,13 +37,13 @@ export default function MapSitePreview(props: PreviewProps) {
       {record.name && address && address !== record.name && <p className="preview-address">{address}</p>}
       <dl className="preview-facts">
         {fact && <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}</dd></div>}
-        <div><dt>Next check</dt><dd>{review}{missing && <small className="preview-missing">{missing}</small>}</dd></div>
+        <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>
       <div className="preview-actions">
       {evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}
       {evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("numbers")}>Check open land</button>}
       {evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} compact />}
-      <button type="button" className={evidence && evidence.kind !== "financials" ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
+      <button type="button" className={evidence ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
       </div>
     </aside>
   );

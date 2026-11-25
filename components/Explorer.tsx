@@ -2022,6 +2022,7 @@ export default function Explorer() {
       }
     }
     if (next >= 0) goReview(next);
+    else if (reviewChange) returnToReview();
     setQueueCount((count) => Math.max(0, count - 1));
   }
 
@@ -3083,7 +3084,7 @@ export default function Explorer() {
         ) : null}
         <PanelBoundary name="Record">
         {showingPreview ? (
-          <MapSitePreview site={selectedSite || (selectedDeal?.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null)} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
+          <MapSitePreview loading={!figuresReady} site={selectedSite || (selectedDeal?.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null)} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
             onOpen={(panel) => {
               if (panel) write({ panel });
               setPreviewId(null);

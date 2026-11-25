@@ -4050,3 +4050,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   }
   .comparison-table[data-sites="2"] thead th:first-child { width: 24%; }
 }
+@media (min-width: 768px) {
+  /* The record and header share a base stacking level. Open header menus must
+     receive pointer input above the later-painted record and its imagery. */
+  .shell > .bar:has(.more-wrap .menu, .user-menu .menu, .popover) { z-index: 12; }
+}

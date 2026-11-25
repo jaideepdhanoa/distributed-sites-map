@@ -23,6 +23,11 @@ jobs:
       - run: npm run test:actions
       - uses: actions/upload-artifact@v4
         with:
+          name: assignment-handoff
+          path: review-shots/*-work-handoff.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
           name: review-change-screenshots
           path: |
             review-shots/*-comparison-coverage.png

@@ -27,4 +27,5 @@ jobs:
           path: |
             review-shots/*-review-change.png
             review-shots/*-finding-*.png
+            review-shots/*-comparison-request.png
           if-no-files-found: error

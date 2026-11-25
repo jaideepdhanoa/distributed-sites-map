@@ -35,9 +35,9 @@ export async function readDecision(sql: Sql, id: string, actor: string, canWrite
   const { citations, ...choice } = row.after_json;
   const current = await Promise.all(citations.map(async ({ note, ...figure }) => {
     const target = parseEvidenceTarget(new URLSearchParams(figure));
-    return { ...figure, followUp: await findRequest(sql, target, note) };
+    return { ...figure, followUp: await findRequest(sql, target, note, row.at) };
   }));
-  return { editable, decision: { ...choice, citations: current, version: row.id, author: row.actor_id, at: stamp(row.at) } };
+  return { editable, decision: { ...choice, citations: current, version: row.id, author: row.actor_id, at: stamp(row.at).replace(/Z$/, "+00:00") } };
 }
 
 export async function saveDecision(sql: Sql, id: string, actor: string, input: DecisionDraft, version: string) {

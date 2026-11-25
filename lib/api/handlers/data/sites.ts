@@ -49,6 +49,7 @@ const KEEP = [
   "network_status",
   "listed",
   "contacted",
+  "asking_price",
   "asking_price_display",
   "asking_price_source",
   "pipeline_stage",

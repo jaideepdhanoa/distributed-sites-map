@@ -86,19 +86,19 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
       {error && <p role="alert">{error} <button className="text-link" type="button" onClick={()=>{setEditing(false);setAccess(undefined);setAttempt(n=>n+1);}}>Refresh decision</button></p>}
       <div><button className="primary" disabled={pending || !choice || !reason.trim() || !keys.length}>{pending ? "Saving…" : "Save decision"}</button> <button className="text-link" type="button" disabled={pending} onClick={()=>setEditing(false)}>Cancel</button></div>
     </form> : decision && <>
-      <small>Diligence decision · {decision.author} · {new Date(decision.at).toLocaleDateString()}</small>
+      <header className="decision-summary"><small>Diligence decision · {decision.author} · {new Date(decision.at).toLocaleDateString()}</small>
       <h3>{decision.preferred ? "Prefer " + (sites.find(s=>s.id===decision.preferred)?.title || decision.preferred) : "Hold all sites"}</h3>
-      <p>{decision.rationale}</p>
+      <p>{decision.rationale}</p></header>
       <ul>{decision.citations.map(c=>{
         const live=byKey.get(figureKey(c));
         const followUp = c.followUp;
         const label=evidenceMeasures[c.measure];
         const changed=live && (c.value!==live.value || c.period!==live.period || c.basis!==live.basis);
         return <li key={figureKey(c)}><strong>{sites.find(s=>s.id===c.targetId)?.title || c.targetId} · {label}</strong>
-          {changed ? <span className="decision-change">Changed since decision · {valueText(c)} → {valueText(live)}</span> : <span>{live ? valueText(c) : "Current figure unavailable · At decision · " + valueText(c)}</span>}
+          {changed ? <><small className="decision-change">Changed since decision</small><span>{valueText(c)} → {valueText(live)}</span></> : <span>{live ? valueText(c) : "Current figure unavailable · At decision · " + valueText(c)}</span>}
           <button className="text-link" onClick={()=>inspect(c.targetId,label)}>Inspect {label.toLowerCase()}</button>
           {!followUp && live?.value === "—" && <button className="text-link" onClick={() => checkGap(live)}>Check missing evidence</button>}
-          {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
+          {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · Owner "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
         </li>;
       })}</ul>
       {access.editable && <button className="text-link" onClick={edit}>Revise decision</button>}

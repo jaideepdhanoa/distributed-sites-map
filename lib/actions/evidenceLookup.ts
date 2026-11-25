@@ -17,12 +17,12 @@ export function parseEvidenceTarget(query: URLSearchParams) {
   return { ...target, context, source: "\nSource: Compare?" + key };
 }
 
-export async function findRequest(sql: Sql, target: ReturnType<typeof parseEvidenceTarget>, linkedNote = ""): Promise<EvidenceRequest | null> {
+export async function findRequest(sql: Sql, target: ReturnType<typeof parseEvidenceTarget>, linkedNote = "", since: Date | string | null = null): Promise<EvidenceRequest | null> {
   const result = await sql.query<{ id: string; resolved_at: unknown }>(
     `SELECT id,resolved_at FROM notes WHERE target_kind=$1 AND target_id=$2 AND parent_id IS NULL
-       AND (($4 = '' AND resolved_at IS NULL) OR id = $4) AND deleted_at IS NULL AND body LIKE 'Missing evidence\n%'
+       AND (($4 = '' AND (resolved_at IS NULL OR created_at >= $5::timestamptz)) OR id = $4) AND deleted_at IS NULL AND body LIKE 'Missing evidence\n%'
        AND right(body,length($3::text))=$3 ORDER BY created_at,id LIMIT 1`,
-    [target.targetKind, target.targetId, target.source, linkedNote]);
+    [target.targetKind, target.targetId, target.source, linkedNote, since]);
   const note = result.rows[0]?.id;
   if (!note) return null;
   const steps = await sql.query<{ status: string; owner: string; due: string }>(

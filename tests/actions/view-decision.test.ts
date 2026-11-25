@@ -36,6 +36,12 @@ test("saved decision preserves its cited value, follows its original request, an
   const held = await saveDecision(sql, team.id, "reviewer", { ...draft, preferred: null }, saved.decision!.version);
   assert.equal(held.decision?.preferred, null);
   await saveDecision(sql, privateView.id, "reviewer", draft, "");
+  const laterNote = await createNote(sql, { targetKind: "site", targetId: "alpha", authorId: "reviewer",
+    body: "Missing evidence\nCheck the updated survey." + source }, () => ({}));
+  await resolveNote(sql, { id: laterNote.id, actorId: "reviewer" });
+  const privateDecision = await readDecision(sql, privateView.id, "reviewer", true);
+  assert.equal(privateDecision.decision?.citations[0].followUp?.note, laterNote.id);
+  assert.equal(privateDecision.decision?.citations[0].followUp?.status, "resolved");
   await assert.rejects(readDecision(sql, privateView.id, "teammate", true), /unavailable/);
   assert.equal((await listAudit(sql)).some(entry => entry.action === "view.decision"), false);
 });

@@ -1,3 +1,4 @@
+import type { ActionRole } from "@/lib/actions/roles";
 import { NextResponse } from "next/server";
 import { canReadFinancials } from "@/lib/agent/access";
 import { attachPackageHrefs } from "@/lib/financials";
@@ -18,11 +19,15 @@ export async function GET() {
   const session = await requireUser();
   if (!isSession(session)) return session;
   console.info(JSON.stringify({ event: "data", user: session.u, part: "deals" }));
+  return NextResponse.json(await loadMapDeals(session.actionRole), { headers: privateHeaders });
+}
+
+export async function loadMapDeals(role: ActionRole) {
   const deals = await readDeals();
   const staged = await overlayHeldStages(await overlayDealStages(await overlayStageFile(overlayDeals(deals, loadNdaSnapshot()), "deal")), "deal");
   const dropped = withSuggestedDrops(staged);
   const chipped = await overlayDealChips(dropped, true);
-  const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature)));
+  const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(role)).map((feature) => withPricing(feature)));
   // Live decisions can change while the published workbook snapshot stays the same.
-  return NextResponse.json(redactGmailPayload({ ...dropped, features }), { headers: privateHeaders });
+  return redactGmailPayload({ ...dropped, features });
 }

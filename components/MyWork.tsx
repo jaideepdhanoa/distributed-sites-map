@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { isOpenAgreement, type NdaQueueItem } from "@/lib/nda";
+import { evidenceChanged, reviewValue, type CitationReview } from "@/lib/comparisonDecision";
 import type { WorkRow } from "@/lib/api/handlers/actions/work";
 import { pacificToday } from "@/lib/queue/today";
 import Link from "next/link";
@@ -27,7 +28,10 @@ export default function MyWork({
   position: WorkPosition | null;
   close: () => void;
 }) {
-  const [filter, setFilter] = useState(position?.filter || "Assigned to me");
+  const search = useSearchParams();
+  const reviewFilter = "Decisions to revisit";
+  const [filter, setFilter] = useState(search.get("workFilter") === "decisions" ? reviewFilter : position?.filter || "Assigned to me");
+  const [changes, setChanges] = useState<CitationReview[]>([]);
   const shell = useRef<HTMLElement>(null);
   const returning = useRef(position);
   const [announcement,setAnnouncement] = useState("");
@@ -44,9 +48,10 @@ export default function MyWork({
     }
     async function refresh() {
       setBusy(true);
-      const [work, agreements] = await Promise.allSettled([
+      const [work, agreements, decisions] = await Promise.allSettled([
         read("/api/actions/work"),
         read("/api/data/nda"),
+        read("/api/actions/comparison-decision?queue=1"),
       ]);
       if (c.signal.aborted) return;
       const items: WorkRow[] =
@@ -71,7 +76,9 @@ export default function MyWork({
             kind: "NDA",
           });
         }
+      setChanges(decisions.status === "fulfilled" ? decisions.value.items : []);
       setErrors([
+        ...(decisions.status === "rejected" ? [reviewFilter] : []),
         ...(work.status === "rejected" ? ["Actions and evidence gaps"] : []),
         ...(agreements.status === "rejected" ? ["NDA follow-ups"] : []),
       ]);
@@ -94,7 +101,6 @@ export default function MyWork({
       window.removeEventListener("focus", reload);
     };
   }, [username, attempt]);
-  const search = useSearchParams();
   const explore = new URLSearchParams({funnel:"universe"});
   for (const key of ["city","stage"]) {
     const value = search.get(key);
@@ -145,6 +151,7 @@ export default function MyWork({
           {[
             "Assigned to me",
             "Overdue",
+            reviewFilter,
             "Team evidence gaps",
             "NDA follow-ups",
           ].map((group) => (
@@ -158,7 +165,7 @@ export default function MyWork({
               {group}
               {!busy && !errors.length && (
                 <strong>
-                  {rows.filter((row) => matches(row, group)).length}
+                  {group === reviewFilter ? changes.length : rows.filter(row => matches(row, group)).length}
                 </strong>
               )}
             </button>
@@ -178,16 +185,23 @@ export default function MyWork({
         )}
         {busy ? (
           <p role="status">Loading work…</p>
-        ) : !visible.length && !errors.length ? (
+        ) : !(filter === reviewFilter ? changes.length : visible.length) && !errors.length ? (
           <p role="status">
             {filter === "Assigned to me"
               ? <>You have no open assignments. <Link className="text-link" href={"/?"+explore}>Explore sites</Link></>
-              : "No open items in this view."}
+              : filter === reviewFilter ? "Your saved decisions are up to date." : "No open items in this view."}
           </p>
         ) : null}
         <span role="status" className="sr">{announcement}</span>
         <ul>
-          {visible.map((row,index) => (
+          {filter === reviewFilter ? changes.map(item => <li key={item.view + item.key} className="decision-work-row">
+            <div>
+              <small>{item.name} · {item.outcome}</small>
+              <Link href={item.href} prefetch={false} className="text-link">{item.siteName} · {item.measure}</Link>
+            </div>
+            <div><strong>{item.reason}</strong><span>{reviewValue(item.previous)}
+              {evidenceChanged(item.previous, item.current) && " → " + reviewValue(item.current)}</span></div>
+          </li>) : visible.map((row,index) => (
             <li key={row.kind + row.id} data-work-row={row.kind + row.id}>
               <div>
                 <small>

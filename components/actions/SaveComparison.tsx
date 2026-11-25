@@ -26,7 +26,7 @@ export default function SaveComparison({ query, ...decisionProps }: Props) {
     return () => controller.abort();
   }, [savedId]);
   const current = new URLSearchParams(params.toString());
-  for (const key of ["savedView", "site", "panel", "sheet", "measure"]) current.delete(key);
+  for (const key of ["savedView", "site", "panel", "sheet", "measure", "reviewCitation"]) current.delete(key);
   const restored = reopened && reopened.id === savedId && new URLSearchParams(reopened.query).toString() === current.toString() ? reopened.name : "";
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");

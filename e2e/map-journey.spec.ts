@@ -194,6 +194,18 @@ test("browse two nearby sites and keep the city camera", async ({ page }, info) 
   for (let i = 0; i < 2; i++) {
     if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
     await expect(nearby.locator("[data-nearby-id]").nth(1)).toBeVisible();
+    const first = nearby.locator("[data-nearby-id]").first();
+    await expect(first.locator("small")).toHaveText(/.+/);
+    if (!i && info.project.name === "desktop") {
+      const ring = page.locator(".nearby-map-ring");
+      await first.hover();
+      await expect(ring).toBeVisible();
+      await page.mouse.move(0, 0);
+      await expect(ring).toHaveCount(0);
+      await first.focus();
+      await expect(ring).toBeVisible();
+      await expect.poll(() => camera(page)).toEqual(origin);
+    }
     if (!i && !process.env.MAP_PRODUCTION_CHECK) {
       await mkdir("review-shots", { recursive: true });
       const prefix = process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";

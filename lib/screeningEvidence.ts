@@ -85,3 +85,9 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   if (first > 0) figures.unshift(figures.splice(first, 1)[0]);
   return { status, reason: /^not screened yet[.]?$/i.test(reason || "") ? "" : reason, figures, check, evidence, missing, review: review || "Review the site evidence." };
 }
+
+export function previewFitFigure(figures: ReturnType<typeof screeningEvidence>["figures"]) {
+  return ["Open land", "Usable bays", "Parcel size", "Traffic"]
+    .map(label => figures.find(figure => figure.label === label)).find(Boolean)
+    || figures.find(figure => figure.label !== "Parcel number");
+}

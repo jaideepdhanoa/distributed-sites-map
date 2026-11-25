@@ -7,11 +7,11 @@ import type { Sql } from "./db";
 import { findRequest, parseEvidenceTarget } from "./evidenceLookup";
 import { InputError, parseBody, stamp } from "./text";
 
-type StoredFigure = CitedFigure & { note: string };
+export type StoredFigure = CitedFigure & { note: string; closed?: string };
 type Entry = { id: string; actor_id: string; at: Date | string;
   after_json: Omit<DecisionDraft, "citations"> & { citations: StoredFigure[] } };
 
-async function viewFor(sql: Sql, id: string, actor: string, lock = false) {
+export async function viewFor(sql: Sql, id: string, actor: string, lock = false) {
   const result = await sql.query<{ owner_id: string; url_query: string }>(
     "SELECT owner_id,url_query FROM saved_views WHERE id=$1 AND (owner_id=$2 OR scope='team')" + (lock ? " FOR UPDATE" : ""), [id, actor]);
   if (!result.rows[0]) throw new InputError("Comparison unavailable.", 404);
@@ -33,7 +33,7 @@ export async function readDecision(sql: Sql, id: string, actor: string, canWrite
   const row = await latest(sql, id);
   if (!row) return { editable, decision: null };
   const { citations, ...choice } = row.after_json;
-  const current = await Promise.all(citations.map(async ({ note, ...figure }) => {
+  const current = await Promise.all(citations.map(async ({ note, closed, ...figure }) => {
     const target = parseEvidenceTarget(new URLSearchParams(figure));
     return { ...figure, followUp: await findRequest(sql, target, note, row.at) };
   }));
@@ -58,7 +58,7 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
     if (citations.some(other => figureKey(other) === figureKey(figure))) throw new InputError("Choose each figure once.");
     const followUp = await findRequest(sql, target);
     citations.push({ targetId: target.targetId, targetKind: target.targetKind, measure: figure.measure,
-      period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "" });
+      period: figure.period.trim(), basis: figure.basis.trim(), value, note: followUp?.note || "", closed: followUp?.closedAt || "" });
   }
   await audit(sql, { actorId: actor, action: "view.decision", targetKind: "view", targetId: id, after: { preferred: input.preferred, rationale, citations } });
   return readDecision(sql, id, actor, true);

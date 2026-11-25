@@ -2082,7 +2082,7 @@ export default function MapView(props: Props) {
               <button type="button" className="primary" data-testid="space-finish" onClick={() => sendDraw("finish")}>Finish</button>
               {props.selectedSpaceId ? <button type="button" className="paper-btn" data-testid="space-draw-delete" onClick={() => setDeleteAsk((value) => value + 1)}>Delete</button> : null}
             </div>
-          ) : props.canDrawLots ? (
+          ) : props.canDrawLots && !measure ? (
             <button type="button" className="tool draw-tool" aria-label="Draw available lots" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}><Pentagon size={16} aria-hidden="true" />Draw</button>
           ) : null}
           {measure ? (
@@ -2092,7 +2092,7 @@ export default function MapView(props: Props) {
               <button type="button" className="paper-btn" data-testid="measure-done" onClick={() => setMeasure(false)}>Done</button>
             </div>
           ) : null}
-          <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" aria-pressed={measure} onClick={() => setMeasure((value) => !value)}><Ruler size={16} aria-hidden="true" />Measure</button>
+          {!props.spaceDrawing && <button type="button" className={`tool ${measure ? "on" : ""}`} data-testid="measure" aria-pressed={measure} onClick={() => setMeasure((value) => !value)}><Ruler size={16} aria-hidden="true" />Measure</button>}
         </div>
       </div>
       <div className="map-attrib">{(props.basemap || "satellite") === "satellite" ? "Powered by Esri · Earthstar Geographics, Maxar" : "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"}</div>

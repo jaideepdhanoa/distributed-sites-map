@@ -227,3 +227,21 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   await expect(page.getByTestId("financials-entry")).toContainText("SDE $520,000");
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
+
+test("a financial check leads with statement coverage and opens its evidence", async ({ page }) => {
+  const id = "PIPE-MIA-0080";
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const deal = payload.features.find((item: { properties: { deal_id: string } }) => item.properties.deal_id === id);
+    deal.properties.stage_blocker = "Review the financial statement.";
+    await route.fulfill({ response, json: payload });
+  });
+  await page.route(`**/api/data/financials/${id}`, route => route.fulfill({ json: { pnl: sampleStatement(), pnlDemo: true } }));
+  await page.goto(`/?funnel=pipeline&site=${id}&sheet=full`, { waitUntil: "domcontentloaded" });
+  const brief = page.getByRole("region", { name: "Screening decision" });
+  await expect(brief.getByText("Statement coverage", { exact: true })).toBeInViewport();
+  await expect(brief).toContainText("Sample package");
+  await brief.getByRole("button", { name: "Review financials" }).click();
+  await expect(page.getByRole("dialog", { name: "Profit and loss" })).toBeVisible();
+});

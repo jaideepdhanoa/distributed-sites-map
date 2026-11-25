@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import { canWrite, useActionStatus } from "./panel";
 
 type FindingSummary = { title: string; text: string };
@@ -23,6 +24,7 @@ type FindingProps = {
 export default function RecordFinding({ kind, id, source, review }: FindingProps) {
   const status = useActionStatus();
   const params = useSearchParams();
+  const router = useRouter();
   const findingRequested = params.get("panel") === "finding";
   const [open, setOpen] = useState(findingRequested);
   const [outcome, setOutcome] = useState("finding");
@@ -78,6 +80,16 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
   const confirmation = saved || recent;
   if (!writable && !confirmation) return null;
 
+  function closeEditor() {
+    setOpen(false);
+    if (!findingRequested) return;
+    const query = new URLSearchParams(currentSearch());
+    query.delete("panel");
+    const href = `/?${query}`;
+    rememberSearch(href);
+    router.replace(href, { scroll: false });
+  }
+
   async function save(event: FormEvent) {
     event.preventDefault();
     if (submitting.current || !body.trim() || (proposal && !value.trim())) return;
@@ -107,7 +119,7 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
       if (!live.current) return;
       receipt.current = { draft: "", key: "" };
       setSaved({ title: proposal ? "Change submitted for approval" : outcome === "missing" ? "Evidence gap saved" : "Finding saved", text: proposal ? item.proposedValue : findingText(item.body)?.text || body.trim() });
-      setOpen(false);
+      closeEditor();
       setBody(""); setValue(""); setCitation(null); setOutcome("finding");
       if (!reviewing) window.dispatchEvent(new Event("queue-refresh"));
     } catch (cause) {
@@ -130,14 +142,14 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
       <label>Record as<select className="secondary" value={outcome} disabled={pending} onChange={event => setOutcome(event.target.value)}>
         <option value="finding">Finding</option><option value="missing">Missing evidence</option><option value="proposal">Proposed correction</option>
       </select></label>
-      {proposal && <><label>Field<select className="secondary" value={field} disabled={pending} onChange={event => setField(event.target.value)}>
+      {proposal && <><label>Field<select aria-label="Field" className="secondary" value={field} disabled={pending} onChange={event => setField(event.target.value)}>
         <option value="zoning">Zoning</option><option value="owner">Owner</option><option value="address">Address</option><option value="name">Site name</option><option value="next_step">Next step</option>
       </select></label><label>Proposed value<input className="secondary" required maxLength={500} disabled={pending} value={value} onChange={event => setValue(event.target.value)} /></label></>}
       <label>{outcome === "missing" ? "What is still missing?" : "What did you find?"}<textarea className="secondary" rows={2} ref={editor} required maxLength={1600} disabled={pending} value={body} onChange={event => setBody(event.target.value)} /></label>
       <label>Source<input className="secondary" value={citation ?? source} maxLength={1000} disabled={pending} onChange={event => setCitation(event.target.value)} placeholder="Document, link, or source name" /></label>
       {error && <p role="alert" className="err">{error}</p>}
       <div className="finding-buttons"><button className="primary" type="submit" disabled={pending || !body.trim() || (proposal && !value.trim())}>{pending ? "Saving…" : proposal ? "Submit for approval" : outcome === "missing" ? "Save evidence gap" : "Save finding"}</button>
-      <button className="text-link" type="button" disabled={pending} onClick={() => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); }}>Cancel</button></div>
+      <button className="text-link" type="button" disabled={pending} onClick={() => { closeEditor(); requestAnimationFrame(() => trigger.current?.focus()); }}>Cancel</button></div>
     </form> : <button ref={trigger} type="button" className={saved ? "text-link" : "primary"} onClick={() => { setSaved(null); setError(""); setOpen(true); }}>{saved ? "Record another finding" : "Record finding"}</button>)}
   </div>;
 }

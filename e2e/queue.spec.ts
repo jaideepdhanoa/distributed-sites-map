@@ -453,12 +453,12 @@ for (const width of [1440, 390]) {
         await request.post("/api/queue/snooze", { data: { siteId: id, until: "2000-01-01" } });
         await request.post("/api/queue", { data: { siteId: id, undo: true } });
       }
-      await page.goto(inQueue ? `/?review=1&rsite=${id}&qstage=any&qmarket=all&sheet=full` : `/?funnel=universe&site=${id}&city=PHX&sheet=full`);
+      await page.goto(inQueue ? `/?review=1&rsite=${id}&qstage=any&qmarket=all&sheet=full` : `/?funnel=universe&site=${id}&city=PHX&sheet=full${index === 0 ? "&panel=finding" : ""}`);
       const record = page.locator("aside.drawer");
       await expect(record).toHaveAttribute("data-record", id);
       const before = inQueue ? await page.getByTestId("review-position").innerText() : "";
       const brief = record.getByRole("region", { name: "Screening decision" });
-      await brief.getByRole("button", { name: "Record finding", exact: true }).click();
+      if (index !== 0) await brief.getByRole("button", { name: "Record finding", exact: true }).click();
       const form = brief.getByRole("form", { name: "Record finding" });
       if (index === 0) await expect(form.getByLabel("Source")).toHaveValue(/^https?:/);
       if (index === 1) {

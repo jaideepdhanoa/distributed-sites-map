@@ -854,7 +854,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
+      const linked = panel === "finding" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -3090,7 +3090,7 @@ export default function Explorer() {
         {showingPreview ? (
           <MapSitePreview loading={!figuresReady} site={selectedSite || (selectedDeal?.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null)} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
             onOpen={(panel) => {
-              if (panel) write({ panel });
+              if (panel) write({ panel, sheet: "full" });
               setPreviewId(null);
               setSheetSnap("full");
               requestAnimationFrame(() => {

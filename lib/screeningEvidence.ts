@@ -55,7 +55,7 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   let evidence: Evidence | undefined;
   let missing = "";
   if (deal?.stage_group === "dropped") review = "No further review scheduled.";
-  else if (!gap && signedIn && deal?.stage_group === "financial" && deal.kind !== "land" && deal.financials_open !== false) review = "Review the financial statement.";
+  else if (!gap && signedIn && deal && (deal.stage_group === "financial" || deal.stage_group === "contacted") && deal.kind !== "land" && deal.financials_open !== false) review = "Review the financial statement.";
   else if (!gap && site?.verdict) review = nextStepText(site);
   else if (!gap && listing?.approximate) review = "Confirm the exact location.";
   else if (!gap && site && !deal) review = "Check the county parcel record.";

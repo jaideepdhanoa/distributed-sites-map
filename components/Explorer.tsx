@@ -732,8 +732,8 @@ export default function Explorer() {
     let cancel = false;
     const token = ++dataGen.current;
     const controller = new AbortController();
-    const read = async (path: string) => {
-      const response = await fetch(path, { signal: controller.signal });
+    const read = async (path: string, cache: RequestCache = "default") => {
+      const response = await fetch(path, { signal: controller.signal, cache });
       if (response.status === 401) window.location.assign("/login");
       if (!response.ok) throw new Error("Unavailable");
       return response.json();
@@ -748,7 +748,7 @@ export default function Explorer() {
     async function load() {
       try {
         const [sitesBody, dealsBody, funnelPayload, user] = await Promise.all([
-          read(`/api/data/sites?city=${city}`), read("/api/data/deals"), read("/api/data/funnel"), read("/api/me"),
+          read(`/api/data/sites?city=${city}`, "no-store"), read("/api/data/deals", "no-store"), read("/api/data/funnel"), read("/api/me"),
         ]);
         if (cancel || token !== dataGen.current) return;
         setMe(user);
@@ -789,10 +789,10 @@ export default function Explorer() {
     let cancel = false;
     async function refresh(token: number) {
       const requests = [
-        fetch("/api/data/deals"),
-        fetch(`/api/data/sites?city=${city}`),
+        fetch("/api/data/deals", { cache: "no-store" }),
+        fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
       ];
-      if (catalogOn.current) requests.push(fetch("/api/data/sites"));
+      if (catalogOn.current) requests.push(fetch("/api/data/sites", { cache: "no-store" }));
       const [dealsRes, sitesRes, allSitesRes] = await Promise.all(requests);
       if (cancel || token !== dataGen.current || !dealsRes?.ok || !sitesRes?.ok) return;
       const deals = await dealsRes.json();
@@ -830,7 +830,7 @@ export default function Explorer() {
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
-    fetch("/api/data/sites").then(async (response) => {
+    fetch("/api/data/sites", { cache: "no-store" }).then(async (response) => {
       if (!response.ok || cancel) return;
       const payload = await response.json() as { features?: SiteFeature[] };
       if (!cancel) {
@@ -1416,7 +1416,7 @@ export default function Explorer() {
     }
     let cancel = false;
     setFiguresReady(false);
-    fetch(`/api/data/sites/${encodeURIComponent(selectedSiteId)}`).then(async (response) => {
+    fetch(`/api/data/sites/${encodeURIComponent(selectedSiteId)}`, { cache: "no-store" }).then(async (response) => {
       if (cancel) return;
       if (response.ok) setDetail(presentSite((await response.json()) as SiteProps));
       setFiguresReady(true);

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSession, readGenerated, requireUser, snapshotCacheHeaders } from "@/lib/guard";
-import { currentSnapshotMeta, snapshotGeneration } from "@/lib/snapshot/read";
+import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import { overlayHeldStages } from "@/lib/changes/heldStage";
 import { overlayUniverseMedia } from "@/lib/universeMedia";
 import { overlayQuickLubeCensus } from "@/lib/changes/read";
@@ -143,6 +142,6 @@ export async function GET(request: NextRequest) {
   const withCensus = await overlayQuickLubeCensus({ type: "FeatureCollection", features });
   const staged = await overlayUniverseMedia(await overlayHeldStages(await overlayStageFile(withCensus, "site"), "site"));
   console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
-  const version = currentSnapshotMeta()?.id || `files-${snapshotGeneration()}`;
-  return NextResponse.json(redactGmailPayload(staged), { headers: snapshotCacheHeaders(version) });
+  // Live decisions can change while the published workbook snapshot stays the same.
+  return NextResponse.json(redactGmailPayload(staged), { headers: privateHeaders });
 }

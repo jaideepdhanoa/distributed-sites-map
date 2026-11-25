@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { withConnectionString } from "../lib/actions/db";
+import { migrate } from "../lib/actions/migrate";
+import { publishSnapshot, selectLive } from "../lib/snapshot/store";
 
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
 const site = "PHX-U180";
@@ -789,3 +792,129 @@ function generatedDeal(id: string) {
   };
   return file.features.find((feature) => feature.properties.deal_id === id)?.properties;
 }
+
+test("an approved drop survives a warm browser cache and a reload without a new snapshot", async ({ page, request }, testInfo) => {
+  // Do not install page.route/context.route in this test: routing disables the
+  // browser HTTP cache and would hide the regression this case exercises.
+  const database = "postgres://postgres:postgres@127.0.0.1:55433/postgres";
+  const siteNumber = 9001 + testInfo.retry * 2;
+  const target = `PIPE-PHX-${siteNumber}`;
+  const universe = `WB-PHX-${siteNumber}`;
+  const deals = {
+    type: "FeatureCollection",
+    features: [siteNumber, siteNumber + 1].map((id) => ({
+      type: "Feature", geometry: { type: "Point", coordinates: [-112.07, 33.45] },
+      properties: {
+        deal_id: `PIPE-PHX-${id}`, universe_id: `WB-PHX-${id}`, kind: "pipeline",
+        name: `Synthetic cache site ${id}`, city: "PHX", business_type: "Car wash",
+        stage: "1 Desk screen", stage_group: "desk", coord_status: "located",
+        listed: true, broker_contacted: true, is_c_store: false,
+      },
+    })),
+  };
+  const sites = {
+    type: "FeatureCollection",
+    features: deals.features.map(({ geometry, properties: deal }) => ({
+      type: "Feature", geometry,
+      properties: {
+        site_id: deal.universe_id, linked_deal_id: deal.deal_id,
+        linked_deal_stage: deal.stage, pipeline_stage: deal.stage,
+        name: deal.name, city: "PHX", business_type: "Car wash", coord_status: "located",
+        in_area: true, counts_as_site: true, listed: true, contacted: true,
+        service_area_class: "inside", land_only: false,
+      },
+    })),
+  };
+  const fixture = await withConnectionString(database, async (sql) => {
+    await migrate(sql, { connectionString: database });
+    const previous = await selectLive(sql);
+    const published = await publishSnapshot(sql, {
+      sourceRunId: "browser-stage-cache-regression", workbookModifiedAt: null, gitSha: "test",
+      files: [
+        { name: "deals.geojson", body: JSON.stringify(deals) },
+        { name: "sites.geojson", body: JSON.stringify(sites) },
+      ],
+    });
+    return { previousId: previous?.id, id: published.id };
+  });
+  const refreshSnapshot = async () => {
+    const response = await page.request.post("/api/data/revalidate", {
+      headers: { authorization: "Bearer e2e-snapshot-secret-not-for-production" },
+    });
+    expect(response.ok()).toBeTruthy();
+  };
+  try {
+    await refreshSnapshot();
+    await login(page.request, "reviewer");
+    const proposal = await page.request.post("/api/actions/suggestions", {
+      data: {
+        targetKind: "deal", targetId: target, field: "proposed_next_step",
+        detail: "knock_off", proposedValue: "Dropped", reason: "Synthetic site is unavailable.",
+      },
+    });
+    expect(proposal.status()).toBe(201);
+    await page.goto(`/?city=PHX&funnel=pipeline&pstage=desk&view=list&site=${target}`);
+    const drawer = page.locator("aside.drawer");
+    await expect(drawer).toHaveAttribute("data-record", target);
+    await expect(drawer.getByRole("heading", { name: "Desk screen", exact: true })).toBeVisible();
+    await expect(page.getByTestId("scope-count").first()).toHaveText("2 sites");
+
+    // These are ordinary browser fetches, including the all-city catalog. The
+    // second pass warms any HTTP cache without changing the published snapshot.
+    const paths = ["/api/data/deals", "/api/data/sites?city=PHX", "/api/data/sites"];
+    await page.evaluate(async (urls) => {
+      for (let pass = 0; pass < 2; pass += 1) {
+        await Promise.all(urls.map(async (url) => { await (await fetch(url)).json(); }));
+      }
+    }, paths);
+    const card = page.getByTestId("proposed-next-step");
+    await expect(card).toBeVisible();
+    await card.getByLabel("Outcome").selectOption("accepted");
+    await card.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(drawer.getByRole("heading", { name: "Dropped", exact: true })).toBeVisible();
+    const saved = await withConnectionString(database, async (sql) => ({
+      stage: (await sql.query<{ stage: string }>("SELECT stage FROM site_stages WHERE site_id = $1", [target])).rows[0]?.stage,
+      snapshotId: (await selectLive(sql))?.id,
+    }));
+    expect(saved).toEqual({ stage: "Dropped", snapshotId: fixture.id });
+
+    const tracePath = `/api/actions/audit?targetKind=deal&targetId=${target}`;
+    const traceResponse = await page.request.get(tracePath);
+    expect(traceResponse.status()).toBe(200);
+    expect(traceResponse.headers()["cache-control"]).toBe("private, no-store");
+    const trace = await traceResponse.json();
+    expect(trace.stage).toMatchObject({ siteId: target, stage: "Dropped", updatedBy: "reviewer" });
+    expect(trace.entries.every((entry: { targetKind: string; targetId: string }) => entry.targetKind === "deal" && entry.targetId === target)).toBe(true);
+    expect(trace.stageEvents).toEqual([expect.objectContaining({ stage: "Dropped", actor: "reviewer", source: "Accepted stage decision" })]);
+    expect((await page.request.get(`/api/actions/audit?targetId=${target}`)).status()).toBe(400);
+    await login(request, "viewer");
+    expect((await request.get(tracePath)).status()).toBe(403);
+
+    const fresh = await page.evaluate(async ({ urls, targetId, universeId }) => Promise.all(urls.map(async (url) => {
+      const response = await fetch(url);
+      const body = await response.json();
+      const row = body.features.find((feature: { properties: { deal_id?: string; site_id?: string } }) =>
+        feature.properties.deal_id === targetId || feature.properties.site_id === universeId)?.properties;
+      return { cache: response.headers.get("cache-control"), etag: response.headers.get("etag"), stage: row?.stage || row?.pipeline_stage };
+    })), { urls: paths, targetId: target, universeId: universe });
+    expect(fresh.map((row) => row.stage)).toEqual(["Dropped", "Dropped", "Dropped"]);
+    expect(fresh.every((row) => row.cache?.includes("no-store"))).toBe(true);
+    expect(fresh.map((row) => row.etag)).toEqual([null, null, null]);
+
+    await page.reload();
+    await expect(drawer.getByRole("heading", { name: "Dropped", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/pstage=dropped/);
+    await expect(page.getByTestId("scope-count").first()).toHaveText("1 site");
+    await expect(page.getByTestId("pipeline-list")).toContainText(`Synthetic cache site ${siteNumber}`);
+    await page.goto("/?city=PHX&funnel=pipeline&pstage=desk&view=list");
+    await expect(page.getByTestId("scope-count").first()).toHaveText("1 site");
+    await expect(page.getByTestId("pipeline-list")).toContainText(`Synthetic cache site ${siteNumber + 1}`);
+    await expect(page.getByTestId("pipeline-list")).not.toContainText(`Synthetic cache site ${siteNumber}`);
+  } finally {
+    await withConnectionString(database, async (sql) => {
+      await sql.query("DELETE FROM snapshots WHERE id = $1", [fixture.id]);
+      if (fixture.previousId) await sql.query("UPDATE snapshots SET status = 'live' WHERE id = $1", [fixture.previousId]);
+    });
+    await refreshSnapshot();
+  }
+});

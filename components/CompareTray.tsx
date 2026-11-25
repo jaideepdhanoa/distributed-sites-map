@@ -147,10 +147,10 @@ export default function CompareTray({
                           const target = value === MISSING && evidenceEnabled ? evidenceTarget(column.targetKind,column.id,label,column.deal) : undefined;
                           return (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {target ? <button className="text-link compare-evidence" type="button" aria-label={`Check missing ${label} for ${column.title}`} onClick={event=>{
+                            {target ? <button className="text-link compare-evidence" type="button" aria-label={`Not on file · Check missing ${label} for ${column.title}`} onClick={event=>{
                               inspectedCell.current = event.currentTarget;
                               setGap({target,title:column.title,label});
-                            }}>Not on file</button> : kind !== "detail" && value !== MISSING && !["Unavailable","Checking…","Not applicable"].includes(value) && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`Inspect ${label} for ${columns[i].title}`} onClick={event => {
+                            }}>Not on file</button> : kind !== "detail" && value !== MISSING && !["Unavailable","Checking…","Not applicable"].includes(value) && onInspect ? <button className="text-link compare-evidence" type="button" aria-label={`${value} · Inspect ${label} for ${columns[i].title}`} onClick={event => {
                               inspectedCell.current = event.currentTarget;
                               onInspect(columns[i].id, label);
                             }}>{value}</button> : value !== MISSING ? value : label === "Suggested drop" ? "None recorded" : "Not on file"}

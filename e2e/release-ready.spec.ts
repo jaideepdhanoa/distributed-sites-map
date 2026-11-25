@@ -33,7 +33,7 @@ for (const size of sizes) {
     await ready(page);
     await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
     await expect.poll(async () => page.locator(".shell").getAttribute("data-zoom")).toMatch(/^\d/);
-    if (size.width < 768) await page.getByRole("button", { name: "Layers" }).click();
+    await page.getByRole("button", { name: "Layers", exact: true }).click();
     const zoomBefore = await page.locator(".shell").getAttribute("data-zoom");
     await page.locator("label.layer-row", { has: page.getByTestId("dropped-layer") }).click();
     await expect(page).toHaveURL(/city=PHX/);

@@ -170,8 +170,9 @@ test("screening actions follow the recorded check and its actual evidence", () =
   const missing = screeningEvidence({ site: { ...parcel, county_url: "" }, signedIn: false });
   assert.equal(missing.evidence, undefined);
   assert.match(missing.missing, /not on file/);
-  const space = deal({ stage_group: "desk", stage_blocker: "Confirm open land", open_land_basis: "Estimated", open_land_sqft: 100 });
+  const space = deal({ stage_group: "desk", stage_blocker: "Confirm open land", bays_that_fit: 3, open_land_basis: "Estimated", open_land_sqft: 100 });
   assert.equal(screeningEvidence({ deal: space, signedIn: true }).evidence?.kind, "space");
+  assert.equal(screeningEvidence({ deal: space, signedIn: true }).figures[0].label, "Open land");
   assert.equal(screeningEvidence({ deal: { ...space, open_land_sqft: 0 }, signedIn: true }).evidence, undefined);
   const financial = deal({ stage_group: "financial", stage_blocker: "Check financials" });
   assert.equal(screeningEvidence({ deal: financial, signedIn: true }).evidence?.kind, "financials");

@@ -260,9 +260,7 @@ test("the queue card shows a change, a mention, and a pending next step", async 
 
   const fresh = await queue(request);
   const placed = fresh.items.findIndex((item) => typeof item.snapshot?.lng === "number");
-  const missing = fresh.items.findIndex((item) => item.snapshot?.lng == null);
   expect(placed).toBeGreaterThanOrEqual(0);
-  expect(missing).toBeGreaterThanOrEqual(0);
 
   await openAs(page, "contributor", `/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
   const controls = page.getByTestId("review-bar");
@@ -303,12 +301,30 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   await page.waitForTimeout(400);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop-next.png" });
 
-  await page.goto(`/?review=1&qmarket=all&qstage=any&i=${missing + 1}`);
+  // Model an unlocated site even when every current queue record has been mapped.
+  const noLocationId = fresh.items[placed].siteId;
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const feature = data.features.find((item: { properties: { deal_id: string } }) => item.properties.deal_id === noLocationId);
+    feature.geometry = null;
+    feature.properties.universe_id = null;
+    await route.fulfill({ response, json: data });
+  });
+  await page.route("**/api/queue?*", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const row = data.items?.find((item: { siteId: string }) => item.siteId === noLocationId);
+    if (row?.snapshot) Object.assign(row.snapshot, { lat: null, lng: null });
+    await route.fulfill({ response, json: data });
+  });
+  await page.goto(`/?review=1&qmarket=all&qstage=any&rsite=${noLocationId}`);
   await hideDevOverlay(page);
   await expect(page.getByTestId("review-noloc")).toBeVisible();
   await page.locator(".maplibregl-canvas").waitFor();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-noloc.png" });
+  await page.unrouteAll({ behavior: "wait" });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
@@ -433,3 +449,67 @@ test("the review filter menu stays inside a 390px screen", async ({ page }) => {
   });
   expect(covered).toBe(false);
 });
+
+for (const width of [1440, 390]) {
+  test(`five screening findings keep their sources, permissions and review context at ${width}px`, async ({ page, request }) => {
+    test.slow();
+    await login(request, "contributor");
+    const deal = await activePipelineDeal(request);
+    const response = await request.get("/api/data/sites?city=PHX");
+    const data = await response.json() as { features: { properties: { site_id: string; linked_deal_id?: string } }[] };
+    const extra = data.features.map(item => item.properties).filter(site => /^PHX-U\d+$/.test(site.site_id) && !site.linked_deal_id && !["PHX-U189", "PHX-U645"].includes(site.site_id)).slice(0, 2);
+    const ids = ["PHX-U189", "PHX-U645", ...extra.map(site => site.site_id), deal];
+    expect(new Set(ids).size).toBe(5);
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await openAs(page, "contributor", "/?funnel=universe&city=PHX");
+    await mkdir("review-shots", { recursive: true });
+    for (const [index, id] of ids.entries()) {
+      const inQueue = id === deal;
+      if (inQueue) {
+        await request.post("/api/queue/snooze", { data: { siteId: id, until: "2000-01-01" } });
+        await request.post("/api/queue", { data: { siteId: id, undo: true } });
+      }
+      await page.goto(inQueue ? `/?review=1&rsite=${id}&qstage=any&qmarket=all&sheet=full` : `/?funnel=universe&site=${id}&city=PHX&sheet=full${index === 0 ? "&panel=finding" : ""}`);
+      const record = page.locator("aside.drawer");
+      await expect(record).toHaveAttribute("data-record", id);
+      const before = inQueue ? await page.getByTestId("review-position").innerText() : "";
+      const brief = record.getByRole("region", { name: "Screening decision" });
+      if (index !== 0) await brief.getByRole("button", { name: "Record finding", exact: true }).click();
+      const form = brief.getByRole("form", { name: "Record finding" });
+      if (index === 0) await expect(form.getByRole("textbox", { name: "Source", exact: true })).toHaveValue(/^https?:/);
+      if (index === 1) {
+        await expect(brief).toContainText("County record link not on file.");
+        await form.getByLabel("Record as").selectOption("missing");
+      }
+      if (index === 2) {
+        await form.getByLabel("Record as").selectOption("proposal");
+        await form.getByLabel("Field", { exact: true }).selectOption("zoning");
+        await form.getByLabel("Proposed value").fill("Review classification");
+      }
+      const finding = index === 1 ? "Parcel reference still needed." : "Parcel boundary checked against the source.";
+      await form.getByRole("textbox", { name: index === 1 ? "What is still missing?" : "What did you find?" }).fill(finding);
+      await form.getByRole("textbox", { name: "Source", exact: true }).fill("Example county assessment map");
+      if (index === 0) await form.screenshot({ path: `review-shots/${width}-finding-editor.png` });
+      await form.getByRole("button", { name: index === 2 ? "Submit for approval" : index === 1 ? "Save evidence gap" : "Save finding" }).click();
+      const title = index === 2 ? "Change submitted for approval" : index === 1 ? "Evidence gap saved" : "Finding saved";
+      await expect(brief.getByRole("status")).toContainText(title);
+      if (inQueue) {
+        await brief.getByRole("button", { name: "Return to review" }).click();
+        await expect(page.getByTestId("review-since")).toBeFocused();
+        await expect(page.getByTestId("review-position")).toHaveText(before, { useInnerText: true });
+        expect(new URL(page.url()).searchParams.get("rsite")).toBe(id);
+      } else {
+        await page.reload();
+        await expect(brief.getByRole("status")).toContainText(title);
+        if (index === 2) {
+          const res = await request.get(`/api/actions/suggestions?targetKind=site&targetId=${id}`);
+          expect((await res.json()).suggestions.some((entry: { status: string; reason: string }) => entry.status === "open" && entry.reason.includes("Example county assessment map"))).toBe(true);
+          await brief.getByRole("status").screenshot({ path: `review-shots/${width}-finding-approval.png` });
+        }
+      }
+    }
+    await openAs(page, "viewer", "/?site=PHX-U189&sheet=full");
+    await expect(page.getByRole("region", { name: "Screening decision" }).getByRole("status")).toContainText("Finding saved");
+    await expect(page.getByRole("button", { name: "Record finding", exact: true })).toHaveCount(0);
+  });
+}

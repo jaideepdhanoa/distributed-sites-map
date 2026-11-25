@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { ArrowRight, LocateFixed } from "lucide-react";
 import { displayAddress } from "@/lib/format";
 import { screeningEvidence } from "@/lib/screeningEvidence";
+import { canWrite, useActionStatus } from "./actions/panel";
 import FinancialsEntry from "./FinancialsEntry";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 
@@ -12,7 +13,7 @@ type PreviewProps = {
   linkedDeal?: DealProps | null;
   signedIn: boolean;
   loading: boolean;
-  onOpen: (panel?: "open-land") => void;
+  onOpen: (panel?: "open-land" | "finding") => void;
   onClose: () => void;
 };
 
@@ -20,6 +21,7 @@ export default function MapSitePreview(props: PreviewProps) {
   const { site, deal, listing, onOpen, onClose } = props;
   const record = deal || site || listing;
   const id = deal?.deal_id || site?.site_id || listing?.listing_id;
+  const access = useActionStatus();
   const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }); }, [id]);
   if (!record) return null;
@@ -43,6 +45,7 @@ export default function MapSitePreview(props: PreviewProps) {
       {evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}
       {evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("open-land")}>Check open land</button>}
       {evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} compact />}
+      {props.signedIn && !listing && access.enabled && canWrite(access.actionRole) && <button type="button" className="text-link preview-open" onClick={() => onOpen("finding")}>Record finding</button>}
       <button type="button" className={evidence ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
       </div>
     </aside>

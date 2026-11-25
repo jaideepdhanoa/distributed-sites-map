@@ -843,17 +843,18 @@ export default function Explorer() {
   }, [me?.actionsEnabled, badgeKey, queueTick]);
 
   useEffect(() => {
-    const media = window.matchMedia("(min-width: 1100px)");
-    const apply = () => setLayersOpen(media.matches);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
+    try { setLayersOpen(window.localStorage.getItem("map-layers-open") === "1"); } catch {}
   }, []);
+
+  function chooseLayers(open: boolean) {
+    setLayersOpen(open);
+    try { window.localStorage.setItem("map-layers-open", open ? "1" : "0"); } catch {}
+  }
 
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
+      const linked = panel === "finding" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -2270,7 +2271,7 @@ export default function Explorer() {
             ) : null}
           </div>
           <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
-            {activeStepLabel}
+            <span>{activeStepLabel}</span><small>{selectedMarket === "other" ? "Other markets" : marketLabel(selectedMarket)} · {shownCount.toLocaleString("en-US")} {shownCount === 1 ? "site" : "sites"}</small>
           </button>
         </div>
         <div className="phone-view-row only-mobile">
@@ -2967,7 +2968,7 @@ export default function Explorer() {
             <>
               <div className="layers-bar">
                 <p className="eyebrow">Layers</p>
-                <button type="button" className="close" aria-label="Close layers" onClick={() => setLayersOpen(false)}><span aria-hidden="true">×</span></button>
+                <button type="button" className="close" aria-label="Close layers" onClick={() => chooseLayers(false)}><span aria-hidden="true">×</span></button>
               </div>
               <div className="layers-body">
                 <div className="only-mobile">
@@ -3038,11 +3039,14 @@ export default function Explorer() {
               </div>
             </>
           ) : (
-            <button type="button" className="paper-btn" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+            <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
           )}
         </aside>
         {!listView ? (
           <div className="map-corner">
+            {!inReview && <div className="map-scope only-desktop" aria-label="Current map results" data-testid="map-scope">
+              <span>{shortlistTitle}</span><strong>{shownCount.toLocaleString("en-US")} {shownCount === 1 ? "site" : "sites"}</strong>
+            </div>}
             {ringsOutside ? (
               <div className="rings-outside" role="status">
                 <p>5- and 10-mile rings are outside this view.</p>
@@ -3086,7 +3090,7 @@ export default function Explorer() {
         {showingPreview ? (
           <MapSitePreview loading={!figuresReady} site={selectedSite || (selectedDeal?.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null)} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
             onOpen={(panel) => {
-              if (panel) write({ panel });
+              if (panel) write({ panel, sheet: "full" });
               setPreviewId(null);
               setSheetSnap("full");
               requestAnimationFrame(() => {

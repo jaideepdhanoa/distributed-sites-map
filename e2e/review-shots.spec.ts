@@ -140,8 +140,8 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.screenshot({ path: `review-shots/${name}-unscreened.png`, fullPage: false });
   await page.goto("/?funnel=pipeline&city=PHX&pstage=desk", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   if (name === "mobile") {
-    await page.getByRole("button", { name: "Layers", exact: true }).click();
     await expect(page.getByTestId("basemap")).toBeVisible();
   } else {
     await expect(page.getByTestId("basemap-desktop")).toBeVisible();
@@ -369,7 +369,7 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
       await expect(brief).toBeInViewport();
       await expect(record.locator(".card-hero")).toBeAttached();
       if (index === 0) {
-        await expect(brief).toContainText("2025");
+        await expect(brief.getByText("Parcel number", { exact: true })).toBeVisible();
         const aerial = record.locator("img.hero-aerial");
         if (await aerial.count()) await aerial.evaluate(async img => { await (img as HTMLImageElement).decode(); });
         await page.screenshot({ path: `review-shots/${info.project.name}-record-brief.png` });
@@ -399,4 +399,26 @@ test("open-land evidence links show the measurement in the viewport", async ({ p
   const label = page.locator('#panel-numbers [data-evidence="open-land"]');
   await expect(label).toBeInViewport();
   await expect(label.locator("xpath=following-sibling::div[1]")).toBeInViewport();
+});
+
+test("map tools are one tap away and Layers restores the last explicit choice", async ({ page }, info) => {
+  await page.goto("/?funnel=universe&city=PHX&stage=in_area", { waitUntil: "domcontentloaded" });
+  const layers = page.getByRole("button", { name: "Layers", exact: true });
+  const close = page.getByRole("button", { name: "Close layers" });
+  await expect(layers).toBeVisible();
+  const scope = info.project.name === "mobile" ? page.locator(".phone-step") : page.getByTestId("map-scope");
+  await expect(scope).toContainText("Phoenix");
+  await expect(scope).toContainText("Service area");
+  await expect(scope).toContainText(/\d+ sites/);
+  await layers.click();
+  await page.reload();
+  await expect(close).toBeVisible();
+  await close.click();
+  await page.reload();
+  await expect(layers).toBeVisible();
+  const tools = page.getByRole("group", { name: "Map tools" });
+  await expect(tools.getByText("Map tools")).toBeVisible();
+  await tools.getByTestId("measure").click();
+  await expect(tools.getByTestId("measure-done")).toBeVisible();
+  await tools.getByTestId("measure-done").click();
 });

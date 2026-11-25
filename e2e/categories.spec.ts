@@ -83,6 +83,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(page.getByTestId("pipeline-list")).toContainText("Black Canyon");
 
   await page.goto("/?funnel=pipeline&pstage=desk");
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   const layers = page.locator("aside.layers.open");
   await expect(layers.getByText("Auto service")).toHaveCount(0);
   await expect(layers.getByText("Unscreened market listings")).toHaveCount(0);

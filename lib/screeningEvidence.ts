@@ -51,23 +51,31 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   const gap = signedIn ? present(deal?.stage_blocker) || present(deal?.next_step) : "";
   const county = countyLink(site?.county_url);
   let review = gap;
+  let check: "county" | "space" | "financials" | undefined;
   let evidence: Evidence | undefined;
   let missing = "";
   if (deal?.stage_group === "dropped") review = "No further review scheduled.";
-  else if (!gap && signedIn && deal?.stage_group === "financial" && deal.kind !== "land" && deal.financials_open !== false) review = "Review the financial statement.";
+  else if (!gap && signedIn && deal && (deal.stage_group === "financial" || deal.stage_group === "contacted") && deal.kind !== "land" && deal.financials_open !== false) review = "Review the financial statement.";
   else if (!gap && site?.verdict) review = nextStepText(site);
   else if (!gap && listing?.approximate) review = "Confirm the exact location.";
   else if (!gap && site && !deal) review = "Check the county parcel record.";
   else if (!gap && !present(spare.value)) review = "Confirm how much open land is usable.";
   else if (!gap && present(spare.value)) review = "Verify the usable open land.";
   if (/county|parcel record|assessor|\bapn\b/i.test(review)) {
+    check = "county";
+    if (present(site?.apn)) add("Parcel number", site?.apn, site?.fields?.apn?.source || "Site record", site?.fields?.apn?.date);
     if (county) evidence = { kind: "county", href: county };
     else missing = "County record link not on file.";
   } else if (/open land|usable land|spare land|usable space|bay fit/i.test(review)) {
+    check = "space";
     if (present(spare.value) && (site || deal)) evidence = { kind: "space" };
     else missing = "Open-land measurement not on file.";
   } else if (signedIn && deal && deal.kind !== "land" && deal.financials_open !== false && /financial|p\s*&\s*l|cash flow|revenue|profit and loss/i.test(review)) {
+    check = "financials";
     evidence = { kind: "financials", id: deal.deal_id };
   }
-  return { status, reason, figures, evidence, missing, review: review || "Review the site evidence." };
+  const preferred = check === "space" ? "Open land" : check === "county" ? "Parcel number" : "";
+  const first = figures.findIndex(figure => figure.label === preferred);
+  if (first > 0) figures.unshift(figures.splice(first, 1)[0]);
+  return { status, reason: /^not screened yet[.]?$/i.test(reason || "") ? "" : reason, figures, check, evidence, missing, review: review || "Review the site evidence." };
 }

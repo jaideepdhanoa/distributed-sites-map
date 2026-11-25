@@ -230,9 +230,27 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   for (const i of [0, 1]) await rows.nth(i).getByRole("checkbox").check();
   await page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true }).click();
   const matrix = page.getByRole("table", { name: "Site comparison" });
+  const measureRows = matrix.locator("[data-compare-row]");
+  await expect(measureRows.first()).toBeVisible();
+  if (phone) {
+    const fits = await matrix.evaluate(table => {
+      const end = table.querySelector("thead th:last-child")!.getBoundingClientRect().right;
+      return end <= table.parentElement!.getBoundingClientRect().right + 1;
+    });
+    expect(fits, "both sites fit side by side on a phone").toBe(true);
+  }
+  const compactCount = await measureRows.count();
+  expect(compactCount).toBeGreaterThan(0);
+  for (const cells of await measureRows.evaluateAll(rows => rows.map(row => Array.from(row.querySelectorAll("td"), cell => cell.textContent)))) {
+    expect(new Set(cells).size, "the default comparison shows differing values or a one-sided gap").toBeGreaterThan(1);
+  }
+  await page.getByTestId("compare-tray").screenshot({ path: `review-shots/${info.project.name}-shortlist-compare.png` });
+  await page.getByRole("button", { name: "Show all measures" }).click();
+  expect(await measureRows.count()).toBeGreaterThan(compactCount);
   for (const name of ["Site fit", "Financials", "Diligence"]) await expect(matrix.getByRole("rowgroup", { name })).toBeAttached();
   await expect(matrix.getByText("Not on file", { exact: true }).first()).toBeAttached();
-  await page.getByTestId("compare-tray").screenshot({ path: `review-shots/${info.project.name}-shortlist-compare.png` });
+  await page.getByRole("button", { name: "Show differences" }).click();
+  await expect(measureRows).toHaveCount(compactCount);
   await page.getByRole("button", { name: "Close compare" }).click();
   await expect(page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true })).toBeFocused();
   const restored = await firstFive();
@@ -260,5 +278,86 @@ test("the record shows the action, owner and deadline together", async ({ page }
     await page.screenshot({ path: `review-shots/${info.project.name}-record-action.png`, clip: {
       x: Math.max(0, header.x), y, width: Math.min(header.width, page.viewportSize()!.width - Math.max(0, header.x)), height: bottom - y,
     } });
+  }
+});
+
+test("inspect five Phoenix map pins and return to the original view", async ({ page }, info) => {
+  type BrowserMap = import("maplibre-gl").Map;
+  type TestWindow = Window & { __sitesMap: BrowserMap };
+  const path = "/?funnel=universe&stage=in_area&city=PHX";
+  await page.goto(path, { waitUntil: "domcontentloaded" });
+  await waitForBasemap(page);
+  await page.waitForFunction(async () => {
+    const source = (window as unknown as TestWindow).__sitesMap?.getSource<import("maplibre-gl").GeoJSONSource>("sites");
+    const data = await source?.getData();
+    return data?.type === "FeatureCollection" && data.features.length >= 5;
+  });
+  const pins = await page.evaluate(async () => {
+    const source = (window as unknown as TestWindow).__sitesMap.getSource<import("maplibre-gl").GeoJSONSource>("sites")!;
+    const data = await source.getData() as {
+      type: string;
+      features: Array<{ geometry: { type: string; coordinates: number[] } | null; properties: { city?: string; site_id?: string } }>;
+    };
+    if (data.type !== "FeatureCollection") return [];
+    const sites = data.features.flatMap(feature => feature.geometry?.type === "Point" && feature.properties?.city === "PHX"
+      ? [{ id: String(feature.properties.site_id), center: feature.geometry.coordinates as [number, number] }] : []);
+    sites.sort((a, b) => Number(b.id === "PHX-U189") - Number(a.id === "PHX-U189"));
+    return sites.filter((site, i) => !sites.slice(0, i).some(other =>
+      Math.abs(other.center[0] - site.center[0]) + Math.abs(other.center[1] - site.center[1]) < 0.002)).slice(0, 5);
+  });
+  expect(pins.length).toBe(5);
+  const camera = () => page.evaluate(() => {
+    const map = (window as unknown as TestWindow).__sitesMap;
+    return [...map.getCenter().toArray(), map.getZoom()].map(value => Number(value.toFixed(4)));
+  });
+  for (const [index, pin] of pins.entries()) {
+    await page.evaluate(point => {
+      (window as unknown as TestWindow).__sitesMap.jumpTo({ center: point, zoom: 15 });
+    }, pin.center);
+    await page.waitForFunction(({ center, id }) => {
+      const map = (window as unknown as TestWindow).__sitesMap;
+      const point = map.project(center);
+      return map.queryRenderedFeatures(point, { layers: ["sites"] }).some(feature => feature.properties?.site_id === id);
+    }, pin);
+    const before = await camera();
+    const click = await page.evaluate(center => {
+      const map = (window as unknown as TestWindow).__sitesMap;
+      const rect = map.getContainer().getBoundingClientRect();
+      const point = map.project(center);
+      return { x: rect.left + point.x, y: rect.top + point.y };
+    }, pin.center);
+    if (info.project.name === "mobile") await page.touchscreen.tap(click.x, click.y);
+    else await page.mouse.click(click.x, click.y);
+    const preview = page.locator(".map-preview");
+    await expect(preview).toHaveAttribute("data-record", pin.id);
+    await expect(page.locator(".selected-pin-name")).toHaveText(await preview.getByRole("heading").innerText());
+    const action = preview.getByRole("button", { name: "Open site record" });
+    await expect(action).toBeInViewport({ ratio: 1 });
+    await expect(preview.getByText("Next check", { exact: true })).toBeVisible();
+    await expect(preview.locator("dd").last()).not.toBeEmpty();
+    if (index === 0) {
+      await page.mouse.move(1, 1);
+      await waitForBasemap(page);
+      if (info.project.name === "mobile") {
+        const zoom = await page.locator(".maplibregl-ctrl-zoom-in").boundingBox();
+        const tools = await page.locator(".measure-row").boundingBox();
+        expect(zoom && tools && tools.x + tools.width <= zoom.x, "map tools leave zoom reachable").toBe(true);
+      }
+      await page.screenshot({ path: `review-shots/${info.project.name}-map-preview.png` });
+    }
+    if (index % 2 === 0) {
+      await action.click();
+      const record = page.locator("aside.drawer");
+      await expect(record).toHaveAttribute("data-record", pin.id);
+      await expect(record.locator(".card-hero")).toBeAttached();
+      if (info.project.name === "mobile") await expect(record).toHaveClass(/snap-full/);
+      await record.getByRole("button", { name: "Close", exact: true }).click();
+    } else await preview.getByRole("button", { name: "Close site preview" }).click();
+    await expect(page.locator("aside.drawer")).toHaveCount(0);
+    await expect.poll(camera).toEqual(before);
+    const query = new URL(page.url()).searchParams;
+    expect(query.get("city")).toBe("PHX");
+    expect(query.get("stage")).toBe("in_area");
+    await expect.poll(() => new URL(page.url()).searchParams.has("site")).toBe(false);
   }
 });

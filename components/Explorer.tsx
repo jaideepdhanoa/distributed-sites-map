@@ -8,6 +8,7 @@ import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, type FeedSite } from "./queue/QueueView";
 import { AskPanel } from "./agent/AskPanel";
 import { RecordActions } from "./actions/RecordActions";
+import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
 import AppLoading from "./AppLoading";
@@ -184,6 +185,8 @@ export default function Explorer() {
   const [error, setError] = useState("");
   const [missingSite, setMissingSite] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [keyOpen, setKeyOpen] = useState(false);
   const tableOpen = params.get("table") === "1";
   const compare = params.get("disagree") === "1";
   const showDropped = params.get("ruled") === "1";
@@ -1275,8 +1278,10 @@ export default function Explorer() {
     ? detail
     : sites.find((site) => site.site_id === selected)
       ?? offMarketFeatures.find((feature) => feature.properties.site_id === selected)?.properties
+      ?? catalog?.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const showingPreview = Boolean(selected && previewId === selected && !listView && !reviewing && !ndaVisible && !loopsVisible);
   const selectedSquare = selectedDeal ? asSquare(selectedDeal) : null;
   if (selectedSquare && !drawnDeals.some((feature) => feature.properties.deal_id === selectedDeal?.deal_id)) drawnDeals.push(selectedSquare);
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
@@ -1329,6 +1334,7 @@ export default function Explorer() {
   }, [selected, selectedSiteId, data]);
 
   function choose(id: string | null) {
+    setPreviewId(null);
     if (id && isProtectedId(id)) return;
     setSelected(id);
     setFiguresReady(!id);
@@ -2136,7 +2142,7 @@ export default function Explorer() {
       const target = event.target as HTMLElement;
       const row = target.closest<HTMLElement>("[data-site-row]");
       if (row) lastCell.current = { row: row.dataset.siteRow || "", cell: target.closest<HTMLElement>("[data-col]")?.dataset.col || "" };
-    }} className={`shell ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    }} className={`shell ${showingPreview ? "pin-preview-open" : ""} ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
@@ -2188,7 +2194,7 @@ export default function Explorer() {
             <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
             <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
           </div>
-          {listView && desktopFilters}
+          {desktopFilters}
           {me?.actionsEnabled ? (
             <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
               Review{(() => {
@@ -2380,7 +2386,6 @@ export default function Explorer() {
           ) : null}
           {stageUnmapped > 0 ? <span className="summary-chip" data-testid="unmapped-note">{stageUnmapped.toLocaleString()} without a location</span> : null}
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
-          {!listView && desktopFilters}
           <div className="more-wrap only-desktop">
             <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
             {moreOpen ? (
@@ -2734,6 +2739,8 @@ export default function Explorer() {
           offMarket={offMarketShown}
           unscreened={showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && feature.geometry) : []}
           selectedId={selected}
+          mapScope={selectedMarket + "/" + funnel}
+          previewName={showingPreview ? (selectedDeal?.name || selectedSite?.name || selectedUnscreened?.name || displayAddress(selectedDeal?.address || selectedSite?.address || selectedUnscreened?.address) || selected || "") : ""}
           showAreas={showAreas}
           showDepots={showDepots}
           showSites={showUniverse}
@@ -2762,8 +2769,13 @@ export default function Explorer() {
                 return;
               }
             }
-            if (dealRows.some((deal) => deal.deal_id === id)) setTableTab(dealRows.find((deal) => deal.deal_id === id)?.kind === "land" ? "land" : "pipeline");
-            choose(id);
+            if (isProtectedId(id)) return;
+            placedSite.current = id;
+            setPreviewId(id);
+            setSelected(id);
+            setFiguresReady(false);
+            setSheetSnap("peek");
+            replaceSearch(window.location.search, { site: id }, true);
           }}
           spaceShapes={markedSpaces}
           showSpaces={showSpaces}
@@ -3006,8 +3018,11 @@ export default function Explorer() {
               </div>
             ) : null}
             {unplacedInView.length > 0 && <button className="paper-btn location-note" type="button" onClick={() => { setUnplacedScope(true); setUnplacedOpen(true); }}>{unplacedInView.length.toLocaleString()} without a location</button>}
-            <aside className="map-key" aria-label="Key">
-              <ul>
+            <aside className={`map-key ${keyOpen ? "key-expanded" : ""}`} aria-label="Key">
+              <button type="button" className="paper-btn key-toggle" aria-expanded={keyOpen} aria-controls="map-key-items" onClick={() => setKeyOpen(open => !open)}>
+                <span className="key-symbols" aria-hidden="true">● ◇</span> Map key
+              </button>
+              <ul id="map-key-items" hidden={!keyOpen}>
                 <li><i className="swatch cleared" /> Cleared</li>
                 <li><i className="swatch possible" /> Possible</li>
                 <li><i className="swatch unresolved" /> Unresolved</li>
@@ -3036,7 +3051,22 @@ export default function Explorer() {
           </aside>
         ) : null}
         <PanelBoundary name="Record">
-        {selectedDeal ? (
+        {showingPreview ? (
+          <MapSitePreview site={selectedSite} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
+            onOpen={() => {
+              setPreviewId(null);
+              setSheetSnap("full");
+              requestAnimationFrame(() => {
+                const title = shellRef.current?.querySelector<HTMLElement>(".drawer h2");
+                if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+              });
+            }}
+            onClose={() => {
+              choose(null);
+              shellRef.current?.querySelector<HTMLCanvasElement>(".maplibregl-canvas")?.focus({ preventScroll: true });
+            }}
+          />
+        ) : selectedDeal ? (
           <DealDetail
             decisionFirst={listView || inReview}
             deal={selectedDeal}

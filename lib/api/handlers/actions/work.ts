@@ -87,13 +87,13 @@ export async function GET(request: Request) {
       const rows: WorkRow[] = [];
       const openGaps = new Map(
         gaps.rows.map((gap) => [
-          gap.target_kind + gapReference(gap.target_id, gap.id),
+          gap.target_kind + ":" + gap.target_id + ":" + gapReference(gap.target_id, gap.id),
           gap,
         ]),
       );
       const linked = new Set<string>();
       for (const step of steps.rows) {
-        const gap = openGaps.get(step.target_kind + step.reason);
+        const gap = openGaps.get(step.target_kind + ":" + step.target_id + ":" + step.reason);
         if (gap) linked.add(gap.id);
         if (!gap && step.owner !== session.u) continue;
         const title = safeSnapshot(step.title, 500);

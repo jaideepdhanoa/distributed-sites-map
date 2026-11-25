@@ -436,7 +436,8 @@ export default function Explorer() {
   const sortDesc = sortParam.endsWith(":desc");
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
   // A direct shortlist visit covers the map. Keep the camera alive after the first map visit.
-  const needsMap = !listView || reviewing || followArea;
+  const workDetail = params.get("fromWork") === "1" && Boolean(params.get("site") || params.get("nda"));
+  const needsMap = (!listView && !myWork && !workDetail && !ndaVisible) || reviewing || followArea;
   const [mapVisited, setMapVisited] = useState(false);
   useEffect(() => {
     if (needsMap) setMapVisited(true);
@@ -566,7 +567,6 @@ export default function Explorer() {
   }
 
   const workPosition = useRef<WorkPosition | null>(null);
-  const workDetail = params.get("fromWork") === "1" && Boolean(params.get("site") || params.get("nda"));
   const workQuery = useRef("");
   const workOrigin = useRef<{ query: string; top: number; left: number; cell: string; row: string } | null>(null);
   const lastCell = useRef({ row: "", cell: "" });
@@ -689,7 +689,7 @@ export default function Explorer() {
     rememberSearch(href);
     // The comparison is client state. The homepage server component reads no query
     // parameters, and Next synchronizes these history changes with useSearchParams.
-    if ("compare" in next || "measure" in next) {
+    if ("compare" in next || "measure" in next || "fromWork" in next) {
       if (history) window.history.pushState(null, "", href);
       else window.history.replaceState(null, "", href);
     } else if (history) router.push(href, { scroll: false });

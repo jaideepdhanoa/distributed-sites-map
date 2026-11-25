@@ -166,7 +166,7 @@ export default function CompareTray({
           </div>
         </>
       ) : null}
-      {gap && <ComparisonEvidence target={gap.target} title={gap.title} close={()=>setGap(null)} saved={()=>setRefresh(n=>n+1)}
+      {gap && <ComparisonEvidence target={gap.target} title={gap.title} close={()=>{setGap(null); requestAnimationFrame(()=>inspectedCell.current?.focus({preventScroll:true}));}} saved={()=>setRefresh(n=>n+1)}
         inspect={note=>{setGap(null);onInspect?.(gap.target.targetId,gap.label,new URLSearchParams({panel:"discussion",note}));}} />}
     </aside>
   );

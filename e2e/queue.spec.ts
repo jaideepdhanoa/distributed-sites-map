@@ -743,9 +743,11 @@ for (const width of [1440,390]) {
     await page.setViewportSize({width,height:width===390?844:900});
     await openAs(page,"contributor","/?funnel=universe&city=PHX&view=list&compare="+ids.join("|"));
     const cell = page.getByRole("button",{name:"Check missing Zoning for Example North"});
-    await page.route("**/api/actions/comparison-evidence?**",route=>route.fulfill({status:503,json:{}}),{times:1});
+    await page.route("**/api/actions/comparison-evidence?**",route=>route.fulfill({status:503,json:{}}));
     await cell.click();
-    const sheet = page.getByRole("dialog",{name:"Zoning"});
+    const sheet = page.locator("dialog.compare-evidence-sheet[open]");
+    await expect(sheet.getByRole("alert")).toContainText("Couldn’t check");
+    await page.unroute("**/api/actions/comparison-evidence?**");
     await expect(sheet.getByRole("button",{name:"Request evidence"})).toHaveCount(0);
     await sheet.getByRole("button",{name:"Retry"}).click();
     await sheet.getByLabel("Owner").selectOption("reviewer");

@@ -2371,7 +2371,7 @@ export default function Explorer() {
           })}
           {me?.actionsEnabled && loopsAllowed && <button type="button" className={loopsVisible || ndaVisible ? "chip on" : "chip"} aria-current={myWork ? "page" : undefined} onClick={()=>{if (!myWork) {setSelected(null);write({loops:"work",nda:null,view:null,table:null,review:null,i:null,site:null,measure:null,compare:null});}}}>My work</button>}
           {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
+            <button className={`review-launch ${inReview ? "on" : ""}`} aria-current={inReview ? "page" : undefined} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
               Review{(() => {
                 const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
                 return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;

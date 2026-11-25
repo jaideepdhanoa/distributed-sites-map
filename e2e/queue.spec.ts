@@ -271,7 +271,7 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   await expect(controls.getByRole("button", { name: "Previous" })).toBeVisible();
   await expect(controls.getByRole("button", { name: "Next", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.getByRole("button", { name: "Pipeline" })).toHaveClass(/on/);
+  await expect(page.getByRole("navigation", { name: "Acquisition workspace" }).getByRole("button", { name: /^Review/ })).toHaveAttribute("aria-current", "page");
   await page.locator(".maplibregl-canvas").waitFor();
   await expect.poll(async () => page.evaluate(() => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures?: (opts: { layers: string[] }) => unknown[] } }).__sitesMap;

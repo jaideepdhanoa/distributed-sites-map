@@ -4179,11 +4179,17 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .workspace-jobs button:focus-visible { outline:2px solid white; outline-offset:-3px; }
 .empty-filter { overflow-wrap:anywhere; }
 @media(max-width:767px) {
+  .compare-evidence-sheet[open] { scroll-padding-block:5rem 3rem; }
+  .compare-evidence-sheet[open] header { position:sticky; top:0; z-index:1; padding-block:.25rem; background:var(--paper,#fffdf8); }
+  .compare-evidence-sheet[open] form { gap:.5rem; }
+  .compare-evidence-sheet[open] form label { gap:.3rem; }
+  .compare-evidence-sheet[open] form .primary { position:sticky; bottom:0; }
   .empty-filter .text-link, .work-hub [role="status"] .text-link { min-height:44px; }
   .work-hub [role="status"] a.text-link { display:inline-flex; align-items:center; }
   .work-page li { min-width:0; overflow-wrap:anywhere; }
 }
 @media(max-height:540px) and (max-width:767px) {
+  .compare-evidence-sheet[open] { max-height:90dvh; }
   .bar .workspace-jobs { overflow-x:auto; justify-content:flex-start; }
   .workspace-jobs .chip, .workspace-jobs .review-launch { flex-shrink:0; }
   .work-page { padding-bottom:max(1rem,env(safe-area-inset-bottom)); }

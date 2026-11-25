@@ -260,9 +260,7 @@ test("the queue card shows a change, a mention, and a pending next step", async 
 
   const fresh = await queue(request);
   const placed = fresh.items.findIndex((item) => typeof item.snapshot?.lng === "number");
-  const missing = fresh.items.findIndex((item) => item.snapshot?.lng == null);
   expect(placed).toBeGreaterThanOrEqual(0);
-  expect(missing).toBeGreaterThanOrEqual(0);
 
   await openAs(page, "contributor", `/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
   const controls = page.getByTestId("review-bar");
@@ -303,12 +301,30 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   await page.waitForTimeout(400);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop-next.png" });
 
-  await page.goto(`/?review=1&qmarket=all&qstage=any&i=${missing + 1}`);
+  // Model an unlocated site even when every current queue record has been mapped.
+  const noLocationId = fresh.items[placed].siteId;
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const feature = data.features.find((item: { properties: { deal_id: string } }) => item.properties.deal_id === noLocationId);
+    feature.geometry = null;
+    feature.properties.universe_id = null;
+    await route.fulfill({ response, json: data });
+  });
+  await page.route("**/api/queue?*", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const row = data.items?.find((item: { siteId: string }) => item.siteId === noLocationId);
+    if (row?.snapshot) Object.assign(row.snapshot, { lat: null, lng: null });
+    await route.fulfill({ response, json: data });
+  });
+  await page.goto(`/?review=1&qmarket=all&qstage=any&rsite=${noLocationId}`);
   await hideDevOverlay(page);
   await expect(page.getByTestId("review-noloc")).toBeVisible();
   await page.locator(".maplibregl-canvas").waitFor();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-noloc.png" });
+  await page.unrouteAll({ behavior: "wait" });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);

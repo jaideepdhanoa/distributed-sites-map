@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import { canWrite, useActionStatus } from "./panel";
 
@@ -24,7 +24,6 @@ type FindingProps = {
 export default function RecordFinding({ kind, id, source, review }: FindingProps) {
   const status = useActionStatus();
   const params = useSearchParams();
-  const router = useRouter();
   const findingRequested = params.get("panel") === "finding";
   const [open, setOpen] = useState(findingRequested);
   const [outcome, setOutcome] = useState("finding");
@@ -87,7 +86,7 @@ export default function RecordFinding({ kind, id, source, review }: FindingProps
     query.delete("panel");
     const href = `/?${query}`;
     rememberSearch(href);
-    router.replace(href, { scroll: false });
+    window.history.replaceState(null, "", href);
   }
 
   async function save(event: FormEvent) {

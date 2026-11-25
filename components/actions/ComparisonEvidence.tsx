@@ -6,8 +6,8 @@ import { canWrite, useActionStatus } from "./panel";
 type Lookup = { followUp: EvidenceRequest | null; accounts: { id: string; name: string }[] };
 const statuses: Record<string,string> = { open:"Awaiting approval", accepted:"Approved", ready:"Ready for approval", agreed_waiting:"Waiting", completed:"Completed", rejected:"Declined", superseded:"Superseded" };
 
-export default function ComparisonEvidence({target, title, close, inspect, saved}: {
-  target: EvidenceTarget; title: string; close: () => void; inspect: (note:string) => void; saved: () => void;
+export default function ComparisonEvidence({target, title, context = "Not on file", close, inspect, saved}: {
+  target: EvidenceTarget; title: string; context?: string; close: () => void; inspect: (note:string) => void; saved: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const access = useActionStatus();
@@ -59,7 +59,7 @@ export default function ComparisonEvidence({target, title, close, inspect, saved
     onCancel={event=>{event.preventDefault(); if (!pending) close();}}>
     <header><div><span className="eyebrow">{title}</span><h2 id="compare-evidence-title">{label}</h2></div>
       <button className="close" type="button" aria-label="Close evidence request" onClick={close} disabled={pending}>×</button></header>
-    <p>{[target.period,target.basis,"Not on file"].filter(Boolean).join(" · ")}</p>
+    <p>{[target.period,target.basis,context].filter(Boolean).join(" · ")}</p>
     {readFailed ? <p role="alert">Couldn’t check for an existing request. <button type="button" className="text-link" onClick={()=>setAttempt(n=>n+1)}>Retry</button></p>
     : !lookup ? <p role="status">Checking for a follow-up…</p>
     : item ? <section aria-label="Existing follow-up">

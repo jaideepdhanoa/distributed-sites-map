@@ -267,8 +267,8 @@ export function capacityFacts(row: CapacityRecord | null | undefined, scope: "si
   if (factText(record.cap_b_feeder)) hosting.push(`Feeder ${factText(record.cap_b_feeder)}`);
   const frontage = factNumber(record.cap_b_frontage);
   const nearby = factNumber(record.cap_b_nearby);
-  if (frontage != null) hosting.push(`Frontage hosting ${factCount(frontage)}`);
-  if (nearby != null) hosting.push(`Nearby hosting ${factCount(nearby)}`);
+  if (frontage != null) hosting.push(`Frontage hosting ${factCount(frontage)} MW`);
+  if (nearby != null) hosting.push(`Nearby hosting ${factCount(nearby)} MW`);
   if (factText(record.cap_b_horizon)) hosting.push(`Horizon ${factText(record.cap_b_horizon)}`);
   if (hosting.length) {
     facts.push({ id: "b", lines: hosting, basis: factBasis(record.cap_b_source, record.cap_b_confidence, record.cap_b_as_of) });

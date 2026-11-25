@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
 import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
-import { financialsCard, statementTiles, type StatementTile } from "@/lib/pnl/cue";
+import { financialsCard, shownYear, statementTiles, type StatementTile } from "@/lib/pnl/cue";
 import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
 import PnlOverlay from "./PnlOverlay";
 
@@ -113,6 +113,8 @@ export default function FinancialsEntry({
     setOpen(false);
   }, [dealId]);
   const card = settled && statement ? financialsCard(statement, sample) : null;
+  const year = statement && card ? shownYear(statement) : null;
+  const [selectedLine,setSelectedLine] = useState("");
   if (!settled && compact) return <small role="status">Checking for financials…</small>;
   if (!settled) {
     return (
@@ -127,20 +129,30 @@ export default function FinancialsEntry({
   }
   return (
     <>
-      {compact ? (card ? <button type="button" className={compact === "link" ? "text-link statement-link" : "primary preview-open"} ref={trigger} onClick={() => setOpen(true)}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
+      {compact ? (card ? <button type="button" className={compact === "link" ? "text-link statement-link" : "primary preview-open"} onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
         <article className="fin-entry">
-          <button type="button" className="fin-tile" ref={trigger} data-testid="financials-entry" onClick={() => setOpen(true)}>
-            <span>Financials</span>
+          <button type="button" className="fin-tile" data-testid="financials-entry" onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>
+            <span>Financials · stated figures</span>
+            <small>{card.coverage}</small>
             <strong>{card.revenue} revenue</strong>
             <small>{card.cashLabel} {card.cash} · {card.margin} margin</small>
-            <small>{card.coverage}</small>
             <span className="fin-open">Open P&L <span aria-hidden="true">→</span></span>
           </button>
+          {year && <div className="statement-evidence">
+            <small>Monthly statements on file · {year.year}</small>
+            <div className="month-coverage">{Array.from({length:12},(_,i) => {
+              const month = new Date(Date.UTC(year.year,i,1)).toLocaleString("en-US",{month:"short",timeZone:"UTC"});
+              const label = month + (year.months[i] ? " on file" : " not on file");
+              return <abbr key={month} title={label} aria-label={label} data-present={Boolean(year.months[i])}>{month}{year.months[i] && <sup aria-hidden="true">✓</sup>}</abbr>;
+            })}</div>
+            {[["total-revenue","Revenue"],[card.cashLabel.toLowerCase(),card.cashLabel]].map(([line,label]) =>
+              <button className="text-link" type="button" key={line} onClick={event => {trigger.current = event.currentTarget;setSelectedLine(line);setOpen(true);}}>View {label} line</button>)}
+          </div>}
         </article>
       ) : packageOnFile ? (
         <p className="fin-quiet" data-testid="financials-quiet">Financials: package not yet broken into line items</p>
       ) : null}
-      {open && card ? createPortal(<PnlOverlay statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true })); }} />, document.body) : null}
+      {open && card ? createPortal(<PnlOverlay initialGrain={selectedLine ? card.grain : null} selection={selectedLine ? {line:selectedLine,period:card.period,year:card.year} : undefined} statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => { setOpen(false); setSelectedLine(""); requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true })); }} />, document.body) : null}
     </>
   );
 }

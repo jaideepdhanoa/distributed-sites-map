@@ -4348,3 +4348,27 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .decision-work-row span { display: block; color: var(--ink-2); }
 .decision-summary > .text-link { display: block; width: fit-content; margin-bottom: 6px; }
 .decision-brief li > .text-link { text-align: left; }
+
+.power-evidence, .investment-economics { padding-block: 12px; }
+.power-evidence dd small { display: block; color: var(--ink-2); }
+.investment-economics h3, .power-evidence h3 { font-family: Georgia, serif; text-transform: none; }
+.investment-economics h4 { margin: 18px 0 5px; }
+.price-lead { display:block; font-size: 1.6rem; font-variant-numeric:tabular-nums; }
+.month-coverage { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:2px; margin:6px 0; }
+.month-coverage abbr { text-align:center; border:1px solid var(--line); border-radius:3px; text-decoration:none; }
+.month-coverage [data-present=true] { background:#e5ede3; color:var(--green); font-weight:700; }
+
+.statement-evidence { padding: 4px 12px 12px; }
+.statement-evidence .text-link { margin-right:12px; min-height:44px; }
+.month-coverage { font-size:11px; }
+
+.drawer .power-evidence > h3, .drawer .investment-economics > h3 {
+  font: 600 1.3rem/1.2 Georgia, serif; letter-spacing: normal;
+  color: var(--ink); text-transform: none; margin: 5px 0 12px;
+}
+.record-brief dd > .text-link { display: block; }
+.power-evidence .text-link { min-height: 44px; }
+.month-coverage abbr { display:grid; align-items:center; min-height:24px; }
+.month-coverage sup { line-height:8px; }
+/* Reserve space for the summary, monthly coverage and statement links during loading. */
+.fin-entry { min-block-size: 16.25rem; }

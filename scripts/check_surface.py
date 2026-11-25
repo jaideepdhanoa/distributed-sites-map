@@ -29,6 +29,7 @@ GENERATED = (
 )
 PANEL_FILES = {
     "components/KeyStrip.tsx",
+    "components/PowerEvidence.tsx",
     "components/Detail.tsx",
     "components/Explorer.tsx",
     "components/ListView.tsx",

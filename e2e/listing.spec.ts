@@ -26,7 +26,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(page.getByTestId("map-link")).toHaveText("Map ↗");
   await expect(page.getByTestId("street-view-link")).toHaveText("Street View ↗");
   await expect(page.getByTestId("listing-link")).toHaveAttribute("aria-label", "Open the listing");
-  await expect(page.getByTestId("card-numbers")).toContainText("Cash flow");
+  await expect(page.getByTestId("overview-cash")).toBeVisible();
   await expect(page.getByTestId("card-numbers")).toContainText("Open land");
   await expect(page.getByTestId("card-numbers")).toContainText("Bays that fit");
   await expect(page.getByTestId("card-numbers")).toContainText("Traffic");

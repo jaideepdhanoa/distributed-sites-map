@@ -305,7 +305,7 @@ function DealHeadline({
       ) : null}
       {showMoney ? (
         <div data-testid="overview-cash">
-          <span data-evidence="cash-flow">Cash flow</span>
+          <span data-evidence="cash-flow">{tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
           {pending ? <PendingFigure /> : (
             <>
               <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
@@ -651,8 +651,8 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      <RecordNavigation />
       <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
+      <RecordNavigation />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
@@ -695,7 +695,7 @@ export default function Detail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
-        economics={<Economics deal={linkedDeal} site={site} signedIn={signedIn} />}
+        economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
             <details className="disclosure">
@@ -980,8 +980,8 @@ export function DealDetail({
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
-      <RecordNavigation />
       <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
+      <RecordNavigation />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
@@ -1012,7 +1012,7 @@ export function DealDetail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
-        economics={<Economics deal={deal} site={universeSite} signedIn={signedIn} />}
+        economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>
             <details className="disclosure">

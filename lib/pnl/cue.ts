@@ -1,5 +1,5 @@
 import { NOT_IN_PACKAGE } from "../keyNumbers";
-import { buildPnlGrid } from "./grid";
+import { buildPnlGrid, columnPeriodKey } from "./grid";
 import type { PnlStatement, PnlYearView } from "./statement";
 import { windowCoverage } from "./window";
 
@@ -11,17 +11,12 @@ export type FinancialsCard = {
   cashLabel: "SDE" | "EBITDA";
   margin: string;
   coverage: string;
+  year: number;
+  period: string;
+  grain: "annual" | "monthly";
 };
 
-function amount(statement: PnlStatement, mode: "months" | "years", year: number, columnId: string, id: string): string {
-  const grid = buildPnlGrid(statement, mode, mode === "months" ? year : undefined);
-  const index = grid.columns.findIndex((column) => column.id === columnId);
-  if (index < 0) return "";
-  const cell = grid.rows.find((row) => row.id === id)?.cells[index];
-  return cell?.kind === "value" ? cell.amount : "";
-}
-
-function shownYear(statement: PnlStatement): PnlYearView | null {
+export function shownYear(statement: PnlStatement): PnlYearView | null {
   return statement.years.find((year) => year.annual || year.ranges?.length || year.months.some(Boolean) || year.missingMonths?.length) ?? null;
 }
 
@@ -51,7 +46,13 @@ export function financialsCard(statement: PnlStatement, sample = false): Financi
   const statementColumn = Boolean(year.annual);
   const mode = statementColumn ? "years" : "months";
   const columnId = statementColumn ? year.annual!.id : "ytd";
-  const read = (id: string) => amount(statement, mode, year.year, columnId, id);
+  const grid = buildPnlGrid(statement, mode, year.year);
+  const index = grid.columns.findIndex(column => column.id === columnId);
+  if (index < 0) return null;
+  const read = (id: string) => {
+    const cell = grid.rows.find(row => row.id === id)?.cells[index];
+    return cell?.kind === "value" ? cell.amount : "";
+  };
   const sde = read("sde");
   const ebitda = read("ebitda");
   const periodLabel = statementColumn
@@ -59,10 +60,13 @@ export function financialsCard(statement: PnlStatement, sample = false): Financi
     : (year.months.some(Boolean) || year.missingMonths?.length ? windowCoverage(year) : year.ranges?.[0]?.columnLabel) || `FY${year.year}`;
   const coverage = `${periodLabel}${sample ? " · Sample package" : ""}`;
   return {
+    year: year.year,
+    period: columnPeriodKey(grid.columns[index]),
+    grain: statementColumn ? "annual" : "monthly",
     revenue: read("total-revenue") || "—",
     cash: sde || ebitda || "—",
     cashLabel: sde ? "SDE" : "EBITDA",
-    margin: (sde ? read("sde-margin") : "") || read("margin") || "—",
+    margin: (sde ? read("sde-margin") : read("margin")) || "—",
     coverage,
   };
 }

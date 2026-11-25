@@ -58,6 +58,9 @@ export default function PnlPhone({
     const at = grid.columns.findIndex(column => matchesColumnPeriod(column, targetPeriod));
     if (at < 0) return;
     appliedLink.current = linkKey;
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(".pnl-phone-line[data-linked=true] button")?.scrollIntoView({block:"nearest"});
+    });
     if (grain === "month") setMonth(at);
     else setAnnualColumn(grid.columns[at].id);
   }, [targetPeriod, linkKey, grid, grain]);

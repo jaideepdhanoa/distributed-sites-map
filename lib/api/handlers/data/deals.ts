@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { canReadFinancials } from "@/lib/agent/access";
 import { attachPackageHrefs } from "@/lib/financials";
 import { packageHrefMap } from "@/lib/financialsLoad";
-import { isSession, requireUser, snapshotCacheHeaders } from "@/lib/guard";
-import { currentSnapshotMeta, snapshotGeneration } from "@/lib/snapshot/read";
+import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { overlayDeals } from "@/lib/nda";
 import { loadNdaSnapshot } from "@/lib/ndaLoad";
 import { withPricing } from "@/lib/pricingLoad";
@@ -24,6 +23,6 @@ export async function GET() {
   const dropped = withSuggestedDrops(staged);
   const chipped = await overlayDealChips(dropped, true);
   const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(session.actionRole)).map((feature) => withPricing(feature)));
-  const version = currentSnapshotMeta()?.id || `files-${snapshotGeneration()}`;
-  return NextResponse.json(redactGmailPayload({ ...dropped, features }), { headers: snapshotCacheHeaders(version) });
+  // Live decisions can change while the published workbook snapshot stays the same.
+  return NextResponse.json(redactGmailPayload({ ...dropped, features }), { headers: privateHeaders });
 }

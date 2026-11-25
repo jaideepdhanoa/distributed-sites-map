@@ -22,6 +22,7 @@ async function main() {
     env: {
       ...process.env,
       AUTH_SECRET: "e2e-auth-secret-not-for-production",
+      CRON_SECRET: "e2e-snapshot-secret-not-for-production",
       AUTH_USERS: JSON.stringify(users),
       DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:55433/postgres",
       DATABASE_SSL: "disable",

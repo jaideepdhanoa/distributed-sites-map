@@ -4,6 +4,7 @@ import { displayAddress } from "@/lib/format";
 import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
 import { canWrite, useActionStatus } from "./actions/panel";
 import { PowerFollowUp } from "./PowerEvidence";
+import SpaceOptions from "./spaces/SpaceOptions";
 import FinancialsEntry from "./FinancialsEntry";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 
@@ -18,7 +19,7 @@ type PreviewProps = {
   comparisonFull: boolean;
   onCompare?: () => void;
   onSatellite?: () => void;
-  onOpen: (panel?: "open-land" | "finding") => void;
+  onOpen: (panel?: "open-land" | "finding" | "space-options") => void;
   onClose: () => void;
 };
 
@@ -49,6 +50,7 @@ export default function MapSitePreview(props: PreviewProps) {
         {fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}
         <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>
+      {props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
       <div className="preview-actions">
       {power && <PowerFollowUp deal={powerDeal} site={site} primary />}
       {evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}

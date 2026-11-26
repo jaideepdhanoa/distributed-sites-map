@@ -92,6 +92,9 @@ jobs:
           fi
           python scripts/sync_workbook.py
           python scripts/build_data.py
+          if [ -f data/source/space-layouts.json ]; then
+            cp data/source/space-layouts.json data/generated/space-layouts.json
+          fi
       - name: Hash the generated data
         id: hash
         run: python scripts/snapshot_hash.py > /tmp/snapshot-hash

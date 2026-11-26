@@ -1,3 +1,4 @@
+import { outlineHref } from "@/lib/spaces/outlineAnchor";
 import { absoluteSiteUrl } from "@/lib/agent/links";
 import { isExcludedSite } from "./excluded";
 
@@ -42,6 +43,9 @@ export function commentHref(
     url.searchParams.set("nda", siteId);
     if (noteId) url.searchParams.set("note", noteId);
     return url.toString();
+  }
+  if (anchor?.type === "space" && anchor.spaceId?.startsWith("outline:")) {
+    return new URL(outlineHref(siteId, anchor.spaceId, noteId), appOrigin()).toString();
   }
   const url = new URL(discussionHref(siteId));
   if (noteId) url.searchParams.set("note", noteId);

@@ -2,20 +2,25 @@ import { useId, useState } from "react";
 import type { Aerial, Zone, Point } from "@/lib/spaces/options";
 import { kinds } from "@/lib/spaces/options";
 
-export default function OptionAerial({ image, zones, active, reviewed = [], onSelect, onPoint }: {
-  image: Aerial; zones: Zone[]; active?: string; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point) => void;
+export default function OptionAerial({ image, zones, active, reviewed = [], onSelect, onPoint, corner, onCorner }: {
+  image: Aerial; zones: Zone[]; active?: string; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point, corner?: number) => void; corner?: number; onCorner?: (corner: number) => void;
 }) {
   const frameLabel = image.kind === "site-plan" ? "Site plan" : image.kind === "site-photo" ? "Site photo" : "Site aerial";
   const pattern = useId().replace(/:/g, "");
   const [failed, setFailed] = useState("");
+  function position(svg: SVGSVGElement, x: number, y: number): Point | undefined {
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const pt = new DOMPoint(x, y).matrixTransform(matrix.inverse());
+    if (pt.x < 0 || pt.y < 0 || pt.x > image.width || pt.y > image.height) return;
+    return [Math.round(pt.x * 1000 / image.width) / 10, Math.round(pt.y * 1000 / image.height) / 10];
+  }
   if (failed === image.id) return <p role="status">The source image could not be displayed. <button type="button" className="text-link" onClick={() => setFailed("")}>Retry image</button></p>;
   return <figure className="option-aerial">
     <svg viewBox={`0 0 ${image.width} ${image.height}`} role="img" aria-label={zones.length ? frameLabel + " showing " + zones.map(z => z.label).join(", ") : frameLabel}
       onClick={onPoint ? event => {
-        const matrix = event.currentTarget.getScreenCTM();
-        if (!matrix) return;
-        const pt = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-        if (pt.x >= 0 && pt.y >= 0 && pt.x <= image.width && pt.y <= image.height) onPoint([Math.round(pt.x * 1000 / image.width) / 10, Math.round(pt.y * 1000 / image.height) / 10]);
+        const point = position(event.currentTarget, event.clientX, event.clientY);
+        if (point) onPoint(point);
       } : undefined}>
       <defs><pattern id={pattern} width="10" height="10" patternUnits="userSpaceOnUse"><path d="M-2 2L2 -2M0 10L10 0M8 12L12 8" stroke="white" strokeWidth="2.5" /></pattern></defs>
       <image onError={() => setFailed(image.id)} href={image.src} width={image.width} height={image.height} />
@@ -29,6 +34,20 @@ export default function OptionAerial({ image, zones, active, reviewed = [], onSe
             strokeDasharray={clear || reviewed.includes(z.label) ? undefined : "6 4"} vectorEffect="non-scaling-stroke" />
         </g>;
       })}
+      {onPoint && zones.find(z => z.label === active)?.points.map(([x,y], index) => (
+        <g key={index} transform={`translate(${x * image.width / 100},${y * image.height / 100})`}
+          style={{touchAction:"none",cursor:"grab"}} onClick={event => event.stopPropagation()}
+          onPointerDown={event => { event.preventDefault(); onCorner?.(index); event.currentTarget.setPointerCapture(event.pointerId); }}
+          onPointerMove={event => {
+            const svg = event.currentTarget.ownerSVGElement;
+            if (!svg || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            const point = position(svg, event.clientX, event.clientY);
+            if (point) onPoint(point, index);
+          }}>
+          <circle r={Math.min(image.width,image.height) * .04} fill="transparent" />
+          <circle r={Math.min(image.width,image.height) * .013} fill={index === corner ? "#ffe49a" : "white"} stroke="#152b27" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        </g>
+      ))}
     </svg>
     <figcaption>{image.source} · {image.kind === "site-plan" ? "Filed " : ""}{image.date || "Date unknown"}{image.documentUrl && <> · <a href={image.documentUrl} target="_blank" rel="noopener noreferrer" className="text-link">Open source</a></>}</figcaption>
   </figure>;

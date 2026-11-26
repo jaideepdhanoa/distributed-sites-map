@@ -478,7 +478,7 @@ const commentAnchorPayload = z
     type: z.enum(["pnl_cell", "pnl_line", "space", "nda"]),
     line: z.string().trim().max(40).optional(),
     period: z.string().trim().max(80).optional(),
-    space_id: z.string().trim().max(40).optional(),
+    space_id: z.string().trim().max(128).optional(),
   })
   .strict();
 

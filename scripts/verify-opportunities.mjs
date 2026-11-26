@@ -26,6 +26,7 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
       coverage = {
         activeSites: rows.length,
         activeShortlist: rows.filter(r => r.review?.primary.disposition === "Shortlist").length,
+        shortlistVisitPlans: rows.filter(r => r.review?.primary.disposition === "Shortlist" && r.review.visitPlan).length,
         serviceDiligence: rows.filter(r => r.review?.primary.disposition === "Service diligence").length,
         recommendedDrops: rows.filter(r => r.review?.primary.disposition === "Suggest drop").length,
         filedOutsideActive: filed?.length,

@@ -18,7 +18,11 @@ const optionSchema = z.object({
   evidence: link, offering: text.nullable(),
 }).refine(row => !row.dropReason || row.disposition === "Dropped" || row.disposition === "Suggest drop")
   .refine(row => row.rank === null || ["Shortlist", "Service diligence"].includes(row.disposition));
-const siteSchema = z.object({ name: text, primary: optionSchema, alternatives: z.array(optionSchema).max(20) })
+const visitPlanSchema = z.object({
+  decision: text, reason: text, commercial: text, power: text, beforeVisit: text,
+  fieldwork: text, scenario: text, beforeLoi: text, basis: text,
+});
+const siteSchema = z.object({ name: text, primary: optionSchema, alternatives: z.array(optionSchema).max(20), visitPlan: visitPlanSchema.optional() })
   .refine(row => new Set([row.primary, ...row.alternatives].map(o => o.route)).size === row.alternatives.length + 1);
 const fileSchema = z.object({
   version: z.literal(1), register: z.url().regex(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]+\/edit$/).nullable(),

@@ -131,3 +131,38 @@ test("commercial diligence order, alternate routes and archived reviews", async 
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-opportunities.png",animations:"disabled"});
 });
+
+test("shortlisted visit shows the charging decision and its parallel diligence work", async ({page}, info) => {
+  const primary = {route:"Operating acquisition", disposition:"Shortlist", rank:1, rationale:"A bay might be freed.",
+    next:"Measure the aisle.", reviewedOn:"2026-01-01", owner:"Reviewer (proposed)", revisitOn:"2026-01-12",
+    evidence:"https://example.org/record", offering:null};
+  const visitPlan = {decision:"Confirm access", reason:"Measure the service bay while the queue is active.",
+    commercial:"Reconcile the operating receipts.", power:"Scope a utility discovery request.",
+    beforeVisit:"Confirm access to the yard.", fieldwork:"Measure the turn with a queue present.",
+    scenario:"Compare both footprints.", basis:"Illustrative network reference.", beforeLoi:"Verify rights and retained income."};
+  const row = {id:"PIPE-LAS-9001",city:"LAS",name:"Example service yard",stage:"Desk screen",mapped:false,
+    priority:"Check space",section:"Operating",financeVisible:true,review:{name:"Example service yard",primary,alternatives:[],visitPlan},
+    charging:{merit:{action:"Review for closure",next:"Review the original outdoor layout.",netValue:null},
+      name:"Screen",result:{siteCost:null},screen:[],selected:null}};
+  await page.route("**/api/data/selection-review",route=>route.fulfill({json:{rows:[row],hasInputs:true,mismatches:0}}));
+  await page.goto("/selection-review?disposition=Shortlist");
+  const card = page.locator(".visit-decision");
+  await expect(card.getByText(visitPlan.reason)).toBeVisible();
+  await expect(card.getByText(/Review for closure/)).toBeVisible();
+  await expect(card.getByText(/Reviewer.*2026-01-12/)).toBeVisible();
+  await card.getByText("Actions and offer conditions").click();
+  await expect(card.getByText(visitPlan.power,{exact:false})).toBeVisible();
+  await expect(card.getByText(visitPlan.beforeLoi,{exact:false})).toBeVisible();
+  expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await mkdir("review-shots",{recursive:true});
+  await card.screenshot({path:"review-shots/"+info.project.name+"-visit-decision.png",animations:"disabled"});
+  await card.getByText("Test cash needed while waiting for power").click();
+  await expect(card.getByRole("table")).toHaveCount(0);
+  await card.getByLabel("Months from closing to power").fill("3");
+  await card.getByLabel("Cash required at closing ($)",{exact:true}).fill("100");
+  await card.getByLabel(/Monthly operating cash/).fill("-10");
+  await card.getByLabel(/Monthly financing/).fill("10");
+  await expect(card.getByRole("row",{name:/month 9/})).toContainText("$280");
+  await card.getByLabel(/Monthly operating cash/).fill("20");
+  await expect(card.getByRole("row",{name:/month 15/})).toContainText("$100");
+});

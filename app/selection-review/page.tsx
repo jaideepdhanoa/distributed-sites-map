@@ -27,8 +27,8 @@ export default function SelectionReview() {
     <a className="text-link" href="/?funnel=pipeline&view=list">← Pipeline list</a>
     <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>
     <div className="space-review-filters">
-      <label>Market<select className="secondary" value={market} onChange={e=>setMarket(e.target.value)}><option value="">All markets</option>{[...new Set(rows.map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
-      <label>Next check<select className="secondary" value={check} onChange={e=>setCheck(e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
+      <label>Market<select aria-label="Market" className="secondary" value={market} onChange={e=>setMarket(e.target.value)}><option value="">All markets</option>{[...new Set(rows.map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
+      <label>Next check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setCheck(e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Find a site<input className="field" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Name or site ID" /></label>
     </div>
     {!data && !error && <p role="status">Loading pipeline…</p>}

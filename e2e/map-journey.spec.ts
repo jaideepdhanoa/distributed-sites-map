@@ -269,3 +269,34 @@ test("released Compare loads statement evidence for operating deals", async ({pa
   await expect(row).not.toContainText("Checking…");
   await expect(row.getByRole("button",{name:"Retry statement"})).toHaveCount(0);
 });
+
+test("scan market readings and open the mapped wash radius", async ({page}, info) => {
+  await page.goto("/?city=LAS&funnel=pipeline&pstage=all");
+  await page.getByRole("button", {name:"Market context",exact:true}).click();
+  const panel = page.getByRole("complementary",{name:"Market context map"});
+  const list = panel.getByRole("button",{name:/Sites in view/});
+  if (await list.getAttribute("aria-expanded") === "false") await list.click();
+  const first = panel.locator("[data-market-site]").first();
+  await expect(first).toBeVisible();
+  await panel.getByRole("button",{name:/Washes · 1 mi/}).click();
+  await expect(panel.locator('th[aria-sort="ascending"]')).toContainText("Washes");
+  await panel.getByRole("button",{name:"Trade area",exact:true}).click();
+  await panel.getByRole("combobox").selectOption("income");
+  await expect(panel).toContainText("median within 3 mi");
+  await panel.getByRole("button",{name:"Traffic",exact:true}).click();
+  if (!process.env.MAP_PRODUCTION_CHECK) {
+    await mkdir("review-shots",{recursive:true});
+    const name = process.env.MAP_DEPLOYED_PREVIEW ? "preview" : "local";
+    await page.screenshot({path:`review-shots/${info.project.name}-${name}-market-context.png`});
+  }
+  await first.click();
+  const preview = page.getByRole("complementary").filter({has:page.locator("#pin-preview-title")});
+  const card = preview.getByRole("region",{name:"Market context"});
+  await expect(card).toBeVisible();
+  await card.getByRole("button",{name:"3 mi",exact:true}).click();
+  await expect(card.getByRole("button",{name:"3 mi",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(card).toContainText("mapped census locations");
+  await expect(page).toHaveURL(/washRadius=3/);
+  await preview.getByRole("button",{name:"Close site preview"}).click();
+  await expect(panel).toBeVisible();
+});

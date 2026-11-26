@@ -149,3 +149,7 @@ At city zoom, Nearby sites follows the visible map and orders matching records b
 Saved comparisons place the decision beside its source figures. Keep the original value, basis and reporting period legible when a current figure changes. Link each citation to the underlying record and any matching evidence follow-up.
 
 Decisions to revisit links directly to one changed citation. Show its original and current figures, the source, and the owner’s review action alongside the decision rationale. Keep and Revise create dated records. Nearby rows show one parcel fact and highlight its map position on hover or keyboard focus. The ring lets pointer events reach the map.
+
+### Market context
+
+Market context is a map mode beside Layers. It replaces the five Area data switches. One measure colors the filtered shortlist using fixed bands, with gray for missing and an explicit reading count on clusters. Sites in view uses the same mapped records, supports numeric sorting and opens the ordinary pin preview. On a phone the list starts collapsed. Workbook nearest-segment traffic, the 800 m maximum and linked census readings retain their separate sources. Wash totals within one and three miles are cumulative. Mapped census locations have their own count and radius. Market context in the record and Compare reads the same measures and units.

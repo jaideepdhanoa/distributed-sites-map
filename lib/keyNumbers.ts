@@ -700,7 +700,7 @@ export function growthText(value?: number | null) {
   return `${text}%`;
 }
 
-function trafficRoad(value?: string | null) {
+export function trafficRoad(value?: string | null) {
   const readable = shortRoad(value);
   const rawId = (value || "").match(/\b(\d{6,})\b/)?.[1] || "";
   const digits = readable.replace(/\D/g, "");

@@ -51,7 +51,7 @@ import { LAND_PAUSED_NOTE, UNIVERSE_STAGE_LABEL, countyCheck } from "@/lib/listL
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
-import { indexPowerLinks } from "@/lib/powerLinkIndex";
+import { catalogPowerRecords } from "@/lib/powerLinkIndex";
 import { mapPower, matchesMapPower, serviceFilters, hostingFilters, type ServiceFilter, type HostingFilter } from "@/lib/mapPower";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
@@ -1107,20 +1107,9 @@ export default function Explorer() {
   const powerCatalog = useMemo(() => {
     const allSites = new Map((catalog || []).map(f => [f.properties.site_id,f.properties]));
     for (const f of data?.sites.features || []) allSites.set(f.properties.site_id,f.properties);
-    const pairs: [string,string][] = dealBundle.features.map(f => [f.properties.deal_id,f.properties.universe_id]);
-    for (const site of allSites.values()) {
-      for (const id of [site.linked_deal_id,...(site.linked_deal_ids || [])]) if (id) pairs.push([id,site.site_id]);
-    }
-    return {sites:allSites,links:indexPowerLinks(pairs)};
+    return catalogPowerRecords([...allSites.values()], dealBundle.features.map(f => f.properties));
   }, [catalog,data?.sites,dealBundle]);
-  function powerDealForSite(site: SiteProps) {
-    const link = powerCatalog.links.get("site:"+site.site_id);
-    return link ? dealBundle.byId.get(link.targetId) : undefined;
-  }
-  function powerSiteForDeal(deal: DealProps) {
-    const link = powerCatalog.links.get("deal:"+deal.deal_id);
-    return link ? powerCatalog.sites.get(link.targetId) : undefined;
-  }
+  const { dealFor: powerDealForSite, siteFor: powerSiteForDeal } = powerCatalog;
   function dealForSite(site: SiteProps) {
     if (site.linked_deal_id) {
       const linked = dealBundle.byId.get(site.linked_deal_id);
@@ -3380,6 +3369,7 @@ export default function Explorer() {
           />
         ) : selectedDeal ? (
           <DealDetail
+            power={{deal:pinPowerDeal,site:pinPowerSite}}
             decisionFirst={listView || inReview}
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
@@ -3424,6 +3414,7 @@ export default function Explorer() {
           />
         ) : selectedSite ? (
           <Detail
+            power={{deal:pinPowerDeal,site:pinPowerSite}}
             decisionFirst={listView || inReview}
             site={selectedSite}
             lng={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}

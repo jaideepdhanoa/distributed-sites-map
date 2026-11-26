@@ -126,3 +126,17 @@ test("comparison carries a service disagreement and distinguishes utility foreca
   assert.equal(f?.kind,"basis");
   assert.ok(f.values[0].includes("2028"));
 });
+
+test("power joins accept reverse links and suppress ambiguous linked readings", async () => {
+  const {catalogPowerRecords} = await import("../../lib/powerLinkIndex");
+  const a=deal({deal_id:"EXAMPLE-A",universe_id:""});
+  const site={site_id:"EXAMPLE-S",linked_deal_id:a.deal_id,cap_c_phase:"3-phase",cap_c_volts:480} as unknown as import("../../lib/types").SiteProps;
+  const only=catalogPowerRecords([site],[a]);
+  assert.equal(only.siteFor(a),site);
+  assert.equal(only.dealFor(site),a);
+  const other=deal({deal_id:"EXAMPLE-B",universe_id:site.site_id});
+  const multiple=catalogPowerRecords([site],[a,other]);
+  assert.equal(multiple.siteFor(other),undefined);
+  assert.equal(multiple.dealFor(site),undefined);
+  assert.equal(dealRows(other,[site],true,null).find(row=>row.label==="On-site service")?.value,"—");
+});

@@ -1,3 +1,4 @@
+import { catalogPowerRecords } from "@/lib/powerLinkIndex";
 import { usePurchaseScenarios } from "./PurchaseScenarios";
 import { originalScenario,purchaseLabels,purchaseRows,preferredScenario,scenarioFigure,readScenario } from "@/lib/purchaseReview";
 import { createPortal } from "react-dom";
@@ -49,6 +50,7 @@ export default function CompareTray({
   const [highlight, setHighlight] = useState(true);
   const [gap,setGap] = useState<{target:EvidenceTarget;title:string;label:string;context?:string} | null>(null);
   const lookup = contextSites || sites;
+  const power = catalogPowerRecords(lookup, contextDeals || deals);
   const count = deals.length + sites.length;
   const matrixRef = useRef<HTMLDivElement>(null);
   const inspectedCell = useRef<HTMLButtonElement | null>(null);
@@ -81,8 +83,8 @@ export default function CompareTray({
     };
   }, [hasMatrix]);
   const columns = [
-    ...deals.map(deal => ({ id: deal.deal_id, followUps: deal.kind !== "land" && deal.stage_group !== "dropped", targetKind:"deal" as const, deal, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
-    ...sites.map(site => ({ id: site.site_id, followUps: !site.land_only, targetKind:"site" as const, deal:(contextDeals || deals).find(d=>d.deal_id===site.linked_deal_id || d.universe_id===site.site_id), title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
+    ...deals.map(deal => ({ id: deal.deal_id, followUps: deal.kind !== "land" && deal.stage_group !== "dropped", targetKind:"deal" as const, deal, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn, power.siteFor(deal) || null) })),
+    ...sites.map(site => ({ id: site.site_id, followUps: !site.land_only, targetKind:"site" as const, deal:(contextDeals || deals).find(d=>d.deal_id===site.linked_deal_id || d.universe_id===site.site_id), title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn, power.dealFor(site) || null) })),
   ];
   const statementIds = signedIn && hasMatrix ? [...new Set(columns.flatMap(c => c.deal && showsFinancials(c.deal) ? [c.deal.deal_id] : []))].sort().join("|") : "";
   const statements = useComparisonStatements(statementIds);
@@ -280,7 +282,7 @@ export default function CompareTray({
                         <th scope="row">{label}{label === "Bays that fit" && <small>Earlier workbook screen</small>}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {renderCell(columns[i], label, kind, value)}{label === "Next check" && <small>{columns[i].deal?.screening?.origin}</small>}
+                            {renderCell(columns[i], label, kind, value)}{label === "Next check" && <small>{columns[i].rows.find(row=>row.label===label)?.source}</small>}
                             {label === "Cash flow" && value !== MISSING && value !== "Not applicable" && columns[i].deal?.figures_source && <small className="comparison-source">{columns[i].deal?.figures_source}</small>}
                           </td>
                         ))}

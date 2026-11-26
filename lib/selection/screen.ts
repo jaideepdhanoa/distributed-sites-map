@@ -41,14 +41,18 @@ export type ScreenSummary = {
 export function screenSummary(city: string, input: Inputs | undefined, view: Pick<TriageRow,"focus"|"fit">,
   record: {listing_removed?: unknown; stage_blocker?: unknown; next_step?: unknown}): ScreenSummary {
   const [priority,instruction] = selectionCheck(city,input,view.focus,record.listing_removed === true);
+  return currentScreen({priority,instruction,origin:"Suggested check",fit:view.fit,
+    layoutCheck:["Test conversion","Measure fourth stall","Measure the footprint","Resolve parcel","Obtain usable image","Screen fleet service","Revisit site evidence"].includes(priority)}, record);
+}
+
+export function currentScreen(screen: ScreenSummary, record: {stage_blocker?: unknown; next_step?: unknown}): ScreenSummary {
   const recorded = (v:unknown) => typeof v === "string" && v.trim() && !/^(?:—|-|unknown|not on file|n\/a)$/i.test(v.trim()) ? v.trim() : "";
   const blocker = recorded(record.stage_blocker);
   const next = recorded(record.next_step);
-  const mandate = priority === "Land paused" || priority === "Outside mandate";
-  if (!mandate && (blocker || (next && priority !== "Resolve site rights"))) {
+  const mandate = screen.priority === "Land paused" || screen.priority === "Outside mandate";
+  if (!mandate && (blocker || (next && screen.priority !== "Resolve site rights"))) {
     return {priority:blocker ? "Resolve recorded blocker" : "Recorded next action",instruction:blocker || next,
-      origin:blocker ? "Recorded blocker" : "Recorded next action",fit:view.fit,layoutCheck:false};
+      origin:blocker ? "Recorded blocker" : "Recorded next action",fit:screen.fit,layoutCheck:false};
   }
-  return {priority,instruction,origin:"Suggested check",fit:view.fit,
-    layoutCheck:["Test conversion","Measure fourth stall","Measure the footprint","Resolve parcel","Obtain usable image","Screen fleet service","Revisit site evidence"].includes(priority)};
+  return screen;
 }

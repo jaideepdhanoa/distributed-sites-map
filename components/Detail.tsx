@@ -1,3 +1,4 @@
+import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, folderHref, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
@@ -554,10 +555,12 @@ export default function Detail({
   spaceNote,
   onLayoutOverlay,
   washInspection,
+  power,
   decisionFirst = false,
   onOpenNda,
 }: {
   washInspection?: WashInspection;
+  power?: PowerRecords;
   decisionFirst?: boolean;
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -660,7 +663,7 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
+      <RecordBrief power={power} target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
       <RecordNavigation financials={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
@@ -831,7 +834,7 @@ export default function Detail({
         numbers={figuresReady ? (
           <>
             {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
-            <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
+            <SitePacket power={power} site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
             <div className="kv">
               <span data-evidence="asking">Asking price</span>
               <div>
@@ -905,10 +908,12 @@ export function DealDetail({
   spaceNote,
   onLayoutOverlay,
   washInspection,
+  power,
   decisionFirst = false,
   onOpenNda,
 }: {
   washInspection?: WashInspection;
+  power?: PowerRecords;
   decisionFirst?: boolean;
   deal: DealProps;
   peers?: DealProps[];
@@ -1001,7 +1006,7 @@ export function DealDetail({
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
-      <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
+      <RecordBrief power={power} target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
       <RecordNavigation financials={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
@@ -1087,7 +1092,7 @@ export function DealDetail({
         numbers={
           <>
             {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
-            {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
+            {figuresReady ? <KeyStrip power={power} deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">
               <span data-evidence="asking">Asking price</span>

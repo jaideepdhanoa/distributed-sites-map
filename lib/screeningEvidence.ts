@@ -1,3 +1,4 @@
+import { currentScreen } from "./selection/screen";
 import { cashTile, sheetMoney, acresText, spareLandSqft, universeTrafficLine, workbookTrafficLine } from "./keyNumbers";
 import { nextStepText, stageTitle, statusOf } from "./labels";
 import type { DealProps, SiteProps, UnscreenedProps } from "./types";
@@ -33,7 +34,7 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
     const text = present(value);
     if (text) figures.push({ label, value: text, source: present(source), date: present(date) });
   }
-  const screen = signedIn ? deal?.screening : undefined;
+  const screen = signedIn && deal?.screening && deal.stage_group !== "dropped" ? currentScreen(deal.screening, deal) : undefined;
   if (screen?.fit) add("Assessed layout",screen.fit,"Space assessment");
   if (deal?.bays_that_fit != null) add("Earlier workbook bays", String(deal.bays_that_fit), "Pipeline workbook");
   add("Open land", spare.value, spare.note);

@@ -17,6 +17,7 @@ import {
   type Assessment,
   type Point,
 } from "@/lib/spaces/options";
+import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import { outlineId } from "@/lib/spaces/outlineAnchor";
 import { reviewBody } from "@/lib/spaces/optionReview";
 import type { MapSpaceSite, SpaceCatalog } from "@/lib/spaces/mapCatalog";
@@ -77,6 +78,7 @@ export default function MainMapSpaces({
   onDrawAt?: (site: string, center: Point) => void;
 }) {
   const params = useSearchParams();
+  const back = reviewReturn(params.get("returnTo"), ["/space-review", "/selection-review"], "");
   const open = params.get("spaces") === "1";
   const id = params.get("spaceSite") || "",
     area = params.get("spaceArea") || "";
@@ -318,9 +320,9 @@ export default function MainMapSpaces({
       ) : (
         <div className="space-map-open" data-testid="map-spaces-workspace">
           <div className="space-map-header"><header className="space-map-bar">
-            <button type="button" className="paper-btn" onClick={() => leave(() => navigate(false))}>
+            <button type="button" className="paper-btn" onClick={() => leave(() => back ? window.location.assign(back) : navigate(false))}>
               <ChevronLeft size={16} />
-              Main map
+              {back ? reviewLabel(back) : "Main map"}
             </button>
             <h2>Spaces</h2>
             {site && (

@@ -34,5 +34,9 @@ test("pin, record and comparison share the assessed layout, condition and record
   assert.equal(brief.review,gate.instruction);
   assert.equal(previewFitFigure(brief.figures)?.value,option.fit);
   assert.equal(dealRows(deal,[],true).find(r=>r.label==="Next check")?.value,gate.instruction);
-  assert.equal(screenSummary("PHX",undefined,option,{}).priority,"Test conversion");
+  const projected=screenSummary("PHX",undefined,option,{});
+  assert.equal(projected.priority,"Test conversion");
+  const updated={...deal,screening:projected,stage_blocker:"Review the financial statement."};
+  assert.equal(screeningEvidence({deal:updated,signedIn:true}).evidence?.kind,"financials");
+  assert.equal(dealRows(updated,[],true).find(r=>r.label==="Next check")?.value,updated.stage_blocker);
 });

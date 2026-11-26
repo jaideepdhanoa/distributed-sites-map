@@ -1,3 +1,4 @@
+import { currentScreen } from "./selection/screen";
 import { comparisonPower } from "./mapPower";
 import { purchaseLabels, purchaseRows } from "./purchaseReview";
 import { marketLabels, marketEvidence, marketComparisonRows } from "./marketContext";
@@ -50,7 +51,7 @@ function powerRows(deal?: DealProps, site?: SiteProps): CompareRow[] {
   ];
 }
 
-export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): CompareRow[] {
+export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean, powerSite?: SiteProps | null): CompareRow[] {
   const linked = sites.find((site) => site.site_id === deal.universe_id);
   const cash = cashTile(deal);
   const spare = spareLandSqft(deal.open_land_sqft, linked?.spare_ac_own, deal.open_land_basis);
@@ -68,7 +69,7 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean)
     { label: "Land", key: deal.land_acres, value: shown(acresText(deal.land_acres)) },
     { label: "Open land", value: spare.value },
     { label: "Land measurement", value: shown(spare.note) },
-    ...(signedIn ? powerRows(deal, linked) : []),
+    ...(signedIn ? powerRows(deal, powerSite === undefined ? linked : powerSite || undefined) : []),
     { label: "Power", value: powerSummary(factsForDeal(deal)) || "—" },
     { label: "Depot", value: depotLine(deal.miles_to_depot) },
     { label: "Zoning", value: shown(linked?.zoning) },
@@ -115,7 +116,7 @@ function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
   ];
 }
 
-export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): CompareRow[] {
+export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean, powerDeal?: DealProps | null): CompareRow[] {
   const linked = deals.find((deal) => deal.universe_id === site.site_id || deal.deal_id === site.linked_deal_id);
   const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
   const spare = spareLandSqft(linked?.open_land_sqft, site.spare_ac_own, linked?.open_land_basis);
@@ -133,7 +134,7 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean)
     { label: "Land", key: site.parcel_acres ?? site.lot_ac, value: shown(acres) },
     { label: "Open land", value: spare.value },
     { label: "Land measurement", value: shown(spare.note) },
-    ...(signedIn ? powerRows(linked, site) : []),
+    ...(signedIn ? powerRows(powerDeal === undefined ? linked : powerDeal || undefined, site) : []),
     { label: "Power", value: powerSummary(factsForSite(site, linked)) || "—" },
     { label: "Depot", value: depotLine(site.miles_to_depot) },
     { label: "Zoning", value: shown(site.zoning) },
@@ -164,6 +165,7 @@ function earningsBasis(deal?: DealProps) {
 
 function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRow[] {
   if (!deal || !signedIn) return [];
+  const screen = deal.screening && currentScreen(deal.screening, deal);
   const applicable = deal.kind !== "land" && deal.financials_open !== false && deal.figures_status !== "vacant";
   return [
     { label: "Financial source", value: applicable ? shown(deal.figures_source) : "Not applicable" },
@@ -172,7 +174,7 @@ function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRo
     { label: "Figure basis", value: applicable ? shown(deal.earnings_basis || deal.figures_basis) : "Not applicable" },
     { label: "Reporting period", value: applicable ? shown(deal.earnings_period || deal.revenue_period) : "Not applicable" },
     { label: "Blocker", key: deal.stage_blocker === MISSING ? "clear" : deal.stage_blocker?.trim() ? "blocked" : null, value: deal.stage_blocker === MISSING ? "No blocker recorded" : shown(deal.stage_blocker) },
-    { label: "Next check", value: shown(deal.screening?.instruction || deal.stage_blocker && deal.stage_blocker !== MISSING && deal.stage_blocker || deal.next_step), source:deal.screening?.origin },
+    { label: "Next check", value: deal.stage_group === "dropped" ? "No further review scheduled." : shown(screen?.instruction || deal.stage_blocker && deal.stage_blocker !== MISSING && deal.stage_blocker || deal.next_step), source:screen?.origin },
     ...(deal.screening?.fit ? [{label:"Assessed layout",value:deal.screening.fit,source:"Space assessment"}] : []),
   ];
 }

@@ -1,3 +1,4 @@
+import { catalogPowerRecords } from "@/lib/powerLinkIndex";
 import { readScenario, scenarioFigure } from "@/lib/purchaseReview";
 import { showsFinancials } from "@/lib/keyNumbers";
 import { linkedPnlIds, loadPnlStatement } from "@/lib/pnl/read";
@@ -15,6 +16,7 @@ import { evidenceMeasures, evidenceTarget, type EvidenceTarget } from "./compari
 import type { ActionRole } from "./roles";
 
 export function decisionCatalog(sites: SiteProps[], deals: DealProps[]) {
+  const power = catalogPowerRecords(sites,deals);
   const bySite = new Map(sites.map(site => [site.site_id, site]));
   const byDeal = new Map(deals.map(deal => [deal.deal_id, deal]));
 
@@ -57,7 +59,8 @@ export function decisionCatalog(sites: SiteProps[], deals: DealProps[]) {
       return line ? {...c,...line} : {...c,value:MISSING,source:"Financial statement"};
     }
     const linked = site || bySite.get(deal?.universe_id || "");
-    const rows = site ? siteRows(site, deal ? [deal] : [], true) : dealRows(deal!, linked ? [linked] : [], true);
+    const rows = site ? siteRows(site, deal ? [deal] : [], true, power.dealFor(site) || null)
+      : dealRows(deal!, linked ? [linked] : [], true, power.siteFor(deal!) || null);
     const label = evidenceMeasures[c.measure];
     const row = rows.find(r => r.label === label);
     const target = evidenceTarget(c.targetKind, c.targetId, label, deal)!;

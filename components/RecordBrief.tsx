@@ -1,3 +1,4 @@
+import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
@@ -10,6 +11,7 @@ import RecordFinding from "./actions/RecordFinding";
 
 type Figure = ReturnType<typeof screeningEvidence>["figures"][number];
 type BriefProps = Parameters<typeof screeningEvidence>[0] & {
+  power?: PowerRecords;
   target?: { kind: "site" | "deal"; id: string };
   pnl?: { statement: PnlStatement | null; settled: boolean; sample: boolean };
 };
@@ -20,7 +22,7 @@ function FigureRow({ fact }: { fact: Figure }) {
   return <div><dt>{fact.label}</dt><dd>{fact.value}<small>{[source, date].filter(Boolean).join(" · ")}</small></dd></div>;
 }
 
-export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
+export default function RecordBrief({ target, pnl, power, ...input }: BriefProps) {
   const router = useRouter();
   const { status, reason, origin, review, evidence, check, missing, figures } = screeningEvidence(input);
   const financial = check === "financials" && input.signedIn;
@@ -49,7 +51,7 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
             query.set("panel", evidence.kind === "layout" ? "space-options" : "open-land");
             const href = `/?${query}`;
             rememberSearch(href); router.replace(href, { scroll: false });
-          }}>{review}</button> : review}{input.signedIn && /power|utility|electrical/i.test(review) && !evidence && <PowerFollowUp deal={input.deal} site={input.site} />}{missing && !land && <small>{missing}</small>}</dd></div>
+          }}>{review}</button> : review}{input.signedIn && /power|utility|electrical/i.test(review) && !evidence && <PowerFollowUp {...(power || {deal:input.deal,site:input.site})} />}{missing && !land && <small>{missing}</small>}</dd></div>
         <div><dt>Site fit</dt><dd>{fit?.label === "Assessed layout" ? fit.value : input.site?.verdict || (fit ? fit.label + " · " + fit.value : "Fit requires verification")}</dd></div>
         {financial ? <div><dt>Statement coverage</dt><dd>{coverage || (pnl?.settled ? "No statement coverage on file." : "Checking statement coverage…")}{coverage && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} loaded={pnl} compact="link" />}</dd></div>
           : land && missing ? <div><dt>Open land</dt><dd>{missing}</dd></div>

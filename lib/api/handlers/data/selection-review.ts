@@ -17,11 +17,16 @@ import { unmappedChargingSite } from "@/lib/charging/unmapped";
 import type { DealProps } from "@/lib/types";
 import { loadMapDeals } from "./deals";
 
+import type { ActionRole } from "@/lib/actions/roles";
+
 export async function GET() {
   const session = await requireUser();
   if (!isSession(session)) return session;
+  return NextResponse.json(await loadSelectionReview(session.actionRole), {headers:privateHeaders});
+}
+export async function loadSelectionReview(role:ActionRole) {
   const raw = readGeneratedOptional("selection-inputs.json") as Record<string,Inputs> | undefined;
-  const current = await loadMapDeals(session.actionRole);
+  const current = await loadMapDeals(role);
   const mapped = new Map(current.features.filter(f => f.properties?.kind === "pipeline").map(f => [String(f.properties?.deal_id), f]));
   const missing = (raw ? Object.keys(raw) : assessedSiteIds()).filter(id => !mapped.has(id) && !isExcludedSite(id));
   const features = missing.map(id => {
@@ -33,7 +38,7 @@ export async function GET() {
   const all = [...mapped.values(), ...offMap.features];
   const rows: SelectionRow[] = [];
   let mismatches = 0;
-  const financeVisible = canReadFinancials(session.actionRole);
+  const financeVisible = canReadFinancials(role);
   const register = financeVisible ? opportunityRegister() : undefined;
   const stages = new Map<string,string>();
   const evidence = financeVisible ? selectionResearch() : null;
@@ -62,5 +67,5 @@ export async function GET() {
   const activeIds = new Set(rows.map(r => r.id));
   const filed = Object.entries(register?.sites ?? {}).filter(([id]) => !activeIds.has(id))
     .map(([id,review]) => ({id, city:id.split("-")[1], stage:stages.get(id) || "Stage unavailable", review}));
-  return NextResponse.json({rows,filed,registerUrl:register?.register,mismatches,hasInputs:Boolean(raw)}, {headers:privateHeaders});
+  return {rows,filed,registerUrl:register?.register,mismatches,hasInputs:Boolean(raw)};
 }

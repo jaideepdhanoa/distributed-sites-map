@@ -68,15 +68,16 @@ export default function MapSitePreview(props: PreviewProps) {
       {!showingPower && props.marketMode && !listing && <MarketEvidence metric={props.marketMode} deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
       {showingPower ? <MapPowerCard deal={props.powerDeal} site={props.powerSite} grid={props.grid} onGrid={props.onGrid}/> : <dl className="preview-facts">
         {fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}
-        <div><dt>Next check</dt><dd>{review}<small className="preview-missing">{origin}</small>{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
+        <div><dt>Next check</dt><dd>{powerDeal?.charging?.merit.next ?? review}<small className="preview-missing">{powerDeal?.charging?"Site decision":origin}</small>{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>}
       {!showingPower && evidence?.kind !== "layout" && props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
       {!showingPower && props.signedIn && powerDeal?.charging && !site?.land_only && <section className="charging-preview">
-        <strong>Charging economics</strong><span>{powerDeal.charging.stale?"Refresh saved case":powerDeal.charging.result.decision}</span>
+        <strong>Charging economics</strong><span>{powerDeal.charging.merit.action}</span>
         <p>{powerDeal.charging.result.siteCost==null?"Site cost pending":"$"+powerDeal.charging.result.siteCost.toFixed(2)+" / charge"}
           {powerDeal.charging.result.depot!=null && " · $"+powerDeal.charging.result.depot.toFixed(2)+" depot"+(powerDeal.charging.comparator==="workbook"?" proxy":"")}</p>
+        {powerDeal.charging.merit.downsideGap!=null && <small>Downside gap ${powerDeal.charging.merit.downsideGap.toFixed(2)} per charge</small>}
         <small>{powerDeal.charging.name} · {powerDeal.charging.result.peakSessions??"Unknown"} peak charges · {powerDeal.charging.result.opening||"Opening unconfirmed"}</small>
-        <p>{powerDeal.charging.result.next}</p>{!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<ChargingLink site={powerDeal.deal_id} revision={powerDeal.charging.selected}/>
+        {!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<ChargingLink site={powerDeal.deal_id} revision={powerDeal.charging.selected}/>
       </section>}
       {!props.grid.open && <div className="preview-actions">
       {!showingPower && power && <PowerFollowUp deal={props.powerDeal} site={props.powerSite} primary />}

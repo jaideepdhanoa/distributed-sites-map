@@ -1,4 +1,6 @@
 "use client";
+import { siteMerit } from "@/lib/charging/merit";
+import { MeritEditor } from "./SiteMerit";
 import { useEffect,useRef,useState } from "react";
 import { amounts,calculate,diligenceDrivers,fields,groups,initialCase,keys,modelVersion,type CalculationTrace,type Evidence,type Inputs,type Key,type SavedCase } from "@/lib/charging/model";
 import { filedScreenLabel } from "@/lib/charging/summary";
@@ -17,9 +19,9 @@ export function ChargingSiteSection({deal}:{deal:DealProps}) {
   const c=deal.charging;
   if(!c)return null;
   return <section className="charging-preview" aria-label="Charging economics"><strong>Charging economics</strong>
-    <p>{c.stale?"Refresh saved case":c.result.decision} · {c.name}</p>
+    <p>{c.merit.action} · {c.name}</p>
     <p>{c.result.siteCost==null?"Site cost pending":amounts(c.result.siteCost,2)+" per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
-    <p>{c.result.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} revision={c.selected}/></section>;
+    <p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} revision={c.selected}/></section>;
 }
 export function ChargingEditor({site,revision,explain=false}:{site:string;revision?:string|null;explain?:boolean}) {
   const [payload,setPayload]=useState<Payload|null>(null),[failed,setFailed]=useState(false),[attempt,retry]=useState(0);
@@ -68,6 +70,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
   const referenceBasis=originalInputs && savedReference!==undefined?"Filed reference saved with this revision":"Using the current filed network inputs";
   const layout=site.purchase?.layout;
   const stale=!!parent && (parent.sourceRevision!==data.source || parent.model!==modelVersion);
+  const merit=siteMerit(site,draft,true,stale && !reviewed,false);
   const later=parent && history.find(row=>row.id===parent.id && row.revision>parent.revision);
   const updatedSources=parent && later?keys.filter(k=>JSON.stringify(sourceValue(parent.inputs,k))!==JSON.stringify(sourceValue(later.inputs,k))):[];
   function edit(next:Inputs){setDraft(next);setStatus("");}
@@ -114,7 +117,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
     for(const k of ["stalls","build","posts","loss","conversion","interruption"] as Key[])delete evidence[k];
     const sourceValues={...draft.sourceValues};
     for(const k of ["stalls","build","posts","loss","conversion","interruption"] as Key[])delete sourceValues[k];
-    edit({...draft,sourceValues,layout:label,rights:"unknown",rightsSource:"",rightsDate:"",allOptionsReviewed:false,values,evidence});
+    edit({...draft,ranking:undefined,sourceValues,layout:label,rights:"unknown",rightsSource:"",rightsDate:"",allOptionsReviewed:false,values,evidence});
   }
   function field(key:Key){
     const meta=fields[key],src=sourceValue(draft,key),e=src.evidence,val=draft.values[key],overridden=!!draft.sourceValues?.[key];
@@ -199,7 +202,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
       {metric("Peak charges per shift",shown(current.peakSessions),compare?shown(otherResult!.peakSessions):undefined)}
       {metric(draft.terms==="lease"?"Monthly rent at parity":"Purchase price at parity",current.annualGap>0?"Fails even at zero":amounts(current.ceiling),compare?amounts(otherResult!.ceiling):undefined)}
     </dl>
-    <p className="purchase-check"><strong>{current.decision}</strong> · {current.next}</p>
+    <p className="purchase-check"><strong>{merit.action}</strong> · {merit.next}</p>
     {!parent && <p className="charging-screen">{filedScreenLabel(screen)}</p>}
     {site.selectionResearch?.check && <p>Filed site check · {site.selectionResearch.check}</p>}
     <details className="disclosure"><summary className="disclosure">Throughput, offer and cash details</summary>
@@ -224,6 +227,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
       <table><caption>Workbook savings against depot at the filed ask, by hypothetical layout</caption><thead><tr><th>Stalls</th><th>Filed costs</th><th>Conversion downside</th></tr></thead>
         <tbody>{screen.map(row=><tr key={row.stalls}><th>{row.stalls}</th><td>{(100*row.base).toFixed(1)}%</td><td>{(100*row.downside).toFixed(1)}%</td></tr>)}</tbody></table>
       <p>Zero or positive savings reaches parity. Paid Moove staffing throughout. The filed downside adds conversion works and lost operating contribution. Verify the layout and local service.</p></details>}
+    <MeritEditor draft={draft} merit={merit} onChange={edit}/>
     <h4>Edit assumptions</h4>
     <button className="paper-btn" type="button" onClick={()=>{
       const derived=trialValue(trialValue(draft,"conversion",250000),"loss",50000);

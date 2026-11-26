@@ -62,6 +62,7 @@ export function dealTip(props: Record<string, unknown>): TipModel {
     decision_at: text(props.decision_at),
   });
   const facts: TipFact[] = [
+    ...(text(props.merit_action) ? [{label:"Site action",value:text(props.merit_action)}] : []),
     { label: "Stage", value: stageChipLabel(text(props.stage), text(props.stage_group) || "desk") },
     ...(decision ? [{ label: "Decision", value: decision }] : []),
     ...(text(props.suggested_drop) && text(props.stage_group) !== "dropped" && !/^dropped\b/i.test(text(props.stage))

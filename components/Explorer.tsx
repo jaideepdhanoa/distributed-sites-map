@@ -56,6 +56,7 @@ import { mapPower, matchesMapPower, serviceFilters, hostingFilters, type Service
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
 import { inCountedMarket, labeledCount, reviewBadge, shownMarketCounts } from "@/lib/counts";
+import { actionColors } from "@/lib/charging/merit";
 import { scoreIssue } from "@/lib/scoreDisplay";
 import type { SpaceShape } from "./spaces/SpacePopover";
 import { siteSpaceChange } from "@/lib/spaces/change";
@@ -3296,7 +3297,8 @@ export default function Explorer() {
               </button>
               <ul id="map-key-items" hidden={!keyOpen}>
                 {funnel === "pipeline" ? <>
-                  {Array.from(new Set(listDeals.map(deal => deal.stage_group === "contacted" ? "financial" : deal.stage_group === "later" ? "close" : deal.stage_group))).sort().map(group =>
+                  {Object.entries(actionColors).filter(([action])=>listDeals.some(d=>d.charging?.merit.action===action)).map(([action,color])=><li key={action}><i className="swatch pipeline-pin" style={{backgroundColor:color}}/>{action}</li>)}
+                  {Array.from(new Set(listDeals.filter(d=>!d.charging?.merit).map(deal => deal.stage_group === "contacted" ? "financial" : deal.stage_group === "later" ? "close" : deal.stage_group))).sort().map(group =>
                     <li key={group}><i className={`swatch pipeline-pin stage-${group}`} />{stageTitle(group)}</li>)}
                   {showUniverse && <li><i className="pin-sample diamond" />Census site</li>}
                 </> : <>

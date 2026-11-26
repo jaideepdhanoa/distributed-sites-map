@@ -14,6 +14,7 @@ import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, nextStepText, plainVerdict, QUICK_LUBE_LABEL, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { derivePowerRating, type PowerRatingInput } from "@/lib/score/power-rating";
+import { MeritCard } from "./SiteMerit";
 import { storedScoreView } from "@/lib/scoreDisplay";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
@@ -187,7 +188,7 @@ function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps |
   const open = hover || pinned;
   return (
     <section className="score-tile" data-testid="score-tile" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <span>Score</span>
+      <span>Historical score</span>
       {view.status === "not_scored" ? <strong data-testid="score-chip">Not scored</strong> : view.status === "provisional" ? (
         <strong data-testid="score-chip" title={`Stored total ${view.total}. Parts sum to ${view.summed}.`}>
           <span className="chip">Provisional</span> {view.summed}
@@ -698,6 +699,7 @@ export default function Detail({
         signedIn={signedIn}
         listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
       />
+      {linkedDeal?.charging && <MeritCard deal={linkedDeal}/>}
       <ScoreTile deal={linkedDeal} site={site} />
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
@@ -1029,6 +1031,7 @@ export function DealDetail({
         signedIn={signedIn}
         listingTitle={deal.listing_removed ? "May be removed" : undefined}
       />
+      {deal?.charging && <MeritCard deal={deal}/>}
       <ScoreTile deal={deal} site={universeSite} />
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (

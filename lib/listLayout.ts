@@ -36,6 +36,7 @@ export type SheetColumn<Row> = {
 
 /** Financials, NDA status, last contact, and next step stay off a signed-out sheet. */
 export const PRIVATE_COLUMN_IDS = [
+  "merit",
   "asking",
   "perAcre",
   "cashFlow",
@@ -93,7 +94,7 @@ export function defaultLayout(ids: string[], pinned: string[] = ["site"], hidden
 }
 
 export function phoneColumns(surface: LayoutSurface): string[] {
-  if (surface === "pipeline") return ["site", "stage", "county", "score", "openLand"];
+  if (surface === "pipeline") return ["site", "stage", "county", "merit", "score", "openLand"];
   return ["site", "stage", "county", "score"];
 }
 

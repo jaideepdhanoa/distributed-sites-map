@@ -194,7 +194,7 @@ assert.match(spareLandSqft(null, 1.2).value, /sq ft/);
 assert.equal(spareLandSqft(null, 1.2).note, "Census estimate");
 assert.equal(defaultColumnIds().includes("address"), false);
 assert.equal(defaultColumnIds().includes("site"), true);
-assert.deepEqual(defaultColumnIds(), ["site", "stage", "county", "score", "asking", "openLand", "capacity", "traffic", "cashFlow"]);
+assert.deepEqual(defaultColumnIds(), ["site", "stage", "county", "merit", "asking", "openLand", "capacity", "traffic", "cashFlow"]);
 assert.deepEqual(parseColumns(null).includes("nda"), false);
 assert.equal(parseColumns("site,nda").includes("nda"), true);
 console.log("key numbers ok");

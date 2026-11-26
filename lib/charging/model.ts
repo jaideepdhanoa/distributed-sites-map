@@ -30,6 +30,7 @@ export const fields = {
 export type Key = keyof typeof fields;
 export type Evidence = {status:"assumed"|"quoted"|"verified"; source:string; date:string; url?:string; reviewer?:string};
 export type Inputs = {
+  ranking?: import("./merit").RankingInputs;
   values:Record<Key,number|null>; evidence:Partial<Record<Key,Evidence>>;
   sourceValues?:Partial<Record<Key,{value:number|null;evidence:Evidence}>>;
   layout:string; rights:"unknown"|"controlled"|"unavailable"; rightsSource:string; rightsDate:string;

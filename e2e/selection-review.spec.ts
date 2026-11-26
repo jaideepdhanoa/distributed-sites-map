@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { marketSequence,meritVersion } from "../lib/charging/merit";
+import type { SelectionRow } from "../lib/selection/screen";
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 
@@ -57,8 +60,41 @@ test("released selection review joins uniquely and serves active rows", async ({
     !/dropped|off[ -]?market/i.test(f.properties.stage));
   expect(mappedActive.every((f: {properties:{deal_id:string}})=>activeIds.has(f.properties.deal_id))).toBe(true);
   console.info("Selection parity",info.project.name,JSON.stringify({active:rows.length,stageDifferences:result.mismatches,workbookInputs:result.hasInputs}));
+  const financialRows=(result.rows as SelectionRow[]).filter(r=>r.charging);
+  expect(financialRows.length).toBeGreaterThan(0);
+  expect(financialRows.every(r=>r.charging?.merit.version===meritVersion)).toBe(true);
+  const ranks=marketSequence(financialRows.map(r=>({id:r.id,city:r.city,merit:r.charging!.merit})));
+  const digestRows=financialRows.map(row=>{
+    const c=row.charging!,m=c.merit,rank=ranks.get(row.id);
+    return [row.id,c.selected?.split(":").pop()??"",m.action,m.next,m.downsideGap,m.downsideCeiling,m.netValue,
+      rank?.rank,rank?.value,rank?.peak,m.version].map(v=>typeof v==="number" ? v.toPrecision(12) : v??"");
+  }).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
+  const fingerprint=createHash("sha256").update(JSON.stringify(digestRows)).digest("hex");
+  console.info("Charging decision readback",JSON.stringify({rows:financialRows.length,ranked:ranks.size,version:meritVersion,fingerprint}));
   await page.goto("/selection-review");
   await expect(page.getByText(rows.length+" of "+rows.length+" active sites")).toBeVisible();
+});
+
+test("rank eligible sites by market and allocate a shared peak once", async ({page},info) => {
+  const load={sessions:1200,peak:8,annualFixed:8400,variable:2};
+  const network={pool:"weekday west",annualNeed:1200,peakNeed:8,avoided:12,years:4,rate:0,depot:12,base:load,downside:load,yearOne:25000};
+  const merit={version:"site-merit/1",action:"Advance diligence",next:"Review the funded operating plan.",order:0,checkCost:null,checkDays:null,
+    downsideGap:-3,downsideCeiling:50000,netValue:14400,servedPeak:8,network};
+  const row={id:"PIPE-LAS-9997",city:"LAS",name:"West dispatch site",priority:"Verify a condition",instruction:"Verify the plan.",stage:"2 Financial screen",
+    amount:null,section:"Ranked",mapped:true,financeVisible:true,readiness:"Local case",charging:{name:"Paid shifts",selected:"demo:1",merit,
+      comparator:"local",screen:[],result:{siteCost:9,depot:12,earlyMin:20}}};
+  const peer={...row,id:"PIPE-LAS-9998",name:"West alternative"};
+  const incomplete={...row,id:"PIPE-LAS-9999",name:"Unmeasured bay",charging:{...row.charging,merit:{...merit,action:"Verify a condition",order:1,netValue:null,network:null,next:"Measure bay circulation."}}};
+  await page.route("**/api/data/selection-review",r=>r.fulfill({json:{hasInputs:true,mismatches:0,rows:[peer,incomplete,row]}}));
+  await page.goto("/selection-review?market=LAS");
+  await expect(page.getByText("Measure bay circulation.")).toBeVisible();
+  await page.getByLabel("Order",{exact:true}).selectOption("investment");
+  await expect(page.getByText("1 of 3 active sites")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"West dispatch site"})).toBeVisible();
+  await expect(page.getByText(/LAS #1.*14,400.*8 residual peak charges/)).toBeVisible();
+  expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:"review-shots/"+info.project.name+"-investment-sequence.png",animations:"disabled"});
 });
 
 test("commercial diligence order, alternate routes and archived reviews", async ({page}, info) => {

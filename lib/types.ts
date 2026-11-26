@@ -173,6 +173,7 @@ export type SiteProps = {
 };
 
 export type DealProps = {
+  chargingHold?: string;
   charging?: import("./charging/summary").ChargingSummary;
   statementCoverage?: "present" | "empty" | "unavailable";
   screening?: import("./selection/screen").ScreenSummary;

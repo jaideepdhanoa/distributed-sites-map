@@ -110,6 +110,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
+  if (id === "merit") return signedIn ? deal.charging?.merit.action ?? deal.screening?.priority ?? "—" : "";
   if (id === "county") return row.countyLabel || "—";
   if (id === "score") {
     const view = storedScoreView({
@@ -191,6 +192,7 @@ function stageFilterCode(deal: DealProps): string {
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
+  if (id === "merit") return deal.charging?.merit.order ?? null;
   if (id === "asking") return signedIn ? deal.asking_price : null;
   if (id === "score") return typeof deal.score === "number" ? deal.score : null;
   if (id === "acres") return deal.land_acres;
@@ -222,7 +224,7 @@ function csvCell(value: string): string {
 export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], signedIn = true) {
   const fixed = ["Site ID", "Market", "Stage", "Drop reason"];
   const rest = columns.filter((id) => id !== "site" && id !== "stage" && id !== "chip_drop");
-  const header = [...fixed, ...rest.map((id) => PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id)];
+  const header = [...fixed, ...rest.map((id) => id==="score" ? "Score" : PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id)];
   const lines = [
     header.join(","),
     ...rows.map((row) => {
@@ -298,8 +300,10 @@ export default function PipelineList({
   const allowed = useMemo(() => allowedIds(PIPELINE_COLUMNS.map((column) => column.id), signedIn), [signedIn]);
   const fallback = useMemo(() => {
     const optional = PIPELINE_COLUMNS.filter((column) => "optional" in column && column.optional).map((column) => column.id);
-    return defaultLayout(allowed, ["site"], optional);
-  }, [allowed]);
+    const base=defaultLayout(allowed, ["site"], optional);
+    if(signedIn)base.sort={id:"merit",desc:false};
+    return base;
+  }, [allowed,signedIn]);
   const seed = useMemo(() => (columnSeed?.length ? defaultLayout(allowed, ["site"], allowed.filter((id) => id !== "site" && !columnSeed.includes(id))) : null), [allowed, columnSeed]);
   const { layout, update } = useListLayout({
     surface: "pipeline",
@@ -596,7 +600,8 @@ export default function PipelineList({
               stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
-              action: signedIn ? plainNextStep(row.deal.next_step || "").line || undefined : undefined,
+              actionLabel: signedIn ? row.deal.charging?.merit.action : undefined,
+              action: signedIn ? row.deal.charging?.merit.next || plainNextStep(row.deal.next_step || "").line || undefined : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
                 if (row.deal.next_step && signedIn) return null;

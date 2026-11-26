@@ -61,7 +61,7 @@ export function conversionReturn(investment: number, charging: number, displaced
 }
 
 /** A rectangular outdoor footprint needs a map registration or a source scale bar. */
-export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds, image?: Aerial): [number, number] | null {
+export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds, image?: Pick<Aerial,"width"|"height"|"metersPerPixel">): [number, number] | null {
   if ((!bounds && !image?.metersPerPixel) || !zone || zone.kind === "bay" || zone.kind === "clear" || zone.points.length !== 4) return null;
   const edges = zone.points.map((point, i) => {
     const next = zone.points[(i + 1) % 4];

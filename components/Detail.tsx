@@ -544,6 +544,7 @@ export default function Detail({
   signedIn = false,
   outsideFilter = false,
   locationFix = null,
+  savedLots,
   spaceCount = 0,
   spaceSlots = 0,
   spaceSqft = 0,
@@ -575,6 +576,7 @@ export default function Detail({
   signedIn?: boolean;
   outsideFilter?: boolean;
   locationFix?: "edit" | "propose" | null;
+  savedLots?: ReactNode;
   spaceCount?: number;
   spaceSlots?: number;
   spaceSqft?: number;
@@ -697,6 +699,7 @@ export default function Detail({
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
       {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
+      {signedIn && savedLots}
       {related}
       <PanelSections
         economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
@@ -886,6 +889,7 @@ export function DealDetail({
   related,
   outsideFilter = false,
   locationFix = null,
+  savedLots,
   spaceCount = 0,
   spaceSlots = 0,
   spaceSqft = 0,
@@ -918,6 +922,7 @@ export function DealDetail({
   related?: ReactNode;
   outsideFilter?: boolean;
   locationFix?: "edit" | "propose" | null;
+  savedLots?: ReactNode;
   spaceCount?: number;
   spaceSlots?: number;
   spaceSqft?: number;
@@ -1017,6 +1022,7 @@ export function DealDetail({
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
       {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
+      {signedIn && savedLots}
       {related}
       <PanelSections
         economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}

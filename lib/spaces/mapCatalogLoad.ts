@@ -35,7 +35,7 @@ export async function mapCatalog(deals: Deal[]): Promise<SpaceCatalog> {
   for (const [id, row] of rows) {
     if (!row?.image || row.status !== "reviewed" || !row.zones.some((zone) => zone.kind !== "clear"))
       continue;
-    const { id: frameId, bounds, date, source, kind } = row.image;
+    const { id: frameId, bounds, date, source, kind, width, height, metersPerPixel } = row.image;
     const deal = indexed.get(id);
     const props = deal?.properties;
     const cohort = props
@@ -56,7 +56,7 @@ export async function mapCatalog(deals: Deal[]): Promise<SpaceCatalog> {
       market: id.split("-")[1],
       cohort,
       revision: row.revision,
-      frame: { id: frameId, bounds, date, source, kind },
+      frame: { id: frameId, bounds, date, source, kind, width, height, metersPerPixel },
       center: bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : pin,
       zones: mapZones(id, row, notes),
     });

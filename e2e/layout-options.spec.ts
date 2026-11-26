@@ -103,7 +103,13 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   await page.route("**/api/actions/status",r=>r.fulfill({json:{enabled:true,actionRole:"contributor",username:"reviewer"}}));
   await page.goto("/?spaces=1");
   const work = page.getByTestId("map-spaces-workspace");
-  await work.getByRole("button",{name:/Example service site/}).click();
+  const result = work.getByRole("button", {name:/Example service site/});
+  const fit = work.getByLabel("Physical fit filter");
+  await fit.selectOption("interior");
+  await expect(result).toHaveCount(0);
+  await fit.selectOption("measure");
+  await expect(result).toBeVisible();
+  await result.click();
   await expect(work).toContainText("Analysis proposal");
   await expect(work).toContainText("Stall fit unresolved");
   await work.getByRole("button",{name:"Convert bays",exact:true}).click();

@@ -66,6 +66,7 @@ import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
 import { fullUniverseNeeded } from "@/lib/viewHelp";
 import { resolveSiteLink, siteHref } from "@/lib/siteLink";
 import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
+import SavedLots from "./spaces/SavedLots";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
@@ -2260,16 +2261,29 @@ export default function Explorer() {
     })));
   }
 
-  async function writeSpace(space: { siteId: string; id: string; version: number; box: GroundBox; type: SpaceType; layout: SpaceLayout }, deleted = false) {
+  async function writeSpace(space: { siteId: string; id: string; version: number; box: GroundBox; type: SpaceType; layout: SpaceLayout }, deleted = false, key: string = crypto.randomUUID()) {
     const response = await fetch("/api/changes", {
       method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+      headers: { "content-type": "application/json", "idempotency-key": key },
       body: JSON.stringify({ changes: [siteSpaceChange(space, deleted)] }),
     });
     if (!response.ok) return "";
     const body = await response.json() as { results?: { entity_id?: string }[] };
     await refreshSpaces();
     return body.results?.[0]?.entity_id || space.id;
+  }
+
+  async function removeSavedLot(lot: SpaceShape, key:string) {
+    const id = await writeSpace(lot,true,key);
+    if (!id) {
+      await refreshSpaces();
+      throw Error("Removal was not confirmed. Cancel and reopen the latest lot before retrying.");
+    }
+    const response = await fetch("/api/data/spaces?"+new URLSearchParams({site:lot.siteId}),{cache:"no-store"});
+    if (!response.ok || (await response.json()).spaces.some((saved: {id:string})=>saved.id===lot.id)) {
+      throw Error("Removal could not be verified. Refresh the site to check.");
+    }
+    setPickedSpace(current=>current===lot.id?"":current);
   }
 
   function beginMark() {
@@ -3297,6 +3311,7 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            savedLots={<SavedLots key={selected} lots={recordSpaces} remove={me?.actionRole && canWrite(me.actionRole as ActionRole) ? removeSavedLot : undefined} />}
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
@@ -3345,6 +3360,7 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            savedLots={<SavedLots key={selected} lots={recordSpaces} remove={me?.actionRole && canWrite(me.actionRole as ActionRole) ? removeSavedLot : undefined} />}
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}

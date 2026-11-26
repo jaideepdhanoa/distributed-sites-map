@@ -42,6 +42,7 @@ jobs:
           WORKBOOK_MIRROR_ENABLED: ${{ vars.WORKBOOK_MIRROR_ENABLED }}
           WORKBOOK_MIRROR_DRY_RUN: ${{ (inputs.dry_run == true || inputs.dry_run == 'true') && '1' || '0' }}
           SIMULATE_SITE_FLAG: ${{ (inputs.simulate_site_flag == true || inputs.simulate_site_flag == 'true') && '1' || '0' }}
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}

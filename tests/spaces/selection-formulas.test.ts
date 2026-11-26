@@ -38,3 +38,23 @@ test("research rejects unsafe links and impossible duplicate stall cases",()=>{
   const c={stalls:4,base:0,stress:-0.1};
   assert.throws(()=>parse({...item,quote:1,cases:[c,c]}));
 });
+
+test("paid hypothetical layouts remain conditional until a current comparable site case exists",async()=>{
+  const {chargingMirrorRows}=await import("../../scripts/charging-mirror");
+  const {initialCase,calculate,modelVersion}=await import("../../lib/charging/model");
+  const {summarize}=await import("../../lib/charging/summary");
+  const d={deal_id:"PIPE-MIA-9998",asking_price:100000} as import("../../lib/types").DealProps;
+  const row=input(18,d.deal_id);row.cells[43]="8";
+  const table:SheetTable={title:"Pipeline",headerRow:4,headers,rows:[row]};
+  const summary=summarize(d,"aaaa");summary.screen=[{stalls:8,base:.15,downside:.10}];summary.screenDepot=20;
+  const current=new Map([[d.deal_id,summary]]);
+  const pending=chargingMirrorRows(table,[],current)[1];
+  assert.equal(pending[14],"");assert.equal(pending[15],-2);
+  const inputs=initialCase(d);inputs.rights="controlled";inputs.comparator="local";inputs.comparable=true;
+  inputs.evidence.depot={status:"quoted",date:"2026-11-01",source:"Example comparable"};
+  const saved={id:"example",site_id:d.deal_id,revision:1,name:"Example case",author:"Reviewer",at:"2026-11-02",model:modelVersion,
+    sourceRevision:"aaaa",inputs,result:{...calculate(inputs),difference:0},selected:true};
+  summary.selected="example:1";
+  assert.equal(chargingMirrorRows(table,[saved],current)[1][14],0);
+  summary.stale=true;assert.equal(chargingMirrorRows(table,[saved],current)[1][14],"");
+});

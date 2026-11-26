@@ -4,8 +4,8 @@ type Amounts<K extends string> = Record<K, number | null>;
 export type PurchaseInputs = Amounts<"ask"|"revenue"|"ebitda"|"normalized"|"cash"|"charge"|"allowance"|"ceiling"|"landCap"|"walkAway"|"required"|"networkCost"|"stalls"|"fit"|"cars"|"priorCars"|"priorRevenue"|"memberShare"|"claim"|"screeningPrice"> & {
   periods?: Partial<Record<"ebitda"|"normalized"|"revenue",string>>; claimLabel: string; status: string; package: string; open: string; archetype: string; ownership: string; checked: string; textInputs: string[];
 };
-export type PurchaseAssumptions = Amounts<"closing"|"upkeep"|"oversight"|"capital"|"margin"|"target"|"lower"|"hub"|"horizon"|"demand"|"defaultStalls"|"sharedStalls">;
-export type PurchaseData = { inputs: PurchaseInputs; assumptions: PurchaseAssumptions; layout?: {revision:string; zones:string[]}; };
+export type PurchaseAssumptions = Amounts<"closing"|"upkeep"|"oversight"|"capital"|"margin"|"target"|"lower"|"hub"|"horizon"|"demand"|"defaultStalls"|"sharedStalls"> & {charging?:import("./charging/model").Assumptions};
+export type PurchaseData = { inputs: PurchaseInputs; assumptions: PurchaseAssumptions; layout?: {revision:string; zones:string[]; stalls?:(number|null)[]}; };
 export type PurchaseBasis = "workbook" | "normalized";
 export const purchaseLabels = ["Financial evidence", "Retained annual cash", "Annual capital charge", "Annual surplus or shortfall", "Business-supported price", "Network target ceiling", "Year-one retained cash", "Purchase check"] as const;
 export const amount = (n: number | null | undefined) => n == null || !Number.isFinite(n) ? "—" : n.toLocaleString("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});

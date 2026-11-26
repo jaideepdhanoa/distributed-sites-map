@@ -4647,3 +4647,26 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .comparison-attention { flex-wrap:nowrap; overflow-x:auto; }
   .comparison-attention > * { flex-shrink:0; }
 }
+
+.charging-preview,.charging-editor { margin-block: .8rem; color: var(--ink); }
+.charging-preview { border-left: 3px solid var(--pine,#1e4636); padding: .2rem .8rem; }
+.charging-preview > span,.charging-preview > strong,.charging-preview > a,.charging-metrics small { display: block; }
+.charging-preview p { margin: .25rem 0; }
+.charging-editor { padding-block: .4rem 1rem; border-bottom: 1px solid var(--line,#d6cebe); }
+.charging-controls,.charging-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,195px),1fr)); gap: .7rem; }
+.charging-editor label,.charging-save { display: grid; gap: .3rem; }
+.charging-editor label:has(.check) { display:flex; align-items:center; }
+.charging-controls label,.charging-controls input,.charging-controls select { min-width:0; max-width:100%; }
+.charging-metrics > div { display:block; padding:.6rem; background:var(--paper,#fffdf8); }
+.charging-metrics dd { margin: .2rem 0; font-weight:600; }
+.charging-controls details,.charging-editor > details,.charging-save { margin-block:.6rem; }
+.charging-save .primary,.charging-save .paper-btn { justify-self:start; }
+
+.charging-title { font-size:clamp(1.45rem,3vw,2rem); line-height:1.15; margin:.35rem 0 1.1rem; }
+.charging-editor .charging-metrics { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1px; margin:1rem 0; padding:1px; background:var(--line,#d6cebe); border-radius:.5rem; overflow:hidden; }
+.charging-editor .charging-metrics > div { display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; padding:.75rem; gap:.4rem; margin:0; border:0; background:var(--paper,#fffdf8); }
+.charging-editor .charging-metrics dt { font-size:.82rem; }
+.charging-editor .charging-metrics dd { margin:0; text-align:left; font-variant-numeric:tabular-nums; font-size:clamp(1rem,1.8vw,1.35rem); }
+.charging-editor .charging-metrics small { font-weight:400; font-size:.76rem; }
+.charging-screen { margin-block:.55rem; }
+@media(max-width:700px) { .charging-editor .charging-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .charging-editor .charging-metrics > div:last-child { grid-column:1/-1; } }

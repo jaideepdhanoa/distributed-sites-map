@@ -16,9 +16,9 @@ test("selection prioritizes mandate, sale rights and a separate fleet-service pa
   assert.equal(selectionCheck("MIA",{...row,segment:"Quick lube"},"Revisit site evidence",false)[0],"Screen fleet service");
 });
 
-test("investment screen respects role, zero, missing inputs and the current workbook hurdle", () => {
-  assert.equal(investmentScreen({...row,hurdle:0.3},true),"Base case below 30% hurdle");
-  assert.equal(investmentScreen({...row,hurdle:0.35,screen:0.35},true),"Base case clears 35% · verify assumptions");
+test("investment screen respects role, zero, missing inputs and the current depot parity hurdle", () => {
+  assert.equal(investmentScreen({...row,hurdle:0.3},true),"Workbook reaches depot parity · verify inputs");
+  assert.equal(investmentScreen({...row,hurdle:0.35,screen:0.35},true),"Workbook reaches depot parity · verify inputs");
   assert.equal(investmentScreen({...row,hurdle:0.3,screen:null},true),"Investment case unverified");
   assert.equal(investmentScreen({...row,hurdle:0.3},false),"Investment case unverified");
 });

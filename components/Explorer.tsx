@@ -858,9 +858,12 @@ export default function Explorer() {
       });
       void refresh(token);
     }
+    const onCaseSaved=()=>{void refresh(++dataGen.current).catch(()=>undefined);};
+    window.addEventListener("charging-case-saved",onCaseSaved);
     window.addEventListener(STAGE_REFRESH_EVENT, onStage);
     return () => {
       cancel = true;
+      window.removeEventListener("charging-case-saved",onCaseSaved);
       window.removeEventListener(STAGE_REFRESH_EVENT, onStage);
     };
   }, [city]);

@@ -250,6 +250,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && vars.WORKBOOK_MIRROR_ENABLED == '1'
         env:
           WORKBOOK_MIRROR_ENABLED: "1"
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_PRODUCTION_HOST: ${{ vars.NEON_PRODUCTION_HOST }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}

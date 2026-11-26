@@ -1,3 +1,4 @@
+import { filedScreenLabel } from "@/lib/charging/summary";
 import MapPowerCard, { type GridCoverage } from "./MapPowerCard";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, LocateFixed } from "lucide-react";
@@ -69,6 +70,13 @@ export default function MapSitePreview(props: PreviewProps) {
         <div><dt>Next check</dt><dd>{review}<small className="preview-missing">{origin}</small>{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>}
       {!showingPower && evidence?.kind !== "layout" && props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
+      {!showingPower && props.signedIn && powerDeal?.charging && !site?.land_only && <section className="charging-preview">
+        <strong>Charging economics</strong><span>{powerDeal.charging.stale?"Refresh saved case":powerDeal.charging.result.decision}</span>
+        <p>{powerDeal.charging.result.siteCost==null?"Site cost pending":"$"+powerDeal.charging.result.siteCost.toFixed(2)+" / charge"}
+          {powerDeal.charging.result.depot!=null && " · $"+powerDeal.charging.result.depot.toFixed(2)+" depot"+(powerDeal.charging.comparator==="workbook"?" proxy":"")}</p>
+        <small>{powerDeal.charging.name} · {powerDeal.charging.result.peakSessions??"Unknown"} peak charges · {powerDeal.charging.result.opening||"Opening unconfirmed"}</small>
+        <p>{powerDeal.charging.result.next}</p>{!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<a className="text-link" href={"/charging?site="+encodeURIComponent(powerDeal.deal_id)}>Edit charging assumptions</a>
+      </section>}
       {!props.grid.open && <div className="preview-actions">
       {!showingPower && power && <PowerFollowUp deal={props.powerDeal} site={props.powerSite} primary />}
       {!showingPower && evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}

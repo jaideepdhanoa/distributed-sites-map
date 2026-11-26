@@ -24,6 +24,16 @@ ASSUMPTIONS = {
     "horizon": "Analysis horizon (years)", "demand": "Stalls of charging demand to match the hub",
     "defaultStalls": "Default stalls: business plus spare land", "sharedStalls": "Default stalls: shared site",
 }
+CHARGING_ASSUMPTIONS = {
+    "charges": "Charges over 10 years", "unitBuild": "Build cost per stall ($)",
+    "attendant": "Attendant post that plugs cars in, around the clock ($ a year)",
+    "perPost": "Stalls one attendant covers per shift", "kw": "Power per stall, managed charging (kW)",
+    "fixed": "Fixed upkeep per site, excluding insurance ($ a year)", "insurance": "Insurance per site ($ a year)",
+    "perCharger": "Upkeep per charger ($ a year)", "ports": "Stalls per charger (dual port)",
+    "upgrade": "Utility upgrade per site, new service ($)", "tax": "Property tax (% of one-time cost, per year)",
+    "hostHours": "Hours a day the business is open, when its staff plug cars in by day",
+    "escalation": "Sum of escalation factors over 10 years (x)",
+}
 def number(v):
     if isinstance(v, bool) or v is None: return None
     if isinstance(v, str) and not re.fullmatch(r"-?\d+(?:\.\d+)?", v.strip()): return None
@@ -59,4 +69,6 @@ def write_purchase_review(book, sites, destination, facts):
             "package": text("Package status"), "open": text("Business stays open"), "archetype": text("Archetype"),
             "ownership": text("Real estate in the sale"), "checked": checked if isinstance(checked,str) and re.fullmatch(r"\d{4}-\d\d-\d\d",checked) else "",
             "textInputs": [k for k, label in FIELDS.items() if amounts[k] is not None and isinstance(row.get(label), str)]}
-    destination.write_text(json.dumps({"version":1,"assumptions":{k:assumptions.get(label) for k,label in ASSUMPTIONS.items()},"sites":rows},separators=(",",":")))
+    program = {k: assumptions.get(label) for k, label in ASSUMPTIONS.items()}
+    program["charging"] = {k: assumptions.get(label) for k, label in CHARGING_ASSUMPTIONS.items()}
+    destination.write_text(json.dumps({"version":1,"assumptions":program,"sites":rows},separators=(",",":")))

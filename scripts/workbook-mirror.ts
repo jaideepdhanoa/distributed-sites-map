@@ -54,6 +54,7 @@ import {
   type SheetTable,
 } from "../lib/changes/mirror";
 import { loadSheetTable, readBackCells, readBackOutcome, readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
+import { mirrorCharging } from "./charging-mirror";
 import { checkSelectionFormulas, formulaRequests, planSelectionFormulas, reviewFields } from "../lib/selection/formulas";
 import { writeFormulaBatch, readGrids } from "./power-sheet-read";
 
@@ -152,7 +153,9 @@ async function main(): Promise<void> {
   const token = await sheetsToken(raw);
   if (selected.includes("site")) {
     const load = () => loadTable(token, "Pipeline", 4, reviewFields, true);
-    const edits = planSelectionFormulas(await load());
+    const pipeline = await load();
+    await mirrorCharging(token,url,pipeline,dryRun);
+    const edits = planSelectionFormulas(pipeline);
     if (edits.length && !dryRun) {
       const grid = (await readGrids(token)).find(g => g.title === "Pipeline");
       if (!grid) throw Error("Pipeline grid missing.");

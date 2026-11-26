@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { initialCase } from "../lib/charging/model";
+import type { SelectionRow } from "../lib/selection/screen";
 import { readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
@@ -917,4 +920,24 @@ test("an approved drop survives a warm browser cache and a reload without a new 
     });
     await refreshSnapshot();
   }
+});
+
+test("a contributor saves a charging case through the app and a viewer can reopen it",async({request,baseURL})=>{
+  test.skip(process.env.E2E_ACTIONS!=="1" || new URL(baseURL!).hostname!=="127.0.0.1","Uses the local test database only.");
+  await login(request,"contributor");
+  const list=await request.get("/api/data/selection-review");
+  const row=((await list.json()).rows as SelectionRow[]).find(r=>r.charging && r.mapped);
+  expect(Boolean(row)).toBe(true);
+  const path="/api/actions/charging?site="+encodeURIComponent(row!.id);
+  const before=await (await request.get(path)).json();
+  expect(before.source).toMatch(/^[a-f0-9]{24}$/);
+  const payload={id:randomUUID(),requestId:randomUUID(),base:0,name:"Example paid coverage",sourceRevision:before.source,inputs:initialCase(before.site),
+    select:true,expectedSelection:before.site.charging.selected};
+  const save=await request.post(path,{data:payload});expect(save.status()).toBe(200);
+  const again=await request.post(path,{data:payload});expect(again.status()).toBe(200);
+  const read=await (await request.get(path)).json();expect(read.site.charging.selected).toBe(payload.id+":1");
+  expect(read.history.filter((r:{id:string})=>r.id===payload.id)).toHaveLength(1);
+  await login(request,"viewer");
+  const viewed=await (await request.get(path)).json();expect(viewed.canWrite).toBe(false);
+  expect((await request.post(path,{data:payload})).status()).toBe(403);
 });

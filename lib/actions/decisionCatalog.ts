@@ -1,3 +1,10 @@
+import { showsFinancials } from "@/lib/keyNumbers";
+import { linkedPnlIds, loadPnlStatement } from "@/lib/pnl/read";
+import { demoStatement } from "@/lib/pnl/demo";
+import { isStatementMeasure, statementFigures } from "@/lib/pnl/citation";
+import type { CitedFigure } from "@/lib/comparisonDecision";
+import type { Sql } from "./db";
+import type { PnlStatement } from "@/lib/pnl/statement";
 import { loadMapDeals } from "@/lib/api/handlers/data/deals";
 import { loadMapSites } from "@/lib/api/handlers/data/sites";
 import { dealRows, siteRows, MISSING } from "@/lib/comparison";
@@ -14,10 +21,34 @@ export function decisionCatalog(sites: SiteProps[], deals: DealProps[]) {
     const row = bySite.get(id) || byDeal.get(id);
     return row?.name || row?.address || id;
   }
-  function resolve(c: EvidenceTarget) {
+  const statements = new Map<string,{pnl:PnlStatement;sample:boolean}>();
+  const links = [...deals.map(d => ({dealId:d.deal_id,siteId:d.universe_id || ""})),
+    ...sites.map(s => ({dealId:s.linked_deal_id || "",siteId:s.site_id}))];
+  function financialDeal(c: EvidenceTarget) {
+    return c.targetKind === "deal" ? byDeal.get(c.targetId) :
+      deals.find(d => d.deal_id === bySite.get(c.targetId)?.linked_deal_id || d.universe_id === c.targetId);
+  }
+  async function prepareStatements(sql:Sql,citations:EvidenceTarget[]) {
+    const ids = new Set(citations.filter(c => isStatementMeasure(c.measure)).map(financialDeal)
+      .filter(d => d && showsFinancials(d)).map(d => d!.deal_id));
+    for (const id of ids) {
+      if (statements.has(id)) continue;
+      const related = linkedPnlIds(id,links);
+      const loaded = await loadPnlStatement(sql,related);
+      const sample = loaded.status === "ready" ? null : related.map(demoStatement).find(Boolean);
+      statements.set(id,{pnl:sample || loaded,sample:Boolean(sample)});
+    }
+  }
+  function resolve(c: EvidenceTarget & {anchor?: string}) {
     const site = c.targetKind === "site" ? bySite.get(c.targetId) : undefined;
     const deal = site ? deals.find(d => d.deal_id === site.linked_deal_id || d.universe_id === site.site_id) : byDeal.get(c.targetId);
     if (!site && (!deal || c.targetKind !== "deal")) return null;
+    if (isStatementMeasure(c.measure)) {
+      const entry = deal && statements.get(deal.deal_id);
+      if (!entry || entry.pnl.status === "unavailable") return null;
+      const line = statementFigures(entry.pnl,entry.sample,c.anchor).find(f => f.measure === c.measure);
+      return line ? {...c,...line} : {...c,value:MISSING,source:"Financial statement"};
+    }
     const linked = site || bySite.get(deal?.universe_id || "");
     const rows = site ? siteRows(site, deal ? [deal] : [], true) : dealRows(deal!, linked ? [linked] : [], true);
     const label = evidenceMeasures[c.measure];
@@ -39,12 +70,12 @@ export function decisionCatalog(sites: SiteProps[], deals: DealProps[]) {
     return { ...target, value: row?.value || MISSING, source };
   }
   const figures = new Map<string, ReturnType<typeof resolve>>();
-  function figure(c: EvidenceTarget) {
-    const key = [c.targetKind, c.targetId, c.measure].join("|");
+  function figure(c: EvidenceTarget & Pick<CitedFigure,"anchor">) {
+    const key = [c.targetKind, c.targetId, c.measure,c.anchor || ""].join("|");
     if (!figures.has(key)) figures.set(key, resolve(c));
     return figures.get(key) || null;
   }
-  return { name, figure };
+  return { name, figure, prepareStatements };
 }
 
 export async function loadDecisionCatalog(role: ActionRole) {

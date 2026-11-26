@@ -154,3 +154,16 @@ test("the card matches the sheet total for a partial and leaves a missing month 
   const rangeIndex = years.columns.findIndex((column) => column.label === "Jan–Jul 2026");
   assert.equal(columnSummary(years, rangeIndex).revenue, summary.revenue);
 });
+
+test("a cited partial-year column keeps its measure, basis and window when an annual statement arrives", async () => {
+  const { statementFigures } = await import("../../lib/pnl/citation");
+  const later = sampleStatement();
+  const partial = structuredClone(later);
+  partial.years[0].annual = null;
+  const earlier = statementFigures(partial,true).find(f => f.measure === "statement_revenue")!;
+  assert.notEqual(earlier.value, "—");
+  const reopened = statementFigures(later,true,earlier.anchor).find(f => f.measure === earlier.measure);
+  assert.deepEqual(reopened,earlier);
+  assert.notEqual(statementFigures(later,true)[0].anchor,earlier.anchor);
+  assert.deepEqual(statementFigures(later,true,"1999|monthly|1-1"),[]);
+});

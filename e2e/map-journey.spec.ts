@@ -1,3 +1,4 @@
+import { isExcludedSite } from "../lib/alerts/excluded";
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import type { Map as SiteMap } from "maplibre-gl";
@@ -250,4 +251,21 @@ test("the released My work queue opens with its real review state", async ({ pag
   await rows.first().getByRole("link").click();
   await expect(page.locator('[data-focused-citation="true"]')).toBeFocused();
   await expect(page.getByRole("region", { name:"Comparison decision" }).getByRole("link", { name:"Back to My work" })).toBeVisible();
+});
+
+test("released Compare loads statement evidence for operating deals", async ({page}) => {
+  test.skip(!process.env.MAP_PRODUCTION_CHECK,"Signed-in release check.");
+  const response = await page.request.get("/api/data/deals");
+  expect(response.ok()).toBe(true);
+  const data = await response.json();
+  type Deal = {deal_id:string;kind:string;stage_group:string;financials_open?:boolean;figures_status?:string};
+  const ids = data.features.map((f:{properties:Deal})=>f.properties)
+    .filter((d:Deal)=>d.kind === "pipeline" && d.stage_group !== "dropped" && d.figures_status !== "vacant" && d.financials_open !== false && !isExcludedSite(d.deal_id))
+    .slice(0,2).map((d:Deal)=>d.deal_id);
+  expect(ids.length).toBe(2);
+  await page.goto("/?funnel=pipeline&view=list&compare="+encodeURIComponent(ids.join("|")));
+  const row = page.getByTestId("compare-tray").locator('[data-compare-row="Statement revenue"]');
+  await expect(row.locator("td")).toHaveCount(2);
+  await expect(row).not.toContainText("Checking…");
+  await expect(row.getByRole("button",{name:"Retry statement"})).toHaveCount(0);
 });

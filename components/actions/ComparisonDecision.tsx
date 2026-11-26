@@ -2,17 +2,19 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { isStatementMeasure } from "@/lib/pnl/citation";
 import { evidenceMeasures } from "@/lib/actions/comparisonEvidence";
 import { reviewValue, evidenceChanged, figureKey, figureLabel, type CitationReview, type CitedFigure, type DecisionAccess, type FigureOption } from "@/lib/comparisonDecision";
 
 type Props = {
+  openStatement: (figure:CitedFigure) => void;
   view: string; sites: { id: string; title: string }[]; figures: FigureOption[];
   revision: number;
   checkGap: (figure: FigureOption) => void;
   inspect: (id: string, measure: string, source?: URLSearchParams) => void;
 };
 const statusNames: Record<string,string> = { open:"Awaiting approval", accepted:"Approved", ready:"Ready for approval", agreed_waiting:"Waiting", completed:"Completed", rejected:"Declined", superseded:"Superseded", resolved:"Resolved" };
-export default function ComparisonDecision({view,sites,figures,inspect,checkGap,revision}: Props) {
+export default function ComparisonDecision({view,sites,figures,inspect,checkGap,revision,openStatement}: Props) {
   const [access,setAccess] = useState<DecisionAccess>();
   const [attempt,setAttempt] = useState(0);
   const [editing,setEditing] = useState(false);
@@ -45,7 +47,13 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
     focusRow.current.scrollIntoView({ block:"nearest" });
   }, [focusedKey, decision?.version, editing]);
   const byKey = new Map(figures.map(figure => [figureKey(figure), figure]));
-  const selectable = figures.filter(figure => !["Unavailable", "Checking…", "Not applicable"].includes(figure.value));
+  for (const c of decision?.citations || []) {
+    const key = figureKey(c);
+    if (!c.anchor || byKey.has(key)) continue;
+    const review = access?.reviews?.find(r => r.key === key);
+    if (review) byKey.set(key,{...c,...review.current,source:review.source,siteName:sites.find(s=>s.id===c.targetId)?.title || c.targetId});
+  }
+  const selectable = [...byKey.values()].filter(f => !isStatementMeasure(f.measure) || (f.anchor && f.value !== "—")).filter(figure => !["Unavailable", "Checking…", "Not applicable"].includes(figure.value));
   function edit(review?: CitationReview) {
     setEditingReview(review?.reason ? review : undefined);
     setChoice(decision ? decision.preferred || "hold" : "");
@@ -120,8 +128,8 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
           {changed ? <><small className="decision-change">Changed since decision</small><span>{reviewValue(c)} → {reviewValue(current)}</span></> : <span>{live ? reviewValue(c) : "Current figure unavailable · At decision · " + reviewValue(c)}</span>}
           {review?.reviewedAt && <small>Kept by {review.reviewedBy} · {new Date(review.reviewedAt).toLocaleString()}</small>}
           {review?.reason && (review.reviewedAt || review.reason.includes("completed")) && <span>{review.reason}{review.reviewedAt && " · Last reviewed " + reviewValue(review.previous)}</span>}
-          {review?.source && <small>Source · {review.source}</small>}
-          <button className="text-link" onClick={()=>inspect(c.targetId,label)}>Inspect {label.toLowerCase()}</button>
+          {(c.source || review?.source) && <small>Source · {c.source || review?.source}</small>}
+          <button className="text-link" onClick={()=>isStatementMeasure(c.measure) ? openStatement(c) : inspect(c.targetId,label)}>Inspect {isStatementMeasure(c.measure) ? label.replace("Statement ","statement ") : label.toLowerCase()}</button>
           {!followUp && live?.value === "—" && <button className="text-link" onClick={() => checkGap(live)}>Check missing evidence</button>}
           {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note,site:followUp.targetId || c.targetId}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · Owner "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
           {review?.reason && access.editable && <div className="review-actions">

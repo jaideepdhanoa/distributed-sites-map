@@ -1,0 +1,4 @@
+.opportunity-review { margin-block: 0.65rem; border-left: 3px solid var(--accent, #29746e); padding: 0.45rem 0.75rem; overflow-wrap: anywhere; }
+.opportunity-review h3, .opportunity-review h4, .opportunity-review p { margin: 0.35rem 0; }
+.opportunity-review details { margin-top: 0.55rem; }
+.opportunity-review summary { cursor: pointer; }

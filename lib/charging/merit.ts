@@ -83,6 +83,15 @@ export function siteMerit(deal:DealProps,c:Inputs,selected:boolean,stale:boolean
   }
   function result(action:Action,next:string,order:number):Merit {return {...m,action,next,order};}
   if(deal.suggested_drop || deal.listing_removed)return result("Review for closure",deal.suggested_drop || "Reconcile the offering and current disposition.",7);
+  const commercial=deal.opportunityReview?.primary;
+  if(commercial?.disposition==="Suggest drop")return result("Review for closure",commercial.rationale,7);
+  if(commercial){
+    const siteHold=["Previously dropped","Outside mandate"].includes(commercial.disposition);
+    const closed=["Close offering","Watch availability","Archive listing","Off-market prospect"].includes(commercial.disposition);
+    const routeApplies=c.terms==="purchase" ? ["Operating acquisition","Offered acquisition","Property only"].includes(commercial.route)
+      : ["Operating lease","Host agreement"].includes(commercial.route);
+    if(siteHold || (closed && routeApplies))return result("Verify a condition",commercial.next,2);
+  }
   const blocker=deal.stage_blocker?.trim();
   if(blocker && !/^(?:—|-|unknown|n\/a|none|not on file)$/i.test(blocker))return result("Verify a condition",blocker,2);
   if(deal.chargingHold)return result("Verify a condition",deal.chargingHold,2);

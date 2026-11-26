@@ -177,6 +177,7 @@ export type DealProps = {
   charging?: import("./charging/summary").ChargingSummary;
   statementCoverage?: "present" | "empty" | "unavailable";
   screening?: import("./selection/screen").ScreenSummary;
+  opportunityReview?: import("./selection/opportunity").OpportunitySite;
   selectionResearch?: import("./selection/research").SelectionResearch;
   purchase?: import("./purchaseReview").PurchaseData;
   deal_id: string;

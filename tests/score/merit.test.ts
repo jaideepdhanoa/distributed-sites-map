@@ -83,3 +83,14 @@ test("the workbook projects the app decision and preserves zero and blank rank",
   assert.ok(Math.abs(Number(row[23]))<1e-7);assert.notEqual(row[23],"");
   const stale=sheet(summarize(site,"new-base",saved));assert.equal(stale[22],"");assert.equal(stale[23],"");
 });
+
+test("a closed acquisition keeps a distinct host lease available for assessment",()=>{
+  const c=example();
+  const review:NonNullable<DealProps["opportunityReview"]>={name:"Example",alternatives:[],primary:{
+    route:"Operating acquisition",disposition:"Close offering",rank:null,rationale:"Seller retained the property.",
+    next:"Confirm a new offering.",reviewedOn:"2027-01-01",owner:null,revisitOn:null,evidence:"https://example.org",offering:null}};
+  const reviewed={...site,opportunityReview:review};
+  assert.equal(siteMerit(reviewed,c,true,false,false).next,review.primary.next);
+  c.terms="lease";
+  assert.equal(siteMerit(reviewed,c,true,false,false).action,"Advance diligence");
+});

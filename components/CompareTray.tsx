@@ -119,14 +119,16 @@ export default function CompareTray({
   }
   const measures = comparisonMeasures(columns);
   const decisionMeasures = measures.filter(row => row.label !== "Power" || !signedIn);
-  const differences = decisionMeasures.filter(row => row.kind === "different").length;
-  const gaps = decisionMeasures.filter(row => row.label !== "Suggested drop" && row.missing > 0);
-  const allMissing = gaps.filter(row => row.allMissing);
-  const basis = decisionMeasures.filter(row => row.kind === "basis").length;
   const visible = showAll ? measures : decisionMeasures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || ["different", "gap", "basis"].includes(row.kind));
 
   const sections = compareSections.filter(section => visible.some(row => row.section === section));
   const selectedSection = sections.find(section => section === sectionFilter) || "";
+
+  const summaryMeasures = selectedSection ? visible.filter(row => row.section === selectedSection) : decisionMeasures;
+  const differences = summaryMeasures.filter(row => row.kind === "different").length;
+  const gaps = summaryMeasures.filter(row => row.label !== "Suggested drop" && row.missing > 0);
+  const allMissing = gaps.filter(row => row.allMissing);
+  const basis = summaryMeasures.filter(row => row.kind === "basis").length;
 
   function renderCell(column: typeof columns[number], label: string, kind: string, value: string) {
     const row = column.rows.find(row => row.label === label);
@@ -196,7 +198,7 @@ export default function CompareTray({
       {count >= 2 ? (
         <>
           <div className="comparison-mode">
-            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "evidence gap" : "evidence gaps"}{basis > 0 && ` · ${basis} with different bases`}{showAll && allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}</span>
+            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "measure with gaps" : "measures with gaps"}{basis > 0 && ` · ${basis} with different bases`}{showAll && allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}</span>
             <select className="secondary" aria-label="Comparison section" value={selectedSection} onChange={event => {
               setSectionFilter(event.target.value);
               matrixRef.current?.scrollTo({top:0});

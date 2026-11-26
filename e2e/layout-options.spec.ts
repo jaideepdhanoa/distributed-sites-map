@@ -15,7 +15,7 @@ test("compare operating layouts and model a four-stall boundary", async ({ page 
   const deals=await response.json();
   const id=deals.features.find((f: {properties:{kind:string;city:string;stage_group:string}})=>f.properties.kind==="pipeline" && f.properties.city==="PHX" && f.properties.stage_group==="desk").properties.deal_id;
   await page.goto("/?"+new URLSearchParams({site:id,city:"PHX",funnel:"pipeline",panel:"space-options",sheet:"full"}));
-  const panel=page.getByTestId("space-options");
+  const panel=page.getByTestId("space-options").filter({has:page.getByRole("group", {name:"Operating layout"})});
   await expect(panel.getByRole("button",{name:"Convert outdoor space",exact:true})).toHaveAttribute("aria-pressed","true");
   await expect(panel).toContainText("0 stalls in the earlier screen");
   await panel.getByRole("button",{name:"Convert bays",exact:true}).click();

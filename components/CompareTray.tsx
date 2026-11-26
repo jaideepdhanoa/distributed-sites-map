@@ -1,5 +1,5 @@
 import { usePurchaseScenarios } from "./PurchaseScenarios";
-import { purchaseLabels,purchaseRows,preferredScenario,scenarioFigure,readScenario } from "@/lib/purchaseReview";
+import { originalScenario,purchaseLabels,purchaseRows,preferredScenario,scenarioFigure,readScenario } from "@/lib/purchaseReview";
 import { createPortal } from "react-dom";
 import PnlOverlay from "./PnlOverlay";
 import { useComparisonStatements } from "./useComparisonStatements";
@@ -43,6 +43,7 @@ export default function CompareTray({
   evidenceEnabled?: boolean;
 }) {
   const purchaseScenarios=usePurchaseScenarios();
+  const [baseline,setBaseline] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [sectionFilter, setSectionFilter] = useState("");
   const [highlight, setHighlight] = useState(true);
@@ -95,7 +96,7 @@ export default function CompareTray({
   const purchaseFigures:CitedFigure[]=[];
   for (const c of columns) {
     if (!signedIn || !c.deal || c.deal.kind!=="pipeline") continue;
-    const scenario=purchaseScenarios.cases[c.deal.deal_id] || preferredScenario(c.deal);
+    const scenario=baseline ? originalScenario : purchaseScenarios.cases[c.deal.deal_id] || preferredScenario(c.deal);
     const rows=purchaseRows(c.deal,scenario);
     c.rows=c.rows.map(r=>rows.find(v=>v.label===r.label) || r);
     const f=scenarioFigure(c.deal,scenario);
@@ -134,6 +135,9 @@ export default function CompareTray({
   const visible = showAll ? measures : decisionMeasures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || ["different", "gap", "basis"].includes(row.kind));
 
   const sections = compareSections.filter(section => visible.some(row => row.section === section));
+  const attention = visible.filter(row => row.values.some(v=>v.startsWith("Sources disagree")) || row.kind === "basis" || row.partial)
+    .sort((a,b) => Number(b.values.some(v=>v.startsWith("Sources disagree"))) - Number(a.values.some(v=>v.startsWith("Sources disagree"))) ||
+      Number(b.kind==="basis") - Number(a.kind==="basis")).slice(0,3);
   const selectedSection = sections.find(section => section === sectionFilter) || "";
 
   const summaryMeasures = selectedSection ? visible.filter(row => row.section === selectedSection) : decisionMeasures;
@@ -148,7 +152,7 @@ export default function CompareTray({
     const statement = options.get(column.id+"|"+label);
     if (onInspect && column.deal?.kind==="pipeline" && purchaseLabels.some(p=>p===label)) {
       return <button type="button" className="text-link compare-evidence" onClick={event=>{
-        inspectedCell.current=event.currentTarget;onInspect(column.id,label);
+        inspectedCell.current=event.currentTarget;onInspect(column.id,label,baseline ? new URLSearchParams({caseView:"baseline"}) : undefined);
       }}>{value===MISSING?"Inspect financial inputs":value}{row?.basis && <small>{row.basis}</small>}</button>;
     }
     if (statement && value === "Unavailable") return <button type="button" className="text-link" onClick={statements.retry}>Retry statement</button>;
@@ -168,7 +172,7 @@ export default function CompareTray({
     const pieces = value.split(" · ");
     const power = label === "On-site service" || label === "Street-frontage hosting";
     const primary = power ? String(row?.key || value) : pieces[0];
-    const detail = power ? [row?.basis === "Partial" && "Partial service record", row?.source || "Source not recorded"].filter(Boolean).join(" · ") : pieces.slice(1).join(" · ");
+    const detail = power ? [row?.basis === "Partial" && "Partial service record", row?.basis === "Forecast year unknown" && row.basis, row?.source || "Source not recorded"].filter(Boolean).join(" · ") : pieces.slice(1).join(" · ");
     const request = label === "On-site service" && row?.basis !== "Verified" && evidenceEnabled && canFollowUp &&
       evidenceTarget(column.targetKind, column.id, label, column.deal);
     return <><button className="text-link compare-evidence compare-reading" type="button"
@@ -218,8 +222,15 @@ export default function CompareTray({
       </div>
       {count >= 2 ? (
         <>
+          {attention.length > 0 && <div className="comparison-attention" aria-label="Checks before deciding"><strong>Check before deciding</strong>
+            {attention.map(row=><button className="text-link" type="button" key={row.label} onClick={()=>{
+              setSectionFilter(row.section);
+              requestAnimationFrame(()=>{const target=matrixRef.current?.querySelector<HTMLElement>('[data-compare-row="'+CSS.escape(row.label)+'"]');
+                target?.scrollIntoView({block:"nearest"});target?.focus({preventScroll:true});});
+            }}>{row.label} · {row.values.some(v=>v.startsWith("Sources disagree")) ? "Sources disagree" : row.kind==="basis" ? "Different assumptions or periods" : "Evidence gap"}</button>)}</div>}
           <div className="comparison-mode">
             <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "measure with gaps" : "measures with gaps"}{basis > 0 && ` · ${basis} with different bases`}{showAll && allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}</span>
+            {signedIn && columns.some(c => c.deal?.purchase) && <label className="act-check"><input type="checkbox" className="check" checked={baseline} onChange={e=>setBaseline(e.target.checked)}/>Use workbook baseline for all sites</label>}
             <select className="secondary" aria-label="Comparison section" value={selectedSection} onChange={event => {
               setSectionFilter(event.target.value);
               matrixRef.current?.scrollTo({top:0});
@@ -232,7 +243,10 @@ export default function CompareTray({
                 ["Captured at", capturedAt],
                 ["Record ID", "", ...columns.map(column => column.id)],
                 ["Section", "Measure", ...columns.map(column => column.title)],
-                ...measures.map(row => [row.section, row.label, ...row.values.map(value => value === MISSING ? "Not on file" : value)]),
+                ...measures.map(row => [row.section, row.label, ...row.values.map((value,i) => {
+                  const basis = columns[i].rows.find(r=>r.label===row.label)?.basis;
+                  return [value === MISSING ? "Not on file" : value, purchaseLabels.some(label=>label===row.label) && basis].filter(Boolean).join(" · ");
+                })]),
               ];
               const csv = lines.map(line=>line.map(csvCell).join(",")).join("\r\n");
               const url = URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
@@ -262,11 +276,11 @@ export default function CompareTray({
                   <tbody key={section} aria-label={section}>
                     <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
                     {group.map(({ label, values, kind, available, partial, allMissing }) => (
-                      <tr key={label} data-compare-row={label} data-state={kind}>
-                        <th scope="row">{label}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
+                      <tr key={label} tabIndex={-1} data-compare-row={label} data-state={kind}>
+                        <th scope="row">{label}{label === "Bays that fit" && <small>Earlier workbook screen</small>}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
-                            {renderCell(columns[i], label, kind, value)}
+                            {renderCell(columns[i], label, kind, value)}{label === "Next check" && <small>{columns[i].deal?.screening?.origin}</small>}
                             {label === "Cash flow" && value !== MISSING && value !== "Not applicable" && columns[i].deal?.figures_source && <small className="comparison-source">{columns[i].deal?.figures_source}</small>}
                           </td>
                         ))}

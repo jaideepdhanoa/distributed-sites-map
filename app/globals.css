@@ -4628,3 +4628,21 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 @media (min-width: 768px) {
   .map-stage:has(.market-panel) .space-map-launch.tool { left: auto; right: 14px; }
 }
+
+.power-scope-chips, .map-analysis-links { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
+.power-scope-chips { padding:4px 12px; }
+.map-analysis-links .eyebrow { width:100%; }
+.preview-more { flex-basis:100%; }
+.preview-more[open] .preview-open { margin-right:10px; }
+.market-selected-reading { margin:4px 0 10px; color:var(--green); }
+@media(max-width:600px) {
+  .preview-more summary { min-height:44px; align-content:center; }
+  .space-review-results li > div:first-child > strong { display:block; margin-top:5px; }
+}
+
+.comparison-attention { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 14px; padding:8px 14px; background:#f4f1e8; }
+.comparison-attention .text-link { text-align:left; }
+@media(max-width:600px) {
+  .comparison-attention { flex-wrap:nowrap; overflow-x:auto; }
+  .comparison-attention > * { flex-shrink:0; }
+}

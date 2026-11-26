@@ -1,8 +1,9 @@
+import { comparisonPower } from "./mapPower";
 import { purchaseLabels, purchaseRows } from "./purchaseReview";
 import { marketLabels, marketEvidence, marketComparisonRows } from "./marketContext";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress, shownPriceSource } from "@/lib/format";
-import { acresText, cashTile, comparisonPower, depotLine, factsForDeal, factsForSite, fullMoney, spareLandSqft, packageLine, powerSummary, sheetMoney } from "@/lib/keyNumbers";
+import { acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, spareLandSqft, packageLine, powerSummary, sheetMoney } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { stageDetail } from "@/lib/labels";
 import { serviceAreaLabel } from "@/lib/cardStatus";
@@ -14,7 +15,7 @@ type CompareRow = { label: string; value: string; key?: string | number | null; 
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
 export const compareSections = ["Power evidence", "Market context", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
-export const acquisitionCriteria = [...purchaseLabels, "Traffic", "Washes within 1 mile", "Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
+export const acquisitionCriteria = [...purchaseLabels, "Assessed layout", "Traffic", "Washes within 1 mile", "Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
 
 function sectionFor(label: string): typeof compareSections[number] {
   if (marketLabels.some(item=>item===label)) return "Market context";
@@ -23,7 +24,7 @@ function sectionFor(label: string): typeof compareSections[number] {
   if (["Address", "Property owner"].includes(label)) return "Record details";
   if (["Financial package", "Cash flow coverage", "Figure basis", "Reporting period", "Financial source", "Land measurement"].includes(label)) return "Evidence quality";
 
-  if (["Bays that fit", "Service area", "Traffic", "Land", "Open land", "Power", "3-mile population", "Washes", "Depot", "Zoning"].includes(label)) return "Site fit";
+  if (["Assessed layout", "Bays that fit", "Service area", "Traffic", "Land", "Open land", "Power", "3-mile population", "Washes", "Depot", "Zoning"].includes(label)) return "Site fit";
   if (["Stage", "Open evidence gaps", "NDA", "Suggested drop", "Next check", "Blocker"].includes(label)) return "Diligence";
   return "Financials";
 }
@@ -39,12 +40,12 @@ function shown(value?: unknown) {
 }
 
 function powerRows(deal?: DealProps, site?: SiteProps): CompareRow[] {
-  const { service, frontage } = comparisonPower(deal, site);
+  const { service, frontage, differing } = comparisonPower(deal, site);
   return [
     { label: "On-site service", key: service?.value, source: service?.source,
-      basis: service && (service.verified ? "Verified" : service.complete ? "Recorded" : "Partial"),
+      basis: differing ? "Sources disagree" : service && (service.verified ? "Verified" : service.complete ? "Recorded" : "Partial"),
       value: service ? withEvidence(service.value, service.source || "Source not recorded") : MISSING },
-    { label: "Street-frontage hosting", key: frontage?.value, source: frontage?.source,
+    { label: "Street-frontage hosting", key: frontage?.value, source: frontage?.source, basis: frontage?.basis,
       value: frontage ? withEvidence(frontage.value, frontage.source || "Source not recorded") : MISSING },
   ];
 }
@@ -171,7 +172,8 @@ function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRo
     { label: "Figure basis", value: applicable ? shown(deal.earnings_basis || deal.figures_basis) : "Not applicable" },
     { label: "Reporting period", value: applicable ? shown(deal.earnings_period || deal.revenue_period) : "Not applicable" },
     { label: "Blocker", key: deal.stage_blocker === MISSING ? "clear" : deal.stage_blocker?.trim() ? "blocked" : null, value: deal.stage_blocker === MISSING ? "No blocker recorded" : shown(deal.stage_blocker) },
-    { label: "Next check", value: shown(deal.next_step) },
+    { label: "Next check", value: shown(deal.screening?.instruction || deal.stage_blocker && deal.stage_blocker !== MISSING && deal.stage_blocker || deal.next_step), source:deal.screening?.origin },
+    ...(deal.screening?.fit ? [{label:"Assessed layout",value:deal.screening.fit,source:"Space assessment"}] : []),
   ];
 }
 

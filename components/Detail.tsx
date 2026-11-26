@@ -661,7 +661,7 @@ export default function Detail({
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
       <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
-      <RecordNavigation financials={Boolean(signedIn && linkedDeal?.kind==="pipeline" && !site.land_only)} />
+      <RecordNavigation financials={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
@@ -701,7 +701,7 @@ export default function Detail({
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
-      {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
+
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {signedIn && savedLots}
       {related}
@@ -830,6 +830,7 @@ export default function Detail({
         }
         numbers={figuresReady ? (
           <>
+            {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
             <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
             <div className="kv">
               <span data-evidence="asking">Asking price</span>
@@ -1001,7 +1002,7 @@ export function DealDetail({
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
       <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
-      <RecordNavigation financials={signedIn && deal.kind==="pipeline"} />
+      <RecordNavigation financials={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
@@ -1029,7 +1030,7 @@ export function DealDetail({
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
-      {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
+
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {signedIn && savedLots}
       {related}
@@ -1085,6 +1086,7 @@ export function DealDetail({
         }
         numbers={
           <>
+            {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
             {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">

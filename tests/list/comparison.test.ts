@@ -115,3 +115,14 @@ test("acquisition pricing preserves the actual earnings definition, dates, zero 
   assert.equal(compare(a, deal({business_value_display:"Land covers asking"})).get("Implied business price")?.values[1], "Land covers asking");
   assert.ok(!compare(a,b,false).has("Savings versus hub"));
 });
+
+test("comparison carries a service disagreement and distinguishes utility forecast years", () => {
+  const a=deal({cap_c_amps:"400 A",cap_c_source:"Example broker",universe_id:"sample"});
+  const linked={site_id:"sample",cap_c_amps:"800 A",cap_c_source:"Example panel photo"} as import("../../lib/types").SiteProps;
+  const row=dealRows(a,[linked],true).find(r=>r.label==="On-site service")!;
+  assert.equal(row.key,"Sources disagree");
+  for (const text of ["400 A","800 A","Example broker","Example panel photo"]) assert.ok(row.value.includes(text));
+  const f=compare(deal({cap_b_frontage:0,cap_b_horizon:"2028"}),deal({cap_b_frontage:0,cap_b_horizon:"2032"})).get("Street-frontage hosting");
+  assert.equal(f?.kind,"basis");
+  assert.ok(f.values[0].includes("2028"));
+});

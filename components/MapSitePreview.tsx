@@ -12,7 +12,7 @@ import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import MarketEvidence, { type WashInspection } from "./MarketEvidence";
 
 type PreviewProps = {
-  marketMode?: boolean; washInspection?: WashInspection;
+  marketMode?: import("@/lib/marketContext").MarketMetric | null; washInspection?: WashInspection;
   site?: SiteProps | null;
   deal?: DealProps | null;
   listing?: UnscreenedProps | null;
@@ -40,11 +40,11 @@ export default function MapSitePreview(props: PreviewProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }); }, [id]);
   const [tab, setTab] = useState<"site" | "power" | null>(null);
-  useEffect(() => { setTab(null); }, [id, props.powerMode]);
+  useEffect(() => { setTab(null); }, [id, props.powerMode, props.marketMode]);
   if (!record) return null;
   const canSeePower = props.signedIn && !listing;
-  const showingPower = canSeePower && (tab === "power" || (tab == null && props.powerMode));
-  const { figures, status, review, evidence, missing } = screeningEvidence({ site, deal: deal || props.linkedDeal, listing, signedIn: props.signedIn });
+  const showingPower = canSeePower && (tab === "power" || (tab == null && props.powerMode && !props.marketMode));
+  const { figures, status, review, origin, evidence, missing } = screeningEvidence({ site, deal: deal || props.linkedDeal, listing, signedIn: props.signedIn });
   const fact = previewFitFigure(figures);
   const powerDeal = deal || props.linkedDeal;
   const power = props.signedIn && !listing && access.enabled && !evidence && /power|utility|electrical/i.test(review) && powerDeal?.kind !== "land" && !site?.land_only && powerDeal?.stage_group !== "dropped";
@@ -63,23 +63,26 @@ export default function MapSitePreview(props: PreviewProps) {
         <button type="button" className={`segmented ${!showingPower ? "on" : ""}`} aria-pressed={!showingPower} onClick={() => {if (props.grid.open) props.onGrid(); setTab("site");}}>Site fit</button>
         <button type="button" className={`segmented ${showingPower ? "on" : ""}`} aria-pressed={showingPower} onClick={() => setTab("power")}>Power</button>
       </div>}
-      {!showingPower && props.marketMode && !listing && <MarketEvidence deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
+      {!showingPower && props.marketMode && !listing && <MarketEvidence metric={props.marketMode} deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
       {showingPower ? <MapPowerCard deal={props.powerDeal} site={props.powerSite} grid={props.grid} onGrid={props.onGrid}/> : <dl className="preview-facts">
         {fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}
-        <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
+        <div><dt>Next check</dt><dd>{review}<small className="preview-missing">{origin}</small>{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>}
-      {!showingPower && props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
+      {!showingPower && evidence?.kind !== "layout" && props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
       {!props.grid.open && <div className="preview-actions">
       {!showingPower && power && <PowerFollowUp deal={props.powerDeal} site={props.powerSite} primary />}
       {!showingPower && evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}
+      {!showingPower && evidence?.kind === "layout" && <button className="primary preview-open" type="button" onClick={() => onOpen("space-options")}>Inspect layout</button>}
       {!showingPower && evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("open-land")}>Check open land</button>}
       {!showingPower && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} compact />}
       {props.signedIn && powerDeal?.kind==="pipeline" && !site?.land_only && <button type="button" className="paper-btn preview-open" onClick={()=>onOpen("purchase")}>Site financials</button>}
       {props.onCompare && <button className="paper-btn preview-open" type="button" onClick={props.onCompare}
         disabled={props.comparisonFull && !props.compared}>{props.compared ? "Remove from comparison" : props.comparisonFull ? "Comparison full" : "Add to comparison"}</button>}
+      <button type="button" className={showingPower || evidence || power ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
+      {(props.onSatellite || (props.signedIn && !listing && access.enabled && canWrite(access.actionRole))) && <details className="disclosure preview-more"><summary className="disclosure">More actions</summary>
       {props.onSatellite && <button className="text-link preview-open" type="button" onClick={props.onSatellite}>View satellite</button>}
       {props.signedIn && !listing && access.enabled && canWrite(access.actionRole) && <button type="button" className="text-link preview-open" onClick={() => onOpen("finding")}>Record finding</button>}
-      <button type="button" className={showingPower || evidence || power ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
+      </details>}
       </div>}
     </aside>
   );

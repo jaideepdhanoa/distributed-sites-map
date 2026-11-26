@@ -176,7 +176,7 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
     if (!row && !canDraft) return null;
     return <div className="space-options-pin"><Layers3 size={16} aria-hidden="true"/><button className="text-link" type="button" onClick={onOpen}>Compare space options</button>{first && <span>{first.label}</span>}</div>;
   }
-  return <section ref={ref} aria-labelledby={titleId} className="space-options" data-testid="space-options">
+  return <section ref={ref} data-evidence="space-options" aria-labelledby={titleId} className="space-options" data-testid="space-options">
     <div className="space-heading"><Layers3 size={19} aria-hidden="true"/><h3 id={titleId}>Space options</h3></div>
     {row?.zones.some(z=>z.kind!=="clear") && <a className="paper-btn" href={spacesMapHref(site)}>Open spaces on main map</a>}
     {row && !open && <div className="space-top">

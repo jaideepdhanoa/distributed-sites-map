@@ -10,7 +10,7 @@ type RecordInput = {
 };
 
 type Figure = { label: string; value: string; source: string; date: string };
-type Evidence = { kind: "county"; href: string } | { kind: "space" } | { kind: "financials"; id: string };
+type Evidence = { kind: "county"; href: string } | { kind: "space" } | {kind:"layout"} | { kind: "financials"; id: string };
 
 function present(value?: string | null) {
   const text = value?.trim();
@@ -33,7 +33,9 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
     const text = present(value);
     if (text) figures.push({ label, value: text, source: present(source), date: present(date) });
   }
-  if (deal?.bays_that_fit != null) add("Usable bays", String(deal.bays_that_fit), "Pipeline workbook");
+  const screen = signedIn ? deal?.screening : undefined;
+  if (screen?.fit) add("Assessed layout",screen.fit,"Space assessment");
+  if (deal?.bays_that_fit != null) add("Earlier workbook bays", String(deal.bays_that_fit), "Pipeline workbook");
   add("Open land", spare.value, spare.note);
   if (deal?.trade_aadt != null) add("Traffic", workbookTrafficLine(deal).replace(/ · Workbook trade area$/, ""), "Workbook trade area");
   else if (site?.aadt_count) add("Traffic", universeTrafficLine({ ...site, aadt_year: "" }), site.aadt_source, site.aadt_year);
@@ -56,18 +58,21 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   const reason = (signedIn && present(deal?.decision_reason)) || present(site?.summary_why);
   const gap = signedIn ? present(deal?.stage_blocker) || present(deal?.next_step) : "";
   const county = countyLink(site?.county_url);
-  let review = gap;
+  let review = screen?.instruction || gap;
   let check: "county" | "space" | "financials" | undefined;
   let evidence: Evidence | undefined;
   let missing = "";
   if (deal?.stage_group === "dropped") review = "No further review scheduled.";
+  else if (screen) review = screen.instruction;
   else if (!gap && signedIn && deal && (deal.stage_group === "financial" || deal.stage_group === "contacted") && deal.kind !== "land" && deal.financials_open !== false) review = "Review the financial statement.";
   else if (!gap && site?.verdict) review = nextStepText(site);
   else if (!gap && listing?.approximate) review = "Confirm the exact location.";
   else if (!gap && site && !deal) review = "Check the county parcel record.";
+  else if (!gap && deal?.kind === "pipeline") review = "Check a parcel-matched layout for retained operations, parking and convertible bays.";
   else if (!gap && !present(spare.value)) review = "Confirm how much open land is usable.";
   else if (!gap && present(spare.value)) review = "Verify the usable open land.";
-  if (/county|parcel record|assessor|\bapn\b/i.test(review)) {
+  if (screen?.layoutCheck || review.startsWith("Check a parcel-matched layout")) evidence = { kind:"layout" };
+  else if (/county|parcel record|assessor|\bapn\b/i.test(review)) {
     check = "county";
     if (present(site?.apn)) add("Parcel number", site?.apn, site?.fields?.apn?.source || "Site record", site?.fields?.apn?.date);
     if (county) evidence = { kind: "county", href: county };
@@ -83,11 +88,11 @@ export function screeningEvidence({ site, deal, listing, signedIn }: RecordInput
   const preferred = check === "space" ? "Open land" : check === "county" ? "Parcel number" : "";
   const first = figures.findIndex(figure => figure.label === preferred);
   if (first > 0) figures.unshift(figures.splice(first, 1)[0]);
-  return { status, reason: /^not screened yet[.]?$/i.test(reason || "") ? "" : reason, figures, check, evidence, missing, review: review || "Review the site evidence." };
+  return { status, origin:screen?.origin || (gap ? "Recorded check" : "Suggested check"), reason: /^not screened yet[.]?$/i.test(reason || "") ? "" : reason, figures, check, evidence, missing, review: review || "Review the site evidence." };
 }
 
 export function previewFitFigure(figures: ReturnType<typeof screeningEvidence>["figures"]) {
-  return ["Open land", "Usable bays", "Parcel size", "Traffic"]
+  return ["Assessed layout", "Open land", "Earlier workbook bays", "Parcel size", "Traffic"]
     .map(label => figures.find(figure => figure.label === label)).find(Boolean)
     || figures.find(figure => figure.label !== "Parcel number");
 }

@@ -2,7 +2,8 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
-import { amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
+import { useSearchParams } from "next/navigation";
+import { originalScenario, amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
 import { usePurchaseScenario } from "./PurchaseScenarios";
 import FinancialsEntry, { type usePnlTiles } from "./FinancialsEntry";
 import SelectionResearch from "./SelectionResearch";
@@ -15,7 +16,11 @@ function Ledger({rows}:{rows:[string,ReactNode][]}) {
 }
 const percent = (n:number|null|undefined) => n==null ? "—" : (n*100).toLocaleString("en-US",{maximumFractionDigits:2})+"%";
 export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType<typeof usePnlTiles>}) {
-  const {scenario,update}=usePurchaseScenario(deal);
+  const selected = usePurchaseScenario(deal);
+  const baseline = useSearchParams().get("caseView") === "baseline";
+  const [inspection,setInspection] = useState(originalScenario);
+  const scenario = baseline ? inspection : selected.scenario;
+  const update = baseline ? setInspection : selected.update;
   const [checklist,setChecklist]=useState(false);
   const [gap,setGap]=useState(false);
   const [invalid,setInvalid]=useState("");
@@ -67,9 +72,10 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
     <header><p className="eyebrow">Site financials</p><h3>Can the business carry the purchase?</h3>
       <p className="purchase-basis">{evidence}{w?.checked && " · Checked "+w.checked}</p></header>
     <article className="purchase-lead">
-      <span>{leadLabel}</span>
+      <span>{leadLabel}</span>{baseline && <small>Workbook baseline inspection</small>}
       <strong>{amount(annual ?? claim ?? standaloneEarnings ?? revenue ?? ask)}</strong>
       <small>{leadNote.join(" · ")}</small>
+      {source?.sourceHref && <a className="text-link" href={source.sourceHref} target="_blank" rel="noreferrer">Open earnings source ↗</a>}
     </article>
     {annual!=null && result?.charge!=null && <div className="purchase-funding" aria-label="Annual purchase coverage">
       <div><span>Annual charge at ask</span><b>{amount(result.charge)}</b></div>

@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { marketEvidence, formatMarket, workbookSource } from "@/lib/marketContext";
+import { marketEvidence, formatMarket, workbookSource, marketMeasures, type MarketMetric } from "@/lib/marketContext";
 import type { DealProps, SiteProps } from "@/lib/types";
 
 export type WashInspection = {
   radius: 1 | 3 | null; mapped: number | null; select: (miles: 1 | 3) => void;
 };
 
-export default function MarketEvidence({deal, site, inspection, expanded = false}: {
+export default function MarketEvidence({deal, site, inspection, metric, expanded = false}: {
+  metric?: MarketMetric;
   deal?: DealProps | null; site?: SiteProps | null; inspection?: WashInspection; expanded?: boolean;
 }) {
   const e = marketEvidence(deal,site);
   const [details,setDetails] = useState(expanded);
   return <section className="market-evidence" aria-label="Market context" data-evidence="market-context">
     <h3>Market context</h3>
+    {metric && <p className="market-selected-reading"><strong>{marketMeasures[metric].title} · {e[metric] == null ? "Not on file" : formatMarket(e[metric],metric)}</strong> {marketMeasures[metric].unit}</p>}
     <dl className="market-facts">
       <div><dt>{e.trafficBasis || "Road traffic"}</dt><dd>{formatMarket(e.traffic,"traffic")}<small>vehicles/day</small></dd></div>
       <div><dt>Washes within 1 mi</dt><dd>{formatMarket(e.washes,"washes")}</dd></div>

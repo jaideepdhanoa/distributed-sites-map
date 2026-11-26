@@ -68,3 +68,15 @@ test("a saved purchase case resolves against current records and flags a changed
   assert.ok(changed && evidenceChanged(citation,changed));
   assert.equal(changed.value,"—");
 });
+
+test("compared financial measures name only the adjustments that affect their cash period", () => {
+  const current = {...originalScenario,basis:"normalized" as const};
+  const adjusted = {...current,lostCash:5000,upgrade:10000,downtime:2};
+  const rows = purchaseRows(site,adjusted);
+  const row = (name:string) => rows.find(r=>r.label===name)!;
+  assert.match(row("Retained annual cash").basis,/5,000.*displaced/);
+  assert.doesNotMatch(row("Retained annual cash").basis,/upgrade|interrupted/);
+  assert.match(row("Annual surplus or shortfall").basis,/10,000 upgrade/);
+  assert.match(row("Year-one retained cash").basis,/2 months interrupted/);
+  assert.equal(row("Annual capital charge").basis,purchaseRows(site,current).find(r=>r.label==="Annual capital charge")?.basis);
+});

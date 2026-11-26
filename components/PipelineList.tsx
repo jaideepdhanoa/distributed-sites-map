@@ -1,5 +1,7 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { reviewLink, rememberReviewPosition, restoreReviewPosition, setReviewFilter } from "@/lib/reviewNavigation";
 import { FinanceFilters, financeMatch } from "./FinancialPortfolio";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -345,13 +347,23 @@ export default function PipelineList({
       },
     };
   });
-  const [finEvidence,setFinEvidence]=useState("");
-  const [finCarry,setFinCarry]=useState("");
-  const [financeOpen,setFinanceOpen]=useState(false);
+  const params=useSearchParams();
+  const finEvidence=params.get("finEvidence") || "", finCarry=params.get("finCarry") || "";
+  const financeOpen=params.get("finFilter")==="1";
   const ordered = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => row.point && inMapArea(row.point[0], row.point[1], mapArea)) : rows;
     return prepareRows(signedIn && financeOpen ? scoped.filter(r=>financeMatch(r.deal,finEvidence,finCarry)) : scoped, sheetColumns, activeLayout, visible);
   }, [activeLayout, mapArea, rows, sheetColumns, visible,signedIn,financeOpen,finEvidence,finCarry]);
+  const scope = ordered.map(row=>row.deal.deal_id).join("|");
+  const origin = "/?" + params;
+  const listScroller = () => scrollRef.current || paneRef.current?.querySelector<HTMLElement>(".list-scroll") || null;
+  const restoreKey = useRef("");
+  useEffect(()=>{
+    if (ordered.length && restoreKey.current!==origin) {
+      restoreReviewPosition(listScroller());
+      restoreKey.current=origin;
+    }
+  },[ordered.length,origin,phone]);
   const summary = useMemo(() => summaryOf(ordered.map((row) => row.deal)), [ordered]);
   const compMedian = useMemo(() => compMedianOf(ordered.map((row) => row.deal)), [ordered]);
   const marketComps = new Map<string, number>();
@@ -528,8 +540,8 @@ export default function PipelineList({
             </button>
           );
         })}
-        {signedIn && <button className="paper-btn" type="button" aria-expanded={financeOpen} onClick={()=>setFinanceOpen(!financeOpen)}>Filter by financials</button>}
-        {signedIn && financeOpen && <FinanceFilters deals={rows.map(r=>r.deal)} evidence={finEvidence} carry={finCarry} setEvidence={setFinEvidence} setCarry={setFinCarry}/>}
+        {signedIn && <button className="paper-btn" type="button" aria-expanded={financeOpen} onClick={()=>setReviewFilter("finFilter",financeOpen ? "" : "1")}>Filter by financials</button>}
+        {signedIn && financeOpen && <FinanceFilters deals={rows.map(r=>r.deal)} evidence={finEvidence} carry={finCarry} setEvidence={v=>setReviewFilter("finEvidence",v)} setCarry={v=>setReviewFilter("finCarry",v)}/>}
         <ColumnPicker
           resetLabel="Pipeline default"
           onPreset={signedIn ? () => {
@@ -550,15 +562,15 @@ export default function PipelineList({
           sort={{ id: activeLayout.sort?.id || "site", desc: Boolean(activeLayout.sort?.desc) }}
           onChange={(id, desc) => commit({ ...activeLayout, sort: { id, desc }, touched: true })}
         />
-        {signedIn && <a className="paper-btn only-desktop" href="/selection-review">Selection review</a>}
-        {signedIn && <a className="paper-btn only-desktop" href="/space-review">Space review</a>}
+        {signedIn && <a className="paper-btn only-desktop" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
+        {signedIn && <a className="paper-btn only-desktop" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
         <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              {signedIn && <a className="menu-item" role="menuitem" href="/selection-review">Selection review</a>}
-              {signedIn && <a className="menu-item" role="menuitem" href="/space-review">Space review</a>}
+              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
+              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
               {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}

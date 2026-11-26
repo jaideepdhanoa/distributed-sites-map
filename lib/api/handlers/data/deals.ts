@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import type { DealProps } from "@/lib/types";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { createHash } from "node:crypto";
+import { assessedLayouts } from "@/lib/spaces/assessmentLoad";
+import { triage } from "@/lib/spaces/triage";
+import { screenSummary, type Inputs } from "@/lib/selection/screen";
+import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
 import { selectionResearch } from "@/lib/selection/researchLoad";
 import { purchaseFile } from "@/lib/purchaseReviewLoad";
@@ -43,7 +47,10 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
   }).catch(() => null) : null;
   // Use the reviewed outlines, including edits made on the main map. A changed
   // shape invalidates the scenario that referred to the previous footprint.
-  const outlines = purchase ? await mapCatalog(features) : null;
+  const assessments = new Map(assessedLayouts());
+  const outlines = await mapCatalog(features, [...assessments]);
+  const bySite = new Map(outlines.sites.map(site => [site.id,site]));
+  const selection = readGeneratedOptional("selection-inputs.json") as Record<string,Inputs> | undefined;
   const layouts = new Map(outlines?.reviewsAvailable ? outlines.sites.map(site => {
     const zones = site.zones.filter(zone => zone.kind !== "clear");
     const revision = createHash("sha256").update(JSON.stringify([site.revision, site.frame.id,
@@ -53,9 +60,16 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
   const enriched = features.map(feature => {
     const d = feature.properties as DealProps;
     const inputs = purchase?.sites[d.deal_id];
-    if (!allowed || d.kind !== "pipeline") return feature;
+    if (d.kind !== "pipeline") return feature;
+    const row = assessments.get(d.deal_id);
+    const current = bySite.get(d.deal_id);
+    const view = triage(current && row ? {...row,zones:current.zones} : row);
+    if (current && !outlines.reviewsAvailable) view.fit = "Current outline needs verification";
+    const active = d.stage_group !== "dropped" && !/off[ -]?market/i.test(d.stage || "");
+    const screening = active && (row || selection?.[d.deal_id]) ? screenSummary(d.city,selection?.[d.deal_id],view,d) : undefined;
+    if (!allowed) return {...feature, properties:{...d,screening}};
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
-    return {...feature,properties:{...d,statementCoverage,selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    return {...feature,properties:{...d,screening,statementCoverage,selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})}};
   });
   // Live decisions can change while the published workbook snapshot stays the same.

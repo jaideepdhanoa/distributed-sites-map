@@ -247,7 +247,7 @@ test("a financial check leads with statement coverage and opens its evidence", a
   const brief = page.getByRole("region", { name: "Screening decision" });
   await expect(brief.getByText("Statement coverage", { exact: true })).toBeInViewport();
   await expect(brief).toContainText("Sample package");
-  await brief.getByRole("button", { name: "Review financials" }).click();
+  await brief.getByRole("button", { name: "Open P&L" }).click();
   await expect(page.getByRole("dialog", { name: "Profit and loss" })).toBeVisible();
 });
 
@@ -278,7 +278,7 @@ test("screen power evidence and trace acquisition pricing", async ({page}) => {
   await page.getByRole("tab",{name:"Site fit"}).click();
   await expect(page.locator(".power-evidence")).toContainText("On-site capacity unconfirmed");
   await expect(page.locator(".power-evidence")).toContainText("2.1 MW");
-  await page.getByRole("tab",{name:"Economics"}).click();
+  await page.getByRole("tab",{name:"Financials"}).click();
   await expect(page.getByTestId("pricing")).toBeVisible();
   await expect(page.locator(".investment-economics")).toContainText("18%");
   await expect(page.locator(".investment-economics")).toContainText("Implied business price");

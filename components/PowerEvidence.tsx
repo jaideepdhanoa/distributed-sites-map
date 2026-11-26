@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { comparisonPower, factsForDeal, factsForSite } from "@/lib/keyNumbers";
+import { comparisonPower } from "@/lib/mapPower";
+import { factsForDeal, factsForSite } from "@/lib/keyNumbers";
 import { derivePowerRating } from "@/lib/score/power-rating";
 import { useActionStatus } from "./actions/panel";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
@@ -28,12 +29,12 @@ export default function PowerEvidence({deal, site, signedIn}: {deal?: DealProps 
   const record = deal || site;
   const facts = deal ? factsForDeal(deal) : factsForSite(site);
   const rating = derivePowerRating({...record, market:record?.city});
-  const { service, frontage } = comparisonPower(deal, site);
+  const { service, frontage, differing } = comparisonPower(deal, site);
   const names = { b:"Other utility hosting evidence", a:"Grid proximity", d:"Load history" };
-  return <section className="power-evidence" data-evidence="power"><span className="eyebrow">Power</span><h3>{service?.verified ? "Verified on-site service" : service?.complete ? "Recorded on-site service" : service ? "Partial on-site service record" : "On-site capacity unconfirmed"}</h3>
+  return <section className="power-evidence" data-evidence="power"><span className="eyebrow">Power</span><h3>{differing ? "Sources disagree" : service?.verified ? "Verified on-site service" : service?.complete ? "Recorded on-site service" : service ? "Partial on-site service record" : "On-site capacity unconfirmed"}</h3>
     <dl className="record-economics">
       <div data-evidence="on-site-service"><dt>On-site service</dt><dd>{service?.value || "Unconfirmed"}{service && <small>{service.source || "Source not recorded"}</small>}</dd></div>
-      <div data-evidence="street-hosting"><dt>Street-frontage hosting</dt><dd>{frontage?.value || "Not on file"}{frontage && <small>{frontage.source || "Source not recorded"}</small>}</dd></div>
+      <div data-evidence="street-hosting"><dt>Street-frontage hosting</dt><dd>{frontage?.value || "Not on file"}{frontage && <small>{[frontage.basis, frontage.source].filter(Boolean).join(" · ")}</small>}</dd></div>
       {(["b","a","d"] as const).map(id => {
         const fact = facts.find(item => item.id === id);
         const lines = fact?.lines.filter(line => !line.startsWith("Frontage hosting "));

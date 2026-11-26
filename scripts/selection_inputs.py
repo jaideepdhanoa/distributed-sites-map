@@ -15,7 +15,7 @@ def number(cell):
     return value if math.isfinite(value) else None
 
 
-def selection_inputs(rows):
+def selection_inputs(rows, hurdle=None):
     result = {}
     for row in rows:
         key = str(row.get("Site ID") or "").strip()
@@ -23,6 +23,9 @@ def selection_inputs(rows):
             continue
         result[key] = {
             "stage": row.get("Stage") or "",
+            "hurdle": hurdle,
+            "outside": row.get("Knock-out") == "Outside the service area",
+            "operating": row.get("Knock-out") not in ("Business not operating", "Business not confirmed"),
             "segment": row.get("Segment") or "",
             "land": row.get("Archetype") == "Land only" or row.get("Knock-out") == "Land only",
             "unavailable": row.get("Listing status") == "Sold or withdrawn" or row.get("Knock-out") == "No longer for sale",
@@ -38,5 +41,13 @@ if __name__ == "__main__":
     import json
     from scripts.build_data import OUT, sheet_rows, source_workbook
 
-    rows = sheet_rows(source_workbook(), "Pipeline", 3)
-    (OUT / "selection-inputs.json").write_text(json.dumps(selection_inputs(rows), sort_keys=True))
+    import openpyxl
+
+    workbook = source_workbook()
+    rows = sheet_rows(workbook, "Pipeline", 3)
+    assumptions = openpyxl.load_workbook(workbook, read_only=True, data_only=True)
+    try:
+        hurdle = number(assumptions["Assumptions"]["B22"].value)
+    finally:
+        assumptions.close()
+    (OUT / "selection-inputs.json").write_text(json.dumps(selection_inputs(rows, hurdle), sort_keys=True))

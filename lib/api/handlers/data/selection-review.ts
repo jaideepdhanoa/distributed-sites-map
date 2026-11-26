@@ -8,7 +8,7 @@ import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { assessedSiteIds, layoutAssessment } from "@/lib/spaces/assessmentLoad";
 import { triage } from "@/lib/spaces/triage";
-import { selectionCheck, type Inputs, type SelectionRow } from "@/lib/selection/screen";
+import { investmentScreen, selectionCheck, type Inputs, type SelectionRow } from "@/lib/selection/screen";
 import { loadMapDeals } from "./deals";
 
 export async function GET() {
@@ -43,7 +43,7 @@ export async function GET() {
     rows.push({id,city,name:String(p.name || p.address || id),mapped:Boolean(mapped.get(id)?.geometry),stage,mirrorStage:input?.stage || "",
       priority,instruction,geometry:!a && typeof input?.recorded === "number" ? input.recorded+" stalls in the workbook" : view.baseline,option:view.finding || view.focus,assessed:Boolean(a),evidenceDate:a?.reviewedOn || "",
       section:input?.section || (input ? "Missing section" : "Workbook input unavailable"),amount:financeVisible ? input?.screen ?? null : null,
-      financeVisible,quickLube:(input?.segment || a?.row.segment || "").toLowerCase().includes("lube") });
+      readiness:investmentScreen(input,financeVisible),financeVisible,quickLube:(input?.segment || a?.row.segment || "").toLowerCase().includes("lube") });
   }
   return NextResponse.json({rows,mismatches,hasInputs:Boolean(raw)}, {headers:privateHeaders});
 }

@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 
 test("selection review distinguishes an unanswered check from zero savings", async ({page},info) => {
   const row = {id:"PIPE-PHX-9999",name:"Example service center",city:"PHX",mapped:false,stage:"1 Desk screen",mirrorStage:"1 Desk screen",
-    priority:"Test conversion",instruction:"Measure the bay and confirm retained operations.",geometry:"0 stalls in the earlier screen",option:"Service building",
+    readiness:"Base case below 30% hurdle",priority:"Test conversion",instruction:"Measure the bay and confirm retained operations.",geometry:"0 stalls in the earlier screen",option:"Service building",
     section:"Missing section",amount:0,financeVisible:true,assessed:true,evidenceDate:"",quickLube:false};
   await page.route("**/api/data/selection-review", r=>r.fulfill({json:{rows:[row,{...row,id:"PIPE-LAS-9999",city:"LAS",name:"Example wash",amount:null}],mismatches:0,hasInputs:true}}));
   await page.goto("/selection-review");

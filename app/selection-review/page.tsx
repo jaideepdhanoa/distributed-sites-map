@@ -38,7 +38,7 @@ export default function SelectionReview() {
       {data.hasInputs && <p>{data.mismatches} stage differences across the joined records. The review uses the application stage when available.</p>}
       {!scoped.length && <p>No sites match these filters.</p>}
       <ul className="space-review-results">{scoped.map(r=><li key={r.id}><div>
-        <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2><p>{r.id}</p>
+        <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2><p>{r.id}</p><strong>{r.readiness}</strong>
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.mapped && <a href={"/?"+new URLSearchParams({site:r.id,city:r.city,funnel:"pipeline",sheet:"full"})}>Open site record</a>}

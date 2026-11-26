@@ -157,11 +157,10 @@ test("phone layers list scrolls between the header and the sheet", async ({ page
   await expect(panel.getByText("Auto service")).toHaveCount(0);
   await expect(panel.getByText("Unscreened market listings")).toHaveCount(0);
   await expect(panel.getByText("Listed, not yet screened")).toHaveCount(0);
-  const bounds = await page.evaluate(() => {
-    const layers = document.querySelector(".layers.open")!;
+  const bounds = await note.evaluate(note => {
+    const layers = note.closest(".layers.open")!;
     const bar = document.querySelector("header.bar")!;
     const drawer = document.querySelector("aside.drawer")!;
-    const note = layers.querySelector(".layers-body .layer-row:last-of-type")!;
     const lr = layers.getBoundingClientRect();
     const br = bar.getBoundingClientRect();
     const dr = drawer.getBoundingClientRect();

@@ -50,6 +50,8 @@ import { LAND_PAUSED_NOTE, UNIVERSE_STAGE_LABEL, countyCheck } from "@/lib/listL
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
+import { indexPowerLinks } from "@/lib/powerLinkIndex";
+import { mapPower, matchesMapPower, serviceFilters, hostingFilters, type ServiceFilter, type HostingFilter } from "@/lib/mapPower";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
 import { inCountedMarket, labeledCount, reviewBadge, shownMarketCounts } from "@/lib/counts";
@@ -188,6 +190,8 @@ export default function Explorer() {
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
   const [handoff, setHandoff] = useState("");
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
+  const [gridStatus,setGridStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [gridAttempt,setGridAttempt] = useState(0);
   const [stepsOpen, setStepsOpen] = useState(false);
   useEffect(() => {
     if (!stepsOpen) return;
@@ -407,6 +411,14 @@ export default function Explorer() {
     categoryKeyRef.current = categoryKey;
     categoriesRef.current = categories;
   }
+  const powerMode = Boolean(me?.u) && params.get("power") === "1" && params.get("view") !== "list";
+  const serviceParam = params.get("service") || "all";
+  const hostingParam = params.get("hosting") || "all";
+  const serviceFilter = Object.hasOwn(serviceFilters,serviceParam) ? serviceParam as ServiceFilter : "all";
+  const hostingFilter = Object.hasOwn(hostingFilters,hostingParam) ? hostingParam as HostingFilter : "all";
+  const powerFiltered = powerMode && (serviceFilter !== "all" || hostingFilter !== "all");
+  const [gridFocusId,setGridFocusId] = useState<string | null>(null);
+  useEffect(() => { setGridFocusId(null); }, [selected, powerMode, selectedMarket]);
   const query = params.get("q") || "";
   const who = params.get("who") || "";
   const [funnelPref, setFunnelPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
@@ -516,16 +528,17 @@ export default function Explorer() {
     };
   }, [me?.u]);
   useEffect(() => {
-    let cancel = false;
-    fetch("/api/data/grid").then(async (response) => {
-      if (!response.ok || cancel) return;
-      const payload = await response.json() as { features?: GeoFeature[] };
-      if (!cancel) setGridFeatures(Array.isArray(payload.features) ? payload.features : []);
-    }).catch(() => undefined);
-    return () => {
-      cancel = true;
-    };
-  }, []);
+    if (!me?.u) return;
+    const request = new AbortController();
+    setGridStatus("loading");
+    fetch("/api/data/grid",{signal:request.signal}).then(async response => {
+      if (!response.ok) throw Error();
+      const payload = await response.json();
+      if (!Array.isArray(payload.features)) throw Error();
+      if (!request.signal.aborted) {setGridFeatures(payload.features);setGridStatus("ready");}
+    }).catch(() => {if (!request.signal.aborted) setGridStatus("error");});
+    return () => request.abort();
+  }, [me?.u,gridAttempt]);
   useEffect(() => {
     setPinPref({
       version: window.localStorage.getItem(PIN_LABEL_VERSION_KEY),
@@ -1087,6 +1100,23 @@ export default function Explorer() {
     return { features: rows, byId, byUniverse };
   }, [data?.deals]);
 
+  const powerCatalog = useMemo(() => {
+    const allSites = new Map((catalog || []).map(f => [f.properties.site_id,f.properties]));
+    for (const f of data?.sites.features || []) allSites.set(f.properties.site_id,f.properties);
+    const pairs: [string,string][] = dealBundle.features.map(f => [f.properties.deal_id,f.properties.universe_id]);
+    for (const site of allSites.values()) {
+      for (const id of [site.linked_deal_id,...(site.linked_deal_ids || [])]) if (id) pairs.push([id,site.site_id]);
+    }
+    return {sites:allSites,links:indexPowerLinks(pairs)};
+  }, [catalog,data?.sites,dealBundle]);
+  function powerDealForSite(site: SiteProps) {
+    const link = powerCatalog.links.get("site:"+site.site_id);
+    return link ? dealBundle.byId.get(link.targetId) : undefined;
+  }
+  function powerSiteForDeal(deal: DealProps) {
+    const link = powerCatalog.links.get("deal:"+deal.deal_id);
+    return link ? powerCatalog.sites.get(link.targetId) : undefined;
+  }
   function dealForSite(site: SiteProps) {
     if (site.linked_deal_id) {
       const linked = dealBundle.byId.get(site.linked_deal_id);
@@ -1101,6 +1131,7 @@ export default function Explorer() {
 
   function passesChips(site: SiteProps, loose: boolean, anyMarket = false) {
     if (!anyMarket && !shownInMarket(site.city)) return false;
+    if (powerFiltered && !matchesMapPower(mapPower(powerDealForSite(site),site),serviceFilter,hostingFilter)) return false;
     if (!siteInCategories(site, links, categories)) return false;
     if (query && !matchesQuery(query, siteSearchParts(site)) && !indexedIds?.has(site.site_id) && !(site.linked_deal_id && indexedIds?.has(site.linked_deal_id))) return false;
     if (loose) return true;
@@ -1181,7 +1212,7 @@ export default function Explorer() {
     return [...byId.values()].sort(compareSites);
     // passesChips closes over the chip state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, categories, who, data?.deals, links, reach, indexedIds]);
+  }, [features, catalog, stage, city, allStages, allCities, universeWide, landTier, verdict, listed, landSites, showDropped, compare, query, extra, categories, who, data?.deals, links, reach, indexedIds, powerFiltered, powerCatalog, serviceFilter, hostingFilter]);
 
   const visibleFeatures: SiteFeature[] = visibleSites.flatMap((site) => {
     const feature = poolById.get(site.site_id);
@@ -1199,6 +1230,7 @@ export default function Explorer() {
   }
 
   function dealAllowed(deal: DealProps, keepSelected = false): boolean {
+    if (powerFiltered && !matchesMapPower(mapPower(deal,powerSiteForDeal(deal)),serviceFilter,hostingFilter)) return false;
     if (keepSelected && selected === deal.deal_id) return true;
     return dealInCategories(deal, categories);
   }
@@ -1347,7 +1379,7 @@ export default function Explorer() {
       ]
         .map((deal) => dealFeatures.find((feature) => feature.properties.deal_id === deal.deal_id))
         .filter((feature): feature is DealFeature => Boolean(feature?.geometry));
-  const listedStepEmpty = funnel !== "pipeline" && listed === "yes" && !query && visibleSites.length === 0;
+  const listedStepEmpty = !powerFiltered && funnel !== "pipeline" && listed === "yes" && !query && visibleSites.length === 0;
   const handoffStep: StageId | null = !listedStepEmpty ? null
     : stage !== "universe" && subcount("universe", "listed") > 0 ? "universe"
     : stage !== "in_area" && subcount("in_area", "listed") > 0 ? "in_area"
@@ -1414,6 +1446,15 @@ export default function Explorer() {
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
   const showingPreview = Boolean(selected && previewId === selected && !listView && !reviewing && !ndaVisible && !loopsVisible);
+  const pinPowerDeal = selectedDeal || (selectedSite ? powerDealForSite(selectedSite) : null);
+  const linkedPowerSite = selectedDeal ? powerSiteForDeal(selectedDeal) : null;
+  const pinPowerSite = selectedSite || (linkedPowerSite && detail?.site_id === linkedPowerSite.site_id ? detail : linkedPowerSite);
+  const selectedGrid = !selected || !me?.u ? [] : gridFeatures.filter(({properties:p}) => {
+    if (p.deal_id === selected) return true;
+    if (p.deal_id) return p.deal_id === pinPowerDeal?.deal_id;
+    return Boolean(p.site_id && p.site_id === pinPowerSite?.site_id);
+  });
+  const gridOpen = Boolean(showingPreview && selected && gridFocusId === selected);
   const selectedSquare = selectedDeal ? asSquare(selectedDeal) : null;
   if (selectedSquare && !drawnDeals.some((feature) => feature.properties.deal_id === selectedDeal?.deal_id)) drawnDeals.push(selectedSquare);
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
@@ -1828,7 +1869,7 @@ export default function Explorer() {
     return passesChips(feature.properties, false, universeWide);
   });
   const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry) : [];
-  const listingScope = showUnscreened ? unscreened.filter(feature => shownInMarket(feature.properties.city) &&
+  const listingScope = showUnscreened && !powerFiltered ? unscreened.filter(feature => shownInMarket(feature.properties.city) &&
     (!mapArea || (feature.geometry && inMapArea(...feature.geometry.coordinates, mapArea)))) : [];
   const unscreenedPins = listingScope.filter(feature => feature.geometry);
   const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.filter(feature => feature.geometry).length) + unscreenedPins.length;
@@ -2923,7 +2964,7 @@ export default function Explorer() {
           marketRows={marketRows}
           washRing={activeMetric === "washes" && washOrigin ? {point:washOrigin, miles:washRadius} : null}
           washPoints={activeMetric === "washes" ? washPoints : []}
-          gridFeatures={gridFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
+          gridFeatures={selectedGrid} gridFocusId={gridOpen ? selected : null}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
@@ -3161,6 +3202,18 @@ export default function Explorer() {
                 </div>
                 {me?.u && <button type="button" className={pinLabel==="financials"?"chip on":"chip"} aria-pressed={pinLabel==="financials"} onClick={()=>setPinLabel(pinLabel==="financials"?"asking":"financials")}>Financial evidence</button>}
                 {me?.u && pinLabel==="financials" && <FinancialPortfolio deals={drawnDeals.filter(f=>f.geometry && (!liveArea || inMapArea(...f.geometry.coordinates,liveArea)) && financialEvidence(f.properties)!=="Not applicable").map(f=>f.properties)} open={openPurchase}/>}
+                {me?.u && !listView && <section className="power-map-filters" aria-label="Power view filters">
+                  <label className="layer-row"><input type="checkbox" className="check" checked={powerMode}
+                    onChange={e => write({power:e.target.checked ? "1" : null,service:null,hosting:null})}/>Power view</label>
+                  {powerMode && <>
+                    <label>Property service<select className="secondary" value={serviceFilter} onChange={e => write({service:e.target.value === "all" ? null : e.target.value, site:null})}>
+                      {Object.entries(serviceFilters).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                    <label>Utility coverage<select className="secondary" value={hostingFilter} onChange={e => write({hosting:e.target.value === "all" ? null : e.target.value, site:null})}>
+                      {Object.entries(hostingFilters).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                    <span className="layer-meta" role="status">{mappedCount.toLocaleString()} matching mapped {mappedCount === 1 ? "site" : "sites"}</span>
+                    {powerFiltered && <button type="button" className="text-link" onClick={() => write({service:null,hosting:null})}>Clear power filters</button>}
+                  </>}
+                </section>}
                 <p className="eyebrow">On the map</p>
                 {funnel === "universe" ? (
                   <label className="layer-row" title={LAYER_TITLES.pipeline}>
@@ -3207,7 +3260,7 @@ export default function Explorer() {
             <div className="market-layer-tools">
               {!inReview && !listView && !marking && <button type="button" className={activeMetric ? "tool on" : "tool"} aria-pressed={Boolean(activeMetric)}
                 onClick={()=>chooseMarketMetric(activeMetric ? null : "traffic")}>Market context</button>}
-              <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+              <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>{powerMode ? "Layers · Power" : "Layers"}</button>
             </div>
           )}
         </aside>
@@ -3283,6 +3336,12 @@ export default function Explorer() {
         <PanelBoundary name="Record">
         {showingPreview ? (
           <MapSitePreview
+            powerMode={powerMode} powerDeal={pinPowerDeal} powerSite={pinPowerSite}
+            grid={{open:gridOpen, status:gridStatus,
+              substation:selectedGrid.some(f => f.geometry && !f.properties.label_only && f.properties.kind === "substation"),
+              line:selectedGrid.some(f => f.geometry && !f.properties.label_only && f.properties.kind === "line"),
+              retry:()=>setGridAttempt(n=>n+1)}}
+            onGrid={() => setGridFocusId(gridOpen ? null : selected)}
             compared={Boolean(selected && compareIds.includes(selected))}
             marketMode={Boolean(activeMetric)} washInspection={washInspection}
             comparisonFull={compareIds.length >= 4}

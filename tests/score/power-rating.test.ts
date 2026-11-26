@@ -1,3 +1,4 @@
+import { mapPower, matchesMapPower } from "../../lib/mapPower";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -416,4 +417,20 @@ test("the formula and report workflows stay manual, and the formula apply is con
   assert.match(migration, /power_rating/);
   assert.match(migration, /power_rating_reason/);
   assert.doesNotMatch(migration, /PIPE-|LAND-|INSERT INTO sites/);
+});
+
+test("map evidence preserves zero, forecast years, disagreement and independent filter axes", () => {
+  const broker = {cap_c_phase:"3-phase",cap_c_volts:480,cap_c_source:"Broker note",cap_c_confidence:"Claimed",
+    cap_b_frontage:0,cap_b_nearby:2.2,cap_b_horizon:"2028"};
+  const document = {cap_c_volts:240,cap_c_source:"Main panel photo",cap_c_confidence:"Verified"};
+  const facts = mapPower(broker,document);
+  assert.equal(facts.street[0].frontage,0);
+  assert.equal(facts.street[0].horizon,"2028");
+  assert.equal(facts.differing,true);
+  assert.equal(matchesMapPower(facts,"broker","with"),true);
+  assert.equal(matchesMapPower(facts,"documented","with"),true);
+  assert.equal(matchesMapPower(mapPower(document),"documented","without"),true);
+  assert.equal(matchesMapPower(mapPower({cap_a_line_ft:20}),"unknown","without"),true);
+  assert.equal(mapPower(broker).service[0].available,null);
+  assert.equal(mapPower(document).service[0].documented,true);
 });

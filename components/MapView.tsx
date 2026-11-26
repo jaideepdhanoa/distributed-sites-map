@@ -74,6 +74,7 @@ type Props = {
   washRing: {point: [number,number]; miles: 1 | 3} | null;
   washPoints?: NearbyWash[];
   gridFeatures?: GeoFeature[];
+  gridFocusId?: string | null;
   onRingsOutside?: (outside: boolean) => void;
   registerFrameRings?: (frame: (() => void) | null) => void;
   spaceShapes?: SpaceShape[];
@@ -1352,7 +1353,7 @@ export default function MapView(props: Props) {
     const observed = node.current;
     const preserveView = Boolean(kept);
     const recenter = () => {
-      if (propsRef.current.reviewFocus || propsRef.current.spacesOpen) return;
+      if (propsRef.current.reviewFocus || propsRef.current.spacesOpen || propsRef.current.gridFocusId) return;
       const id = propsRef.current.selectedId;
       if (!id) return;
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === id);
@@ -1532,7 +1533,15 @@ export default function MapView(props: Props) {
       else map.addSource("deal-labels", { type: "geojson", data: labelData });
       const gridData = {
         type: "FeatureCollection" as const,
-        features: (props.gridFeatures || []).filter((feature) => feature.geometry),
+        features: (props.gridFeatures || []).filter(f => f.geometry).map(f => {
+          const raw = String(f.properties.label || "");
+          const distance = raw.match(/([\d,.]+\s*(?:mi|ft))\s*$/i)?.[1];
+          const station = raw.split("·")[0].trim();
+          const name = f.properties.kind === "line" ? "High-voltage line"
+            : !station || /^substation$/i.test(station) ? "Substation"
+            : /substation/i.test(station) ? station : station+" substation";
+          return {...f, properties:{...f.properties, map_label:distance ? name+" · "+distance+" away" : name}};
+        }),
       };
       const gridSource = map.getSource("grid") as GeoJSONSource | undefined;
       if (gridSource) gridSource.setData(gridData);
@@ -1569,7 +1578,7 @@ export default function MapView(props: Props) {
           id: "grid-substation-point",
           type: "circle",
           source: "grid",
-          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"]],
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"], ["!", ["has","label_only"]]],
           paint: { "circle-radius": 7, "circle-color": "#1d4e89", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2 },
         });
       }
@@ -1580,12 +1589,12 @@ export default function MapView(props: Props) {
           source: "grid",
           filter: ["any", ["==", ["geometry-type"], "Point"], ["has", "label_only"]],
           layout: {
-            "text-field": ["get", "label"],
+            "text-field": ["get", "map_label"],
             "text-font": ["Noto Sans Regular"],
             "text-size": 13,
             "text-offset": [0, -1.4],
             "text-anchor": "bottom",
-            "text-allow-overlap": true,
+            "text-allow-overlap": false,
           },
           paint: { "text-color": "#1d4e89", "text-halo-color": "#f7f4ee", "text-halo-width": 3 },
         });
@@ -1655,7 +1664,7 @@ export default function MapView(props: Props) {
       if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
-      if (propsRef.current.spacesOpen) return;
+      if (propsRef.current.spacesOpen || propsRef.current.gridFocusId) return;
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
       const drawing = Boolean(propsRef.current.spaceDrawing);
@@ -1898,6 +1907,7 @@ export default function MapView(props: Props) {
     props.offMarket.some((feature) => feature.properties.site_id === props.selectedId) ||
     props.deals.some((feature) => feature.properties.deal_id === props.selectedId) ||
     props.unscreened?.some(feature => feature.properties.listing_id === props.selectedId);
+  const gridCamera = useRef<{id:string; center:[number,number]; zoom:number; bearing:number; pitch:number; padding:ReturnType<Map["getPadding"]>} | null>(null);
   const gridToken = (props.gridFeatures || []).map((feature) => String(feature.properties?.deal_id || feature.properties?.site_id || "")).join(",");
   useEffect(() => {
     const map = mapRef.current;
@@ -1917,7 +1927,7 @@ export default function MapView(props: Props) {
     }
     let cancel = false;
     const go = () => {
-      if (cancel || reviewFocusRef.current || propsRef.current.spacesOpen) return;
+      if (cancel || reviewFocusRef.current || propsRef.current.gridFocusId || propsRef.current.spacesOpen) return;
       if (propsRef.current.spaceDrawing && propsRef.current.spaceFly) {
         const fly = propsRef.current.spaceFly;
         map.jumpTo({ center: [fly.lng, fly.lat], zoom: 18, padding: pointPadding(map) });
@@ -1976,6 +1986,52 @@ export default function MapView(props: Props) {
       map.off("idle", go);
     };
   }, [mapGeneration, props.selectedId, props.previewName, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, props.washRing?.miles, gridToken]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const id = props.gridFocusId;
+    if (!id) {
+      const previous = gridCamera.current;
+      gridCamera.current = null;
+      if (previous && previous.id === props.selectedId && props.previewName) {
+        map.stop();
+        map.jumpTo(previous);
+      }
+      return;
+    }
+    const pin = previewLng != null && previewLat != null ? [previewLng,previewLat] : null;
+    if (!pin || !map.getContainer().clientWidth) return;
+    const coords = (propsRef.current.gridFeatures || []).flatMap(f => geometryCoords(f.geometry));
+    if (!coords.length) return;
+    map.stop();
+    if (gridCamera.current?.id !== id) gridCamera.current = {id, center:map.getCenter().toArray(),
+      zoom:map.getZoom(), bearing:map.getBearing(), pitch:map.getPitch(), padding:map.getPadding()};
+    const points = [pin,...coords];
+    const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
+    const bounds: [[number, number], [number, number]] = [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]];
+    const container = map.getContainer();
+    const preview = container.closest(".shell")?.querySelector(".map-preview");
+    function frameGrid() {
+      if (!map || propsRef.current.gridFocusId !== id) return;
+      const canvas = container.getBoundingClientRect();
+      const pad = pointPadding(map);
+      if (preview && !window.matchMedia("(max-width: 767px)").matches) {
+        pad.right = Math.max(0, canvas.right - preview.getBoundingClientRect().left);
+      }
+      const edge = Math.max(0, Math.min(32, (canvas.height - pad.top - pad.bottom) / 5, (canvas.width - pad.left - pad.right) / 5));
+      map.fitBounds(bounds, {
+        absolutePadding: true,
+        padding: { top: pad.top + edge, bottom: pad.bottom + edge, left: pad.left + edge, right: pad.right + edge },
+        bearing: 0, pitch: 0, maxZoom: 16, duration: 0,
+      });
+    }
+    frameGrid();
+    const observer = new ResizeObserver(frameGrid);
+    observer.observe(container);
+    if (preview) observer.observe(preview);
+    return () => observer.disconnect();
+  }, [mapGeneration,props.gridFocusId,props.selectedId,props.previewName,gridToken,previewLng,previewLat]);
 
   useEffect(() => {
     const map = mapRef.current;

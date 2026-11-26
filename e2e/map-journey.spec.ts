@@ -277,6 +277,99 @@ test("released Compare loads statement evidence for operating deals", async ({pa
   await expect(row.getByRole("button",{name:"Retry statement"})).toHaveCount(0);
 });
 
+test("screen property, street and grid evidence from a selected pin", async ({page}, info) => {
+  test.skip(Boolean(process.env.MAP_PRODUCTION_CHECK), "Synthetic map fixtures run on pull requests.");
+  await page.route("https://tiles.openfreemap.org/styles/positron", route => route.fulfill({json:{version:8,
+    glyphs:"https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",sources:{},
+    layers:[{id:"background",type:"background",paint:{"background-color":"#eceee6"}}]}}));
+  await page.route("https://demotiles.maplibre.org/**",route=>route.fulfill({contentType:"application/x-protobuf",body:""}));
+  const center = [-115.16,36.15];
+  const id = "PIPE-LAS-EXAMPLE";
+  await page.route("**/api/data/deals",async route=>{
+    const response = await route.fetch();
+    const data = await response.json();
+    const template = data.features.find((f:{properties:{kind:string}})=>f.properties.kind==="pipeline");
+    const features = [0,1].map(i=>({...template, geometry:{type:"Point",coordinates:[center[0]+i*.003,center[1]]},
+      properties:{...template.properties,deal_id:i ? "PIPE-LAS-OTHER" : id,universe_id:"",city:"LAS",kind:"pipeline",stage_group:"desk",
+        name:i ? "Example unverified site":"Example service site",address:"Example parcel",folder_url:"",cap_c_amps:null,cap_c_panels:null,
+        cap_c_phase:i ? null:"3-phase",cap_c_volts:i ? null:480,cap_c_source:"Broker note",cap_c_confidence:"Claimed",cap_c_as_of:"2026-11-12",
+        cap_b_horizon:"2028",cap_b_frontage:i ? null:0,cap_b_nearby:i ? null:2.2,cap_b_source:"NV Energy DRP",
+        cap_b_confidence:"Estimated",cap_b_feeder:"",cap_b_as_of:"2026-10-01",cap_a_line_ft:680,cap_a_substation_mi:.32,
+        cap_a_source:"OpenStreetMap",cap_a_as_of:"2026-10-01",cap_d_peak:null,cap_d_year:null}}));
+    await route.fulfill({response,json:{...data,features}});
+  });
+  await page.route("**/api/data/grid",route=>route.fulfill({json:{type:"FeatureCollection",features:[{
+    type:"Feature",properties:{kind:"substation",deal_id:id,label:"Example station · 0.32 mi"},
+    geometry:{type:"Point",coordinates:[center[0]-.006,center[1]+.003]},
+  }]}}));
+  await page.goto("/?city=LAS&funnel=pipeline&pstage=all");
+  await page.getByRole("button",{name:"Layers",exact:true}).click();
+  const filters=page.getByRole("region",{name:"Power view filters"});
+  await filters.getByLabel("Power view",{exact:true}).click();
+  await expect(filters.getByLabel("Power view",{exact:true})).toBeChecked();
+  await filters.getByLabel("Property service").selectOption("unknown");
+  await filters.getByLabel("Utility coverage").selectOption("with");
+  await expect(filters.getByRole("status")).toContainText("0 matching");
+  await filters.getByLabel("Property service").selectOption("broker");
+  await expect(filters.getByRole("status")).toContainText("1 matching");
+  await page.getByRole("button",{name:"Close layers"}).click();
+  const nearby=page.getByRole("complementary",{name:"Nearby sites"});
+  const toggle=nearby.getByRole("button",{name:/Nearby sites/});
+  if(await toggle.getAttribute("aria-expanded")==="false") await toggle.click();
+  await nearby.locator('[data-nearby-id="'+id+'"]').click();
+  const card=page.getByRole("region",{name:"Site power"});
+  await expect(card).toContainText("Broker reported");
+  await expect(card).toContainText("2028 estimate");
+  await expect(card).toContainText("0 MW");
+  await expect(card).toContainText("2.2 MW");
+  await expect(card).toContainText("680 ft away");
+  await expect(card).toContainText("Mapped line unavailable");
+  await expect(card).toContainText("Get a photo of the main breaker label");
+  await page.waitForFunction(()=>!(window as unknown as MapWindow).__sitesMap.isMoving());
+  const original=await camera(page);
+  await card.getByRole("button",{name:"Show nearby grid"}).click();
+  await expect.poll(()=>camera(page)).not.toEqual(original);
+  // Both positions must be in the uncovered map area, including above the phone sheet.
+  await expect.poll(() => page.evaluate(([lng,lat]) => {
+    const map = (window as unknown as MapWindow).__sitesMap;
+    const canvas = map.getCanvas().getBoundingClientRect();
+    const sheet = document.querySelector(".map-preview")!.getBoundingClientRect();
+    return [[lng,lat],[lng-.006,lat+.003]].map(([x,y]) => {
+      const pt = map.project([x,y]);
+      const left = pt.x + canvas.left, top = pt.y + canvas.top;
+      const onMap = left >= canvas.left && left <= canvas.right && top >= canvas.top && top <= canvas.bottom;
+      const covered = left >= sheet.left && left <= sheet.right && top >= sheet.top && top <= sheet.bottom;
+      return onMap && !covered ? "visible" : `${onMap ? "under sheet" : "off map"} at ${Math.round(left)},${Math.round(top)}`;
+    });
+  }, center)).toEqual(["visible", "visible"]);
+  await card.getByRole("button",{name:"Return to site view"}).click();
+  await expect.poll(()=>camera(page)).toEqual(original);
+  await page.locator(".map-preview").evaluate(el=>{el.scrollTop=0;});
+  await mkdir("review-shots",{recursive:true});
+  await page.locator(".map-preview").screenshot({path:"review-shots/"+info.project.name+"-map-power.png",style:"nextjs-portal { display:none !important }"});
+});
+
+test("released Power view filters open and clear on the market map", async ({page})=>{
+  test.skip(!process.env.MAP_PRODUCTION_CHECK, "Read-only signed-in release check.");
+  await page.goto("/?city=LAS&funnel=pipeline&pstage=all&power=1&hosting=with");
+  await page.getByRole("button",{name:"Layers · Power"}).click();
+  const filters=page.getByRole("region",{name:"Power view filters"});
+  await expect(filters.getByLabel("Utility coverage")).toHaveValue("with");
+  await filters.getByRole("button",{name:"Clear power filters"}).click();
+  await expect(filters.getByLabel("Utility coverage")).toHaveValue("all");
+  await page.getByRole("button",{name:"Close layers"}).click();
+  const nearby=page.getByRole("complementary",{name:"Nearby sites"});
+  const toggle=nearby.getByRole("button",{name:/Nearby sites/});
+  if (await toggle.getAttribute("aria-expanded")==="false") await toggle.click();
+  await nearby.locator("[data-nearby-id]").first().click();
+  const card=page.getByRole("region",{name:"Site power"});
+  for (const name of ["At the property","On the street","Nearby grid","Next check"]) {
+    await expect(card.getByRole("heading",{name})).toBeVisible();
+  }
+  await expect(card.getByText("Checking mapped locations…")).toHaveCount(0);
+  await expect(card.getByRole("button",{name:"Retry grid map"})).toHaveCount(0);
+});
+
 test("scan market readings and open the mapped wash radius", async ({page}, info) => {
   await page.goto("/?city=LAS&funnel=pipeline&pstage=all");
   await page.getByRole("button", {name:"Market context",exact:true}).click();

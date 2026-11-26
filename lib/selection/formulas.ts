@@ -43,6 +43,9 @@ const documented = 'Assumptions!$A$152';
 function confidence(formula:string) {
   return formula.includes(legacy) && formula.includes(documented) && formula.includes('COLUMN($BG$1)') ? formula.replace(legacy,corrected) : formula;
 }
+function parityPoints(r:number) {
+  return `=IF($A${r}="","",IF(ISNUMBER(BQ${r}),IF(BQ${r}>=0,Assumptions!$B$77,0),0))`;
+}
 function pendingSection(r:number) {
   return `=IF($A${r}="","",IF(REGEXMATCH(LOWER(E${r}),"dropped"),"3 Dropped",IF(REGEXMATCH(LOWER(E${r}),"off[ -]?market"),"4 Off market",IF(OR(CC${r}<>"",CJ${r}="Yes"),"2 Knocked out",IF(AND(ISNUMBER(AR${r}),AR${r}>=Assumptions!$B$68,AK${r}="Yes",ISNUMBER(BQ${r}),CG${r}<>"",CG${r}<>"Not confirmed"),"1 Ranked","5 Evidence pending")))))`;
 }
@@ -61,6 +64,13 @@ export function planSelectionFormulas(table:SheetTable):Edit[] {
     seen.add(id);
     if(!/^[12] (Desk|Financial) screen$/i.test(cells[4])) continue;
     if (/^land only/i.test(cells[10] || "") || /^land only/i.test(cells[84] || "") || cells[80]==="Land only") continue;
+    // Update the active operating rows only. Historical targets retain their recorded basis.
+    const allowance=formulas[20] || "";
+    if(allowance.includes("(1-Assumptions!$B$22)*Assumptions!$B$26"))
+      edits.push({row,column:20,id,formula:allowance.replace("(1-Assumptions!$B$22)*Assumptions!$B$26","Assumptions!$B$26")});
+    const points=formulas[74] || "";
+    if(points.includes("Assumptions!$B$83") && points.includes("Assumptions!$B$84"))
+      edits.push({row,column:74,id,formula:parityPoints(row)});
     const old=formulas[64] || "";
     if(old && confidence(old)!==old) edits.push({row,column:64,id,formula:confidence(old)});
     if(!["Auto repair","Quick lube"].includes(cells[3]) || cells[81] || formulas[81]) continue;
@@ -68,7 +78,9 @@ export function planSelectionFormulas(table:SheetTable):Edit[] {
       const column=Number(key);
       if(cells[column] || formulas[column]) continue;
       let formula:string|undefined;
-      if(column===64) {
+      if(column===74 && template.formulas![74].includes("Assumptions!$B$77"))formula=parityPoints(row);
+      else if(column===20 && template.formulas![20].includes("Assumptions!$B$26"))formula=template.formulas![20].replace("(1-Assumptions!$B$22)*Assumptions!$B$26","Assumptions!$B$26").replace(/([A-Z]+)5(?![0-9])/g,(_,col)=>col+row);
+      else if(column===64) {
         // Substitute only the row-relative A1 references in this known template.
         const src=confidence(template.formulas![64]);
         if(!src.includes(corrected)) throw Error("Unrecognized confidence formula.");

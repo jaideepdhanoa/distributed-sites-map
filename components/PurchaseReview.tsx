@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { originalScenario, amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
 import { usePurchaseScenario } from "./PurchaseScenarios";
 import FinancialsEntry, { type usePnlTiles } from "./FinancialsEntry";
+import { ChargingSiteSection } from "./ChargingEconomics";
 import SelectionResearch from "./SelectionResearch";
 import FinancialsPanel from "./FinancialsPanel";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
@@ -57,7 +58,7 @@ export default function PurchaseReview({deal,pnl,power}:{deal:DealProps;pnl:Retu
   }
   function switchCase(next:Partial<PurchaseScenario>) {update({...scenario,...next});}
   function closeChecklist(){setChecklist(false);requestAnimationFrame(()=>trigger.current?.focus());}
-  if (evidence==="Not applicable") return <p>Operating financials are not applicable to this site.</p>;
+  if (evidence==="Not applicable") return <>{deal.charging && <ChargingSiteSection deal={deal}/>}<p>Operating financials are not applicable to this site.</p></>;
   const withheld=evidence==="Withheld" || /refus|unavailable/i.test(w?.package || deal.package_status || "");
   const constraints = purchaseConstraints(deal);
   const sources = (pnl.panel?.figures || []).filter(f=>{
@@ -71,6 +72,7 @@ export default function PurchaseReview({deal,pnl,power}:{deal:DealProps;pnl:Retu
   const source=sources.length===1?sources[0]:null;
   const check=changed ? "Review the changed footprint" : purchaseCheck(deal);
   return <section className="purchase-review" aria-label="Purchase support" data-testid="purchase-review">
+    {deal.charging && <ChargingSiteSection deal={deal}/>}
     <div className="purchase-summary">
     <header><p className="eyebrow">Site financials</p><h3>Can the business carry the purchase?</h3>
       <p className="purchase-basis">{evidence}{w?.checked && " · Checked "+w.checked}</p></header>
@@ -107,7 +109,7 @@ export default function PurchaseReview({deal,pnl,power}:{deal:DealProps;pnl:Retu
         ["EBITDA needed at ask for target saving",amount(w.required)]]}/>
       <p className="layer-meta">The capital charge uses {percent(a.closing)} closing costs and {percent(a.capital)} cost of capital. Operating and purchase scopes require review.</p>
       <details className="disclosure"><summary className="disclosure">Price support and network assumptions</summary>
-        <Ledger rows={[["Price supported by business cash alone",amount(result.cashPrice)],["Network target · "+percent(a.target)+" saving",amount(result.ceiling)],
+        <Ledger rows={[["Price supported by business cash alone",amount(result.cashPrice)],["Workbook filed ceiling",amount(result.ceiling)],
           ["Alternative · "+percent(a.lower)+" saving",amount(result.lower)],["Breakeven with hub",amount(result.breakeven)],["Land-value constraint",amount(w.landCap)],
           ["Land-constrained target",w.landCap==null?"Land-value check pending":amount(result.walkAway)],["Screening price",amount(w.screeningPrice)],
           ["Annual land cost the network can carry",amount(w.allowance)],["Workbook layout",w.archetype || "Default setup"],["Recorded stalls that fit",w.fit??"Unconfirmed"]]}/>

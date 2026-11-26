@@ -33,13 +33,19 @@ function SelectionList() {
   },[attempt]);
   const rows = data?.rows || [];
   const scoped = rows.filter(r => (!scope || scope.has(r.id)) && (!market || r.city === market) && (!check || r.priority === check) &&
-    [r.name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>scope ? scope.get(a.id)! - scope.get(b.id)! : a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
+    (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
+    (!params.get("charging") || (r.charging?.stale?"Refresh saved case":r.charging?.result.decision)===params.get("charging")) &&
+    [r.name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>scope ? scope.get(a.id)! - scope.get(b.id)! : (params.get("sort")==="earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
   return <main ref={pane} className="space-review-page">
     <a className="text-link" href={back}>← Pipeline list</a>
     <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>
     <div className="space-review-filters">
       <label>Market<select aria-label="Market" className="secondary" value={market} onChange={e=>setReviewFilter("market",e.target.value)}><option value="">All markets</option>{[...new Set(rows.map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Next check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
+      <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
+        <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.stale?"Refresh saved case":r.charging.result.decision]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
+      <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[4,6,8,10].map(n=><option value={n} key={n}>{n} hypothetical stalls</option>)}</select></label>
+      <label>Order<select className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       <label>Find a site<input className="field" value={query} onChange={e=>setReviewFilter("q",e.target.value)} placeholder="Name or site ID" /></label>
     </div>
     {scope && <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button>}
@@ -53,6 +59,9 @@ function SelectionList() {
         <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2><strong>{r.priority}</strong><p>{r.instruction}</p><small>{r.id}</small></div><div><strong>{r.readiness}</strong>
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
+        {r.charging && <div className="charging-preview"><strong>Charging · {r.charging.stale?"Refresh saved case":r.charging.result.decision}</strong>
+          <p>{r.charging.name} · {r.charging.result.siteCost==null?"Cost pending":"$"+r.charging.result.siteCost.toFixed(2)+"/charge"}</p><small>{r.charging.result.next}</small>
+          <a className="text-link" href={"/charging?site="+encodeURIComponent(r.id)}>Open charging case</a></div>}
         {r.research && <SelectionResearch row={r.research}/>}
         {r.mapped && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}
       <p>{r.geometry} · {r.option}</p>

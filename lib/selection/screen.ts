@@ -8,14 +8,14 @@ export type Inputs = {
 export type SelectionRow = {
   id: string; name: string; city: string; mapped: boolean; stage: string; mirrorStage: string;
   priority: string; instruction: string; geometry: string; section: string; amount: number | null;
+  charging?: import("../charging/summary").ChargingSummary;
   research?: import("./research").SelectionResearch;
   readiness: string; financeVisible: boolean; option: string; evidenceDate: string; assessed: boolean; quickLube: boolean;
 };
 
 export function investmentScreen(input: Inputs | undefined, financeVisible: boolean) {
-  if (!financeVisible || input?.hurdle == null || input.screen == null) return "Investment case unverified";
-  const hurdle = (100 * input.hurdle).toFixed(0) + "%";
-  return input.screen < input.hurdle ? "Base case below "+hurdle+" hurdle" : "Base case clears "+hurdle+" · verify assumptions";
+  if (!financeVisible || input?.screen == null) return "Investment case unverified";
+  return input.screen>=0 ? "Workbook reaches depot parity · verify inputs" : "Workbook above depot cost";
 }
 
 export function selectionCheck(city: string, input: Inputs | undefined, focus: ReviewFocus, listingRemoved: boolean) {

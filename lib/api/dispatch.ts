@@ -1,3 +1,4 @@
+import * as charging from "./handlers/actions/charging";
 import * as decision from "@/lib/api/handlers/actions/comparison-decision";
 import * as evidence from "@/lib/api/handlers/actions/comparison-evidence";
 import * as work from "@/lib/api/handlers/actions/work";
@@ -98,6 +99,7 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/actions/notes/:id/reopen", { POST: notesReopen.POST as Handler }),
   route("/api/actions/notes/:id/resolve", { POST: notesResolve.POST as Handler }),
   route("/api/actions/notes/:id", { PATCH: notesId.PATCH as Handler, DELETE: notesId.DELETE as Handler }),
+  route("/api/actions/charging", { GET: charging.GET as Handler, POST: charging.POST as Handler }),
   route("/api/actions/comparison-decision", { GET: decision.GET as Handler, POST: decision.POST as Handler }),
   route("/api/actions/comparison-evidence", { GET: evidence.GET as Handler, POST: evidence.POST as Handler }),
   route("/api/actions/work", { GET: work.GET as Handler }),

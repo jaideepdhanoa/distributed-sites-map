@@ -29,11 +29,24 @@ function assessmentFile() {
   return file;
 }
 
-export function assessedSiteIds() {
-  return Object.keys(assessmentFile()?.sites || {}).filter(id => /^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(id) && !isExcludedSite(id));
+function safeSiteId(id:string) {
+  return /^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(id) && !isExcludedSite(id);
 }
+
+export function assessedSiteIds() {
+  return Object.keys(assessmentFile()?.sites || {}).filter(safeSiteId);
+}
+export function assessedLayouts(): [string, Assessment][] {
+  const rows = Object.entries(assessmentFile()?.sites || {});
+  return rows.flatMap(([site,value]) => {
+    if (!safeSiteId(site)) return [];
+    const result = assessmentSchema.safeParse(value);
+    return result.success ? [[site,result.data] as [string,Assessment]] : [];
+  });
+}
+
 export function layoutAssessment(site: string): { row: Assessment; reviewedOn: string } | null {
-  if (!/^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(site) || isExcludedSite(site)) return null;
+  if (!safeSiteId(site)) return null;
   const file = assessmentFile();
   if (!file?.reviewedOn) return null;
   const checked = assessmentSchema.safeParse(file.sites?.[site]);

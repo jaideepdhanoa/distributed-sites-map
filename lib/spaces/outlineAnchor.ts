@@ -9,7 +9,7 @@ export function findOutline(row: Assessment | undefined, id: string) {
 }
 
 export function outlineHref(site: string, id: string, note?: string) {
-  const query = new URLSearchParams({ site, panel: "space-options", outline: id });
+  const query = new URLSearchParams({ spaces:"1", spaceSite:site, spaceArea:id, discussion:"1" });
   if (note) query.set("note", note);
-  return "/space-review?" + query.toString();
+  return "/?" + query.toString();
 }

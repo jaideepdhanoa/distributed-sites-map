@@ -2,8 +2,8 @@ import { useId, useState } from "react";
 import type { Aerial, Zone, Point } from "@/lib/spaces/options";
 import { kinds } from "@/lib/spaces/options";
 
-export default function OptionAerial({ image, zones, active, reviewed = [], onSelect, onPoint, corner, onCorner }: {
-  image: Aerial; zones: Zone[]; active?: string; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point, corner?: number) => void; corner?: number; onCorner?: (corner: number) => void;
+export default function OptionAerial({ image, zones, active, labels=false, reviewed = [], onSelect, onPoint, corner, onCorner }: {
+  image: Aerial; zones: Zone[]; active?: string; labels?:boolean; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point, corner?: number) => void; corner?: number; onCorner?: (corner: number) => void;
 }) {
   const frameLabel = image.kind === "site-plan" ? "Site plan" : image.kind === "site-photo" ? "Site photo" : "Site aerial";
   const pattern = useId().replace(/:/g, "");
@@ -27,11 +27,15 @@ export default function OptionAerial({ image, zones, active, reviewed = [], onSe
       {zones.map((z, i) => {
         const clear = z.kind === "clear", selected = !active || active === z.label;
         const points = z.points.map(([x,y]) => [x * image.width / 100, y * image.height / 100].join(",")).join(" ");
-        const fill = clear ? "url(#" + pattern + ")" : z.kind === "bay" ? "#ffbb62" : "#64e5be";
+        const amber = labels && selected && !clear;
+        const fill = clear ? "url(#" + pattern + ")" : amber ? "#ffbb3d" : z.kind === "bay" ? "#ffbb62" : "#64e5be";
         return <g key={z.label + i} opacity={clear || selected ? 1 : .65} onClick={!clear && onSelect ? () => onSelect(z.label) : undefined} style={!clear && onSelect ? { cursor: "pointer" } : undefined}><title>{z.label} · {kinds[z.kind].label}</title>
           <polygon points={points} fill={fill} fillOpacity={clear ? .7 : .35} stroke="#152b27" strokeWidth="4" vectorEffect="non-scaling-stroke" />
-          <polygon points={points} fill="none" stroke={clear ? "#fff" : z.kind === "bay" ? "#ffe49a" : "#abffe0"} strokeWidth="2"
+          <polygon points={points} fill="none" stroke={clear ? "#fff" : amber ? "#ffe08b" : z.kind === "bay" ? "#ffe49a" : "#abffe0"} strokeWidth="2"
             strokeDasharray={clear || reviewed.includes(z.label) ? undefined : "6 4"} vectorEffect="non-scaling-stroke" />
+          {labels && (clear || selected) && !onPoint && <text x={Math.max(image.width*.18,Math.min(image.width*.82,z.points.reduce((v,p)=>v+p[0],0)/z.points.length*image.width/100))}
+            y={z.points.reduce((v,p)=>v+p[1],0)/z.points.length*image.height/100} textAnchor="middle" dominantBaseline="middle"
+            fill="white" stroke="#17261e" strokeWidth={Math.min(image.width,image.height)*.012} paintOrder="stroke" fontSize={Math.min(image.width,image.height)*.032} fontWeight="700">{clear?"Keep clear":z.label}</text>}
         </g>;
       })}
       {onPoint && zones.find(z => z.label === active)?.points.map(([x,y], index) => (

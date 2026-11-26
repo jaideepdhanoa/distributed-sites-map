@@ -38,7 +38,7 @@ export default function SpaceReviewList() {
   }
   return <main className="space-review-page">
     <a className="text-link" href="/?funnel=pipeline&view=list">← Pipeline list</a>
-    <h1>Space review</h1><p>Find a footprint to measure, a conversion to test, or a parcel that needs better evidence.</p>
+    <h1>Space review</h1><a className="paper-btn" href="/?spaces=1">Open spaces on main map</a><p>Find a footprint to measure, a conversion to test, or a parcel that needs better evidence.</p>
     <div className="space-review-filters">
       <label>Pipeline<select className="secondary" value={cohort} onChange={e => setCohort(e.target.value as TriageRow["cohort"])}>{Object.entries(cohorts).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
       <label>Next check<select className="secondary" value={focus} onChange={e=>setFocus(e.target.value)}><option value="">All checks</option>{focusOrder.map(f=><option key={f}>{f}</option>)}</select></label>

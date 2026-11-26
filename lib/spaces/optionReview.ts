@@ -1,7 +1,7 @@
 import type { Note } from "@/lib/actions/notes";
 import { options, usableOutline, type Option, type Point } from "./options";
 
-export type Disposition = "Keep for diligence" | "Dismiss option";
+export type Disposition = "Keep for diligence" | "Dismiss option" | "Adjust outline";
 export type FitEvidence = { stalls: number; source: string; predicted?: [number, number] };
 export function fitOutcome(evidence: FitEvidence) {
   const range = evidence.predicted;
@@ -29,7 +29,7 @@ export function readReview(note: Pick<Note, "body" | "deleted" | "parentId">): R
   if (lines[0] !== "Space option review") return null;
   const [label, disposition] = (lines[1] || "").split(" · ");
   const option = (Object.keys(options) as Option[]).find(key => options[key] === label);
-  if (!option || (disposition !== "Keep for diligence" && disposition !== "Dismiss option")) return null;
+  if (!option || (disposition !== "Keep for diligence" && disposition !== "Dismiss option" && disposition !== "Adjust outline")) return null;
   const field = (prefix: string) => lines.find(line => line.startsWith(prefix))?.slice(prefix.length) || "";
   const [revision, frame] = field("Basis: ").split(" · ");
   if (!revision || !frame) return null;

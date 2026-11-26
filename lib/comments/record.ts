@@ -5,6 +5,8 @@ import { InputError, parseBody } from "@/lib/actions/text";
 import { isExcludedSite } from "@/lib/alerts/excluded";
 import { notifyNote } from "@/lib/alerts/notify";
 import { recordAppEvent } from "@/lib/queue/events";
+import { layoutAssessment } from "@/lib/spaces/assessmentLoad";
+import { findOutline } from "@/lib/spaces/outlineAnchor";
 import { SPACE_ID, spaceTypeLabel, type SpaceType } from "@/lib/spaces/vocab";
 import { isCommentLine, suggestBrokerQuestion, type CommentAnchor, type CommentTag, type OpenPnlComment } from "./anchor";
 
@@ -77,6 +79,17 @@ async function readRow(sql: Sql, id: string): Promise<NoteRow | null> {
 }
 
 async function spaceLabel(sql: Sql, siteId: string, spaceId: string): Promise<string> {
+  if (spaceId.startsWith("outline:")) {
+    let row = layoutAssessment(siteId)?.row;
+    if (!row || row.status === "needs-image") {
+      const { liveSource, cachedDraft } = await import("@/lib/spaces/generateOptions");
+      const source = await liveSource(siteId);
+      if (source) row = (await cachedDraft(source))?.row || row;
+    }
+    const outline = findOutline(row, spaceId);
+    if (!outline) throw new InputError("That outline is not on this assessment.", 404, "space_id");
+    return outline.label;
+  }
   if (!SPACE_ID.test(spaceId)) throw new InputError("That lot is not on the map.", 404, "space_id");
   const rows = await sql.query<{ site_id: string; type: SpaceType }>(
     `SELECT site_id, type FROM site_spaces WHERE id = $1 AND deleted_at IS NULL`,

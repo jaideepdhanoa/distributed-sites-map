@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceFilters, financeMatch } from "./FinancialPortfolio";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
@@ -39,10 +40,11 @@ import { dealCategory } from "@/lib/categories";
 import { cardNdaLabel } from "@/lib/nda";
 import { RowLinks } from "./RowLinks";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
+import { ColumnPicker, EmptyShortlist, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
+import { plainNextStep } from "@/lib/nextStepLine";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily, tagFamily } from "@/lib/tags/vocab";
@@ -231,13 +233,15 @@ export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], si
 }
 
 export default function PipelineList({
+  title,
   rows,
   outsideRow = null,
   columns,
-  selectedId,
+  selectedId, initialSelection, onSelection, onScope,
   sort,
   onSort,
   onOpen,
+  onFinancials,
   onShowMap,
   onColumns,
   onResetColumns,
@@ -256,13 +260,18 @@ export default function PipelineList({
   onClearArea,
   onDismiss,
 }: {
+  title: string;
   rows: PipelineRow[];
   outsideRow?: PipelineRow | null;
   columns: PipelineColumnId[];
+  initialSelection?: string[];
+  onSelection?: (ids: string[]) => void;
+  onScope?: (ids: string[], layout: ListLayout) => void;
   selectedId: string | null;
   sort: { id: PipelineColumnId; desc: boolean };
   onSort: (id: PipelineColumnId, desc?: boolean) => void;
   onOpen: (id: string) => void;
+  onFinancials?: (id:string)=>void;
   onShowMap: (id: string) => void;
   onColumns: (next: PipelineColumnId[]) => void;
   onResetColumns: () => void;
@@ -272,8 +281,8 @@ export default function PipelineList({
   onBroker?: (name: string) => void;
   onCompare?: (ids: string[]) => void;
   onCopyLink?: (ids: string[]) => Promise<void> | void;
-  onComment?: (ids: string[], note: string) => Promise<void>;
-  onDrop?: (ids: string[], reason: string) => Promise<void>;
+  onComment?: (ids: string[], note: string) => Promise<string[]>;
+  onDrop?: (ids: string[], reason: string) => Promise<string[]>;
   sortQuery?: string | null;
   columnSeed?: string[] | null;
   userId?: string;
@@ -302,8 +311,8 @@ export default function PipelineList({
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
-  const [selecting, setSelecting] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>(initialSelection || []);
+  useEffect(() => { onSelection?.(picked); }, [picked, onSelection]);
   const [commentOpen, setCommentOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -336,12 +345,19 @@ export default function PipelineList({
       },
     };
   });
+  const [finEvidence,setFinEvidence]=useState("");
+  const [finCarry,setFinCarry]=useState("");
+  const [financeOpen,setFinanceOpen]=useState(false);
   const ordered = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => row.point && inMapArea(row.point[0], row.point[1], mapArea)) : rows;
-    return prepareRows(scoped, sheetColumns, activeLayout, visible);
-  }, [activeLayout, mapArea, rows, sheetColumns, visible]);
+    return prepareRows(signedIn && financeOpen ? scoped.filter(r=>financeMatch(r.deal,finEvidence,finCarry)) : scoped, sheetColumns, activeLayout, visible);
+  }, [activeLayout, mapArea, rows, sheetColumns, visible,signedIn,financeOpen,finEvidence,finCarry]);
   const summary = useMemo(() => summaryOf(ordered.map((row) => row.deal)), [ordered]);
   const compMedian = useMemo(() => compMedianOf(ordered.map((row) => row.deal)), [ordered]);
+  const marketComps = new Map<string, number>();
+  for (const { deal } of ordered) {
+    if (signedIn && deal.city && deal.comp_median_per_acre != null) marketComps.set(deal.city, deal.comp_median_per_acre);
+  }
   const strips = useMemo(() => ({
     asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
     acres: stripStats(ordered.map((row) => row.deal.land_acres)),
@@ -359,9 +375,10 @@ export default function PipelineList({
     capacity: stripStats(ordered.map((row) => row.deal.cap_a_substation_mi)),
   }), [ordered, signedIn]);
   const visibleIds = ordered.map((row) => row.deal.deal_id);
+  useEffect(() => { onScope?.(visibleIds, activeLayout); }, [visibleIds, activeLayout, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const pickedRows = ordered.filter((row) => pickedSet.has(row.deal.deal_id));
-  const showChecks = !phone || selecting;
+  const commonStage = sharedStage(ordered.map(row => stageChipLabel(row.deal.stage, row.deal.stage_group)));
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
 
   useEffect(() => {
@@ -430,11 +447,16 @@ export default function PipelineList({
     setPending(true);
     setActionError("");
     try {
-      await onComment(pickedRows.map((row) => row.deal.deal_id), note.trim());
+      const failed = await onComment(pickedRows.map((row) => row.deal.deal_id), note.trim());
+      if (failed.length) {
+        const saved = pickedRows.filter(row => !failed.includes(row.deal.deal_id));
+        setPicked(failed);
+        setActionError(`${saved.length} of ${pickedRows.length} saved.${saved.length ? " Saved: " + saved.map(row => row.deal.name || row.deal.deal_id).join(", ") + "." : ""} The remaining sites are selected for retry.`);
+        return;
+      }
       setCommentOpen(false);
       setNote("");
       setPicked([]);
-      setSelecting(false);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "The note could not be saved.");
     } finally {
@@ -448,11 +470,16 @@ export default function PipelineList({
     setPending(true);
     setActionError("");
     try {
-      await onDrop(pickedRows.map((row) => row.deal.deal_id), label);
+      const failed = await onDrop(pickedRows.map((row) => row.deal.deal_id), label);
+      if (failed.length) {
+        const saved = pickedRows.filter(row => !failed.includes(row.deal.deal_id));
+        setPicked(failed);
+        setActionError(`${saved.length} of ${pickedRows.length} saved.${saved.length ? " Saved: " + saved.map(row => row.deal.name || row.deal.deal_id).join(", ") + "." : ""} The remaining sites are selected for retry.`);
+        return;
+      }
       setDropOpen(false);
       setReason("");
       setPicked([]);
-      setSelecting(false);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "The drop could not be submitted.");
     } finally {
@@ -461,12 +488,11 @@ export default function PipelineList({
   }
 
   const summaryBar = (
-    <div className="summary-row" data-testid="summary-row">
-      <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{summary.count.toLocaleString()}</strong><small className="only-desktop">{summary.withAsking} with an asking price</small></div>
-      <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong></div>
-      <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{acresTotal(summary.totalAcres)}</strong></div>
-      <div><span className="only-desktop">Median per acre</span><span className="only-mobile">Per acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong></div>
-    </div>
+    <ShortlistSummary title={title} count={ordered.length} commonStage={commonStage}>
+      <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
+      <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{summary.count === 0 ? "No matching sites" : summary.withAcres ? acresTotal(summary.totalAcres) : "Acreage unknown"}</strong>{summary.withAcres > 0 && <small>{summary.withAcres} of {summary.count} reported</small>}</div>
+      <div><span className="only-desktop">Market land comps / acre</span><span className="only-mobile">Land comps / acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong>{signedIn && <details className="disclosure"><summary className="disclosure">Market basis</summary><p>{compMedian.tip}</p>{Array.from(marketComps, ([market, value]) => <p key={market}>{market} · {fullMoney(value)} per acre</p>)}</details>}</div>
+    </ShortlistSummary>
   );
   const outside = outsideRow ? (
     <div className="outside-row" data-testid="outside-row">
@@ -482,7 +508,7 @@ export default function PipelineList({
     <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
       {summaryBar}
       <div className="list-bar">
-        <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
+        {mapArea ? <p>Within map area</p> : null}
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
         {Object.entries(activeLayout.filters).map(([id, value]) => {
           const label = PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id;
@@ -498,12 +524,19 @@ export default function PipelineList({
               }}
             >
               {label}
-              <span className="sr">{value}</span>
+              <span> · {value}</span>
             </button>
           );
         })}
+        {signedIn && <button className="paper-btn" type="button" aria-expanded={financeOpen} onClick={()=>setFinanceOpen(!financeOpen)}>Filter by financials</button>}
+        {signedIn && financeOpen && <FinanceFilters deals={rows.map(r=>r.deal)} evidence={finEvidence} carry={finCarry} setEvidence={setFinEvidence} setCarry={setFinCarry}/>}
         <ColumnPicker
           resetLabel="Pipeline default"
+          onPreset={signedIn ? () => {
+            const preferred = ["site", "stage", "asking", "revenue", "cashFlow", "askingCash", "nextStep"].filter(id => allowed.includes(id));
+            const rest = allowed.filter(id => !preferred.includes(id));
+            commit({ ...activeLayout, order: [...preferred, ...rest], hidden: rest, touched: true });
+          } : undefined}
           columns={PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => ({ id: column.id, label: column.label }))}
           hidden={activeLayout.hidden}
           onToggle={(id) => toggleColumn(id as PipelineColumnId)}
@@ -517,23 +550,29 @@ export default function PipelineList({
           sort={{ id: activeLayout.sort?.id || "site", desc: Boolean(activeLayout.sort?.desc) }}
           onChange={(id, desc) => commit({ ...activeLayout, sort: { id, desc }, touched: true })}
         />
+        {signedIn && <a className="paper-btn only-desktop" href="/selection-review">Selection review</a>}
+        {signedIn && <a className="paper-btn only-desktop" href="/space-review">Space review</a>}
         <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
-              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
+              {signedIn && <a className="menu-item" role="menuitem" href="/selection-review">Selection review</a>}
+              {signedIn && <a className="menu-item" role="menuitem" href="/space-review">Space review</a>}
+              {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
             </div>
           ) : null}
         </div>
       </div>
+      {!ordered.length && <EmptyShortlist
+        clearFilters={Object.values(activeLayout.filters).some(Boolean) ? ()=>commit({...activeLayout,filters:{},touched:true}) : undefined}
+        clearArea={mapArea ? onClearArea : undefined} />}
       {phone ? (
         <div className="list-scroll">
           {outside}
-          <PhoneCards rows={ordered.map((row) => {
+          <PhoneCards commonStage={commonStage} rows={ordered.map((row) => {
             const id = row.deal.deal_id;
             const address = displayAddress(row.deal.address);
             return {
@@ -544,27 +583,21 @@ export default function PipelineList({
               stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
+              action: signedIn ? plainNextStep(row.deal.next_step || "").line || undefined : undefined,
               chips: (() => {
+                if (row.deal.kind === "land") return <LandPausedChip />;
+                if (row.deal.next_step && signedIn) return null;
                 const chips = dealChips(row.deal, signedIn);
-                const waiting = chips.find((chip) => chip.family === "waiting_on" && chip.code !== "nothing");
-                const gap = chips.find((chip) => chip.family === "biggest_gap");
-                return (
-                  <>
-                    <TypeChip value={typeLabel(row.deal)} />
-                    {row.deal.kind === "land" ? <LandPausedChip /> : null}
-                    {row.countyLabel ? <CountyChip label={row.countyLabel} note={row.countyNote || ""} /> : null}
-                    <ScoreCell input={scoreInput(row)} />
-                    {waiting ? <TagChip chip={waiting} compact /> : null}
-                    {gap ? <TagChip chip={gap} compact /> : null}
-                  </>
-                );
+                const priority = chips.find(chip => chip.family === "waiting_on" && chip.code !== "nothing") || chips.find(chip => chip.family === "biggest_gap");
+                return priority ? <TagChip chip={priority} compact /> : null;
               })(),
               selected: id === selectedId,
-              check: showChecks ? (
+              check: (
                 <label className="row-check">
-                  <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
+                  <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}, ${displayAddress(row.deal.address) || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
                 </label>
-              ) : null,
+              ),
+              secondaryAction:signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={()=>onFinancials(id)}>Financials</button>,
               onOpen: () => onOpen(id),
             };
           })} />
@@ -581,7 +614,7 @@ export default function PipelineList({
         onOpen={onOpen}
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
-        headerExtra={(id) => id === "site" && showChecks ? (
+        headerExtra={(id) => id === "site" ? (
           <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
         ) : null}
         renderCell={(row, column) => {
@@ -618,6 +651,7 @@ export default function PipelineList({
             const nda = signedIn ? dealChips(row.deal, signedIn).find((chip) => chip.family === "nda" && chip.code !== "not_required") : undefined;
             return (
               <StageTypeCell
+            hideStage={Boolean(commonStage)}
                 stage={row.deal.stage || ""}
                 group={row.deal.stage_group || ""}
                 detail={droppedDecisionLine(row.deal)}
@@ -632,15 +666,16 @@ export default function PipelineList({
           }
           if (column === "site") return (
             <span className="site-name">
-              {showChecks ? (
-                <RowCheck label={`Select ${row.deal.name || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
-              ) : null}
+              {(
+                <RowCheck label={`Select ${row.deal.name || id}, ${displayAddress(row.deal.address) || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
+              )}
               <span className="site-title">
                 <span className="site-name-text" title={String(cell(row, "site", signedIn) || row.deal.deal_id)}>
                   {unread.has(row.deal.deal_id) ? <i className="queue-dot" data-testid="queue-dot" aria-label="In your review" /> : null}
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
+                {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                 <span className="site-meta">
                   {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
                     <span className="site-address" title={displayAddress(row.deal.address)}>{displayAddress(row.deal.address)}</span>
@@ -666,12 +701,12 @@ export default function PipelineList({
       />}
       {pickedRows.length ? (
         <div className="selection-bar" data-testid="selection-bar" ref={barRef}>
-          <p>{pickedRows.length.toLocaleString()} selected</p>
+          <p>{pickedRows.length.toLocaleString()} selected{pickedRows.length < 2 ? " · Select one more to compare" : pickedRows.length > 4 ? " · Choose up to 4 to compare" : ""}</p>
           <button type="button" className="paper-btn" disabled={pickedRows.length < 2 || pickedRows.length > 4} title="Opens the compare view for 2 to 4 sites" onClick={() => onCompare?.(pickedRows.map((row) => row.deal.deal_id))}>Compare</button>
           <button type="button" className="paper-btn" onClick={() => download(pickedRows)}>Export CSV</button>
           <button type="button" className="paper-btn" onClick={() => { void Promise.resolve(onCopyLink?.(pickedRows.map((row) => row.deal.deal_id))).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "Link copied" : "Copy link"}</button>
           {canAct && onComment ? <button type="button" className="paper-btn" onClick={() => { setActionError(""); setCommentOpen(true); }}>Comment</button> : null}
-          {canAct && onDrop ? <button type="button" className="paper-btn" onClick={() => { setActionError(""); setDropOpen(true); }}>Drop with reason</button> : null}
+          {canAct && onDrop ? <button type="button" className="paper-btn" onClick={() => { setActionError(""); setDropOpen(true); }}>Propose drop</button> : null}
         </div>
       ) : null}
       {commentOpen ? createPortal(
@@ -682,7 +717,7 @@ export default function PipelineList({
               <button type="button" className="close" aria-label="Close comment" onClick={() => setCommentOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <p className="filter-note">One note is added to each selected site, on the same note path as a single comment.</p>
-            <ul className="pick-list">{pickedRows.map((row) => <li key={row.deal.deal_id}>{row.deal.name || row.deal.deal_id}</li>)}</ul>
+            <ul className="pick-list">{pickedRows.map((row) => <li key={row.deal.deal_id}>{row.deal.name || row.deal.deal_id} · {displayAddress(row.deal.address) || row.deal.deal_id}</li>)}</ul>
             <label>
               Note
               <textarea className="field" aria-label="Note" value={note} rows={3} maxLength={4000} onChange={(event) => setNote(event.target.value)} />
@@ -695,13 +730,13 @@ export default function PipelineList({
       ) : null}
       {dropOpen ? createPortal(
         <div className="list-dialog">
-          <div className="popover" role="dialog" aria-label="Drop with a reason">
+          <div className="popover" role="dialog" aria-label="Propose drop">
             <div className="popover-head">
-              <h2>Drop with a reason</h2>
+              <h2>Propose drop</h2>
               <button type="button" className="close" aria-label="Close drop" onClick={() => setDropOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <p className="filter-note">Each site is submitted for approval with this reason. Nothing is dropped until someone approves it.</p>
-            <ul className="pick-list">{pickedRows.map((row) => <li key={row.deal.deal_id}>{row.deal.name || row.deal.deal_id}</li>)}</ul>
+            <ul className="pick-list">{pickedRows.map((row) => <li key={row.deal.deal_id}>{row.deal.name || row.deal.deal_id} · {displayAddress(row.deal.address) || row.deal.deal_id}</li>)}</ul>
             <ReasonPicker label="Drop reason" testId="drop-reason" options={tagFamily("drop_reason")?.codes || []} value={reason} onChange={setReason} />
             {actionError ? <p className="err">{actionError}</p> : null}
             <button type="button" className="primary" disabled={pending || !tagFamily("drop_reason")?.codes.some((item) => item.code === reason)} onClick={() => void submitDrop()}>Submit for approval</button>
@@ -748,6 +783,7 @@ function Strip({
 }) {
   if (value == null || !Number.isFinite(value) || !stats) return null;
   const place = stripPlace(value, stats, direction, markNegative);
+  if (place.count === 1) return <small className="layer-meta">Only reported figure</small>;
   return (
     <span className="range-strip" title={stripTip(format(value), format(stats.median), place.rank, place.count)}>
       <i className="range-track" />
@@ -797,9 +833,9 @@ function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stat
   const party = shownBroker(deal) || shownFirm(deal);
   const full = source ? `${price} · ${source}` : price;
   const sourceNode = !source ? null : listing ? (
-    <a className="text-link" href={listing} target="_blank" rel="noopener noreferrer" title={`${full}. Opens the listing`} onClick={(event) => event.stopPropagation()}>{source}</a>
+    <a className="text-link" href={listing} target="_blank" rel="noopener noreferrer" title={`${full}. Opens the listing`} onClick={(event) => event.stopPropagation()}>{source} · Open listing ↗</a>
   ) : party && onBroker ? (
-    <button type="button" className="text-link" title={`${full}. Filters the list to this broker`} onClick={(event) => { event.stopPropagation(); onBroker(party); }}>{source}</button>
+    <button type="button" className="text-link" title={`${full}. Filters the list to this broker`} onClick={(event) => { event.stopPropagation(); onBroker(party); }}>See {source} sites · All markets</button>
   ) : (
     source
   );

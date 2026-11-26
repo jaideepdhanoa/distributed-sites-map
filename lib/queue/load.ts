@@ -177,7 +177,7 @@ export async function loadQueue(sql: Sql, userId: string, filters: QueueFilters,
     push(event.siteId, { at: event.at, summary: event.summary, type: event.type });
   }
   for (const event of await listAppEvents(sql)) {
-    push(event.siteId, { at: event.at, summary: event.summary, type: event.type });
+    push(event.siteId, { at: event.at, summary: event.summary, type: event.type, ...(event.noteId ? { noteId: event.noteId } : {}) });
   }
   for (const row of flags.rows) {
     const note = safeSnapshot(row.note, 200);

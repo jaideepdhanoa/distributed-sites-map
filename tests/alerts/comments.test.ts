@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { createWithReceipt } from "../../lib/actions/createReceipt";
 import test from "node:test";
 import { migrate } from "../../lib/actions/migrate";
 import { createNote } from "../../lib/actions/notes";
@@ -271,4 +273,25 @@ test("a seventh comment still reaches the owner instantly and another person rol
   assert.equal(other.rows.length, 1);
   assert.equal(other.rows[0]?.channel, "digest");
   assert.equal(other.rows[0]?.status, "pending");
+});
+
+
+test("a retried note delivers an instant alert only after the receipt commits", async () => {
+  const sql = await ready();
+  await createNote(sql, { targetKind: "deal", targetId: deal.deal_id, body: "First inspection", authorId: "reviewer" }, lookup);
+  const input = { targetKind: "deal" as const, targetId: deal.deal_id, body: "Check the north entrance", authorId: "contributor" };
+  const request = new Request("http://localhost/api/actions/notes", { headers: { "Idempotency-Key": randomUUID() } });
+  const write = () => createWithReceipt(sql, request, input.authorId, input, tx => createNote(tx, input, lookup));
+  await assert.rejects(createWithReceipt(sql, request, input.authorId, input, async tx => {
+    await createNote(tx, input, lookup);
+    throw new Error("Interrupted before commit");
+  }), /Interrupted before commit/);
+  const notes = () => sql.query("SELECT id FROM notes WHERE body = $1", [input.body]);
+  const alerts = () => sql.query("SELECT id FROM alert_log WHERE user_id = 'reviewer' AND body LIKE $1", ["%" + input.body + "%"]);
+  assert.equal((await notes()).rows.length, 0);
+  assert.equal((await alerts()).rows.length, 0);
+  const saved = await write();
+  assert.equal((await write()).id, saved.id);
+  assert.equal((await notes()).rows.length, 1);
+  assert.equal((await alerts()).rows.length, 1);
 });

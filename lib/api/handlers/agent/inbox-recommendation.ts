@@ -1,11 +1,11 @@
-import { agentOk, requireInbox, withAgentDb } from "@/lib/agent/http";
+import { agentOk, isAgentCaller, requireAgent, withAgentDb } from "@/lib/agent/http";
 import { addRecommendation, parseRecommendation } from "@/lib/agent/recommend";
 import { isResponse, jsonError } from "@/lib/actions/http";
 import { FeedError } from "@/lib/agent/inbox";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const denied = requireInbox(request);
-  if (denied) return denied;
+  const caller = requireAgent(request);
+  if (!isAgentCaller(caller)) return caller;
   const { id } = await context.params;
   if (!/^[A-Za-z0-9-]{8,80}$/.test(id)) return jsonError("That inbox row is not in the feed.", 404);
   let body: unknown;
@@ -17,6 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   let draft;
   try {
     draft = parseRecommendation(body);
+    if (caller.id === "chatgpt") draft.model = caller.id;
   } catch (error) {
     if (error instanceof FeedError) return jsonError(error.message, error.status);
     const message = error instanceof Error ? error.message : "The recommendation could not be read.";

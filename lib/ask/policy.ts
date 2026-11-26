@@ -37,12 +37,25 @@ export function withCitations(text: string, sources: AskSource[]): { text: strin
   if (text === REFUSAL) return { text, gap: false, empty: false };
   const linked = hasCitation(text);
   if (!sources.length && !linked) return { text: UNKNOWN, gap: true, empty: false };
+  const gap = /\bi (?:don't|don’t|do not) know\b/i.test(text);
   if (!linked && sources.length) {
     const lines = sources.slice(0, 6).map((source) => `- [${source.label}](${source.href})`);
-    return { text: `${text.trim()}\n\nSources:\n${lines.join("\n")}`, gap: false, empty: false };
+    return { text: `${text.trim()}\n\nSources:\n${lines.join("\n")}`, gap, empty: false };
   }
-  if (/i don't know/i.test(text) && !linked) return { text: UNKNOWN, gap: true, empty: false };
-  return { text, gap: false, empty: false };
+  return { text, gap, empty: false };
+}
+
+/** A shortlist answer may only cite evidence returned for its selected records. */
+export function citedShortlistAnswer(text: string, sources: AskSource[]) {
+  if (!text.trim() || text === REFUSAL) return withCitations(text, sources);
+  const known = new Set(sources.map(source => source.href));
+  const passages = text.trim().split(/\n\s*\n|\n(?=[-*]\s)/).filter(line =>
+    !/^#{1,6}\s+[^\n]+$/.test(line.trim()));
+  const grounded = passages.length > 0 && passages.every(line => {
+    const links = Array.from(line.matchAll(/\[[^\]]+\]\(([^)]+)\)/g), match => match[1]);
+    return links.length > 0 && links.every(link => known.has(link));
+  });
+  return grounded ? withCitations(text,sources) : { text: UNKNOWN, gap:true, empty:false };
 }
 
 export function collectSources(value: unknown, into: AskSource[] = [], seen = new Set<string>()): AskSource[] {

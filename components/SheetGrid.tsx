@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { GripVertical, ListFilter, Pin } from "lucide-react";
+import { GripVertical, ListFilter } from "lucide-react";
 import {
   clampWidth,
   columnWidth,
@@ -172,6 +172,7 @@ export default function SheetGrid<Row>({
   function onGridKey(event: React.KeyboardEvent) {
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+    if (target instanceof Element && target.closest("button, a, .col-menu")) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
       moveFocus(1, 0);
@@ -271,7 +272,7 @@ export default function SheetGrid<Row>({
         </colgroup>
         <thead>
           <tr role="row">
-            {columns.map((column) => {
+            {columns.map((column, position) => {
               const active = layout.sort?.id === column.id;
               const pinned = layout.pinned.includes(column.id);
               const filtered = Boolean(layout.filters[column.id]);
@@ -294,7 +295,7 @@ export default function SheetGrid<Row>({
                     {headerExtra?.(column.id)}
                     <button
                       type="button"
-                      className="sort-header col-grip"
+                      tabIndex={-1} aria-hidden="true" className="sort-header col-grip"
                       aria-label={`Reorder ${column.label}`}
                       onPointerDown={(event) => onGripDown(event, column.id)}
                     >
@@ -318,22 +319,10 @@ export default function SheetGrid<Row>({
                       >
                         <ListFilter aria-hidden="true" />
                       </button>
-                      <button
-                        type="button"
-                        className="sort-header col-pin"
-                        aria-label={pinned ? `Unpin ${column.label}` : `Pin ${column.label}`}
-                        aria-pressed={pinned}
-                        onClick={() => {
-                          const next = pinned ? layout.pinned.filter((item) => item !== column.id) : [...layout.pinned, column.id];
-                          onLayout({ ...layout, pinned: next.length ? next : ["site"], touched: true });
-                        }}
-                      >
-                        <Pin aria-hidden="true" />
-                      </button>
                     </span>
                     <button
                       type="button"
-                      className="sort-header col-resize"
+                      tabIndex={-1} aria-hidden="true" className="sort-header col-resize"
                       aria-label={`Resize ${column.label}`}
                       onPointerDown={(event) => onResizeDown(event, column.id)}
                     />
@@ -357,6 +346,14 @@ export default function SheetGrid<Row>({
                         />
                         Pin left
                       </label>
+                      <div className="column-settings">
+                        <button type="button" className="menu-item" disabled={position === 0} onClick={() => reorder(column.id, columns[position - 1].id)}>Move left</button>
+                        <button type="button" className="menu-item" disabled={position === columns.length - 1} onClick={() => reorder(column.id, columns[position + 1].id)}>Move right</button>
+                        <label>Width in pixels<input className="field" type="number" min={clampWidth(0)} max={clampWidth(9999)} key={column.id} defaultValue={width} onBlur={event => {
+                          const next = event.currentTarget.valueAsNumber;
+                          if (Number.isFinite(next)) onLayout({ ...layout, widths: { ...layout.widths, [column.id]: clampWidth(next) }, touched: true });
+                        }} /></label>
+                      </div>
                       {column.id === "site" ? null : (
                         <button
                           type="button"
@@ -448,6 +445,7 @@ export default function SheetGrid<Row>({
               <tr
                 key={id}
                 role="row"
+                data-site-row={id}
                 data-index={item.index}
                 ref={virtualizer.measureElement}
                 className={id === selectedId ? "list-row on" : "list-row"}
@@ -506,9 +504,7 @@ export default function SheetGrid<Row>({
           ) : null}
         </tbody>
       </table>
-      {rows.length === 0 ? (
-        <p className="note empty-filter" data-testid="empty-filter">No sites match this filter.</p>
-      ) : null}
+
       </div>
     </div>
   );

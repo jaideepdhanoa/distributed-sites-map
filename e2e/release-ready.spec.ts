@@ -33,7 +33,7 @@ for (const size of sizes) {
     await ready(page);
     await expect(page.locator(".shell")).toHaveAttribute("data-city", "PHX");
     await expect.poll(async () => page.locator(".shell").getAttribute("data-zoom")).toMatch(/^\d/);
-    if (size.width < 768) await page.getByRole("button", { name: "Layers" }).click();
+    await page.getByRole("button", { name: "Layers", exact: true }).click();
     const zoomBefore = await page.locator(".shell").getAttribute("data-zoom");
     await page.locator("label.layer-row", { has: page.getByTestId("dropped-layer") }).click();
     await expect(page).toHaveURL(/city=PHX/);
@@ -69,6 +69,7 @@ for (const size of sizes) {
       await page.getByRole("button", { name: "Menu" }).click();
       await page.getByRole("button", { name: /Needs location/ }).click();
     } else {
+      await page.getByTestId("map-scope").click();
       const opener = page.getByTestId("needs-location");
       if (await opener.count()) await opener.click();
     }
@@ -127,7 +128,11 @@ for (const size of sizes) {
 test("an unknown id shows Site not found and a protected id stays closed", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop");
   await page.goto("/?site=WB-LAS-9999", { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("site-missing")).toHaveText("Site not found");
+  const missing = page.getByTestId("site-missing");
+  await expect(missing).toContainText("Site not found");
+  await missing.getByRole("button", { name: "Back to listings" }).click();
+  await expect(page).not.toHaveURL(/site=WB-LAS-9999/);
+  await expect(page).toHaveURL(/view=list/);
   await page.goto("/?site=PIPE-PHX-0006", { waitUntil: "domcontentloaded" });
   await expect(page).not.toHaveURL(/PIPE-PHX-0006/);
   await expect(page.locator("aside.drawer")).toHaveCount(0);

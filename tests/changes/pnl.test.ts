@@ -45,7 +45,8 @@ async function ready() {
 
 test("Muse can write a captured line and a viewer, Indie, a bad clock, and a shorthand amount cannot", () => {
   assert.throws(() => validateBatch(viewer, "k1", { changes: [line()] }), /do not have permission/);
-  assert.throws(() => validateBatch(indie, "k1", { changes: [line()] }), /Only Muse can write a P&L line/);
+  assert.doesNotThrow(() => validateBatch({ id: "chatgpt", kind: "agent" }, "chatgpt-line", { changes: [line()] }));
+  assert.throws(() => validateBatch(indie, "k1", { changes: [line()] }), /Only Muse or ChatGPT can write a P&L line/);
   assert.throws(() => validateBatch(muse, "k1", { changes: [line({ captured_at: "2026-03-01" })] }), /ISO-8601 time with a zone offset/);
   assert.throws(() => validateBatch(muse, "k1", { changes: [line({ captured_at: "2026-03-01T15:00:00" })] }), /ISO-8601 time with a zone offset/);
   assert.throws(
@@ -287,11 +288,11 @@ test("only Muse can retract a line, and the row and the event stay", async () =>
   const id = created.results[0]?.entity_id || "";
   assert.throws(
     () => validateBatch(indie, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, reason: "Duplicate sample line", at: CAPTURED } }] }),
-    /Only Muse can retract/,
+    /Only Muse or ChatGPT can retract/,
   );
   assert.throws(
     () => validateBatch(reviewer, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, reason: "Duplicate sample line", at: CAPTURED } }] }),
-    /Only Muse can retract/,
+    /Only Muse or ChatGPT can retract/,
   );
   assert.throws(
     () => validateBatch(muse, "k-retract", { changes: [{ ...line(), entity_id: id, expected_version: 1, payload: { retract: true, at: CAPTURED } }] }),

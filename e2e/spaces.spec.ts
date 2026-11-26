@@ -57,23 +57,26 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAs(page, `/?funnel=universe&site=${site}`);
   await expect(page.getByTestId("space-summary")).toContainText("No lots drawn yet");
-  await expect(page.getByTestId("mark-space")).toBeVisible();
+  await expect(page.getByTestId("open-map-spaces")).toBeVisible();
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
   await expect(page.getByTestId("space-summary")).toContainText("1 lot");
   await expect(page.getByTestId("space-summary")).toContainText("sq ft");
   await expect(page.getByTestId("space-summary")).toContainText("slots");
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.getByTestId("spaces-layer")).toBeChecked();
   await closeLayers(page);
+  const preferredBefore = await page.evaluate(() => localStorage.getItem("basemap"));
+  await page.getByTestId("open-map-spaces").click();
   await page.getByTestId("mark-space").click();
   await expect(page.getByTestId("space-draw-bar")).toBeVisible();
-  const zoom = await page.evaluate(async () => {
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect.poll(() => page.evaluate(() => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number } }).__sitesMap;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return map ? map.getZoom() : -1;
-  });
-  if (zoom < 17) throw new Error(`map zoom stayed at ${zoom}`);
+    return map?.getZoom() ?? -1;
+  })).toBeGreaterThanOrEqual(17);
+  expect(await page.evaluate(() => localStorage.getItem("basemap"))).toBe(preferredBefore);
   const canvas = page.locator(".stage-map canvas");
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
@@ -117,6 +120,7 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
   await expect(page.getByTestId("space-summary")).toContainText("slots");
+  await page.getByTestId("open-map-spaces").click();
   await page.getByTestId("mark-space").click();
   await expect(page.getByTestId("space-finish")).toBeVisible();
   await expect(page.getByTestId("space-cancel")).toBeVisible();
@@ -204,6 +208,7 @@ test("a saved lot opens its popover outside drawing mode", async ({ page }) => {
   await expect(popover.getByTestId("space-delete")).toBeVisible();
   await popover.getByRole("button", { name: "Close available lot" }).click();
   await expect(popover).toBeHidden();
+  await page.getByTestId("open-map-spaces").click();
   await page.getByTestId("mark-space").click();
   await expect(page.getByTestId("space-draw-bar")).toBeVisible();
   await clickSavedLot(page);
@@ -230,11 +235,13 @@ test("cancel and Escape discard an unfinished lot", async ({ page }) => {
   await expect(page.getByTestId("space-summary")).toContainText("sq ft");
   const before = await page.getByTestId("space-summary").innerText();
   await closeLayers(page);
+  await page.getByTestId("open-map-spaces").click();
   await page.getByTestId("mark-space").click();
   await expect(page.getByTestId("space-draw-bar")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
   await expect(page.getByTestId("space-summary")).toHaveText(before);
+  await page.getByTestId("open-map-spaces").click();
   await page.getByTestId("mark-space").click();
   await page.getByTestId("space-cancel").click();
   await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);

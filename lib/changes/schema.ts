@@ -1,3 +1,4 @@
+import { canCapture, canMaintainSites, isWriteAgent } from "@/lib/agent/identity";
 import { z } from "zod";
 import type { ActionRole } from "@/lib/actions/roles";
 import { canDecide, canWriteContent } from "@/lib/actions/roles";
@@ -249,6 +250,8 @@ export type NdaPayload = {
   note: string;
   source_ref: string;
   at: string;
+  /** Dossier fields this change sets to blank. Omitted when nothing is cleared. */
+  cleared?: string[];
 };
 
 export type ParsedChange = {
@@ -475,7 +478,7 @@ const commentAnchorPayload = z
     type: z.enum(["pnl_cell", "pnl_line", "space", "nda"]),
     line: z.string().trim().max(40).optional(),
     period: z.string().trim().max(80).optional(),
-    space_id: z.string().trim().max(40).optional(),
+    space_id: z.string().trim().max(128).optional(),
   })
   .strict();
 
@@ -861,8 +864,8 @@ function parsePnlLine(
   if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
   const raw = rawRecord(payload);
   if (raw && raw.retract === true) return parsePnlRetract(actor, index, raw, identity);
-  if (actor.kind === "agent" && actor.id.trim().toLowerCase() !== "muse") {
-    throw new InputError(`Change ${index + 1}: Only Muse can write a P&L line.`, 403);
+  if (actor.kind === "agent" && !canCapture(actor.id.trim().toLowerCase())) {
+    throw new InputError(`Change ${index + 1}: Only Muse or ChatGPT can write a P&L line.`, 403);
   }
   assertContentActor(actor, index);
   if (raw && "amount" in raw && typeof raw.amount === "number") pnlError(index, "amount", `${AMOUNT_FORM}, not a number`);
@@ -954,8 +957,8 @@ function parsePnlRetract(
   raw: Record<string, unknown>,
   identity: { entityId?: string; expectedVersion: number },
 ): PnlRetractPayload {
-  if (actor.kind !== "agent" || actor.id.trim().toLowerCase() !== "muse") {
-    pnlError(index, "retract", "Only Muse can retract a P&L line.", 403);
+  if (actor.kind !== "agent" || !canCapture(actor.id.trim().toLowerCase())) {
+    pnlError(index, "retract", "Only Muse or ChatGPT can retract a P&L line.", 403);
   }
   if (!identity.entityId || identity.expectedVersion < 1) {
     pnlError(index, "entity_id", "A retract needs the line id and its version");
@@ -982,8 +985,8 @@ function sourceValueIsNumber(payload: unknown): boolean {
 
 function parseDataConflict(actor: Actor, index: number, siteId: string, payload: unknown): ConflictPayload {
   if (isExcludedSite(siteId)) throw new InputError(`Change ${index + 1}: That site is not written here.`, 403);
-  if (actor.kind !== "agent" || actor.id.trim().toLowerCase() !== "muse") {
-    throw new InputError(`Change ${index + 1}: Only Muse can record a data conflict.`, 403, "actor");
+  if (actor.kind !== "agent" || !canCapture(actor.id.trim().toLowerCase())) {
+    throw new InputError(`Change ${index + 1}: Only Muse or ChatGPT can record a data conflict.`, 403, "actor");
   }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, "payload");
@@ -1091,31 +1094,49 @@ const NDA_STAGES = new Set([
 
 const NDA_COURTS = new Set(["us", "them", "seller", "none"]);
 const NDA_DOC_KINDS = new Set(["docusign", "clm", "drive", "email", "other"]);
-const NDA_AGENTS = new Set(["muse", "indie"]);
 
-function ndaText(raw: Record<string, unknown>, key: string, index: number, max: number, skipClean = false): string {
-  if (!(key in raw) || raw[key] == null) return "";
+type NdaPresence = "absent" | "clear" | "set";
+
+function ndaString(
+  raw: Record<string, unknown>,
+  key: string,
+  index: number,
+  max: number,
+  skipClean = false,
+): { value: string; presence: NdaPresence } {
+  if (!(key in raw)) return { value: "", presence: "absent" };
+  if (raw[key] == null) return { value: "", presence: "clear" };
   if (typeof raw[key] !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
   const value = raw[key].trim();
   if (value.length > max) throw new InputError(`Change ${index + 1}: That field is too long.`, 400, key);
+  if (!value) return { value: "", presence: "clear" };
   if (!skipClean) cleanText(value);
-  return value;
+  return { value, presence: "set" };
 }
 
-function ndaList(raw: Record<string, unknown>, key: string, index: number): string[] {
-  if (!(key in raw) || raw[key] == null) return [];
+function ndaText(raw: Record<string, unknown>, key: string, index: number, max: number, skipClean = false): string {
+  return ndaString(raw, key, index, max, skipClean).value;
+}
+
+function ndaList(raw: Record<string, unknown>, key: string, index: number): { value: string[]; presence: NdaPresence } {
+  if (!(key in raw)) return { value: [], presence: "absent" };
+  if (raw[key] == null) return { value: [], presence: "clear" };
   if (!Array.isArray(raw[key])) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
-  return raw[key].map((item) => {
-    if (typeof item !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
-    const value = item.trim();
-    if (!value || value.length > 80) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
-    cleanText(value);
-    return value;
-  });
+  if (raw[key].length === 0) return { value: [], presence: "clear" };
+  return {
+    value: raw[key].map((item) => {
+      if (typeof item !== "string") throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+      const value = item.trim();
+      if (!value || value.length > 80) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
+      cleanText(value);
+      return value;
+    }),
+    presence: "set",
+  };
 }
 
 function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
-  const agent = actor.kind === "agent" && NDA_AGENTS.has(actor.id.trim().toLowerCase());
+  const agent = actor.kind === "agent" && isWriteAgent(actor.id.trim().toLowerCase());
   const human = actor.kind === "human" && Boolean(actor.role && canWriteContent(actor.role));
   if (!agent && !human) {
     throw new InputError(`Change ${index + 1}: You do not have permission for that.`, 403);
@@ -1128,6 +1149,9 @@ function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
     if (!NDA_PAYLOAD_FIELDS.has(key)) throw new InputError(`Change ${index + 1}: That field is not accepted.`, 400, key);
   }
   const action = raw.action;
+  if (agent && actor.id === "chatgpt" && (action === "assign" || "owner" in raw)) {
+    throw new InputError(`Change ${index + 1}: A person sets the NDA owner.`, 403, "owner");
+  }
   if (action !== "status" && action !== "assign" && action !== "next_step" && action !== "edit") {
     throw new InputError(`Change ${index + 1}: That NDA action is not accepted.`, 400, "action");
   }
@@ -1135,23 +1159,55 @@ function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
   const zoned = parseZonedTimestamp(atRaw);
   if (!zoned) throw new InputError(`Change ${index + 1}: Use an ISO-8601 time with a zone offset.`, 400, "at");
   const note = ndaText(raw, "note", index, 400);
-  const status = ndaText(raw, "status", index, 80);
-  const waiting = ndaText(raw, "waiting_on", index, 80);
-  const stage = ndaText(raw, "stage", index, 40);
-  const court = ndaText(raw, "court", index, 20);
-  const courtDetail = ndaText(raw, "court_detail", index, 80);
-  const courtSinceRaw = ndaText(raw, "court_since", index, 40);
-  const owner = ndaText(raw, "owner", index, 80);
-  const next = ndaText(raw, "next_step", index, 400);
-  const due = ndaText(raw, "next_step_due", index, 10);
-  const documentUrl = ndaText(raw, "document_url", index, 500);
-  const documentKind = ndaText(raw, "document_kind", index, 20);
-  const contactName = ndaText(raw, "contact_name", index, 80);
-  const contactEmail = ndaText(raw, "contact_email", index, 120);
-  const contactPhone = ndaText(raw, "contact_phone", index, 40, true);
+  const statusField = ndaString(raw, "status", index, 80);
+  const waitingField = ndaString(raw, "waiting_on", index, 80);
+  const stageField = ndaString(raw, "stage", index, 40);
+  if (stageField.presence === "clear") throw new InputError(`Change ${index + 1}: Stage cannot be cleared.`, 400, "stage");
+  const courtField = ndaString(raw, "court", index, 20);
+  const courtDetailField = ndaString(raw, "court_detail", index, 80);
+  const courtSinceField = ndaString(raw, "court_since", index, 40);
+  const ownerField = ndaString(raw, "owner", index, 80);
+  const nextField = ndaString(raw, "next_step", index, 400);
+  const dueField = ndaString(raw, "next_step_due", index, 10);
+  const documentUrlField = ndaString(raw, "document_url", index, 500);
+  const documentKindField = ndaString(raw, "document_kind", index, 20);
+  const contactNameField = ndaString(raw, "contact_name", index, 80);
+  const contactEmailField = ndaString(raw, "contact_email", index, 120);
+  const contactPhoneField = ndaString(raw, "contact_phone", index, 40, true);
   const sourceRef = ndaText(raw, "source_ref", index, 200);
   const threads = ndaList(raw, "gmail_thread_ids", index);
   const covered = ndaList(raw, "covered_refs", index);
+  const status = statusField.value;
+  const waiting = waitingField.value;
+  const stage = stageField.value;
+  const court = courtField.value;
+  const courtDetail = courtDetailField.value;
+  const courtSinceRaw = courtSinceField.value;
+  const owner = ownerField.value;
+  const next = nextField.value;
+  const due = dueField.value;
+  const documentUrl = documentUrlField.value;
+  const documentKind = documentKindField.value;
+  const contactName = contactNameField.value;
+  const contactEmail = contactEmailField.value;
+  const contactPhone = contactPhoneField.value;
+  const cleared = [
+    ["status", statusField.presence],
+    ["waiting_on", waitingField.presence],
+    ["court", courtField.presence],
+    ["court_detail", courtDetailField.presence],
+    ["court_since", courtSinceField.presence],
+    ["owner", ownerField.presence],
+    ["next_step", nextField.presence],
+    ["next_step_due", dueField.presence],
+    ["document_url", documentUrlField.presence],
+    ["document_kind", documentKindField.presence],
+    ["contact_name", contactNameField.presence],
+    ["contact_email", contactEmailField.presence],
+    ["contact_phone", contactPhoneField.presence],
+    ["gmail_thread_ids", threads.presence],
+    ["covered_refs", covered.presence],
+  ].flatMap(([key, presence]) => (presence === "clear" ? [key] : []));
   if (stage && !NDA_STAGES.has(stage)) throw new InputError(`Change ${index + 1}: That stage is not accepted.`, 400, "stage");
   if (court && !NDA_COURTS.has(court)) throw new InputError(`Change ${index + 1}: That court is not accepted.`, 400, "court");
   if (documentKind && !NDA_DOC_KINDS.has(documentKind)) throw new InputError(`Change ${index + 1}: That document kind is not accepted.`, 400, "document_kind");
@@ -1183,11 +1239,12 @@ function parseNda(actor: Actor, index: number, payload: unknown): NdaPayload {
     contact_name: contactName,
     contact_email: contactEmail,
     contact_phone: contactPhone,
-    gmail_thread_ids: threads,
-    covered_refs: covered,
+    gmail_thread_ids: threads.value,
+    covered_refs: covered.value,
     note,
     source_ref: sourceRef,
     at: zoned.iso,
+    ...(cleared.length ? { cleared } : {}),
   };
 }
 
@@ -1388,8 +1445,8 @@ export function isAgentStageDecision(payload: Record<string, unknown>): boolean 
 
 function assertActivityActor(actor: Actor, index: number, type: string): void {
   assertContentActor(actor, index);
-  // Capture rows are Muse's activity write. Other agent tokens stay on their own fields.
-  if (type === "capture" && actor.kind === "agent" && actor.id !== "muse") {
+  // Capture rows require a capture-capable agent.
+  if (type === "capture" && actor.kind === "agent" && !canCapture(actor.id)) {
     throw new InputError(`Change ${index + 1}: An agent cannot write that activity.`, 403);
   }
 }
@@ -1536,11 +1593,11 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
   assertSiteOwnership(actor, index, new Set([...Object.keys(fields), ...Object.keys(facts)]), data.service_area_class, mint);
   for (const key of Object.keys(data.sources || {})) {
     const identitySource = mint && (CREATE_IDENTITY_FIELDS as readonly string[]).includes(key);
-    const indieIdentity = !mint && actor.kind === "agent" && actor.id === "indie" && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
+    const maintenanceIdentity = !mint && actor.kind === "agent" && canMaintainSites(actor.id) && (INDIE_IDENTITY_FIELDS as readonly string[]).includes(key);
     const quickSource = (QUICK_LUBE_FIELDS as readonly string[]).includes(key);
     const roadSource = key === "trade_aadt_road";
     const segmentSource = key === "segment" || key === "segment_group" || key === "category";
-    if (!identitySource && !indieIdentity && !quickSource && !roadSource && !segmentSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
+    if (!identitySource && !maintenanceIdentity && !quickSource && !roadSource && !segmentSource && !NUMERIC_FACT_FIELDS.includes(key as (typeof NUMERIC_FACT_FIELDS)[number])) {
       throw new InputError(`Change ${index + 1}: That source is not for a numeric fact.`);
     }
   }
@@ -1569,13 +1626,13 @@ function parseSite(actor: Actor, index: number, expectedVersion: number, payload
     cleanText(source);
     sources[field] = source;
   }
-  if (!mint && actor.kind === "agent" && actor.id === "indie" && fields.category && (data.segment !== undefined || data.segment_group !== undefined || data.category !== undefined)) {
+  if (!mint && actor.kind === "agent" && canMaintainSites(actor.id) && fields.category && (data.segment !== undefined || data.segment_group !== undefined || data.category !== undefined)) {
     const source = data.sources?.segment?.trim() || data.sources?.segment_group?.trim() || data.sources?.category?.trim() || "";
     if (!source) throw new InputError(`Change ${index + 1}: segment needs a source.`);
     cleanText(source);
     sources.segment = source;
   }
-  if (!mint && actor.kind === "agent" && actor.id === "indie") {
+  if (!mint && actor.kind === "agent" && canMaintainSites(actor.id)) {
     for (const field of INDIE_IDENTITY_FIELDS) {
       const value = fields[field as SiteField];
       if (value === undefined || value === "") continue;
@@ -1649,11 +1706,14 @@ function assertSiteOwnership(actor: Actor, index: number, touched: Set<string>, 
   if (serviceArea === "edge_legacy" || serviceArea === "unknown") {
     throw new InputError(`Change ${index + 1}: An agent cannot set that service area.`);
   }
-  const allowed = new Set<string>(actor.id === "indie" ? [...PHOTO_FIELDS, ...CHECK_FIELDS, ...TRADE_FIELDS] : actor.id === "muse" ? [...MUSE_FIELDS] : []);
+  const allowed = new Set<string>([
+    ...(canCapture(actor.id) ? MUSE_FIELDS : []),
+    ...(canMaintainSites(actor.id) ? [...PHOTO_FIELDS, ...CHECK_FIELDS, ...TRADE_FIELDS] : []),
+  ]);
   const createAllowed = mint ? new Set<string>([...CREATE_IDENTITY_FIELDS, "segment", "segment_group"]) : new Set<string>();
-  const indieUpdate = new Set<string>(actor.id === "indie" && !mint ? ["folder_url", "category", "segment", "segment_group", ...INDIE_IDENTITY_FIELDS] : []);
+  const maintenanceUpdate = new Set<string>(canMaintainSites(actor.id) && !mint ? ["folder_url", "category", "segment", "segment_group", ...INDIE_IDENTITY_FIELDS] : []);
   for (const key of touched) {
-    if (createAllowed.has(key) || indieUpdate.has(key)) continue;
+    if (createAllowed.has(key) || maintenanceUpdate.has(key)) continue;
     if ((SCHEMA_FIELDS as readonly string[]).includes(key) || !allowed.has(key)) {
       throw new InputError(`Change ${index + 1}: An agent cannot write that field.`);
     }

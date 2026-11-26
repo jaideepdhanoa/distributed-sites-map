@@ -8,28 +8,31 @@ export type PhoneCard = {
   stage: string;
   stageNote?: string;
   tone?: string;
+  action?: string;
   facts: string[];
   chips?: ReactNode;
   selected?: boolean;
   check?: ReactNode;
+  secondaryAction?: ReactNode;
   onOpen: () => void;
 };
 
-export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
+export function PhoneCards({ rows, commonStage }: { rows: PhoneCard[]; commonStage: string }) {
   return (
     <ul className="list-cards" data-testid="phone-cards">
       {rows.map((row) => {
         const facts = row.facts.map((fact) => fact.trim()).filter(Boolean);
         return (
-          <li key={row.id} className={row.selected ? "on" : undefined}>
+          <li data-site-row={row.id} key={row.id} className={row.selected ? "on" : undefined}>
             {row.check}
             <button type="button" className="list-row" onClick={row.onOpen}>
               <span className="phone-card-name" title={row.name}>{row.name}</span>
               {row.address ? <span className="site-address" title={row.address}>{row.address}</span> : null}
-              <span className="phone-card-stage">
-                <ChipFace className={`stage-pill tone-${row.tone || "pine"}`} testId="stage-chip" label={row.stage} detail={row.stageNote} />
+              {(!commonStage || row.chips) && <span className="phone-card-stage">
+                {!commonStage && <ChipFace className={`stage-pill tone-${row.tone || "pine"}`} testId="stage-chip" label={row.stage} detail={row.stageNote} />}
                 {row.chips}
-              </span>
+              </span>}
+              {row.action && <span className="mobile-next-action"><b>Next</b> {row.action}</span>}
               {facts.length ? (
                 <span className="phone-card-meta">
                   {facts.map((fact, index) => (
@@ -41,6 +44,7 @@ export function PhoneCards({ rows }: { rows: PhoneCard[] }) {
                 </span>
               ) : null}
             </button>
+            {row.secondaryAction}
           </li>
         );
       })}

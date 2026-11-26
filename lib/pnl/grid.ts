@@ -1,4 +1,4 @@
-import type { OpenPnlComment } from "@/lib/comments/anchor";
+import { periodChip, type OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { monthColumnState } from "./columns";
 import { formatCapturedDate } from "./dateLabel";
@@ -274,6 +274,10 @@ function periodKeys(column: GridColumn): string[] {
   return keys.filter((key): key is string => Boolean(key));
 }
 
+export function matchesColumnPeriod(column: GridColumn, target: string): boolean {
+  return Boolean(target) && periodKeys(column).some(key => key === target || periodChip(key) === periodChip(target));
+}
+
 function attachConflicts(grid: PnlGrid, conflicts: DataConflict[]): PnlGrid {
   const marks = conflicts.filter((row) => row.subject === "pnl_line");
   if (!marks.length) return grid;
@@ -380,6 +384,7 @@ export function buildPnlGrid(statement: PnlStatement, mode: "months" | "years", 
         ...MONTH_SHORT.map((label, index) => withPeriod({
           id: label.toLowerCase(),
           label,
+          periodLabel: selected ? `${label} ${selected}` : label,
           missing: selectedYear ? monthColumnState(selectedYear, index) === "missing" : false,
         }, buckets[index]?.period)),
         withPeriod({

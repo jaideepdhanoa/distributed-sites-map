@@ -29,14 +29,14 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   await cycleSort(stage);
   await expect(stage).toHaveAttribute("aria-sort", "ascending");
 
-  await page.getByRole("button", { name: "Columns" }).click();
-  await page.getByRole("group", { name: "Columns" }).getByText("Traffic", { exact: true }).click();
+  await page.getByRole("button", { name: "Columns", exact: true }).click();
+  await page.getByRole("group", { name: "Columns", exact: true }).getByText("Traffic", { exact: true }).click();
   await expect(page.locator('th[data-col="traffic"]')).toHaveCount(0);
-  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("button", { name: "Columns", exact: true }).click();
 
   const score = page.locator('th[data-col="score"]');
   const before = await score.boundingBox();
-  await score.getByRole("button", { name: "Resize Score" }).evaluate((el) => {
+  await score.locator(".col-resize").evaluate((el) => {
     const rect = el.getBoundingClientRect();
     const startX = rect.x + rect.width / 2;
     const y = rect.y + rect.height / 2;
@@ -50,22 +50,19 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
 
   const land = page.locator('th[data-col="openLand"]');
   await land.hover();
-  const grip = land.getByRole("button", { name: "Reorder Open land" });
+  const grip = land.locator(".col-grip");
   await expect(grip).toBeVisible();
   const from = await grip.boundingBox();
   const label = sortButton(land);
   const labelBox = await label.boundingBox();
   const filter = land.getByRole("button", { name: "Filter Open land" });
-  const pin = land.getByRole("button", { name: "Pin Open land" });
   const filterBox = await filter.boundingBox();
-  const pinBox = await pin.boundingBox();
-  expect(from && labelBox && filterBox && pinBox).toBeTruthy();
-  if (from && labelBox && filterBox && pinBox) {
+  expect(from && labelBox && filterBox).toBeTruthy();
+  if (from && labelBox && filterBox) {
     expect(from.width).toBeGreaterThanOrEqual(24);
     expect(from.height).toBeGreaterThanOrEqual(24);
     expect(from.x + from.width).toBeLessThanOrEqual(labelBox.x + 1);
     expect(from.x + from.width).toBeLessThanOrEqual(filterBox.x + 1);
-    expect(from.x + from.width).toBeLessThanOrEqual(pinBox.x + 1);
   }
   const slot = await grip.evaluate((el) => getComputedStyle(el).position);
   expect(slot).not.toBe("absolute");
@@ -80,10 +77,11 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   }
   await expect(page.locator("[data-testid=sheet-grid] thead th[data-col]").nth(1)).toHaveAttribute("data-col", "openLand");
 
-  await score.getByRole("button", { name: "Pin Score" }).click({ force: true });
+  await score.getByRole("button", { name: "Filter Score" }).click();
+  await page.getByRole("group", { name: "Score column" }).getByRole("checkbox", { name: "Pin left" }).check();
   await expect(score).toHaveAttribute("data-pinned", "true");
 
-  await stage.getByRole("button", { name: "Filter Stage" }).click({ force: true });
+  await stage.getByRole("button", { name: "Filter Stage" }).press("Enter");
   await page.getByRole("group", { name: "Filter Stage" }).getByRole("checkbox", { name: "Offer and close" }).check();
   await expect(page.locator("[data-testid=sheet-grid] tbody tr.list-row")).toHaveCount(0);
   await page.getByRole("button", { name: "Clear filter" }).click();
@@ -122,7 +120,7 @@ test("a phone list is cards and does not offer search this area", async ({ page 
   await page.waitForSelector("[data-testid=phone-cards]");
   await expect(page.locator("[data-testid=phone-cards] button.list-row").first()).toBeVisible();
   await expect(page.getByTestId("search-area")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Columns" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Columns", exact: true })).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await expect(page.locator(".shell")).not.toContainText("PIPE-PHX-0006");

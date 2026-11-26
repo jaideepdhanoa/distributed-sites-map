@@ -76,8 +76,6 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
   if (phone) {
     await expect(page.getByTestId("phone-cards")).toBeVisible();
     await page.getByTestId("phone-cards").screenshot({ path: shotPath(`chips-grid-${suffix}`) });
-    await page.getByRole("button", { name: "More list actions" }).click();
-    await page.getByRole("menuitem", { name: "Select", exact: true }).click();
     await page.locator("[data-testid=phone-cards] input.check").first().click();
   } else {
     const waiting = page.locator("th[data-col='chip_waiting']");
@@ -104,7 +102,7 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
     await page.getByRole("heading", { name: "Distributed Sites" }).click({ timeout: 8_000 });
     await page.locator("[data-testid=sheet-grid] tbody input.check").first().click({ timeout: 8_000 });
   }
-  await page.getByRole("button", { name: "Drop with reason", exact: true }).click({ timeout: 8_000 });
+  await page.getByRole("button", { name: "Propose drop", exact: true }).click({ timeout: 8_000 });
   await expect(page.getByTestId("drop-reason")).toBeVisible();
   await expect(page.getByTestId("drop-reason")).toContainText("Price vs value");
   const drop = page.getByTestId("drop-reason");

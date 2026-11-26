@@ -1,5 +1,9 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+
+import { withConnectionString } from "../lib/actions/db";
+import { migrate } from "../lib/actions/migrate";
+import { publishSnapshot, selectLive } from "../lib/snapshot/store";
 
 const password = process.env.E2E_PASSWORD || "e2e-pass-actions";
 
@@ -49,6 +53,22 @@ async function hideDevOverlay(page: Page) {
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
+test("empty My work opens Explore on a short phone screen", async ({page}) => {
+  await page.setViewportSize({width:390,height:440});
+  await page.route("**/api/actions/work",route=>route.fulfill({json:{rows:[]}}));
+  await page.route("**/api/data/nda",route=>route.fulfill({json:{queue:[]}}));
+  await openAs(page,"contributor","/?loops=work&city=PHX");
+  const hub = page.getByRole("region",{name:"My work"});
+  const empty = hub.getByRole("status").filter({hasText:"no open assignments"});
+  await expect(empty).toBeVisible();
+  await mkdir("review-shots",{recursive:true});
+  await empty.screenshot({path:"review-shots/390-empty-my-work.png"});
+  await empty.getByRole("link",{name:"Explore sites"}).click();
+  const nav = page.getByRole("navigation",{name:"Acquisition workspace"});
+  await expect(nav.getByRole("button",{name:"Explore",exact:true})).toHaveAttribute("aria-current","page");
+  expect(new URL(page.url()).searchParams.get("city")).toBe("PHX");
+});
+
 async function queue(request: APIRequestContext, query = "market=all&stage=any&viable=1") {
   const response = await request.get(`/api/queue?${query}`);
   expect(response.ok()).toBeTruthy();
@@ -84,6 +104,29 @@ test("a new site can be reviewed, and a later note puts it back", async ({ page,
   expect(note.status()).toBe(201);
   const again = await queue(request);
   expect(again.items.find((item) => item.siteId === deal)?.reasons.some((reason) => reason.summary === "New note.")).toBeTruthy();
+  const { note: { id } } = await note.json() as { note: { id: string } };
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto(`/?review=1&rsite=${deal}&qmarket=all&qstage=any`);
+    const changes = page.getByTestId("review-since");
+    await changes.click();
+    const position = await page.getByTestId("review-position").innerText();
+    const line = page.getByTestId("review-since-list").getByRole("button", { name: /New note/ }).first();
+    await line.click();
+    const banner = page.getByRole("region", { name: "Selected review change" });
+    await expect(banner).toContainText("New note");
+    await expect(page.getByRole("tab", { name: "Diligence" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator(`[data-note-id="${id}"]`)).toBeInViewport();
+    await mkdir("review-shots", { recursive: true });
+    await banner.screenshot({ path: `review-shots/${width === 390 ? "mobile" : "desktop"}-review-change.png` });
+    await banner.getByRole("button", { name: "Back to review" }).click();
+    await expect(line).toBeFocused();
+    await expect(page.getByTestId("review-position")).toHaveText(position, { useInnerText: true });
+    const query = new URL(page.url()).searchParams;
+    expect(query.get("rsite")).toBe(deal);
+    expect(query.get("qmarket")).toBe("all");
+    expect(query.get("qstage")).toBe("any");
+  }
 });
 
 test("flagging shows the site to the other account, and snooze hides it until the date", async ({ request }) => {
@@ -237,9 +280,7 @@ test("the queue card shows a change, a mention, and a pending next step", async 
 
   const fresh = await queue(request);
   const placed = fresh.items.findIndex((item) => typeof item.snapshot?.lng === "number");
-  const missing = fresh.items.findIndex((item) => item.snapshot?.lng == null);
   expect(placed).toBeGreaterThanOrEqual(0);
-  expect(missing).toBeGreaterThanOrEqual(0);
 
   await openAs(page, "contributor", `/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
   const controls = page.getByTestId("review-bar");
@@ -250,7 +291,7 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   await expect(controls.getByRole("button", { name: "Previous" })).toBeVisible();
   await expect(controls.getByRole("button", { name: "Next", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.getByRole("button", { name: "Pipeline" })).toHaveClass(/on/);
+  await expect(page.getByRole("navigation", { name: "Acquisition workspace" }).getByRole("button", { name: /^Review/ })).toHaveAttribute("aria-current", "page");
   await page.locator(".maplibregl-canvas").waitFor();
   await expect.poll(async () => page.evaluate(() => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures?: (opts: { layers: string[] }) => unknown[] } }).__sitesMap;
@@ -280,12 +321,30 @@ test("the queue card shows a change, a mention, and a pending next step", async 
   await page.waitForTimeout(400);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-desktop-next.png" });
 
-  await page.goto(`/?review=1&qmarket=all&qstage=any&i=${missing + 1}`);
+  // Model an unlocated site even when every current queue record has been mapped.
+  const noLocationId = fresh.items[placed].siteId;
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const feature = data.features.find((item: { properties: { deal_id: string } }) => item.properties.deal_id === noLocationId);
+    feature.geometry = null;
+    feature.properties.universe_id = null;
+    await route.fulfill({ response, json: data });
+  });
+  await page.route("**/api/queue?*", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const row = data.items?.find((item: { siteId: string }) => item.siteId === noLocationId);
+    if (row?.snapshot) Object.assign(row.snapshot, { lat: null, lng: null });
+    await route.fulfill({ response, json: data });
+  });
+  await page.goto(`/?review=1&qmarket=all&qstage=any&rsite=${noLocationId}`);
   await hideDevOverlay(page);
   await expect(page.getByTestId("review-noloc")).toBeVisible();
   await page.locator(".maplibregl-canvas").waitFor();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "/opt/cursor/artifacts/queue-noloc.png" });
+  await page.unrouteAll({ behavior: "wait" });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/?review=1&qmarket=all&qstage=any&i=${placed + 1}`);
@@ -410,3 +469,594 @@ test("the review filter menu stays inside a 390px screen", async ({ page }) => {
   });
   expect(covered).toBe(false);
 });
+
+for (const width of [1440, 390]) {
+  test(`five screening findings keep their sources, permissions and review context at ${width}px`, async ({ page, request }) => {
+    test.slow();
+    await login(request, "contributor");
+    const deal = await activePipelineDeal(request);
+    const response = await request.get("/api/data/sites?city=PHX");
+    const data = await response.json() as { features: { properties: { site_id: string; linked_deal_id?: string } }[] };
+    const extra = data.features.map(item => item.properties).filter(site => /^PHX-U\d+$/.test(site.site_id) && !site.linked_deal_id && !["PHX-U189", "PHX-U645"].includes(site.site_id)).slice(0, 2);
+    const ids = ["PHX-U189", "PHX-U645", ...extra.map(site => site.site_id), deal];
+    expect(new Set(ids).size).toBe(5);
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await openAs(page, "contributor", "/?funnel=universe&city=PHX");
+    await mkdir("review-shots", { recursive: true });
+    for (const [index, id] of ids.entries()) {
+      const inQueue = id === deal;
+      if (inQueue) {
+        await request.post("/api/queue/snooze", { data: { siteId: id, until: "2000-01-01" } });
+        await request.post("/api/queue", { data: { siteId: id, undo: true } });
+      }
+      await page.goto(inQueue ? `/?review=1&rsite=${id}&qstage=any&qmarket=all&sheet=full` : `/?funnel=universe&site=${id}&city=PHX&sheet=full${index === 0 ? "&panel=finding" : ""}`);
+      const record = page.locator("aside.drawer");
+      await expect(record).toHaveAttribute("data-record", id);
+      const before = inQueue ? await page.getByTestId("review-position").innerText() : "";
+      const brief = record.getByRole("region", { name: "Screening decision" });
+      if (index !== 0) await brief.getByRole("button", { name: "Record finding", exact: true }).click();
+      const form = brief.getByRole("form", { name: "Record finding" });
+      if (index === 0) await expect(form.getByRole("textbox", { name: "Source", exact: true })).toHaveValue(/^https?:/);
+      if (index === 1) {
+        await expect(brief).toContainText("County record link not on file.");
+        await form.getByLabel("Record as").selectOption("missing");
+      }
+      if (index === 2) {
+        await form.getByLabel("Record as").selectOption("proposal");
+        await form.getByLabel("Field", { exact: true }).selectOption("zoning");
+        await form.getByLabel("Proposed value").fill("Review classification");
+      }
+      const finding = index === 1 ? "Parcel reference still needed." : "Parcel boundary checked against the source.";
+      await form.getByRole("textbox", { name: index === 1 ? "What is still missing?" : "What did you find?" }).fill(finding);
+      await form.getByRole("textbox", { name: "Source", exact: true }).fill("Example county assessment map");
+      if (index === 0) await form.screenshot({ path: `review-shots/${width}-finding-editor.png` });
+      await form.getByRole("button", { name: index === 2 ? "Submit for approval" : index === 1 ? "Save evidence gap" : "Save finding" }).click();
+      const title = index === 2 ? "Change submitted for approval" : index === 1 ? "Evidence gap saved" : "Finding saved";
+      await expect(brief.getByRole("status")).toContainText(title);
+      if (inQueue) {
+        await brief.getByRole("button", { name: "Return to review" }).click();
+        await expect(page.getByTestId("review-since")).toBeFocused();
+        await expect(page.getByTestId("review-position")).toHaveText(before, { useInnerText: true });
+        expect(new URL(page.url()).searchParams.get("rsite")).toBe(id);
+      } else {
+        await page.reload();
+        await expect(brief.getByRole("status")).toContainText(title);
+        await expect(brief.getByRole("status")).toContainText("Example county assessment map");
+        if (index === 1) await expect(brief.getByRole("status")).toContainText("Unassigned");
+        if (index === 2) {
+          const res = await request.get(`/api/actions/suggestions?targetKind=site&targetId=${id}`);
+          expect((await res.json()).suggestions.some((entry: { status: string; reason: string }) => entry.status === "open" && entry.reason.includes("Example county assessment map"))).toBe(true);
+          await brief.getByRole("status").screenshot({ path: `review-shots/${width}-finding-approval.png` });
+        }
+      }
+    }
+    await openAs(page, "viewer", "/?site=PHX-U189&sheet=full");
+    await expect(page.getByRole("region", { name: "Screening decision" }).getByRole("status")).toContainText("Finding saved");
+    await expect(page.getByRole("button", { name: "Record finding", exact: true })).toHaveCount(0);
+  });
+}
+
+test("opening the shortlist defers the map and Show on map preserves the canvas on return", async ({ page }) => {
+  await login(page.request, "contributor");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?view=list&funnel=universe&city=PHX&stage=land");
+  await hideDevOverlay(page);
+  const row = page.locator(".pipeline-list [data-site-row]").first();
+  await expect(row).toBeVisible();
+  await expect(page.locator(".stage-map")).toHaveCount(0);
+  const id = await row.getAttribute("data-site-row");
+  await row.getByRole("button", { name: "Show on map" }).click();
+  await expect(page).toHaveURL(url => !url.searchParams.has("view") && url.searchParams.get("site") === id);
+  const canvas = page.locator(".maplibregl-canvas");
+  await expect(canvas).toBeVisible();
+  const firstCanvas = await canvas.elementHandle();
+  await page.getByRole("button", { name: "List", exact: true }).click();
+  await expect(row).toBeVisible();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(canvas).toBeVisible();
+  expect(await firstCanvas.evaluate(node => node.isConnected)).toBe(true);
+});
+
+for (const width of [1440, 390]) {
+  test(`five-site comparison reopens with its evidence and reviewer handoff at ${width}px`, async ({ page, request }, info) => {
+    test.slow();
+    await login(request, "reviewer");
+    const catalog = await (await request.get("/api/data/sites?city=PHX")).json();
+    type Site = { properties: { site_id: string; name: string; counts_as_site: boolean; linked_deal_id?: string; city: string; origin: string } };
+    const names = ["Canyon Wash", "Desert Palm Wash", "Mesa Wash", "North Valley Wash", "Sonoran Wash", "Valley Wash"];
+    const cohort = (catalog.features as Site[]).filter(f => f.properties.city === "PHX" && f.properties.origin === "universe" && f.properties.counts_as_site && !f.properties.linked_deal_id).slice(0, 6).map((f, i) => ({
+      ...f, properties: { ...f.properties, name: names[i], address: (100 + i) + " Example Ave", business_type: "Car wash", counts_as_site: true,
+        land_only: false, duplicate_of: "", in_area: true, service_area_class: "inside", land_tier: i < 5 ? "L10" : "", tenure_fail: false,
+        spare_ac_own: i < 5 ? (i + 3) / 10 : null, spare_ac_own_text: "", verdict: "", owner: "", asking_price: i === 0 ? 0 : null, asking_price_display: "", asking_price_source: "", summary_why: "" },
+    }));
+    expect(cohort).toHaveLength(6);
+    const id = cohort[0].properties.site_id;
+    const source = "Example county assessment map";
+    const note = async (body: string) => {
+      const response = await request.post("/api/actions/notes", { data: { targetKind: "site", targetId: id, body } });
+      expect(response.status()).toBe(201);
+      return (await response.json()).note.id as string;
+    };
+    await note("Screening finding\nParcel boundary located.\nCheck: Verify parcel.\nSource: " + source);
+    const gapText = width === 390 ? "Confirm the rear parcel boundary." : "Confirm rear parcel access.";
+    const gapId = await note("Missing evidence\n" + gapText + "\nCheck: Verify usable land.\nSource: " + source);
+    const created = await request.post("/api/actions/suggestions", { data: { targetKind: "site", targetId: id, field: "proposed_next_step", title: "Verify rear parcel access", proposedValue: "Verify rear parcel access", ownerId: "contributor" } });
+    expect(created.status()).toBe(201);
+    const step = (await created.json()).suggestion;
+    expect((await request.post("/api/actions/suggestions/" + step.id, { data: { status: "accepted" } })).ok()).toBeTruthy();
+    await page.route("**/api/data/sites**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/api/data/sites") return route.fulfill({ json: { ...catalog, features: cohort } });
+      const site = cohort.find(row => path.endsWith("/" + row.properties.site_id));
+      if (site) return route.fulfill({ json: site.properties });
+      return route.continue();
+    });
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await openAs(page, "contributor", "/?funnel=universe&city=PHX&stage=in_area&view=list&sort=site:asc");
+    const scope = page.locator(".workspace-scope:visible");
+    await expect(scope).toContainText("6 sites");
+    await scope.click();
+    await page.getByRole("navigation", { name: "Funnel" }).getByRole("button", { name: /Open land/ }).click();
+    await expect(scope).toContainText("5 sites");
+    const rows = page.locator(".pipeline-list [data-site-row]");
+    await expect(rows).toHaveCount(5);
+    await expect(page.locator(".stage-map")).toHaveCount(0);
+    const capture = async (moment: string, surface = page.locator("body")) => {
+      const dir = process.env.UX_REVIEW_DIR;
+      if (!dir) return;
+      await mkdir(dir, { recursive: true });
+      await page.addStyleTag({ content: "nextjs-portal { display:none !important }" });
+      await surface.screenshot({ path: dir + "/" + width + "-" + moment + ".png", animations: "disabled" });
+    };
+    await capture("shortlist");
+    await rows.nth(0).getByRole("checkbox").check();
+    await rows.nth(1).getByRole("checkbox").check();
+    const serverNavigations: string[] = [];
+    page.on("request", req => {
+      const url = new URL(req.url());
+      if (url.pathname === "/" && url.searchParams.has("compare") && req.headers().rsc === "1") serverNavigations.push(url.search);
+    });
+    await page.getByTestId("selection-bar").getByRole("button", { name: "Compare" }).click();
+    const tray = page.getByTestId("compare-tray");
+    const figure = tray.getByRole("button", { name: "Inspect Open land for Canyon Wash" });
+    await expect(figure).toBeVisible();
+    const gapCounts = tray.locator('[data-compare-row="Open evidence gaps"] td');
+    await expect(gapCounts.first()).toHaveText("1");
+    await expect(gapCounts.nth(1)).toHaveText("0");
+    const price = tray.locator('[data-compare-row="Asking"]');
+    await expect(price).toContainText("Available for 1 of 2 sites");
+    await expect(price.locator("td").first()).toContainText("$0");
+    await expect(price.locator("td").last()).toHaveText("Not on file");
+    await mkdir("review-shots", { recursive:true });
+    await price.screenshot({ path:"review-shots/"+width+"-comparison-coverage.png" });
+    await capture("compare", tray);
+    const downloaded = page.waitForEvent("download");
+    await tray.getByRole("button",{name:"Download dated snapshot"}).click();
+    const snapshot = await downloaded;
+    expect(snapshot.suggestedFilename()).toMatch(/^site-comparison-.*\.csv$/);
+    const contents = await readFile((await snapshot.path())!,"utf8");
+    expect(contents).toContain('"Captured at"');
+    expect(contents).toContain('"EBITDA"');
+    expect(contents).toContain('"Canyon Wash","Desert Palm Wash"');
+
+    await page.route("**/api/ask/status", route => route.fulfill({ json: { ready: true } }));
+    await page.route("**/api/ask", route => {
+      expect(route.request().postDataJSON().siteIds).toEqual(cohort.slice(0, 2).map(row => row.properties.site_id));
+      return route.fulfill({ contentType: "text/event-stream", body: "data: " + JSON.stringify({
+        done: true, text: "Open land is recorded. [Parcel evidence](/?site=" + id + ")",
+      }) + "\n\n" });
+    });
+    await tray.getByRole("button", { name: "Ask about these sites" }).click();
+    const ask = page.getByTestId("ask-panel");
+    await expect(ask.getByRole("combobox")).toHaveValue("list");
+    await ask.getByRole("button", { name: "Compare fit and economics" }).click();
+    await ask.getByRole("button", { name: "Ask", exact: true }).click();
+    await ask.getByRole("link", { name: "Parcel evidence" }).click();
+    await page.getByRole("button", { name: /Back to comparison/ }).click();
+    await expect(tray).toBeVisible();
+    await figure.click();
+    const drawer = page.locator("aside.drawer");
+    await expect(drawer).toHaveAttribute("data-record", id);
+    await expect(drawer.locator('[data-evidence="open-land"]')).toBeInViewport();
+    await capture("evidence", drawer);
+    await drawer.getByRole("tab",{name:"Site fit"}).focus();
+    await page.keyboard.press("ArrowRight");
+    const economics = drawer.getByRole("tab",{name:"Economics"});
+    await expect(economics).toBeFocused();
+    await expect(economics).toHaveAttribute("aria-selected","true");
+    await expect(drawer.getByRole("tabpanel",{name:"Economics"})).toContainText("Reporting period");
+    await drawer.locator(".drawer-scroll").evaluate(node=>node.scrollTo({top:0,behavior:"instant"}));
+    await capture("record",drawer);
+
+    await drawer.getByRole("button", { name: /Back to comparison/ }).click();
+    await expect(figure).toBeFocused();
+    expect(serverNavigations).toHaveLength(0);
+    await tray.getByRole("button", { name: "Save comparison" }).click();
+    const title = width === 390 ? "Phoenix field review" : "Phoenix finalists";
+    const name = info.retry ? title + " · retry " + info.retry : title;
+    const form = tray.getByRole("form", { name: "Save comparison" });
+    await form.getByLabel("Comparison name").fill(name);
+    await page.route("**/api/actions/views", async route => {
+      if (route.request().method() !== "POST") return route.continue();
+      await route.fetch();
+      return route.abort("failed");
+    }, { times: 1 });
+    await form.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(form.getByRole("alert")).toBeVisible();
+    await form.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(tray.getByRole("status").filter({ hasText: name })).toBeVisible();
+    await tray.getByRole("button", { name: "Saved views" }).click();
+    const row = page.getByTestId("views-panel").getByRole("listitem").filter({ hasText: name });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "Open", exact: true }).click();
+    await expect(scope).toContainText("5 sites");
+    await expect(page).toHaveURL(/stage=land/);
+    expect(new URL(page.url()).searchParams.get("sort")).toBe("site:asc");
+    await expect(tray.getByRole("status").filter({ hasText: name })).toBeVisible();
+    await capture("saved", tray);
+    await expect(figure).toBeVisible();
+    await figure.click();
+    const brief = drawer.getByRole("region", { name: "Screening decision" });
+    await expect(brief).toContainText(source);
+    const gap = brief.getByRole("status");
+    await expect(gap).toContainText(gapText);
+    await expect(gap).toContainText("Unassigned");
+    await expect(gap).not.toContainText("Verify rear parcel access");
+    await gap.getByRole("button", { name: "Propose gap action" }).click();
+    const work = drawer.getByTestId("next-step-form");
+    await expect(work.getByLabel("Title")).toHaveValue(gapText);
+    await work.getByLabel("Assignee", { exact: true }).selectOption("contributor");
+    await work.getByLabel("Due", { exact: true }).fill("2030-04-15");
+    await work.getByRole("button", { name: "Submit for approval" }).click();
+    await expect(gap).toContainText("Awaiting approval");
+    await expect(gap).toContainText("Contributor");
+    await expect(gap).toContainText("2030-04-15");
+    const proposals = (await (await request.get("/api/actions/suggestions?targetKind=site&targetId=" + id)).json()).suggestions;
+    const linked = proposals.find((p: { reason: string }) => p.reason.endsWith("note=" + gapId));
+    expect(linked.status).toBe("open");
+    expect((await request.post("/api/actions/suggestions/" + linked.id, { data: { status: "accepted" } })).ok()).toBe(true);
+    await page.reload();
+    await expect(gap).toContainText("Approved");
+    const workNav = page.getByRole("navigation",{name:"Acquisition workspace"});
+    await workNav.getByRole("button",{name:"My work",exact:true}).click();
+    const personalWork = page.getByRole("region",{name:"My work"});
+    await expect(personalWork.getByRole("button",{name:gapText,exact:true})).toBeVisible();
+    await personalWork.getByRole("button",{name:/Team evidence gaps/}).click();
+    const assignment = personalWork.getByRole("button",{name:gapText,exact:true});
+    await assignment.click();
+    await expect(page).toHaveURL(new RegExp("note="+gapId));
+    await drawer.getByRole("button",{name:"Back to My work"}).click();
+    await expect(assignment).toBeFocused();
+    await expect(personalWork.getByRole("button",{name:/Team evidence gaps/})).toHaveAttribute("aria-pressed","true");
+    const item = personalWork.getByRole("listitem").filter({has:page.getByRole("button",{name:gapText,exact:true})});
+    await mkdir("review-shots",{recursive:true});
+    await item.screenshot({path:"review-shots/"+width+"-work-handoff.png"});
+    await item.getByRole("button",{name:"View proposal"}).click();
+    await expect(page).toHaveURL(new RegExp("workItem="+linked.id));
+    await page.goBack();
+    await expect(item.getByRole("button",{name:"View proposal"})).toBeFocused();
+    await capture("assigned",personalWork.locator(".work-page"));
+    await personalWork.getByRole("button",{name:"Return to workspace"}).click();
+    await expect(gap).toContainText("Approved");
+    const activeWork = await request.get("/api/actions/work");
+    expect(activeWork.ok()).toBeTruthy();
+    expect((await activeWork.json()).rows).toEqual(expect.arrayContaining([expect.objectContaining({site:id,note:gapId,owner:"contributor",due:"2030-04-15"})]));
+
+    await gap.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    await capture("gap-action", gap);
+    await expect(drawer.getByTestId("next-step").getByRole("link", { name: "Open evidence thread" })).toHaveAttribute("href", new RegExp("note=" + gapId));
+    await gap.getByRole("button", { name: "Open evidence thread" }).click();
+    const thread = drawer.locator('[data-note-id="' + gapId + '"]');
+    await expect(thread).toContainText(gapText);
+    expect(new URL(page.url()).searchParams.get("note")).toBe(gapId);
+    await expect(brief.getByRole("time").first()).toBeAttached();
+    await brief.locator("summary").filter({ hasText: "Earlier findings" }).click();
+    await expect(brief).toContainText("Parcel boundary located.");
+    await capture("handoff", brief);
+    expect((await request.post("/api/actions/notes", { data: { targetKind: "site", targetId: id, parentId: gapId, body: "Field check confirmed the access line on the assessment map." } })).ok()).toBe(true);
+    expect((await request.post("/api/actions/notes/" + gapId + "/resolve", { data: {} })).ok()).toBe(true);
+    await page.reload();
+    await expect(gap).toContainText("Evidence gap resolved");
+    await expect(thread).toContainText("Field check confirmed");
+    const jobs = page.getByRole("navigation",{name:"Acquisition workspace"});
+    await jobs.getByRole("button",{name:"My work",exact:true}).click();
+    const hub = page.getByRole("region",{name:"My work"});
+    await expect(hub).toBeVisible();
+    await hub.getByRole("button",{name:/Team evidence gaps/}).click();
+    await expect(hub.getByRole("button",{name:gapText,exact:true})).toHaveCount(0);
+    await capture("jobs",hub);
+    await hub.getByRole("button",{name:"Return to workspace"}).click();
+    await expect(thread).toContainText("Field check confirmed");
+
+    await expect(gap.getByRole("button", { name: "Propose gap action" })).toHaveCount(0);
+  });
+}
+
+for (const width of [1440,390]) {
+  test(`request missing evidence from Compare at ${width}px`, async ({page,request}) => {
+    await login(request,"reviewer");
+    const catalog = await (await request.get("/api/data/sites?city=PHX")).json();
+    const sites = catalog.features.filter((f:{properties:{origin:string;linked_deal_id?:string}})=>f.properties.origin==="universe" && !f.properties.linked_deal_id).slice(width===390?2:0,width===390?4:2);
+    sites.forEach((f:{properties:Record<string,unknown>},i:number)=>Object.assign(f.properties,{name:["Example North","Example South"][i],zoning:"",address:"Example street"}));
+    const ids = sites.map((f:{properties:{site_id:string}})=>f.properties.site_id);
+    await page.route("**/api/data/sites?**",route=>route.fulfill({json:{...catalog,features:sites}}));
+    await page.setViewportSize({width,height:width===390?844:900});
+    await openAs(page,"contributor","/?funnel=universe&city=PHX&view=list&compare="+ids.join("|"));
+    const cell = page.getByRole("button",{name:"Check missing Zoning for Example North"});
+    await page.route("**/api/actions/comparison-evidence?**",route=>route.fulfill({status:503,json:{}}));
+    await cell.click();
+    const sheet = page.locator("dialog.compare-evidence-sheet[open]");
+    await expect(sheet.getByRole("alert")).toContainText("Couldn’t check");
+    await page.unroute("**/api/actions/comparison-evidence?**");
+    await expect(sheet.getByRole("button",{name:"Request evidence"})).toHaveCount(0);
+    await sheet.getByRole("button",{name:"Retry"}).click();
+    await sheet.getByLabel("Owner").selectOption("reviewer");
+    await sheet.getByLabel("Evidence needed").fill("Confirm permitted use.");
+    await mkdir("review-shots",{recursive:true});
+    await sheet.screenshot({path:"review-shots/"+width+"-comparison-request.png"});
+    await page.route("**/api/actions/comparison-evidence?**", async route=>{
+      await route.fetch();
+      await route.abort("failed");
+    },{times:1});
+    await sheet.getByRole("button",{name:"Request evidence"}).click();
+    await expect(sheet.getByRole("alert")).toBeVisible();
+    await expect(sheet.getByLabel("Evidence needed")).toHaveValue("Confirm permitted use.");
+    await sheet.getByRole("button",{name:"Request evidence"}).click();
+    await expect(sheet).toContainText("reviewer");
+    await sheet.getByRole("button",{name:"Close evidence request"}).click();
+    await expect(cell).toBeFocused();
+    await cell.click();
+    await expect(sheet.getByRole("button",{name:"View follow-up"})).toBeVisible();
+    const query = new URLSearchParams({targetKind:"site",targetId:ids[0],measure:"zoning"});
+    const api = "/api/actions/comparison-evidence?"+query;
+    const existing = (await (await request.get(api)).json()).followUp;
+    const draft = {data:{description:"Check again"},headers:{"Idempotency-Key":crypto.randomUUID()}};
+    expect((await (await request.post(api,draft)).json()).followUp.note).toBe(existing.note);
+    const work = (await (await request.get("/api/actions/work")).json()).rows;
+    expect(work.filter((r:{note:string})=>r.note===existing.note)).toHaveLength(1);
+    query.set("measure","power");
+    expect((await (await request.get("/api/actions/comparison-evidence?"+query)).json()).followUp).toBeNull();
+    await login(request,"viewer");
+    expect((await request.post(api,draft)).status()).toBe(403);
+    await sheet.getByRole("button",{name:"View follow-up"}).click();
+    await expect(page).toHaveURL(new RegExp("note="+existing.note));
+    await page.getByRole("button",{name:/Back to comparison/}).click();
+    await expect(cell).toBeFocused();
+  });
+}
+
+for (const width of [1440, 390]) {
+  test(`revisit a frontage-only site when its utility confirms on-site service at ${width}px`, async ({ page, request }, info) => {
+    test.slow();
+    await login(request, "reviewer");
+    const catalog = JSON.parse(await readFile("data/generated/sites.geojson", "utf8"));
+    type Fixture = { properties: Record<string, unknown> & { site_id: string } };
+    const start = width === 390 ? 12 : 10;
+    const ids: string[] = catalog.features.filter((f: Fixture) => f.properties.city === "PHX" &&
+      f.properties.origin === "universe" && !f.properties.linked_deal_id && f.properties.counts_as_site)
+      .slice(start, start + 2).map((f: Fixture) => f.properties.site_id);
+    expect(ids).toHaveLength(2);
+    const sites = ids.map((id, i) => ({
+      type: "Feature", geometry: { type: "Point", coordinates: [-112.07 + i * 0.01, 33.45] },
+      properties: { site_id: id, city: "PHX", origin: "universe", counts_as_site: true, in_area: true,
+        service_area_class: "inside", business_type: "Car wash", land_only: false, coord_status: "located",
+        name: ["Canyon Wash", "Mesa Wash"][i], address: "Example avenue",
+        asking_price: i === 0 ? 400000 : 600000, asking_price_source: "Example listing",
+        ...(i === 0 ? { cap_b_frontage: 2.1, cap_b_source: "Example utility hosting map",
+          cap_b_confidence: "Estimated", cap_b_as_of: "2030-01-10" } :
+          { cap_c_amps: 800, cap_c_volts: 480, cap_c_phase: "3-phase", cap_c_confidence: "Verified",
+            cap_c_source: "Example utility letter", cap_c_as_of: "2030-01-11" }) },
+    }));
+    const dealId = width === 390 ? "PIPE-PHX-9011" : "PIPE-PHX-9012";
+    Object.assign(sites[1].properties, {linked_deal_id:dealId});
+    const linked = { ...sites[1], properties: {...sites[1].properties, deal_id:dealId, universe_id:ids[1],
+      kind:"pipeline", stage_group:"desk", stage:"Desk screen", financials_open:true, saving_vs_hub:"18%",
+      figures_source:"Example deal record", figures_status:"shown" } };
+    const pricing = { deals: { [dealId]: { land_estimate:240000, land_estimate_display:"$240,000",
+      business_value:360000, business_value_display:"$360,000", cash_flow_label:"EBITDA", earnings_multiple_which:"EBITDA",
+      stated_cash_flow:90000, stated_cash_flow_display:"$90,000", earnings_period:"FY 2029", earnings_basis:"Broker-stated",
+      earnings_multiple:6.7, earnings_multiple_display:"6.7x", business_multiple:4, business_multiple_display:"4.0x",
+      business_multiple_basis:"Estimate", pricing_eligible:true } } };
+    // Only the isolated Actions test database is writable. Use the ordinary catalog
+    // and detail endpoints so a projection that drops a sourced field fails this test.
+    const database = "postgres://postgres:postgres@127.0.0.1:55433/postgres";
+    const previous = await withConnectionString(database, async sql => {
+      await migrate(sql, { connectionString: database });
+      return selectLive(sql);
+    });
+    const published: string[] = [];
+    const refresh = async () => {
+      const result = await request.post("/api/data/revalidate", { headers: { authorization: "Bearer e2e-snapshot-secret-not-for-production" } });
+      expect(result.ok()).toBeTruthy();
+    };
+    const publish = async () => {
+      const snapshot = await withConnectionString(database, sql => publishSnapshot(sql, {
+        sourceRunId: `decision-test-${width}-${info.retry}-${published.length}`,
+        workbookModifiedAt: null, gitSha: "test",
+        files: [{ name: "sites.geojson", body: JSON.stringify({ type: "FeatureCollection", features: sites }) },
+          { name: "deals.geojson", body: JSON.stringify({ type: "FeatureCollection", features: [linked] }) },
+          { name:"pricing.json", body:JSON.stringify(pricing) }],
+      }));
+      published.push(snapshot.id);
+      await refresh();
+    };
+    try {
+      await publish();
+      const target = new URLSearchParams({ targetKind: "site", targetId: ids[0], measure: "power" });
+      const response = await request.post("/api/actions/comparison-evidence?" + target, {
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        data: { description: "Verify service with the field survey.", owner: "contributor", due: "2030-04-15" },
+      });
+      expect(response.ok()).toBeTruthy();
+      const { followUp } = await response.json();
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await openAs(page, "reviewer", "/?city=PHX&stage=universe&funnel=universe&view=list&compare=" + ids.join("|"));
+      const tray = page.getByTestId("compare-tray");
+      const power = tray.locator('[data-compare-row="On-site service"]');
+      await expect(power.locator("td").first()).toContainText("Unconfirmed");
+      await expect(power.locator("td").last()).toContainText("Verified");
+      const street = tray.locator('[data-compare-row="Street-frontage hosting"]');
+      await expect(street.locator("td").first()).toContainText("2.1 MW");
+      await expect(tray.locator('[data-compare-row="Asking"] td').first()).toContainText("$400,000");
+      await mkdir("review-shots", { recursive: true });
+      await tray.screenshot({path:`review-shots/${width}-power-comparison.png`});
+      const multiple = tray.locator('[data-compare-row="Business-only multiple"] td').last();
+      await expect(multiple).toContainText("4.0x");
+      await expect(multiple).toContainText("FY 2029");
+      await multiple.getByRole("button").click();
+      await expect(page.locator('[data-financial-measure="Business-only multiple"]')).toBeInViewport();
+      await page.getByRole("button",{name:/Back to comparison/}).click();
+      const savings = tray.locator('[data-compare-row="Savings versus hub"] td').last();
+      await expect(savings).toContainText("18%");
+      const section = tray.getByRole("combobox", {name:"Comparison section"});
+      await section.selectOption("Acquisition economics");
+      await expect(tray.locator('[data-compare-row="On-site service"]')).toHaveCount(0);
+      await tray.screenshot({path:`review-shots/${width}-acquisition-economics.png`});
+      await section.selectOption("Power evidence");
+      await power.locator("td").first().getByRole("button").click();
+      const sheet = page.getByRole("dialog");
+      await expect(sheet).toContainText("contributor");
+      await sheet.getByRole("button", {name:"View follow-up"}).click();
+      await expect(sheet).toContainText("Verify service with the field survey.");
+      await sheet.getByRole("button", {name:"Close evidence request"}).click();
+      await tray.getByRole("button", { name: "Save comparison" }).click();
+      const form = tray.getByRole("form", { name: "Save comparison" });
+      await form.getByLabel("Comparison name").fill(`Field survey ${width} ${info.retry}`);
+      await form.getByLabel("Share with the team").check();
+      await form.getByRole("button", { name: "Save", exact: true }).click();
+      await tray.getByRole("button", { name: "Record decision" }).click();
+      const brief = tray.getByRole("region", { name: "Comparison decision" });
+      await brief.getByRole("combobox", { name: "Decision", exact: true }).selectOption(ids[1]);
+      await brief.getByLabel("Reason").fill("Prefer Mesa Wash for its verified service. Canyon Wash costs less and has only a street hosting estimate.");
+      await brief.getByLabel("Cite a figure").selectOption({ label: "Canyon Wash · On-site service" });
+      await brief.getByRole("button", { name: "Add citation" }).click();
+      for (const label of ["Mesa Wash · On-site service", "Canyon Wash · Street-frontage hosting", "Mesa Wash · Business-only multiple", "Mesa Wash · Savings versus hub"]) {
+        await brief.getByLabel("Cite a figure").selectOption({label});
+        await brief.getByRole("button", { name: "Add citation" }).click();
+      }
+      await brief.getByRole("button", { name: "Save decision" }).click();
+      await expect(brief).toContainText("Awaiting approval");
+      const savedUrl = new URL(page.url());
+      expect(savedUrl.searchParams.get("savedView")).toBeTruthy();
+      const proposals = await (await request.get("/api/actions/suggestions?targetKind=site&targetId=" + ids[0])).json();
+      const proposal = proposals.suggestions.find((p: { reason: string }) => p.reason.endsWith("note=" + followUp.note));
+      expect((await request.post("/api/actions/suggestions/" + proposal.id, { data: { status: "accepted" } })).ok()).toBeTruthy();
+      Object.assign(sites[0].properties, { cap_c_amps: 400, cap_c_volts: 480, cap_c_phase: "3-phase", cap_c_source: "Example utility confirmation", cap_c_confidence: "Verified", cap_c_as_of: "2030-02-01" });
+      await publish();
+      await login(page.request, "viewer");
+      await page.goto(savedUrl.pathname + savedUrl.search);
+      await expect(brief).toContainText("Prefer Mesa Wash");
+      await expect(brief).toContainText("Not on file → 400 A");
+      await expect(brief).toContainText("Approved");
+      await expect(brief).toContainText("2030-04-15");
+      await expect(brief.getByRole("button", { name: "Revise decision" })).toHaveCount(0);
+      await mkdir("review-shots", { recursive: true });
+      await brief.screenshot({ path: `review-shots/${width}-comparison-decision.png` });
+      await brief.getByRole("button", { name: "Inspect on-site service" }).first().click();
+      await expect(page.locator("aside.drawer")).toContainText("Example utility confirmation");
+      await page.getByRole("button", { name: /Back to comparison/ }).click();
+      await brief.getByRole("button", { name: /Follow-up/ }).click();
+      await expect(page).toHaveURL(new RegExp("note=" + followUp.note));
+      await login(page.request, "reviewer");
+      await page.goto("/?loops=work&workFilter=decisions");
+      const hub = page.getByRole("region", { name:"My work" });
+      const change = hub.locator(".decision-work-row").filter({ hasText:`Field survey ${width} ${info.retry}` });
+      await expect(change).toContainText("New evidence");
+      await expect(change).toContainText("400 A");
+      await hub.screenshot({path:`review-shots/${width}-decision-queue.png`});
+      await change.getByRole("link", { name:"Canyon Wash · On-site service" }).click();
+      const citation = brief.locator("[data-focused-citation=true]");
+      await expect(citation).toBeFocused();
+      await expect(citation).toContainText("Example utility confirmation");
+      await brief.screenshot({ path:`review-shots/${width}-decision-to-revisit.png` });
+      await citation.getByRole("button", { name:"Keep decision" }).click();
+      await expect(citation).toContainText("Kept by reviewer");
+      await brief.getByRole("link", { name:"Back to My work" }).click();
+      await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
+      Object.assign(sites[0].properties, { cap_c_amps: 600 });
+      await publish();
+      await page.reload();
+      await expect(change).toContainText("600 A");
+      await change.getByRole("link").click();
+      await citation.getByRole("button", { name:"Revise decision" }).click();
+      await brief.getByRole("combobox", { name:"Decision", exact:true }).selectOption("hold");
+      await brief.getByLabel("Reason").fill("Hold both sites pending a service quote.");
+      await brief.getByRole("button", { name:"Save decision" }).click();
+      await expect(brief.getByRole("heading")).toHaveText("Hold all sites");
+      await expect(brief).toContainText("Reviewed Canyon Wash · On-site service");
+      await brief.getByRole("link", { name:"Back to My work" }).click();
+      await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
+
+    } finally {
+      await withConnectionString(database, async sql => {
+        for (const id of published) await sql.query("DELETE FROM snapshots WHERE id = $1", [id]);
+        if (previous) await sql.query("UPDATE snapshots SET status = 'live' WHERE id = $1", [previous.id]);
+      });
+      await refresh();
+    }
+  });
+}
+
+for (const width of [390,1440]) {
+  test(`cite a partial-year statement separately from the deal record at ${width}px`, async ({page,request}, info) => {
+    test.slow();
+    await login(request,"reviewer");
+    const ids = (await pipelineDeals(request)).slice(0,2);
+    const database = "postgres://postgres:postgres@127.0.0.1:55433/postgres";
+    const periodId = "PP-citation-" + width;
+    const lineId = "PL-citation-" + width;
+    const year = width === 390 ? 2031 : 2032;
+    const start = year + "-01-01";
+    await withConnectionString(database, async sql => {
+      await migrate(sql,{connectionString:database});
+      await sql.query(`INSERT INTO pnl_periods(entity_id,site_id,grain,period_start,period_end,year,month,business_type,version,updated_by)
+        VALUES($1,$2,'monthly',$3,$4,$5,1,'car_wash',1,'fixture') ON CONFLICT DO NOTHING`,[periodId,ids[0],start,year+"-01-31",year]);
+      await sql.query(`INSERT INTO pnl_lines(entity_id,period_id,site_id,line_code,amount,amount_text,status,source_document,source_page,captured_at,captured_at_iso,version,updated_by)
+        VALUES($1,$2,$3,'ebitda',42000,'42000','reported','Example operating statement','2',now(),'2026-11-25T12:00:00+00:00',1,'fixture') ON CONFLICT DO NOTHING`,[lineId,periodId,ids[0]]);
+    });
+    try {
+      await page.route("**/api/data/deals",async route=>{
+        const response=await route.fetch(),data=await response.json();
+        const row=data.features.find((f:{properties:{deal_id:string}})=>f.properties.deal_id===ids[0]);
+        Object.assign(row.properties,{name:"Example Wash",address:"Example parcel",kind:"pipeline",financials_open:true,
+          stated_cash_flow:97000,stated_cash_flow_display:"$97,000",cash_flow_label:"SDE",earnings_period:"Prior fiscal year",figures_source:"Example broker record"});
+        await route.fulfill({response,json:data});
+      });
+      await page.setViewportSize({width,height:width === 390 ? 844 : 900});
+      await openAs(page,"reviewer","/?funnel=pipeline&view=list&compare="+ids.join("|"));
+      const tray=page.getByTestId("compare-tray");
+      await expect(tray.locator('[data-compare-row="Cash flow"]')).toContainText("$97,000");
+      const statement=tray.locator('[data-compare-row="Statement EBITDA"]');
+      await expect(statement).toContainText("$42,000");
+      await tray.getByRole("button",{name:"Save comparison"}).click();
+      const form=tray.getByRole("form",{name:"Save comparison"});
+      await form.getByLabel("Comparison name").fill("Statement review "+width+" "+info.retry);
+      await form.getByRole("button",{name:"Save",exact:true}).click();
+      await tray.getByRole("button",{name:"Record decision"}).click();
+      const brief=tray.getByRole("region",{name:"Comparison decision"});
+      await brief.getByRole("combobox",{name:"Decision",exact:true}).selectOption(ids[0]);
+      await brief.getByLabel("Reason").fill("Use the captured operating statement for this review.");
+      await brief.getByLabel("Cite a figure").selectOption({value:ids[0]+"|statement_ebitda|"+year+"|monthly|1-1"});
+      await brief.getByRole("button",{name:"Add citation"}).click();
+      await brief.getByRole("button",{name:"Save decision"}).click();
+      await expect(brief.getByRole("button",{name:"Inspect statement EBITDA"})).toBeVisible();
+      await page.reload();
+      await expect(brief).toContainText("$42,000");
+      await expect(brief).toContainText("Example operating statement");
+      await brief.getByRole("button",{name:"Inspect statement EBITDA"}).click();
+      const linked=page.locator(width===390 ? ".pnl-phone-line[data-linked=true] button" : ".pnl-desktop td[data-linked=true]").first();
+      await expect(linked).toContainText("$42,000");
+      await page.getByRole("button",{name:"Close profit and loss"}).click();
+      await mkdir("review-shots",{recursive:true});
+      await brief.screenshot({path:"review-shots/"+width+"-statement-citation.png"});
+      const missing=tray.locator('[data-compare-row="Statement SDE"] td').first();
+      await missing.getByRole("button").click();
+      await expect(page.locator("dialog[open]")).toContainText("Statement SDE");
+    } finally {
+      await withConnectionString(database, async sql => {
+        await sql.query("DELETE FROM pnl_lines WHERE entity_id=$1",[lineId]);
+        await sql.query("DELETE FROM pnl_periods WHERE entity_id=$1",[periodId]);
+      });
+    }
+  });
+}

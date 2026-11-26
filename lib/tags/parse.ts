@@ -1,3 +1,4 @@
+import { canCapture, canMaintainSites, isWriteAgent } from "@/lib/agent/identity";
 import type { ActionRole } from "@/lib/actions/roles";
 import { canDecide, canWriteContent } from "@/lib/actions/roles";
 import { InputError } from "@/lib/actions/text";
@@ -29,9 +30,9 @@ function allows(actor: Actor, owning: string): boolean {
     return Boolean(actor.role && canDecide(actor.role));
   }
   if (actor.kind === "agent") {
-    if (owning === "muse") return id === "muse";
-    if (owning === "indie") return id === "indie";
-    if (owning === "capture") return id === "muse" || id === "indie";
+    if (owning === "muse") return canCapture(id);
+    if (owning === "indie") return canMaintainSites(id);
+    if (owning === "capture") return isWriteAgent(id);
     return false;
   }
   return Boolean(actor.role && canWriteContent(actor.role as ActionRole));

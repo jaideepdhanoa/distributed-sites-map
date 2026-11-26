@@ -21,11 +21,15 @@ import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import { aerialTile, streetViewHref } from "@/lib/aerial";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
-import PanelSections from "./PanelSections";
+import PanelSections, { RecordNavigation } from "./PanelSections";
+import PurchaseReview from "./PurchaseReview";
+import Economics from "./Economics";
+import MarketEvidence, {type WashInspection} from "./MarketEvidence";
+import RecordBrief from "./RecordBrief";
 import SitePhotos from "./SitePhotos";
+import SpaceOptions, { type MapOutline } from "./spaces/SpaceOptions";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
-import NdaCardThread from "./NdaCardThread";
 import NdaCardLine from "./NdaCardLine";
 import { cardNdaLabel } from "@/lib/nda";
 import { LocationFix } from "./LocationFix";
@@ -231,7 +235,7 @@ function QuickLubeFacts({ site, deal }: { site?: SiteProps | null; deal?: DealPr
         </div>
         <span>Bays</span><div>{text("bay_count") || "—"}</div>
         <span>Lifts</span><div>{text("lift_count") || "—"}</div>
-        <span>Lot</span><div>{text("lot_sqft") ? `${text("lot_sqft")} sq ft` : "—"}</div>
+        <span data-evidence="land">Lot</span><div>{text("lot_sqft") ? `${text("lot_sqft")} sq ft` : "—"}</div>
         <span>Outside</span><div>{text("outside_sqft") ? `${text("outside_sqft")} sq ft` : "—"}{text("outside_note") ? ` ${text("outside_note")}` : ""}</div>
         <span>Owner</span><div>{text("owner_of_record") || text("owner") || "—"}</div>
         <span>Owns the lot</span>
@@ -293,7 +297,7 @@ function DealHeadline({
     <div className="headline" data-testid="card-numbers">
       {showMoney ? (
         <div data-testid="overview-revenue">
-          <span>Revenue</span>
+          <span data-evidence="revenue">Revenue</span>
           {pending ? <PendingFigure /> : (
             <>
               <strong className={phrase(shownRevenue.text)} title={shownRevenue.title}>{shownRevenue.text}</strong>
@@ -304,7 +308,7 @@ function DealHeadline({
       ) : null}
       {showMoney ? (
         <div data-testid="overview-cash">
-          <span>Cash flow</span>
+          <span data-evidence="cash-flow">{tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
           {pending ? <PendingFigure /> : (
             <>
               <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
@@ -319,7 +323,7 @@ function DealHeadline({
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div className="headline-wide">
-        <span>Power</span>
+        <span data-evidence="power">Power</span>
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
@@ -328,7 +332,7 @@ function DealHeadline({
         {land ? <small>{land}</small> : null}
       </div>
       <div>
-        <span>Traffic</span>
+        <span data-evidence="traffic">Traffic</span>
         <strong title={deal.trade_aadt == null ? "Not on file" : undefined}>{traffic}</strong>
         {deal.trade_aadt != null ? <small>vehicles/day</small> : null}
       </div>
@@ -346,7 +350,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
   return (
     <div className="headline" data-testid="card-numbers">
       <div>
-        <span>Cash flow</span>
+        <span data-evidence="cash-flow">Cash flow</span>
         <strong title="Not on file">—</strong>
       </div>
       <div>
@@ -355,7 +359,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
         {spare.note ? <small>{spare.note}</small> : null}
       </div>
       <div className="headline-wide">
-        <span>Power</span>
+        <span data-evidence="power">Power</span>
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
@@ -363,7 +367,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
         <strong title="Not on file">—</strong>
       </div>
       <div>
-        <span>Traffic</span>
+        <span data-evidence="traffic">Traffic</span>
         <strong>{traffic}</strong>
         {site.aadt_count ? <small>{year ? `vehicles/day · ${year}` : "vehicles/day"}</small> : null}
       </div>
@@ -547,8 +551,13 @@ export default function Detail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  onLayoutOverlay,
+  washInspection,
+  decisionFirst = false,
   onOpenNda,
 }: {
+  washInspection?: WashInspection;
+  decisionFirst?: boolean;
   site: SiteProps | null;
   depotMiles?: number | null;
   lat?: number | null;
@@ -575,6 +584,7 @@ export default function Detail({
   spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
+  onLayoutOverlay?: (next: MapOutline | null) => void;
   onOpenNda?: (id: string) => void;
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
@@ -591,6 +601,19 @@ export default function Detail({
   const next = nextStepText(site);
   const unscreened = !site.verdict && (!site.summary_why || site.summary_why === "Not screened yet.") && next === "Not screened yet.";
   const waitingChip = linkedDeal ? visibleChips(linkedDeal, signedIn).find((chip) => chip.family === "waiting_on" && chip.code !== "nothing") || null : null;
+  const nextCard = (
+    <NextStepCard
+      kind="site"
+      id={site.site_id}
+      stageGroup={linkedDeal?.stage_group}
+      stage={linkedDeal?.stage || site.pipeline_stage}
+      signedIn={signedIn}
+      workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
+      suggestedDrop={linkedDeal?.suggested_drop}
+      blocker={linkedDeal}
+      waitingShown={Boolean(waitingChip)}
+    />
+  );
   return (
     <aside
       data-record={site.site_id}
@@ -635,30 +658,20 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />
+      <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
+      <RecordNavigation financials={Boolean(signedIn && linkedDeal?.kind==="pipeline" && !site.land_only)} />
       <section className="decision-block" data-testid="decision-block">
+        {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
-        <NextStepCard
-          kind="site"
-          id={site.site_id}
-          stageGroup={linkedDeal?.stage_group}
-          stage={linkedDeal?.stage || site.pipeline_stage}
-          signedIn={signedIn}
-          workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
-          suggestedDrop={linkedDeal?.suggested_drop}
-          blocker={linkedDeal}
-          waitingShown={Boolean(waitingChip)}
-        />
+        {!decisionFirst && nextCard}
       </section>
+      {!decisionFirst && <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />}
       <div className="card-chips">
-        <span className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
+        <span className={`badge ${linkedDeal ? "" : "screening-repeat"} ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
         <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
         <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing onOpen={onOpenNda} />
         {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? (
-          <>
-            <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} />
-            <NdaCardThread ndaId={linkedDeal.nda_id} onOpen={onOpenNda} />
-          </>
+          <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} onOpen={onOpenNda} />
         ) : null}
       </div>
       {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
@@ -685,11 +698,17 @@ export default function Detail({
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
+      {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
+      {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        purchase={signedIn && linkedDeal?.kind==="pipeline" && !site.land_only && <PurchaseReview key={linkedDeal.deal_id} deal={linkedDeal} pnl={pnl}/>}
+        market={<MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} expanded />}
+        economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
+            <MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} />
             <details className="disclosure">
               <summary className="disclosure">Record</summary>
               <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
@@ -810,18 +829,18 @@ export default function Detail({
           <>
             <SitePacket site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
             <div className="kv">
-              <span>Asking price</span>
+              <span data-evidence="asking">Asking price</span>
               <div>
                 {price || "—"}
                 {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
               </div>
-              <span>Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span>Open land</span><div title={isOpenLandBlank(spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span>Power</span>
+              <span data-evidence="land">Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
+              <span data-evidence="open-land">Open land</span><div title={isOpenLandBlank(spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+              <span data-evidence="power">Power</span>
               <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
               <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
-              <span>Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-              <span>Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
+              <span data-evidence="zoning">Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
+              <span data-evidence="traffic">Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
               <span>Flood</span><div>{site.flood_zone || "—"}</div>
               <span>Year built</span><div>{site.year_built || "—"}</div>
               <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
@@ -842,7 +861,7 @@ export default function Detail({
             ) : null}
           </>
         ) : <p className="note">Loading figures</p>}
-        activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} />}
+        activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} ndaId={linkedDeal?.nda_id || ""} onOpenNda={onOpenNda} />}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onAddCompare} compared={compared} />
@@ -879,8 +898,13 @@ export function DealDetail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  onLayoutOverlay,
+  washInspection,
+  decisionFirst = false,
   onOpenNda,
 }: {
+  washInspection?: WashInspection;
+  decisionFirst?: boolean;
   deal: DealProps;
   peers?: DealProps[];
   universeSite?: SiteProps | null;
@@ -908,6 +932,7 @@ export function DealDetail({
   spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
+  onLayoutOverlay?: (next: MapOutline | null) => void;
   onOpenNda?: (id: string) => void;
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
@@ -915,6 +940,7 @@ export function DealDetail({
   const figuresPending = !pnl.settled;
   const hasPin = lat != null && lng != null;
   const photos = cardPhotos(deal, universeSite);
+  const aerial = aerialTile(lat, lng);
   const cash = cashTile(deal);
   const revenue = revenueTile(deal);
   const cue = listingCue(deal);
@@ -923,6 +949,19 @@ export function DealDetail({
   const gap = chips.find((chip) => chip.family === "biggest_gap");
   const recordChips = sectionChips(chips, ["drop_reason", "advance_reason", "package", "listing", "lead_source", "business_check", "photos", "nda"]);
   const diligence = sectionChips(chips, DILIGENCE_FAMILIES);
+  const nextCard = (
+    <NextStepCard
+      kind="deal"
+      id={deal.deal_id}
+      stageGroup={deal.stage_group}
+      stage={deal.stage}
+      signedIn={signedIn}
+      suggestedDrop={deal.suggested_drop}
+      blocker={deal}
+      chips={chips}
+      waitingShown={Boolean(waiting)}
+    />
+  );
   return (
     <aside
       data-record={deal.deal_id}
@@ -956,28 +995,18 @@ export function DealDetail({
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
-      <SitePhotos card={photos} />
+      <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
+      <RecordNavigation financials={signedIn && deal.kind==="pipeline"} />
       <section className="decision-block" data-testid="decision-block">
+        {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
         <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
         {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
-          <>
-            <NdaCardLine ndaId={deal.nda_id} mirror={deal} />
-            <NdaCardThread ndaId={deal.nda_id} onOpen={onOpenNda} />
-          </>
+          <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
         ) : null}
-        <NextStepCard
-          kind="deal"
-          id={deal.deal_id}
-          stageGroup={deal.stage_group}
-          stage={deal.stage}
-          signedIn={signedIn}
-          suggestedDrop={deal.suggested_drop}
-          blocker={deal}
-          chips={chips}
-          waitingShown={Boolean(waiting)}
-        />
+        {!decisionFirst && nextCard}
       </section>
+      {!decisionFirst && <SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} />}
       <ChipRow chips={diligence} testId="diligence-home" titled />
       {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
       <CardLinks
@@ -994,11 +1023,17 @@ export function DealDetail({
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
+      {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
+      {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        purchase={signedIn && deal.kind==="pipeline" && <PurchaseReview key={deal.deal_id} deal={deal} pnl={pnl}/>}
+        market={<MarketEvidence deal={deal} site={universeSite} inspection={washInspection} expanded />}
+        economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>
+            <MarketEvidence deal={deal} site={universeSite} inspection={washInspection} />
             <details className="disclosure">
               <summary className="disclosure">Record</summary>
               <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>
@@ -1047,25 +1082,25 @@ export function DealDetail({
             {figuresReady ? <KeyStrip deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">
-              <span>Asking price</span>
+              <span data-evidence="asking">Asking price</span>
               <div>
                 {signedIn ? (deal.asking_price_display || "—") : "—"}
                 {signedIn && shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
               </div>
-              <span>Per acre</span>
+              <span data-evidence="per-acre">Per acre</span>
               <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
-              <span>Open land</span>
+              <span data-evidence="open-land">Open land</span>
               <div title={isOpenLandBlank(spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span>Power</span>
+              <span data-evidence="power">Power</span>
               <div><CapacityFacts facts={factsForDeal(deal)} /></div>
-              {signedIn && !cash.hidden ? <span>Revenue</span> : null}
+              {signedIn && !cash.hidden ? <span data-evidence="revenue">Revenue</span> : null}
               {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-revenue" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-revenue" title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div>) : null}
-              {signedIn && !cash.hidden ? <span>Cash flow</span> : null}
+              {signedIn && !cash.hidden ? <span data-evidence="cash-flow">Cash flow</span> : null}
               {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-cash" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-cash" title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div>) : null}
             </div>
           </>
         }
-        activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} />}
+        activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} ndaId={deal.nda_id || ""} onOpenNda={onOpenNda} />}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onCompare ? () => onCompare(!compared) : undefined} compared={compared} />
@@ -1076,12 +1111,14 @@ export function DealDetail({
 
 export function UnscreenedDetail({
   row,
+  signedIn = false,
   lat,
   lng,
   onClose,
   sheet,
 }: {
   row: UnscreenedProps;
+  signedIn?: boolean;
   lat?: number | null;
   lng?: number | null;
   onClose?: () => void;
@@ -1102,12 +1139,13 @@ export function UnscreenedDetail({
       </div>
       <h2>{row.name}</h2>
       <p className="note">{row.address}</p>
+      <RecordBrief listing={row} signedIn={signedIn} />
       <p className="note">{row.listing_id}</p>
       {mapsLinks(lat, lng)}
       <h3>Listing</h3>
       <div className="kv">
         <span>Type</span><div>{row.kind}</div>
-        <span>Asking price</span>
+        <span data-evidence="asking">Asking price</span>
         <div>
           {row.asking_price_display || "Not published"}
           {row.asking_price_source ? ` · ${row.asking_price_source}` : ""}

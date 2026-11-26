@@ -300,6 +300,7 @@ export async function createSuggestion(
   await autoFollow(sql, input.authorId, siteId);
   if (ownerId) await autoFollow(sql, ownerId, siteId);
   await notifySuggestion(sql, {
+    siteName: sql.afterCommit ? String(lookup("deal", siteId)?.name || lookup("site", siteId)?.name || "").trim().slice(0, 160) : undefined,
     id,
     siteId,
     authorId: input.authorId,

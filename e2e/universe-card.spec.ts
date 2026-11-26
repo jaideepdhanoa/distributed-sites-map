@@ -23,6 +23,8 @@ test("a universe card embeds street view and can switch to the aerial", async ({
   });
   expect(found.plain).toMatch(/^WB-/);
   await page.goto(`/?funnel=universe&site=${found.plain}`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("tab", { name: "Aerial" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Street View" }).click();
   const frame = page.getByTestId("street-view-frame");
   await expect(frame).toBeVisible();
   await expect(frame).toHaveAttribute("src", /output=svembed/);

@@ -5,8 +5,9 @@ type Spot = { x: number; y: number; id: string; count: number };
 async function ready(page: Page) {
   await page.waitForSelector(".maplibregl-canvas");
   await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { isStyleLoaded?: () => boolean } }).__sitesMap;
-    return Boolean(map?.isStyleLoaded?.());
+    const map = (window as unknown as { __sitesMap?: import("maplibre-gl").Map }).__sitesMap;
+    const count = document.querySelector(".stage-map")?.getAttribute("data-group-count");
+    return Boolean(map?.getLayer("sites") && !map.isMoving() && Number(count) > 0);
   });
 }
 
@@ -14,7 +15,7 @@ async function jump(page: Page, center: [number, number], zoom: number) {
   await page.evaluate(({ center, zoom }) => {
     const map = (window as unknown as {
       __sitesMap: {
-        jumpTo: (camera: { center: [number, number]; zoom: number }) => void;
+        jumpTo: (camera: { center: [number, number]; zoom: number }, event: { originalEvent: Event }) => void;
         once: (name: string, fn: () => void) => void;
       };
     }).__sitesMap;
@@ -24,7 +25,7 @@ async function jump(page: Page, center: [number, number], zoom: number) {
         window.clearTimeout(stop);
         resolve();
       });
-      map.jumpTo({ center, zoom });
+      map.jumpTo({ center, zoom }, { originalEvent: new WheelEvent("wheel") });
     });
   }, { center, zoom });
 }
@@ -113,10 +114,14 @@ test("All view groups nearby pins, and a group opens onto its pins", async ({ pa
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?funnel=universe&city=all&stage=all", { waitUntil: "domcontentloaded" });
   await ready(page);
+  await expect(page.getByRole("button", { name: /^Phoenix ·/ })).toBeVisible();
+  await jump(page, [-112.05, 33.48], 7.2);
   await countryGroups(page, "site");
 
   await page.goto("/?funnel=pipeline&city=all", { waitUntil: "domcontentloaded" });
   await ready(page);
+  await expect(page.getByRole("button", { name: /^Phoenix ·/ })).toBeVisible();
+  await jump(page, [-112.05, 33.48], 7.2);
   const pipeline = await countryGroups(page, "deal");
   const mapBox = await page.locator(".map").boundingBox();
   expect(mapBox).toBeTruthy();
@@ -177,6 +182,7 @@ test("phone bubbles clear the sheet and stay large enough to tap", async ({ page
   test.skip(info.project.name !== "mobile", "phone sheet");
   await page.goto("/?funnel=pipeline&city=all", { waitUntil: "domcontentloaded" });
   await ready(page);
+  await jump(page, [-112.05, 33.48], 7.2);
   await page.waitForFunction(() => {
     const map = (window as unknown as { __sitesMap?: { getZoom: () => number; queryRenderedFeatures: (options: { layers: string[] }) => unknown[] } }).__sitesMap;
     return Boolean(map && map.getZoom() < 10 && map.queryRenderedFeatures({ layers: ["clusters"] }).length > 0);

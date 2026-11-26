@@ -1,3 +1,6 @@
+import * as decision from "@/lib/api/handlers/actions/comparison-decision";
+import * as evidence from "@/lib/api/handlers/actions/comparison-evidence";
+import * as work from "@/lib/api/handlers/actions/work";
 import { notFound } from "next/navigation";
 import type { NextRequest } from "next/server";
 import * as accounts from "@/lib/api/handlers/actions/accounts";
@@ -49,6 +52,8 @@ import * as parcels from "@/lib/api/handlers/data/parcels";
 import * as revalidate from "@/lib/api/handlers/data/revalidate";
 import * as sites from "@/lib/api/handlers/data/sites";
 import * as sitesId from "@/lib/api/handlers/data/sites-id";
+import * as selectionReview from "@/lib/api/handlers/data/selection-review";
+import * as spaceOptions from "@/lib/api/handlers/data/space-options";
 import * as spaces from "@/lib/api/handlers/data/spaces";
 import * as timeline from "@/lib/api/handlers/data/timeline";
 import * as timelineSummary from "@/lib/api/handlers/data/timeline-summary";
@@ -93,6 +98,9 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/actions/notes/:id/reopen", { POST: notesReopen.POST as Handler }),
   route("/api/actions/notes/:id/resolve", { POST: notesResolve.POST as Handler }),
   route("/api/actions/notes/:id", { PATCH: notesId.PATCH as Handler, DELETE: notesId.DELETE as Handler }),
+  route("/api/actions/comparison-decision", { GET: decision.GET as Handler, POST: decision.POST as Handler }),
+  route("/api/actions/comparison-evidence", { GET: evidence.GET as Handler, POST: evidence.POST as Handler }),
+  route("/api/actions/work", { GET: work.GET as Handler }),
   route("/api/actions/notes", { GET: notes.GET as Handler, POST: notes.POST as Handler }),
   route("/api/actions/status", { GET: status.GET as Handler }),
   route("/api/actions/suggestions/export", { GET: suggestionsExport.GET as Handler }),
@@ -127,6 +135,8 @@ export const apiRoutes: ApiRoute[] = [
   route("/api/data/revalidate", { POST: revalidate.POST as Handler }),
   route("/api/data/sites/:id", { GET: sitesId.GET as Handler }),
   route("/api/data/sites", { GET: sites.GET as Handler }),
+  route("/api/data/selection-review", { GET: selectionReview.GET as Handler }),
+  route("/api/data/space-options", { GET: spaceOptions.GET as Handler, POST: spaceOptions.POST as Handler }),
   route("/api/data/spaces", { GET: spaces.GET as Handler }),
   route("/api/data/timeline/summary", { GET: timelineSummary.GET as Handler }),
   route("/api/data/timeline", { GET: timeline.GET as Handler }),

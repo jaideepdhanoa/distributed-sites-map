@@ -270,3 +270,8 @@
     border-radius: 16px 16px 0 0;
   }
 }
+.review-since-list .text-link { display: grid; text-align: left; min-height: 44px; align-content: center; gap: 2px; }
+.review-since-list small, .review-evidence time { font-size: var(--type-cap); color: var(--ink-3); }
+.review-evidence { flex: none; padding: 8px 14px; max-height: 25vh; overflow-y: auto; background: var(--cream-0); border-block: 1px solid var(--line); }
+.review-evidence p { margin: 3px 0; }
+.review-evidence .text-link { min-height: 34px; }

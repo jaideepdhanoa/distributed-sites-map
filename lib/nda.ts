@@ -76,6 +76,23 @@ function text(value: unknown): string {
   return String(value).trim();
 }
 
+/** A saved dossier value wins. A comms-derived value fills only a blank field. */
+export function preferSaved(saved: unknown, derived: unknown = ""): string {
+  return text(saved) || text(derived);
+}
+
+export function dossierContacts(
+  saved: { contact_name?: unknown; contact_email?: unknown; contact_phone?: unknown; document_url?: unknown },
+  derived: { contact_name?: unknown; contact_email?: unknown; contact_phone?: unknown; document_url?: unknown } = {},
+): { contact_name: string; contact_email: string; contact_phone: string; document_url: string } {
+  return {
+    contact_name: preferSaved(saved.contact_name, derived.contact_name),
+    contact_email: preferSaved(saved.contact_email, derived.contact_email),
+    contact_phone: preferSaved(saved.contact_phone, derived.contact_phone),
+    document_url: preferSaved(saved.document_url, derived.document_url),
+  };
+}
+
 export function dayCount(value: unknown): number | null {
   if (value == null || value === "") return null;
   if (typeof value === "boolean") return null;
@@ -328,6 +345,7 @@ export type NdaStateRow = {
 
 export type NdaQueueItem = NdaAgreement & {
   owner: string;
+  owner_name?: string;
   next_step: string;
   last_action: string;
   version: number;
@@ -418,6 +436,51 @@ export function courtPill(court: string, days: number | null): string {
   return "";
 }
 
+/**
+ * A conflict is a saved stage, court, or court-since that is newer than the
+ * register's last action and does not match it. An owner, next step, or
+ * document edit does not count.
+ */
+export function registerConflict(row: NdaAgreement, state?: NdaStateRow | null): string {
+  if (!state) return "";
+  const registerDate = text(row.nda_last_action_date);
+  const savedDate = text(state.last_action_date);
+  if (!registerDate || !savedDate || savedDate <= registerDate) return "";
+  const suggested = suggestStage(displayStatus(row.nda_status, true));
+  const registerCourt = courtFromWaiting(row.nda_waiting_on);
+  const savedStage = text(state.stage);
+  const savedCourt = text(state.court);
+  const savedSince = text(state.court_since).slice(0, 10);
+  const registerSince = text(row.nda_waiting_on_since).slice(0, 10);
+  const stageDisagrees = Boolean(savedStage && suggested && savedStage !== suggested);
+  const courtDisagrees = Boolean(savedCourt && savedCourt !== registerCourt);
+  const sinceDisagrees = Boolean(savedSince && registerSince && savedSince !== registerSince);
+  if (!stageDisagrees && !courtDisagrees && !sinceDisagrees) return "";
+  return "Register last action is older than the latest saved record.";
+}
+
+export function collapseContained(parts: string[]): string[] {
+  const kept: string[] = [];
+  for (const raw of parts) {
+    const part = raw.trim();
+    if (!part) continue;
+    const folded = part.toLowerCase();
+    if (kept.some((item) => item.toLowerCase().includes(folded) && item.toLowerCase() !== folded)) continue;
+    const contained = kept.findIndex((item) => folded.includes(item.toLowerCase()));
+    if (contained >= 0) {
+      kept[contained] = part;
+      continue;
+    }
+    kept.push(part);
+  }
+  return kept;
+}
+
+function listOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => text(item)).filter(Boolean);
+  return [];
+}
+
 function addressIn(value: string): string {
   const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return match ? match[0] : "";
@@ -428,22 +491,15 @@ function phoneIn(value: string): string {
   return match ? match[0] : "";
 }
 
-function listOf(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((item) => text(item)).filter(Boolean);
-  return [];
-}
-
 export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, history: NdaHistoryItem[] = [], today = ""): NdaQueueItem {
   const written = history.filter((item) => item.status || item.note);
   const stage = state?.stage || suggestStage(displayStatus(row.nda_status, true));
   const court = state?.court || courtFromWaiting(state?.waiting_on || row.nda_waiting_on);
   const since = text(state?.court_since) || text(row.nda_waiting_on_since) || text(row.nda_opened_date);
   const day = today ? daysSince(since.slice(0, 10), today) : null;
-  const savedDate = text(state?.last_action_date);
-  const registerDate = text(row.nda_last_action_date);
-  const conflict = savedDate && registerDate && registerDate < savedDate
-    ? "Register last action is older than the latest saved record."
-    : "";
+  const conflict = registerConflict(row, state);
+  const contacts = dossierContacts(state || {}, { contact_name: row.counterparty_person });
+  const registerText = `${row.notes || ""} ${row.source || ""}`;
   return {
     ...row,
     nda_status: state?.status || displayStatus(row.nda_status, true),
@@ -459,11 +515,11 @@ export function presentNda(row: NdaAgreement, state?: NdaStateRow | null, histor
     court_detail: text(state?.court_detail),
     court_since: since,
     next_step_due: text(state?.next_step_due),
-    document_url: text(state?.document_url),
+    document_url: contacts.document_url,
     document_kind: text(state?.document_kind),
-    contact_name: text(state?.contact_name) || text(row.counterparty_person),
-    contact_email: text(state?.contact_email) || addressIn(`${row.notes || ""} ${row.source || ""}`),
-    contact_phone: text(state?.contact_phone) || phoneIn(`${row.notes || ""} ${row.source || ""}`),
+    contact_name: contacts.contact_name,
+    contact_email: contacts.contact_email || addressIn(registerText),
+    contact_phone: contacts.contact_phone || phoneIn(registerText),
     gmail_thread_ids: listOf(state?.gmail_thread_ids),
     covered_refs: listOf(state?.covered_refs),
     source_ref: text(state?.source_ref),

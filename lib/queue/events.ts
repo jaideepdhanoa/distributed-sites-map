@@ -30,24 +30,25 @@ export async function recordAppEvent(
   }
 }
 
-export async function listAppEvents(sql: Sql): Promise<{ siteId: string; type: string; summary: string; at: string }[]> {
-  let rows: { site_id: string; type: string; summary: string; created_at: Date | string; event_at?: Date | string | null }[];
+export async function listAppEvents(sql: Sql): Promise<{ siteId: string; type: string; summary: string; at: string; noteId?: string }[]> {
+  let rows: { site_id: string; type: string; summary: string; ref_id?: string | null; created_at: Date | string; event_at?: Date | string | null }[];
   try {
-    const selected = await sql.query<{ site_id: string; type: string; summary: string; created_at: Date | string; event_at: Date | string | null }>(
-      `SELECT site_id, type, summary, created_at, event_at FROM queue_events ORDER BY COALESCE(event_at, created_at) ASC`,
+    const selected = await sql.query<{ site_id: string; type: string; summary: string; ref_id?: string | null; created_at: Date | string; event_at: Date | string | null }>(
+      `SELECT site_id, type, summary, ref_id, created_at, event_at FROM queue_events ORDER BY COALESCE(event_at, created_at) ASC`,
     );
     rows = selected.rows;
   } catch (error) {
     const missing = error instanceof Error && /event_at/.test(error.message);
     if (!missing) throw error;
     const selected = await sql.query<{ site_id: string; type: string; summary: string; created_at: Date | string }>(
-      `SELECT site_id, type, summary, created_at FROM queue_events ORDER BY created_at ASC`,
+      `SELECT site_id, type, summary, ref_id, created_at FROM queue_events ORDER BY created_at ASC`,
     );
     rows = selected.rows;
   }
   return rows.map((row) => ({
     siteId: row.site_id,
     type: row.type,
+    ...(row.ref_id && (row.type === "note" || row.type === "reply") ? { noteId: row.ref_id } : {}),
     summary: safeSnapshot(row.summary, 240),
     at: stamp(row.event_at || row.created_at),
   })).filter((row) => row.summary);

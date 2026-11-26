@@ -1,6 +1,15 @@
 import Wordmark from "./Wordmark";
 
-export default function AppLoading() {
+export default function AppLoading({ destination = "Workspace" }: { destination?: string }) {
+  if (destination !== "NDAs") return (
+    <main className="app-boot" data-testid="app-loading" aria-busy="true">
+      <header className="bar"><Wordmark level="p" /></header>
+      <section className="workspace-loading" role="status">
+        <h2>{destination}</h2><p>Loading {destination.toLowerCase()}…</p>
+        {destination === "Shortlist" && [0, 1, 2].map(i => <div key={i} className="skeleton nda-skel wide" />)}
+      </section>
+    </main>
+  );
   return (
     <main className="app-boot" data-testid="app-loading" aria-busy="true" aria-label="Loading NDAs">
       <header className="bar">

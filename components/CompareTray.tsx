@@ -1,168 +1,296 @@
-import type { CSSProperties, ReactNode } from "react";
+import { usePurchaseScenarios } from "./PurchaseScenarios";
+import { purchaseLabels,purchaseRows,preferredScenario,scenarioFigure,readScenario } from "@/lib/purchaseReview";
+import { createPortal } from "react-dom";
+import PnlOverlay from "./PnlOverlay";
+import { useComparisonStatements } from "./useComparisonStatements";
+import { showsFinancials } from "@/lib/keyNumbers";
+import { citedWindow, statementFigures, statementMeasures } from "@/lib/pnl/citation";
+import type { CitedFigure } from "@/lib/comparisonDecision";
+import SaveComparison from "./actions/SaveComparison";
+import ComparisonEvidence from "./actions/ComparisonEvidence";
+import { evidenceMeasures, evidenceTarget, type EvidenceTarget } from "@/lib/actions/comparisonEvidence";
+import { csvCell } from "@/lib/actions/text";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
-import { acreUnit, acresText, cashTile, depotLine, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, openLandLabel, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
-import { basisBadge } from "@/lib/pricing";
-import { stageDetail } from "@/lib/labels";
-import { cardNdaLabel } from "@/lib/nda";
-
-const MISSING = "—";
-
-type CompareRow = { label: string; value: string };
-
-function shown(value?: unknown) {
-  const text = (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
-  return text || MISSING;
-}
-
-function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): CompareRow[] {
-  const linked = sites.find((site) => site.site_id === deal.universe_id);
-  const cash = cashTile(deal);
-  const trade = tradeAreaLines(deal);
-  const population = trade.find((line) => line.startsWith("3-mile population "));
-  const washes = trade.find((line) => line.startsWith("Washes "));
-  const spare = [
-    !isOpenLandBlank(openLandLabel(deal.open_land_sqft, deal.open_land_basis)) ? `${openLandLabel(deal.open_land_sqft, deal.open_land_basis)} sheet` : "",
-    linked && linked.spare_ac_own != null ? `${acreUnit(linked.spare_ac_own, linked.spare_ac_own_text)} census` : "",
-  ].filter(Boolean).join(" · ");
-  const cashBasis = basisBadge(deal.earnings_basis) || basisBadge(cash.basis);
-  const cashValue = cash.hidden ? "" : [cash.value, cash.note, cashBasis].filter(Boolean).join(" · ");
-  return [
-    { label: "Address", value: shown(displayAddress(deal.address)) },
-    { label: "Stage", value: shown(stageDetail(deal.stage, deal.stage_group)) },
-    ...(cardNdaLabel(deal, signedIn) ? [{ label: "NDA", value: cardNdaLabel(deal, signedIn) }] : []),
-    ...(deal.suggested_drop && deal.stage_group !== "dropped" ? [{ label: "Suggested drop", value: deal.suggested_drop }] : []),
-    { label: "Asking", value: signedIn ? sheetMoney(deal.asking_price, deal.asking_price_display) : "—" },
-    { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
-    { label: "Traffic", value: shown(workbookTrafficLine(deal)) },
-    { label: "Land", value: shown(acresText(deal.land_acres)) },
-    { label: "Open land", value: shown(spare) },
-    { label: "Power", value: powerSummary(factsForDeal(deal)) || "—" },
-    { label: "3-mile population", value: population ? population.replace("3-mile population ", "") : MISSING },
-    { label: "Washes", value: washes ? washes.replace(/^Washes /, "") : MISSING },
-    { label: "Depot", value: depotLine(deal.miles_to_depot, deal.miles_to_depot != null) },
-    { label: "Zoning", value: shown(linked?.zoning) },
-    { label: "Owner", value: shown(linked?.owner) },
-    { label: "Cash flow", value: signedIn ? shown(cashValue) : "—" },
-    { label: "Per acre", value: signedIn && deal.price_per_acre != null ? sheetMoney(deal.price_per_acre, fullMoney(deal.price_per_acre)) : "—" },
-    ...pricingRows(deal, signedIn),
-  ];
-}
-
-function pricingRows(deal: DealProps, signedIn: boolean): CompareRow[] {
-  if (!signedIn || deal.kind === "land") return [];
-  const earnings = deal.earnings_multiple_which ? `Asking / ${deal.earnings_multiple_which}` : "Asking / cash flow";
-  const land = deal.land_estimate;
-  const asking = deal.asking_price;
-  const split = asking != null && asking > 0 && land != null
-    ? `Land ${Math.round((Math.max(0, Math.min(land, asking)) / asking) * 100)}% · Business ${Math.round((Math.max(0, asking - land) / asking) * 100)}%`
-    : "—";
-  return [
-    { label: "Pricing", value: split },
-    { label: "Revenue", value: signedIn ? [deal.stated_revenue_display || "—", deal.revenue_basis].filter(Boolean).join(" · ") : "—" },
-    { label: "Land estimate", value: deal.land_estimate_display ? `${deal.land_estimate_display} · Estimate` : (deal.land_estimate_reason || "—") },
-    { label: "Business value", value: deal.business_value_display || deal.business_value_reason || "—" },
-    { label: "County value (land + buildings)", value: deal.county_value_display || "—" },
-    { label: "Asking / revenue", value: deal.revenue_multiple_display && deal.revenue_multiple_display !== "—" ? [deal.revenue_multiple_display, deal.revenue_multiple_basis].filter(Boolean).join(" · ") : (deal.revenue_multiple_reason || "—") },
-    { label: earnings, value: deal.earnings_multiple_display && deal.earnings_multiple_display !== "—" ? [deal.earnings_multiple_display, deal.earnings_multiple_basis].filter(Boolean).join(" · ") : (deal.earnings_multiple_reason || "—") },
-    { label: "Business-only multiple", value: deal.business_multiple_display && deal.business_multiple_display !== "—" ? [deal.business_multiple_display, deal.business_multiple_basis].filter(Boolean).join(" · ") : (deal.business_multiple_reason || "—") },
-  ];
-}
-
-function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean): CompareRow[] {
-  const linked = deals.find((deal) => deal.universe_id === site.site_id || deal.deal_id === site.linked_deal_id);
-  const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
-  const spare = site.spare_ac_own != null ? `${acreUnit(site.spare_ac_own, site.spare_ac_own_text)} census` : "";
-  const cash = linked ? cashTile(linked) : null;
-  const cashBasis = linked ? (basisBadge(linked.earnings_basis) || basisBadge(cash?.basis)) : "";
-  const cashValue = cash && !cash.hidden ? [cash.value, cash.note, cashBasis].filter(Boolean).join(" · ") : "";
-  return [
-    { label: "Address", value: shown(displayAddress(site.address)) },
-    { label: "Stage", value: shown(site.pipeline_stage || "Universe") },
-    ...(linked && cardNdaLabel(linked, signedIn) ? [{ label: "NDA", value: cardNdaLabel(linked, signedIn) }] : []),
-    { label: "Asking", value: signedIn ? shown(site.asking_price_display) : "—" },
-    { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
-    { label: "Traffic", value: shown(universeTrafficLine(site)) },
-    { label: "Land", value: shown(acres) },
-    { label: "Open land", value: shown(spare) },
-    { label: "Power", value: powerSummary(factsForSite(site, linked)) || "—" },
-    { label: "3-mile population", value: linked?.trade_population != null ? Math.round(linked.trade_population).toLocaleString() : MISSING },
-    { label: "Washes", value: linked && (linked.trade_washes_1mi != null || linked.trade_washes_3mi != null) ? [linked.trade_washes_1mi != null ? `${linked.trade_washes_1mi} within 1 mile` : "", linked.trade_washes_3mi != null ? `${linked.trade_washes_3mi} within 3 miles` : ""].filter(Boolean).join(" · ") : MISSING },
-    { label: "Depot", value: depotLine(site.miles_to_depot, site.miles_to_depot != null) },
-    { label: "Zoning", value: shown(site.zoning) },
-    { label: "Owner", value: shown(site.owner) },
-    { label: "Cash flow", value: signedIn ? shown(cashValue) : "—" },
-    { label: "Per acre", value: signedIn && linked?.price_per_acre != null ? sheetMoney(linked.price_per_acre, fullMoney(linked.price_per_acre)) : "—" },
-    ...(linked ? pricingRows(linked, signedIn) : []),
-  ];
-}
-
-function CompareCard({ title, rows }: { title: string; rows: CompareRow[] }) {
-  return (
-    <article style={{ gridRow: `span ${rows.length + 1}` }}>
-      <h3>{title}</h3>
-      {rows.map((row) => (
-        <p key={row.label} data-compare-row={row.label}>
-          <span>{row.label}</span>
-          <strong>{row.value}</strong>
-        </p>
-      ))}
-    </article>
-  );
-}
+import { acquisitionCriteria, compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
 
 export default function CompareTray({
   deals,
   sites,
   contextSites,
+  contextDeals,
   onRemove,
+  inspecting = false,
+  onInspect,
   onClose,
   children,
+  saveQuery,
   signedIn = false,
+  evidenceEnabled = false,
 }: {
   deals: DealProps[];
   sites: SiteProps[];
   contextSites?: SiteProps[];
+  contextDeals?: DealProps[];
+  inspecting?: boolean;
+  onInspect?: (id: string, measure: string, source?: URLSearchParams) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
   children?: ReactNode;
+  saveQuery?: () => string;
   signedIn?: boolean;
+  evidenceEnabled?: boolean;
 }) {
+  const purchaseScenarios=usePurchaseScenarios();
+  const [showAll, setShowAll] = useState(false);
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [highlight, setHighlight] = useState(true);
+  const [gap,setGap] = useState<{target:EvidenceTarget;title:string;label:string;context?:string} | null>(null);
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
+  const matrixRef = useRef<HTMLDivElement>(null);
+  const inspectedCell = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!inspecting && inspectedCell.current?.isConnected) {
+      inspectedCell.current.focus({ preventScroll: true });
+      inspectedCell.current.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [inspecting]);
+  const hasMatrix = count >= 2;
+  const gapQuery = hasMatrix && signedIn ? new URLSearchParams([...deals.map(d=>d.deal_id),...sites.map(s=>s.site_id)].map(id=>["site",id])).toString() : "";
+  const [coverage,setCoverage] = useState<{query:string; counts:Record<string,number>|null}>();
+  const [refresh,setRefresh] = useState(0);
+  useEffect(()=>{
+    if (!gapQuery || inspecting) return;
+    const controller = new AbortController();
+    fetch("/api/actions/work?"+gapQuery,{signal:controller.signal,cache:"no-store"}).then(async response=>{
+      if (!response.ok) throw Error();
+      const {counts} = await response.json();
+      if (!controller.signal.aborted) setCoverage({query:gapQuery,counts});
+    }).catch(()=>{if (!controller.signal.aborted) setCoverage({query:gapQuery,counts:null});});
+    return ()=>controller.abort();
+  },[gapQuery,refresh,inspecting]);
+  useEffect(() => {
+    if (!hasMatrix) return;
+    const trigger = document.activeElement;
+    matrixRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [hasMatrix]);
+  const columns = [
+    ...deals.map(deal => ({ id: deal.deal_id, followUps: deal.kind !== "land" && deal.stage_group !== "dropped", targetKind:"deal" as const, deal, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
+    ...sites.map(site => ({ id: site.site_id, followUps: !site.land_only, targetKind:"site" as const, deal:(contextDeals || deals).find(d=>d.deal_id===site.linked_deal_id || d.universe_id===site.site_id), title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
+  ];
+  const statementIds = signedIn && hasMatrix ? [...new Set(columns.flatMap(c => c.deal && showsFinancials(c.deal) ? [c.deal.deal_id] : []))].sort().join("|") : "";
+  const statements = useComparisonStatements(statementIds);
+  const [opened,setOpened] = useState<CitedFigure | null>(null);
   if (!count) return null;
+  function statementFor(column: typeof columns[number], anchor?:string) {
+    const loaded = column.deal && statements.rows[column.deal.deal_id];
+    return loaded ? statementFigures(loaded.pnl,Boolean(loaded.pnlDemo),anchor) : [];
+  }
+  const options = new Map<string,CitedFigure>();
+  const purchaseFigures:CitedFigure[]=[];
+  for (const c of columns) {
+    if (!signedIn || !c.deal || c.deal.kind!=="pipeline") continue;
+    const scenario=purchaseScenarios.cases[c.deal.deal_id] || preferredScenario(c.deal);
+    const rows=purchaseRows(c.deal,scenario);
+    c.rows=c.rows.map(r=>rows.find(v=>v.label===r.label) || r);
+    const f=scenarioFigure(c.deal,scenario);
+    if (f && f.value!==MISSING) purchaseFigures.push({...f,measure:"purchase_case",targetKind:c.targetKind,targetId:c.id});
+  }
+  for (const column of columns) {
+    if (!statementIds) break;
+    const applicable = column.deal && showsFinancials(column.deal);
+    const loaded = applicable ? statements.rows[column.deal!.deal_id] : null;
+    const lines = statementFor(column);
+    for (const measure of statementMeasures) {
+      const label = evidenceMeasures[measure];
+      const line = lines.find(f => f.measure === measure);
+      const value = !applicable ? "Not applicable" : loaded === undefined ? "Checking…" : loaded === null ? "Unavailable" : line?.value || MISSING;
+      const figure = {targetId:column.id,targetKind:column.targetKind,measure,value,period:line?.period || "",
+        basis:line?.basis || "Financial statement",source:line?.source || "Financial statement",anchor:line?.anchor || ""};
+      options.set(column.id+"|"+label,figure);
+      column.rows.push({label,value:value === MISSING || !line ? value : [value,line.period,line.basis,line.source].join(" · "),
+        key:value,basis:[line?.period,line?.basis].join("|")});
+    }
+  }
+  const openColumn = opened && columns.find(c => c.id === opened.targetId);
+  const openLine = openColumn && statementFor(openColumn,opened?.anchor).find(f => f.measure === opened?.measure);
+  const openData = openColumn?.deal && statements.rows[openColumn.deal.deal_id];
+  function openStatement(figure:CitedFigure) {
+    inspectedCell.current = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+    setOpened(figure);
+  }
+  if (gapQuery) for (const column of columns) {
+    const count = coverage?.query === gapQuery ? coverage.counts?.[column.id] : undefined;
+    const value = count != null ? String(count) : coverage?.query === gapQuery ? "Unavailable" : "Checking…";
+    column.rows.push({label:"Open evidence gaps",key:count,value});
+  }
+  const measures = comparisonMeasures(columns);
+  const decisionMeasures = measures.filter(row => row.label !== "Power" || !signedIn);
+  const visible = showAll ? measures : decisionMeasures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || ["different", "gap", "basis"].includes(row.kind));
+
+  const sections = compareSections.filter(section => visible.some(row => row.section === section));
+  const selectedSection = sections.find(section => section === sectionFilter) || "";
+
+  const summaryMeasures = selectedSection ? visible.filter(row => row.section === selectedSection) : decisionMeasures;
+  const differences = summaryMeasures.filter(row => row.kind === "different").length;
+  const gaps = summaryMeasures.filter(row => row.label !== "Suggested drop" && row.missing > 0);
+  const allMissing = gaps.filter(row => row.allMissing);
+  const basis = summaryMeasures.filter(row => row.kind === "basis").length;
+
+  function renderCell(column: typeof columns[number], label: string, kind: string, value: string) {
+    const row = column.rows.find(row => row.label === label);
+    const canFollowUp = column.followUps && column.deal?.kind !== "land" && column.deal?.stage_group !== "dropped";
+    const statement = options.get(column.id+"|"+label);
+    if (onInspect && column.deal?.kind==="pipeline" && purchaseLabels.some(p=>p===label)) {
+      return <button type="button" className="text-link compare-evidence" onClick={event=>{
+        inspectedCell.current=event.currentTarget;onInspect(column.id,label);
+      }}>{value===MISSING?"Inspect financial inputs":value}{row?.basis && <small>{row.basis}</small>}</button>;
+    }
+    if (statement && value === "Unavailable") return <button type="button" className="text-link" onClick={statements.retry}>Retry statement</button>;
+    if (statement && !["Not applicable","Checking…",MISSING].includes(value)) return <button type="button" className="text-link compare-evidence"
+      onClick={()=>openStatement(statement)}>{statement.value}<small>{[statement.period,statement.basis,statement.source].join(" · ")}</small></button>;
+    if (value === MISSING) {
+      const target = evidenceEnabled && canFollowUp && (statement || evidenceTarget(column.targetKind, column.id, label, column.deal));
+      if (!target) return label === "Suggested drop" ? "None recorded" : "Not on file";
+      return <>{label === "On-site service" && <strong className="comparison-unconfirmed">Unconfirmed</strong>}<button className="text-link compare-evidence" type="button"
+        aria-label={label === "On-site service" ? `Check on-site service for ${column.title}` : `Not on file · Check missing ${label} for ${column.title}`}
+        onClick={event => {
+          inspectedCell.current = event.currentTarget;
+          setGap({target, title:column.title, label});
+        }}>{label === "On-site service" ? "Check on-site service" : "Not on file"}</button></>;
+    }
+    if (!onInspect || kind === "detail" || ["Unavailable", "Checking…", "Not applicable"].includes(value)) return value;
+    const pieces = value.split(" · ");
+    const power = label === "On-site service" || label === "Street-frontage hosting";
+    const primary = power ? String(row?.key || value) : pieces[0];
+    const detail = power ? [row?.basis === "Partial" && "Partial service record", row?.source || "Source not recorded"].filter(Boolean).join(" · ") : pieces.slice(1).join(" · ");
+    const request = label === "On-site service" && row?.basis !== "Verified" && evidenceEnabled && canFollowUp &&
+      evidenceTarget(column.targetKind, column.id, label, column.deal);
+    return <><button className="text-link compare-evidence compare-reading" type="button"
+      aria-label={`${value} · Inspect ${label} for ${column.title}`}
+      onClick={event => {
+        inspectedCell.current = event.currentTarget;
+        onInspect(column.id, label);
+      }}><strong>{primary}</strong>{detail && <small>{detail}</small>}</button>
+      {request && <button type="button" className="text-link compare-evidence" onClick={event => {
+        inspectedCell.current = event.currentTarget;
+        setGap({target:request, title:column.title, label, context:value});
+      }}>Check on-site service</button>}</>;
+  }
+
   return (
-    <aside className="compare-tray" data-testid="compare-tray">
+    <aside hidden={inspecting} className="compare-tray" data-testid="compare-tray">
       <div className="compare-bar">
-        <strong>Compare</strong>
+        <h2>Compare sites</h2>
         {deals.map((deal) => (
-          <button key={deal.deal_id} type="button" onClick={() => onRemove(deal.deal_id)} className="menu-item">
+          <button key={deal.deal_id} type="button" aria-label={`Remove ${deal.name || deal.address} from comparison`} onClick={() => onRemove(deal.deal_id)} className="menu-item">
             {deal.name || deal.address}
             <span aria-hidden="true"> ×</span>
           </button>
         ))}
         {sites.map((site) => (
-          <button key={site.site_id} type="button" onClick={() => onRemove(site.site_id)} className="menu-item">
+          <button key={site.site_id} type="button" aria-label={`Remove ${site.name || site.address} from comparison`} onClick={() => onRemove(site.site_id)} className="menu-item">
             {site.name || site.address}
             <span aria-hidden="true"> ×</span>
           </button>
         ))}
-        <button type="button" className="compare-go" disabled={count < 2}>
-          Compare {count}
-        </button>
+        <span className="layer-meta" role="status">{count} of 4 selected{count === 1 ? " · Select another site" : count === 4 ? " · Remove one to add another" : ""}</span>
         <button type="button" className="close" aria-label="Close compare" onClick={onClose}><span aria-hidden="true">×</span></button>
         {children}
+        {saveQuery && count >= 2 && onInspect && <SaveComparison key={columns.map(c => c.id).join("|")} query={saveQuery} sites={columns} inspect={onInspect} restorePurchase={f=>{
+            const s=readScenario(f.anchor || ""), d=columns.find(c=>c.id===f.targetId)?.deal;
+            if(s && d) purchaseScenarios.set(d.deal_id,s);
+            onInspect(f.targetId,"Purchase scenario");
+          }} openStatement={openStatement} revision={refresh}
+          checkGap={figure => setGap({ target: figure, title: figure.siteName, label: evidenceMeasures[figure.measure] })}
+          figures={[...purchaseFigures.map(f=>({...f,siteName:columns.find(c=>c.id===f.targetId)!.title})),...columns.flatMap(column => column.rows.flatMap(row => {
+            const statement = options.get(column.id+"|"+row.label);
+            if (statement) return [{...statement,siteName:column.title}];
+            const target = evidenceTarget(column.targetKind, column.id, row.label, column.deal);
+            return target
+              ? [{ ...target, value: row.value, siteName: column.title, source: row.source || "", ...(["revenue","cash_flow","ebitda"].includes(target.measure) ? {source:column.deal?.figures_source || "Deal record"} : {}) }] : [];
+          }))]} />}
       </div>
       {count >= 2 ? (
-        <div className="compare-grid" style={{ "--compare-cols": String(count) } as CSSProperties}>
-          {deals.map((deal) => (
-            <CompareCard key={deal.deal_id} title={deal.name || displayAddress(deal.address) || deal.deal_id} rows={dealRows(deal, lookup, signedIn)} />
-          ))}
-          {sites.map((site) => (
-            <CompareCard key={site.site_id} title={site.name || displayAddress(site.address) || site.site_id} rows={siteRows(site, deals, signedIn)} />
-          ))}
-        </div>
+        <>
+          <div className="comparison-mode">
+            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "measure with gaps" : "measures with gaps"}{basis > 0 && ` · ${basis} with different bases`}{showAll && allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}</span>
+            <select className="secondary" aria-label="Comparison section" value={selectedSection} onChange={event => {
+              setSectionFilter(event.target.value);
+              matrixRef.current?.scrollTo({top:0});
+            }}><option value="">All sections</option>{sections.map(section => <option key={section}>{section}</option>)}</select>
+            {coverage?.query === gapQuery && coverage.counts === null && <button type="button" className="text-link" onClick={()=>setRefresh(n=>n+1)}>Retry gap counts</button>}
+            <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
+            <button type="button" className="text-link" onClick={()=>{
+              const capturedAt = new Date().toISOString();
+              const lines = [
+                ["Captured at", capturedAt],
+                ["Record ID", "", ...columns.map(column => column.id)],
+                ["Section", "Measure", ...columns.map(column => column.title)],
+                ...measures.map(row => [row.section, row.label, ...row.values.map(value => value === MISSING ? "Not on file" : value)]),
+              ];
+              const csv = lines.map(line=>line.map(csvCell).join(",")).join("\r\n");
+              const url = URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "site-comparison-"+capturedAt.slice(0,10)+".csv";
+              link.click();
+              window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }}>Download dated snapshot</button>
+            {(showAll || visible.length < measures.length) && (
+              <button type="button" className="text-link" aria-expanded={showAll} aria-controls="comparison-facts" onClick={() => setShowAll(value => !value)}>
+                {showAll ? "Show decision criteria" : "Show all measures"}
+              </button>
+            )}
+          </div>
+          <div className="comparison-scroll" id="comparison-facts" ref={matrixRef} tabIndex={0} aria-label="Comparison facts">
+            <table className="comparison-table" data-highlight={highlight} data-sites={columns.length}>
+              <caption className="sr">Site comparison</caption>
+              <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
+              {sections.filter(section => !selectedSection || selectedSection === section).map(section => {
+                const group = visible.filter(row => row.section === section);
+                const order = section === "Acquisition economics" ? ["Asking","Land estimate","Implied business price","Asking / earnings","Business-only multiple","Savings versus hub"] : section === "Financials" ? ["Revenue","Statement revenue","Cash flow","Statement SDE","EBITDA","Statement EBITDA"] : [];
+                const rank = (label:string) => order.includes(label) ? order.indexOf(label) : order.length;
+                group.sort((a,b) => rank(a.label) - rank(b.label));
+                if (!group.length) return null;
+                return (
+                  <tbody key={section} aria-label={section}>
+                    <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
+                    {group.map(({ label, values, kind, available, partial, allMissing }) => (
+                      <tr key={label} data-compare-row={label} data-state={kind}>
+                        <th scope="row">{label}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
+                        {values.map((value, i) => (
+                          <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
+                            {renderCell(columns[i], label, kind, value)}
+                            {label === "Cash flow" && value !== MISSING && value !== "Not applicable" && columns[i].deal?.figures_source && <small className="comparison-source">{columns[i].deal?.figures_source}</small>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                );
+              })}
+            </table>
+            {!visible.length && <p className="note">No differing figures to show.</p>}
+          </div>
+        </>
       ) : null}
+      {opened && openData && openLine && openLine.value !== MISSING ? createPortal(<PnlOverlay statement={citedWindow(openData.pnl,opened.anchor || "")!} siteId={openColumn?.deal?.deal_id}
+        initialGrain={openLine.selection.grain === "annual" ? "annual" : "monthly"} selection={openLine.selection}
+        onClose={()=>{setOpened(null); requestAnimationFrame(()=>inspectedCell.current?.focus({preventScroll:true}));}} />,document.body)
+        : opened && openColumn?.deal && !openData ? <section aria-label="Statement evidence"><p role="status">{openData === null ? "Statement unavailable." : "Checking statement…"}</p>
+          {openData === null && <button className="text-link" type="button" onClick={statements.retry}>Retry statement</button>}
+          <button className="text-link" onClick={()=>setOpened(null)}>Back to comparison</button></section>
+        : opened && <ComparisonEvidence target={opened} title={openColumn?.title || opened.targetId}
+          context="The cited statement line is unavailable. Check the supporting document."
+          saved={()=>setRefresh(n=>n+1)} close={()=>setOpened(null)} inspect={note=>{setOpened(null);onInspect?.(opened.targetId,evidenceMeasures[opened.measure],new URLSearchParams({panel:"discussion",note}));}} />}
+      {gap && <ComparisonEvidence target={gap.target} title={gap.title} context={gap.context} close={()=>{setGap(null); requestAnimationFrame(()=>inspectedCell.current?.focus({preventScroll:true}));}} saved={()=>setRefresh(n=>n+1)}
+        inspect={note=>{setGap(null);onInspect?.(gap.target.targetId,gap.label,new URLSearchParams({panel:"discussion",note}));}} />}
     </aside>
   );
 }

@@ -12,15 +12,23 @@ type Turn = AskTurn & { sources?: Source[] };
 
 export function AskPanel({
   open,
+  shortlist = [],
   site,
+  canPropose,
+  onSource,
   onClearSite,
   onClose,
 }: {
   open: boolean;
+  shortlist?: string[];
   site: { id: string; name: string } | null;
+  canPropose: boolean;
+  onSource: (href: string) => void;
   onClearSite: () => void;
   onClose: () => void;
 }) {
+  const [useShortlist, setUseShortlist] = useState(shortlist.length > 0 && shortlist.length <= 20);
+  const scoped = !site && useShortlist && shortlist.length > 0 && shortlist.length <= 20;
   const [ready, setReady] = useState<boolean | null>(null);
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -32,9 +40,9 @@ export function AskPanel({
   const flight = useRef<AbortController | null>(null);
   const alive = useRef(true);
 
-  useEffect(() => () => {
-    alive.current = false;
-    flight.current?.abort();
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; flight.current?.abort(); };
   }, []);
 
   useEffect(() => {
@@ -85,7 +93,7 @@ export function AskPanel({
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, siteId: site?.id || null }),
+        body: JSON.stringify({ question: text, siteId: site?.id || null, ...(scoped ? { siteIds: shortlist } : {}) }),
         signal: controller.signal,
       });
       if (runId.current !== requestId || !alive.current) return;
@@ -150,7 +158,7 @@ export function AskPanel({
       setNotice("Open a site to file this as a work item.");
       return;
     }
-    window.dispatchEvent(new CustomEvent("sites-prefill-work-item", { detail: { title: text.slice(0, 120) } }));
+    window.dispatchEvent(new CustomEvent("sites-prefill-work-item", { detail: { targetId: site.id, title: text.slice(0, 120) } }));
     onClose();
   }
 
@@ -161,21 +169,33 @@ export function AskPanel({
       <div className="ask-head">
         <div className="ask-title">
           <p className="eyebrow">Ask</p>
-          {site ? null : <p className="layer-meta" data-testid="ask-scope">Portfolio and markets</p>}
+          {!site && (shortlist.length && shortlist.length <= 20
+            ? <label>Ask about <select className="secondary" disabled={pending || turns.length > 0} value={scoped ? "list" : "all"} onChange={e => setUseShortlist(e.target.value === "list")}>
+                <option value="list">These {shortlist.length} sites</option><option value="all">Portfolio and markets</option>
+              </select></label>
+            : <p className="layer-meta" data-testid="ask-scope">Portfolio and markets{shortlist.length > 20 ? " · Narrow to 20 sites to ask about this list" : ""}</p>)}
         </div>
         <button type="button" className="close" aria-label="Close Ask" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       {site ? (
-        <button type="button" className="removable" data-testid="ask-chip" onClick={onClearSite}>
+        <button type="button" className="removable" data-testid="ask-chip" disabled={pending || turns.length > 0} onClick={onClearSite}>
           {site.name}<span aria-hidden="true">×</span>
         </button>
       ) : null}
       {unset ? <p data-testid="ask-unset">Ask isn&apos;t set up yet</p> : null}
       <div className="ask-log" ref={logRef}>
+        {!unset && !turns.length && (site || scoped) && <button type="button" className="paper-btn ask-prompt" onClick={() => {
+          setQuestion(site ? "Which evidence is missing for this site’s next decision?" : "Which differences in fit and economics are supported by the records for these sites?");
+          composerRef.current?.focus();
+        }}>{site ? "Check missing evidence" : "Compare fit and economics"}</button>}
+        {!unset && !turns.length && (site || scoped) && <button type="button" className="paper-btn ask-prompt" onClick={()=>{
+          setQuestion("Which outstanding diligence items prevent a decision? Cite each blocker, the responsible owner and any missing evidence.");
+          composerRef.current?.focus();
+        }}>Explain blockers</button>}
         {turns.map((turn, index) => (
           <div key={`${turn.role}-${index}`}>
             {turn.role === "ask" && turn.pending && !turn.text ? <AskThinking slow={turn.slow} /> : null}
-            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} /> : null}
+            {turn.role === "ask" && turn.text ? <AskMarkdown text={turn.text} onSite={onSource} /> : null}
             {turn.role === "user" ? <p className="ask-bubble">{turn.text}</p> : null}
             {turn.error && turn.linkRetry ? (
               <button type="button" className="text-link" data-testid="ask-retry" disabled={pending} onClick={() => void send(turns[index - 1]?.text || question)}>
@@ -187,7 +207,7 @@ export function AskPanel({
                 Try again
               </button>
             ) : null}
-            {turn.gap ? (
+            {turn.gap && canPropose ? (
               <button type="button" className="paper-btn" data-testid="ask-work-item" onClick={() => makeWorkItem(turns[index - 1]?.text || turn.text)}>
                 Make it a work item
               </button>
@@ -222,7 +242,7 @@ export function AskPanel({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            placeholder={site ? "Ask about this site" : "Ask about the portfolio"}
+            placeholder={site ? "Ask about this site" : scoped ? "Which of these sites is missing a P&L?" : "Ask about the portfolio"}
           />
           <button type="submit" className="primary" disabled={pending || !question.trim()} aria-busy={pending}>{pending ? "Thinking…" : "Ask"}</button>
         </form>

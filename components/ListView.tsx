@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NdaChip } from "./NdaChip";
 import { PhoneCards } from "./PhoneCards";
 import { useNarrowList } from "./useNarrowList";
@@ -11,7 +11,7 @@ import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { listScoreText } from "@/lib/keyNumbers";
 import type { StoredScoreInput } from "@/lib/scoreDisplay";
 import { CountyChip, LandPausedChip, ScoreCell, StageTypeCell, TypeChip } from "./ListLook";
-import { ColumnPicker, RowCheck, SortControl } from "./ListChrome";
+import { ColumnPicker, EmptyShortlist, RowCheck, ShortlistSummary, SortControl, sharedStage } from "./ListChrome";
 import { UNIVERSE_STAGE_LABEL } from "@/lib/listLook";
 import { stageChipLabel } from "@/lib/chips";
 import {
@@ -60,13 +60,13 @@ export type ListRow = {
 
 export const LIST_COLUMNS: { id: keyof Omit<ListRow, "id" | "lng" | "lat" | "nda" | "ndaId" | "near" | "nearShort" | "address" | "listingUrl" | "folderUrl" | "packageUrl" | "lead" | "tier" | "zoning" | "city">; label: string }[] = [
   { id: "site", label: "Site" },
-  { id: "stage", label: "Stage" },
+  { id: "stage", label: "Stage / type" },
   { id: "county", label: "County check" },
   { id: "score", label: "Score" },
   { id: "spare", label: "Open land" },
   { id: "grade", label: "Power" },
   { id: "traffic", label: "Traffic" },
-  { id: "listed", label: "Asking" },
+  { id: "listed", label: "Listing" },
 ];
 
 type ListColumnId = (typeof LIST_COLUMNS)[number]["id"];
@@ -81,13 +81,15 @@ export function listCsv(rows: ListRow[]) {
 }
 
 export default function ListView({
+  title,
   rows,
-  selectedId,
+  selectedId, initialSelection, onSelection, onScope,
   sort,
   onSort,
   onOpen,
   onShowMap,
   onExport,
+  onCompare,
   note,
   signedIn = false,
   userId = "",
@@ -96,13 +98,18 @@ export default function ListView({
   onClearArea,
   onDismiss,
 }: {
+  title: string;
   rows: ListRow[];
+  initialSelection?: string[];
+  onSelection?: (ids: string[]) => void;
+  onScope?: (ids: string[], layout: ListLayout) => void;
   selectedId: string | null;
   sort: { id: string; desc: boolean };
   onSort: (id: ListColumnId | "", desc?: boolean) => void;
   onOpen: (id: string) => void;
   onShowMap: (id: string) => void;
   onExport: () => void;
+  onCompare: (ids: string[]) => void;
   note?: string;
   signedIn?: boolean;
   userId?: string;
@@ -119,8 +126,8 @@ export default function ListView({
   const paneRef = useRef<HTMLDivElement>(null);
   const phone = useNarrowList(paneRef);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
-  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>(initialSelection || []);
+  useEffect(() => { onSelection?.(picked); }, [picked, onSelection]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sortOverride = sortFromParam(sortQuery === undefined ? `${sort.id}:${sort.desc ? "desc" : "asc"}` : sortQuery, allowed);
   const activeLayout: ListLayout = sortOverride === undefined ? layout : { ...layout, sort: sortOverride };
@@ -136,8 +143,9 @@ export default function ListView({
     return prepareRows(scoped, columns, activeLayout, visible);
   }, [activeLayout, columns, mapArea, rows, visible]);
 
-  const showChecks = !phone || selecting;
+  const commonStage = sharedStage(ordered.map(row => row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || "")));
   const visibleIds = ordered.map((row) => row.id);
+  useEffect(() => { onScope?.(visibleIds, activeLayout); }, [visibleIds, activeLayout, onScope]);
   const pickedSet = new Set(picked.filter((id) => visibleIds.includes(id)));
   const allOn = visibleIds.length > 0 && visibleIds.every((id) => pickedSet.has(id));
   function toggleRow(id: string) {
@@ -162,15 +170,13 @@ export default function ListView({
 
   return (
     <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length}>
-      <div className="summary-row" data-testid="summary-row">
-        <div><span className="only-desktop">In this filter</span><span className="only-mobile">Shown</span><strong>{ordered.length.toLocaleString()}</strong></div>
+      <ShortlistSummary title={title} count={ordered.length} commonStage={commonStage}>
         <div><span className="only-desktop">Listed</span><span className="only-mobile">Listed</span><strong>{ordered.filter((row) => /^yes/i.test(row.listed)).length.toLocaleString()}</strong></div>
         <div><span className="only-desktop">Land OK</span><span className="only-mobile">Land OK</span><strong>{ordered.filter((row) => row.county === "Land OK").length.toLocaleString()}</strong></div>
         <div><span className="only-desktop">Not reviewed</span><span className="only-mobile">Unchecked</span><strong>{ordered.filter((row) => row.county === "Unchecked").length.toLocaleString()}</strong></div>
-      </div>
+      </ShortlistSummary>
       {note ? <p className="list-note" role="status">{note}</p> : null}
       <div className="list-bar">
-        <p>{ordered.length.toLocaleString()}{mapArea ? " in this map area" : " shown"}</p>
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
         <SortControl
           columns={visible.flatMap((id) => {
@@ -192,31 +198,27 @@ export default function ListView({
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); setSelecting((value) => !value); setPicked([]); }}>{selecting ? "Done" : "Select"}</button>
-              {selecting ? <button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button> : null}
+              {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); downloadVisible(columns, ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}
             </div>
           ) : null}
         </div>
       </div>
+      {!ordered.length && <EmptyShortlist
+        clearFilters={Object.values(activeLayout.filters).some(Boolean) ? ()=>commit({...activeLayout,filters:{},touched:true}) : undefined}
+        clearArea={mapArea ? onClearArea : undefined} />}
       {phone ? (
         <div className="list-scroll">
-          <PhoneCards rows={ordered.map((row) => ({
+          <PhoneCards commonStage={commonStage} rows={ordered.map((row) => ({
             id: row.id,
             name: row.site || "—",
             address: row.address && row.address !== row.site ? row.address : row.city,
             stage: row.universeOnly ? UNIVERSE_STAGE_LABEL : stageChipLabel(row.stage, row.stageGroup || ""),
-            chips: (
-              <>
-                <TypeChip value={row.type} />
-                {row.landPaused ? <LandPausedChip /> : null}
-                {row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null}
-                {row.scoreInput ? <ScoreCell input={row.scoreInput} /> : null}
-              </>
-            ),
+            chips: row.landPaused ? <LandPausedChip /> : row.county ? <CountyChip label={row.county} note={row.countyNote || ""} /> : null,
             facts: universeCardFacts(row, signedIn),
             selected: row.id === selectedId,
+            check: <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} />,
             onOpen: () => onOpen(row.id),
           }))} />
         </div>
@@ -231,12 +233,12 @@ export default function ListView({
         onOpen={onOpen}
         onClose={() => onDismiss?.()}
         scrollRef={scrollRef}
-        headerExtra={(id) => id === "site" && showChecks ? (
+        headerExtra={(id) => id === "site" ? (
           <RowCheck label="Select all shown" checked={allOn} onChange={toggleAll} />
         ) : null}
         renderCell={(row, column) => column === "site" ? (
           <span className="site-name">
-            {showChecks ? <RowCheck label={`Select ${row.site || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} /> : null}
+            <RowCheck label={`Select ${row.site || row.id}, ${row.address || row.id}`} checked={pickedSet.has(row.id)} onChange={() => toggleRow(row.id)} />
             <span className="site-title">
               <span className="site-name-text" title={row.site || row.id}>{row.site || "—"}</span>
               <span className="site-meta">
@@ -248,6 +250,7 @@ export default function ListView({
           </span>
         ) : column === "stage" ? (
           <StageTypeCell
+            hideStage={Boolean(commonStage)}
             stage={row.stage}
             group={row.stageGroup || ""}
             detail={row.stageDetail}
@@ -267,6 +270,11 @@ export default function ListView({
           <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); onShowMap(row.id); }}>Show on map</button>
         )}
       />}
+      {pickedSet.size > 0 && <div className="selection-bar" data-testid="selection-bar">
+        <p>{pickedSet.size} selected{pickedSet.size < 2 ? " · Select one more to compare" : pickedSet.size > 4 ? " · Choose up to 4 to compare" : ""}</p>
+        <button type="button" className="paper-btn" disabled={pickedSet.size < 2 || pickedSet.size > 4} onClick={() => onCompare([...pickedSet])}>Compare</button>
+        <button type="button" className="text-link" onClick={() => setPicked([])}>Clear selection</button>
+      </div>}
     </div>
   );
 }
@@ -293,8 +301,12 @@ export function listCellText(row: ListRow, id: ListColumnId, signedIn: boolean) 
 }
 
 export function universeCardFacts(row: ListRow, signedIn: boolean): string[] {
-  return [listCellText(row, "listed", signedIn), listCellText(row, "spare", signedIn)]
-    .filter((fact) => fact && fact !== "—" && fact !== "Not on file");
+  const listing = listCellText(row, "listed", signedIn);
+  const spare = listCellText(row, "spare", signedIn);
+  return [
+    listing === "No" ? "Not listed" : listing === "Yes" ? "Listed" : listing && listing !== "—" ? "Listing · " + listing : "Listing unknown",
+    spare && spare !== "—" && spare !== "Not on file" ? "Spare land " + spare : "",
+  ].filter(Boolean);
 }
 
 function shownText(row: ListRow, id: ListColumnId, signedIn: boolean) {

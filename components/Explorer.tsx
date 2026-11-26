@@ -1,30 +1,45 @@
 "use client";
 
+import { PIN_SPLIT_ZOOM } from "@/lib/mapClusters";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionsDialogs, ActionsMenuButtons } from "./actions/ActionsChrome";
 import { FilterPopover, ReviewBar, ReviewFeedSheet, ReviewRail, marketLabel, type FeedSite } from "./queue/QueueView";
-import { AskPanel } from "./agent/AskPanel";
+
 import { RecordActions } from "./actions/RecordActions";
+import type { QueueReason as ReviewChange } from "@/lib/queue/order";
+import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
+import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
+import NearbySites from "./NearbySites";
+import type { MapOutline } from "./spaces/SpaceOptions";
+import FinancialPortfolio from "./FinancialPortfolio";
+import { PurchaseScenarios } from "./PurchaseScenarios";
+import { purchaseLabels, financialEvidence } from "@/lib/purchaseReview";
+import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
 import AppLoading from "./AppLoading";
 import Wordmark from "./Wordmark";
 import ListView, { LIST_COLUMNS, listCsv, type ListRow } from "./ListView";
 import PipelineList, { type PipelineRow } from "./PipelineList";
+import { numberEvidence } from "@/lib/comparison";
+import type { ListLayout } from "@/lib/listLayout";
+import MyWork, { type WorkPosition } from "./MyWork";
 import CompareTray from "./CompareTray";
 import SiteTable, { DealTable, type ActivitySummary } from "./SiteTable";
 import { actionsDown, quietActionsFetch, subscribeActionsDown } from "@/lib/actions/quiet";
 import { DRAWER_DEFAULT, DRAWER_WIDTH_KEY, clampDrawerWidth } from "@/lib/drawerWidth";
 import { initialSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { CITY_VIEW, CITIES, compareSites, droppedAt, heldOutside, inSelectedMarket, inStage, isLiveContactedDeal, matchesLandTier, matchesOpenLandTier, nearestDepot, presentSite, spareTier, type PipeId, type StageId } from "@/lib/filter";
-import { areaQuery, inMapArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
+import { areaQuery, inMapArea, savedListArea, parseMapArea, type MapArea } from "@/lib/geoFilter";
 import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
 import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
-import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
+import { marketEvidence, marketLabels, readMarketMetric, type MarketMetric, type MarketRow } from "@/lib/marketContext";
+import MarketMapPanel from "./MarketMapPanel";
+import type { WashInspection } from "./MarketEvidence";
 import { displayAddress, folderHref, leadSourceLine, listingHref } from "@/lib/format";
 import { dealSearchParts, matchesQuery, partyMatch, siteSearchParts } from "@/lib/search";
 import { paletteGroups } from "@/lib/search/palette";
@@ -119,6 +134,8 @@ function guardFeatures<T extends { features?: { properties?: Record<string, unkn
   return { ...body, features };
 }
 
+const AskPanel = dynamic(() => import("./agent/AskPanel").then(module => module.AskPanel));
+
 export default function Explorer() {
   const params = useSearchParams();
   const router = useRouter();
@@ -156,27 +173,53 @@ export default function Explorer() {
     const width = Math.ceil(layers.getBoundingClientRect().width);
     shell.style.setProperty("--layers-clear", `${Math.max(width, 1) + 22}px`);
   });
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [listingsReady, setListingsReady] = useState(false);
   const [data, setData] = useState<AppData | null>(null);
   const [activity, setActivity] = useState<ActivitySummary>({});
   const [unscreened, setUnscreened] = useState<UnscreenedFeature[]>([]);
   const [detail, setDetail] = useState<SiteProps | null>(null);
   const [me, setMe] = useState<{ u: string; role: string; actionRole?: string; actionsEnabled?: boolean } | null>(null);
+  const [askList, setAskList] = useState<string[]>([]);
   const [askOpen, setAskOpen] = useState(false);
   const [askSite, setAskSite] = useState<{ id: string; name: string } | null>(null);
   const [figuresReady, setFiguresReady] = useState(!params.get("site"));
   const [handoff, setHandoff] = useState("");
   const [gridFeatures, setGridFeatures] = useState<GeoFeature[]>([]);
   const [stepsOpen, setStepsOpen] = useState(false);
+  useEffect(() => {
+    if (!stepsOpen) return;
+    shellRef.current?.querySelector<HTMLButtonElement>("#workspace-scope .close")?.focus({ preventScroll: true });
+    const closeKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); dismissScope(); }
+    };
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest("#workspace-scope, .workspace-scope, .market-marker")) setStepsOpen(false);
+    };
+    document.addEventListener("keydown", closeKey);
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      document.removeEventListener("keydown", closeKey);
+      document.removeEventListener("pointerdown", outside);
+    };
+  }, [stepsOpen]);
   const [queueCount, setQueueCount] = useState(0);
   const [queueTick, setQueueTick] = useState(0);
   const [feed, setFeed] = useState<FeedSite[]>([]);
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [loadedQueueKey, setLoadedQueueKey] = useState("");
+  const reviewRequest = useRef(false);
+  const [reviewChange, setReviewChange] = useState<{ site: string; reason: ReviewChange; index: number; panel: string | null; note: string | null; msg: string | null; snap: SheetSnap } | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [undo, setUndo] = useState<{ siteId: string; previous: string | null; index: number } | null>(null);
   const [feedSheet, setFeedSheet] = useState(false);
   const [error, setError] = useState("");
   const [missingSite, setMissingSite] = useState("");
   const [selected, setSelected] = useState<string | null>(params.get("site"));
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [keyOpen, setKeyOpen] = useState(false);
   const tableOpen = params.get("table") === "1";
   const compare = params.get("disagree") === "1";
   const showDropped = params.get("ruled") === "1";
@@ -193,6 +236,10 @@ export default function Explorer() {
   const [tip, setTip] = useState("");
   const [ringCursor, setRingCursor] = useState<{ x: number; y: number } | null>(null);
   const [ringsOutside, setRingsOutside] = useState(false);
+  const nearbyHighlight = useRef<((point: [number, number] | null) => void) | null>(null);
+  const highlightNearby = useCallback((point: [number, number] | null) => nearbyHighlight.current?.(point), []);
+  const nearbyPicker = useRef<((id: string) => void) | null>(null);
+  const [mapZoom, setMapZoom] = useState(0);
   const frameRings = useRef<(() => void) | null>(null);
   const registerFrameRings = useCallback((frame: (() => void) | null) => {
     frameRings.current = frame;
@@ -228,7 +275,8 @@ export default function Explorer() {
     note.dataset.hidden = "0";
   }, [ringCursor]);
   const [copied, setCopied] = useState(false);
-  const compareIds = (params.get("compare") || "").split("|").filter(Boolean).slice(0, 4);
+  const compareParam = params.get("compare") || "";
+  const compareIds = useMemo(() => Array.from(new Set(compareParam.split("|").filter(Boolean))).slice(0, 4), [compareParam]);
   const [changesNote, setChangesNote] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -259,12 +307,14 @@ export default function Explorer() {
   const [showSpaces, setShowSpaces] = useState(true);
   const [markedSpaces, setMarkedSpaces] = useState<SpaceShape[]>([]);
   const [spaceNames, setSpaceNames] = useState<Record<string, string>>({});
+  const [layoutOverlay, setLayoutOverlay] = useState<MapOutline | null>(null);
   const [marking, setMarking] = useState<{ siteId: string; lng: number; lat: number; nonce: number } | null>(null);
   const [pickedSpace, setPickedSpace] = useState("");
   const [commentedSpaceIds, setCommentedSpaceIds] = useState<string[]>([]);
   const [threadSpaceId, setThreadSpaceId] = useState("");
   const [commentFly, setCommentFly] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const [mapNote, setMapNote] = useState("");
+  const [mapAttempt, setMapAttempt] = useState(0);
   useEffect(() => {
     if (!me?.u) return undefined;
     let cancel = false;
@@ -368,15 +418,22 @@ export default function Explorer() {
   const allPipes = pipeView.all;
   const pipeStage: PipeId = pipeView.stage;
   const outsideGroup = funnel === "pipeline" && params.get("outside") === "1" && allPipes;
-  const listView = params.get("view") === "list";
+  const mapRequested = params.get("view") !== "list";
+  const recoveringMap = Boolean(mapNote) && params.get("spaces")!=="1" && mapRequested && !params.has("review") && params.get("view") !== "review" && !params.has("loops") && !params.has("nda");
+  const listView = !mapRequested || recoveringMap;
+  function retryMap() {
+    setMapNote("");
+    setMapAttempt(attempt => attempt + 1);
+  }
   const [liveArea, setLiveArea] = useState<MapArea | null>(null);
   const [followArea, setFollowArea] = useState(false);
-  const mapAreaLive = followArea ? liveArea : null;
+  const mapAreaLive = followArea ? liveArea : savedListArea(params.get("listArea"));
   const reach: Reach = parseReach(params.get("reach"));
   const ndaRaw = params.get("nda") || "";
   const ndaId = /^NDA-\d{3,}$/i.test(ndaRaw) ? ndaRaw.toUpperCase() : "";
   const ndaParam = ndaRaw === "1" || Boolean(ndaId);
-  const loopsParam = params.get("loops") === "1";
+  const myWork = params.get("loops") === "work";
+  const loopsParam = myWork || params.get("loops") === "1";
   const loopsAllowed = Boolean(me?.actionRole && ndaQueueAllowed(me.actionRole));
   const loopsVisible = loopsParam && loopsAllowed;
   const ndaVisible = ndaParam && !loopsVisible;
@@ -397,6 +454,13 @@ export default function Explorer() {
   const sortKey = (LIST_COLUMNS.some((column) => column.id === sortParam.split(":")[0]) ? sortParam.split(":")[0] : "site") as keyof Omit<ListRow, "id">;
   const sortDesc = sortParam.endsWith(":desc");
   const reviewing = params.get("review") === "1" || params.get("view") === "review";
+  // A direct shortlist visit covers the map. Keep the camera alive after the first map visit.
+  const workDetail = params.get("fromWork") === "1" && Boolean(params.get("site") || params.get("nda"));
+  const needsMap = (!listView && !myWork && !workDetail && !ndaVisible) || reviewing || followArea;
+  const [mapVisited, setMapVisited] = useState(false);
+  useEffect(() => {
+    if (needsMap) setMapVisited(true);
+  }, [needsMap]);
   const queueMarket = params.get("qmarket") || (reviewing ? "all" : city);
   const queueStage = params.get("qstage") || (reviewing || funnel !== "pipeline" || allPipes ? "any" : pipeStage);
   const queueViable = params.get("qviable") !== "0";
@@ -413,7 +477,8 @@ export default function Explorer() {
   const pipelineColumns = parseColumns(params.get("cols"));
   const pillParam = params.get("pill");
   const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
-  const [basemap, setBasemap] = useState<"positron" | "satellite">("satellite");
+  const [preferredBasemap, setBasemap] = useState<"positron" | "satellite">("positron");
+  const basemap = marking || params.get("spaces")==="1" ? "satellite" : preferredBasemap;
   const [marketPref, setMarketPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [marketReady, setMarketReady] = useState(false);
   const appliedMarket = useRef(false);
@@ -509,11 +574,11 @@ export default function Explorer() {
     write({ pill: next });
   }
 
-  function chooseFunnel(next: FunnelMode) {
+  function chooseFunnel(next: FunnelMode, workspace = false) {
     window.localStorage.setItem(FUNNEL_STORAGE, next);
     window.localStorage.setItem(FUNNEL_VERSION_KEY, FUNNEL_VERSION);
     setFunnelPref({ version: FUNNEL_VERSION, value: next });
-    write({ funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null, nda: null, loops: null });
+    write({ ...(workspace ? { loops:null, nda:null, review:null, i:null, rsite:null, site:null, panel:null, note:null, compare:null, measure:null, slist:null, savedView:null, view:next === "pipeline" ? "list" : null } : {}), funnel: next, tab: next === "pipeline" ? "pipeline" : null, score: next === "pipeline" ? params.get("score") : null, nda: null, loops: null });
   }
 
   function chooseBasemap(next: "positron" | "satellite") {
@@ -521,16 +586,117 @@ export default function Explorer() {
     setBasemap(next);
   }
 
+  const workPosition = useRef<WorkPosition | null>(null);
+  const workQuery = useRef("");
+  const workOrigin = useRef<{ query: string; top: number; left: number; cell: string; row: string } | null>(null);
+  const lastCell = useRef({ row: "", cell: "" });
+  const listSelection = useRef<Record<string, string[]>>({ pipeline: [], universe: [] });
+  const listScope = useRef<string[]>([]);
+  const [listCount, setListCount] = useState<number | null>(null);
+  const listLayout = useRef<ListLayout | null>(null);
+  const rememberScope = useCallback((ids: string[], layout: ListLayout) => {
+    listScope.current = ids;
+    listLayout.current = layout;
+    setListCount(ids.length);
+  }, []);
+  const comparisonOrigin = useRef<string | null>(null);
+  const inspectMeasure = params.get("measure");
+  const inspecting = Boolean(inspectMeasure && selected && (compareIds.includes(selected) || comparisonOrigin.current !== null));
+  useEffect(() => {
+    if (inspecting) shellRef.current?.querySelector<HTMLButtonElement>(".comparison-back")?.focus({ preventScroll: true });
+  }, [inspecting, selected]);
+  function inspectComparison(id: string, measure: string, source?: URLSearchParams) {
+    comparisonOrigin.current = currentSearch();
+    setPreviewId(null);
+    const inspectedId = source?.get("site") || id;
+    setSelected(inspectedId);
+    const panel = marketLabels.some(label=>label===measure) ? "market-context" : measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
+    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (purchaseLabels.some(l=>l===measure) || measure==="Purchase scenario" ? "purchase" : ["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
+  }
+  function returnComparison() {
+    if (comparisonOrigin.current !== null) {
+      setSelected(new URLSearchParams(comparisonOrigin.current).get("site"));
+      replaceSearch(comparisonOrigin.current, { measure: null });
+      comparisonOrigin.current = null;
+    } else {
+      setSelected(null);
+      write({ site: null, measure: null, panel: null, sheet: null });
+    }
+  }
+  function comparisonQuery() {
+    const query = new URLSearchParams(currentSearch());
+    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView", "reviewCitation", "workFilter"]) query.delete(key);
+    query.set("compare", compareIds.join("|"));
+    query.set("city", selectedMarket);
+    query.set("funnel", funnel);
+    if (funnel === "universe" && !query.has("stage")) query.set("stage", stage);
+    if (funnel === "pipeline" && !query.has("pstage")) query.set("pstage", "all");
+    if (listView && listLayout.current) {
+      const layout = listLayout.current;
+      query.set(funnel + "Layout", JSON.stringify(layout));
+      query.set("sort", layout.sort ? layout.sort.id + ":" + (layout.sort.desc ? "desc" : "asc") : "none");
+      if (mapAreaLive?.kind === "polygon" && mapAreaLive.points.length === 4) {
+        query.set("listArea", [...mapAreaLive.points[0], ...mapAreaLive.points[2]].join(","));
+      }
+    }
+    return query.toString();
+  }
+  const comparisonBack = inspecting && <button className="text-link comparison-back" data-measure={inspectMeasure} type="button" onClick={returnComparison}>Back to comparison · {inspectMeasure}</button>;
+  const queryString = params.toString();
+  useEffect(() => {
+    const updateSearch = () => rememberSearch(window.location.pathname + window.location.search);
+    window.addEventListener("popstate", updateSearch);
+    return () => window.removeEventListener("popstate", updateSearch);
+  }, []);
+  useEffect(() => {
+    const origin = workOrigin.current;
+    if (!origin || origin.query !== queryString || !data) return;
+    const frame = requestAnimationFrame(() => {
+      const scroller = document.querySelector<HTMLElement>(".list-x, .list-pane .list-scroll:not(:has(.list-x))");
+      if (scroller) scroller.scrollTo(origin.left, origin.top);
+      requestAnimationFrame(() => {
+        const row = origin.row && document.querySelector<HTMLElement>(`[data-site-row="${CSS.escape(origin.row)}"]`);
+        if (row) (row.querySelector<HTMLElement>(`[data-col="${CSS.escape(origin.cell)}"], button.list-row`) || row).focus({ preventScroll: true });
+      });
+      workOrigin.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [queryString, data]);
+
+  function restoreOrigin() {
+    const origin = workOrigin.current;
+    if (!origin) return false;
+    wantedReview.current = "";
+    leaveSite.current = "";
+    setSelected(new URLSearchParams(origin.query).get("site"));
+    replaceSearch(origin.query, {});
+    return true;
+  }
+
+  function returnToWork() {
+    setSelected(null);
+    replaceSearch(workQuery.current || params.toString(), { loops:"work", fromWork:null, nda:null, site:null, sheet:null, note:null, msg:null, workItem:null, panel:null });
+  }
   function write(next: Record<string, string | null>, history = false) {
     const live = typeof window === "undefined" ? params.toString() : currentSearch();
+    const prior = new URLSearchParams(live);
+    const enteringWork = next.review === "1" || Boolean(next.nda) || Boolean(next.loops);
+    if (enteringWork && !prior.has("nda") && !prior.has("loops") && prior.get("review") !== "1" && prior.get("view") !== "review" && !prior.has("ndafrom")) {
+      const scroller = document.querySelector<HTMLElement>(".list-x, .list-pane .list-scroll:not(:has(.list-x))");
+      workOrigin.current = { query: prior.toString(), top: scroller?.scrollTop || 0, left: scroller?.scrollLeft || 0, ...lastCell.current };
+      history = true;
+    }
     const patch = next.site ? { q: null, ...next } : next;
     replaceSearch(live, patch, history);
   }
 
   function stopReview(next: Record<string, string | null> = {}) {
+    if (mapNote && !next.view) retryMap();
+    setReviewChange(null);
+    if (reviewing && Object.keys(next).length === 0 && restoreOrigin()) return;
     wantedReview.current = "";
     leaveSite.current = "";
-    write({ review: null, view: null, i: null, rsite: null, nda: null, loops: null, ...next });
+    write({ review: null, view: null, i: null, rsite: null, nda: null, loops: null, ...(reviewChange ? { panel: null, note: null, msg: null } : {}), ...next });
   }
 
   function replaceSearch(base: string, next: Record<string, string | null>, history = false) {
@@ -543,7 +709,12 @@ export default function Explorer() {
     // An empty `/?` does not clear a lone search param. `/` does, and it stays a client navigation.
     const href = query ? `/?${query}` : "/";
     rememberSearch(href);
-    if (history) router.push(href, { scroll: false });
+    // The comparison is client state. The homepage server component reads no query
+    // parameters, and Next synchronizes these history changes with useSearchParams.
+    if ("compare" in next || "measure" in next || "fromWork" in next) {
+      if (history) window.history.pushState(null, "", href);
+      else window.history.replaceState(null, "", href);
+    } else if (history) router.push(href, { scroll: false });
     else router.replace(href, { scroll: false });
   }
 
@@ -557,79 +728,82 @@ export default function Explorer() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
+  const batchKeys = useRef(new Map<string, string>());
   async function postSelection(ids: string[], bodyFor: (id: string) => Record<string, string>, path = "/api/actions/notes") {
-    const errors: string[] = [];
+    const failed: string[] = [];
     for (const id of ids) {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(bodyFor(id)),
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({})) as { error?: string };
-        errors.push(payload.error || "That could not be saved.");
+      const body = JSON.stringify(bodyFor(id));
+      const fingerprint = path + body;
+      const key = batchKeys.current.get(fingerprint) || crypto.randomUUID();
+      batchKeys.current.set(fingerprint, key);
+      try {
+        const response = await fetch(path, {
+          method: "POST", headers: { "content-type": "application/json", "Idempotency-Key": key }, body,
+        });
+        if (!response.ok) throw new Error();
+        batchKeys.current.delete(fingerprint);
+      } catch {
+        failed.push(id);
       }
     }
-    if (errors.length) throw new Error(errors[0]);
+    return failed;
   }
 
   const dataGen = useRef(0);
   useEffect(() => {
     let cancel = false;
     const token = ++dataGen.current;
-    Promise.all([
-      fetch(`/api/data/sites?city=${city}`),
-      fetch("/api/data/areas"),
-      fetch("/api/data/depots"),
-      fetch(`/api/data/parcels?city=${city}`),
-      fetch("/api/data/funnel"),
-      fetch("/api/data/deals"),
-      fetch("/api/data/unscreened"),
-      fetch("/api/data/timeline/summary"),
-      fetch("/api/me"),
-    ]).then(async ([sitesRes, areasRes, depotsRes, parcelsRes, funnelRes, dealsRes, unscreenedRes, summaryRes, meRes]) => {
-      if (sitesRes.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      if (!sitesRes.ok || !areasRes.ok || !depotsRes.ok || !parcelsRes.ok || !funnelRes.ok || !dealsRes.ok || !unscreenedRes.ok) {
-        if (!cancel && token === dataGen.current) setError("The site data could not be loaded.");
-        return;
-      }
-      const [sitesBody, areasBody, depotsBody, parcelsBody, funnelPayload, dealsBody] = await Promise.all([
-        sitesRes.json(),
-        areasRes.json(),
-        depotsRes.json(),
-        parcelsRes.json(),
-        funnelRes.json(),
-        dealsRes.json(),
-      ]);
-      if (!cancel && token === dataGen.current) {
-        setData((current) => ({
+    const controller = new AbortController();
+    const read = async (path: string, cache: RequestCache = "default") => {
+      const response = await fetch(path, { signal: controller.signal, cache });
+      if (response.status === 401) window.location.assign("/login");
+      if (!response.ok) throw new Error("Unavailable");
+      return response.json();
+    };
+    const empty = { type: "FeatureCollection" as const, features: [] };
+    setError("");
+    setUnavailable([]);
+    setListingsReady(false);
+    const noteFailure = (name: string) => {
+      if (!cancel) setUnavailable(current => current.includes(name) ? current : [...current, name]);
+    };
+    async function load() {
+      try {
+        const [sitesBody, dealsBody, funnelPayload, user] = await Promise.all([
+          read(`/api/data/sites?city=${city}`, "no-store"), read("/api/data/deals", "no-store"), read("/api/data/funnel"), read("/api/me"),
+        ]);
+        if (cancel || token !== dataGen.current) return;
+        setMe(user);
+        setData(current => ({
           sites: current ? preservePendingStage(current.sites, guardFeatures(sitesBody)) : guardFeatures(sitesBody),
-          areas: areasBody,
-          depots: depotsBody,
-          parcels: parcelsBody,
           deals: current ? preservePendingStage(current.deals, guardFeatures(dealsBody)) : guardFeatures(dealsBody),
-          funnel: funnelPayload.funnel,
+          funnel: funnelPayload.funnel, areas: empty, depots: empty, parcels: empty,
         }));
-        const unscreenedPayload = await unscreenedRes.json();
-        setUnscreened(Array.isArray(unscreenedPayload.features) ? unscreenedPayload.features : []);
-        setMe(meRes.ok ? await meRes.json() : null);
-        if (summaryRes.ok) {
-          const summary = (await summaryRes.json()) as { records?: ActivitySummary };
-          setActivity(summary.records || {});
-        }
         const changes = funnelPayload.meta?.changes;
         if (changes && typeof changes.new_sites === "number") {
           setChangesNote(`Since the previous published build: ${changes.new_sites} new sites, ${changes.verdict_changes} verdict changes, ${changes.stage_moves} stage moves.`);
         }
+        for (const layer of ["areas", "depots", "parcels"] as const) {
+          const path = layer === "parcels" ? `/api/data/parcels?city=${city}` : `/api/data/${layer}`;
+          void read(path).then(payload => {
+            if (!cancel) setData(current => current ? { ...current, [layer]: payload } : current);
+          }).catch(() => noteFailure(layer));
+        }
+        void read("/api/data/unscreened").then(payload => {
+          if (cancel) return;
+          setUnscreened(Array.isArray(payload.features) ? payload.features : []);
+          setListingsReady(true);
+        }).catch(() => noteFailure("unscreened listings"));
+        void read("/api/data/timeline/summary").then(payload => {
+          if (!cancel) setActivity(payload.records || {});
+        }).catch(() => noteFailure("activity summary"));
+      } catch {
+        if (!cancel) setError("Your workspace could not be loaded.");
       }
-    });
-    return () => {
-      cancel = true;
-    };
-  }, [city]);
+    }
+    void load();
+    return () => { cancel = true; controller.abort(); };
+  }, [city, loadAttempt]);
 
   const catalogOn = useRef(false);
   catalogOn.current = Boolean(catalog);
@@ -637,10 +811,10 @@ export default function Explorer() {
     let cancel = false;
     async function refresh(token: number) {
       const requests = [
-        fetch("/api/data/deals"),
-        fetch(`/api/data/sites?city=${city}`),
+        fetch("/api/data/deals", { cache: "no-store" }),
+        fetch(`/api/data/sites?city=${city}`, { cache: "no-store" }),
       ];
-      if (catalogOn.current) requests.push(fetch("/api/data/sites"));
+      if (catalogOn.current) requests.push(fetch("/api/data/sites", { cache: "no-store" }));
       const [dealsRes, sitesRes, allSitesRes] = await Promise.all(requests);
       if (cancel || token !== dataGen.current || !dealsRes?.ok || !sitesRes?.ok) return;
       const deals = await dealsRes.json();
@@ -674,11 +848,11 @@ export default function Explorer() {
   }, [city]);
 
   const linkedId = params.get("site") || "";
-  const needCatalog = fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
+  const needCatalog = (Boolean(linkedId) && readMarketMetric(params) === "washes") || fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
-    fetch("/api/data/sites").then(async (response) => {
+    fetch("/api/data/sites", { cache: "no-store" }).then(async (response) => {
       if (!response.ok || cancel) return;
       const payload = await response.json() as { features?: SiteFeature[] };
       if (!cancel) {
@@ -781,17 +955,18 @@ export default function Explorer() {
   }, [me?.actionsEnabled, badgeKey, queueTick]);
 
   useEffect(() => {
-    const media = window.matchMedia("(min-width: 1100px)");
-    const apply = () => setLayersOpen(media.matches);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
+    try { setLayersOpen(window.localStorage.getItem("map-layers-open") === "1"); } catch {}
   }, []);
+
+  function chooseLayers(open: boolean) {
+    setLayersOpen(open);
+    try { window.localStorage.setItem("map-layers-open", open ? "1" : "0"); } catch {}
+  }
 
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
+      const linked = panel === "purchase" || panel === "market-context" || panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -1105,7 +1280,13 @@ export default function Explorer() {
     const has = compareIds.includes(id);
     const want = on ?? !has;
     if (want === has) return;
-    const next = want ? (compareIds.length >= 4 ? compareIds : [...compareIds, id]) : compareIds.filter((item) => item !== id);
+    if (want && compareIds.length >= 4) {
+      const remove = document.querySelector<HTMLButtonElement>(".compare-bar button.menu-item");
+      remove?.focus();
+      remove?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    const next = want ? [...compareIds, id] : compareIds.filter((item) => item !== id);
     write({ compare: next.length ? next.join("|") : null });
   }
 
@@ -1128,19 +1309,37 @@ export default function Explorer() {
   }
 
   const pipelineStepRows = pipelineDeals;
-  const pipelineSquares = pipelineStepRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const stageLandRows = landDeals.filter((deal) => funnel !== "pipeline" || dealWide || dealOnPipeStep(deal, pipeStage, reach));
-  const stageLandSquares = stageLandRows.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
+  const tierOn = (deal: DealProps) => (dealCategory(deal) !== "wash" || matchesOpenLandTier(deal.open_land_sqft, landTier)) && (!mapArea || (() => {
+    const point = dealPoint(deal);
+    return point ? inMapArea(point[0], point[1], mapArea) : false;
+  })());
+  const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
+  const landForList = stageLandRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
+  const pickedIds = (params.get("pick") || "").split("|").filter(Boolean);
+  const pickedSet = new Set(pickedIds);
+  function dealHasScoreIssue(deal: DealProps): boolean {
+    return scoreIssue({
+      score: deal.score,
+      economics: deal.economics_points,
+      land: deal.land_points,
+      power: deal.power_points,
+      location: deal.location_points,
+      deal: deal.deal_points,
+      naEconomics: deal.business_type === "Quick lube",
+    });
+  }
+  const listDeals = (pickedSet.size
+    ? dealRows.filter((deal) => pickedSet.has(deal.deal_id) && viewDeal(deal) && dealAllowed(deal))
+    : [...rangedPipeline, ...landForList]).filter((deal) => !scoreIssues || dealHasScoreIssue(deal));
+  const pipelineSquares = listDeals.map(asSquare).filter((feature): feature is DealFeature => Boolean(feature));
   const landSiteDrawn = new Set(
     visibleFeatures
       .filter((feature) => feature.geometry && isLandParcelSite(feature.properties, links))
       .map((feature) => feature.properties.site_id),
   );
   const drawnDealsBase: DealFeature[] = funnel === "pipeline"
-    ? [
-        ...(showPipeline ? pipelineSquares : []),
-        ...stageLandSquares,
-      ]
+    ? pipelineSquares
     : [
         ...(showPipeline ? pipelineDeals.filter((deal) => !deal.universe_id) : []),
         ...landDeals.filter((deal) => !deal.universe_id || !landSiteDrawn.has(deal.universe_id)),
@@ -1160,23 +1359,19 @@ export default function Explorer() {
   const handoffCopy = handoffStep
     ? `${STEPS.find((step) => step.id === stage)?.label || "This step"} has no listed sites. Showing ${handoffStep === "universe" ? "Universe" : "Service area"}, which has ${subcount(handoffStep, "listed").toLocaleString()} listed.`
     : handoff;
-  const areaDeals = (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
-    if (funnel === "pipeline" && dealCategory(feature.properties) === "wash" && !matchesOpenLandTier(feature.properties.open_land_sqft, landTier)) return false;
+  const areaDeals = funnel === "pipeline" ? pipelineSquares : (listedStepEmpty ? [] : drawnDealsBase).filter((feature) => {
     if (!mapArea) return true;
     const coords = feature.geometry?.coordinates;
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
   });
   const drawnDeals = areaDeals;
-  const overlaysOn = parseOverlays(params.get("overlay"));
-  function toggleOverlay(id: OverlayId) {
-    const next = overlaysOn.includes(id) ? overlaysOn.filter((item) => item !== id) : [...overlaysOn, id];
-    write({ overlay: next.length ? next.join("|") : null });
+  const marketMetric = readMarketMetric(params);
+  const washRadius = params.get("washRadius") === "3" ? 3 : 1;
+  function chooseMarketMetric(next: MarketMetric | null) {
+    write({marketMetric: next, overlay: null, washRadius: null});
+    chooseLayers(false);
+    closeMenus();
   }
-  const overlayPoints = overlayFeatures(drawnDeals, overlaysOn).flatMap((feature) => {
-    const coords = feature.geometry?.coordinates;
-    if (!coords) return [];
-    return [{ label: feature.properties.label, coordinates: [coords[0], coords[1]] as [number, number] }];
-  });
   const handedOff = useRef("");
   const stepKey = `${funnel}|${stage}|${pipeStage}|${listed}|${allStages}|${allPipes}|${outsideGroup}`;
   const seenStep = useRef(stepKey);
@@ -1214,23 +1409,21 @@ export default function Explorer() {
     ? detail
     : sites.find((site) => site.site_id === selected)
       ?? offMarketFeatures.find((feature) => feature.properties.site_id === selected)?.properties
+      ?? catalog?.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const showingPreview = Boolean(selected && previewId === selected && !listView && !reviewing && !ndaVisible && !loopsVisible);
   const selectedSquare = selectedDeal ? asSquare(selectedDeal) : null;
   if (selectedSquare && !drawnDeals.some((feature) => feature.properties.deal_id === selectedDeal?.deal_id)) drawnDeals.push(selectedSquare);
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
+  const washOrigin = selected && marketMetric === "washes" ? spacePoint() : null;
   const washPoints = (() => {
-    if (!overlaysOn.includes("washes") || (!selectedDeal && !selectedSite)) return [];
-    const origin = selectedDeal ? dealPoint(selectedDeal) : (() => {
-      const coords = featureById.get(selectedSite?.site_id || "")?.geometry?.coordinates;
-      return coords ? [coords[0], coords[1]] as [number, number] : null;
-    })();
-    if (!origin) return [];
+    if (!washOrigin) return [];
     const pool = catalog && catalog.length ? catalog : features;
     const exclude = new Set<string>();
     if (selectedSite) exclude.add(selectedSite.site_id);
     if (selectedDeal?.universe_id) exclude.add(selectedDeal.universe_id);
-    const rows: WashSite[] = pool.map((feature) => ({
+    const rows: WashSite[] = pool.filter(feature=>!feature.properties.duplicate_of && feature.properties.counts_as_site !== false).map((feature) => ({
       id: feature.properties.site_id,
       name: feature.properties.name || feature.properties.address || feature.properties.site_id,
       lng: feature.geometry?.coordinates?.[0] ?? null,
@@ -1239,7 +1432,7 @@ export default function Explorer() {
       verdict: feature.properties.verdict,
       landOnly: Boolean(feature.properties.land_only),
     }));
-    return nearbyWashPoints(origin, rows, exclude);
+    return nearbyWashPoints(washOrigin, rows, exclude).filter(row => row.miles <= washRadius);
   })();
   const withheldHere = showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && !feature.properties.pinned) : [];
 
@@ -1255,7 +1448,7 @@ export default function Explorer() {
     }
     let cancel = false;
     setFiguresReady(false);
-    fetch(`/api/data/sites/${encodeURIComponent(selectedSiteId)}`).then(async (response) => {
+    fetch(`/api/data/sites/${encodeURIComponent(selectedSiteId)}`, { cache: "no-store" }).then(async (response) => {
       if (cancel) return;
       if (response.ok) setDetail(presentSite((await response.json()) as SiteProps));
       setFiguresReady(true);
@@ -1267,7 +1460,14 @@ export default function Explorer() {
     };
   }, [selected, selectedSiteId, data]);
 
+  function openPurchase(id:string) {
+    if (isProtectedId(id)) return;
+    setPreviewId(null); chooseLayers(false); setSelected(id); setSheetSnap("full");
+    write({site:id,panel:"purchase",sheet:"full"},true);
+  }
+
   function choose(id: string | null) {
+    setPreviewId(null);
     if (id && isProtectedId(id)) return;
     setSelected(id);
     setFiguresReady(!id);
@@ -1417,10 +1617,11 @@ export default function Explorer() {
     }
     const known = dealRows.some((deal) => deal.deal_id === id)
       || sites.some((site) => site.site_id === id)
-      || (catalog ?? []).some((feature) => feature.properties.site_id === id);
-    const waiting = linked.kind === "universe" && !catalog && !known;
+      || (catalog ?? []).some((feature) => feature.properties.site_id === id)
+      || unscreened.some(feature => feature.properties.listing_id === id);
+    const waiting = (linked.kind === "universe" && !catalog && !known) || (!listingsReady && /^L-/i.test(id));
     setMissingSite(!waiting && !known ? "Site not found" : "");
-  }, [data, params, catalog]);
+  }, [data, params, catalog, unscreened, listingsReady]);
 
   useEffect(() => {
     if (!data || !selected || reviewing) return;
@@ -1595,18 +1796,12 @@ export default function Explorer() {
     return (
       <main className="empty">
         <Wordmark level="p" />
-        <p>{error}</p>
+        <p role="alert">{error}</p>
+        <button type="button" className="paper-btn" onClick={() => setLoadAttempt(value => value + 1)}>Retry workspace</button>
       </main>
     );
   }
-  if (!data) {
-    return (
-      <main className="empty">
-        <Wordmark level="p" />
-        <AppLoading />
-      </main>
-    );
-  }
+  if (!data) return <AppLoading destination={ndaParam ? "NDAs" : reviewing ? "Review" : listView ? "Shortlist" : "Map"} />;
 
   const wideCity = (pipelineWide ? pipelineDeals[0]?.city : universeWide ? visibleSites[0]?.city : "") || "";
   const home = marketFocus(allCities ? "all" : city);
@@ -1622,19 +1817,20 @@ export default function Explorer() {
     onSnap: setSheetSnap,
     onStep: (direction: "more" | "less") => setSheetSnap((snap) => stepSheet(snap, direction)),
   };
-  const unplacedDeals = dealRows.filter((deal) => !isProtectedId(deal.deal_id) && (deal.kind === "pipeline" || deal.kind === "land") && shownInMarket(deal.city) && !dealPoint(deal) && inReach(deal, reach) && dealAllowed(deal));
   const locationFix = params.get("fix") === "location"
     ? (me?.actionRole === "reviewer" ? "edit" : me?.actionRole === "contributor" ? "propose" : null)
     : null;
   const offMarketPool = (universeWide || allCities) && catalog ? catalog.filter((feature) => feature.properties.origin === "off-market") : offMarketFeatures;
   const offMarketShown = funnel === "pipeline" || (extra && !universeWide) ? [] : offMarketPool.filter((feature) => {
-    if (!feature.geometry) return false;
+    if (mapArea && (!feature.geometry || !inMapArea(...feature.geometry.coordinates, mapArea))) return false;
     if (!(allStages || universeWide || stage === "universe") && !atStage(feature.properties, stage)) return false;
     return passesChips(feature.properties, false, universeWide);
   });
   const universePins = showUniverse ? shownFeatures.filter((feature) => feature.geometry) : [];
-  const unscreenedPins = showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && feature.geometry) : [];
-  const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.length) + unscreenedPins.length;
+  const listingScope = showUnscreened ? unscreened.filter(feature => shownInMarket(feature.properties.city) &&
+    (!mapArea || (feature.geometry && inMapArea(...feature.geometry.coordinates, mapArea)))) : [];
+  const unscreenedPins = listingScope.filter(feature => feature.geometry);
+  const pinCount = (funnel === "pipeline" ? drawnDeals.length : universePins.length + offMarketShown.filter(feature => feature.geometry).length) + unscreenedPins.length;
   const siteById = new Map([...sites, ...catalogSites].map((site) => [site.site_id, site]));
 
   function siteTypeLabel(site: SiteProps): string {
@@ -1662,7 +1858,7 @@ export default function Explorer() {
     const pipeline = Boolean(deal && (deal.kind === "pipeline" || deal.kind === "land") && deal.stage_group);
     return {
       id: site.site_id,
-      site: site.name || site.address || site.site_id,
+      site: site.name && site.name.trim().toLowerCase() !== (site.address || "").trim().toLowerCase() ? site.name : displayAddress(site.address) || site.site_id,
       type: siteTypeLabel(site),
       city: site.city,
       stage: pipeline && deal ? (deal.stage || "") : UNIVERSE_STAGE_LABEL,
@@ -1694,7 +1890,7 @@ export default function Explorer() {
       listingUrl: listingHref(dealForSite(site)?.listing_url || site.listing_url),
       folderUrl: folderHref(site.folder_url || dealForSite(site)?.folder_url),
       packageUrl: dealForSite(site)?.package_href || "",
-      ...pointOf(featureById.get(site.site_id)?.geometry?.coordinates),
+      ...pointOf(poolById.get(site.site_id)?.geometry?.coordinates),
     };
   }
 
@@ -1746,32 +1942,11 @@ export default function Explorer() {
     };
   }
 
+  const shortlistSites = new Map([...shownFeatures, ...offMarketShown].map(feature => [feature.properties.site_id, feature]));
   const listRows = [...(funnel === "pipeline"
-    ? pipelineSquares.map((feature) => dealRow(feature.properties))
-    : [...universePins.map((feature) => siteRow(feature.properties)), ...offMarketShown.map((feature) => siteRow(feature.properties))]
-  ), ...(showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city)).map((feature) => ({ ...unscreenedRow(feature.properties), ...pointOf(feature.geometry?.coordinates) })) : [])];
-  const tierOn = (deal: DealProps) => (dealCategory(deal) !== "wash" || matchesOpenLandTier(deal.open_land_sqft, landTier)) && (!mapArea || (() => {
-    const point = dealPoint(deal);
-    return point ? inMapArea(point[0], point[1], mapArea) : false;
-  })());
-  const rangedPipeline = pipelineStepRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
-  const landForList = stageLandRows.filter((deal) => inRange(deal, ranges) && tierOn(deal));
-  const pickedIds = (params.get("pick") || "").split("|").filter(Boolean);
-  const pickedSet = new Set(pickedIds);
-  function dealHasScoreIssue(deal: DealProps): boolean {
-    return scoreIssue({
-      score: deal.score,
-      economics: deal.economics_points,
-      land: deal.land_points,
-      power: deal.power_points,
-      location: deal.location_points,
-      deal: deal.deal_points,
-      naEconomics: deal.business_type === "Quick lube",
-    });
-  }
-  const listDeals = (pickedSet.size
-    ? dealRows.filter((deal) => pickedSet.has(deal.deal_id) && viewDeal(deal) && dealAllowed(deal))
-    : [...rangedPipeline, ...landForList]).filter((deal) => !scoreIssues || dealHasScoreIssue(deal));
+    ? listDeals.map(dealRow)
+    : [...shortlistSites.values()].map(feature => siteRow(feature.properties))),
+    ...listingScope.map(feature => ({ ...unscreenedRow(feature.properties), ...pointOf(feature.geometry?.coordinates) }))];
   const reviewLinks: Record<string, { listing?: string; folder?: string; packageHref?: string }> = {};
   for (const deal of dealRows) {
     const listing = listingHref(deal.listing_url);
@@ -1832,7 +2007,19 @@ export default function Explorer() {
   });
   if (allStages && funnel !== "pipeline" && !who) activeFilters.push({ id: "all-stages", label: "All stages", clear: () => write({ stage: null }) });
 
+  function dismissScope() {
+    setStepsOpen(false);
+    shellRef.current?.querySelector<HTMLButtonElement>(window.matchMedia("(max-width: 767px)").matches ? ".phone-step" : '[data-testid="map-scope"]')?.focus();
+  }
+
+  function toggleScope() {
+    const open = !stepsOpen;
+    closeMenus();
+    setStepsOpen(open);
+  }
+
   function closeMenus() {
+    setStepsOpen(false);
     setFiltersOpen(false);
     setMoreOpen(false);
     setUserOpen(false);
@@ -1841,9 +2028,7 @@ export default function Explorer() {
     setUnplacedOpen(false);
   }
 
-  const stageUnmapped = funnel === "pipeline" && (outsideGroup || (!allPipes && !pipelineWide))
-    ? [...pipelineDeals, ...stageLandRows].filter((deal) => !dealPoint(deal)).length
-    : 0;
+
 
   function inFunnelMarket(deal: DealProps): boolean {
     if (isProtectedId(deal.deal_id)) return false;
@@ -1855,17 +2040,31 @@ export default function Explorer() {
     return true;
   }
 
+  const locationRows = funnel === "pipeline"
+    ? pipelineRows.map(row => ({ id: row.deal.deal_id, name: row.deal.name || row.deal.address || row.deal.deal_id, city: row.deal.city, point: row.point }))
+    : listRows.map(row => ({ id: row.id, name: row.site, city: row.city, point: row.lng != null && row.lat != null ? [row.lng, row.lat] as [number, number] : null }));
+  const unplacedInView = locationRows.filter(row => !row.point);
+  const mappedShortlist = locationRows.flatMap(row => row.point ? [{ city: row.city, point: row.point }] : []);
+  const mappedCount = mappedShortlist.length;
+  const activeMetric = !inReview && !listView && !marking ? marketMetric : null;
+  const marketRows: MarketRow[] = activeMetric ? locationRows.flatMap(row => {
+    if (!row.point) return [];
+    const site = siteById.get(row.id);
+    const deal = site ? dealForSite(site) : dealBundle.byId.get(row.id);
+    return [{...row, point: row.point, evidence: marketEvidence(deal, site || siteById.get(deal?.universe_id || ""))}];
+  }) : [];
+  const washInspection: WashInspection | undefined = selected && !selectedUnscreened && spacePoint() ? {
+    radius: activeMetric === "washes" ? washRadius : null,
+    mapped: washOrigin && (catalog || features.some(f=>f.properties.city === (selectedDeal?.city || selectedSite?.city))) ? washPoints.length : null,
+    select: miles => {
+      closeMenus(); chooseLayers(false); setPreviewId(selected); setSheetSnap("half");
+      write({marketMetric:"washes", washRadius:String(miles), overlay:null, view:null, panel:null, sheet:"half"});
+    },
+  } : undefined;
   function summaryText() {
     if (funnel !== "pipeline") return "";
-    const stageView = !outsideGroup && !allPipes && !pipelineWide && !who;
-    const home = !stageView && !outsideGroup;
-    const rows = stageView || outsideGroup
-      ? [...pipelineDeals, ...stageLandRows]
-      : dealRows.filter((deal) => {
-          if (!inFunnelMarket(deal)) return false;
-          if (inReach(deal, reach)) return true;
-          return showDroppedRows && deal.stage_group === "dropped";
-        });
+    const home = !outsideGroup && (allPipes || pipelineWide || Boolean(who));
+    const rows = listDeals;
     const droppedRows = home
       ? dealRows.filter((deal) => inFunnelMarket(deal) && dealOnPipeStep(deal, "dropped", reach))
       : rows.filter((deal) => deal.stage_group === "dropped");
@@ -1881,18 +2080,62 @@ export default function Explorer() {
   function goReview(index: number) {
     const count = Math.max(reviewList.length, 1);
     const next = Math.min(Math.max(index, 0), count - 1);
-    write({ review: "1", i: String(next + 1), view: null, q: null });
+    setReviewChange(null);
+    write({ review: "1", i: String(next + 1), view: null, q: null, panel: null, note: null, msg: null });
+  }
+
+  function openReviewEvidence(reason: ReviewChange, index: number) {
+    if (!reviewCurrent) return;
+    setReviewChange({ site: reviewCurrent.siteId, reason, index, panel: params.get("panel"), note: params.get("note"), msg: params.get("msg"), snap: sheetSnap });
+    setSheetSnap("full");
+    write({ panel: changeDestination(reason.type).panel || "overview", note: reason.noteId || null, msg: null });
+  }
+
+  function returnToReview() {
+    if (!reviewChange) return;
+    const { panel, note, msg, snap, index } = reviewChange;
+    setReviewChange(null);
+    setSheetSnap(snap);
+    write({ panel, note, msg });
+    shellRef.current?.querySelector<HTMLElement>(".drawer-scroll")?.scrollTo({ top: 0 });
+    const changes = shellRef.current?.querySelector<HTMLButtonElement>('[data-testid="review-since"]');
+    if (changes?.getAttribute("aria-expanded") !== "true") changes?.click();
+    requestAnimationFrame(() => {
+      const line = shellRef.current?.querySelector<HTMLButtonElement>(`[data-change-index="${index}"]`);
+      (line || changes)?.focus({ preventScroll: true });
+    });
+  }
+
+  const changeBanner = inReview && reviewCurrent && reviewChange?.site === reviewCurrent.siteId
+    ? <ReviewEvidence reason={reviewChange.reason} onReturn={returnToReview} /> : null;
+
+  async function saveReview(body: { siteId: string; undo?: boolean; previous?: string | null }) {
+    if (reviewRequest.current) return null;
+    reviewRequest.current = true;
+    setReviewSaving(true);
+    setReviewError("");
+    try {
+      const response = await fetch("/api/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error();
+      return await response.json() as { previous?: string | null };
+    } catch {
+      setReviewError(body.undo ? "Undo could not be confirmed. Check the item and try Undo again." : "Review could not be confirmed. Check the item and try again.");
+      window.dispatchEvent(new Event("queue-refresh"));
+      return null;
+    } finally {
+      reviewRequest.current = false;
+      setReviewSaving(false);
+    }
   }
 
   async function markCurrentReviewed() {
     if (!reviewCurrent || reviewCurrent.status === "reviewed") return;
-    const response = await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ siteId: reviewCurrent.siteId }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { previous?: string | null };
-    if (!response.ok) return;
+    const payload = await saveReview({ siteId: reviewCurrent.siteId });
+    if (!payload) return;
     const previous = payload.previous ?? null;
     const siteId = reviewCurrent.siteId;
     setFeed((items) => items.map((item) => item.siteId === siteId ? { ...item, status: "reviewed", previous } : item));
@@ -1908,16 +2151,14 @@ export default function Explorer() {
       }
     }
     if (next >= 0) goReview(next);
+    else if (reviewChange) returnToReview();
     setQueueCount((count) => Math.max(0, count - 1));
   }
 
   async function undoReviewMark() {
     if (!undo) return;
-    await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ undo: true, siteId: undo.siteId, previous: undo.previous }),
-    });
+    const saved = await saveReview({ undo: true, siteId: undo.siteId, previous: undo.previous });
+    if (!saved) return;
     setFeed((items) => items.map((item) => item.siteId === undo.siteId ? { ...item, status: "open" } : item));
     goReview(undo.index);
     setUndo(null);
@@ -1980,7 +2221,30 @@ export default function Explorer() {
     return [...byId.values()];
   }
   const marketView = shownMarketCounts(funnel === "pipeline" ? pipelineViewDeals : universeCountSites(), selectedMarket);
+  const activeStepLabel = funnel === "pipeline"
+    ? outsideGroup ? "Outside service area" : allPipes || pipelineWide ? "All deals" : PIPE_STEPS.find(item => item.id === pipeStage)?.label || "Desk screen"
+    : allStages || universeWide ? "All sites" : STEPS.find(item => item.id === stage)?.label || "Open land";
+  const shortlistTitle = `${selectedMarket === "other" ? "Other markets" : marketLabel(selectedMarket)} · ${activeStepLabel}`;
+  const desktopFilters = (
+    <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => {
+      setFiltersOpen(!filtersOpen);
+      if (!filtersOpen) setLayersOpen(false);
+      setMoreOpen(false);
+      setUserOpen(false);
+      setUnplacedOpen(false);
+    }}>
+      Filters{activeFilters.length > 0 && <span className="count-badge">{activeFilters.length}</span>}
+    </button>
+  );
   const shownCount = marketView.shown;
+  const resultCount = listView && !ndaVisible && !loopsVisible ? listCount ?? shownCount : locationRows.length;
+  const scopeLabel = <><span>{shortlistTitle}</span><small data-testid="scope-count">{resultCount.toLocaleString("en-US")} {resultCount === 1 ? "site" : "sites"}</small></>;
+  const mapCoverage = <div className="shortlist-map-coverage" aria-label="Mapped shortlist">
+    <span>{mappedCount.toLocaleString("en-US")} mapped</span>
+    {unplacedInView.length > 0 && <button type="button" className="text-link" onClick={() => {
+      closeMenus(); setUnplacedOpen(true);
+    }}>{unplacedInView.length.toLocaleString("en-US")} need{unplacedInView.length === 1 ? "s" : ""} location</button>}
+  </div>;
   const allCount = pipelineAllCount(shownCount, hiddenDropped);
   const outsideCount = countOutsideServiceArea(marketDeals);
   const reviewMarkers = inReview && !reviewMiss ? reviewList.flatMap((site, index) => {
@@ -1994,7 +2258,7 @@ export default function Explorer() {
     if (!selected) return null;
     const deal = dealRows.find((row) => row.deal_id === selected);
     if (deal) return dealPoint(deal);
-    const coords = featureById.get(selected)?.geometry?.coordinates;
+    const coords = poolById.get(selected)?.geometry?.coordinates;
     return coords ? [coords[0], coords[1]] : null;
   }
 
@@ -2032,23 +2296,43 @@ export default function Explorer() {
     if (mapNote) return;
     const point = spacePoint();
     if (!selected || !point) return;
-    chooseBasemap("satellite");
     setShowSpaces(true);
     if (listView) write({ view: null });
     setMarking({ siteId: selected, lng: point[0], lat: point[1], nonce: Date.now() });
   }
 
   const recordSpaces = markedSpaces.filter((space) => space.siteId === selected);
+  function openContextAsk(comparison = false) {
+    const site = selectedDeal ? { id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id }
+      : selectedSite ? { id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id } : null;
+    const comparing = comparison || (!inspecting && compareIds.length >= 2);
+    if (!comparing && site && showingPreview) setPreviewId(null);
+    setAskSite(comparing ? null : site);
+    setAskList(comparing ? [...compareIds] : listView && !ndaVisible && !loopsVisible ? [...listScope.current] : []);
+    setAskOpen(true);
+  }
+  function inspectAskSource(href: string) {
+    const url = new URL(href, window.location.origin);
+    const id = url.searchParams.get("site");
+    setAskOpen(false);
+    if (id && url.pathname === "/" && compareIds.includes(id) && [...url.searchParams.keys()].every(key => ["site","panel","note"].includes(key))) inspectComparison(id, "Screening decision",url.searchParams);
+    else if (id && url.pathname === "/" && [...url.searchParams.keys()].every(key => key === "site")) choose(id);
+    else router.push(href, { scroll: false });
+  }
   const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
-    <div ref={bindShell} className={`shell ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
+    <PurchaseScenarios key={me?.u || "signed-out"}><div ref={bindShell} onFocusCapture={event => {
+      const target = event.target as HTMLElement;
+      const row = target.closest<HTMLElement>("[data-site-row]");
+      if (row) lastCell.current = { row: row.dataset.siteRow || "", cell: target.closest<HTMLElement>("[data-col]")?.dataset.col || "" };
+    }} className={`shell ${showingPreview ? "pin-preview-open" : ""} ${marking ? "space-marking" : ""} ${tableOpen ? "table-open" : ""} ${listView && !ndaVisible && !loopsVisible ? "list-open" : ""} ${ndaVisible ? "nda-open" : ""} ${loopsVisible ? "loops-open" : ""} ${selected ? "drawer-open" : ""} ${selected ? `sheet-${sheetSnap}` : "sheet-peek"} ${inReview ? "reviewing" : ""} ${filtersOpen ? "filters-open" : ""} ${stepsOpen ? "steps-open" : ""}`} data-visible={visibleSites.length} data-city={allCities ? "all" : city} data-stage={allStages ? "all" : stage} data-pin-count={pinCount} data-list-count={funnel === "pipeline" ? pipelineRows.length : listRows.length}>
       {(filtersOpen || moreOpen || userOpen || menuOpen || unplacedOpen || alertsOpen) ? (
         <button className="backdrop" type="button" aria-label="Close menu" onClick={closeMenus} />
       ) : null}
       {alertsOpen ? <AlertSettings onClose={() => setAlertsOpen(false)} /> : null}
       {askOpen && me?.u ? (
-        <AskPanel open site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
+        <AskPanel open canPropose={me.actionRole === "contributor" || me.actionRole === "reviewer"} onSource={inspectAskSource} shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
       <CommandSearch
         open={commandOpen}
@@ -2061,9 +2345,113 @@ export default function Explorer() {
         })}
       />
       <header className="bar">
+        {recoveringMap && <div className="map-retry" role="status"><span>Map unavailable. Showing your shortlist.</span>
+          <button className="text-link" type="button" onClick={retryMap}>Retry map</button>
+        </div>}
         <ActionsQuietNotice />
         <div className="top">
-          <Wordmark view={tableOpen ? "list" : "map"} />
+          <Wordmark view={listView || tableOpen ? "list" : "map"} />
+          <button className="paper-btn workspace-scope only-desktop" type="button" data-testid="map-scope" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
+            {scopeLabel}
+          </button>
+          {!listView && !inReview && !ndaVisible && !loopsVisible && <div className="only-desktop">{mapCoverage}</div>}
+          <div className="search-wrap only-desktop">
+            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search everything" onClick={() => setCommandOpen(true)}>Search</button>
+            <kbd data-testid="command-search-open" aria-hidden="true">{appleShortcut ? "⌘K" : "Ctrl K"}</kbd>
+          </div>
+          <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
+            <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
+            <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
+          </div>
+          {desktopFilters}
+          {loopsAllowed ? (
+            <button type="button" className={`paper-btn nda-launch ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => ndaVisible && restoreOrigin() ? undefined : write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
+              NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
+            </button>
+          ) : null}
+          {me?.u ? (
+            <button
+              type="button"
+              className="paper-btn ask-launch"
+              data-testid="ask-open"
+              onClick={() => openContextAsk()}
+            >
+              Ask
+            </button>
+          ) : null}
+          <div className="more-wrap only-desktop">
+            <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
+            {moreOpen ? (
+              <div className="menu" role="menu">
+                <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
+                <ActionsMenuButtons close={() => setMoreOpen(false)} />
+                {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMoreOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
+                <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
+                {changesNote ? <p className="menu-note">{changesNote}</p> : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="user-menu only-desktop">
+            <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
+              {(me?.u || "?").slice(0, 1).toUpperCase()}
+            </button>
+            {userOpen ? (
+              <div className="menu" role="menu">
+                <p className="menu-note">{me?.u}</p>
+                {me?.role === "admin" ? <a role="menuitem" href="/admin">Accounts</a> : null}
+                {me?.u ? <button type="button" role="menuitem" onClick={() => { setAlertsOpen(true); setUserOpen(false); }} className="menu-item">Alert settings</button> : null}
+                {me?.role === "admin" ? <a role="menuitem" href="/admin/alerts">Alerts admin</a> : null}
+                <button type="button" role="menuitem" onClick={logout} className="menu-item">Sign out</button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <nav className="workspace-jobs" aria-label="Acquisition workspace" aria-description="Discover sites in Explore, screen sites in Pipeline, open assignments in My work, or review the site queue.">
+          {(["universe","pipeline"] as const).map(job => {
+            const active = funnel === job && !inReview && !loopsVisible && !ndaVisible;
+            return <button type="button" key={job} className={active ? "chip on" : "chip"} aria-current={active ? "page" : undefined} onClick={()=>{if (!active) {setSelected(null); chooseFunnel(job,true);}}}>{job === "universe" ? "Explore" : "Pipeline"}</button>;
+          })}
+          {me?.actionsEnabled && loopsAllowed && <button type="button" className={loopsVisible || ndaVisible ? "chip on" : "chip"} aria-current={myWork ? "page" : undefined} onClick={()=>{if (!myWork) {workPosition.current=null;setSelected(null);write({fromWork:null,loops:"work",nda:null,view:null,table:null,review:null,i:null,site:null,measure:null,compare:null});}}}>My work</button>}
+          {me?.actionsEnabled ? (
+            <button className={`review-launch ${inReview ? "on" : ""}`} aria-current={inReview ? "page" : undefined} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
+              Review{(() => {
+                const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
+                return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
+              })()}
+            </button>
+          ) : null}
+        </nav>
+        <div className="phone-view-row only-mobile">
+          <button className="phone-step workspace-scope only-mobile" type="button" aria-controls="workspace-scope" aria-expanded={stepsOpen} onClick={toggleScope}>
+            {scopeLabel}
+          </button>
+          <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
+            <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
+            <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
+          </div>
+          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onClick={() => setCommandOpen(true)} />
+          <button
+            type="button"
+            className="icon-btn filter-launch"
+            aria-label="Filters"
+            aria-expanded={filtersOpen}
+            aria-pressed={filtersOpen}
+            data-testid="filters-open"
+            onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.2 7.2V18l-3.6 2v-6.8L4 6z" /></svg>
+            {activeFilters.length ? <span className="count-badge" aria-hidden="true">{activeFilters.length}</span> : null}
+          </button>
+          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        </div>
+        {unavailable.length > 0 && <div role="status" className="workspace-warning">Unavailable · {unavailable.join(", ")} <button type="button" className="text-link" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></div>}
+        {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite} <button type="button" className="text-link" onClick={() => { setSelected(null); write({ site: null, view: "list" }); }}>Back to listings</button></p> : null}
+        <section className="funnel-row" id="workspace-scope" aria-label="Market and stage">
+          <div className="scope-sheet-title"><h2>Market and stage</h2>
+            <button className="close" type="button" aria-label="Close steps" onClick={dismissScope}><span aria-hidden="true">×</span></button>
+          </div>
           <div className="cities only-desktop" role="group" aria-label="Market">
             {(() => {
               const totals = marketView.totals;
@@ -2082,110 +2470,17 @@ export default function Explorer() {
               );
             })()}
           </div>
-          <div className="search-wrap only-desktop">
-            <button type="button" className="search scope-search" data-testid="scope-search" aria-label="Search name, address, broker, APN, id" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }}>Search name, address, broker, APN, id</button>
-            <kbd aria-hidden="true">/</kbd>
-          </div>
-          <button type="button" className="chip command-open only-desktop" data-testid="command-search-open" aria-label="Search everything" onClick={() => setCommandOpen(true)}>{appleShortcut ? "⌘K" : "Ctrl K"}</button>
-          <div className="funnel-switch only-desktop" role="group" aria-label="Which funnel">
-            <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
-            <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-          </div>
-          <div className="funnel-switch map-switch only-desktop" role="group" aria-label="Map or list">
-            <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
-            <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
-          </div>
-          {me?.actionsEnabled ? (
-            <button className={`review-launch ${inReview ? "on" : ""}`} type="button" onClick={() => write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
-              Review{(() => {
-                const badge = reviewBadge({ count: queueCount, allMarkets: allCities });
-                return badge.count ? <><span className="count-badge" data-testid="queue-count">{badge.count}</span>{badge.label ? <span className="split" data-testid="review-scope">{badge.label}</span> : null}</> : null;
-              })()}
-            </button>
-          ) : null}
-          {me?.u ? (
-            <button
-              type="button"
-              className="paper-btn ask-launch"
-              data-testid="ask-open"
-              onClick={() => {
-                if (selectedDeal) setAskSite({ id: selectedDeal.deal_id, name: selectedDeal.name || selectedDeal.deal_id });
-                else if (selectedSite) setAskSite({ id: selectedSite.site_id, name: selectedSite.name || selectedSite.site_id });
-                else setAskSite(null);
-                setAskOpen(true);
-              }}
-            >
-              Ask
-            </button>
-          ) : null}
-          {loopsAllowed ? (
-            <button type="button" className={`paper-btn ${ndaVisible ? "on" : ""}`} data-testid="nda-queue-tab" onClick={() => write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null })}>
-              NDAs {ndaOpenCount == null ? <span className="skeleton nda-skel count" data-testid="nda-count-hold" /> : ndaOpenCount}
-            </button>
-          ) : null}
-          <div className="user-menu only-desktop">
-            <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={userOpen} aria-label={me?.u ? `Account menu for ${me.u}` : "Account menu"} onClick={() => { setUserOpen((value) => !value); setFiltersOpen(false); setMoreOpen(false); }}>
-              {(me?.u || "?").slice(0, 1).toUpperCase()}
-            </button>
-            {userOpen ? (
-              <div className="menu" role="menu">
-                <p className="menu-note">{me?.u}</p>
-                {me?.role === "admin" ? <a role="menuitem" href="/admin">Accounts</a> : null}
-                {me?.u ? <button type="button" role="menuitem" onClick={() => { setAlertsOpen(true); setUserOpen(false); }} className="menu-item">Alert settings</button> : null}
-                {me?.role === "admin" ? <a role="menuitem" href="/admin/alerts">Alerts admin</a> : null}
-                <button type="button" role="menuitem" onClick={logout} className="menu-item">Sign out</button>
-              </div>
-            ) : null}
-          </div>
-          <button className="phone-step only-mobile" type="button" onClick={() => { setStepsOpen(true); setMenuOpen(false); }}>
-            {funnel === "pipeline"
-              ? (outsideGroup ? "Outside service area" : allPipes ? "All deals" : (PIPE_STEPS.find((step) => step.id === pipeStage)?.label || "Desk screen"))
-              : (allStages ? "All sites" : (STEPS.find((step) => step.id === stage)?.label || "Open land"))}
-          </button>
-        </div>
-        <div className="phone-view-row only-mobile">
-          <label className="city-pick">
+          <label className="city-pick only-mobile">
             <span className="sr">City</span>
-            <select aria-label="City" value={allCities ? "all" : city} onChange={(event) => jump(event.target.value)} className="secondary">
-              <option value="all">All markets</option>
-              <option value="PHX">Phoenix</option>
-              <option value="LAS">Las Vegas</option>
-              <option value="MIA">Miami</option>
+            <select aria-label="City" value={selectedMarket} onChange={(event) => jump(event.target.value)} className="secondary">
+              <option value="all">All markets ({marketView.totals.All})</option>
+              <option value="PHX">Phoenix ({marketView.totals.PHX})</option>
+              <option value="LAS">Las Vegas ({marketView.totals.LAS})</option>
+              <option value="MIA">Miami ({marketView.totals.MIA})</option>
+              {(selectedMarket === "other" || marketView.totals.Other > 0) && <option value="other">Other markets ({marketView.totals.Other})</option>}
             </select>
           </label>
-          <div className="funnel-switch map-switch" role="group" aria-label="Map or list">
-            <button className={!listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview()}>Map</button>
-            <button className={listView && !inReview ? "chip on" : "chip"} type="button" onClick={() => stopReview({ view: "list" })}>List</button>
-          </div>
-          <button type="button" className="search mobile-search" data-testid="scope-search" aria-label="Search sites" onMouseDown={(event) => { event.preventDefault(); setCommandOpen(true); }} />
-          <button
-            type="button"
-            className="icon-btn filter-launch"
-            aria-label="Filters"
-            aria-expanded={filtersOpen}
-            aria-pressed={filtersOpen}
-            data-testid="filters-open"
-            onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.2 7.2V18l-3.6 2v-6.8L4 6z" /></svg>
-            {activeFilters.length ? <span className="count-badge" aria-hidden="true">{activeFilters.length}</span> : null}
-          </button>
-          <button className="icon-btn only-mobile" type="button" aria-expanded={menuOpen} aria-label="Menu" onClick={() => { setMenuOpen((value) => { const next = !value; if (next) setStepsOpen(false); return next; }); setFiltersOpen(false); setLayersOpen(false); }}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-          </button>
-        </div>
-        <div className="funnel-switch only-mobile" role="group" aria-label="Which funnel">
-          <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
-          <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
-          <button className={filtersOpen ? "chip on" : "chip"} type="button" onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMenuOpen(false); }}>Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}</button>
-        </div>
-        {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite}</p> : null}
-        <div className="funnel-row">
-          <div className="funnel-sheet-head only-mobile">
-            <p className="eyebrow">Steps</p>
-            <button className="close" type="button" aria-label="Close steps" onClick={() => setStepsOpen(false)}><span aria-hidden="true">×</span></button>
-          </div>
-          <nav className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
+          <nav id="workspace-funnel" className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? null : (
               <>
                 <span className="step">
@@ -2263,9 +2558,9 @@ export default function Explorer() {
                 {withheldHere.length.toLocaleString()} address withheld
               </button>
             ) : null}
-            {funnel === "pipeline" && unplacedDeals.length > 0 ? (
+            {funnel === "pipeline" && unplacedInView.length > 0 ? (
               <button className={`aside only-desktop ${unplacedOpen ? "on" : ""}`} type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen((value) => !value); setWithheldOpen(false); setMoreOpen(false); setFiltersOpen(false); }}>
-                Needs location ({unplacedDeals.length.toLocaleString()})
+                Needs location ({unplacedInView.length.toLocaleString()})
               </button>
             ) : null}
           {query && funnel === "universe" && stage !== "universe" ? (
@@ -2277,30 +2572,14 @@ export default function Explorer() {
               return <button className="aside" type="button" onClick={() => write({ stage: "universe" }, true)}>{more.toLocaleString()} more at other steps</button>;
             })()
           ) : null}
-          {summaryText() ? (
+          {!listView && summaryText() ? (
             <span className="summary-chip" title={SUMMARY_NOTES.pipeline}>
               {summaryText()}
             </span>
           ) : null}
-          {stageUnmapped > 0 ? <span className="summary-chip" data-testid="unmapped-note">{stageUnmapped.toLocaleString()} without a location</span> : null}
           {data.funnel.workbook_as_of ? <span className="summary-chip as-of">Data as of {data.funnel.workbook_as_of}</span> : null}
-          <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen((value) => { const next = !value; if (next) setLayersOpen(false); return next; }); setMoreOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>
-            Filters
-            {activeFilters.length ? <span className="count-badge">{activeFilters.length}</span> : null}
-          </button>
-          <div className="more-wrap only-desktop">
-            <button className={`tool ${moreOpen ? "on" : ""}`} type="button" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setFiltersOpen(false); setUserOpen(false); setUnplacedOpen(false); }}>More</button>
-            {moreOpen ? (
-              <div className="menu" role="menu">
-                <button type="button" onClick={() => void copyLink()} className="menu-item">{copied ? "Link copied" : "Copy link"}</button>
-                <ActionsMenuButtons close={() => setMoreOpen(false)} />
-                {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMoreOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
-                <button type="button" onClick={() => { setGuideOpen(true); setMoreOpen(false); }} className="menu-item">How to read this</button>
-                {changesNote ? <p className="menu-note">{changesNote}</p> : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
+
+        </section>
         {activeFilters.length ? (
           <div className="active-row" aria-label="Active filters">
             {activeFilters.map((item) => (
@@ -2468,8 +2747,16 @@ export default function Explorer() {
             <div className="funnel-switch segment" role="group" aria-label="Which funnel">
               <button className={funnel === "universe" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("universe")}>Universe</button>
               <button className={funnel === "pipeline" ? "chip on" : "chip"} type="button" onClick={() => chooseFunnel("pipeline")}>Pipeline</button>
+            </div>
+            <div className="menu-group" role="group" aria-label="NDA and Ask">
               {me?.actionRole && ndaQueueAllowed(me.actionRole) ? (
-                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
+                <button type="button" className="menu-item" data-testid="nda-queue-menu" onClick={() => { setMenuOpen(false); if (ndaVisible && restoreOrigin()) return; write(ndaVisible ? { nda: null } : { nda: "1", loops: null, view: null, table: null, review: null, i: null }); }}>NDAs {ndaOpenCount == null ? "…" : ndaOpenCount}</button>
+              ) : null}
+              {me?.u ? (
+                <button type="button" className="menu-item ask-launch" data-testid="ask-menu" onClick={() => {
+                  setMenuOpen(false);
+                  openContextAsk();
+                }}>Ask</button>
               ) : null}
             </div>
             <div className="menu-group" role="group" aria-label="Find">
@@ -2480,8 +2767,8 @@ export default function Explorer() {
               <ActionsMenuButtons close={() => setMenuOpen(false)} />
               {loopsAllowed ? <button type="button" data-testid="open-loops-open" onClick={() => { setMenuOpen(false); write(loopsVisible ? { loops: null } : { loops: "1", nda: null, view: null, table: null, review: null, i: null }); }} className="menu-item">Open loops</button> : null}
               <button type="button" onClick={() => { setGuideOpen(true); setMenuOpen(false); }} className="menu-item">How to read this</button>
-              {funnel === "pipeline" && unplacedDeals.length > 0 ? (
-                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedDeals.length.toLocaleString()})</button>
+              {funnel === "pipeline" && unplacedInView.length > 0 ? (
+                <button type="button" data-testid="needs-location" onClick={() => { setUnplacedOpen(true); setMenuOpen(false); }} className="menu-item">Needs location ({unplacedInView.length.toLocaleString()})</button>
               ) : null}
             </div>
             {changesNote ? <p className="menu-note">{changesNote}</p> : null}
@@ -2518,11 +2805,12 @@ export default function Explorer() {
               <button type="button" className="close" aria-label="Close" onClick={() => setUnplacedOpen(false)}><span aria-hidden="true">×</span></button>
             </div>
             <ul className="unplaced-list">
-              {unplacedDeals.map((deal) => (
-                <li key={deal.deal_id}>
-                  <button type="button" className="text-link" onClick={() => { choose(deal.deal_id); setUnplacedOpen(false); }}>{deal.name || deal.address || deal.deal_id}</button>
-                  {" · "}{stageTitle(deal.stage_group)}
-                  <button type="button" className="chip" data-testid="fix-location" onClick={() => { setSelected(deal.deal_id); write({ site: deal.deal_id, fix: "location" }); setUnplacedOpen(false); }}>Fix</button>
+              {unplacedInView.map(row => (
+                <li key={row.id}>
+                  <button type="button" className="text-link" onClick={() => { choose(row.id); setUnplacedOpen(false); }}>{row.name}</button>
+                  {dealBundle.byId.has(row.id) && <button type="button" className="chip" data-testid="fix-location" onClick={() => {
+                    setSelected(row.id); write({ site: row.id, fix: "location" }); setUnplacedOpen(false);
+                  }}>Fix</button>}
                 </li>
               ))}
             </ul>
@@ -2537,6 +2825,7 @@ export default function Explorer() {
       ) : null}
       {inReview && me?.actionsEnabled && !reviewMiss && (!reviewScoped || reviewQueueReady) ? (
         <ReviewBar
+          saving={reviewSaving}
           index={reviewIndex}
           total={reviewList.length}
           reviewed={feed.filter((site) => site.status === "reviewed").length}
@@ -2548,6 +2837,7 @@ export default function Explorer() {
           onReviewed={() => void markCurrentReviewed()}
           onExit={() => stopReview()}
           onOpenFeed={() => setFeedSheet(true)}
+          onEvidence={openReviewEvidence}
           onSnooze={snoozeCurrent}
           reasons={reviewCurrent?.reasons || []}
           firstVisit={Boolean(reviewCurrent?.firstVisit)}
@@ -2593,38 +2883,41 @@ export default function Explorer() {
           </div>
         ) : null}
         {inReview && reviewCurrent && !reviewCoords ? <p className="review-noloc" data-testid="review-noloc">No exact location yet</p> : null}
+        {reviewError ? <p className="undo-bar" role="alert">{reviewError}</p> : null}
         {undo ? (
           <div className="review-toast" role="status">
             Marked reviewed.
-            <button type="button" onClick={() => void undoReviewMark()} className="menu-item">Undo</button>
+            <button type="button" disabled={reviewSaving} onClick={() => void undoReviewMark()} className="menu-item">Undo</button>
           </div>
         ) : null}
         {feedSheet ? (
           <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
-        <PanelBoundary name="Map">
-        <MapView
+        {(needsMap || mapVisited) && <PanelBoundary name="Map">
+        <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"}
+          onDrawAt={me ? (siteId, center) => {
+            setShowSpaces(true); setPickedSpace(""); setMarking({siteId,lng:center[0],lat:center[1],nonce:Date.now()});
+            if (dealRows.some(deal=>deal.deal_id===siteId)) { setSelected(siteId); setPreviewId(siteId); setSheetSnap("peek"); }
+          } : undefined}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
-          coverage={funnel !== "pipeline" && showUniverse ? {
-            listed: shownFeatures.length,
-            missingPoint: shownFeatures.filter((feature) => !feature.geometry).length,
-          } : null}
           deals={drawnDeals}
-          fitPoints={[
-            ...((funnel === "pipeline" ? [] : shownFeatures).flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : [])),
-            ...drawnDeals.flatMap((feature) => feature.geometry ? [feature.geometry.coordinates as [number, number]] : []),
-          ]}
+          nearbyHighlight={nearbyHighlight} nearbyPicker={nearbyPicker}
+          shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
-          overlayPoints={overlayPoints}
-          washPoints={washPoints}
+          marketMetric={activeMetric}
+          marketRows={marketRows}
+          washRing={activeMetric === "washes" && washOrigin ? {point:washOrigin, miles:washRadius} : null}
+          washPoints={activeMetric === "washes" ? washPoints : []}
           gridFeatures={gridFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
           areas={data.areas.features}
           depots={data.depots.features}
           parcels={data.parcels.features}
           offMarket={offMarketShown}
-          unscreened={showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && feature.geometry) : []}
+          unscreened={unscreenedPins}
           selectedId={selected}
+          mapScope={selectedMarket + "/" + funnel}
+          previewName={showingPreview ? (selectedDeal?.name || selectedSite?.name || selectedUnscreened?.name || displayAddress(selectedDeal?.address || selectedSite?.address || selectedUnscreened?.address) || selected || "") : ""}
           showAreas={showAreas}
           showDepots={showDepots}
           showSites={showUniverse}
@@ -2634,11 +2927,13 @@ export default function Explorer() {
           focusLat={focus.center[1]}
           focusZoom={focus.zoom}
           fitAll={fitAll}
+          scopeOpen={stepsOpen}
+          onMarketPick={market => { setStepsOpen(false); jump(market); }}
           preserveCamera={showDroppedDeals ? "dropped" : "shown"}
           reviewMarkers={reviewMarkers}
           queueIds={openQueueIds}
           reviewFocus={reviewFocus}
-          pinLabel={pinLabel}
+          pinLabel={activeMetric ? "none" : pinLabel}
           onPinLabel={setPinLabel}
           basemap={basemap}
           onBasemap={chooseBasemap}
@@ -2653,11 +2948,17 @@ export default function Explorer() {
                 return;
               }
             }
-            if (dealRows.some((deal) => deal.deal_id === id)) setTableTab(dealRows.find((deal) => deal.deal_id === id)?.kind === "land" ? "land" : "pipeline");
-            choose(id);
+            if (isProtectedId(id)) return;
+            placedSite.current = id;
+            setPreviewId(id);
+            setSelected(id);
+            setFiguresReady(false);
+            setSheetSnap("peek");
+            replaceSearch(window.location.search, { site: id }, true);
           }}
           spaceShapes={markedSpaces}
           showSpaces={showSpaces}
+          layoutOverlay={layoutOverlay && layoutOverlay.site === (selectedDeal?.deal_id || (selectedSite && dealForSite(selectedSite)?.deal_id)) && !marking ? layoutOverlay : null}
           spaceDrawing={Boolean(marking)}
           spaceFly={commentFly || marking}
           selectedSpaceId={pickedSpace}
@@ -2691,11 +2992,12 @@ export default function Explorer() {
             const east = bounds.getEast();
             const north = bounds.getNorth();
             if (![west, south, east, north].every((value) => Number.isFinite(value))) return;
+            setMapZoom(meta?.zoom ?? 0);
             setLiveArea({ kind: "polygon", points: [[west, south], [east, south], [east, north], [west, north]] });
             if (meta?.user && listView && !window.matchMedia("(max-width: 767px)").matches) setFollowArea(true);
           }}
         />
-        </PanelBoundary>
+        </PanelBoundary>}
         {handoffCopy ? <p className="empty-map" role="status">{handoffCopy}</p> : null}
         {funnel === "universe" && !listView && shownFeatures.length === 0 ? (
           <p className="empty-map">{listedStepEmpty
@@ -2730,16 +3032,31 @@ export default function Explorer() {
               write({ ...patch, site, nda: null, ndafrom: ndaId || "1" }, true);
             }}
             onPick={(id) => { if (/^NDA-\d{3,}$/i.test(id)) write({ nda: id.toUpperCase() }, true); }}
-            onClose={() => write({ nda: null })}
-            onBack={() => write(params.get("site") ? { nda: null } : { nda: "1" })}
+            onClose={() => { if (workDetail) returnToWork(); else if (!restoreOrigin()) write({ nda: null }); }}
+            onBack={() => workDetail ? returnToWork() : write(params.get("site") ? { nda: null } : { nda: "1" })}
             onMenu={() => setMenuOpen(true)}
-            backLabel={params.get("site") ? "Back to site" : "Back to queue"}
+            backLabel={workDetail ? "Back to My work" : params.get("site") ? "Back to site" : "Back to queue"}
           />
         ) : null}
-        {loopsVisible ? <OpenLoops onOpen={choose} onClose={() => write({ loops: null })} /> : null}
+        {loopsVisible && myWork && me?.u ? <MyWork username={me.u} position={workPosition.current}
+          names={Object.fromEntries([...dealRows.map(d=>[d.deal_id,d.name]), ...sites.map(s=>[s.site_id,s.name])])}
+          close={()=>{workPosition.current=null;if (!restoreOrigin()) write({loops:null});}}
+          open={(row,position)=>{
+            workPosition.current=position;
+            workQuery.current=currentSearch();
+            if (row.kind === "NDA") write({nda:row.id,loops:null,fromWork:"1"},true);
+            else {
+              const thread = position.proposal ? null : row.note;
+              setSelected(row.site);
+              write({loops:null,site:row.site,fromWork:"1",panel:thread ? "discussion" : "proposal",note:thread || null,workItem:thread ? null : row.id,sheet:"full"},true);
+            }
+          }} /> : loopsVisible ? <OpenLoops onOpen={choose} onClose={() => { if (!restoreOrigin()) write({ loops: null }); }} /> : null}
         <PanelBoundary name="List">
         {listView && !ndaVisible && !loopsVisible && funnel === "pipeline" ? (
           <PipelineList
+            title={shortlistTitle}
+            initialSelection={listSelection.current.pipeline.length ? listSelection.current.pipeline : params.has("pipelineLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
+            onFinancials={openPurchase}
             rows={pipelineRows}
             outsideRow={outsideRow}
             unreadIds={openQueueIds}
@@ -2751,21 +3068,21 @@ export default function Explorer() {
             onSort={(id, desc) => write({ sort: desc === undefined ? "none" : `${id}:${desc ? "desc" : "asc"}` })}
             onOpen={choose}
             onDismiss={() => choose(null)}
-            onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
+            onShowMap={(id) => { if (mapNote) retryMap(); setSelected(id); write({ view: null, site: id }); }}
             sortQuery={params.has("sort") ? params.get("sort") : null}
             columnSeed={params.has("cols") ? pipelineColumns : null}
             userId={me?.u || ""}
             mapArea={mapAreaLive}
             onSearchArea={() => setFollowArea(true)}
-            onClearArea={() => setFollowArea(false)}
+            onClearArea={() => { setFollowArea(false); write({ listArea: null }); }}
             onColumns={(next) => {
               const defaults = defaultColumnIds().join(",");
               const value = next.join(",");
               write({ cols: value === defaults ? null : value });
             }}
             onResetColumns={() => write({ cols: null, sort: null })}
-            onBroker={(name) => write({ who: name, funnel: "pipeline", tab: "pipeline", pstage: null, city: "all", view: "list" })}
-            onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: "list" })}
+            onBroker={openParty}
+            onCompare={(ids) => write({ compare: ids.slice(0, 4).join("|"), view: recoveringMap ? null : "list" })}
             onCopyLink={async (ids) => {
               const next = new URL(window.location.href);
               next.searchParams.set("view", "list");
@@ -2786,13 +3103,16 @@ export default function Explorer() {
           />
         ) : listView && !ndaVisible && !loopsVisible ? (
           <ListView
+            title={shortlistTitle}
+            onCompare={ids => write({ compare: ids.join("|"), view: recoveringMap ? null : "list" })}
+            initialSelection={listSelection.current.universe.length ? listSelection.current.universe : params.has("universeLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.universe = ids; }} onScope={rememberScope}
             rows={listRows}
             selectedId={selected}
             sort={{ id: sortKey, desc: sortDesc }}
             onSort={(id, desc) => write({ sort: desc === undefined ? "none" : `${id}:${desc ? "desc" : "asc"}` })}
             onOpen={choose}
             onDismiss={() => choose(null)}
-            onShowMap={(id) => { setSelected(id); write({ view: null, site: id }); }}
+            onShowMap={(id) => { if (mapNote) retryMap(); setSelected(id); write({ view: null, site: id }); }}
             onExport={exportList}
             note={handoffCopy}
             signedIn={Boolean(me?.u)}
@@ -2800,7 +3120,7 @@ export default function Explorer() {
             sortQuery={params.has("sort") ? params.get("sort") : null}
             mapArea={mapAreaLive}
             onSearchArea={() => setFollowArea(true)}
-            onClearArea={() => setFollowArea(false)}
+            onClearArea={() => { setFollowArea(false); write({ listArea: null }); }}
           />
         ) : null}
         </PanelBoundary>
@@ -2809,14 +3129,14 @@ export default function Explorer() {
             <>
               <div className="layers-bar">
                 <p className="eyebrow">Layers</p>
-                <button type="button" className="close" aria-label="Close layers" onClick={() => setLayersOpen(false)}><span aria-hidden="true">×</span></button>
+                <button type="button" className="close" aria-label="Close layers" onClick={() => chooseLayers(false)}><span aria-hidden="true">×</span></button>
               </div>
               <div className="layers-body">
                 <div className="only-mobile">
                   <p className="eyebrow">Basemap</p>
                   <div className="segmented" role="group" aria-label="Basemap" data-testid="basemap">
                     <button type="button" className={`segmented ${basemap === "satellite" ? "on" : ""}`} onClick={() => chooseBasemap("satellite")}>Satellite</button>
-                    <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Map</button>
+                    <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Streets</button>
                   </div>
                 </div>
                 <p className="eyebrow">Pin labels</p>
@@ -2825,6 +3145,8 @@ export default function Explorer() {
                     <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} title={title} onClick={() => setPinLabel(id)}>{label}</button>
                   ))}
                 </div>
+                {me?.u && <button type="button" className={pinLabel==="financials"?"chip on":"chip"} aria-pressed={pinLabel==="financials"} onClick={()=>setPinLabel(pinLabel==="financials"?"asking":"financials")}>Financial evidence</button>}
+                {me?.u && pinLabel==="financials" && <FinancialPortfolio deals={drawnDeals.filter(f=>f.geometry && (!liveArea || inMapArea(...f.geometry.coordinates,liveArea)) && financialEvidence(f.properties)!=="Not applicable").map(f=>f.properties)} open={openPurchase}/>}
                 <p className="eyebrow">On the map</p>
                 {funnel === "universe" ? (
                   <label className="layer-row" title={LAYER_TITLES.pipeline}>
@@ -2844,10 +3166,10 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="swatch stage-dropped" /></span>
                   Dropped deals
                 </label>
-                <label className="layer-row" title="Lots drawn on the satellite view. Slot counts stay estimated until someone checks them.">
+                <label className="layer-row" title="Analyzed footprints and lots drawn by the team.">
                   <input className="check" type="checkbox" checked={showSpaces} onChange={(event) => setShowSpaces(event.target.checked)} data-testid="spaces-layer" />
                   <span className="layer-mark"><i className="swatch l10" /></span>
-                  Available lots
+                  Spaces
                 </label>
                 <p className="eyebrow">Context</p>
                 <label className="layer-row" title={LAYER_TITLES.areas}>
@@ -2865,47 +3187,65 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="pin-sample line" /></span>
                   <span className="layer-nest">Depot rings</span>
                 </label>
-                <p className="eyebrow">Area data</p>
-                {(["traffic", "population", "growth", "income", "washes"] as const).map((id) => {
-                  const item = OVERLAYS.find((entry) => entry.id === id);
-                  if (!item) return null;
-                  return (
-                    <label key={item.id} className="layer-row" title={LAYER_TITLES[item.id]}>
-                      <input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} />
-                      <span className="layer-mark" />
-                      {item.label}
-                    </label>
-                  );
-                })}
               </div>
             </>
           ) : (
-            <button type="button" className="paper-btn" onClick={() => { setLayersOpen(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+            <div className="market-layer-tools">
+              {!inReview && !listView && !marking && <button type="button" className={activeMetric ? "tool on" : "tool"} aria-pressed={Boolean(activeMetric)}
+                onClick={()=>chooseMarketMetric(activeMetric ? null : "traffic")}>Market context</button>}
+              <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+            </div>
           )}
         </aside>
         {!listView ? (
           <div className="map-corner">
+            {activeMetric && !selected && !stepsOpen && !filtersOpen && !unplacedOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
+              <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} clustered={mapZoom < PIN_SPLIT_ZOOM} missingLocations={unplacedInView.length}
+                showMissing={()=>{closeMenus();setUnplacedOpen(true);}} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}
+            {!activeMetric && mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
+              <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
+                onSpot={highlightNearby} fact={id => {
+                  const site = siteById.get(id);
+                  const deal = site ? dealForSite(site) : dealRows.find(row => row.deal_id === id);
+                  const listing = !site && !deal ? listingScope.find(row => row.properties.listing_id === id)?.properties : undefined;
+                  const evidence = screeningEvidence({ site: site || siteById.get(deal?.universe_id || ""), deal, listing, signedIn: Boolean(me) });
+                  const fact = previewFitFigure(evidence.figures);
+                  return fact ? fact.label + " · " + fact.value : me ? "Asking price not on file" : "Site fit not on file";
+                }} onPick={id => nearbyPicker.current?.(id)} />
+            )}
             {ringsOutside ? (
               <div className="rings-outside" role="status">
                 <p>5- and 10-mile rings are outside this view.</p>
                 <button type="button" className="paper-btn" onClick={() => frameRings.current?.()}>Show rings</button>
               </div>
             ) : null}
-            {(() => {
-              const missing = funnel === "pipeline"
-                ? pipelineStepRows.length - pipelineSquares.length
-                : visibleSites.filter((site) => !featureById.get(site.site_id)?.geometry).length + (landSites ? landDeals.filter((deal) => !dealPoint(deal)).length : 0);
-              return missing > 0 ? <p className="location-note">{missing.toLocaleString()} without a location</p> : null;
-            })()}
-            <aside className="map-key" aria-label="Key">
-              <ul>
-                <li><i className="swatch cleared" /> Cleared</li>
-                <li><i className="swatch possible" /> Possible</li>
-                <li><i className="swatch unresolved" /> Unresolved</li>
-                <li><i className="swatch held" /> Held</li>
-                <li><i className="swatch l10" /> 10k+ sq ft</li>
-                <li><i className="swatch l4" /> 4k+ sq ft</li>
-                <li title={NEAR_TIP}><i className="swatch near" /> Outside, nearby</li>
+
+            {!selected && !inReview && <div className="only-mobile">{mapCoverage}</div>}
+            <aside className={`map-key ${keyOpen ? "key-expanded" : ""}`} aria-label="Key">
+              <button type="button" className="paper-btn key-toggle" aria-expanded={keyOpen} aria-controls="map-key-items" onClick={() => setKeyOpen(open => !open)}>
+                <span className="key-symbols" aria-hidden="true">● ◇</span> Map key
+              </button>
+              <ul id="map-key-items" hidden={!keyOpen}>
+                {funnel === "pipeline" ? <>
+                  {Array.from(new Set(listDeals.map(deal => deal.stage_group === "contacted" ? "financial" : deal.stage_group === "later" ? "close" : deal.stage_group))).sort().map(group =>
+                    <li key={group}><i className={`swatch pipeline-pin stage-${group}`} />{stageTitle(group)}</li>)}
+                  {showUniverse && <li><i className="pin-sample diamond" />Census site</li>}
+                </> : <>
+                  <li><i className="swatch cleared" />Cleared</li>
+                  <li><i className="swatch possible" />Possible</li>
+                  <li><i className="swatch unresolved" />Unresolved</li>
+                  <li><i className="swatch held" />Held</li>
+                  <li><i className="swatch l10" />10k+ sq ft</li>
+                  <li><i className="swatch l4" />4k+ sq ft</li>
+                  <li title={NEAR_TIP}><i className="swatch near" />Outside, nearby</li>
+                  {showPipeline && <li><i className="pin-sample circle" />Pipeline deal</li>}
+                </>}
+                {showAreas && <li><i className="swatch current-area" />Service areas</li>}
+                {showDepots && <li><i className="pin-sample depot" />Depot</li>}
+                {showRings && <li><i className="pin-sample line" />Depot rings</li>}
+                {showSpaces && <li><i className="swatch space-proposal-swatch" />Analyzed space</li>}
+                {showSpaces && markedSpaces.length > 0 && <li><i className="swatch l10" />Team-drawn lot</li>}
+                {showUnscreened && <li><i className="swatch nearby" />Unscreened listing</li>}
               </ul>
             </aside>
           </div>
@@ -2927,19 +3267,48 @@ export default function Explorer() {
           </aside>
         ) : null}
         <PanelBoundary name="Record">
-        {selectedDeal ? (
+        {showingPreview ? (
+          <MapSitePreview
+            compared={Boolean(selected && compareIds.includes(selected))}
+            marketMode={Boolean(activeMetric)} washInspection={washInspection}
+            comparisonFull={compareIds.length >= 4}
+            onCompare={selected && !selectedUnscreened ? () => {
+              const next = compareIds.includes(selected) ? compareIds.filter(id => id !== selected) : [...compareIds, selected];
+              if (next.length > 4) return;
+              setPreviewId(null); setSelected(null);
+              replaceSearch(window.location.search, { site: null, compare: next.join("|") || null }, false);
+              requestAnimationFrame(() => shellRef.current?.querySelector<HTMLCanvasElement>(".maplibregl-canvas")?.focus({ preventScroll: true }));
+            } : undefined}
+            onSatellite={basemap === "positron" ? () => chooseBasemap("satellite") : undefined}
+            loading={!figuresReady} site={selectedSite || (selectedDeal?.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null)} deal={selectedDeal} listing={selectedUnscreened} linkedDeal={selectedSite ? dealForSite(selectedSite) : null} signedIn={Boolean(me)}
+            onOpen={(panel) => {
+              if (panel) write({ panel, sheet: "full" });
+              setPreviewId(null);
+              setSheetSnap("full");
+              requestAnimationFrame(() => {
+                const title = shellRef.current?.querySelector<HTMLElement>(".drawer h2");
+                if (!panel && title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+              });
+            }}
+            onClose={() => {
+              choose(null);
+              shellRef.current?.querySelector<HTMLCanvasElement>(".maplibregl-canvas")?.focus({ preventScroll: true });
+            }}
+          />
+        ) : selectedDeal ? (
           <DealDetail
+            decisionFirst={listView || inReview}
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
-            universeSite={selectedDeal.universe_id ? siteById.get(selectedDeal.universe_id) : null}
+            universeSite={selectedDeal.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null}
             universeName={siteById.get(selectedDeal.universe_id)?.name}
             depotMiles={selectedDeal.miles_to_depot}
             lng={dealPoint(selectedDeal)?.[0]}
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
-            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
+            onClose={workDetail ? returnToWork : inspecting ? returnComparison : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={(workDetail && <button type="button" className="text-link" onClick={returnToWork}>Back to My work</button>) || comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             compared={compareIds.includes(selectedDeal.deal_id)}
@@ -2951,6 +3320,8 @@ export default function Explorer() {
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            washInspection={washInspection}
+            onLayoutOverlay={setLayoutOverlay}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             onOpenNda={(id) => write({ nda: id })}
             locationFix={locationFix}
@@ -2961,6 +3332,7 @@ export default function Explorer() {
         ) : selectedUnscreened ? (
           <UnscreenedDetail
             row={selectedUnscreened}
+            signedIn={Boolean(me)}
             lng={unscreened.find((feature) => feature.properties.listing_id === selectedUnscreened.listing_id)?.geometry?.coordinates?.[0]}
             lat={unscreened.find((feature) => feature.properties.listing_id === selectedUnscreened.listing_id)?.geometry?.coordinates?.[1]}
             onClose={() => choose(null)}
@@ -2968,11 +3340,12 @@ export default function Explorer() {
           />
         ) : selectedSite ? (
           <Detail
+            decisionFirst={listView || inReview}
             site={selectedSite}
-            lng={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
-            lat={featureById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}
+            lng={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
+            lat={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}
             depotMiles={(() => {
-              const feature = featureById.get(selectedSite.site_id);
+              const feature = poolById.get(selectedSite.site_id);
               const coords = feature?.geometry?.coordinates;
               if (!coords || !data) return selectedSite.miles_to_depot;
               return nearestDepot(coords[0], coords[1], data.depots.features)?.miles ?? selectedSite.miles_to_depot;
@@ -2984,8 +3357,8 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={() => { setSelected(null); write({ site: null, ndafrom: null }); }}
-            banner={params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined}
+            onClose={workDetail ? returnToWork : inspecting ? returnComparison : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={(workDetail && <button type="button" className="text-link" onClick={returnToWork}>Back to My work</button>) || comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             onOpenNda={(id) => write({ nda: id })}
@@ -2996,6 +3369,8 @@ export default function Explorer() {
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            washInspection={washInspection}
+            onLayoutOverlay={setLayoutOverlay}
             figuresReady={figuresReady}
             outsideFilter={Boolean(selectedSite && !siteInCategories(selectedSite, links, categories))}
             related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}
@@ -3004,28 +3379,26 @@ export default function Explorer() {
         </PanelBoundary>
         <PanelBoundary name="Compare">
         {compareIds.length ? (
-          <CompareTray
+          <CompareTray saveQuery={me?.actionsEnabled ? comparisonQuery : undefined}
             deals={compareIds.flatMap((id) => {
               const deal = dealRows.find((item) => item.deal_id === id);
               return deal ? [deal] : [];
             })}
             sites={compareIds.flatMap((id) => {
               if (dealRows.some((item) => item.deal_id === id)) return [];
-              const site = sites.find((item) => item.site_id === id);
+              const site = siteById.get(id);
               return site ? [site] : [];
             })}
-            contextSites={sites}
+            contextSites={[...siteById.values()]}
+            contextDeals={dealRows}
             signedIn={Boolean(me)}
+            evidenceEnabled={Boolean(me?.actionsEnabled)}
+            inspecting={inspecting}
+            onInspect={inspectComparison}
             onRemove={(id) => setCompared(id, false)}
             onClose={() => write({ compare: null, slist: null })}
           >
-            {compareIds.length >= 2 && me?.u ? (
-              <button type="button" className="paper-btn" onClick={() => void fetch("/api/actions/views", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ name: `Compare ${compareIds.length}`, query: `compare=${compareIds.join("|")}`, scope: "personal" }),
-              })}>Save view</button>
-            ) : null}
+            {compareIds.length >= 2 && me?.u && <button type="button" className="text-link" onClick={() => openContextAsk(true)}>Ask about these sites</button>}
           </CompareTray>
         ) : null}
         </PanelBoundary>
@@ -3051,6 +3424,6 @@ export default function Explorer() {
         <div ref={ringNoteRef} className="map-tip-fixed" data-hidden="1">{LAYER_TITLES.rings}</div>,
         document.body,
       ) : null}
-    </div>
+    </div></PurchaseScenarios>
   );
 }

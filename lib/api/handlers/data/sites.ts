@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSession, readGenerated, requireUser, snapshotCacheHeaders } from "@/lib/guard";
-import { currentSnapshotMeta, snapshotGeneration } from "@/lib/snapshot/read";
+import { isSession, privateHeaders, readGenerated, requireUser } from "@/lib/guard";
 import { overlayHeldStages } from "@/lib/changes/heldStage";
 import { overlayUniverseMedia } from "@/lib/universeMedia";
 import { overlayQuickLubeCensus } from "@/lib/changes/read";
@@ -46,10 +45,18 @@ const KEEP = [
   "cap_b_source",
   "cap_b_as_of",
   "cap_b_confidence",
+  "cap_c_amps",
+  "cap_c_volts",
+  "cap_c_phase",
+  "cap_c_panels",
+  "cap_c_source",
+  "cap_c_as_of",
+  "cap_c_confidence",
   "land_control",
   "network_status",
   "listed",
   "contacted",
+  "asking_price",
   "asking_price_display",
   "asking_price_source",
   "pipeline_stage",
@@ -132,6 +139,11 @@ export async function GET(request: NextRequest) {
   const session = await requireUser();
   if (!isSession(session)) return session;
   const city = request.nextUrl.searchParams.get("city");
+  console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
+  return NextResponse.json(await loadMapSites(city), { headers: privateHeaders });
+}
+
+export async function loadMapSites(city: string | null) {
   const full = readGenerated("sites.geojson") as { features: SiteFeature[] };
   const visible = omitProtectedSites(full.features);
   const chosen = city ? visible.filter((feature) => feature.properties.city === city) : visible;
@@ -142,7 +154,6 @@ export async function GET(request: NextRequest) {
   });
   const withCensus = await overlayQuickLubeCensus({ type: "FeatureCollection", features });
   const staged = await overlayUniverseMedia(await overlayHeldStages(await overlayStageFile(withCensus, "site"), "site"));
-  console.info(JSON.stringify({ event: "data", user: session.u, part: "sites" }));
-  const version = currentSnapshotMeta()?.id || `files-${snapshotGeneration()}`;
-  return NextResponse.json(redactGmailPayload(staged), { headers: snapshotCacheHeaders(version) });
+  // Live decisions can change while the published workbook snapshot stays the same.
+  return redactGmailPayload(staged);
 }

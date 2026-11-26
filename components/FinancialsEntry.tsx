@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
 import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
-import { financialsCard, statementTiles, type StatementTile } from "@/lib/pnl/cue";
-import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import { financialsCard, shownYear, statementTiles, type StatementTile } from "@/lib/pnl/cue";
+import type { FinancialPanel } from "@/lib/financials";
+import { emptyStatement, unavailableStatement, type PnlStatement } from "@/lib/pnl/statement";
+import ComparisonEvidence from "./actions/ComparisonEvidence";
+import { useActionStatus } from "./actions/panel";
+import { statementFigures, type StatementMeasure } from "@/lib/pnl/citation";
 import PnlOverlay from "./PnlOverlay";
 
 export type PnlTiles = { revenue: StatementTile; cash: StatementTile };
@@ -36,6 +40,9 @@ export function usePnlTiles(dealId: string) {
   const [statement, setStatement] = useState<PnlStatement | null>(null);
   const [conflicts, setConflicts] = useState<DataConflict[]>([]);
   const [comments, setComments] = useState<OpenPnlComment[]>([]);
+  const [panel,setPanel] = useState<FinancialPanel | null>(null);
+  const [failed,setFailed] = useState(false);
+  const [attempt,setAttempt] = useState(0);
   const [sample, setSample] = useState(false);
   const [settled, setSettled] = useState(!dealId);
   const [loadedFor, setLoadedFor] = useState(dealId);
@@ -47,6 +54,7 @@ export function usePnlTiles(dealId: string) {
   }, []);
   if (loadedFor !== dealId) {
     setLoadedFor(dealId);
+    setPanel(null); setFailed(false);
     setStatement(null);
     setSample(false);
     setSettled(!dealId);
@@ -69,16 +77,17 @@ export function usePnlTiles(dealId: string) {
       setSettled(false);
     }
     fetch(`/api/data/financials/${encodeURIComponent(dealId)}`, { cache: "no-store" })
-      .then(async (response) => (response.ok ? await response.json() as { pnl?: unknown; pnlDemo?: boolean; conflicts?: unknown; comments?: unknown } : null))
+      .then(async (response) => (response.ok ? await response.json() as FinancialPanel & { pnl?: unknown; pnlDemo?: boolean; conflicts?: unknown; comments?: unknown } : null))
       .then((body) => {
         if (cancel) return;
-        setStatement(readStatement(body?.pnl));
+        setPanel(body); setFailed(!body);
+        setStatement(body ? readStatement(body.pnl) : unavailableStatement());
         setConflicts(conflictList(body?.conflicts));
         setComments(commentList(body?.comments));
         setSample(Boolean(body?.pnlDemo));
       })
       .catch(() => {
-        if (!cancel) setStatement(emptyStatement());
+        if (!cancel) { setFailed(true); setStatement(unavailableStatement()); }
       })
       .finally(() => {
         if (!cancel) setSettled(true);
@@ -86,17 +95,19 @@ export function usePnlTiles(dealId: string) {
     return () => {
       cancel = true;
     };
-  }, [dealId, commentTick]);
-  return { statement, conflicts, comments, sample, settled, tiles: statement ? statementTiles(statement, sample) : null };
+  }, [dealId, commentTick, attempt]);
+  return { panel, failed, retry:()=>setAttempt(n=>n+1), statement, conflicts, comments, sample, settled, tiles: statement ? statementTiles(statement, sample) : null };
 }
 
 export default function FinancialsEntry({
   dealId,
   packageOnFile = false,
+  compact = false,
   loaded,
 }: {
   dealId: string;
   packageOnFile?: boolean;
+  compact?: boolean | "link";
   loaded?: { statement: PnlStatement | null; sample: boolean; settled: boolean; conflicts?: DataConflict[]; comments?: OpenPnlComment[] };
 }) {
   const own = usePnlTiles(loaded ? "" : dealId);
@@ -105,11 +116,19 @@ export default function FinancialsEntry({
   const comments = loaded ? loaded.comments ?? [] : own.comments;
   const sample = loaded ? loaded.sample : own.sample;
   const settled = loaded ? loaded.settled : own.settled;
+  const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     setOpen(false);
   }, [dealId]);
   const card = settled && statement ? financialsCard(statement, sample) : null;
+  const year = statement && card ? shownYear(statement) : null;
+  const access = useActionStatus();
+  const [missing,setMissing] = useState<StatementMeasure | null>(null);
+  const lines = card && statement ? statementFigures(statement,sample) : [];
+  const missingLine = lines.find(f => f.measure === missing);
+  const [selectedLine,setSelectedLine] = useState("");
+  if (!settled && compact) return <small role="status">Checking for financials…</small>;
   if (!settled) {
     return (
       <article className="fin-entry" data-testid="financials-loading" aria-busy="true">
@@ -123,20 +142,39 @@ export default function FinancialsEntry({
   }
   return (
     <>
-      {card ? (
+      {compact ? (card ? <button type="button" className={compact === "link" ? "text-link statement-link" : "primary preview-open"} onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
         <article className="fin-entry">
-          <button type="button" className="fin-tile" data-testid="financials-entry" onClick={() => setOpen(true)}>
-            <span>Financials</span>
+          <button type="button" className="fin-tile" data-testid="financials-entry" onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>
+            <span>Financials · stated figures</span>
+            <small>{card.coverage}</small>
             <strong>{card.revenue} revenue</strong>
             <small>{card.cashLabel} {card.cash} · {card.margin} margin</small>
-            <small>{card.coverage}</small>
             <span className="fin-open">Open P&L <span aria-hidden="true">→</span></span>
           </button>
+          {year && <div className="statement-evidence">
+            <small>Monthly statements on file · {year.year}</small>
+            <div className="month-coverage">{Array.from({length:12},(_,i) => {
+              const month = new Date(Date.UTC(year.year,i,1)).toLocaleString("en-US",{month:"short",timeZone:"UTC"});
+              const label = month + (year.months[i] ? " on file" : " not on file");
+              return <abbr key={month} title={label} aria-label={label} data-present={Boolean(year.months[i])}>{month}{year.months[i] && <sup aria-hidden="true">✓</sup>}</abbr>;
+            })}</div>
+            {lines.filter(f => f.measure === "statement_revenue" || f.measure === (card.cashLabel === "SDE" ? "statement_sde" : "statement_ebitda")).map(f => {
+              const label = f.measure === "statement_revenue" ? "Revenue" : card.cashLabel;
+              if (f.value === "—") return access.enabled ? <button className="text-link" type="button" key={f.measure}
+                onClick={()=>setMissing(f.measure)}>Request {label} document</button> : null;
+              return <button className="text-link" type="button" key={f.measure} onClick={event => {
+                trigger.current = event.currentTarget; setSelectedLine(f.selection.line); setOpen(true);
+              }}>View {label} line</button>;
+            })}
+          </div>}
         </article>
       ) : packageOnFile ? (
         <p className="fin-quiet" data-testid="financials-quiet">Financials: package not yet broken into line items</p>
       ) : null}
-      {open && card ? createPortal(<PnlOverlay statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => setOpen(false)} />, document.body) : null}
+      {missingLine && <ComparisonEvidence target={{targetKind:"deal",targetId:dealId,measure:missingLine.measure,period:missingLine.period,basis:missingLine.basis}}
+        title="Financial statement" context="Supporting document needed" close={()=>setMissing(null)} saved={()=>{}}
+        inspect={note=>{const url=new URL(window.location.href); url.searchParams.set("site",dealId); url.searchParams.set("panel","discussion"); url.searchParams.set("note",note); window.location.assign(url.href);}} />}
+      {open && card ? createPortal(<PnlOverlay initialGrain={selectedLine ? card.grain : null} selection={selectedLine ? {line:selectedLine,period:card.period,year:card.year} : undefined} statement={statement ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={dealId} onClose={() => { setOpen(false); setSelectedLine(""); requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true })); }} />, document.body) : null}
     </>
   );
 }

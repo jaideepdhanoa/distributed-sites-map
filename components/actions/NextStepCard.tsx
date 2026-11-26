@@ -1,5 +1,7 @@
 "use client";
 
+import GapThreadLink from "./GapThreadLink";
+
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { canCloseProposal } from "@/lib/actions/proposalAccess";
@@ -162,6 +164,7 @@ export function NextStepCard({
   const [ownerId, setOwnerId] = useState("");
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
+  const lastCreate = useRef({ draft: "", key: "" });
   const [pending, setPending] = useState(false);
   const [dropHidden, setDropHidden] = useState(false);
   const dropKey = `sites-drop-hide:${kind}:${id}`;
@@ -207,10 +210,21 @@ export function NextStepCard({
       setOpen(true);
     }
     function onPrefill(event: Event) {
-      const detail = (event as CustomEvent<{ title?: string }>).detail;
+      const detail = (event as CustomEvent<{ title?: string; targetId?: string; reason?: string }>).detail;
+      if (detail?.targetId && detail.targetId !== id) return;
+      setEditing(null);
+      setReason(detail?.reason || "");
+      setOwnerId("");
+      setDue("");
+      setError("");
       setType("work_item");
       setOpen(true);
-      if (detail?.title) setTitle(detail.title.slice(0, 120));
+      setTitle((detail?.title || "").slice(0, 120));
+      requestAnimationFrame(() => {
+        const form = cardRef.current?.querySelector("form");
+        form?.scrollIntoView({ block: "center" });
+        form?.querySelector<HTMLElement>('[aria-label="Title"], input:not([type=date]), textarea')?.focus({ preventScroll: true });
+      });
     }
     window.addEventListener("sites-open-next-step", onOpen);
     window.addEventListener("sites-prefill-work-item", onPrefill);
@@ -218,7 +232,7 @@ export function NextStepCard({
       window.removeEventListener("sites-open-next-step", onOpen);
       window.removeEventListener("sites-prefill-work-item", onPrefill);
     };
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -288,7 +302,9 @@ export function NextStepCard({
   const pendingSteps = steps.filter((item) => item.status === "open" && !item.doneAt);
   const readySteps = steps.filter((item) => item.status === "ready" && !item.doneAt);
   const waitingSteps = steps.filter((item) => item.status === "agreed_waiting" && !item.doneAt);
-  const focus = readySteps[0] || pendingSteps[0] || waitingSteps[0] || null;
+  const workItem = proposal ? params.get("workItem") : null;
+  const requested = workItem ? steps.find(step=>step.id===workItem && !step.doneAt) : undefined;
+  const focus = (requested && ["ready","open","agreed_waiting"].includes(requested.status) ? requested : null) || readySteps[0] || pendingSteps[0] || waitingSteps[0] || null;
 
   useEffect(() => {
     if (!focus) return;
@@ -353,13 +369,13 @@ export function NextStepCard({
     return (
       <section className="next-card" data-testid="next-step">
         {showDrop ? <div className="suggested-row" data-testid="suggested-drop"><p>{dropPhrase}</p></div> : null}
-        {context}
         {workbookBlock}
+        {context}
       </section>
     );
   }
 
-  const approved = steps
+  const approved = (requested?.status === "accepted" ? requested : undefined) || steps
     .filter((item) => item.status === "accepted" && !item.doneAt)
     .sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || ""))[0];
 
@@ -383,17 +399,28 @@ export function NextStepCard({
   async function submit(path: string, body: unknown, method = "POST") {
     setPending(true);
     setError("");
-    const response = await fetch(path, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (path === "/api/actions/suggestions" && method === "POST") {
+      const draft = JSON.stringify(body);
+      if (lastCreate.current.draft !== draft) lastCreate.current = { draft, key: crypto.randomUUID() };
+      headers["Idempotency-Key"] = lastCreate.current.key;
+    }
+    let response: Response;
+    try {
+      response = await fetch(path, { method, headers, body: JSON.stringify(body) });
+    } catch {
+      setPending(false);
+      setError("Save could not be confirmed. Your draft is here. Check the refreshed record before submitting again.");
+      await reload();
+      return;
+    }
     const payload = (await response.json().catch(() => ({}))) as { error?: string; suggestion?: Step };
     setPending(false);
     if (!response.ok) {
       setError(payload.error || "That could not be saved.");
       return;
     }
+    lastCreate.current = { draft: "", key: "" };
     const saved = payload.suggestion;
     const refresh = saved ? refreshFromSuggestion(kind, id, saved) : null;
     if (saved && refresh) {
@@ -451,7 +478,7 @@ export function NextStepCard({
       detail: stepType,
       title: stepType === "work_item" ? title : stepType === "knock_off" ? reason.trim() : undefined,
       proposedValue: stepType === "bring_back" || stepType === "stage_move" ? stage : stepType === "mark_duplicate" ? survivor : title,
-      reason: picked || (stepType === "mark_duplicate" || stepType === "bring_back" ? reason : ""),
+      reason: picked || (stepType === "mark_duplicate" || stepType === "bring_back" || stepType === "work_item" ? reason : ""),
       ownerId: allowsAssignee(stepType) ? ownerId : "",
       targetOn: allowsDate(stepType) ? due : "",
     };
@@ -565,6 +592,7 @@ export function NextStepCard({
         </div>
         {sameIdea(headline, kindLabel) ? null : <p className="proposal-kind">{kindLabel}</p>}
         <p className="proposal-title">{headline}</p>
+        <GapThreadLink targetId={id} reason={focus.reason} />
         <p className="proposal-meta">
           Proposed by {who(accounts, focus.authorId)} · {formatPacific(focus.createdAt)}
           {focus.ownerName ? ` · Assignee ${focus.ownerName}` : knock ? " · No assignee" : ""}
@@ -673,12 +701,12 @@ export function NextStepCard({
         <span className="badge checked">Approved</span>
         {sameIdea(headline, kindLabel) ? null : <p className="proposal-kind">{kindLabel}</p>}
         <p className="proposal-title">{headline}</p>
+        <GapThreadLink targetId={id} reason={approved.reason} />
         <p className="proposal-meta">
           Approved by {who(accounts, approved.decidedBy) || "the approver"}
           {approved.decidedAt ? ` · ${formatPacific(approved.decidedAt)}` : ""}
-          {approved.ownerName ? ` · Owner ${approved.ownerName}` : ""}
-          {approved.targetOn ? ` · Due ${shortDate(approved.targetOn)}` : ""}
         </p>
+        <p className="step-assignment"><span>Owner <b>{approved.ownerName || who(accounts, approved.ownerId) || "Unassigned"}</b></span>{approved.targetOn && <span>Due <b>{shortDate(approved.targetOn)}</b></span>}</p>
         <div className="act-row">
           {reviewer || approved.ownerId === status.username ? (
             <button type="button" className="propose" data-testid="next-step-done" onClick={() => void submit(`/api/actions/suggestions/${approved.id}/done`, {})}>Mark done</button>
@@ -761,9 +789,9 @@ export function NextStepCard({
           ) : null}
         </div>
       ) : null}
-      {context}
-      {tone === "empty" ? null : workbookBlock}
       {focus && !open ? <div data-testid="proposed-next-step">{body}</div> : body}
+      {tone === "empty" ? null : workbookBlock}
+      {context}
       {bringBack && !idle ? (
         <button type="button" className="paper-btn" data-testid="bring-back-dropped" onClick={() => { setType("bring_back"); setOpen(true); setReason(""); }}>Bring back</button>
       ) : null}
@@ -775,14 +803,15 @@ export function NextStepCard({
 function WorkbookLine({ text, owner, due }: { text: string; owner: string; due: string }) {
   const plain = plainNextStep(text);
   const [open, setOpen] = useState(false);
-  const meta = [owner ? `Owner ${owner}` : "", due ? `Due ${due}` : ""].filter(Boolean).join(" · ");
+
   const more = Boolean(plain.full && plain.full !== plain.line);
-  if (!plain.line && !meta) return null;
+  if (!plain.line && !owner && !due) return null;
   return (
     <div className="workbook-step" data-testid="workbook-step" data-note={open ? "full" : "line"}>
+      <h3>Next action</h3>
       {plain.line && !open ? <p className="next-line" title={plain.full}>{plain.line}</p> : null}
       {open ? <p className="next-full">{plain.full}</p> : null}
-      {meta ? <p className="proposal-meta">{meta}</p> : null}
+      <p className="step-assignment"><span>Owner <b>{owner || "Unassigned"}</b></span>{due && <span>Due <b>{due}</b></span>}</p>
       {more ? (
         <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           {open ? "Hide full note" : "Show full note"}

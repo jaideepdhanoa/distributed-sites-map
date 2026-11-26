@@ -43,6 +43,14 @@ function stallRows(widthFt: number, depthFt: number, aisleFt: number): number {
   return doubles * 2 + (left + 1e-6 >= single ? 1 : 0);
 }
 
+/** One row served by an existing aisle on its boundary. The adjacent traffic lane cannot supply stall depth. */
+export function estimateEdgeRow(lengthFt: number, footprintFt: number, aisleFt: number, layout: SpaceLayout) {
+  if (layout === "pull_through" || aisleFt < AISLE_FT[layout]) return 0;
+  const angle = layout === "stalls_90" ? 90 : layout === "stalls_60" ? 60 : 45;
+  const stall = stallFootprint(angle);
+  return footprintFt >= stall.depthFt ? fit(lengthFt, stall.alongFt) : 0;
+}
+
 export function estimateSlots(lengthFt: number, widthFt: number, layout: SpaceLayout): number {
   if (layout === "pull_through") {
     return fit(lengthFt, PULL_THROUGH_WIDTH_FT) * fit(widthFt, PULL_THROUGH_DEPTH_FT);

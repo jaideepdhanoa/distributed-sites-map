@@ -29,6 +29,11 @@ const expected = [
   "GET /api/actions/recommendations",
   "DELETE /api/actions/views/:id",
   "GET /api/actions/views",
+  "GET /api/actions/comparison-decision",
+  "POST /api/actions/comparison-decision",
+  "GET /api/actions/comparison-evidence",
+  "POST /api/actions/comparison-evidence",
+  "GET /api/actions/work",
   "POST /api/actions/views",
   "GET /api/alerts/digest",
   "GET /api/alerts/flush",
@@ -62,6 +67,9 @@ const expected = [
   "POST /api/data/revalidate",
   "GET /api/data/sites/:id",
   "GET /api/data/sites",
+  "GET /api/data/selection-review",
+  "GET /api/data/space-options",
+  "POST /api/data/space-options",
   "GET /api/data/spaces",
   "GET /api/data/timeline/summary",
   "GET /api/data/timeline",
@@ -160,8 +168,10 @@ test("ask streams from the catch-all instead of its own function", () => {
 test("changes is on the catch-all and rejects a writer with no credential", async () => {
   const indie = process.env.AGENT_WRITE_TOKEN_INDIE;
   const muse = process.env.AGENT_WRITE_TOKEN_MUSE;
+  const chatgpt = process.env.AGENT_WRITE_TOKEN_CHATGPT;
   delete process.env.AGENT_WRITE_TOKEN_INDIE;
   delete process.env.AGENT_WRITE_TOKEN_MUSE;
+  delete process.env.AGENT_WRITE_TOKEN_CHATGPT;
   try {
     assert.equal((await call("GET", "/api/changes")).status, 405);
     const missing = await call("POST", "/api/changes");
@@ -177,6 +187,8 @@ test("changes is on the catch-all and rejects a writer with no credential", asyn
   } finally {
     if (indie === undefined) delete process.env.AGENT_WRITE_TOKEN_INDIE;
     else process.env.AGENT_WRITE_TOKEN_INDIE = indie;
+    if (chatgpt === undefined) delete process.env.AGENT_WRITE_TOKEN_CHATGPT;
+    else process.env.AGENT_WRITE_TOKEN_CHATGPT = chatgpt;
     if (muse === undefined) delete process.env.AGENT_WRITE_TOKEN_MUSE;
     else process.env.AGENT_WRITE_TOKEN_MUSE = muse;
   }

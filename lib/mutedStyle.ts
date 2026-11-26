@@ -7,7 +7,7 @@ let pending: Promise<StyleSpecification> | null = null;
 /** OpenFreeMap Positron, recolored to the cream basemap. Same tiles, glyphs, and sprite. */
 export function mutedPositronStyle(): Promise<StyleSpecification> {
   if (!pending) {
-    pending = fetch(STYLE_URL).then(async (response) => {
+    pending = fetch(STYLE_URL, { signal: AbortSignal.timeout(12000) }).then(async (response) => {
       if (!response.ok) throw new Error(`basemap ${response.status}`);
       const style = (await response.json()) as StyleSpecification;
       return mute(style);
@@ -35,8 +35,8 @@ function tone(id: string, prop: string): string | null {
   if (id === "water" || id.startsWith("waterway")) return "#dfe6e4";
   if (id.includes("residential") || id.includes("landuse")) return "#efeae0";
   if (id === "building") return prop.includes("outline") ? "#e7e0d2" : "#f7f3ec";
-  if (id.includes("motorway") && (id.includes("casing") || id.includes("subtle"))) return "#e4d9c4";
-  if (id.includes("motorway")) return "#f3eee4";
+  if (id.includes("motorway") && (id.includes("casing") || id.includes("subtle"))) return "#beaf91";
+  if (id.includes("motorway")) return "#e8d7b9";
   if (id.includes("major") && (id.includes("casing") || id.includes("subtle"))) return "#e7e0d2";
   if (id.includes("major")) return "#fbf9f4";
   if (id.includes("minor") || id.includes("path") || id.includes("pier") || id.includes("service") || id.startsWith("aeroway")) return "#e9e3d6";
@@ -44,7 +44,7 @@ function tone(id: string, prop: string): string | null {
   if (id.startsWith("boundary")) return "#d6cebe";
   if (id.includes("ice") || id.includes("glacier")) return "#f6f3ec";
   if (prop === "text-color") {
-    if (id.startsWith("label_city") || id.startsWith("label_country") || id === "label_state" || id === "label_town") return "#6f6757";
+    if (id.startsWith("label_city") || id.startsWith("label_country") || id === "label_state" || id === "label_town") return "#514d42";
     if (id.includes("water")) return "#8aa0a4";
     return "#9a917f";
   }
@@ -60,9 +60,6 @@ function mute(style: StyleSpecification): StyleSpecification {
   delete next.bearing;
   delete next.pitch;
   for (const layer of next.layers) {
-    if (/shield/i.test(layer.id)) {
-      layer.layout = { ...(layer.layout || {}), visibility: "none" };
-    }
     const paint = layer.paint;
     if (!paint) continue;
     for (const key of Object.keys(paint)) {

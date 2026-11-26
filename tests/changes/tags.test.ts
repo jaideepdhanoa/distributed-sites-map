@@ -23,6 +23,9 @@ function tag(family: string, code: string, extra: Record<string, unknown> = {}, 
 }
 
 test("owning roles decide who can write a chip", () => {
+  const chatgpt: Actor = { id: "chatgpt", kind: "agent" };
+  assert.doesNotThrow(() => validateBatch(chatgpt, "combined-tags", { changes: [tag("waiting_on", "we_owe"), tag("photos", "partial")] }));
+  assert.throws(() => validateBatch(chatgpt, "human-tag", { changes: [tag("drop_reason", "duplicate")] }), /person decides/);
   assert.throws(() => validateBatch(indie, "indie-wait", { changes: [tag("waiting_on", "broker_reply")] }), /owned by another role/);
   assert.throws(() => validateBatch(muse, "muse-drop", { changes: [tag("drop_reason", "duplicate")] }), /person decides/);
   assert.throws(() => validateBatch(contributor, "contributor-drop", { changes: [tag("drop_reason", "duplicate")] }), /owned by another role/);
@@ -67,12 +70,15 @@ test("Dropped still needs a human actor and a reason in the database", async () 
     ),
     /Dropped needs a reason/,
   );
-  await assert.rejects(
-    () => sql.query(
-      `INSERT INTO site_stages (site_id, market, stage, reason, version, updated_by) VALUES ('PIPE-PHX-0108', 'PHX', 'Dropped', 'Lot too small', 1, 'muse')`,
-    ),
-    /Dropped needs a human actor/,
-  );
+  for (const actor of ["muse", "indie", "chatgpt"]) {
+    await assert.rejects(
+      () => sql.query(
+        "INSERT INTO site_stages (site_id, market, stage, reason, version, updated_by) VALUES ($1, 'PHX', 'Dropped', 'Sample reason', 1, $2)",
+        ["PIPE-PHX-9108", actor],
+      ),
+      /Dropped needs a human actor/,
+    );
+  }
   await sql.query(
     `INSERT INTO site_stages (site_id, market, stage, reason, version, updated_by) VALUES ('PIPE-PHX-0108', 'PHX', 'Dropped', 'Lot too small', 1, 'ada')`,
   );
@@ -82,7 +88,8 @@ test("Dropped still needs a human actor and a reason in the database", async () 
 
 test("015 still adds tag after 016 through 020 are already recorded", async () => {
   const sql = await memorySql();
-  const files = readdirSync(migrationDir()).filter((name) => name.endsWith(".sql") && name !== "015_tags.sql").sort();
+  const pending = ["015_tags.sql", "035_chatgpt_stage_guard.sql"];
+  const files = readdirSync(migrationDir()).filter((name) => name.endsWith(".sql") && !pending.includes(name)).sort();
   await sql.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id text PRIMARY KEY,
@@ -96,7 +103,9 @@ test("015 still adds tag after 016 through 020 are already recorded", async () =
   const recorded = await sql.query<{ id: string }>("SELECT id FROM schema_migrations ORDER BY id");
   assert.ok(recorded.rows.some((row) => row.id === "016_search.sql"));
   assert.ok(recorded.rows.some((row) => row.id === "020_proposal_close.sql"));
-  assert.deepEqual(await migrate(sql), ["015_tags.sql"]);
+  await assert.rejects(() => migrate(sql, { onlyPending: pending[1] }), /pending migrations differ/i);
+  assert.deepEqual(await migrate(sql), pending);
+  assert.deepEqual(await migrate(sql, { onlyPending: pending[1] }), []);
   const check = await sql.query<{ def: string }>(
     `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'events_entity_type_check'`,
   );

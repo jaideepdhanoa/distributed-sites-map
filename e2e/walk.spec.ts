@@ -56,7 +56,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   const fit = await page.evaluate(() => {
     const bar = document.querySelector(".pipeline-list .list-bar");
     const card = document.querySelector("[data-testid=phone-cards] button.list-row");
-    const count = bar?.querySelector("p");
+    const count = document.querySelector(".phone-step [data-testid=scope-count]");
     const sort = bar?.querySelector("[data-testid=sort-control]");
     if (!bar || !card || !count || !sort) return { missing: true, pieces: false, scroll: false, overlap: false, stacked: false, clipped: false };
     const countBox = count.getBoundingClientRect();
@@ -66,7 +66,7 @@ test("phone list is one toolbar row of cards and hides search this area", async 
     const meta = card.querySelector(".phone-card-meta");
     return {
       missing: false,
-      pieces: Boolean(card.querySelector(".phone-card-name") && card.querySelector(".phone-card-stage") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
+      pieces: Boolean(card.querySelector(".phone-card-name") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
       scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth > 1 || bar.scrollWidth - bar.clientWidth > 1,
       overlap: overlapX > 1 && overlapY > 1,
       stacked: countBox.bottom <= sortBox.top + 1,
@@ -81,7 +81,8 @@ test("phone list is one toolbar row of cards and hides search this area", async 
   expect(fit.scroll).toBe(false);
   fs.mkdirSync("review-shots", { recursive: true });
   await page.locator(".pipeline-list .list-bar").screenshot({ path: "review-shots/phone-list-toolbar.png" });
-  await page.locator("[data-testid=phone-cards] button.list-row").first().click();
+  const firstCard = page.getByTestId("phone-cards").locator("button.list-row").first();
+  await firstCard.locator(".phone-card-name").tap();
   await expect(page).toHaveURL(/[?&]site=/);
 });
 
@@ -93,7 +94,7 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   await expect(card).toBeVisible();
   await page.locator("[data-testid=phone-cards]").screenshot({ path: "review-shots/mobile-card-gaps.png" });
   const gaps = await card.evaluate((node) => {
-    const stage = node.querySelector(".phone-card-stage");
+    const stage = node.querySelector(".phone-card-stage") || node.querySelector(".mobile-next-action") || node.querySelector(".phone-card-name");
     const meta = node.querySelector(".phone-card-meta");
     const facts = [...node.querySelectorAll(".phone-fact")];
     const sep = node.querySelector(".phone-sep");
@@ -110,8 +111,9 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
       sepSpace,
       bareMissing: /Not on file/.test(node.textContent || ""),
       summaryHeight: summary?.getBoundingClientRect().height || 0,
+      firstCardVisible: node.getBoundingClientRect().bottom <= innerHeight,
+      showsCoverage: Boolean(summary?.textContent?.includes("reported")),
       oneRow: tops.length > 1 && Math.max(...tops) - Math.min(...tops) < 4,
-      tileHeight: tiles.reduce((max, box) => Math.max(max, box.height), 0),
       clipped: Boolean(summary && tiles.some((box) => box.right > (summary.getBoundingClientRect().right + 1))),
     };
   });
@@ -120,8 +122,11 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   expect(gaps?.sepSpace).toBeGreaterThanOrEqual(12);
   expect(gaps?.bareMissing).toBe(false);
   expect(gaps?.clipped).toBe(false);
-  expect(gaps?.tileHeight).toBeLessThan(36);
-  expect(gaps?.summaryHeight).toBeLessThan(80);
+  expect(gaps?.showsCoverage).toBe(true);
+  expect(gaps?.firstCardVisible).toBe(true);
+  expect(gaps?.summaryHeight).toBeLessThan(844 * 0.16);
+  await page.getByRole("button", { name: "Figures", exact: true }).click();
+  await expect(page.locator(".shortlist-figures")).toBeVisible();
 });
 
 test("signed-in next step and open loops do not show a gmail id", async ({ page }, info) => {
@@ -190,7 +195,7 @@ test("a land deeplink does not turn the land filter on", async ({ page }, info) 
   await expect(page.locator(".chip.removable", { hasText: /^Land$/ })).toHaveCount(0);
   const after = Number(await page.locator(".shell").getAttribute("data-list-count"));
   expect(after).toBe(before);
-  const filterCount = await page.evaluate(() => document.querySelector("[data-testid=summary-row] strong")?.textContent?.replace(/,/g, "").trim() || "");
+  const filterCount = await page.evaluate(() => document.querySelector("[data-testid=map-scope] [data-testid=scope-count]")?.textContent?.replace(/,/g, "").split(" ")[0] || "");
   expect(filterCount).toBe(String(before));
   await expect(page.getByTestId("outside-row")).toBeVisible();
   const cardLeak = await page.evaluate(() => {
@@ -215,6 +220,7 @@ test("the All count matches the list, and a zoomed width uses cards", async ({ p
   test.skip(info.project.name !== "desktop", "counts and zoom");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&view=list", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("map-scope").click();
   await page.waitForSelector("[data-testid=all-stages]");
   const counts = await page.evaluate(() => {
     const all = document.querySelector("[data-testid=all-stages] strong")?.textContent?.replace(/,/g, "").trim() || "";

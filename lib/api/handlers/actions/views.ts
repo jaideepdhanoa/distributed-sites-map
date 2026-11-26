@@ -1,4 +1,5 @@
 import { isResponse, jsonError, jsonOk, openActions, runWrite } from "@/lib/actions/http";
+import { createWithReceipt } from "@/lib/actions/createReceipt";
 import { canDecide } from "@/lib/actions/roles";
 import { createView, listViews } from "@/lib/actions/views";
 
@@ -20,13 +21,13 @@ export async function POST(request: Request) {
     return jsonError("The view could not be read.", 400);
   }
   const view = await runWrite(session, { action: "view" }, (sql) =>
-    createView(sql, {
+    createWithReceipt(sql, request, session.u, body, tx => createView(tx, {
       name: String(body.name || ""),
       query: String(body.query || ""),
       ownerId: session.u,
       scope: body.scope === "team" ? "team" : "personal",
       allowTeam: canDecide(session.actionRole),
-    }),
+    })),
   );
   if (isResponse(view)) return view;
   return jsonOk({ view }, 201);

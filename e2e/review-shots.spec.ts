@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { cityPipelineCounts } from "./pipeline-counts";
 
 async function showFunnel(page: Page, project: string) {
-  if (project === "mobile") await page.locator(".phone-step").click();
+  await page.locator(".workspace-scope:visible").click();
   await expect(page.locator("nav.funnel")).toBeVisible();
 }
 
@@ -56,7 +56,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await expect(page.locator("nav.funnel")).toContainText("Universe");
   if (name === "mobile") {
     const header = await page.evaluate(() => {
-      const city = document.querySelector(".phone-view-row .city-pick select");
+      const city = document.querySelector(".phone-view-row .phone-step");
       const search = document.querySelector(".phone-view-row .mobile-search");
       const menu = document.querySelector(".phone-view-row [aria-label='Menu']");
       const filters = document.querySelector(".phone-view-row [aria-label='Filters']");
@@ -123,8 +123,12 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     await expect(page.locator(".list-pane thead")).toContainText("County check");
     await expect(page.getByTestId("type-chip").first()).toBeVisible();
   } else {
-    await expect(page.getByTestId("phone-cards")).toBeVisible();
-    await expect(page.getByTestId("type-chip").first()).toBeVisible();
+    const cards = page.getByTestId("phone-cards");
+    await expect(cards).toBeVisible();
+    await expect(page.locator(".workspace-scope:visible")).toContainText("Phoenix · Open land");
+    await expect(page.locator(".shortlist-stage")).toContainText("Universe");
+    await expect(cards.getByTestId("stage-chip")).toHaveCount(0);
+    await expect(cards.locator(".phone-card-meta").first()).toContainText(/listed|listing/i);
   }
   await page.screenshot({ path: `review-shots/${name}-universe-list.png`, fullPage: false });
   await page.goto("/?newlist=1&city=PHX&site=L-239", { waitUntil: "domcontentloaded" });
@@ -136,8 +140,8 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.screenshot({ path: `review-shots/${name}-unscreened.png`, fullPage: false });
   await page.goto("/?funnel=pipeline&city=PHX&pstage=desk", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   if (name === "mobile") {
-    await page.getByRole("button", { name: "Layers", exact: true }).click();
     await expect(page.getByTestId("basemap")).toBeVisible();
   } else {
     await expect(page.getByTestId("basemap-desktop")).toBeVisible();
@@ -162,4 +166,256 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.locator(".drawer-scroll").evaluate((node) => { node.scrollTop = 0; });
   await expect(stars.locator("h2")).toBeInViewport();
   await page.screenshot({ path: `review-shots/${name}-mia-0080.png`, fullPage: false });
+});
+
+test("screening queue separates court, owner and due date on both layouts", async ({ page }, info) => {
+  const queue = [
+    { nda_id: "NDA-910", counterparty_firm: "Sample agreement A", court: "us", court_pill: "Our court", days_court: 2, owner: "", stage: "draft", next_step: "Review draft", next_step_due: "2000-01-01" },
+    { nda_id: "NDA-911", counterparty_firm: "Sample agreement B", court: "them", court_pill: "Their court", days_court: 30, owner: "reviewer", stage: "draft", next_step: "", next_step_due: "" },
+  ];
+  await page.route("**/api/data/nda", route => route.fulfill({ json: { queue } }));
+  await page.goto("/?nda=1", { waitUntil: "domcontentloaded" });
+  const panel = page.getByTestId("nda-queue");
+  await expect(panel.getByRole("heading", { name: "Overdue" })).toBeVisible();
+  const rows = panel.locator(".nda-row");
+  await expect(rows.first()).toContainText("Sample agreement A");
+  await expect(rows.last()).toContainText("Sample agreement B");
+  await panel.getByLabel("Owner", { exact: true }).selectOption("unassigned");
+  await expect(rows).toHaveCount(1);
+  await panel.getByRole("tab", { name: /^Their court/ }).click();
+  await expect(panel.getByText("No agreements match these filters.")).toBeVisible();
+  await panel.getByRole("button", { name: "Clear NDA filters" }).click();
+  await expect(rows).toHaveCount(2);
+  await panel.screenshot({ path: `review-shots/${info.project.name}-screening-queue.png` });
+});
+
+test("an incomplete search can recover without losing the query", async ({ page }, info) => {
+  let available = false;
+  await page.route("**/api/search?*", route => route.fulfill(available
+    ? { json: { mode: "index", groups: { sites: [], brokers: [], conversations: [] } } }
+    : { status: 503, json: {} }));
+  await page.goto("/?view=list&funnel=pipeline", { waitUntil: "domcontentloaded" });
+  const trigger = page.getByTestId("scope-search").filter({ visible: true }).first();
+  await trigger.click();
+  const dialog = page.getByTestId("command-search");
+  const input = dialog.getByRole("textbox");
+  await input.fill("zzqfixture");
+  await expect(dialog.getByRole("status")).toContainText("Full search is unavailable");
+  await dialog.screenshot({ path: `review-shots/${info.project.name}-screening-search.png` });
+  available = true;
+  await dialog.getByRole("button", { name: "Retry search" }).click();
+  await expect(input).toHaveValue("zzqfixture");
+  await expect(dialog.getByTestId("command-empty")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test("screen five sites in Phoenix and return to the same selection", async ({ page }, info) => {
+  const phone = info.project.name === "mobile";
+  await page.goto("/?funnel=universe&view=list&city=PHX&stage=land&sort=site:asc", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".workspace-scope:visible")).toContainText("Phoenix · Open land");
+  const rows = page.locator(".pipeline-list [data-site-row]");
+  await expect(rows.nth(4)).toBeVisible();
+  const firstFive = async () => rows.evaluateAll(elements => elements.slice(0, 5).map(element => element.getAttribute("data-site-row")));
+  const before = await firstFive();
+  const box = await rows.first().boundingBox();
+  expect(box).toBeTruthy();
+  console.log(`Shortlist first row at ${Math.round(box!.y)} CSS px (${info.project.name})`);
+  expect(box!.y).toBeLessThan(phone ? 255 : 340);
+  for (const i of [0, 1]) await rows.nth(i).getByRole("checkbox").check();
+  await page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true }).click();
+  const matrix = page.getByRole("table", { name: "Site comparison" });
+  const measureRows = matrix.locator("[data-compare-row]");
+  await expect(measureRows.first()).toBeVisible();
+  if (phone) {
+    const fits = await matrix.evaluate(table => {
+      const end = table.querySelector("thead th:last-child")!.getBoundingClientRect().right;
+      return end <= table.parentElement!.getBoundingClientRect().right + 1;
+    });
+    expect(fits, "both sites fit side by side on a phone").toBe(true);
+  }
+  const compactCount = await measureRows.count();
+  expect(compactCount).toBeGreaterThan(0);
+  for (const label of ["Open land","On-site service","Street-frontage hosting","Asking","Cash flow","Reporting period","Next check"]) {
+    await expect(matrix.locator(`[data-compare-row="${label}"]`)).toBeAttached();
+  }
+  await page.getByTestId("compare-tray").screenshot({ path: `review-shots/${info.project.name}-shortlist-compare.png` });
+  await page.getByRole("button", { name: "Show all measures" }).click();
+  expect(await measureRows.count()).toBeGreaterThan(compactCount);
+  await expect(matrix.locator('[data-compare-row="Power"]')).toBeAttached();
+  for (const name of ["Site fit", "Financials", "Diligence"]) await expect(matrix.getByRole("rowgroup", { name })).toBeAttached();
+  await expect(matrix.getByText("Not on file", { exact: true }).first()).toBeAttached();
+  await page.getByRole("button", { name: "Show decision criteria" }).click();
+  await expect(measureRows).toHaveCount(compactCount);
+  await page.getByRole("button", { name: "Close compare" }).click();
+  await expect(page.getByTestId("selection-bar").getByRole("button", { name: "Compare", exact: true })).toBeFocused();
+  const restored = await firstFive();
+  expect(restored.length === 5 && restored.every((id, index) => id === before[index])).toBe(true);
+  for (const i of [0, 1]) await expect(rows.nth(i).getByRole("checkbox")).toBeChecked();
+});
+
+test("the record shows the action, owner and deadline together", async ({ page }, info) => {
+  await page.route("**/api/data/financials/PIPE-MIA-0080", route => route.fulfill({
+    json: { workbookStep: { text: "Confirm available power with the utility.", owner: "Site team", due: "2027-01-12" } },
+  }));
+  await page.goto("/?funnel=pipeline&view=list&site=PIPE-MIA-0080&sheet=full", { waitUntil: "domcontentloaded" });
+  const drawer = page.locator("aside.drawer");
+  const action = drawer.getByTestId("workbook-step");
+  await expect(action).toContainText("Confirm available power");
+  await expect(action).toContainText("Site team");
+  await expect(action).toContainText("Jan 12");
+  await drawer.locator(".drawer-scroll").evaluate(el => { el.scrollTop = 0; });
+  const header = await drawer.getByTestId("panel-top").boundingBox();
+  const last = await action.boundingBox();
+  expect(header && last).toBeTruthy();
+  if (header && last) {
+    const y = Math.max(0, header.y);
+    const bottom = Math.min(page.viewportSize()!.height, last.y + last.height + 8);
+    await page.screenshot({ path: `review-shots/${info.project.name}-record-action.png`, clip: {
+      x: Math.max(0, header.x), y, width: Math.min(header.width, page.viewportSize()!.width - Math.max(0, header.x)), height: bottom - y,
+    } });
+  }
+});
+
+test("inspect five Phoenix map pins and return to the original view", async ({ page }, info) => {
+  type BrowserMap = import("maplibre-gl").Map;
+  type TestWindow = Window & { __sitesMap: BrowserMap };
+  const path = "/?funnel=universe&stage=in_area&city=PHX";
+  await page.goto(path, { waitUntil: "domcontentloaded" });
+  await waitForBasemap(page);
+  await page.waitForFunction(async () => {
+    const source = (window as unknown as TestWindow).__sitesMap?.getSource<import("maplibre-gl").GeoJSONSource>("sites");
+    const data = await source?.getData();
+    return data?.type === "FeatureCollection" && data.features.length >= 5;
+  });
+  const pins = await page.evaluate(async () => {
+    const source = (window as unknown as TestWindow).__sitesMap.getSource<import("maplibre-gl").GeoJSONSource>("sites")!;
+    const data = await source.getData() as {
+      type: string;
+      features: Array<{ geometry: { type: string; coordinates: number[] } | null; properties: { city?: string; site_id?: string } }>;
+    };
+    if (data.type !== "FeatureCollection") return [];
+    const sites = data.features.flatMap(feature => feature.geometry?.type === "Point" && feature.properties?.city === "PHX"
+      ? [{ id: String(feature.properties.site_id), center: feature.geometry.coordinates as [number, number] }] : []);
+    const priority = (id: string) => id === "PHX-U189" ? 2 : id === "PHX-U645" ? 1 : 0;
+    sites.sort((a, b) => priority(b.id) - priority(a.id));
+    return sites.filter((site, i) => !sites.slice(0, i).some(other =>
+      Math.abs(other.center[0] - site.center[0]) + Math.abs(other.center[1] - site.center[1]) < 0.002)).slice(0, 5);
+  });
+  expect(pins.length).toBe(5);
+  const camera = () => page.evaluate(() => {
+    const map = (window as unknown as TestWindow).__sitesMap;
+    return [...map.getCenter().toArray(), map.getZoom()].map(value => Number(value.toFixed(4)));
+  });
+  for (const [index, pin] of pins.entries()) {
+    await page.evaluate(point => {
+      (window as unknown as TestWindow).__sitesMap.jumpTo({ center: point, zoom: 15 });
+    }, pin.center);
+    await page.waitForFunction(({ center, id }) => {
+      const map = (window as unknown as TestWindow).__sitesMap;
+      const point = map.project(center);
+      return map.queryRenderedFeatures(point, { layers: ["sites"] }).some(feature => feature.properties?.site_id === id);
+    }, pin);
+    const before = await camera();
+    const click = await page.evaluate(center => {
+      const map = (window as unknown as TestWindow).__sitesMap;
+      const rect = map.getContainer().getBoundingClientRect();
+      const point = map.project(center);
+      return { x: rect.left + point.x, y: rect.top + point.y };
+    }, pin.center);
+    if (info.project.name === "mobile") await page.touchscreen.tap(click.x, click.y);
+    else await page.mouse.click(click.x, click.y);
+    const preview = page.locator(".map-preview");
+    await expect(preview).toHaveAttribute("data-record", pin.id);
+    await expect(page.locator(".selected-pin-name")).toHaveText(await preview.getByRole("heading").innerText());
+    const action = preview.getByRole("button", { name: "Open site record" });
+    await expect(action).toBeInViewport({ ratio: 1 });
+    await expect(preview.getByText("Next check", { exact: true })).toBeVisible();
+    await expect(preview.locator("dd").last()).not.toBeEmpty();
+    if (index === 0) {
+      const county = preview.getByRole("link", { name: /Open county record/ });
+      const site = await (await page.request.get(`/api/data/sites/${pin.id}`)).json();
+      await expect(county).toHaveAttribute("href", new URL(site.county_url).href);
+      // Confirm a single tap opens the recorded destination without relying on county uptime.
+      await page.context().route(site.county_url, route => route.fulfill({ contentType: "text/plain", body: "Parcel record" }));
+      const opened = page.waitForEvent("popup");
+      await county.click();
+      const parcel = await opened;
+      await expect(parcel).toHaveURL(site.county_url);
+      await parcel.close();
+      await expect(preview).toBeVisible();
+      await page.mouse.move(1, 1);
+      await waitForBasemap(page);
+      if (info.project.name === "mobile") {
+        const zoom = await page.locator(".maplibregl-ctrl-zoom-in").boundingBox();
+        const tools = await page.locator(".measure-row").boundingBox();
+        expect(zoom && tools && tools.x + tools.width <= zoom.x, "map tools leave zoom reachable").toBe(true);
+      }
+      await page.screenshot({ path: `review-shots/${info.project.name}-map-preview.png` });
+    }
+    if (pin.id === "PHX-U645") {
+      await expect(preview.getByText("County record link not on file.")).toBeVisible();
+      await expect(preview.getByRole("link", { name: /Open county record/ })).toHaveCount(0);
+    }
+    if (index % 2 === 0 || pin.id === "PHX-U645") {
+      await action.click();
+      const record = page.locator("aside.drawer");
+      await expect(record).toHaveAttribute("data-record", pin.id);
+      const brief = record.getByRole("region", { name: "Screening decision" });
+      await expect(brief).toBeInViewport();
+      await expect(record.locator(".card-hero")).toBeAttached();
+      if (index === 0) {
+        await expect(brief.getByText("Parcel number", { exact: true })).toBeVisible();
+        const aerial = record.locator("img.hero-aerial");
+        if (await aerial.count()) await aerial.evaluate(async img => { await (img as HTMLImageElement).decode(); });
+        await page.screenshot({ path: `review-shots/${info.project.name}-record-brief.png` });
+      }
+      if (info.project.name === "mobile") await expect(record).toHaveClass(/snap-full/);
+      await record.getByRole("button", { name: "Close", exact: true }).click();
+    } else await preview.getByRole("button", { name: "Close site preview" }).click();
+    await expect(page.locator("aside.drawer")).toHaveCount(0);
+    await expect.poll(camera).toEqual(before);
+    const query = new URL(page.url()).searchParams;
+    expect(query.get("city")).toBe("PHX");
+    expect(query.get("stage")).toBe("in_area");
+    await expect.poll(() => new URL(page.url()).searchParams.has("site")).toBe(false);
+  }
+});
+
+test("screen a site without a linked county record", async ({ page }, info) => {
+  await page.goto("/?funnel=universe&city=PHX&stage=in_area&site=PHX-U645&sheet=full", { waitUntil: "domcontentloaded" });
+  const brief = page.getByRole("region", { name: "Screening decision" });
+  await expect(brief).toContainText("County record link not on file.");
+  await expect(brief).toBeInViewport();
+  await brief.screenshot({ path: `review-shots/${info.project.name}-missing-evidence.png` });
+});
+
+test("open-land evidence links show the measurement in the viewport", async ({ page }) => {
+  await page.goto("/?site=PIPE-MIA-0080&funnel=pipeline&panel=open-land&sheet=full", { waitUntil: "domcontentloaded" });
+  const label = page.locator('#panel-numbers [data-evidence="open-land"]');
+  await expect(label).toBeInViewport();
+  await expect(label.locator("xpath=following-sibling::div[1]")).toBeInViewport();
+});
+
+test("map tools are one tap away and Layers restores the last explicit choice", async ({ page }, info) => {
+  await page.goto("/?funnel=universe&city=PHX&stage=in_area", { waitUntil: "domcontentloaded" });
+  const layers = page.getByRole("button", { name: "Layers", exact: true });
+  const close = page.getByRole("button", { name: "Close layers" });
+  await expect(layers).toBeVisible();
+  const scope = info.project.name === "mobile" ? page.locator(".phone-step") : page.getByTestId("map-scope");
+  await expect(scope).toContainText("Phoenix");
+  await expect(scope).toContainText("Service area");
+  await expect(scope).toContainText(/\d+ sites/);
+  await layers.click();
+  await page.reload();
+  await expect(close).toBeVisible();
+  await close.click();
+  await page.reload();
+  await expect(layers).toBeVisible();
+  const tools = page.getByRole("group", { name: "Map tools" });
+  await expect(tools.getByText("Map tools")).toBeVisible();
+  await tools.getByTestId("measure").click();
+  await expect(tools.getByTestId("measure-done")).toBeVisible();
+  await tools.getByTestId("measure-done").click();
 });

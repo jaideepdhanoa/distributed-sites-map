@@ -115,7 +115,7 @@ test("phone overview tiles name a missing line when a package is on file", async
   const numbers = page.getByTestId("card-numbers");
   await numbers.scrollIntoViewIfNeeded();
   const revenue = numbers.locator("div").filter({ hasText: "Revenue" }).first();
-  const cash = numbers.locator("div").filter({ hasText: "Cash flow" }).first();
+  const cash = numbers.getByTestId("overview-cash");
   await expect(revenue.locator("strong")).toHaveText("Not in package");
   await expect(cash.locator("strong")).toHaveText("Not in package");
   await expect(revenue).not.toContainText("Not on file");
@@ -126,7 +126,7 @@ test("phone overview tiles name a missing line when a package is on file", async
   const empty = page.getByTestId("card-numbers");
   await empty.scrollIntoViewIfNeeded();
   await expect(empty.locator("div").filter({ hasText: "Revenue" }).first().locator("strong")).toHaveText("—");
-  const emptyCash = empty.locator("div").filter({ hasText: "Cash flow" }).first();
+  const emptyCash = empty.getByTestId("overview-cash");
   await expect(emptyCash.locator("strong")).toHaveText("—");
   await expect(emptyCash).toContainText("Not on file");
 });
@@ -200,7 +200,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   const numbers = page.getByTestId("card-numbers");
   await numbers.scrollIntoViewIfNeeded();
   const revenue = numbers.locator("div").filter({ hasText: "Revenue" }).first();
-  const cash = numbers.locator("div").filter({ hasText: "Cash flow" }).first();
+  const cash = numbers.getByTestId("overview-cash");
   await expect(revenue.locator("strong")).toHaveText("$1,000,000");
   await expect(revenue).toContainText("FY2024");
   await expect(revenue).toContainText("2 of 12 months");
@@ -213,6 +213,11 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   await expect(entry).toContainText("$1,000,000 revenue");
   await expect(entry).toContainText("SDE $520,000");
   await expect(entry).toContainText("FY2024 · 2 of 12 months · Sample package");
+  await expect(page.locator(".month-coverage abbr[data-present=true]")).toHaveCount(2);
+  await page.getByRole("button", {name:"View SDE line"}).click();
+  const linked = page.locator(mobile ? ".pnl-phone-line[data-linked=true] button" : ".pnl-desktop td[data-linked=true]").first();
+  await expect(linked).toContainText("$520,000");
+  await page.getByRole("button", {name:"Close profit and loss"}).click();
   const numbersList = page.locator("#panel-numbers .kv");
   await expect(numbersList).toContainText("$1,000,000");
   await expect(numbersList).toContainText("$520,000");
@@ -223,7 +228,104 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   await siteDrawer.waitFor({ state: "attached", timeout: 45_000 });
   const siteNumbers = siteDrawer.getByTestId("card-numbers");
   await expect(siteNumbers.locator("div").filter({ hasText: "Revenue" }).first().locator("strong")).toHaveText("$1,000,000");
-  await expect(siteNumbers.locator("div").filter({ hasText: "Cash flow" }).first().locator("strong")).toHaveText("$520,000");
+  await expect(siteNumbers.getByTestId("overview-cash").locator("strong")).toHaveText("$520,000");
   await expect(page.getByTestId("financials-entry")).toContainText("SDE $520,000");
   await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("a financial check leads with statement coverage and opens its evidence", async ({ page }) => {
+  const id = "PIPE-MIA-0080";
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const deal = payload.features.find((item: { properties: { deal_id: string } }) => item.properties.deal_id === id);
+    deal.properties.stage_blocker = "Review the financial statement.";
+    await route.fulfill({ response, json: payload });
+  });
+  await page.route(`**/api/data/financials/${id}`, route => route.fulfill({ json: { pnl: sampleStatement(), pnlDemo: true } }));
+  await page.goto(`/?funnel=pipeline&site=${id}&sheet=full`, { waitUntil: "domcontentloaded" });
+  const brief = page.getByRole("region", { name: "Screening decision" });
+  await expect(brief.getByText("Statement coverage", { exact: true })).toBeInViewport();
+  await expect(brief).toContainText("Sample package");
+  await brief.getByRole("button", { name: "Review financials" }).click();
+  await expect(page.getByRole("dialog", { name: "Profit and loss" })).toBeVisible();
+});
+
+test("screen power evidence and trace acquisition pricing", async ({page}) => {
+  const id = "PIPE-LAS-0011";
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const row = data.features.find((item: {properties:{deal_id:string}}) => item.properties.deal_id === id);
+    Object.assign(row.properties, {name:"Juniper Wash", address:"Illustrative site", stage_group:"desk",
+      stage_blocker:"Confirm on-site power.", decision_reason:"", next_step:"", kind:"pipeline",
+      cap_c_amps:null, cap_c_volts:null, cap_c_phase:null, cap_c_panels:null, cap_b_frontage:2.1,
+      cap_b_source:"Utility hosting map", cap_b_confidence:"Estimated", saving_vs_hub:"18%"});
+    await route.fulfill({response,json:data});
+  });
+  await page.route("**/api/actions/status", route => route.fulfill({json:{enabled:true,actionRole:"viewer"}}));
+  await page.route("**/api/actions/comparison-evidence?*", route => {
+    expect(new URL(route.request().url()).searchParams.get("measure")).toBe("power");
+    return route.fulfill({json:{followUp:null,accounts:[]}});
+  });
+  await page.goto("/?funnel=pipeline&site="+id);
+  const brief = page.getByRole("region",{name:"Screening decision"});
+  const action = brief.getByRole("button",{name:"Open power follow-up"});
+  await expect(action).toBeInViewport();
+  await action.click();
+  await expect(page.getByRole("dialog")).toContainText("No open follow-up");
+  await page.getByRole("button",{name:"Close evidence request"}).click();
+  await page.getByRole("tab",{name:"Site fit"}).click();
+  await expect(page.locator(".power-evidence")).toContainText("On-site capacity unconfirmed");
+  await expect(page.locator(".power-evidence")).toContainText("2.1 MW");
+  await page.getByRole("tab",{name:"Economics"}).click();
+  await expect(page.getByTestId("pricing")).toBeVisible();
+  await expect(page.locator(".investment-economics")).toContainText("18%");
+  await expect(page.locator(".investment-economics")).toContainText("Implied business price");
+});
+
+test("power follow-up stays with the selected map pin", async ({ page }, info) => {
+  // Isolate the pin workflow from the external basemap tile service.
+  await page.route("https://tiles.openfreemap.org/styles/positron",route=>route.fulfill({json:{version:8,
+    glyphs:"https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",sources:{},
+    layers:[{id:"background",type:"background",paint:{"background-color":"#f2ede4"}}]}}));
+  await page.route("https://demotiles.maplibre.org/**",route=>route.fulfill({contentType:"application/x-protobuf",body:""}));
+  await page.route("**/api/data/deals", async route => {
+    const response = await route.fetch();
+    const catalog = await response.json();
+    for (const {properties} of catalog.features) Object.assign(properties, {
+      name:"Example service site", address:"Example parcel", stage_group:"desk", stage_blocker:"Confirm on-site power.", kind:"pipeline",
+    });
+    await route.fulfill({response,json:catalog});
+  });
+  await page.route("**/api/actions/status", route => route.fulfill({json:{enabled:true,actionRole:"viewer"}}));
+  await page.route("**/api/actions/comparison-evidence?*", route => route.fulfill({json:{accounts:[],followUp:{
+    note:"note-sample",status:"accepted",owner:"Field team",due:"2030-03-15",targetKind:"site",targetId:"example-site",
+  }}}));
+  await page.route("**/api/actions/notes?*", route => route.fulfill({json:{notes:[{
+    id:"note-sample",body:"Confirm service at the parcel.",authorId:"reviewer",createdAt:"2026-01-02T12:00:00+00:00",mentions:[],
+  }]}}));
+  await page.goto("/?city=PHX&funnel=pipeline&pstage=all");
+  const nearby = page.getByRole("complementary",{name:"Nearby sites"});
+  const toggle = nearby.getByRole("button",{name:/Nearby sites/});
+  await expect(toggle).toBeVisible();
+  if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
+  await nearby.locator("[data-nearby-id]").first().click();
+  const pin = page.locator(".map-preview");
+  const id = await pin.getAttribute("data-record");
+  const camera = () => page.evaluate(() => {
+    const map = (window as unknown as {__sitesMap:import("maplibre-gl").Map}).__sitesMap;
+    return [...map.getCenter().toArray(),map.getZoom()];
+  });
+  await page.waitForFunction(() => !(window as unknown as {__sitesMap:import("maplibre-gl").Map}).__sitesMap.isMoving());
+  const original = await camera();
+  await pin.getByRole("button",{name:"Open power follow-up"}).click();
+  const sheet = page.locator("dialog[open]");
+  await expect(sheet).toContainText("Field team · Due 2030-03-15");
+  await sheet.getByRole("button",{name:"View follow-up"}).click();
+  await expect(sheet.locator("[data-note-id=note-sample]")).toContainText("Confirm service at the parcel.");
+  await sheet.screenshot({path:"review-shots/"+info.project.name+"-linked-power.png"});
+  await sheet.getByRole("button",{name:"Close evidence request"}).click();
+  await expect(pin).toHaveAttribute("data-record",id!);
+  await expect.poll(camera).toEqual(original);
 });

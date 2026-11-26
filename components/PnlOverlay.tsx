@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { focusMode, focusYear, type CommentAnchor, type OpenPnlComment } from "@/lib/comments/anchor";
 import type { DataConflict } from "@/lib/conflicts/view";
 import { buildPnlGrid } from "@/lib/pnl/grid";
@@ -17,6 +17,7 @@ export default function PnlOverlay({
   comments = [],
   siteId = "",
   focus = null,
+  selection,
   previewNotes,
   onClose,
   onChecklist,
@@ -27,6 +28,7 @@ export default function PnlOverlay({
   comments?: OpenPnlComment[];
   siteId?: string;
   focus?: { type: "pnl_cell" | "pnl_line"; line: string; period: string } | null;
+  selection?: { line: string; period: string; year: number };
   previewNotes?: ThreadNote[];
   onClose: () => void;
   onChecklist?: () => void;
@@ -34,18 +36,39 @@ export default function PnlOverlay({
   const [mode, setMode] = useState<"months" | "years">(initialGrain === "annual" ? "years" : "months");
   const [percent, setPercent] = useState(false);
   const [basis, setBasis] = useState<"stated" | "normalized">("stated");
-  const shown: PnlStatement = basis === "normalized"
+  const shown = useMemo<PnlStatement>(() => basis === "normalized"
     ? { ...statement, years: statement.normalizedYears ?? [] }
-    : statement;
+    : statement, [basis, statement]);
   const years = shown.years.map((item) => item.year);
   useEffect(() => {
     if (initialGrain === "annual") setMode("years");
     if (initialGrain === "monthly") setMode("months");
   }, [initialGrain]);
-  const [year, setYear] = useState(years[0] || 0);
+  const [year, setYear] = useState(selection?.year || years[0] || 0);
   const [thread, setThread] = useState<CommentAnchor | null>(null);
-  const grid = useMemo(() => buildPnlGrid(shown, mode, year, conflicts, comments), [shown, mode, year, conflicts, comments]);
+
+  const effectiveYear = years.includes(year) ? year : years[0] || 0;
+  const grid = useMemo(() => buildPnlGrid(shown, mode, effectiveYear, conflicts, comments), [shown, mode, effectiveYear, conflicts, comments]);
   const business = shown.years.find((item) => item.year === year)?.businessLabel || shown.years[0]?.businessLabel || "";
+
+  const returnTo = useRef<HTMLElement | null>(null);
+  function closeThread() {
+    const line = thread?.line;
+    const period = thread?.period;
+    setThread(null);
+    requestAnimationFrame(() => {
+      const previous = returnTo.current;
+      returnTo.current = null;
+      if (previous?.isConnected && previous.getClientRects().length) { previous.focus(); return; }
+      if (!line) return;
+      const selector = `[data-line="${CSS.escape(line)}"]`;
+      const exact = period ? selector + `[data-period="${CSS.escape(period)}"]` : selector;
+      const evidence = [...document.querySelectorAll<HTMLElement>(selector + "[data-linked], " + exact)]
+        .find(node => node.getClientRects().length)
+        || [...document.querySelectorAll<HTMLElement>(selector)].find(node => node.getClientRects().length);
+      evidence?.focus();
+    });
+  }
 
   const focusType = focus?.type || "";
   const focusLine = focus?.line || "";
@@ -67,6 +90,7 @@ export default function PnlOverlay({
 
   function openThread(anchor: { type: "pnl_cell" | "pnl_line"; line: string; period: string }) {
     if (!siteId) return;
+    returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setThread({ type: anchor.type, siteId, line: anchor.line, period: anchor.period, spaceId: "", label: "" });
   }
 
@@ -74,11 +98,12 @@ export default function PnlOverlay({
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      onClose();
+      if (thread) closeThread();
+      else onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, thread]);
 
   return (
     <section className="pnl-overlay" role="dialog" aria-modal="true" aria-label="Profit and loss" data-testid="pnl-overlay">
@@ -96,9 +121,9 @@ export default function PnlOverlay({
             <button type="button" className={percent ? "segmented" : "segmented on"} onClick={() => setPercent(false)}>Dollars</button>
             <button type="button" className={percent ? "segmented on" : "segmented"} onClick={() => setPercent(true)}>% of revenue</button>
           </div>
-          {statement.hasNormalized ? <PnlBasis basis={basis} onChange={setBasis} /> : null}
+
           {mode === "months" && years.length > 1 ? (
-            <select className="secondary" aria-label="Year" value={year} onChange={(event) => setYear(Number(event.target.value))}>
+            <select className="secondary" aria-label="Year" value={effectiveYear} onChange={(event) => setYear(Number(event.target.value))}>
               {years.map((item) => {
                 const label = shown.years.find((view) => view.year === item)?.columnLabel || String(item);
                 return <option key={item} value={item}>{label}</option>;
@@ -106,19 +131,20 @@ export default function PnlOverlay({
             </select>
           ) : null}
         </div>
+        {statement.hasNormalized ? <PnlBasis basis={basis} onChange={setBasis} /> : <span className="layer-meta">Stated figures</span>}
         {onChecklist ? <button type="button" className="text-link" onClick={onChecklist}>Package checklist</button> : null}
         <button type="button" className="close" data-overlay-dismiss="true" aria-label="Close profit and loss" onClick={onClose}><span aria-hidden="true">×</span></button>
       </header>
       {statement.status !== "ready" ? <p className="pnl-empty" data-testid="pnl-empty">{statement.message}</p> : (
         <>
           <div className="pnl-desktop">
-            <PnlGrid grid={grid} percent={percent} onComment={siteId ? openThread : undefined} focusLine={focus?.line} focusPeriod={focus?.type === "pnl_line" ? "" : focus?.period} />
+            <PnlGrid grid={grid} percent={percent} onComment={siteId ? openThread : undefined} focusLine={focus?.line || selection?.line} focusPeriod={focus?.type === "pnl_line" ? "" : focus?.period || selection?.period} />
           </div>
-          <PnlPhone statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
+          <PnlPhone mode={mode} onMode={setMode} year={effectiveYear} onYear={setYear} focus={focus || selection} statement={shown} conflicts={conflicts} comments={comments} onComment={siteId ? openThread : undefined} />
         </>
       )}
       {thread ? (
-        <CommentThread siteId={thread.siteId} anchor={thread} notes={previewNotes} variant="sheet" source="Financials" preview={Boolean(previewNotes)} onClose={() => setThread(null)} />
+        <CommentThread siteId={thread.siteId} anchor={thread} notes={previewNotes} variant="sheet" source="Financials" preview={Boolean(previewNotes)} onClose={closeThread} />
       ) : null}
     </section>
   );

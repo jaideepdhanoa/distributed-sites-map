@@ -51,5 +51,5 @@ export function windowCoverage(year: PnlYearView): string | null {
   }
   const span = window.end - window.start + 1;
   const named = missingNames.length ? ` (${missingNames.join(", ")} missing)` : "";
-  return `${window.label} · ${present} of ${span} months${named}`;
+  return `${window.label} · ${present} of ${span} ${span === 1 ? "month" : "months"}${named}`;
 }

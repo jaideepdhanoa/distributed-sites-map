@@ -13,9 +13,16 @@ export default async function globalSetup() {
   let browser: Browser | undefined;
   try {
     browser = await chromium.launch();
-    const context = await browser.newContext({ baseURL, extraHTTPHeaders: headers });
+    const context = await browser.newContext({ baseURL });
+    // Vercel sets a deployment-scoped cookie. Third-party tile requests use normal browser headers.
+    if (bypass) await context.request.get("/login", { headers, maxRedirects: 0 });
     const page = await context.newPage();
     await page.goto("/login", { waitUntil: "domcontentloaded" });
+    if (new URL(page.url()).origin !== new URL(baseURL).origin) throw new Error("Preview sign-in reached a different origin");
+    if (process.env.E2E_EXPECTED_SHA) {
+      const deployed = await page.locator('meta[name="build-sha"]').getAttribute("content", { timeout: 15_000 });
+      if (deployed !== process.env.E2E_EXPECTED_SHA) throw new Error("The preview serves a different commit");
+    }
     const status = await page.evaluate(async (body) => {
       const response = await fetch("/api/login", {
         method: "POST",

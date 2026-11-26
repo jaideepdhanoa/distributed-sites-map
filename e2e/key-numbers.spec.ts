@@ -18,12 +18,13 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
     await page.locator(".phone-step").click();
   } else {
     await expect(page.getByRole("button", { name: "Pipeline", exact: true }).first()).toHaveClass(/on/);
+    await page.getByTestId("map-scope").click();
   }
   await expect(page.locator("nav.funnel")).toBeVisible();
   await expect(page.locator("nav.funnel")).toContainText("Desk screen");
   await expect(page.locator("nav.funnel")).not.toContainText("Open land");
-  if (mobile) await page.getByRole("button", { name: "Close steps" }).click();
-  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "Close steps" }).click();
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(page.locator("aside.layers.open")).toContainText("Universe sites");
   await page.goto("/?funnel=universe", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
@@ -31,12 +32,12 @@ test("a bare visit opens Pipeline, and an explicit Universe link still opens Uni
     await expect(page.locator(".phone-step")).toContainText("Open land");
     await page.locator(".phone-step").click();
   } else {
-    await expect(page.getByRole("button", { name: "Universe", exact: true }).first()).toHaveClass(/on/);
+    await expect(page.getByRole("navigation", {name:"Acquisition workspace"}).getByRole("button", {name:"Explore"})).toHaveClass(/on/);
   }
   await expect(page.locator("nav.funnel")).toContainText("Open land");
 });
 
-test("satellite is the default basemap and a switch is remembered", async ({ page }, info) => {
+test("Streets is the default basemap and a switch is remembered", async ({ page }, info) => {
   await page.addInitScript(() => {
     if (!window.sessionStorage.getItem("basemap-init")) {
       window.localStorage.removeItem("basemap");
@@ -45,10 +46,10 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
   });
   if (info.project.name !== "mobile") await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk");
-  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
   const mobile = info.project.name === "mobile";
   const chooser = mobile ? page.getByTestId("basemap") : page.getByTestId("basemap-desktop");
-  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(chooser).toBeVisible();
   if (!mobile) {
     const close = page.getByRole("button", { name: "Close layers" });
@@ -57,7 +58,7 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     const bounds = await chooser.boundingBox();
     expect(bounds && bounds.width > 20 && bounds.height > 20).toBeTruthy();
   }
-  await expect(chooser.getByRole("button", { name: "Satellite" })).toHaveClass(/on/);
+  await expect(chooser.getByRole("button", { name: "Streets" })).toHaveClass(/on/);
   await page.waitForFunction(() => {
     const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
     return Boolean(map?.isStyleLoaded());
@@ -79,13 +80,6 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     expect(Math.abs(camera.lng - before.lng)).toBeLessThan(0.03);
     expect(Math.abs(camera.lat - before.lat)).toBeLessThan(0.03);
   };
-  await chooser.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
-  await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
-    return Boolean(map?.isStyleLoaded());
-  });
-  await stillThere();
   await chooser.getByRole("button", { name: "Satellite", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
   await page.waitForFunction(() => {
@@ -93,14 +87,21 @@ test("satellite is the default basemap and a switch is remembered", async ({ pag
     return Boolean(map?.isStyleLoaded());
   });
   await stillThere();
-  await chooser.getByRole("button", { name: "Map", exact: true }).click();
-  await page.reload();
+  await chooser.getByRole("button", { name: "Streets", exact: true }).click();
   await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
-  if (mobile) await page.getByRole("button", { name: "Layers", exact: true }).click();
-  await expect(chooser.getByRole("button", { name: "Map", exact: true })).toHaveClass(/on/);
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
+    return Boolean(map?.isStyleLoaded());
+  });
+  await stillThere();
+  await chooser.getByRole("button", { name: "Satellite", exact: true }).click();
+  await page.reload();
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect(page.getByRole("button", { name: "Close layers" })).toBeVisible();
+  await expect(chooser.getByRole("button", { name: "Satellite", exact: true })).toHaveClass(/on/);
   await page.evaluate(() => window.localStorage.removeItem("basemap"));
   await page.goto("/?review=1");
-  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "satellite");
+  await expect(page.locator(".stage-map")).toHaveAttribute("data-basemap", "positron");
 });
 
 test("pipeline list shows unpinned Phoenix deals and the key-number strip", async ({ page }) => {
@@ -133,9 +134,9 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
   await expect(page.getByTestId("summary-row")).toContainText("Median asking");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&site=PIPE-PHX-0067");
-  await expect(page.getByTestId("card-numbers")).toContainText("Cash flow");
+  await expect(page.getByTestId("overview-cash")).toBeVisible();
   await page.getByTestId("panel-tab-numbers").click();
-  await expect(page.getByTestId("key-strip")).toContainText("Cash flow");
+  await expect(page.getByTestId("cash-flow-tile")).toBeVisible();
   await expect(page.getByTestId("key-strip")).toContainText("Broker-stated");
   await expect(page.getByTestId("key-strip")).not.toContainText("Package figures not shown");
 
@@ -148,6 +149,6 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
   await expect(page.getByTestId("key-strip")).toContainText("Attractiveness");
 
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&compare=LAND-PHX-0035|PIPE-PHX-0067");
-  await expect(page.getByTestId("compare-tray")).toContainText("Compare 2");
+  await expect(page.getByTestId("compare-tray")).toContainText("2 of 4 selected");
   await expect(page.getByTestId("compare-tray")).toContainText("$478,044");
 });

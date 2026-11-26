@@ -1,3 +1,4 @@
+import { outlineHref } from "@/lib/spaces/outlineAnchor";
 import type { CommentAnchor } from "./anchor";
 
 export const COMMENT_OPEN = "open-comment-anchor";
@@ -5,6 +6,10 @@ export const COMMENT_CHANGED = "comment-threads-changed";
 
 export function requestCommentAnchor(anchor: CommentAnchor): void {
   if (typeof window === "undefined") return;
+  if (anchor.type === "space" && anchor.spaceId.startsWith("outline:")) {
+    window.location.assign(outlineHref(anchor.siteId, anchor.spaceId));
+    return;
+  }
   window.dispatchEvent(new CustomEvent(COMMENT_OPEN, { detail: anchor }));
 }
 

@@ -1,4 +1,6 @@
+import { financialEvidence } from "./purchaseReview.ts";
 import { basisBadge } from "./pricing.ts";
+import { explicitMw, lineVolts, phaseKind, serviceAmps } from "./score/power-rating.ts";
 import { packageOnFile } from "./pnl/package.ts";
 import type { DealProps, SiteProps } from "./types";
 
@@ -141,7 +143,7 @@ export const COLUMN_MINIMUMS: Record<string, number> = {
 };
 
 export type PipelineColumnId = (typeof PIPELINE_COLUMNS)[number]["id"];
-export type PinLabel = "none" | "asking" | "acres" | "peracre";
+export type PinLabel = "financials" | "none" | "asking" | "acres" | "peracre";
 
 export type RangeFilter = {
   askMin: number | null;
@@ -160,7 +162,7 @@ const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "oma
 export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
-    if (key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
+    if (key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
     if (key === "stated_revenue" || key === "stated_revenue_display" || key === "stated_cash_flow" || key === "stated_cash_flow_display") delete copy[key];
     if (key === "county_value" || key === "county_value_display" || key === "land_estimate" || key === "land_estimate_display") delete copy[key];
     if (key === "business_value" || key === "business_value_display" || key.endsWith("_multiple") || key.endsWith("_multiple_display")) delete copy[key];
@@ -267,8 +269,8 @@ export function capacityFacts(row: CapacityRecord | null | undefined, scope: "si
   if (factText(record.cap_b_feeder)) hosting.push(`Feeder ${factText(record.cap_b_feeder)}`);
   const frontage = factNumber(record.cap_b_frontage);
   const nearby = factNumber(record.cap_b_nearby);
-  if (frontage != null) hosting.push(`Frontage hosting ${factCount(frontage)}`);
-  if (nearby != null) hosting.push(`Nearby hosting ${factCount(nearby)}`);
+  if (frontage != null) hosting.push(`Frontage hosting ${factCount(frontage)} MW`);
+  if (nearby != null) hosting.push(`Nearby hosting ${factCount(nearby)} MW`);
   if (factText(record.cap_b_horizon)) hosting.push(`Horizon ${factText(record.cap_b_horizon)}`);
   if (hosting.length) {
     facts.push({ id: "b", lines: hosting, basis: factBasis(record.cap_b_source, record.cap_b_confidence, record.cap_b_as_of) });
@@ -306,6 +308,35 @@ export function factsForSite(site: CapacityRecord | null | undefined, deal?: Cap
   const own = capacityFacts(site, "site");
   if (own.length || !deal) return own;
   return capacityFacts(deal, "site");
+}
+
+/** Keep readings and provenance together. Prefer the deal's service record when linked. */
+export function comparisonPower(deal?: DealProps | null, site?: SiteProps | null) {
+  const records = [deal, site].filter((record): record is DealProps | SiteProps => Boolean(record));
+  const service = records.flatMap(record => {
+    const mw = explicitMw(record.cap_c_amps) ?? explicitMw(record.cap_c_volts) ?? explicitMw(record.cap_c_phase);
+    const amps = serviceAmps(record.cap_c_amps);
+    const volts = lineVolts(record.cap_c_volts);
+    const phase = phaseKind(record.cap_c_phase);
+    const panels = factNumber(record.cap_c_panels);
+    const readings = [
+      mw != null && mw >= 0 ? factCount(mw) + " MW" : "",
+      amps != null ? factCount(amps, 0) + " A" : "",
+      volts != null ? factCount(volts, 0) + " V" : "",
+      phase === "three" ? "3-phase" : phase === "single" ? "Single-phase" : "",
+      panels != null ? factCount(panels, 0) + (panels === 1 ? " panel" : " panels") : "",
+    ].filter(Boolean);
+    if (!readings.length) return [];
+    const complete = (mw != null && mw >= 0) || (amps != null && volts != null && Boolean(phase));
+    const source = cleanFactText(record.cap_c_source);
+    const verified = complete && Boolean(source) && record.cap_c_confidence?.trim().toLowerCase() === "verified";
+    return [{ value: readings.join(" · "), source: factBasis(source || "Source not recorded", record.cap_c_confidence, record.cap_c_as_of),
+      verified, complete }];
+  })[0];
+  const street = records.find(record => factNumber(record.cap_b_frontage) != null);
+  const frontage = street ? { value: factCount(street.cap_b_frontage!) + " MW",
+    source: factBasis(cleanFactText(street.cap_b_source) || "Source not recorded", street.cap_b_confidence, street.cap_b_as_of) } : undefined;
+  return {service, frontage};
 }
 
 export const UNKNOWN = "—";
@@ -472,6 +503,7 @@ export function depotLine(miles?: number | null, hasPin = true) {
 }
 
 export function pillText(deal: DealProps, mode: PinLabel) {
+  if (mode === "financials") return financialEvidence(deal)==="Not applicable" ? "" : financialEvidence(deal);
   if (mode === "asking") return compactMoney(deal.asking_price);
   if (mode === "acres") {
     const acres = deal.land_acres;
@@ -569,6 +601,7 @@ export function summaryOf(deals: DealProps[]) {
     count: deals.length,
     withAsking: asking.length,
     medianAsking: median(asking),
+    withAcres: acres.length,
     totalAcres: acres.reduce((sum, value) => sum + value, 0),
     medianPerAcre: median(perAcre),
   };
@@ -669,7 +702,7 @@ export function growthText(value?: number | null) {
   return `${text}%`;
 }
 
-function trafficRoad(value?: string | null) {
+export function trafficRoad(value?: string | null) {
   const readable = shortRoad(value);
   const rawId = (value || "").match(/\b(\d{6,})\b/)?.[1] || "";
   const digits = readable.replace(/\D/g, "");

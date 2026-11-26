@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { SYNC_DRIVE_SCOPE } from "@/lib/changes/mirror";
 import { sheetsAccessToken } from "@/lib/changes/sheetsAuth";
-import { redisConfig } from "@/lib/lockout";
+import { redisCommand } from "@/lib/redisCommand";
 import { isolatedKey } from "@/lib/preview/safety";
 import {
   isSafeFileId,
@@ -52,20 +52,6 @@ function readMemory(folderId: string, filename: string): { id: string; mime: str
 
 function writeMemory(folderId: string, filename: string, value: { id: string; mime: string } | null): void {
   names.set(nameKey(folderId, filename), { at: Date.now(), value });
-}
-
-async function redisCommand(parts: (string | number)[]): Promise<unknown> {
-  const cfg = redisConfig();
-  if (!cfg) return undefined;
-  const response = await fetch(cfg.url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(parts),
-    cache: "no-store",
-  });
-  if (!response.ok) return undefined;
-  const payload = (await response.json()) as { result?: unknown };
-  return payload.result;
 }
 
 async function readRedis(folderId: string, filename: string): Promise<{ id: string; mime: string } | null | undefined> {

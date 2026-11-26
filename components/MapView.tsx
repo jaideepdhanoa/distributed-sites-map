@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GeoJSONSource, Map, Marker, NavigationControl, setWorkerUrl, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
+import { GeoJSONSource, Map, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Pentagon, Ruler } from "lucide-react";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
@@ -15,10 +15,13 @@ import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBo
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 import type { GroundBox } from "@/lib/spaces/measure";
+import type { MapOutline } from "./spaces/SpaceOptions";
+import { worldPoint } from "@/lib/spaces/options";
 import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
+  layoutOverlay?: MapOutline | null;
   sites: SiteFeature[];
   deals: DealFeature[];
   areas: GeoFeature[];
@@ -2096,6 +2099,29 @@ export default function MapView(props: Props) {
       map.off("load", go);
     };
   }, [mapGeneration, props.spaceFly]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const layer = props.layoutOverlay;
+    const paint = () => {
+      const source = map.getSource("layout-options") as GeoJSONSource | undefined;
+      if (!source && !layer?.frame) return;
+      const features = (layer?.zones || []).map(zone => {
+        const ring = zone.points.map(point => worldPoint(point, layer!.frame!));
+        return { type: "Feature" as const, properties: { kind: zone.kind, solid: zone.kind === "clear" || Boolean(layer?.reviewed.includes(zone.label)) }, geometry: { type: "Polygon" as const, coordinates: [[...ring, ring[0]]] } };
+      });
+      const data = { type: "FeatureCollection" as const, features };
+      if (source) { source.setData(data); return; }
+      map.addSource("layout-options", { type: "geojson", data });
+      const color: ExpressionSpecification = ["match", ["get", "kind"], "clear", "#f7f1df", "bay", "#ffc870", "#56d8ac"];
+      map.addLayer({ id: "layout-option-fill", type: "fill", source: "layout-options", paint: { "fill-color": color, "fill-opacity": 0.32 } });
+      map.addLayer({ id: "layout-option-line", type: "line", source: "layout-options", filter: ["==", ["get", "solid"], false], paint: { "line-color": color, "line-width": 2.5, "line-dasharray": [3,2] } });
+      map.addLayer({ id: "layout-option-reviewed", type: "line", source: "layout-options", filter: ["==", ["get", "solid"], true], paint: { "line-color": color, "line-width": 2.5 } });
+    };
+    if (map.isStyleLoaded() || map.getSource("layout-options")) paint(); else map.once("load", paint);
+    return () => { map.off("load", paint); };
+  }, [mapGeneration, props.layoutOverlay]);
 
   function undoMeasure() {
     points.current = points.current.slice(0, -1);

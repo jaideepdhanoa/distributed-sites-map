@@ -92,6 +92,9 @@ jobs:
           fi
           python scripts/sync_workbook.py
           python scripts/build_data.py
+          if [ -f data/source/space-layouts.json ]; then
+            cp data/source/space-layouts.json data/generated/space-layouts.json
+          fi
       - name: Hash the generated data
         id: hash
         run: python scripts/snapshot_hash.py > /tmp/snapshot-hash
@@ -348,6 +351,19 @@ jobs:
               echo "Could not dispatch $workflow on $BRANCH."
             fi
           done
+      - name: Check whether this layout file has passed signed-in production readback
+        id: layouts
+        if: github.ref == 'refs/heads/main' && hashFiles('data/generated/space-layouts.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
+        uses: actions/cache@v4
+        with:
+          path: .space-layouts-readback
+          key: space-layout-readback-v1-${{ hashFiles('data/generated/space-layouts.json') }}
+      - name: Verify each released layout and source aerial
+        if: steps.layouts.outcome == 'success' && steps.layouts.outputs.cache-hit != 'true'
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: node scripts/verify-space-layouts.mjs
       - name: Fail when the data checks failed
         if: steps.checks.outcome == 'failure' || steps.gap.outcome == 'failure'
         run: exit 1

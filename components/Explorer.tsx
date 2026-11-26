@@ -12,6 +12,7 @@ import type { QueueReason as ReviewChange } from "@/lib/queue/order";
 import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
 import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
 import NearbySites from "./NearbySites";
+import type { MapOutline } from "./spaces/SpaceOptions";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -300,6 +301,7 @@ export default function Explorer() {
   const [showSpaces, setShowSpaces] = useState(true);
   const [markedSpaces, setMarkedSpaces] = useState<SpaceShape[]>([]);
   const [spaceNames, setSpaceNames] = useState<Record<string, string>>({});
+  const [layoutOverlay, setLayoutOverlay] = useState<MapOutline | null>(null);
   const [marking, setMarking] = useState<{ siteId: string; lng: number; lat: number; nonce: number } | null>(null);
   const [pickedSpace, setPickedSpace] = useState("");
   const [commentedSpaceIds, setCommentedSpaceIds] = useState<string[]>([]);
@@ -958,7 +960,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel";
+      const linked = panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -2930,6 +2932,7 @@ export default function Explorer() {
           }}
           spaceShapes={markedSpaces}
           showSpaces={showSpaces}
+          layoutOverlay={layoutOverlay && layoutOverlay.site === (selectedDeal?.deal_id || (selectedSite && dealForSite(selectedSite)?.deal_id)) && !marking ? layoutOverlay : null}
           spaceDrawing={Boolean(marking)}
           spaceFly={commentFly || marking}
           selectedSpaceId={pickedSpace}
@@ -3292,6 +3295,7 @@ export default function Explorer() {
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            onLayoutOverlay={setLayoutOverlay}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             onOpenNda={(id) => write({ nda: id })}
             locationFix={locationFix}
@@ -3339,6 +3343,7 @@ export default function Explorer() {
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            onLayoutOverlay={setLayoutOverlay}
             figuresReady={figuresReady}
             outsideFilter={Boolean(selectedSite && !siteInCategories(selectedSite, links, categories))}
             related={relatedPanel({ id: selectedSite.site_id, kind: "site", name: selectedSite.name, address: selectedSite.address, apn: selectedSite.apn })}

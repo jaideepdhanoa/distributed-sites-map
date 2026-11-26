@@ -25,6 +25,7 @@ import PanelSections, { RecordNavigation } from "./PanelSections";
 import Economics from "./Economics";
 import RecordBrief from "./RecordBrief";
 import SitePhotos from "./SitePhotos";
+import SpaceOptions, { type MapOutline } from "./spaces/SpaceOptions";
 import SpaceSummary from "./spaces/SpaceSummary";
 import { NdaChip } from "./NdaChip";
 import NdaCardLine from "./NdaCardLine";
@@ -548,6 +549,7 @@ export default function Detail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  onLayoutOverlay,
   decisionFirst = false,
   onOpenNda,
 }: {
@@ -578,6 +580,7 @@ export default function Detail({
   spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
+  onLayoutOverlay?: (next: MapOutline | null) => void;
   onOpenNda?: (id: string) => void;
 }) {
   const packageHref = usePackageHref(linkedDeal?.deal_id || site?.linked_deal_id || "", signedIn);
@@ -692,6 +695,7 @@ export default function Detail({
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
       ) : null}
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
+      {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
@@ -887,6 +891,7 @@ export function DealDetail({
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
+  onLayoutOverlay,
   decisionFirst = false,
   onOpenNda,
 }: {
@@ -918,6 +923,7 @@ export function DealDetail({
   spaceSqft?: number;
   onMarkSpace?: () => void;
   spaceNote?: string;
+  onLayoutOverlay?: (next: MapOutline | null) => void;
   onOpenNda?: (id: string) => void;
 }) {
   const packageHref = usePackageHref(deal.deal_id, signedIn);
@@ -1009,6 +1015,7 @@ export function DealDetail({
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
       ) : null}
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
+      {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections

@@ -123,7 +123,7 @@ def _target_for(name: str, mime: str) -> str | None:
         return None
     if mime == SHEET:
         return _STEM.get(name)
-    if name in _REQUIRED or name.lower().endswith(".kmz"):
+    if name == "space-layouts.json" or name in _REQUIRED or name.lower().endswith(".kmz"):
         return name
     return None
 

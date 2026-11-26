@@ -341,12 +341,15 @@ export default function MapView(props: Props) {
           imagery: {
             type: "raster",
             tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+            // At parcel zoom, overzoom the available imagery instead of requesting no-data tiles.
+            maxzoom: 19,
             tileSize: 256,
             attribution: "Powered by Esri",
           },
           labels: {
             type: "raster",
             tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+            maxzoom: 19,
             tileSize: 256,
           },
           areas: { type: "geojson", data: { type: "FeatureCollection", features: [] } },

@@ -3,10 +3,16 @@
 import { useEffect, useState, useRef, useId } from "react";
 import { useSearchParams } from "next/navigation";
 import { Layers3 } from "lucide-react";
-import { firstOption, kinds, options, outlineDimensions, fitRange, edgeFitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
+import { checkSpaceFit, fitChecks } from "@/lib/spaces/fitCheck";
+import { firstOption, kinds, options, outlineDimensions, usableOutline, fitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
 import OptionAerial from "./OptionAerial";
 import { imageCandidates, isPanoUrl, type PhotoCard } from "@/lib/photos";
-import OptionReview, { useOptionReviews } from "./OptionReview";
+import { spacesMapHref } from "@/lib/spaces/mapCatalog";
+import { outlineId, findOutline } from "@/lib/spaces/outlineAnchor";
+import { reviewBody } from "@/lib/spaces/optionReview";
+import { canWrite, useActionStatus } from "@/components/actions/panel";
+import CommentThread from "@/components/comments/CommentThread";
+import OptionReview, { useOptionReviews, useSaveReview } from "./OptionReview";
 
 type Loaded = { row: Assessment; reviewedOn: string };
 const missing: Record<Option, string> = {
@@ -18,8 +24,16 @@ export type MapOutline = { site: string; frame: NonNullable<Assessment["image"]>
 
 function Workspace({ site, data, photos, onOverlay }: { site: string; data: Loaded; photos?: PhotoCard; onOverlay?: (v: MapOutline | null) => void }) {
   const { row, reviewedOn } = data;
-  const [option, setOption] = useState<Option>(firstOption(row));
-  const [which, setWhich] = useState(0);
+  const linked = findOutline(row, useSearchParams().get("outline") || "");
+  const initialOption = (linked && kinds[linked.kind].option) || firstOption(row);
+  const [option, setOption] = useState<Option>(initialOption);
+  const [which, setWhich] = useState(linked ? optionZones(row, initialOption).indexOf(linked) : 0);
+  const [discussion, setDiscussion] = useState(Boolean(linked));
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const busy = useRef(false);
+  const save = useSaveReview(site);
+  const status = useActionStatus();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Point[]>();
   const [corner, setCorner] = useState(0);
@@ -27,48 +41,77 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const zones = optionZones(row, option);
   const zone = zones[which];
   const area = zone?.label || options[option];
-  const prior = history.reviews.find(x => x.review?.option === option && x.review.area === area);
+  const prior = history.reviews.find(x => x.review?.option === option && x.review.area === area && x.review.disposition !== "Adjust outline");
   const reviewed: string[] = [];
   const visible = zones.map(candidate => {
     if (candidate === zone && draft) return { ...candidate, points: draft };
-    const decision = history.reviews.find(entry => entry.review?.option === option && entry.review.area === candidate.label)?.review;
-    if (!decision || decision.frame !== row.image?.id || decision.disposition !== "Keep for diligence") return candidate;
-    if (!decision.points && decision.revision !== row.revision) return candidate;
+    const geometry = history.reviews.find(({review}) => review?.option === option && review.area === candidate.label && review.frame === row.image?.id && review.points)?.review?.points;
+    if (!geometry) return candidate;
     reviewed.push(candidate.label);
-    return decision.points ? { ...candidate, points: decision.points } : candidate;
+    return { ...candidate, points: geometry };
   });
   const clear = row.status === "reviewed" ? row.zones.filter(z => z.kind === "clear") : [];
   const painted = [...visible, ...clear];
   const overlayKey = JSON.stringify({ zones: painted, reviewed });
   useEffect(() => {
-    if (onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, ...JSON.parse(overlayKey) });
+    if (editing && onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, ...JSON.parse(overlayKey) });
     return () => onOverlay?.(null);
-  }, [site, row.image?.bounds, overlayKey, onOverlay]);
-  const reset = () => { setDraft(undefined); setEditing(false); setCorner(0); };
-  function changePoint(point: Point) {
+  }, [site, row.image?.bounds, overlayKey, onOverlay, editing]);
+  const reset = () => { setDraft(undefined); setEditing(false); setCorner(0); setEditError(""); };
+  function changePoint(point: Point, index = corner) {
     const current = visible[which]?.points;
     if (!current) return;
-    setDraft(current.map((p,i) => i === corner ? point : p));
+    setDraft(current.map((p,i) => i === index ? point : p));
+  }
+  async function saveOutline() {
+    if (!zone || !row.image || !draft || busy.current) return;
+    if (!usableOutline(draft)) { setEditError("The outline crosses itself or has no area. Move a corner before saving."); return; }
+    busy.current = true;
+    setSaving(true);
+    setEditError("");
+    try {
+      await save(reviewBody({ disposition: "Adjust outline", option, area, revision: row.revision, frame: row.image.id, points: draft, reason: "Updated the outline." }));
+      history.retry();
+      reset();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "The outline could not be saved.");
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
   }
   const activePoint = (visible[which]?.points)?.[corner];
-  const dims = outlineDimensions(visible.find(z => z.label === zone?.label), row.image?.bounds, row.image);
-  const range = dims && fitRange(dims[0], dims[1], Math.min(6, dims[1]), "stalls_90");
-  const edge = dims && range && range[1] < 4 ? edgeFitRange(dims[0], dims[1], Math.min(6, dims[1]), 24, "stalls_90") : null;
+  const shown = visible.find(z => z.label === zone?.label);
+  const fit = shown && checkSpaceFit(shown, row.image);
+  const dims = fit?.dimensions ?? null;
+  const range = fit?.inside;
+  const edge = fit?.adjacent;
   const originalDims = outlineDimensions(zone, row.image?.bounds, row.image);
   const predicted = originalDims && fitRange(originalDims[0], originalDims[1], Math.min(6, originalDims[1]), "stalls_90");
   const held = row.status !== "reviewed";
   const bayEvidence = option === "bays" && photos ? photos.photos.filter(photo =>
     ["building", "street_level", "floor_plan", "site_plan"].includes(photo.role) || /(?:floor|site) plan/i.test(photo.caption || "")
   ).flatMap(photo => imageCandidates(photo, "full").slice(0, 1).map(url => ({ url, label: photo.caption || (photo.role === "building" ? "Building photo" : "Filed site evidence") }))) : [];
-  const selectArea = (index: number) => { setWhich(index); reset(); };
+  const selectArea = (index: number) => { setWhich(index); setDiscussion(false); reset(); };
   return <div className="space-workspace">
     <div className="space-tabs" role="group" aria-label="Operating layout">{(Object.keys(options) as Option[]).map(key =>
-      <button type="button" className={key === option ? "segmented on" : "segmented"} aria-pressed={key === option} key={key}
-        onClick={() => { setOption(key); setWhich(0); reset(); }}>{options[key]}</button>)}</div>
-    {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing && zones.length > 1 ? label => selectArea(zones.findIndex(z => z.label === label)) : undefined} onPoint={editing ? changePoint : undefined} />}
+      <button type="button" className={key === option ? "segmented on" : "segmented"} aria-pressed={key === option} disabled={saving} key={key}
+        onClick={() => { setOption(key); selectArea(0); }}>{options[key]}</button>)}</div>
+    {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing && zones.length > 1 ? label => selectArea(zones.findIndex(z => z.label === label)) : undefined} onPoint={editing && !saving ? changePoint : undefined} corner={editing ? corner : undefined} onCorner={setCorner} />}
     {painted.length > 0 && <div className="space-legend">{visible.some(z => !reviewed.includes(z.label)) && <span><i className="draft-key" />Proposed area</span>}{reviewed.length > 0 && <span><i className="review-key" />Team outline</span>}{clear.length > 0 && <span><i className="clear-key" />Keep clear</span>}</div>}
+    {zones.length > 1 && <label>Candidate area<select className="secondary" value={which} disabled={saving} onChange={e => selectArea(Number(e.target.value))}>{zones.map((z,i) => <option key={z.label} value={i}>{z.label}</option>)}</select></label>}
+    {zone && <div className="space-actions" aria-label={zone.label}>
+      {history.state === "ready" && status.enabled && canWrite(status.actionRole) && !editing && <button type="button" className="paper-btn" onClick={() => setEditing(true)}>Adjust outline</button>}
+      <button type="button" className="paper-btn" aria-expanded={discussion} onClick={() => setDiscussion(open => !open)}>Comment</button>
+    </div>}
+    {editing && activePoint && zone && <div className="space-edit"><strong>Adjust a corner</strong><p>Drag a corner, tap its new position, or enter its coordinates.</p>
+      <div className="layout-inputs"><label>Corner<select className="secondary" value={corner} disabled={saving} onChange={e=>setCorner(Number(e.target.value))}>{zone.points.map((_,i) => <option key={i} value={i}>{i+1}</option>)}</select></label>
+      {(["Horizontal %", "Vertical %"] as const).map((n,i) => <label key={n}>{n}<input className="field" type="number" min={0} max={100} step={0.1} value={activePoint[i]} disabled={saving} onChange={e => { const v=e.target.valueAsNumber; if(Number.isFinite(v)&&v>=0&&v<=100) changePoint(i===0?[v,activePoint[1]]:[activePoint[0],v]); }} /></label>)}</div>
+      <div className="space-actions"><button type="button" className="primary" disabled={!draft || saving} onClick={() => void saveOutline()}>{saving ? "Saving…" : "Save outline"}</button>
+        <button type="button" className="text-link" disabled={saving} onClick={reset}>Cancel</button></div>
+      {editError && <p role="alert">{editError}</p>}</div>}
+    {zone && discussion && <CommentThread key={outlineId(zone)} siteId={site} anchor={{type:"space", siteId:site, line:"", period:"", spaceId:outlineId(zone), label:zone.label}} variant="inline" source="Space Review" />}
     <div className="space-observation"><h4>{held ? (row.status === "hold" ? "Resolve the site or image" : "Source needed") : row.image?.kind === "site-plan" ? "What the site plan shows" : row.image?.kind === "site-photo" ? "What the site photo shows" : "What the aerial shows"}</h4><p>{row.summary}</p></div>
-    {zones.length > 1 && <label>Candidate area<select className="secondary" value={which} onChange={e => selectArea(Number(e.target.value))}>{zones.map((z,i) => <option key={z.label} value={i}>{z.label}</option>)}</select></label>}
     <h4>{zone?.label || options[option]}</h4><p>{zone ? kinds[zone.kind].protect : held ? "The stall count remains unresolved for this layout." : missing[option]}</p>
     {row.evidence?.filter(item => item.option === option).map(item => <p key={item.url}><a className="text-link" href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></p>)}
     {option === "bays" && (bayEvidence.length > 0 || isPanoUrl(photos?.frontageUrl || "")) && <details className="disclosure"><summary className="disclosure">View bay and frontage evidence</summary>
@@ -76,16 +119,13 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
       {isPanoUrl(photos?.frontageUrl || "") && <p><a className="text-link" href={photos!.frontageUrl} target="_blank" rel="noopener noreferrer">Inspect the street frontage</a></p>}
     </details>}
     {range && dims && <div className="space-fit-range"><strong>{range[0] === range[1] ? range[0] : range.join("–")} stalls · outline-only test</strong><p>{threshold(...range)}. Approx. {dims[0]} × {dims[1]} ft; 90° stalls and aisle inside this outline. The lower case reserves up to 6 ft in each dimension. Rights and operating hours still need evidence.</p></div>}
-    {edge && edge[1] >= 4 && <p className="space-gate"><strong>An adjacent aisle could change the decision.</strong> The outline could serve {edge[0] === edge[1] ? edge[0] : edge.join("–")} stalls in one row if a continuous 24 ft outside aisle is usable. Verify its width, turning access and availability at peak.</p>}
-    {zone && !range && <p className="space-gate"><strong>Four-stall fit unresolved.</strong> {zone.kind === "bay" ? "Interior dimensions and access are needed." : "Measure the clear rectangle and its aisle."}</p>}
+    {edge && range && range[1] < 4 && edge[1] >= 4 && <p className="space-gate"><strong>An adjacent aisle could change the decision.</strong> The outline could serve {edge[0] === edge[1] ? edge[0] : edge.join("–")} stalls in one row if a continuous 24 ft outside aisle is usable. Verify its width, turning access and availability at peak.</p>}
+    {zone?.fitHold && <p className="space-gate"><strong>{fitChecks[zone.fitHold]}</strong></p>}
+    {zone && !zone.fitHold && !range && <p className="space-gate"><strong>Four-stall fit unresolved.</strong> {zone.kind === "bay" ? "Interior dimensions and access are needed." : "Measure the clear rectangle and its aisle."}</p>}
     {zone && <div className="space-next"><strong>What would settle fit and availability</strong><p>{zone.check || kinds[zone.kind].check}</p></div>}
-    {editing && activePoint && zone && <div className="space-edit"><strong>Adjust a corner</strong><p>Choose a corner, then tap the image or enter its position.</p>
-      <div className="layout-inputs"><label>Corner<select className="secondary" value={corner} onChange={e=>setCorner(Number(e.target.value))}>{zone.points.map((_,i) => <option key={i} value={i}>{i+1}</option>)}</select></label>
-      {(["Horizontal %", "Vertical %"] as const).map((n,i) => <label key={n}>{n}<input className="field" type="number" min={0} max={100} step={0.1} value={activePoint[i]} onChange={e => { const v=e.target.valueAsNumber; if(Number.isFinite(v)&&v>=0&&v<=100) changePoint(i===0?[v,activePoint[1]]:[activePoint[0],v]); }} /></label>)}</div>
-      <button type="button" className="text-link" onClick={reset}>Reset changes</button><p>Keep for diligence to save this outline with the team's review.</p></div>}
     {history.state === "unavailable" && <p role="status">Team reviews unavailable. <button type="button" className="text-link" onClick={history.retry}>Retry</button></p>}
     <OptionReview key={option + area} site={site} option={option} row={row} area={area} prior={prior} dimensions={dims} predicted={predicted} ready={history.state === "ready"}
-      refresh={history.retry} edit={zone && !editing ? () => setEditing(true) : undefined} points={draft || visible[which]?.points} clearPoints={() => setDraft(undefined)} stopEdit={() => setEditing(false)} />
+      refresh={history.retry} points={draft || visible[which]?.points} clearPoints={() => setDraft(undefined)} stopEdit={() => setEditing(false)} />
     {history.reviews.some(x => x.review?.revision !== row.revision && x.review?.area !== area) && <details className="disclosure"><summary className="disclosure">Earlier layout reviews</summary>{history.reviews.filter(x => x.review?.revision !== row.revision && x.review?.area !== area).map(x => <p key={x.note.id}>{x.review?.area} · {x.review?.disposition} · {x.review?.reason}</p>)}</details>}
     <a className="text-link" href="/space-review">Review other sites</a>
     <p className="space-date">Layout review · {reviewedOn}{row.cohort !== "active" ? " · " + (row.cohort === "dropped" ? "Dropped record" : "Off-market record") : ""}</p>
@@ -138,6 +178,7 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
   }
   return <section ref={ref} aria-labelledby={titleId} className="space-options" data-testid="space-options">
     <div className="space-heading"><Layers3 size={19} aria-hidden="true"/><h3 id={titleId}>Space options</h3></div>
+    {row?.zones.some(z=>z.kind!=="clear") && <a className="paper-btn" href={spacesMapHref(site)}>Open spaces on main map</a>}
     {row && !open && <div className="space-top">
       {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={first ? [first] : []}/><button type="button" className="text-link" aria-label="Open annotated layout" onClick={() => setOpen(true)} /></div>}
       <div><strong>{first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>

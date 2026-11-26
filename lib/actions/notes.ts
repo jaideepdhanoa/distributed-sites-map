@@ -8,6 +8,7 @@ import { notifyNote } from "@/lib/alerts/notify";
 import { autoFollow } from "@/lib/queue/follow";
 import { recordAppEvent } from "@/lib/queue/events";
 import { fileLookup, type RecordLookup } from "./records";
+import { layoutAssessment } from "@/lib/spaces/assessmentLoad";
 import { permanentSiteId } from "./suggestions";
 import { InputError, parseBody, parseTarget, stamp, type TargetKind } from "./text";
 import { isExcludedSite } from "@/lib/alerts/excluded";
@@ -202,7 +203,9 @@ export async function createNote(
     targetId = target;
   } else {
     const target = parseTarget(targetKind, targetId);
-    if (!lookup(target.targetKind, target.targetId)) throw new InputError("That site or deal is not on the map.", 404);
+    if (!lookup(target.targetKind, target.targetId) && !(target.targetKind === "deal" && layoutAssessment(target.targetId))) {
+      throw new InputError("That site or deal is not available.", 404);
+    }
     targetKind = target.targetKind;
     targetId = target.targetId;
   }

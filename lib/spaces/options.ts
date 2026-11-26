@@ -19,7 +19,7 @@ export const kinds = {
   bay: { option: "bays", label: "Service or wash bay", protect: "Retain service access and account for displaced servicing work.", check: "Obtain the interior plan, pits, clear height and approach dimensions. Compare lost shop contribution and fleet-service value." },
   clear: { option: null, label: "Keep clear", protect: "", check: "" },
 } as const;
-export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string };
+export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string; fitHold?: "footprint" | "aisle" };
 export type Aerial = { kind?: "site-plan" | "site-photo"; metersPerPixel?: number; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {
   status: "reviewed" | "hold" | "needs-image"; summary: string; recorded: number | null;
@@ -61,8 +61,8 @@ export function conversionReturn(investment: number, charging: number, displaced
 }
 
 /** A rectangular outdoor footprint needs a map registration or a source scale bar. */
-export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds, image?: Aerial): [number, number] | null {
-  if ((!bounds && !image?.metersPerPixel) || !zone || zone.kind === "bay" || zone.kind === "clear" || zone.points.length !== 4) return null;
+export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds, image?: Pick<Aerial,"width"|"height"|"metersPerPixel">): [number, number] | null {
+  if ((!bounds && !image?.metersPerPixel) || !zone || zone.fitHold === "footprint" || zone.kind === "bay" || zone.kind === "clear" || zone.points.length !== 4) return null;
   const edges = zone.points.map((point, i) => {
     const next = zone.points[(i + 1) % 4];
     if (bounds) {

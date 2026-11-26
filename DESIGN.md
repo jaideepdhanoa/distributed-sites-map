@@ -153,3 +153,7 @@ Decisions to revisit links directly to one changed citation. Show its original a
 ### Power on the map
 
 Power view is a signed-in map layer. Filter property-service evidence independently of utility estimates. A pin's Power tab shows the actual readings with their sources, the forecast year, distance from the pin to mapped infrastructure, and the shared follow-up. Preserve recorded zeroes. A known distance can exist without matching geometry. Framing the grid is reversible and keeps the site selected.
+
+### Market context
+
+Market context is a map mode beside Layers. It replaces the five Area data switches. One measure colors the filtered shortlist using fixed bands, with gray for missing and an explicit reading count on clusters. Sites in view uses the same mapped records, supports numeric sorting and opens the ordinary pin preview. On a phone the list starts collapsed. Workbook nearest-segment traffic, the 800 m maximum and linked census readings retain their separate sources. Wash totals within one and three miles are cumulative. Mapped census locations have their own count and radius. Market context in the record and Compare reads the same measures and units.

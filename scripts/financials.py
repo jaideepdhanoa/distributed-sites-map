@@ -887,6 +887,9 @@ def write_financials_file(workbook: Path, destination: Path, reg: dict | None = 
         return {"sites": 0, "kept": True}
     sites, facts, checks = read_workbook(workbook, reg)
     payload = build_payload(sites, facts, checks)
+    from scripts.purchase_review import write_purchase_review
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    write_purchase_review(workbook, sites, destination.with_name("purchase-review.json"), facts)
     from scripts.build_data import scan_obj
 
     problems = scan_obj(payload, "financials")

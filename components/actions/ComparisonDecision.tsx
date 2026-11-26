@@ -8,13 +8,14 @@ import { reviewValue, evidenceChanged, figureKey, figureLabel, type CitationRevi
 
 type Props = {
   openStatement: (figure:CitedFigure) => void;
+  restorePurchase?: (figure:CitedFigure)=>void;
   view: string; sites: { id: string; title: string }[]; figures: FigureOption[];
   revision: number;
   checkGap: (figure: FigureOption) => void;
   inspect: (id: string, measure: string, source?: URLSearchParams) => void;
 };
 const statusNames: Record<string,string> = { open:"Awaiting approval", accepted:"Approved", ready:"Ready for approval", agreed_waiting:"Waiting", completed:"Completed", rejected:"Declined", superseded:"Superseded", resolved:"Resolved" };
-export default function ComparisonDecision({view,sites,figures,inspect,checkGap,revision,openStatement}: Props) {
+export default function ComparisonDecision({view,sites,figures,inspect,checkGap,revision,openStatement,restorePurchase}: Props) {
   const [access,setAccess] = useState<DecisionAccess>();
   const [attempt,setAttempt] = useState(0);
   const [editing,setEditing] = useState(false);
@@ -129,7 +130,7 @@ export default function ComparisonDecision({view,sites,figures,inspect,checkGap,
           {review?.reviewedAt && <small>Kept by {review.reviewedBy} · {new Date(review.reviewedAt).toLocaleString()}</small>}
           {review?.reason && (review.reviewedAt || review.reason.includes("completed")) && <span>{review.reason}{review.reviewedAt && " · Last reviewed " + reviewValue(review.previous)}</span>}
           {(c.source || review?.source) && <small>Source · {c.source || review?.source}</small>}
-          <button className="text-link" onClick={()=>isStatementMeasure(c.measure) ? openStatement(c) : inspect(c.targetId,label)}>Inspect {isStatementMeasure(c.measure) ? label.replace("Statement ","statement ") : label.toLowerCase()}</button>
+          <button className="text-link" onClick={()=>c.measure==="purchase_case" && restorePurchase ? restorePurchase(c) : isStatementMeasure(c.measure) ? openStatement(c) : inspect(c.targetId,label)}>Inspect {isStatementMeasure(c.measure) ? label.replace("Statement ","statement ") : label.toLowerCase()}</button>
           {!followUp && live?.value === "—" && <button className="text-link" onClick={() => checkGap(live)}>Check missing evidence</button>}
           {followUp && <button className="text-link" onClick={()=>inspect(c.targetId,label,new URLSearchParams({panel:"discussion",note:followUp.note,site:followUp.targetId || c.targetId}))}>Follow-up · {statusNames[followUp.status] || followUp.status}{followUp.owner && " · Owner "+followUp.owner}{followUp.due && " · Due "+followUp.due}</button>}
           {review?.reason && access.editable && <div className="review-actions">

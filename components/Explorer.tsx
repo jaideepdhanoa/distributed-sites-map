@@ -1,5 +1,6 @@
 "use client";
 
+import { PIN_SPLIT_ZOOM } from "@/lib/mapClusters";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +14,9 @@ import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
 import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
 import NearbySites from "./NearbySites";
 import type { MapOutline } from "./spaces/SpaceOptions";
+import FinancialPortfolio from "./FinancialPortfolio";
+import { PurchaseScenarios } from "./PurchaseScenarios";
+import { purchaseLabels, financialEvidence } from "@/lib/purchaseReview";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -33,7 +37,9 @@ import { areaQuery, inMapArea, savedListArea, parseMapArea, type MapArea } from 
 import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
 import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
-import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
+import { marketEvidence, marketLabels, readMarketMetric, type MarketMetric, type MarketRow } from "@/lib/marketContext";
+import MarketMapPanel from "./MarketMapPanel";
+import type { WashInspection } from "./MarketEvidence";
 import { displayAddress, folderHref, leadSourceLine, listingHref } from "@/lib/format";
 import { dealSearchParts, matchesQuery, partyMatch, siteSearchParts } from "@/lib/search";
 import { paletteGroups } from "@/lib/search/palette";
@@ -68,6 +74,7 @@ import { ndaChip, ndaQueueAllowed } from "@/lib/nda";
 import { fullUniverseNeeded } from "@/lib/viewHelp";
 import { resolveSiteLink, siteHref } from "@/lib/siteLink";
 import { NEAR_TIP, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
+import SavedLots from "./spaces/SavedLots";
 import { canWrite } from "./actions/panel";
 import type { ActionRole } from "@/lib/actions/roles";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
@@ -425,7 +432,7 @@ export default function Explorer() {
   const pipeStage: PipeId = pipeView.stage;
   const outsideGroup = funnel === "pipeline" && params.get("outside") === "1" && allPipes;
   const mapRequested = params.get("view") !== "list";
-  const recoveringMap = Boolean(mapNote) && mapRequested && !params.has("review") && params.get("view") !== "review" && !params.has("loops") && !params.has("nda");
+  const recoveringMap = Boolean(mapNote) && params.get("spaces")!=="1" && mapRequested && !params.has("review") && params.get("view") !== "review" && !params.has("loops") && !params.has("nda");
   const listView = !mapRequested || recoveringMap;
   function retryMap() {
     setMapNote("");
@@ -484,7 +491,7 @@ export default function Explorer() {
   const pillParam = params.get("pill");
   const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [preferredBasemap, setBasemap] = useState<"positron" | "satellite">("positron");
-  const basemap = marking ? "satellite" : preferredBasemap;
+  const basemap = marking || params.get("spaces")==="1" ? "satellite" : preferredBasemap;
   const [marketPref, setMarketPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [marketReady, setMarketReady] = useState(false);
   const appliedMarket = useRef(false);
@@ -617,8 +624,8 @@ export default function Explorer() {
     setPreviewId(null);
     const inspectedId = source?.get("site") || id;
     setSelected(inspectedId);
-    const panel = measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
-    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
+    const panel = marketLabels.some(label=>label===measure) ? "market-context" : measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
+    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (purchaseLabels.some(l=>l===measure) || measure==="Purchase scenario" ? "purchase" : ["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {
@@ -855,7 +862,7 @@ export default function Explorer() {
   }, [city]);
 
   const linkedId = params.get("site") || "";
-  const needCatalog = fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
+  const needCatalog = (Boolean(linkedId) && readMarketMetric(params) === "washes") || fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
@@ -973,7 +980,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
+      const linked = panel === "purchase" || panel === "market-context" || panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -1391,16 +1398,13 @@ export default function Explorer() {
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
   });
   const drawnDeals = areaDeals;
-  const overlaysOn = parseOverlays(params.get("overlay"));
-  function toggleOverlay(id: OverlayId) {
-    const next = overlaysOn.includes(id) ? overlaysOn.filter((item) => item !== id) : [...overlaysOn, id];
-    write({ overlay: next.length ? next.join("|") : null });
+  const marketMetric = readMarketMetric(params);
+  const washRadius = params.get("washRadius") === "3" ? 3 : 1;
+  function chooseMarketMetric(next: MarketMetric | null) {
+    write({marketMetric: next, overlay: null, washRadius: null});
+    chooseLayers(false);
+    closeMenus();
   }
-  const overlayPoints = overlayFeatures(drawnDeals, overlaysOn).flatMap((feature) => {
-    const coords = feature.geometry?.coordinates;
-    if (!coords) return [];
-    return [{ label: feature.properties.label, coordinates: [coords[0], coords[1]] as [number, number] }];
-  });
   const handedOff = useRef("");
   const stepKey = `${funnel}|${stage}|${pipeStage}|${listed}|${allStages}|${allPipes}|${outsideGroup}`;
   const seenStep = useRef(stepKey);
@@ -1454,18 +1458,14 @@ export default function Explorer() {
   const selectedSquare = selectedDeal ? asSquare(selectedDeal) : null;
   if (selectedSquare && !drawnDeals.some((feature) => feature.properties.deal_id === selectedDeal?.deal_id)) drawnDeals.push(selectedSquare);
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
+  const washOrigin = selected && marketMetric === "washes" ? spacePoint() : null;
   const washPoints = (() => {
-    if (!overlaysOn.includes("washes") || (!selectedDeal && !selectedSite)) return [];
-    const origin = selectedDeal ? dealPoint(selectedDeal) : (() => {
-      const coords = poolById.get(selectedSite?.site_id || "")?.geometry?.coordinates;
-      return coords ? [coords[0], coords[1]] as [number, number] : null;
-    })();
-    if (!origin) return [];
+    if (!washOrigin) return [];
     const pool = catalog && catalog.length ? catalog : features;
     const exclude = new Set<string>();
     if (selectedSite) exclude.add(selectedSite.site_id);
     if (selectedDeal?.universe_id) exclude.add(selectedDeal.universe_id);
-    const rows: WashSite[] = pool.map((feature) => ({
+    const rows: WashSite[] = pool.filter(feature=>!feature.properties.duplicate_of && feature.properties.counts_as_site !== false).map((feature) => ({
       id: feature.properties.site_id,
       name: feature.properties.name || feature.properties.address || feature.properties.site_id,
       lng: feature.geometry?.coordinates?.[0] ?? null,
@@ -1474,7 +1474,7 @@ export default function Explorer() {
       verdict: feature.properties.verdict,
       landOnly: Boolean(feature.properties.land_only),
     }));
-    return nearbyWashPoints(origin, rows, exclude);
+    return nearbyWashPoints(washOrigin, rows, exclude).filter(row => row.miles <= washRadius);
   })();
   const withheldHere = showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && !feature.properties.pinned) : [];
 
@@ -1501,6 +1501,12 @@ export default function Explorer() {
       cancel = true;
     };
   }, [selected, selectedSiteId, data]);
+
+  function openPurchase(id:string) {
+    if (isProtectedId(id)) return;
+    setPreviewId(null); chooseLayers(false); setSelected(id); setSheetSnap("full");
+    write({site:id,panel:"purchase",sheet:"full"},true);
+  }
 
   function choose(id: string | null) {
     setPreviewId(null);
@@ -2082,6 +2088,21 @@ export default function Explorer() {
   const unplacedInView = locationRows.filter(row => !row.point);
   const mappedShortlist = locationRows.flatMap(row => row.point ? [{ city: row.city, point: row.point }] : []);
   const mappedCount = mappedShortlist.length;
+  const activeMetric = !inReview && !listView && !marking ? marketMetric : null;
+  const marketRows: MarketRow[] = activeMetric ? locationRows.flatMap(row => {
+    if (!row.point) return [];
+    const site = siteById.get(row.id);
+    const deal = site ? dealForSite(site) : dealBundle.byId.get(row.id);
+    return [{...row, point: row.point, evidence: marketEvidence(deal, site || siteById.get(deal?.universe_id || ""))}];
+  }) : [];
+  const washInspection: WashInspection | undefined = selected && !selectedUnscreened && spacePoint() ? {
+    radius: activeMetric === "washes" ? washRadius : null,
+    mapped: washOrigin && (catalog || features.some(f=>f.properties.city === (selectedDeal?.city || selectedSite?.city))) ? washPoints.length : null,
+    select: miles => {
+      closeMenus(); chooseLayers(false); setPreviewId(selected); setSheetSnap("half");
+      write({marketMetric:"washes", washRadius:String(miles), overlay:null, view:null, panel:null, sheet:"half"});
+    },
+  } : undefined;
   function summaryText() {
     if (funnel !== "pipeline") return "";
     const home = !outsideGroup && (allPipes || pipelineWide || Boolean(who));
@@ -2301,16 +2322,29 @@ export default function Explorer() {
     })));
   }
 
-  async function writeSpace(space: { siteId: string; id: string; version: number; box: GroundBox; type: SpaceType; layout: SpaceLayout }, deleted = false) {
+  async function writeSpace(space: { siteId: string; id: string; version: number; box: GroundBox; type: SpaceType; layout: SpaceLayout }, deleted = false, key: string = crypto.randomUUID()) {
     const response = await fetch("/api/changes", {
       method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+      headers: { "content-type": "application/json", "idempotency-key": key },
       body: JSON.stringify({ changes: [siteSpaceChange(space, deleted)] }),
     });
     if (!response.ok) return "";
     const body = await response.json() as { results?: { entity_id?: string }[] };
     await refreshSpaces();
     return body.results?.[0]?.entity_id || space.id;
+  }
+
+  async function removeSavedLot(lot: SpaceShape, key:string) {
+    const id = await writeSpace(lot,true,key);
+    if (!id) {
+      await refreshSpaces();
+      throw Error("Removal was not confirmed. Cancel and reopen the latest lot before retrying.");
+    }
+    const response = await fetch("/api/data/spaces?"+new URLSearchParams({site:lot.siteId}),{cache:"no-store"});
+    if (!response.ok || (await response.json()).spaces.some((saved: {id:string})=>saved.id===lot.id)) {
+      throw Error("Removal could not be verified. Refresh the site to check.");
+    }
+    setPickedSpace(current=>current===lot.id?"":current);
   }
 
   function beginMark() {
@@ -2343,7 +2377,7 @@ export default function Explorer() {
   const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
-    <div ref={bindShell} onFocusCapture={event => {
+    <PurchaseScenarios key={me?.u || "signed-out"}><div ref={bindShell} onFocusCapture={event => {
       const target = event.target as HTMLElement;
       const row = target.closest<HTMLElement>("[data-site-row]");
       if (row) lastCell.current = { row: row.dataset.siteRow || "", cell: target.closest<HTMLElement>("[data-col]")?.dataset.col || "" };
@@ -2915,15 +2949,21 @@ export default function Explorer() {
           <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
         {(needsMap || mapVisited) && <PanelBoundary name="Map">
-        <MapView key={mapAttempt}
+        <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"}
+          onDrawAt={me ? (siteId, center) => {
+            setShowSpaces(true); setPickedSpace(""); setMarking({siteId,lng:center[0],lat:center[1],nonce:Date.now()});
+            if (dealRows.some(deal=>deal.deal_id===siteId)) { setSelected(siteId); setPreviewId(siteId); setSheetSnap("peek"); }
+          } : undefined}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           deals={drawnDeals}
           nearbyHighlight={nearbyHighlight} nearbyPicker={nearbyPicker}
           shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
-          overlayPoints={overlayPoints}
-          washPoints={washPoints}
+          marketMetric={activeMetric}
+          marketRows={marketRows}
+          washRing={activeMetric === "washes" && washOrigin ? {point:washOrigin, miles:washRadius} : null}
+          washPoints={activeMetric === "washes" ? washPoints : []}
           gridFeatures={selectedGrid} gridFocusId={gridOpen ? selected : null}
           areas={data.areas.features}
           depots={data.depots.features}
@@ -2948,7 +2988,7 @@ export default function Explorer() {
           reviewMarkers={reviewMarkers}
           queueIds={openQueueIds}
           reviewFocus={reviewFocus}
-          pinLabel={pinLabel}
+          pinLabel={activeMetric ? "none" : pinLabel}
           onPinLabel={setPinLabel}
           basemap={basemap}
           onBasemap={chooseBasemap}
@@ -3071,6 +3111,7 @@ export default function Explorer() {
           <PipelineList
             title={shortlistTitle}
             initialSelection={listSelection.current.pipeline.length ? listSelection.current.pipeline : params.has("pipelineLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
+            onFinancials={openPurchase}
             rows={pipelineRows}
             outsideRow={outsideRow}
             unreadIds={openQueueIds}
@@ -3159,6 +3200,8 @@ export default function Explorer() {
                     <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} title={title} onClick={() => setPinLabel(id)}>{label}</button>
                   ))}
                 </div>
+                {me?.u && <button type="button" className={pinLabel==="financials"?"chip on":"chip"} aria-pressed={pinLabel==="financials"} onClick={()=>setPinLabel(pinLabel==="financials"?"asking":"financials")}>Financial evidence</button>}
+                {me?.u && pinLabel==="financials" && <FinancialPortfolio deals={drawnDeals.filter(f=>f.geometry && (!liveArea || inMapArea(...f.geometry.coordinates,liveArea)) && financialEvidence(f.properties)!=="Not applicable").map(f=>f.properties)} open={openPurchase}/>}
                 {me?.u && !listView && <section className="power-map-filters" aria-label="Power view filters">
                   <label className="layer-row"><input type="checkbox" className="check" checked={powerMode}
                     onChange={e => write({power:e.target.checked ? "1" : null,service:null,hosting:null})}/>Power view</label>
@@ -3190,10 +3233,10 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="swatch stage-dropped" /></span>
                   Dropped deals
                 </label>
-                <label className="layer-row" title="Lots drawn on the satellite view. Slot counts stay estimated until someone checks them.">
+                <label className="layer-row" title="Analyzed footprints and lots drawn by the team.">
                   <input className="check" type="checkbox" checked={showSpaces} onChange={(event) => setShowSpaces(event.target.checked)} data-testid="spaces-layer" />
                   <span className="layer-mark"><i className="swatch l10" /></span>
-                  Available lots
+                  Spaces
                 </label>
                 <p className="eyebrow">Context</p>
                 <label className="layer-row" title={LAYER_TITLES.areas}>
@@ -3211,27 +3254,22 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="pin-sample line" /></span>
                   <span className="layer-nest">Depot rings</span>
                 </label>
-                <p className="eyebrow">Area data</p>
-                {(["traffic", "population", "growth", "income", "washes"] as const).map((id) => {
-                  const item = OVERLAYS.find((entry) => entry.id === id);
-                  if (!item) return null;
-                  return (
-                    <label key={item.id} className="layer-row" title={LAYER_TITLES[item.id]}>
-                      <input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} />
-                      <span className="layer-mark" />
-                      {item.label}
-                    </label>
-                  );
-                })}
               </div>
             </>
           ) : (
-            <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>{powerMode ? "Layers · Power" : "Layers"}</button>
+            <div className="market-layer-tools">
+              {!inReview && !listView && !marking && <button type="button" className={activeMetric ? "tool on" : "tool"} aria-pressed={Boolean(activeMetric)}
+                onClick={()=>chooseMarketMetric(activeMetric ? null : "traffic")}>Market context</button>}
+              <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>{powerMode ? "Layers · Power" : "Layers"}</button>
+            </div>
           )}
         </aside>
         {!listView ? (
           <div className="map-corner">
-            {mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
+            {activeMetric && !selected && !stepsOpen && !filtersOpen && !unplacedOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
+              <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} clustered={mapZoom < PIN_SPLIT_ZOOM} missingLocations={unplacedInView.length}
+                showMissing={()=>{closeMenus();setUnplacedOpen(true);}} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}
+            {!activeMetric && mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
               <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
                 onSpot={highlightNearby} fact={id => {
                   const site = siteById.get(id);
@@ -3272,9 +3310,9 @@ export default function Explorer() {
                 {showAreas && <li><i className="swatch current-area" />Service areas</li>}
                 {showDepots && <li><i className="pin-sample depot" />Depot</li>}
                 {showRings && <li><i className="pin-sample line" />Depot rings</li>}
-                {showSpaces && markedSpaces.length > 0 && <li><i className="swatch l10" />Available lot</li>}
+                {showSpaces && <li><i className="swatch space-proposal-swatch" />Analyzed space</li>}
+                {showSpaces && markedSpaces.length > 0 && <li><i className="swatch l10" />Team-drawn lot</li>}
                 {showUnscreened && <li><i className="swatch nearby" />Unscreened listing</li>}
-                {OVERLAYS.filter(item => overlaysOn.includes(item.id)).map(item => <li key={item.id}>{item.label}</li>)}
               </ul>
             </aside>
           </div>
@@ -3305,6 +3343,7 @@ export default function Explorer() {
               retry:()=>setGridAttempt(n=>n+1)}}
             onGrid={() => setGridFocusId(gridOpen ? null : selected)}
             compared={Boolean(selected && compareIds.includes(selected))}
+            marketMode={Boolean(activeMetric)} washInspection={washInspection}
             comparisonFull={compareIds.length >= 4}
             onCompare={selected && !selectedUnscreened ? () => {
               const next = compareIds.includes(selected) ? compareIds.filter(id => id !== selected) : [...compareIds, selected];
@@ -3351,9 +3390,11 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            savedLots={<SavedLots key={selected} lots={recordSpaces} remove={me?.actionRole && canWrite(me.actionRole as ActionRole) ? removeSavedLot : undefined} />}
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            washInspection={washInspection}
             onLayoutOverlay={setLayoutOverlay}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             onOpenNda={(id) => write({ nda: id })}
@@ -3399,9 +3440,11 @@ export default function Explorer() {
             signedIn={Boolean(me)}
             spaceCount={recordSpaces.length}
             spaceSlots={recordSpaces.reduce((sum, space) => sum + space.estSlots, 0)}
+            savedLots={<SavedLots key={selected} lots={recordSpaces} remove={me?.actionRole && canWrite(me.actionRole as ActionRole) ? removeSavedLot : undefined} />}
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            washInspection={washInspection}
             onLayoutOverlay={setLayoutOverlay}
             figuresReady={figuresReady}
             outsideFilter={Boolean(selectedSite && !siteInCategories(selectedSite, links, categories))}
@@ -3456,6 +3499,6 @@ export default function Explorer() {
         <div ref={ringNoteRef} className="map-tip-fixed" data-hidden="1">{LAYER_TITLES.rings}</div>,
         document.body,
       ) : null}
-    </div>
+    </div></PurchaseScenarios>
   );
 }

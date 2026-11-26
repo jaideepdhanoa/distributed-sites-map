@@ -10,6 +10,12 @@ export function useOptionReviews(id: string) {
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    const refresh = () => setAttempt(n => n + 1);
+    window.addEventListener("space-outline-saved", refresh);
+    return () => window.removeEventListener("space-outline-saved", refresh);
+  }, []);
+  useEffect(() => {
+    if (!id) { setNotes([]); return; }
     const controller = new AbortController();
     setState("loading");
     fetch("/api/actions/notes?" + new URLSearchParams({ targetKind: "deal", targetId: id }), { signal: controller.signal, cache: "no-store" })
@@ -21,9 +27,29 @@ export function useOptionReviews(id: string) {
   return { reviews: notes.map(note => ({ note, review: readReview(note) })).filter(x => x.review !== null)
     .sort((a,b) => Date.parse(b.note.createdAt) - Date.parse(a.note.createdAt)), state, retry: () => setAttempt(n => n+1) };
 }
-export default function OptionReview({ site, option, area, row, prior, dimensions, predicted, ready, refresh, edit, stopEdit, points, clearPoints }: {
+export function useSaveReview(site: string) {
+  const receipt = useRef({ body: "", key: "" });
+  return async (body: string) => {
+    if (receipt.current.body !== body) receipt.current = { body, key: crypto.randomUUID() };
+    const response = await fetch("/api/actions/notes", {
+      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": receipt.current.key },
+      body: JSON.stringify({ targetKind: "deal", targetId: site, body }),
+    });
+    if (!response.ok) throw Error((await response.json()).error || "The review could not be saved.");
+    const created = (await response.json()).note as Note;
+    const verify = await fetch("/api/actions/notes?" + new URLSearchParams({ targetKind: "deal", targetId: site }), { cache: "no-store" });
+    if (!verify.ok || !(await verify.json()).notes?.some((n: Note) => n.id === created.id && n.body === body)) {
+      throw Error("Save unconfirmed. Retry to check the same submission.");
+    }
+    receipt.current = { body: "", key: "" };
+    window.dispatchEvent(new Event("queue-refresh"));
+    window.dispatchEvent(new Event("space-outline-saved"));
+  };
+}
+
+export default function OptionReview({ site, option, area, row, prior, dimensions, predicted, ready, refresh, stopEdit, points, clearPoints }: {
   site: string; option: Option; area: string; row: Assessment; prior?: { note: Note; review: Review | null };
-  dimensions: [number, number] | null; predicted: readonly [number, number] | null; ready: boolean; refresh: () => void; edit?: () => void; stopEdit: () => void; points?: Point[]; clearPoints: () => void;
+  dimensions: [number, number] | null; predicted: readonly [number, number] | null; ready: boolean; refresh: () => void; stopEdit: () => void; points?: Point[]; clearPoints: () => void;
 }) {
   const status = useActionStatus();
   const [inputs, setInputs] = useState(emptyInputs);
@@ -35,7 +61,7 @@ export default function OptionReview({ site, option, area, row, prior, dimension
   const [measurementSource, setMeasurementSource] = useState("");
   const [pending,setPending] = useState(false);
   const [error,setError] = useState("");
-  const receipt = useRef({ body: "", key: "" });
+  const save = useSaveReview(site);
   const busy = useRef(false);
   const last = prior?.review;
   const currentFrame = row.image?.id || "unavailable";
@@ -48,18 +74,10 @@ export default function OptionReview({ site, option, area, row, prior, dimension
     const body = reviewBody({ disposition: mode, option, area, revision: row.revision, frame: currentFrame,
       points: geometry, reason: why + " · Rights: " + rights + " · Operating availability: " + hours, assumptions: describeInputs(inputs), measured });
     if (body.length > 2000) { setError("Shorten the reason or measurement citation so this decision fits in a team note."); return; }
-    if (receipt.current.body !== body) receipt.current = { body, key: crypto.randomUUID() };
     busy.current = true; setPending(true); setError("");
     try {
-      const response = await fetch("/api/actions/notes", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": receipt.current.key },
-        body: JSON.stringify({ targetKind: "deal", targetId: site, body }) });
-      if (!response.ok) throw Error((await response.json()).error || "The review could not be saved.");
-      const created = (await response.json()).note as Note;
-      const verify = await fetch("/api/actions/notes?" + new URLSearchParams({ targetKind: "deal", targetId: site }), { cache: "no-store" });
-      if (!verify.ok || !(await verify.json()).notes?.some((n: Note) => n.id === created.id && n.body === body)) throw Error("Save unconfirmed. Retry to check the same submission.");
-      receipt.current = { body: "", key: "" };
+      await save(body);
       setMode(null); setWhy(""); setMeasuredStalls(""); setMeasurementSource(""); stopEdit(); clearPoints(); refresh();
-      window.dispatchEvent(new Event("queue-refresh"));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to confirm the review."); }
     finally { busy.current = false; setPending(false); }
   }
@@ -82,7 +100,6 @@ export default function OptionReview({ site, option, area, row, prior, dimension
         <div className="space-actions"><button className="primary" type="submit" disabled={pending || !why.trim()}>{pending ? "Saving…" : "Save team review"}</button><button className="text-link" type="button" disabled={pending} onClick={() => setMode(null)}>Cancel</button></div>
       </form> : <div className="space-actions">
         <button type="button" className="paper-btn" onClick={() => setMode("Keep for diligence")}>Keep for diligence</button>
-        {edit && <button type="button" className="text-link" onClick={edit}>Adjust outline</button>}
         <button type="button" className="text-link" onClick={() => setMode("Dismiss option")}>Dismiss option</button>
       </div>}{error && <p role="alert">{error}</p>}
     </div>}

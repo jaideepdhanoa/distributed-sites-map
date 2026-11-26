@@ -22,7 +22,9 @@ import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import { aerialTile, streetViewHref } from "@/lib/aerial";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections, { RecordNavigation } from "./PanelSections";
+import PurchaseReview from "./PurchaseReview";
 import Economics from "./Economics";
+import MarketEvidence, {type WashInspection} from "./MarketEvidence";
 import RecordBrief from "./RecordBrief";
 import SitePhotos from "./SitePhotos";
 import SpaceOptions, { type MapOutline } from "./spaces/SpaceOptions";
@@ -544,15 +546,18 @@ export default function Detail({
   signedIn = false,
   outsideFilter = false,
   locationFix = null,
+  savedLots,
   spaceCount = 0,
   spaceSlots = 0,
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
   onLayoutOverlay,
+  washInspection,
   decisionFirst = false,
   onOpenNda,
 }: {
+  washInspection?: WashInspection;
   decisionFirst?: boolean;
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -575,6 +580,7 @@ export default function Detail({
   signedIn?: boolean;
   outsideFilter?: boolean;
   locationFix?: "edit" | "propose" | null;
+  savedLots?: ReactNode;
   spaceCount?: number;
   spaceSlots?: number;
   spaceSqft?: number;
@@ -655,7 +661,7 @@ export default function Detail({
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
       <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
-      <RecordNavigation />
+      <RecordNavigation financials={Boolean(signedIn && linkedDeal?.kind==="pipeline" && !site.land_only)} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
@@ -697,11 +703,15 @@ export default function Detail({
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
       {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
+      {signedIn && savedLots}
       {related}
       <PanelSections
+        purchase={signedIn && linkedDeal?.kind==="pipeline" && !site.land_only && <PurchaseReview key={linkedDeal.deal_id} deal={linkedDeal} pnl={pnl}/>}
+        market={<MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} expanded />}
         economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
+            <MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} />
             <details className="disclosure">
               <summary className="disclosure">Record</summary>
               <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
@@ -886,15 +896,18 @@ export function DealDetail({
   related,
   outsideFilter = false,
   locationFix = null,
+  savedLots,
   spaceCount = 0,
   spaceSlots = 0,
   spaceSqft = 0,
   onMarkSpace,
   spaceNote,
   onLayoutOverlay,
+  washInspection,
   decisionFirst = false,
   onOpenNda,
 }: {
+  washInspection?: WashInspection;
   decisionFirst?: boolean;
   deal: DealProps;
   peers?: DealProps[];
@@ -918,6 +931,7 @@ export function DealDetail({
   related?: ReactNode;
   outsideFilter?: boolean;
   locationFix?: "edit" | "propose" | null;
+  savedLots?: ReactNode;
   spaceCount?: number;
   spaceSlots?: number;
   spaceSqft?: number;
@@ -987,7 +1001,7 @@ export function DealDetail({
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
       <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
-      <RecordNavigation />
+      <RecordNavigation financials={signedIn && deal.kind==="pipeline"} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
@@ -1017,11 +1031,15 @@ export function DealDetail({
       {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
       {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
+      {signedIn && savedLots}
       {related}
       <PanelSections
+        purchase={signedIn && deal.kind==="pipeline" && <PurchaseReview key={deal.deal_id} deal={deal} pnl={pnl}/>}
+        market={<MarketEvidence deal={deal} site={universeSite} inspection={washInspection} expanded />}
         economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>
+            <MarketEvidence deal={deal} site={universeSite} inspection={washInspection} />
             <details className="disclosure">
               <summary className="disclosure">Record</summary>
               <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>

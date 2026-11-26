@@ -3,6 +3,7 @@ import { roleAllows } from "@/lib/actions/roles";
 import { askReady } from "@/lib/ask/model";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { loadMapDeals } from "./deals";
+import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
 import { triage } from "@/lib/spaces/triage";
 import type { DealProps } from "@/lib/types";
 import { isExcludedSite } from "@/lib/alerts/excluded";
@@ -16,8 +17,12 @@ export async function GET(request: Request) {
   const session = await requireUser();
   if (!isSession(session)) return session;
   const params = new URL(request.url).searchParams;
+  if (params.get("view") === "map") {
+    const deals = await loadMapDeals(session.actionRole, false);
+    return json(await mapCatalog(deals.features));
+  }
   if (params.get("view") === "portfolio") {
-    const deals = await loadMapDeals(session.actionRole);
+    const deals = await loadMapDeals(session.actionRole, false);
     const mapped = deals.features.flatMap(feature => {
       const deal = feature.properties as DealProps;
       if (deal.kind !== "pipeline" || isExcludedSite(deal.deal_id)) return [];

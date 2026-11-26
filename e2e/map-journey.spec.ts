@@ -1,7 +1,7 @@
 import { isExcludedSite } from "../lib/alerts/excluded";
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import type { Map as SiteMap } from "maplibre-gl";
+import type { GeoJSONSource, Map as SiteMap } from "maplibre-gl";
 
 type MapWindow = Window & { __sitesMap: SiteMap };
 
@@ -23,7 +23,12 @@ async function visiblePins(page: Page) {
       const [lng, lat] = feature.geometry.coordinates;
       const pt = map.project([lng, lat]);
       const x = box.left + pt.x, y = box.top + pt.y;
-      return document.elementFromPoint(x, y) === canvas ? [{ id: String(feature.properties.site_id), x, y }] : [];
+      if (document.elementFromPoint(x, y) !== canvas) return [];
+      const layers = ["sites","pin-singles","offmarket","deals-pipe","focus-pin","clusters"].filter(id => map.getLayer(id));
+      const hits = map.queryRenderedFeatures([Math.round(pt.x),Math.round(pt.y)],{layers});
+      const id = String(feature.properties.site_id);
+      if (!hits.length || hits.some(hit => (hit.properties.site_id || hit.properties.deal_id) !== id)) return [];
+      return [{id,x,y}];
     });
   });
 }
@@ -51,6 +56,7 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
     return map?.getLayer("sites") && map.isStyleLoaded() && !map.isMoving();
   });
   const zoomIn = page.locator(".maplibregl-ctrl-zoom-in");
+  if (phone) await zoomIn.click({trial:true,timeout:5000});
   for (let i = 0; i < 4 && (await visiblePins(page)).length < 2; i++) {
     await zoomIn.click();
     await page.waitForFunction(() => !(window as unknown as MapWindow).__sitesMap.isMoving());
@@ -73,8 +79,9 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
     else await page.mouse.click(pin.x, pin.y);
     const preview = page.locator(".map-preview");
     await expect(preview).toBeVisible();
-    const id = await preview.getAttribute("data-record");
-    expect(id && !ids.includes(id)).toBeTruthy();
+    await expect(preview).toHaveAttribute("data-record",pin.id);
+    const id = pin.id;
+    expect(ids).not.toContain(id);
     ids.push(id!);
     previous = { ...pin, id: id! };
     await preview.getByRole("button", { name: "Add to comparison" }).click();
@@ -360,4 +367,52 @@ test("released Power view filters open and clear on the market map", async ({pag
   }
   await expect(card.getByText("Checking mapped locations…")).toHaveCount(0);
   await expect(card.getByRole("button",{name:"Retry grid map"})).toHaveCount(0);
+});
+
+test("scan market readings and open the mapped wash radius", async ({page}, info) => {
+  await page.goto("/?city=LAS&funnel=pipeline&pstage=all");
+  await page.getByRole("button", {name:"Market context",exact:true}).click();
+  const panel = page.getByRole("complementary",{name:"Market context map"});
+  const list = panel.getByRole("button",{name:/Sites in view/});
+  const phone = info.project.name === "mobile";
+  await expect(list).toHaveAttribute("aria-expanded",phone ? "false" : "true");
+  if (phone) await list.click();
+  const first = panel.locator("[data-market-site]").first();
+  await expect(first).toBeVisible();
+  await panel.getByRole("button",{name:/Washes · 1 mi/}).click();
+  await expect(panel.locator('th[aria-sort="ascending"]')).toContainText("Washes");
+  await panel.getByRole("button",{name:"Trade area",exact:true}).click();
+  await panel.getByRole("combobox").selectOption("income");
+  await expect(panel).toContainText("median within 3 mi");
+  await panel.getByRole("button",{name:"Traffic",exact:true}).click();
+  await expect(panel.getByRole("button",{name:"Traffic",exact:true})).toHaveAttribute("aria-pressed","true");
+  const sample = await first.evaluate(button => ({
+    id: button.getAttribute("data-market-site"),
+    traffic: button.closest("tr")?.querySelector("td")?.firstChild?.textContent,
+  }));
+  await page.waitForFunction(async ({id,traffic}) => {
+    const map = (window as unknown as MapWindow).__sitesMap;
+    if (!map?.getLayer("market-readings") || map.isMoving() || !map.isSourceLoaded("pins")) return false;
+    const data = await map.getSource<GeoJSONSource>("pins")?.getData();
+    if (data?.type !== "FeatureCollection") return false;
+    const pin = data.features.find((feature: {properties: {site_id?: string} | null}) => feature.properties?.site_id === id);
+    if (!pin || pin.properties?.market_label !== traffic) return false;
+    const drawn = map.queryRenderedFeatures({layers:["market-readings"],filter:["==",["get","site_id"],id]});
+    return drawn.every(feature => feature.properties.market_label === traffic);
+  }, sample);
+  if (!process.env.MAP_PRODUCTION_CHECK) {
+    await mkdir("review-shots",{recursive:true});
+    const name = process.env.MAP_DEPLOYED_PREVIEW ? "preview" : "local";
+    await page.screenshot({path:`review-shots/${info.project.name}-${name}-market-context.png`});
+  }
+  await first.click();
+  const preview = page.getByRole("complementary").filter({has:page.locator("#pin-preview-title")});
+  const card = preview.getByRole("region",{name:"Market context"});
+  await expect(card).toBeVisible();
+  await card.getByRole("button",{name:"3 mi",exact:true}).click();
+  await expect(card.getByRole("button",{name:"3 mi",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(card).toContainText(/\d+ mapped census location/);
+  await expect(page).toHaveURL(/washRadius=3/);
+  await preview.getByRole("button",{name:"Close site preview"}).click();
+  await expect(panel).toBeVisible();
 });

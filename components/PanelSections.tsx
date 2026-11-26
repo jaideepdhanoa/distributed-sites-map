@@ -9,6 +9,7 @@ const TABS = [
   ["overview", "Record"],
   ["numbers", "Site fit"],
   ["economics", "Economics"],
+  ["purchase", "Financials"],
   ["discussion", "Diligence"],
   ["activity", "Activity"],
 ] as const;
@@ -16,18 +17,22 @@ const TABS = [
 type TabId = (typeof TABS)[number][0];
 
 function recordTab(panel: string | null): TabId {
-  return panel === "open-land" ? "numbers" : panel === "economics" || panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
+  return panel === "market-context" ? "economics" : panel === "open-land" ? "numbers" : panel === "purchase" || panel === "economics" || panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
 }
 
 export default function PanelSections({
   overview,
   economics,
+  purchase,
+  market,
   numbers,
   activity,
   discussion,
 }: {
+  purchase?: ReactNode;
   overview: ReactNode;
   economics: ReactNode;
+  market: ReactNode;
   numbers: ReactNode;
   activity: ReactNode;
   discussion: ReactNode;
@@ -40,13 +45,13 @@ export default function PanelSections({
   const measure = params.get("measure") || "";
   const tab = recordTab(panel);
   useEffect(() => {
-    if (panel !== "economics" && panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    if (panel !== "purchase" && panel !== "market-context" && panel !== "economics" && panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
     const scroller = node?.closest(".drawer-scroll");
     if (!node || !(scroller instanceof HTMLElement)) return;
     let frame = 0;
     const align = () => {
-      const evidence = panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
+      const evidence = panel === "market-context" ? "market-context" : panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
       const target = evidence ? node.querySelector<HTMLElement>(`[data-evidence="${CSS.escape(evidence)}"]`)
         : panel === "economics" && measure ? node.querySelector<HTMLElement>(`[data-financial-measure="${CSS.escape(measure)}"]`)
         : panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
@@ -84,7 +89,7 @@ export default function PanelSections({
       added.disconnect();
     };
   }, [site, panel, note, measure]);
-  const panels = { economics, overview, numbers, activity, discussion };
+  const panels = { purchase:purchase || <p>Operating financials are not applicable to this record.</p>, economics: <>{market}{economics}</>, overview, numbers, activity, discussion };
   const intel = panel === "intel";
   return (
     <div className="panel-sections" ref={sections}>
@@ -103,10 +108,11 @@ export default function PanelSections({
   );
 }
 
-export function RecordNavigation() {
+export function RecordNavigation({financials=false}:{financials?:boolean} = {}) {
   const params = useSearchParams();
   const panel = params.get("panel");
   const tab = recordTab(panel);
+  const tabs=TABS.filter(([id])=>id!=="purchase" || financials);
   function chooseTab(id: TabId) {
     const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
     const shown = next.get("panel") || "overview";
@@ -122,7 +128,7 @@ export function RecordNavigation() {
   }
   return (
       <div className="panel-tabs" role="tablist" aria-label="Panel sections">
-        {TABS.map(([id, label], index) => (
+        {tabs.map(([id, label], index) => (
           <button
             key={id}
             type="button"
@@ -130,10 +136,10 @@ export function RecordNavigation() {
             id={`record-tab-${id}`}
             tabIndex={tab === id ? 0 : -1}
             onKeyDown={event => {
-              const next = event.key === "ArrowRight" ? (index+1)%TABS.length : event.key === "ArrowLeft" ? (index+TABS.length-1)%TABS.length : event.key === "Home" ? 0 : event.key === "End" ? TABS.length-1 : -1;
+              const next = event.key === "ArrowRight" ? (index+1)%tabs.length : event.key === "ArrowLeft" ? (index+tabs.length-1)%tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length-1 : -1;
               if (next < 0) return;
               event.preventDefault();
-              const dest = TABS[next][0];
+              const dest = tabs[next][0];
               document.getElementById("record-tab-"+dest)?.focus();
               chooseTab(dest);
             }}

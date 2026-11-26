@@ -9,7 +9,10 @@ import SpaceOptions from "./spaces/SpaceOptions";
 import FinancialsEntry from "./FinancialsEntry";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 
+import MarketEvidence, { type WashInspection } from "./MarketEvidence";
+
 type PreviewProps = {
+  marketMode?: boolean; washInspection?: WashInspection;
   site?: SiteProps | null;
   deal?: DealProps | null;
   listing?: UnscreenedProps | null;
@@ -25,7 +28,7 @@ type PreviewProps = {
   comparisonFull: boolean;
   onCompare?: () => void;
   onSatellite?: () => void;
-  onOpen: (panel?: "open-land" | "finding" | "space-options") => void;
+  onOpen: (panel?: "purchase" | "open-land" | "finding" | "space-options") => void;
   onClose: () => void;
 };
 
@@ -60,6 +63,7 @@ export default function MapSitePreview(props: PreviewProps) {
         <button type="button" className={`segmented ${!showingPower ? "on" : ""}`} aria-pressed={!showingPower} onClick={() => {if (props.grid.open) props.onGrid(); setTab("site");}}>Site fit</button>
         <button type="button" className={`segmented ${showingPower ? "on" : ""}`} aria-pressed={showingPower} onClick={() => setTab("power")}>Power</button>
       </div>}
+      {!showingPower && props.marketMode && !listing && <MarketEvidence deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
       {showingPower ? <MapPowerCard deal={props.powerDeal} site={props.powerSite} grid={props.grid} onGrid={props.onGrid}/> : <dl className="preview-facts">
         {fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}
         <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
@@ -70,6 +74,7 @@ export default function MapSitePreview(props: PreviewProps) {
       {!showingPower && evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}
       {!showingPower && evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("open-land")}>Check open land</button>}
       {!showingPower && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} compact />}
+      {props.signedIn && powerDeal?.kind==="pipeline" && !site?.land_only && <button type="button" className="paper-btn preview-open" onClick={()=>onOpen("purchase")}>Site financials</button>}
       {props.onCompare && <button className="paper-btn preview-open" type="button" onClick={props.onCompare}
         disabled={props.comparisonFull && !props.compared}>{props.compared ? "Remove from comparison" : props.comparisonFull ? "Comparison full" : "Add to comparison"}</button>}
       {props.onSatellite && <button className="text-link preview-open" type="button" onClick={props.onSatellite}>View satellite</button>}

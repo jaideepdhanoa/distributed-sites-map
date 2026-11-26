@@ -11,6 +11,7 @@ export const assessmentSchema = z.object({
   zones: z.array(z.object({
     kind: z.enum(["pad", "parking", "vacuum", "apron", "storage", "bay", "clear"]), label: z.string().max(100),
     points: z.array(z.tuple([percent, percent])).min(3).max(40), check: z.string().max(600).optional(),
+    fitHold: z.enum(["footprint", "aisle"]).optional(),
   })).max(30),
   segment: z.string().max(120), cohort: z.enum(["active", "off-market", "dropped"]), revision: z.string().regex(/^[a-f0-9]{12}$/),
   evidence: z.array(z.object({label:z.string().max(120),url:sourceDocument,option:z.enum(["retain","outdoor","bays"])})).max(8).optional(),
@@ -29,11 +30,24 @@ function assessmentFile() {
   return file;
 }
 
-export function assessedSiteIds() {
-  return Object.keys(assessmentFile()?.sites || {}).filter(id => /^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(id) && !isExcludedSite(id));
+function safeSiteId(id:string) {
+  return /^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(id) && !isExcludedSite(id);
 }
+
+export function assessedSiteIds() {
+  return Object.keys(assessmentFile()?.sites || {}).filter(safeSiteId);
+}
+export function assessedLayouts(): [string, Assessment][] {
+  const rows = Object.entries(assessmentFile()?.sites || {});
+  return rows.flatMap(([site,value]) => {
+    if (!safeSiteId(site)) return [];
+    const result = assessmentSchema.safeParse(value);
+    return result.success ? [[site,result.data] as [string,Assessment]] : [];
+  });
+}
+
 export function layoutAssessment(site: string): { row: Assessment; reviewedOn: string } | null {
-  if (!/^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(site) || isExcludedSite(site)) return null;
+  if (!safeSiteId(site)) return null;
   const file = assessmentFile();
   if (!file?.reviewedOn) return null;
   const checked = assessmentSchema.safeParse(file.sites?.[site]);

@@ -3167,7 +3167,7 @@ export default function Explorer() {
                       {Object.entries(serviceFilters).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
                     <label>Utility coverage<select className="secondary" value={hostingFilter} onChange={e => write({hosting:e.target.value === "all" ? null : e.target.value, site:null})}>
                       {Object.entries(hostingFilters).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-                    <span className="layer-meta" role="status">{mappedCount.toLocaleString()} matching mapped sites</span>
+                    <span className="layer-meta" role="status">{mappedCount.toLocaleString()} matching mapped {mappedCount === 1 ? "site" : "sites"}</span>
                     {powerFiltered && <button type="button" className="text-link" onClick={() => write({service:null,hosting:null})}>Clear power filters</button>}
                   </>}
                 </section>}

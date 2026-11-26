@@ -4450,6 +4450,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .map-power-card .paper-btn, .map-power-card .primary { margin-top: 6px; }
 .map-power-card small { display: block; }
 .power-map-filters { display: grid; gap: 6px; }
+.power-map-filters .layer-row { display: flex; align-items: center; gap: 8px; }
+.power-map-filters > .text-link { justify-self: start; }
 .power-map-filters label:not(.layer-row) { display: grid; gap: 3px; font-size: 13px; }
 @media (max-width: 767px) {
   .shell.drawer-open.pin-preview-open .map-preview.with-power { max-height: 58dvh; }

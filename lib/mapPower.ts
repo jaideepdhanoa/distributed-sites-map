@@ -88,6 +88,36 @@ export function mapPower(...inputs: (Reading | null | undefined)[]) {
   return { service, street, distances, load, differing, next };
 }
 
+/** The matrix, record and citations retain the same linked readings as the pin. */
+export function comparisonPower(...records: (Reading | undefined | null)[]) {
+  const {service, street, differing} = mapPower(...records);
+  const provenance = (r: (typeof service)[number] | (typeof street)[number]) =>
+    [r.evidence.label || "Source not recorded", r.confidence, r.date].filter(Boolean).join(" · ");
+  const readings = service.map(r => ({
+    value: r.facts.replace(" MW stated", " MW"),
+    source: provenance(r),
+    complete: r.statedMw != null || (r.amps != null && r.volts != null && Boolean(r.phase)),
+    verified: Boolean(r.evidence.label) && r.confidence.toLowerCase() === "verified",
+  }));
+  const values = [...new Set(readings.map(r => r.value))];
+  const forecasts = street.filter(r => r.frontage != null);
+  const forecastValues = forecasts.map(r => r.frontage!.toLocaleString() + " MW" + (r.horizon ? " · " + r.horizon + " estimate" : ""));
+  const horizons = [...new Set(forecasts.map(r => r.horizon || "Forecast year unknown"))].sort().join(" / ");
+  return {
+    differing,
+    service: readings.length ? {
+      value: differing ? "Sources disagree" : values.join(" / "),
+      source: readings.map(r => (readings.length > 1 ? r.value + " · " : "") + r.source).join(" / "),
+      complete: readings.some(r => r.complete),
+      verified: !differing && readings.some(r => r.complete && r.verified),
+    } : undefined,
+    frontage: forecasts.length ? {
+      value: [...new Set(forecastValues)].join(" / "), basis: horizons,
+      source: forecasts.map((r,i) => (forecasts.length > 1 ? forecastValues[i] + " · " : "") + provenance(r)).join(" / "),
+    } : undefined,
+  };
+}
+
 export function matchesMapPower(power: ReturnType<typeof mapPower>, service: ServiceFilter, hosting: HostingFilter) {
   const serviceMatch = service === "all" || (service === "unknown" ? !power.service.length : power.service.some(s => s[service]));
   return serviceMatch && (hosting === "all" || (hosting === "with") === Boolean(power.street.length));

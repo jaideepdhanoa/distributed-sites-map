@@ -22,3 +22,21 @@ test("investment screen respects role, zero, missing inputs and the current work
   assert.equal(investmentScreen({...row,hurdle:0.3,screen:null},true),"Investment case unverified");
   assert.equal(investmentScreen({...row,hurdle:0.3},false),"Investment case unverified");
 });
+
+test("pin, record and comparison share the assessed layout, condition and recorded blocker", async () => {
+  const {screenSummary} = await import("../../lib/selection/screen");
+  const {screeningEvidence,previewFitFigure} = await import("../../lib/screeningEvidence");
+  const {dealRows} = await import("../../lib/comparison");
+  const option={fit:"Outdoor conversion · up to four if aisle access is confirmed",focus:"Test a conversion" as const};
+  const gate=screenSummary("PHX",undefined,option,{stage_blocker:"Confirm exclusive access"});
+  const deal={deal_id:"example",kind:"pipeline",stage_group:"desk",bays_that_fit:4,screening:gate} as import("../../lib/types").DealProps;
+  const brief=screeningEvidence({deal,signedIn:true});
+  assert.equal(brief.review,gate.instruction);
+  assert.equal(previewFitFigure(brief.figures)?.value,option.fit);
+  assert.equal(dealRows(deal,[],true).find(r=>r.label==="Next check")?.value,gate.instruction);
+  const projected=screenSummary("PHX",undefined,option,{});
+  assert.equal(projected.priority,"Test conversion");
+  const updated={...deal,screening:projected,stage_blocker:"Review the financial statement."};
+  assert.equal(screeningEvidence({deal:updated,signedIn:true}).evidence?.kind,"financials");
+  assert.equal(dealRows(updated,[],true).find(r=>r.label==="Next check")?.value,updated.stage_blocker);
+});

@@ -2,7 +2,10 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
-import { amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
+import { comparisonPower } from "@/lib/mapPower";
+import type { PowerRecords } from "@/lib/powerLinkIndex";
+import { useSearchParams } from "next/navigation";
+import { originalScenario, amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
 import { usePurchaseScenario } from "./PurchaseScenarios";
 import FinancialsEntry, { type usePnlTiles } from "./FinancialsEntry";
 import SelectionResearch from "./SelectionResearch";
@@ -14,8 +17,12 @@ function Ledger({rows}:{rows:[string,ReactNode][]}) {
   return <dl className="purchase-ledger">{rows.map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>;
 }
 const percent = (n:number|null|undefined) => n==null ? "—" : (n*100).toLocaleString("en-US",{maximumFractionDigits:2})+"%";
-export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType<typeof usePnlTiles>}) {
-  const {scenario,update}=usePurchaseScenario(deal);
+export default function PurchaseReview({deal,pnl,power}:{deal:DealProps;pnl:ReturnType<typeof usePnlTiles>;power?:PowerRecords}) {
+  const selected = usePurchaseScenario(deal);
+  const baseline = useSearchParams().get("caseView") === "baseline";
+  const [inspection,setInspection] = useState(originalScenario);
+  const scenario = baseline ? inspection : selected.scenario;
+  const update = baseline ? setInspection : selected.update;
   const [checklist,setChecklist]=useState(false);
   const [gap,setGap]=useState(false);
   const [invalid,setInvalid]=useState("");
@@ -39,6 +46,7 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
     standaloneEarnings!=null ? [w?.periods?.[w?.normalized!=null?"normalized":"ebitda"] || "Period unconfirmed","Annual cash calculation pending"] :
     revenue!=null ? [w?.periods?.revenue || deal.revenue_period || "Period unconfirmed", deal.revenue_basis || "Revenue only"] : ["Annual operating cash pending"];
   const layout=layoutName(deal,scenario);
+  const { service,frontage } = comparisonPower(power ? power.deal : deal,power?.site);
   const changed=layout==="Footprint changed";
   const hasStatement=pnl.statement?.status==="ready";
   const basisLabel=isRecast ? "Normalized EBITDA" : "Workbook EBITDA";
@@ -67,9 +75,10 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
     <header><p className="eyebrow">Site financials</p><h3>Can the business carry the purchase?</h3>
       <p className="purchase-basis">{evidence}{w?.checked && " · Checked "+w.checked}</p></header>
     <article className="purchase-lead">
-      <span>{leadLabel}</span>
+      <span>{leadLabel}</span>{baseline && <small>Workbook baseline inspection</small>}
       <strong>{amount(annual ?? claim ?? standaloneEarnings ?? revenue ?? ask)}</strong>
       <small>{leadNote.join(" · ")}</small>
+      {source?.sourceHref && <a className="text-link" href={source.sourceHref} target="_blank" rel="noreferrer">Open earnings source ↗</a>}
     </article>
     {annual!=null && result?.charge!=null && <div className="purchase-funding" aria-label="Annual purchase coverage">
       <div><span>Annual charge at ask</span><b>{amount(result.charge)}</b></div>
@@ -126,7 +135,9 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
     </div>
     <details className="disclosure"><summary className="disclosure">Durability and site fit</summary>
       <Ledger rows={[["Car count · latest / prior",[w?.cars,w?.priorCars].map(v=>v?.toLocaleString()??"—").join(" / ")],["Prior annual revenue",amount(w?.priorRevenue)],["Membership share",percent(w?.memberShare)],
-        ["Nearby washes within 1 mile",deal.trade_washes_1mi??"Unknown"],["Road traffic · vehicles per day",deal.trade_aadt?.toLocaleString()??"Unknown"],["On-site electrical service",deal.cap_c_amps!=null?deal.cap_c_amps+" A":"Unconfirmed"],["Frontage hosting",deal.cap_b_frontage!=null?deal.cap_b_frontage+" MW":"Unconfirmed"],["Stalls that fit",w?.fit??deal.bays_that_fit??"Unknown"],["Selected footprint",layout]]}/>
+        ["Nearby washes within 1 mile",deal.trade_washes_1mi??"Unknown"],["Road traffic · vehicles per day",deal.trade_aadt?.toLocaleString()??"Unknown"],["On-site electrical service",service ? [service.value,service.source].filter(Boolean).join(" · ") : "Unconfirmed"],
+        ["Street-frontage hosting",frontage ? [frontage.value,frontage.source].filter(Boolean).join(" · ") : "Unconfirmed"],
+        ["Assessed layout",deal.screening?.fit || "Unassessed"],["Earlier workbook stalls",w?.fit??deal.bays_that_fit??"Unknown"],["Selected footprint",layout]]}/>
       <p>Check peak demand, power upgrade timing and any loss of operating space for this footprint.</p>
     </details>
     {checklist && pnl.panel && createPortal(<FinancialsPanel dealId={deal.deal_id} initial={pnl.panel} onClose={closeChecklist}/>,document.body)}

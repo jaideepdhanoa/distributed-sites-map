@@ -142,7 +142,7 @@ export default function FinancialsEntry({
   }
   return (
     <>
-      {compact ? (card ? <button type="button" className={compact === "link" ? "text-link statement-link" : "primary preview-open"} onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>Review financials</button> : <small>Financial statement unavailable.</small>) : card ? (
+      {compact ? (card ? <button type="button" className={compact === "link" ? "text-link statement-link" : "primary preview-open"} onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>Open P&amp;L</button> : <small>Financial statement unavailable.</small>) : card ? (
         <article className="fin-entry">
           <button type="button" className="fin-tile" data-testid="financials-entry" onClick={event => {trigger.current = event.currentTarget;setOpen(true);}}>
             <span>Financials · stated figures</span>

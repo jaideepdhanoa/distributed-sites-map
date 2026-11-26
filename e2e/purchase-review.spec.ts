@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { example } from "../tests/fixtures/purchase-review";
 import { isExcludedSite } from "../lib/alerts/excluded";
 import type { DealProps } from "../lib/types";
@@ -65,4 +65,43 @@ test("open released financials without changing a record",async({page})=>{
     expect((await panel.locator(".purchase-lead strong").innerText())===expected).toBe(true);
   }
   await expect(page.getByRole("tab",{name:"Financials",exact:true})).toHaveAttribute("aria-selected","true");
+});
+
+test("compare an adjusted purchase against a common baseline and restore the selected cases", async({page},info)=>{
+  const response=await page.request.get("/api/data/deals");
+  const data=await response.json();
+  const records=data.features.filter((f:{properties:DealProps})=>f.properties.kind==="pipeline" && !isExcludedSite(f.properties.deal_id)).slice(0,2);
+  expect(records).toHaveLength(2);
+  for (const [i,record] of records.entries()) Object.assign(record.properties,{name:"Example business "+(i+1),
+    financials_open:true,figures_status:"shown",purchase:example,stage_group:"desk",selectionResearch:undefined});
+  await page.route("**/api/data/deals",r=>r.fulfill({json:{...data,features:records}}));
+  const ids=records.map((record:{properties:DealProps})=>record.properties.deal_id);
+  await page.goto("/?"+new URLSearchParams({funnel:"pipeline",city:"all",view:"list",compare:ids.join("|")}));
+  const tray=page.getByTestId("compare-tray");
+  const row=tray.locator('[data-compare-row="Retained annual cash"]');
+  await row.getByRole("button").first().click();
+  const panel=page.getByTestId("purchase-review");
+  await panel.getByText("Test a layout or operating change",{exact:true}).click();
+  await panel.getByLabel("Annual contribution displaced ($)",{exact:true}).fill("5000");
+  await page.getByRole("button",{name:/Back to comparison/}).click();
+  await expect(row).toHaveAttribute("data-state","basis");
+  await expect(row).toContainText("$5,000/yr displaced");
+  await expect(row).toContainText("$40,000");
+  const downloadPromise = page.waitForEvent("download");
+  await tray.getByRole("button",{name:"Download dated snapshot"}).click();
+  const download = await downloadPromise;
+  const csv = await readFile((await download.path())!,"utf8");
+  const exportedCash = csv.split("\r\n").find(line=>line.includes("Retained annual cash")) || "";
+  expect(exportedCash.includes("$40,000") && exportedCash.includes("$5,000/yr displaced")).toBe(true);
+  await row.scrollIntoViewIfNeeded();
+  const heading=row.getByRole("rowheader");
+  expect(await heading.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await mkdir("review-shots",{recursive:true});
+  await row.screenshot({path:"review-shots/"+info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"")+"compared-cases.png"});
+  const base=tray.getByLabel("Use workbook baseline for all sites");
+  await base.check();
+  await expect(row).toHaveAttribute("data-state","shared");
+  await expect(row.getByRole("button").first()).toContainText("$65,000");
+  await base.uncheck();
+  await expect(row).toContainText("$40,000");
 });

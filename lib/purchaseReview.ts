@@ -7,7 +7,7 @@ export type PurchaseInputs = Amounts<"ask"|"revenue"|"ebitda"|"normalized"|"cash
 export type PurchaseAssumptions = Amounts<"closing"|"upkeep"|"oversight"|"capital"|"margin"|"target"|"lower"|"hub"|"horizon"|"demand"|"defaultStalls"|"sharedStalls">;
 export type PurchaseData = { inputs: PurchaseInputs; assumptions: PurchaseAssumptions; layout?: {revision:string; zones:string[]}; };
 export type PurchaseBasis = "workbook" | "normalized";
-export const purchaseLabels = ["Financial evidence", "Retained annual cash", "Annual capital charge", "Annual surplus or shortfall", "Business-supported price", "Network target ceiling", "Purchase check"] as const;
+export const purchaseLabels = ["Financial evidence", "Retained annual cash", "Annual capital charge", "Annual surplus or shortfall", "Business-supported price", "Network target ceiling", "Year-one retained cash", "Purchase check"] as const;
 export const amount = (n: number | null | undefined) => n == null || !Number.isFinite(n) ? "—" : n.toLocaleString("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
 export function financialEvidence(d: DealProps) {
   const w = d.purchase?.inputs;
@@ -86,12 +86,32 @@ export function purchaseRows(d:DealProps, scenario:PurchaseScenario=preferredSce
   const w=d.purchase?.inputs;
   const result=d.purchase ? purchaseCase(d.purchase,scenario) : null;
   const applicable = financialEvidence(d) !== "Not applicable";
-  const values = [financialEvidence(d), result?.cash, result?.charge, result?.gap, result?.cashPrice, result?.ceiling, purchaseCheck(d)];
-  return purchaseLabels.map((label,i)=>{
-    const v=values[i];
-    const basis = [scenario.basis,w?.periods?.[scenario.basis==="normalized"?"normalized":"ebitda"] || "Period unknown",w?.checked || "Date unrecorded",w?.archetype || "Default layout",w?.ownership || "Scope unknown",w?.status || "Unclassified"].join(" · ");
-    return {label,key:applicable ? v ?? null : null,value:!applicable ? "Not applicable" : typeof v==="string" ? v : amount(v),
-      basis:i>0 && i<6 ? basis : "",source:"Pipeline workbook · "+scenario.basis+" case"};
+  const changed = layoutName(d,scenario) === "Footprint changed";
+  const ownership = w?.ownership?.trim();
+  const scope = /^yes$/i.test(ownership || "") ? "Real estate included" : /^no$/i.test(ownership || "") ? "Real estate excluded" : ownership ? "Sale scope: " + ownership : "Sale scope unknown";
+  const values = [financialEvidence(d), result?.cash, result?.charge, result?.gap, result?.cashPrice,
+    result?.ceiling, result?.firstYear, changed ? "Review the changed footprint" : purchaseCheck(d)];
+  return purchaseLabels.map((label,i) => {
+    const v = values[i];
+    const monetary = i > 0 && label !== "Purchase check";
+    const adjustments: string[] = [];
+    if (monetary && label !== "Annual capital charge") {
+      if (scenario.layout) adjustments.push(layoutName(d,scenario));
+      if (scenario.lostCash) adjustments.push(amount(scenario.lostCash) + "/yr displaced");
+      if (scenario.upgrade && (label === "Annual surplus or shortfall" || label === "Network target ceiling"))
+        adjustments.push(amount(scenario.upgrade) + " upgrade");
+      if (scenario.downtime && label === "Year-one retained cash") adjustments.push(scenario.downtime + " months interrupted");
+    }
+    const earnings = scenario.basis === "normalized" ? "Normalized EBITDA" : "Workbook EBITDA";
+    const basis = label === "Annual capital charge" ? "Workbook charge at ask" : [
+      adjustments.length ? "Adjusted case" : "Base case", ...adjustments, earnings,
+      w?.periods?.[scenario.basis === "normalized" ? "normalized" : "ebitda"] || "Period unknown",
+      w?.archetype || "Default layout", scope,
+    ].join(" · ");
+    const stale = changed && monetary && label !== "Annual capital charge";
+    return {label, key:applicable && !stale ? v ?? null : null,
+      value:!applicable ? "Not applicable" : stale ? "Unavailable" : typeof v === "string" ? v : amount(v),
+      basis:monetary ? basis : "",source:"Pipeline workbook · " + scenario.basis + " case"};
   });
 }
 

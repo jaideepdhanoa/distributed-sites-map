@@ -313,6 +313,12 @@ test("screen property, street and grid evidence from a selected pin", async ({pa
   await filters.getByLabel("Property service").selectOption("broker");
   await expect(filters.getByRole("status")).toContainText("1 matching");
   await page.getByRole("button",{name:"Close layers"}).click();
+  const viewSwitch = page.getByRole("group",{name:"Map or list"});
+  await viewSwitch.getByRole("button",{name:"List",exact:true}).click();
+  const shortlist = page.getByTestId("pipeline-list");
+  await expect(shortlist).toHaveAttribute("data-list-count","1");
+  await expect(shortlist.locator('[data-site-row="'+id+'"]')).toContainText("Example service site");
+  await viewSwitch.getByRole("button",{name:"Map",exact:true}).click();
   const nearby=page.getByRole("complementary",{name:"Nearby sites"});
   const toggle=nearby.getByRole("button",{name:/Nearby sites/});
   if(await toggle.getAttribute("aria-expanded")==="false") await toggle.click();

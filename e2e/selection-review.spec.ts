@@ -18,6 +18,18 @@ test("selection review distinguishes an unanswered check from zero savings", asy
   expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-selection-review.png",animations:"disabled"});
+  await page.route("**/api/data/space-options?view=portfolio", route=>route.fulfill({json:{rows:[{...row,cohort:"active",kinds:[],options:[],focus:"Test a conversion"}]}}));
+  await page.getByRole("link",{name:"Review layout evidence"}).click();
+  await page.getByRole("link",{name:/Back to selection review/}).click();
+  await expect(page.getByLabel("Market",{exact:true})).toHaveValue("PHX");
+  await expect(page.getByText("1 of 2 active sites")).toBeVisible();
+  const originalRow=page.locator("li").filter({hasText:row.name});
+  await expect(originalRow).toBeFocused();
+  await originalRow.getByRole("link",{name:"Review layout evidence"}).click();
+  await expect(page.getByRole("link",{name:/Back to selection review/})).toBeVisible();
+  await page.goBack();
+  await expect(page.getByLabel("Market",{exact:true})).toHaveValue("PHX");
+  await expect.poll(()=>originalRow.evaluate(row=>row.contains(document.activeElement))).toBe(true);
 });
 
 test("released selection review joins uniquely and serves active rows", async ({page},info) => {

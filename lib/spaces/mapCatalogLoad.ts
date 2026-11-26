@@ -8,8 +8,7 @@ type Deal = {
   geometry?: { type?: string; coordinates?: unknown } | null;
 };
 
-export async function mapCatalog(deals: Deal[]): Promise<SpaceCatalog> {
-  const rows = assessedLayouts();
+export async function mapCatalog(deals: Deal[], rows = assessedLayouts()): Promise<SpaceCatalog> {
   const ids = rows.map(([id]) => id);
   let reviewsAvailable = true;
   let notes: OutlineNote[] = [];

@@ -1,5 +1,6 @@
 "use client";
 
+import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
@@ -82,6 +83,7 @@ export function SitePacket({
   hasPin,
   signedIn = false,
   tiles = null,
+  power,
   pending = false,
 }: {
   site: SiteProps;
@@ -89,9 +91,10 @@ export function SitePacket({
   hasPin: boolean;
   signedIn?: boolean;
   tiles?: PnlTiles | null;
+  power?: PowerRecords;
   pending?: boolean;
 }) {
-  if (deal) return <KeyStrip deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} tiles={tiles} pending={pending} />;
+  if (deal) return <KeyStrip power={power} deal={deal} hasPin={hasPin} peers={[]} universeSite={site} signedIn={signedIn} tiles={tiles} pending={pending} />;
   const asking = site.asking_price_display || "";
   const spare = spareLandSqft(null, site.spare_ac_own);
   const acres = site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "";
@@ -102,7 +105,7 @@ export function SitePacket({
         {acres ? <Metric icon={LandPlot} label="Land" value={acres} /> : null}
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
       </div>
-      <PowerEvidence site={site} signedIn={signedIn} />
+      <PowerEvidence {...(power || {site})} signedIn={signedIn} />
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="—" title="Not on file" />}
@@ -118,6 +121,7 @@ export default function KeyStrip({
   universeSite,
   signedIn = false,
   tiles = null,
+  power,
   pending = false,
 }: {
   deal: DealProps;
@@ -126,6 +130,7 @@ export default function KeyStrip({
   universeSite?: SiteProps | null;
   signedIn?: boolean;
   tiles?: PnlTiles | null;
+  power?: PowerRecords;
   pending?: boolean;
 }) {
   const cash = cashTile(deal);
@@ -208,7 +213,7 @@ export default function KeyStrip({
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
         <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
-      <PowerEvidence deal={deal} site={universeSite} signedIn={signedIn} />
+      <PowerEvidence {...(power || {deal,site:universeSite})} signedIn={signedIn} />
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         {signedIn && showFinancials ? (

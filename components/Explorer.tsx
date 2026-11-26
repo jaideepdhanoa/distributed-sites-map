@@ -17,6 +17,7 @@ import type { MapOutline } from "./spaces/SpaceOptions";
 import FinancialPortfolio from "./FinancialPortfolio";
 import { PurchaseScenarios } from "./PurchaseScenarios";
 import { purchaseLabels, financialEvidence } from "@/lib/purchaseReview";
+import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -50,7 +51,7 @@ import { LAND_PAUSED_NOTE, UNIVERSE_STAGE_LABEL, countyCheck } from "@/lib/listL
 import { nearbyWashPoints, type WashSite } from "@/lib/nearbyWashes";
 import { FUNNEL_STORAGE, FUNNEL_VERSION, FUNNEL_VERSION_KEY, resolveFunnelMode, type FunnelMode } from "@/lib/funnelMode";
 import { MARKET_STORAGE, MARKET_VERSION, MARKET_VERSION_KEY, marketFocus, marketSearchValue, type MarketId } from "@/lib/marketView";
-import { indexPowerLinks } from "@/lib/powerLinkIndex";
+import { catalogPowerRecords } from "@/lib/powerLinkIndex";
 import { mapPower, matchesMapPower, serviceFilters, hostingFilters, type ServiceFilter, type HostingFilter } from "@/lib/mapPower";
 import { PIN_LABEL_STORAGE, PIN_LABEL_VERSION, PIN_LABEL_VERSION_KEY, resolvePinLabel } from "@/lib/pinLabel";
 import { pipelineAllCount, pipelineMapSummary } from "@/lib/mapSummary";
@@ -411,12 +412,13 @@ export default function Explorer() {
     categoryKeyRef.current = categoryKey;
     categoriesRef.current = categories;
   }
-  const powerMode = Boolean(me?.u) && params.get("power") === "1" && params.get("view") !== "list";
+  const powerScope = Boolean(me?.u) && params.get("power") === "1";
+  const powerMode = powerScope && params.get("view") !== "list";
   const serviceParam = params.get("service") || "all";
   const hostingParam = params.get("hosting") || "all";
   const serviceFilter = Object.hasOwn(serviceFilters,serviceParam) ? serviceParam as ServiceFilter : "all";
   const hostingFilter = Object.hasOwn(hostingFilters,hostingParam) ? hostingParam as HostingFilter : "all";
-  const powerFiltered = powerMode && (serviceFilter !== "all" || hostingFilter !== "all");
+  const powerFiltered = powerScope && (serviceFilter !== "all" || hostingFilter !== "all");
   const [gridFocusId,setGridFocusId] = useState<string | null>(null);
   useEffect(() => { setGridFocusId(null); }, [selected, powerMode, selectedMarket]);
   const query = params.get("q") || "";
@@ -624,8 +626,8 @@ export default function Explorer() {
     setPreviewId(null);
     const inspectedId = source?.get("site") || id;
     setSelected(inspectedId);
-    const panel = marketLabels.some(label=>label===measure) ? "market-context" : measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
-    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (purchaseLabels.some(l=>l===measure) || measure==="Purchase scenario" ? "purchase" : ["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
+    const panel = measure === "Assessed layout" ? "space-options" : marketLabels.some(label=>label===measure) ? "market-context" : measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
+    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (purchaseLabels.some(l=>l===measure) || measure==="Purchase scenario" ? "purchase" : ["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, caseView:source?.get("caseView") || null, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {
@@ -639,7 +641,7 @@ export default function Explorer() {
   }
   function comparisonQuery() {
     const query = new URLSearchParams(currentSearch());
-    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView", "reviewCitation", "workFilter"]) query.delete(key);
+    for (const key of ["site", "sheet", "panel", "measure", "note", "msg", "slist", "savedView", "caseView", "reviewCitation", "workFilter"]) query.delete(key);
     query.set("compare", compareIds.join("|"));
     query.set("city", selectedMarket);
     query.set("funnel", funnel);
@@ -655,6 +657,8 @@ export default function Explorer() {
     }
     return query.toString();
   }
+  const reviewBack = reviewReturn(params.get("returnTo"),["/space-review","/selection-review"],"");
+  const reviewBackLink = reviewBack && <a className="text-link" href={reviewBack}>← {reviewLabel(reviewBack)}</a>;
   const comparisonBack = inspecting && <button className="text-link comparison-back" data-measure={inspectMeasure} type="button" onClick={returnComparison}>Back to comparison · {inspectMeasure}</button>;
   const queryString = params.toString();
   useEffect(() => {
@@ -1103,20 +1107,9 @@ export default function Explorer() {
   const powerCatalog = useMemo(() => {
     const allSites = new Map((catalog || []).map(f => [f.properties.site_id,f.properties]));
     for (const f of data?.sites.features || []) allSites.set(f.properties.site_id,f.properties);
-    const pairs: [string,string][] = dealBundle.features.map(f => [f.properties.deal_id,f.properties.universe_id]);
-    for (const site of allSites.values()) {
-      for (const id of [site.linked_deal_id,...(site.linked_deal_ids || [])]) if (id) pairs.push([id,site.site_id]);
-    }
-    return {sites:allSites,links:indexPowerLinks(pairs)};
+    return catalogPowerRecords([...allSites.values()], dealBundle.features.map(f => f.properties));
   }, [catalog,data?.sites,dealBundle]);
-  function powerDealForSite(site: SiteProps) {
-    const link = powerCatalog.links.get("site:"+site.site_id);
-    return link ? dealBundle.byId.get(link.targetId) : undefined;
-  }
-  function powerSiteForDeal(deal: DealProps) {
-    const link = powerCatalog.links.get("deal:"+deal.deal_id);
-    return link ? powerCatalog.sites.get(link.targetId) : undefined;
-  }
+  const { dealFor: powerDealForSite, siteFor: powerSiteForDeal } = powerCatalog;
   function dealForSite(site: SiteProps) {
     if (site.linked_deal_id) {
       const linked = dealBundle.byId.get(site.linked_deal_id);
@@ -2021,6 +2014,8 @@ export default function Explorer() {
   }
 
   const activeFilters: { id: string; label: string; clear: () => void }[] = [];
+  if (powerScope && serviceFilter !== "all") activeFilters.push({id:"property-power",label:serviceFilters[serviceFilter],clear:()=>write({service:null})});
+  if (powerScope && hostingFilter !== "all") activeFilters.push({id:"utility-coverage",label:hostingFilters[hostingFilter],clear:()=>write({hosting:null})});
   if (!categories.wash) activeFilters.push({ id: "wash", label: "Car washes off", clear: () => setCategory("wash", true) });
   if (!categories.lube) activeFilters.push({ id: "lube", label: "Quick lube off", clear: () => setCategory("lube", true) });
   if (!categories.auto) activeFilters.push({ id: "auto", label: "Auto service off", clear: () => setCategory("auto", true) });
@@ -2501,6 +2496,7 @@ export default function Explorer() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
+        {powerFiltered && <div className="power-scope-chips" aria-label="Active power filters">{activeFilters.filter(f=>f.id==="property-power" || f.id==="utility-coverage").map(f=><button type="button" className="chip removable" key={f.id} onClick={f.clear} aria-label={"Remove " + f.label}>{f.label} ×</button>)}</div>}
         {unavailable.length > 0 && <div role="status" className="workspace-warning">Unavailable · {unavailable.join(", ")} <button type="button" className="text-link" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></div>}
         {missingSite ? <p className="note" role="status" data-testid="site-missing">{missingSite} <button type="button" className="text-link" onClick={() => { setSelected(null); write({ site: null, view: "list" }); }}>Back to listings</button></p> : null}
         <section className="funnel-row" id="workspace-scope" aria-label="Market and stage">
@@ -3194,6 +3190,9 @@ export default function Explorer() {
                     <button type="button" className={`segmented ${basemap === "positron" ? "on" : ""}`} onClick={() => chooseBasemap("positron")}>Streets</button>
                   </div>
                 </div>
+                {!listView && !inReview && !marking && <div className="map-analysis-links"><p className="eyebrow">Map analysis</p>
+                  <button className="text-link" type="button" onClick={()=>chooseMarketMetric(activeMetric || "traffic")}>Market context</button>
+                  {me?.u && <button className="text-link" type="button" onClick={()=>{chooseLayers(false);write({spaces:"1"});}}>Browse spaces</button>}</div>}
                 <p className="eyebrow">Pin labels</p>
                 <div className="segmented pin-modes" role="group" aria-label="Pin labels">
                   {([["none", "Off", LAYER_TITLES.pinOff], ["asking", "Price", LAYER_TITLES.pinPrice], ["acres", "Acres", LAYER_TITLES.pinAcres], ["peracre", "$/ac", LAYER_TITLES.pinPerAcre]] as const).map(([id, label, title]) => (
@@ -3343,7 +3342,7 @@ export default function Explorer() {
               retry:()=>setGridAttempt(n=>n+1)}}
             onGrid={() => setGridFocusId(gridOpen ? null : selected)}
             compared={Boolean(selected && compareIds.includes(selected))}
-            marketMode={Boolean(activeMetric)} washInspection={washInspection}
+            marketMode={activeMetric} washInspection={washInspection}
             comparisonFull={compareIds.length >= 4}
             onCompare={selected && !selectedUnscreened ? () => {
               const next = compareIds.includes(selected) ? compareIds.filter(id => id !== selected) : [...compareIds, selected];
@@ -3370,6 +3369,7 @@ export default function Explorer() {
           />
         ) : selectedDeal ? (
           <DealDetail
+            power={{deal:pinPowerDeal,site:pinPowerSite}}
             decisionFirst={listView || inReview}
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
@@ -3380,8 +3380,8 @@ export default function Explorer() {
             lat={dealPoint(selectedDeal)?.[1]}
             onOpenSite={selectedDeal.universe_id ? () => choose(selectedDeal.universe_id) : undefined}
             onOpenParty={openParty}
-            onClose={workDetail ? returnToWork : inspecting ? returnComparison : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
-            banner={(workDetail && <button type="button" className="text-link" onClick={returnToWork}>Back to My work</button>) || comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
+            onClose={workDetail ? returnToWork : inspecting ? returnComparison : reviewBack ? () => window.location.assign(reviewBack) : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={(workDetail && <button type="button" className="text-link" onClick={returnToWork}>Back to My work</button>) || comparisonBack || reviewBackLink || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             onCompare={(on) => setCompared(selectedDeal.deal_id, on)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedDeal.deal_id) : undefined}
             compared={compareIds.includes(selectedDeal.deal_id)}
@@ -3414,6 +3414,7 @@ export default function Explorer() {
           />
         ) : selectedSite ? (
           <Detail
+            power={{deal:pinPowerDeal,site:pinPowerSite}}
             decisionFirst={listView || inReview}
             site={selectedSite}
             lng={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
@@ -3431,8 +3432,8 @@ export default function Explorer() {
             compared={compareIds.includes(selectedSite.site_id)}
             onOpenReview={me?.actionsEnabled ? () => openInReview(selectedSite.site_id) : undefined}
             sameOwner={sites.filter((site) => site.site_id !== selectedSite.site_id && site.owner && site.owner === selectedSite.owner).slice(0, 6)}
-            onClose={workDetail ? returnToWork : inspecting ? returnComparison : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
-            banner={(workDetail && <button type="button" className="text-link" onClick={returnToWork}>Back to My work</button>) || comparisonBack || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
+            onClose={workDetail ? returnToWork : inspecting ? returnComparison : reviewBack ? () => window.location.assign(reviewBack) : () => { setSelected(null); write({ site: null, workItem:null, ndafrom: null, panel: null, note: null, msg: null }); }}
+            banner={(workDetail && <button type="button" className="text-link" onClick={returnToWork}>Back to My work</button>) || comparisonBack || reviewBackLink || changeBanner || (params.get("ndafrom") ? <button type="button" className="text-link" data-testid="nda-return" onClick={() => { setSelected(null); write({ nda: params.get("ndafrom"), site: null, ndafrom: null }); }}>Back to NDA</button> : undefined)}
             sheet={sheet}
             extras={<RecordActions kind="site" id={selectedSite.site_id} />}
             onOpenNda={(id) => write({ nda: id })}

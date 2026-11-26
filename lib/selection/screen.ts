@@ -1,4 +1,4 @@
-import type { ReviewFocus } from "@/lib/spaces/triage";
+import type { TriageRow, ReviewFocus } from "@/lib/spaces/triage";
 
 export type Inputs = {
   stage: string; segment: string; land: boolean; unavailable: boolean; control: boolean;
@@ -32,4 +32,27 @@ export function selectionCheck(city: string, input: Inputs | undefined, focus: R
   if (!input?.section) return ["Complete first screen", "Establish sale scope, parcel, retained earnings and a usable layout."];
   if (focus === "Obtain an aerial" || focus === "No assessed layout") return ["Obtain usable image", "Locate a parcel-matched aerial or a dimensioned site plan."];
   return [focus, "Compare usable geometry, dated service headroom, retained cash flow and incremental network coverage."];
+}
+
+export type ScreenSummary = {
+  priority: string; instruction: string; origin: string; fit?: string; layoutCheck: boolean;
+};
+
+export function screenSummary(city: string, input: Inputs | undefined, view: Pick<TriageRow,"focus"|"fit">,
+  record: {listing_removed?: unknown; stage_blocker?: unknown; next_step?: unknown}): ScreenSummary {
+  const [priority,instruction] = selectionCheck(city,input,view.focus,record.listing_removed === true);
+  return currentScreen({priority,instruction,origin:"Suggested check",fit:view.fit,
+    layoutCheck:["Test conversion","Measure fourth stall","Measure the footprint","Resolve parcel","Obtain usable image","Screen fleet service","Revisit site evidence"].includes(priority)}, record);
+}
+
+export function currentScreen(screen: ScreenSummary, record: {stage_blocker?: unknown; next_step?: unknown}): ScreenSummary {
+  const recorded = (v:unknown) => typeof v === "string" && v.trim() && !/^(?:—|-|unknown|not on file|n\/a)$/i.test(v.trim()) ? v.trim() : "";
+  const blocker = recorded(record.stage_blocker);
+  const next = recorded(record.next_step);
+  const mandate = screen.priority === "Land paused" || screen.priority === "Outside mandate";
+  if (!mandate && (blocker || (next && screen.priority !== "Resolve site rights"))) {
+    return {priority:blocker ? "Resolve recorded blocker" : "Recorded next action",instruction:blocker || next,
+      origin:blocker ? "Recorded blocker" : "Recorded next action",fit:screen.fit,layoutCheck:false};
+  }
+  return screen;
 }

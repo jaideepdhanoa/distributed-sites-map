@@ -661,10 +661,10 @@ for (const width of [1440, 390]) {
     await capture("evidence", drawer);
     await drawer.getByRole("tab",{name:"Site fit"}).focus();
     await page.keyboard.press("ArrowRight");
-    const economics = drawer.getByRole("tab",{name:"Economics"});
+    const economics = drawer.getByRole("tab",{name:"Market"});
     await expect(economics).toBeFocused();
     await expect(economics).toHaveAttribute("aria-selected","true");
-    await expect(drawer.getByRole("tabpanel",{name:"Economics"})).toContainText("Reporting period");
+    await expect(drawer.getByRole("tabpanel",{name:"Market"})).toContainText("Market context");
     await drawer.locator(".drawer-scroll").evaluate(node=>node.scrollTo({top:0,behavior:"instant"}));
     await capture("record",drawer);
 

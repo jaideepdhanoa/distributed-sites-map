@@ -1,3 +1,4 @@
+import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
@@ -10,6 +11,7 @@ import RecordFinding from "./actions/RecordFinding";
 
 type Figure = ReturnType<typeof screeningEvidence>["figures"][number];
 type BriefProps = Parameters<typeof screeningEvidence>[0] & {
+  power?: PowerRecords;
   target?: { kind: "site" | "deal"; id: string };
   pnl?: { statement: PnlStatement | null; settled: boolean; sample: boolean };
 };
@@ -20,16 +22,16 @@ function FigureRow({ fact }: { fact: Figure }) {
   return <div><dt>{fact.label}</dt><dd>{fact.value}<small>{[source, date].filter(Boolean).join(" · ")}</small></dd></div>;
 }
 
-export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
+export default function RecordBrief({ target, pnl, power, ...input }: BriefProps) {
   const router = useRouter();
-  const { status, reason, review, evidence, check, missing, figures } = screeningEvidence(input);
+  const { status, reason, origin, review, evidence, check, missing, figures } = screeningEvidence(input);
   const financial = check === "financials" && input.signedIn;
   const coverage = financial && pnl?.statement ? financialsCard(pnl.statement, pnl.sample)?.coverage : "";
   const land = check === "space";
   const asking = figures.find(fact => fact.label === "Asking price");
   const first = financial || (land && missing) ? undefined
     : input.deal && input.deal.kind !== "land" && !land && check !== "county" ? asking || figures[0] : figures[0];
-  const fit = figures.find(fact => fact.label === "Usable bays" || fact.label === "Open land");
+  const fit = figures.find(fact => fact.label === "Assessed layout") || figures.find(fact => fact.label === "Earlier workbook bays" || fact.label === "Open land");
   const economics = figures.find(fact => fact.label === (input.deal?.cash_flow_label || "Cash flow")) || figures.find(fact => fact.label === "Asking price");
   const featuredEconomics = economics !== first ? economics : undefined;
   const showFinancialAsk = financial && asking && asking !== featuredEconomics;
@@ -39,18 +41,18 @@ export default function RecordBrief({ target, pnl, ...input }: BriefProps) {
   const source = evidence?.kind === "county" ? evidence.href : financial && coverage ? `Financial statement · ${coverage}` : land && first?.label === "Open land" ? first.source : "";
   return (
     <section className="record-brief" aria-label="Screening decision">
-      <div className="brief-decision"><span>Screening decision</span><h3>{status}</h3></div>
+      <div className="brief-decision"><span>{input.deal ? "Pipeline stage" : "Screening status"}</span><h3>{status}</h3></div>
       {reason && reason !== status && <p>{reason}</p>}
       <dl>
-        <div><dt>Next check</dt><dd>{evidence?.kind === "county"
+        <div><dt>{origin}</dt><dd>{evidence?.kind === "county"
           ? <a href={evidence.href} target="_blank" rel="noopener noreferrer">{review} <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>
-          : evidence?.kind === "space" ? <button type="button" className="text-link" onClick={() => {
+          : evidence?.kind === "space" || evidence?.kind === "layout" ? <button type="button" className="text-link" onClick={() => {
             const query = new URLSearchParams(currentSearch());
-            query.set("panel", "open-land");
+            query.set("panel", evidence.kind === "layout" ? "space-options" : "open-land");
             const href = `/?${query}`;
             rememberSearch(href); router.replace(href, { scroll: false });
-          }}>{review}</button> : review}{input.signedIn && /power|utility|electrical/i.test(review) && !evidence && <PowerFollowUp deal={input.deal} site={input.site} />}{missing && !land && <small>{missing}</small>}</dd></div>
-        <div><dt>Site fit</dt><dd>{input.site?.verdict || (fit ? fit.label + " · " + fit.value : "Fit requires verification")}</dd></div>
+          }}>{review}</button> : review}{input.signedIn && /power|utility|electrical/i.test(review) && !evidence && <PowerFollowUp {...(power || {deal:input.deal,site:input.site})} />}{missing && !land && <small>{missing}</small>}</dd></div>
+        <div><dt>Site fit</dt><dd>{fit?.label === "Assessed layout" ? fit.value : input.site?.verdict || (fit ? fit.label + " · " + fit.value : "Fit requires verification")}</dd></div>
         {financial ? <div><dt>Statement coverage</dt><dd>{coverage || (pnl?.settled ? "No statement coverage on file." : "Checking statement coverage…")}{coverage && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} loaded={pnl} compact="link" />}</dd></div>
           : land && missing ? <div><dt>Open land</dt><dd>{missing}</dd></div>
           : first ? <FigureRow fact={first} /> : <div><dt>Evidence</dt><dd>No screening figures on file.</dd></div>}

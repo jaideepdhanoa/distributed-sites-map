@@ -4162,7 +4162,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .record-brief { border: 1px solid var(--line); border-top: 3px solid var(--green); border-radius: 10px; padding: 12px 14px; }
 .brief-decision { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 8px; }
 .brief-decision > span, .comparison-table .comparison-section th { font-size: 12px; font-weight: 650; letter-spacing: .035em; }
-.comparison-table th small { display: block; font-size: 11px; line-height: 1.3; font-weight: 500; color: var(--ink-2); }
+.comparison-table th[scope=row] { white-space: normal; overflow-wrap: anywhere; }
+.comparison-table th small { display: block; white-space: normal; font-size: 11px; line-height: 1.3; font-weight: 500; color: var(--ink-2); }
 .comparison-table tr[data-state="gap"] th small, .comparison-table tr[data-state="basis"] th small { color: #75521c; }
 .gap-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
 @media (min-width: 768px) {
@@ -4627,4 +4628,22 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 
 @media (min-width: 768px) {
   .map-stage:has(.market-panel) .space-map-launch.tool { left: auto; right: 14px; }
+}
+
+.power-scope-chips, .map-analysis-links { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
+.power-scope-chips { padding:4px 12px; }
+.map-analysis-links .eyebrow { width:100%; }
+.preview-more { flex-basis:100%; }
+.preview-more[open] .preview-open { margin-right:10px; }
+.market-selected-reading { margin:4px 0 10px; color:var(--green); }
+@media(max-width:600px) {
+  .preview-more summary { min-height:44px; align-content:center; }
+  .space-review-results li > div:first-child > strong { display:block; margin-top:5px; }
+}
+
+.comparison-attention { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 14px; padding:8px 14px; background:#f4f1e8; }
+.comparison-attention .text-link { text-align:left; }
+@media(max-width:600px) {
+  .comparison-attention { flex-wrap:nowrap; overflow-x:auto; }
+  .comparison-attention > * { flex-shrink:0; }
 }

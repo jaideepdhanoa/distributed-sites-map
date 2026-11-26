@@ -3,10 +3,12 @@ import { filedScreenLabel } from "@/lib/charging/summary";
 import { useSearchParams } from "next/navigation";
 import { reviewLink, reviewReturn, setReviewFilter, rememberReviewPosition, restoreReviewPosition } from "@/lib/reviewNavigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import OpportunityReview from "@/components/OpportunityReview";
+import { compareAttention, dispositions, type FiledReview } from "@/lib/selection/opportunity";
 import SelectionResearch from "@/components/SelectionResearch";
 import type { SelectionRow } from "@/lib/selection/screen";
 
-type Result = { rows: SelectionRow[]; mismatches: number; hasInputs: boolean };
+type Result = { rows: SelectionRow[]; mismatches: number; hasInputs: boolean; filed?: FiledReview[]; registerUrl?: string };
 
 export default function SelectionReview() {
   return <Suspense fallback={<main>Loading selection review…</main>}><SelectionList /></Suspense>;
@@ -33,20 +35,32 @@ function SelectionList() {
     return () => controller.abort();
   },[attempt]);
   const rows = data?.rows || [];
-  const scoped = rows.filter(r => (!scope || scope.has(r.id)) && (!market || r.city === market) && (!check || r.priority === check) &&
+  const decision = params.get("disposition") || "";
+  const order = params.get("sort") || "attention";
+  const hasReviews = Boolean(data?.registerUrl || data?.filed?.length || rows.some(r=>r.review));
+  const matchesDecision = (value?:string) => !decision || (value || "Unreviewed") === decision;
+  const matchesPlace = (r:{id:string;city:string}, name:string) => (!scope || scope.has(r.id)) && (!market || r.city === market) && [name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase());
+  const filed = (data?.filed || []).filter(r => matchesPlace(r,r.review.name) && matchesDecision(r.review.primary.disposition));
+  const scoped = rows.filter(r => matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review?.primary.disposition) && (!check || r.priority === check) &&
     (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
-    (!params.get("charging") || (r.charging?.stale?"Refresh saved case":r.charging?.result.decision)===params.get("charging")) &&
-    [r.name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>scope ? scope.get(a.id)! - scope.get(b.id)! : (params.get("sort")==="earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
+    (!params.get("charging") || (r.charging?.stale?"Refresh saved case":r.charging?.result.decision)===params.get("charging"))).sort((a,b)=>{
+      const priority = order === "attention" ? compareAttention(a.review?.primary,b.review?.primary) :
+        order === "earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0;
+      return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
+    });
   return <main ref={pane} className="space-review-page">
     <a className="text-link" href={back}>← Pipeline list</a>
     <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>
+    {data?.registerUrl && <p><a className="text-link" href={data.registerUrl} target="_blank" rel="noreferrer">Open the team’s review register</a> to file new evidence, assign the next check or revise a decision.</p>}
     <div className="space-review-filters">
+      {hasReviews && <label>Commercial decision<select className="secondary" value={decision} onChange={e=>setReviewFilter("disposition",e.target.value)}>
+        <option value="">All commercial decisions</option>{[...dispositions,"Unreviewed"].map(d=><option key={d}>{d}</option>)}</select></label>}
       <label>Market<select aria-label="Market" className="secondary" value={market} onChange={e=>setReviewFilter("market",e.target.value)}><option value="">All markets</option>{[...new Set(rows.map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
-      <label>Next check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
+      <label>Screening check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
         <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.stale?"Refresh saved case":r.charging.result.decision]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
       <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[4,6,8,10].map(n=><option value={n} key={n}>{n} hypothetical stalls</option>)}</select></label>
-      <label>Order<select className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
+      <label>Order<select className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option><option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       <label>Find a site<input className="field" value={query} onChange={e=>setReviewFilter("q",e.target.value)} placeholder="Name or site ID" /></label>
     </div>
     {scope && <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button>}
@@ -57,17 +71,22 @@ function SelectionList() {
       {data.hasInputs && <details className="disclosure"><summary className="disclosure">Data details{data.mismatches > 0 && " · Stage differences"}</summary><p>{data.mismatches} stage differences across the joined records. The application stage is shown when available.</p></details>}
       {!scoped.length && <p>No sites match these filters.</p>}
       <ul className="space-review-results">{scoped.map(r=><li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
-        <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2><strong>{r.priority}</strong><p>{r.instruction}</p><small>{r.id}</small></div><div><strong>{r.readiness}</strong>
+        <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2>{r.review?.name && r.review.name !== r.name && <small>{r.review.name}</small>}
+        {r.review?.primary.disposition === "Previously dropped" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review}/> : <><strong>{r.priority}</strong><p>{r.instruction}</p></>}<small>{r.id}</small></div><div><strong>{r.readiness}</strong>
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.charging && <div className="charging-preview"><strong>Charging · {r.charging.stale?"Refresh saved case":r.charging.result.decision}</strong>
           <p>{r.charging.name} · {r.charging.result.siteCost==null?"Cost pending":"$"+r.charging.result.siteCost.toFixed(2)+"/charge"}</p><small>{r.charging.result.next}</small>{!r.charging.selected && <p>{filedScreenLabel(r.charging.screen)}</p>}
           <a className="text-link" href={"/charging?site="+encodeURIComponent(r.id)}>Open charging case</a></div>}
         {r.research && <SelectionResearch row={r.research}/>}
-        {r.mapped && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}
+        {(r.hasRecord || r.mapped) && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}
       <p>{r.geometry} · {r.option}</p>
         {r.quickLube && r.priority !== "Screen fleet service" && <p>Retained lifts and fleet-service rights also need a separate check.</p>}
         {r.assessed && <a href={reviewLink("/space-review",{site:r.id,panel:"space-options"},origin+"#"+r.id)}>Review layout evidence{r.evidenceDate && " · "+r.evidenceDate}</a>}
-      </div></li>)}</ul></>}
+      </div></li>)}</ul>
+      {filed.length > 0 && !check && !params.get("stalls") && !params.get("charging") && <details className="disclosure">
+        <summary className="disclosure">Filed reviews outside the active list ({filed.length})</summary>
+        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review}/></div></li>)}</ul>
+      </details>}</>}
   </main>;
 }

@@ -688,6 +688,9 @@ export default function PipelineList({
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
+                {signedIn && row.deal.opportunityReview && <small className="site-address" title={row.deal.opportunityReview.primary.next}>
+                  {row.deal.opportunityReview.primary.disposition}{row.deal.opportunityReview.primary.rank != null && " #" + row.deal.opportunityReview.primary.rank}
+                </small>}
                 {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                 <span className="site-meta">
                   {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (

@@ -33,3 +33,6 @@ playwright/.cache/
 # Signed-in selection screen, built from the private pipeline.
 data/generated/selection-inputs.json
 data/generated/selection-evidence.json
+
+# Private commercial reviews and their evidence links
+data/generated/opportunity-reviews.json

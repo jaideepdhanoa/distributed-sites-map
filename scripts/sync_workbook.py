@@ -35,6 +35,8 @@ REQUIRED_SOURCE = (
 _REQUIRED = set(REQUIRED_SOURCE)
 _STEM = {name.rsplit(".", 1)[0]: name for name in REQUIRED_SOURCE if name.endswith((".csv", ".xlsx"))}
 
+_STEM["opportunity-reviews"] = "opportunity-reviews.xlsx"
+
 
 def _b64(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
@@ -123,7 +125,7 @@ def _target_for(name: str, mime: str) -> str | None:
         return None
     if mime == SHEET:
         return _STEM.get(name)
-    if name in {"space-layouts.json", "selection-evidence.json"} or name in _REQUIRED or name.lower().endswith(".kmz"):
+    if name in {"space-layouts.json", "selection-evidence.json", "opportunity-reviews.xlsx"} or name in _REQUIRED or name.lower().endswith(".kmz"):
         return name
     return None
 
@@ -177,6 +179,8 @@ def fetch_source_folder(token: str, source_dir: Path | None = None) -> None:
         path = src / "kmz" / target if target.lower().endswith(".kmz") else src / target
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(blob)
+        if target == "opportunity-reviews.xlsx" and mime == SHEET:
+            path.with_suffix(".url").write_text(f"https://docs.google.com/spreadsheets/d/{file_id}/edit")
         print(f"Fetched {target}")
     print(f"Skipped {skipped} other files")
 

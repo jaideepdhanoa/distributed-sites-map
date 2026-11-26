@@ -528,7 +528,7 @@ export default function PipelineList({
             </button>
           );
         })}
-        {signedIn && <button className="paper-btn" type="button" aria-expanded={financeOpen} onClick={()=>setFinanceOpen(!financeOpen)}>Financial filters</button>}
+        {signedIn && <button className="paper-btn" type="button" aria-expanded={financeOpen} onClick={()=>setFinanceOpen(!financeOpen)}>Filter by financials</button>}
         {signedIn && financeOpen && <FinanceFilters deals={rows.map(r=>r.deal)} evidence={finEvidence} carry={finCarry} setEvidence={setFinEvidence} setCarry={setFinCarry}/>}
         <ColumnPicker
           resetLabel="Pipeline default"

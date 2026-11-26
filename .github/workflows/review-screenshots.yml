@@ -10,7 +10,12 @@ on:
       - components/MapSitePreview.tsx
       - lib/mutedStyle.ts
       - e2e/map-journey.spec.ts
-      - e2e/layout-options.spec.ts e2e/selection-review.spec.ts
+      - e2e/layout-options.spec.ts
+      - e2e/selection-review.spec.ts
+      - app/selection-review/**
+      - lib/selection/**
+      - lib/api/handlers/data/selection-review.ts
+      - scripts/selection_inputs.py
       - components/spaces/**
   workflow_dispatch:
 

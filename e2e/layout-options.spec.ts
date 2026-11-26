@@ -109,6 +109,7 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   await expect(result).toHaveCount(0);
   await fit.selectOption("measure");
   await expect(result).toBeVisible();
+  await expect(work).toContainText("1 space across 1 site");
   await result.click();
   await expect(work).toContainText("Analysis proposal");
   await expect(work).toContainText("Stall fit unresolved");

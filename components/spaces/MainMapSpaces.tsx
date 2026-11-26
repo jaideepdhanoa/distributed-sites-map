@@ -206,6 +206,7 @@ export default function MainMapSpaces({
     if(!zones.length) return [];
     return [zones.length===candidates(s).length ? s : {...s,zones}];
   }),[scoped,needle,fitCheck]);
+  const footprintCount = list.reduce((total, record) => total + candidates(record).length, 0);
   const visible=useMemo(()=>{
     if(!open) return (catalog?.sites||[]).filter(s=>s.id!==previewSite && s.cohort==="active" && (!market||market==="all"||s.market===market));
     return site ? [...list.filter(s=>s.id!==site.id),site] : list;
@@ -503,7 +504,7 @@ export default function MainMapSpaces({
                   onChange={(e) => setSearch(e.target.value)}
                 />
                 <p>
-                  {list.reduce((n, s) => n + candidates(s).length, 0)} spaces across {list.length} sites
+                  {footprintCount} {footprintCount === 1 ? "space" : "spaces"} across {list.length} {list.length === 1 ? "site" : "sites"}
                 </p>
                 <div className="space-map-list">
                   {list.map((s) => (

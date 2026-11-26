@@ -1521,8 +1521,12 @@ export default function MapView(props: Props) {
       const gridData = {
         type: "FeatureCollection" as const,
         features: (props.gridFeatures || []).filter(f => f.geometry).map(f => {
-          const name = f.properties.kind === "line" ? "High-voltage line" : "Substation";
-          const distance = String(f.properties.label || "").match(/([\d,.]+\s*(?:mi|ft))\s*$/i)?.[1];
+          const raw = String(f.properties.label || "");
+          const distance = raw.match(/([\d,.]+\s*(?:mi|ft))\s*$/i)?.[1];
+          const station = raw.split("·")[0].trim();
+          const name = f.properties.kind === "line" ? "High-voltage line"
+            : !station || /^substation$/i.test(station) ? "Substation"
+            : /substation/i.test(station) ? station : station+" substation";
           return {...f, properties:{...f.properties, map_label:distance ? name+" · "+distance+" away" : name}};
         }),
       };

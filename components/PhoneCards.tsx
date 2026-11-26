@@ -9,6 +9,7 @@ export type PhoneCard = {
   stageNote?: string;
   tone?: string;
   action?: string;
+  actionLabel?: string;
   facts: string[];
   chips?: ReactNode;
   selected?: boolean;
@@ -32,7 +33,7 @@ export function PhoneCards({ rows, commonStage }: { rows: PhoneCard[]; commonSta
                 {!commonStage && <ChipFace className={`stage-pill tone-${row.tone || "pine"}`} testId="stage-chip" label={row.stage} detail={row.stageNote} />}
                 {row.chips}
               </span>}
-              {row.action && <span className="mobile-next-action"><b>Next</b> {row.action}</span>}
+              {row.action && <span className="mobile-next-action"><b>{row.actionLabel || "Next"}</b> {row.action}</span>}
               {facts.length ? (
                 <span className="phone-card-meta">
                   {facts.map((fact, index) => (

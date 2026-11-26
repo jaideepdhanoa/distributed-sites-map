@@ -600,7 +600,8 @@ export default function PipelineList({
               stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
-              action: signedIn ? plainNextStep(row.deal.next_step || "").line || undefined : undefined,
+              actionLabel: signedIn ? row.deal.charging?.merit.action : undefined,
+              action: signedIn ? row.deal.charging?.merit.next || plainNextStep(row.deal.next_step || "").line || undefined : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
                 if (row.deal.next_step && signedIn) return null;

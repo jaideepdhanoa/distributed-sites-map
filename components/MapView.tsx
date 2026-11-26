@@ -11,7 +11,8 @@ import { CLUSTER_SOURCE, PHONE_BUBBLE_PX, PIN_SPLIT_ZOOM, clusterBubbleLabel, co
 import { mutedPositronStyle } from "@/lib/mutedStyle";
 import { AREA_TIP_DWELL_MS, placeReadableTip, type TipBox } from "@/lib/tipPlace";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
-import { depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBounds } from "@/lib/depotRings";
+import { formatMarket, marketColor, type MarketMetric, type MarketRow } from "@/lib/marketContext";
+import { ringLine, depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBounds } from "@/lib/depotRings";
 import type { MapArea } from "@/lib/geoFilter";
 import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/lib/types";
 import type { GroundBox } from "@/lib/spaces/measure";
@@ -68,7 +69,9 @@ type Props = {
   shortlistPoints: { city: string; point: [number, number] }[];
   area?: MapArea | null;
   onArea?: (area: MapArea | null) => void;
-  overlayPoints?: { label: string; coordinates: [number, number] }[];
+  marketMetric: MarketMetric | null;
+  marketRows: MarketRow[];
+  washRing: {point: [number,number]; miles: 1 | 3} | null;
   washPoints?: NearbyWash[];
   gridFeatures?: GeoFeature[];
   onRingsOutside?: (outside: boolean) => void;
@@ -358,12 +361,13 @@ export default function MapView(props: Props) {
           sites: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           offmarket: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           deals: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-          pins: { type: "geojson", data: { type: "FeatureCollection", features: [] }, ...CLUSTER_SOURCE },
+          pins: { type: "geojson", data: { type: "FeatureCollection", features: [] }, ...CLUSTER_SOURCE, clusterProperties: { readings: ["+", ["coalesce", ["get", "has_reading"], 0]] } },
           "focus-pin": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "deal-labels": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           unscreened: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           depots: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           rings: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          "wash-radius": {type:"geojson", data:{type:"FeatureCollection",features:[]}},
           washes: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           measure: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           "review-ring": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -683,6 +687,7 @@ export default function MapView(props: Props) {
             },
             paint: { "text-color": "#f7f3ea", "text-halo-color": "#1c1914", "text-halo-width": 2 },
           },
+          { id:"wash-radius",type:"line",source:"wash-radius",paint:{"line-color":"#176c70","line-width":2,"line-dasharray":[4,2]} },
           {
             id: "nearby-washes",
             type: "circle",
@@ -716,7 +721,7 @@ export default function MapView(props: Props) {
             type: "symbol",
             source: "pins",
             maxzoom: PIN_SPLIT_ZOOM,
-            filter: ["!", ["has", "point_count"]],
+            filter: ["all", ["!", ["has", "point_count"]], ["!", ["has", "market_color"]]],
             layout: {
               "icon-image": [
                 "case",
@@ -743,6 +748,7 @@ export default function MapView(props: Props) {
           },
           {
             id: "focus-pin",
+            filter: ["!",["has","market_color"]],
             type: "symbol",
             source: "focus-pin",
             maxzoom: PIN_SPLIT_ZOOM,
@@ -1035,6 +1041,13 @@ export default function MapView(props: Props) {
         current.onSelect(id);
       };
       propsRef.current.nearbyPicker.current = pickPin;
+      const pickMarket = (event: MapLayerMouseEvent) => {
+        if (measureRef.current || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
+        const id = event.features?.[0]?.properties?.site_id;
+        if (typeof id === "string") pickPin(id);
+      };
+      map.on("click", "market-readings", pickMarket);
+      map.on("click", "market-selected", pickMarket);
       map.on("click", "pin-singles", (event: MapLayerMouseEvent) => {
         if (measureRef.current || event.originalEvent.defaultPrevented || propsRef.current.spaceDrawing || groupAt(event.point) != null) return;
         const props = event.features?.[0]?.properties;
@@ -1458,15 +1471,18 @@ export default function MapView(props: Props) {
         ...feature,
         properties: { ...publicDeal(feature.properties), pin_kind: "deal" },
       }));
-      (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: siteFeatures });
-      (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: offFeatures });
-      (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: dealFeatures });
+      const metric = props.marketMetric;
+      (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: metric ? [] : siteFeatures });
+      (map.getSource("offmarket") as GeoJSONSource).setData({ type: "FeatureCollection", features: metric ? [] : offFeatures });
+      (map.getSource("deals") as GeoJSONSource).setData({ type: "FeatureCollection", features: metric ? [] : dealFeatures });
       const groupedSelection = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
-      const counted = countedPins({
-        group: props.groupPins === "sites" ? "sites" : "deals",
-        sites: siteFeatures,
-        offMarket: offFeatures,
-        deals: dealFeatures,
+      const counted = metric ? props.marketRows.map(row => {
+        const value = row.evidence[metric];
+        return {type:"Feature" as const, geometry:{type:"Point" as const,coordinates:row.point}, properties:{
+          site_id:row.id, market_label:formatMarket(value,metric), market_color:marketColor(metric,value), has_reading:value == null ? 0 : 1,
+        }};
+      }) : countedPins({
+        group: props.groupPins === "sites" ? "sites" : "deals", sites: siteFeatures, offMarket: offFeatures, deals: dealFeatures,
       });
       const split = takeSolo(counted, groupedSelection ? null : props.selectedId);
       (map.getSource("pins") as GeoJSONSource).setData({ type: "FeatureCollection", features: split.grouped });
@@ -1507,22 +1523,11 @@ export default function MapView(props: Props) {
       }
       const labelData = {
         type: "FeatureCollection" as const,
-        features: dealLabelFeatures(props.deals, props.pinLabel ?? "asking"),
+        features: metric ? [] : dealLabelFeatures(props.deals, props.pinLabel ?? "asking"),
       };
       const labelSource = map.getSource("deal-labels") as GeoJSONSource | undefined;
       if (labelSource) labelSource.setData(labelData);
       else map.addSource("deal-labels", { type: "geojson", data: labelData });
-      const overlayData = {
-        type: "FeatureCollection" as const,
-        features: (props.overlayPoints || []).map((point) => ({
-          type: "Feature" as const,
-          properties: { label: point.label },
-          geometry: { type: "Point" as const, coordinates: point.coordinates },
-        })),
-      };
-      const overlaySource = map.getSource("overlays") as GeoJSONSource | undefined;
-      if (overlaySource) overlaySource.setData(overlayData);
-      else map.addSource("overlays", { type: "geojson", data: overlayData });
       const gridData = {
         type: "FeatureCollection" as const,
         features: (props.gridFeatures || []).filter((feature) => feature.geometry),
@@ -1583,23 +1588,28 @@ export default function MapView(props: Props) {
           paint: { "text-color": "#1d4e89", "text-halo-color": "#f7f4ee", "text-halo-width": 3 },
         });
       }
-      if (!map.getLayer("overlay-labels")) {
-        map.addLayer({
-          id: "overlay-labels",
-          type: "symbol",
-          source: "overlays",
-          layout: {
-            "text-field": ["get", "label"],
-            "text-font": ["Noto Sans Regular"],
-            "text-size": 11,
-            "text-offset": [0, -1.8],
-            "text-anchor": "bottom",
-            "text-allow-overlap": false,
-            "text-optional": true,
-          },
-          paint: { "text-color": "#1e4636", "text-halo-color": "#f4fff6", "text-halo-width": 6 },
+      for (const [id, source] of [["market-readings", "pins"], ["market-selected", "focus-pin"]]) {
+        if (!map.getLayer(id)) map.addLayer({
+          id, source, type:"circle", filter:["has","market_color"],
+          paint:{"circle-color":["get","market_color"], "circle-radius": id === "market-selected" ? 11 : 8,
+            "circle-stroke-width":id === "market-selected" ? 4 : 2, "circle-stroke-color":id === "market-selected" ? "#173f35" : "#fffdf8"},
         });
+        map.moveLayer(id);
       }
+      if (!map.getLayer("market-labels")) map.addLayer({
+        id:"market-labels", type:"symbol", source:"pins", minzoom:PIN_SPLIT_ZOOM, filter:["has","market_label"],
+        layout:{"text-field":["get","market_label"], "text-font":["Noto Sans Regular"], "text-offset":[0,-1.1], "text-anchor":"bottom", "text-size":12},
+        paint:{"text-color":"#173f35","text-halo-color":"#fffdf8","text-halo-width":2},
+      });
+      map.moveLayer("market-labels");
+      map.setLayoutProperty("cluster-count","text-field",metric
+        ? ["concat",["to-string",["get","readings"]],"/",["to-string",["get","point_count"]]]
+        : ["get","point_count_abbreviated"]);
+
+      const ring = props.washRing;
+      (map.getSource("wash-radius") as GeoJSONSource).setData({type:"FeatureCollection",features:ring ? [
+        {type:"Feature",properties:{},geometry:{type:"LineString",coordinates:ringLine(...ring.point,ring.miles)}},
+      ] : []});
       if (!map.getLayer("deal-pills")) {
         map.addLayer({
           id: "deal-pills",
@@ -1617,7 +1627,7 @@ export default function MapView(props: Props) {
           paint: { "text-color": "#1C1914", "text-halo-color": "#F7EAD2", "text-halo-width": 10 },
         });
       }
-      (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: (props.unscreened || []).filter((f) => f.geometry) });
+      (map.getSource("unscreened") as GeoJSONSource).setData({ type: "FeatureCollection", features: metric ? [] : (props.unscreened || []).filter((f) => f.geometry) });
       (map.getSource("areas") as GeoJSONSource).setData({ type: "FeatureCollection", features: presentAreas(props.areas) });
       (map.getSource("depots") as GeoJSONSource).setData({ type: "FeatureCollection", features: props.depots });
       (map.getSource("rings") as GeoJSONSource).setData({ type: "FeatureCollection", features: depotRingFeatures(props.depots) });
@@ -1643,7 +1653,6 @@ export default function MapView(props: Props) {
       if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
-      map.resize();
       if (propsRef.current.spacesOpen) return;
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
@@ -1702,13 +1711,14 @@ export default function MapView(props: Props) {
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
       }
     };
-    if (map.isStyleLoaded()) push();
-    else map.once("load", push);
+    // Source updates can temporarily clear isStyleLoaded after the one-time load event.
+    // Apply changes as soon as the required sources exist.
+    push();
     return () => {
       cancel = true;
-      map.off("load", push);
+      map.off("idle", push);
     };
-  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.shortlistPoints, props.fitAll, props.scopeOpen, props.preserveCamera, props.mapScope, props.previewName, props.overlayPoints, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
+  }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.shortlistPoints, props.fitAll, props.scopeOpen, props.preserveCamera, props.mapScope, props.previewName, props.marketMetric, props.marketRows, props.washRing, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1803,27 +1813,31 @@ export default function MapView(props: Props) {
     };
   }, [mapGeneration, props.showRings, props.depots]);
 
+  const availableByMarket = new globalThis.Map<string,number>();
+  if (props.marketMetric) for (const row of props.marketRows) {
+    if (row.evidence[props.marketMetric] != null) availableByMarket.set(row.city,(availableByMarket.get(row.city) || 0)+1);
+  }
   const markets = new globalThis.Map<string, { count: number; lng: number; lat: number }>();
   for (const { city, point } of props.fitAll ? props.shortlistPoints : []) {
     const row = markets.get(city) || { count: 0, lng: 0, lat: 0 };
     markets.set(city, { count: row.count + 1, lng: row.lng + point[0], lat: row.lat + point[1] });
   }
-  const marketKey = JSON.stringify(Array.from(markets, ([city, row]) => [city, row.count, row.lng / row.count, row.lat / row.count]));
+  const marketKey = JSON.stringify(Array.from(markets, ([city, row]) => [city, row.count, row.lng / row.count, row.lat / row.count, props.marketMetric ? availableByMarket.get(city) || 0 : null]));
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const rows = JSON.parse(marketKey) as [string, number, number, number][];
+    const rows = JSON.parse(marketKey) as [string, number, number, number, number | null][];
     const names: Record<string, string> = { PHX: "Phoenix", LAS: "Las Vegas", MIA: "Miami" };
-    const markers = rows.map(([city, count, lng, lat]) => {
+    const markers = rows.map(([city, count, lng, lat, available]) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "paper-btn market-marker";
       button.dataset.market = city;
       const name = names[city] || city || "Other markets";
-      button.setAttribute("aria-label", name + " · " + count.toLocaleString());
+      button.setAttribute("aria-label", name + " · " + (available == null ? count.toLocaleString() : available + " of " + count + " with data"));
       const total = document.createElement("span");
       total.className = "market-count";
-      total.textContent = count.toLocaleString();
+      total.textContent = available == null ? count.toLocaleString() : available + "/" + count;
       button.append(name, total);
       button.addEventListener("click", event => {
         event.stopPropagation();
@@ -1921,6 +1935,13 @@ export default function MapView(props: Props) {
       const pin = geometry.coordinates as [number, number];
       const extra = (propsRef.current.gridFeatures || []).flatMap((feature) => geometryCoords(feature.geometry));
       markCentered(map, props.selectedId || "", pin[0], pin[1]);
+      const wash = propsRef.current.washRing;
+      if (wash) {
+        const ring = ringLine(...wash.point,wash.miles);
+        const bounds = leafBounds(ring.map(coordinates=>({geometry:{type:"Point",coordinates}})));
+        if (bounds) fitMap(map,bounds,{padding:pointPadding(map),maxZoom:15,duration:0});
+        return;
+      }
       // This pin was selected on the visible map. Keep the geographic context while its evidence is open.
       if (props.previewName && pinOrigin.current?.id === props.selectedId) return;
       if (props.previewName || !extra.length) {
@@ -1952,7 +1973,7 @@ export default function MapView(props: Props) {
       cancel = true;
       map.off("idle", go);
     };
-  }, [mapGeneration, props.selectedId, props.previewName, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, gridToken]);
+  }, [mapGeneration, props.selectedId, props.previewName, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, props.washRing?.miles, gridToken]);
 
   useEffect(() => {
     const map = mapRef.current;

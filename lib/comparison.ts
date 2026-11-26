@@ -1,7 +1,8 @@
 import { purchaseLabels, purchaseRows } from "./purchaseReview";
+import { marketLabels, marketEvidence, marketComparisonRows } from "./marketContext";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress, shownPriceSource } from "@/lib/format";
-import { acresText, cashTile, comparisonPower, depotLine, factsForDeal, factsForSite, fullMoney, spareLandSqft, packageLine, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
+import { acresText, cashTile, comparisonPower, depotLine, factsForDeal, factsForSite, fullMoney, spareLandSqft, packageLine, powerSummary, sheetMoney } from "@/lib/keyNumbers";
 import { basisBadge } from "@/lib/pricing";
 import { stageDetail } from "@/lib/labels";
 import { serviceAreaLabel } from "@/lib/cardStatus";
@@ -12,10 +13,11 @@ export const MISSING = "—";
 type CompareRow = { label: string; value: string; key?: string | number | null; basis?: string; source?: string };
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
-export const compareSections = ["Power evidence", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
-export const acquisitionCriteria = [...purchaseLabels,"Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
+export const compareSections = ["Power evidence", "Market context", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
+export const acquisitionCriteria = [...purchaseLabels, "Traffic", "Washes within 1 mile", "Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
 
 function sectionFor(label: string): typeof compareSections[number] {
+  if (marketLabels.some(item=>item===label)) return "Market context";
   if (["On-site service", "Street-frontage hosting"].includes(label)) return "Power evidence";
   if (["Asking", "Land estimate", "Implied business price", "Asking / earnings", "Business-only multiple", "Savings versus hub", "Pricing", "County value (land + buildings)", "Asking / revenue", "Per acre"].includes(label)) return "Acquisition economics";
   if (["Address", "Property owner"].includes(label)) return "Record details";
@@ -50,9 +52,6 @@ function powerRows(deal?: DealProps, site?: SiteProps): CompareRow[] {
 export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean): CompareRow[] {
   const linked = sites.find((site) => site.site_id === deal.universe_id);
   const cash = cashTile(deal);
-  const trade = tradeAreaLines(deal);
-  const population = trade.find((line) => line.startsWith("3-mile population "));
-  const washes = trade.find((line) => line.startsWith("Washes "));
   const spare = spareLandSqft(deal.open_land_sqft, linked?.spare_ac_own, deal.open_land_basis);
   const cashBasis = basisBadge(deal.earnings_basis) || basisBadge(cash.basis);
   const cashValue = cash.hidden ? "" : deal.stated_cash_flow == null && !deal.stated_cash_flow_display ? (deal.figures_status === "withheld" ? cash.value : "") : [cash.value, cash.note, deal.earnings_period, cashBasis].filter(Boolean).join(" · ");
@@ -64,14 +63,12 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean)
     ...(deal.suggested_drop && deal.stage_group !== "dropped" ? [{ label: "Suggested drop", key: "Proposed", value: deal.suggested_drop }] : []),
     { label: "Asking", key: signedIn ? deal.asking_price ?? deal.asking_price_display : null, value: signedIn ? withEvidence(sheetMoney(deal.asking_price, deal.asking_price_display), shownPriceSource(deal)) : MISSING },
     { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
-    { label: "Traffic", key: deal.trade_aadt, value: shown(workbookTrafficLine(deal)) },
+    ...marketComparisonRows(marketEvidence(deal,linked)),
     { label: "Land", key: deal.land_acres, value: shown(acresText(deal.land_acres)) },
     { label: "Open land", value: spare.value },
     { label: "Land measurement", value: shown(spare.note) },
     ...(signedIn ? powerRows(deal, linked) : []),
     { label: "Power", value: powerSummary(factsForDeal(deal)) || "—" },
-    { label: "3-mile population", value: population ? population.replace("3-mile population ", "") : MISSING },
-    { label: "Washes", value: washes ? washes.replace(/^Washes /, "") : MISSING },
     { label: "Depot", value: depotLine(deal.miles_to_depot) },
     { label: "Zoning", value: shown(linked?.zoning) },
     { label: "Property owner", value: shown(linked?.owner) },
@@ -131,14 +128,12 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean)
     ...(signedIn && linked ? [{ label: "NDA", key: linked.nda_status || (linked.nda_id ? "Unknown" : "Not required"), value: ndaChip(linked) }] : []),
     { label: "Asking", key: signedIn ? site.asking_price ?? site.asking_price_display : null, value: signedIn ? withEvidence(sheetMoney(site.asking_price, site.asking_price_display), site.asking_price_source) : MISSING },
     { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
-    { label: "Traffic", key: site.aadt_count?.replaceAll(",", ""), value: shown(universeTrafficLine(site)) },
+    ...marketComparisonRows(marketEvidence(linked,site)),
     { label: "Land", key: site.parcel_acres ?? site.lot_ac, value: shown(acres) },
     { label: "Open land", value: spare.value },
     { label: "Land measurement", value: shown(spare.note) },
     ...(signedIn ? powerRows(linked, site) : []),
     { label: "Power", value: powerSummary(factsForSite(site, linked)) || "—" },
-    { label: "3-mile population", value: linked?.trade_population != null ? Math.round(linked.trade_population).toLocaleString() : MISSING },
-    { label: "Washes", value: linked && (linked.trade_washes_1mi != null || linked.trade_washes_3mi != null) ? [linked.trade_washes_1mi != null ? `${linked.trade_washes_1mi} within 1 mile` : "", linked.trade_washes_3mi != null ? `${linked.trade_washes_3mi} within 3 miles` : ""].filter(Boolean).join(" · ") : MISSING },
     { label: "Depot", value: depotLine(site.miles_to_depot) },
     { label: "Zoning", value: shown(site.zoning) },
     { label: "Property owner", value: shown(site.owner) },

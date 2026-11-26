@@ -17,13 +17,14 @@ const TABS = [
 type TabId = (typeof TABS)[number][0];
 
 function recordTab(panel: string | null): TabId {
-  return panel === "open-land" ? "numbers" : panel === "purchase" || panel === "economics" || panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
+  return panel === "market-context" ? "economics" : panel === "open-land" ? "numbers" : panel === "purchase" || panel === "economics" || panel === "discussion" || panel === "numbers" || panel === "activity" ? panel : "overview";
 }
 
 export default function PanelSections({
   overview,
   economics,
   purchase,
+  market,
   numbers,
   activity,
   discussion,
@@ -31,6 +32,7 @@ export default function PanelSections({
   purchase?: ReactNode;
   overview: ReactNode;
   economics: ReactNode;
+  market: ReactNode;
   numbers: ReactNode;
   activity: ReactNode;
   discussion: ReactNode;
@@ -43,13 +45,13 @@ export default function PanelSections({
   const measure = params.get("measure") || "";
   const tab = recordTab(panel);
   useEffect(() => {
-    if (panel !== "purchase" && panel !== "economics" && panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
+    if (panel !== "purchase" && panel !== "market-context" && panel !== "economics" && panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
     const scroller = node?.closest(".drawer-scroll");
     if (!node || !(scroller instanceof HTMLElement)) return;
     let frame = 0;
     const align = () => {
-      const evidence = panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
+      const evidence = panel === "market-context" ? "market-context" : panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
       const target = evidence ? node.querySelector<HTMLElement>(`[data-evidence="${CSS.escape(evidence)}"]`)
         : panel === "economics" && measure ? node.querySelector<HTMLElement>(`[data-financial-measure="${CSS.escape(measure)}"]`)
         : panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
@@ -87,7 +89,7 @@ export default function PanelSections({
       added.disconnect();
     };
   }, [site, panel, note, measure]);
-  const panels = { purchase:purchase || <p>Operating financials are not applicable to this record.</p>, economics, overview, numbers, activity, discussion };
+  const panels = { purchase:purchase || <p>Operating financials are not applicable to this record.</p>, economics: <>{market}{economics}</>, overview, numbers, activity, discussion };
   const intel = panel === "intel";
   return (
     <div className="panel-sections" ref={sections}>

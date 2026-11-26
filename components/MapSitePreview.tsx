@@ -8,7 +8,10 @@ import SpaceOptions from "./spaces/SpaceOptions";
 import FinancialsEntry from "./FinancialsEntry";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 
+import MarketEvidence, { type WashInspection } from "./MarketEvidence";
+
 type PreviewProps = {
+  marketMode?: boolean; washInspection?: WashInspection;
   site?: SiteProps | null;
   deal?: DealProps | null;
   listing?: UnscreenedProps | null;
@@ -46,6 +49,7 @@ export default function MapSitePreview(props: PreviewProps) {
       <h2 id="pin-preview-title" ref={titleRef} tabIndex={-1}>{record.name || address || id}</h2>
       {record.name && address && address !== record.name && <p className="preview-address">{address}</p>}
       {deal?.universe_id && <p className="preview-address">Linked to a census site</p>}
+      {props.marketMode && !listing && <MarketEvidence deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
       <dl className="preview-facts">
         {fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}
         <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>

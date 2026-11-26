@@ -60,3 +60,33 @@ test("released selection review joins uniquely and serves active rows", async ({
   await page.goto("/selection-review");
   await expect(page.getByText(rows.length+" of "+rows.length+" active sites")).toBeVisible();
 });
+
+test("commercial diligence order, alternate routes and archived reviews", async ({page}, info) => {
+  const primary = {route:"Operating acquisition", disposition:"Shortlist", rank:1, rationale:"The seller offered the operating premises.",
+    next:"Measure the north aisle during peak use.", reviewedOn:"2026-01-01", owner:null, revisitOn:null, evidence:"https://example.org/record", offering:null};
+  const review = {name:"Example operating site",primary,alternatives:[]};
+  const hold = {...primary,route:"Offered acquisition",disposition:"Close offering",rank:null,next:"Reopen on written parking rights."};
+  const closed = {name:"Example leased site",primary:hold,alternatives:[{...hold,route:"Host agreement",disposition:"Conditional"}]};
+  const row = {city:"LAS",mapped:false,stage:"Desk screen",priority:"Check space",section:"Operating",option:"Layout pending",geometry:"Walk the aisle",financeVisible:true};
+  await page.route("**/api/data/selection-review",route=>route.fulfill({json:{mismatches:0,hasInputs:true,
+    rows:[{...row,id:"PIPE-LAS-9002",name:closed.name,review:closed},{...row,id:"PIPE-LAS-9001",name:review.name,review}],
+    filed:[{id:"PIPE-LAS-9003",city:"LAS",stage:"Dropped",review:{...closed,name:"Archived example"}}]}}));
+  await page.goto("/selection-review?scope=PIPE-LAS-9002%7CPIPE-LAS-9001");
+  await expect(page.locator(".space-review-results > li").first()).toContainText("Example operating site");
+  await expect(page.getByText("Measure the north aisle during peak use.")).toBeVisible();
+  await page.getByRole("button",{name:"Show all active sites"}).click();
+  await page.getByLabel("Commercial decision").selectOption("Close offering");
+  await expect(page.getByText("1 of 2 active sites")).toBeVisible();
+  await page.getByText("Decision evidence and alternative routes").first().click();
+  await expect(page.getByRole("heading",{name:"Host agreement · Conditional"}).first()).toBeVisible();
+  await page.getByText("Filed reviews outside the active list (1)").click();
+  await expect(page.getByRole("heading",{name:"Archived example"})).toBeVisible();
+  expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
+  await page.getByLabel("Commercial decision").selectOption("Conditional");
+  await expect(page.getByRole("heading",{name:"Conditional",exact:true}).first()).toBeVisible();
+  await page.getByText("Route, charging and screening filters").click();
+  await page.getByLabel("Transaction route").selectOption("Host agreement");
+  await expect(page.getByText("1 of 2 active sites")).toBeVisible();
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:"review-shots/"+info.project.name+"-opportunities.png",animations:"disabled"});
+});

@@ -6,9 +6,10 @@ export type Inputs = {
 };
 
 export type SelectionRow = {
-  id: string; name: string; city: string; mapped: boolean; stage: string; mirrorStage: string;
+  id: string; name: string; city: string; mapped: boolean; hasRecord?: boolean; stage: string; mirrorStage: string;
   priority: string; instruction: string; geometry: string; section: string; amount: number | null;
   charging?: import("../charging/summary").ChargingSummary;
+  review?: import("./opportunity").OpportunitySite;
   research?: import("./research").SelectionResearch;
   readiness: string; financeVisible: boolean; option: string; evidenceDate: string; assessed: boolean; quickLube: boolean;
 };

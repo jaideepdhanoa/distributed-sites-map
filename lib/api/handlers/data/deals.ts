@@ -8,6 +8,7 @@ import { triage } from "@/lib/spaces/triage";
 import { screenSummary, type Inputs } from "@/lib/selection/screen";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
+import { opportunityRegister } from "@/lib/selection/opportunityLoad";
 import { selectionResearch } from "@/lib/selection/researchLoad";
 import { purchaseFile } from "@/lib/purchaseReviewLoad";
 import { selectedCases,sourceRevision } from "@/lib/charging/source";
@@ -44,6 +45,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
   const purchase = includePurchase && canReadFinancials(role) ? purchaseFile() : null;
   const allowed = includePurchase && canReadFinancials(role);
   const saved = allowed ? await selectedCases() : null;
+  const reviews = allowed ? opportunityRegister()?.sites : undefined;
   const research = allowed ? selectionResearch() : null;
   const captured = allowed && actionsEnabled() ? await withSql(async sql => {
     const result = await sql.query<{site_id:string}>("SELECT DISTINCT site_id FROM pnl_lines WHERE deleted_at IS NULL AND amount IS NOT NULL AND updated_by <> 'fixture'");
@@ -73,8 +75,11 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     const screening = active && (row || selection?.[d.deal_id]) ? screenSummary(d.city,selection?.[d.deal_id],view,d) : undefined;
     if (!allowed) return {...feature, properties:{...d,screening}};
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
-    const record:DealProps={...d,screening,statementCoverage,selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    const record:DealProps={...d,screening,statementCoverage,opportunityReview:reviews?.[d.deal_id],selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})};
+    if (active && !/^dropped/i.test(d.stage || "") && record.opportunityReview?.primary.disposition === "Suggest drop") {
+      record.suggested_drop = record.opportunityReview.primary.rationale;
+    }
     if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record),saved?.get(d.deal_id));
     return {...feature,properties:record};
   });

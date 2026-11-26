@@ -2,6 +2,7 @@ import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
+import OpportunityReview from "./OpportunityReview";
 import FinancialsEntry from "./FinancialsEntry";
 import { screeningEvidence } from "@/lib/screeningEvidence";
 import { financialsCard } from "@/lib/pnl/cue";
@@ -42,6 +43,7 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   return (
     <section className="record-brief" aria-label="Screening decision">
       <div className="brief-decision"><span>{input.deal ? "Pipeline stage" : "Screening status"}</span><h3>{status}</h3></div>
+      {input.signedIn && input.deal?.opportunityReview && <OpportunityReview review={input.deal.opportunityReview}/>}
       {reason && reason !== status && <p>{reason}</p>}
       <dl>
         <div><dt>{origin}</dt><dd>{evidence?.kind === "county"

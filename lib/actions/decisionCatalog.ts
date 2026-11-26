@@ -54,7 +54,7 @@ export function decisionCatalog(sites: SiteProps[], deals: DealProps[]) {
     const label = evidenceMeasures[c.measure];
     const row = rows.find(r => r.label === label);
     const target = evidenceTarget(c.targetKind, c.targetId, label, deal)!;
-    let source = "";
+    let source = row?.source || "";
     switch (c.measure) {
       case "power": source = (site ? factsForSite(site, deal) : factsForDeal(deal)).map(f => f.basis).filter(Boolean).join(" · "); break;
       case "asking": source = (site || deal)?.asking_price_source || ""; break;

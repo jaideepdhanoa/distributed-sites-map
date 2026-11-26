@@ -86,3 +86,32 @@ test("coverage distinguishes zero, fully missing, unavailable and inapplicable m
   assert.equal(row("Unavailable", "—").allMissing, false);
   assert.equal(row("Checking…", "Unavailable", "Not applicable").missing, 0);
 });
+
+test("power citations keep street hosting, service readings and their sources independent", async () => {
+  const { decisionCatalog } = await import("../../lib/actions/decisionCatalog");
+  const { evidenceTarget } = await import("../../lib/actions/comparisonEvidence");
+  const curb = deal({ deal_id:"curb", cap_b_frontage:0, cap_b_source:"Utility map", cap_b_as_of:"2030-04-01", cap_b_confidence:"Estimated" });
+  const service = deal({ deal_id:"service", cap_b_nearby:2.1, cap_c_phase:"2 MW will-serve", cap_c_confidence:"Verified", cap_c_source:"Utility letter" });
+  const rows = compare(curb,service);
+  assert.deepEqual(rows.get("On-site service")?.values, ["—","2 MW · Utility letter · Verified"]);
+  assert.deepEqual(rows.get("Street-frontage hosting")?.values, ["0 MW · Utility map · Estimated · 2030-04-01","—"]);
+  const catalog = decisionCatalog([], [curb,service]);
+  const cite = evidenceTarget("deal","curb","Street-frontage hosting")!;
+  assert.equal(catalog.figure(cite)?.source,"Utility map · Estimated · 2030-04-01");
+  assert.equal(catalog.figure(evidenceTarget("deal","curb","On-site service")!)?.value, "—");
+  assert.ok(catalog.figure(evidenceTarget("deal","curb","Power")!));
+  assert.ok(!compare(curb,service,false).has("On-site service"));
+});
+
+test("acquisition pricing preserves the actual earnings definition, dates, zero and missing estimates", async () => {
+  const a = deal({ asking_price:500, land_estimate:300, business_value:200, earnings_multiple_which:"EBITDA",
+    earnings_period:"FY 2030", business_multiple:2, business_multiple_display:"2.0x", saving_vs_hub:"0%" });
+  const b = deal({ earnings_multiple_which:"SDE", cash_flow_label:"SDE", business_multiple:2, business_multiple_display:"2.0x" });
+  const rows = compare(a,b);
+  assert.deepEqual(rows.get("Implied business price")?.values,["$200","—"]);
+  assert.deepEqual(rows.get("Savings versus hub")?.values,["0%","—"]);
+  assert.match(rows.get("Business-only multiple")!.values[0], /2.0x · EBITDA · FY 2030/);
+  assert.equal(rows.get("Business-only multiple")?.kind,"basis");
+  assert.equal(compare(a, deal({business_value_display:"Land covers asking"})).get("Implied business price")?.values[1], "Land covers asking");
+  assert.ok(!compare(a,b,false).has("Savings versus hub"));
+});

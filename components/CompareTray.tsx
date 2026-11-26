@@ -41,8 +41,9 @@ export default function CompareTray({
   evidenceEnabled?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [sectionFilter, setSectionFilter] = useState("");
   const [highlight, setHighlight] = useState(true);
-  const [gap,setGap] = useState<{target:EvidenceTarget;title:string;label:string} | null>(null);
+  const [gap,setGap] = useState<{target:EvidenceTarget;title:string;label:string;context?:string} | null>(null);
   const lookup = contextSites || sites;
   const count = deals.length + sites.length;
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -76,8 +77,8 @@ export default function CompareTray({
     };
   }, [hasMatrix]);
   const columns = [
-    ...deals.map(deal => ({ id: deal.deal_id, targetKind:"deal" as const, deal, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
-    ...sites.map(site => ({ id: site.site_id, targetKind:"site" as const, deal:(contextDeals || deals).find(d=>d.deal_id===site.linked_deal_id || d.universe_id===site.site_id), title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
+    ...deals.map(deal => ({ id: deal.deal_id, followUps: deal.kind !== "land" && deal.stage_group !== "dropped", targetKind:"deal" as const, deal, title: deal.name || displayAddress(deal.address) || deal.deal_id, rows: dealRows(deal, lookup, signedIn) })),
+    ...sites.map(site => ({ id: site.site_id, followUps: !site.land_only, targetKind:"site" as const, deal:(contextDeals || deals).find(d=>d.deal_id===site.linked_deal_id || d.universe_id===site.site_id), title: site.name || displayAddress(site.address) || site.site_id, rows: siteRows(site, contextDeals || deals, signedIn) })),
   ];
   const statementIds = signedIn && hasMatrix ? [...new Set(columns.flatMap(c => c.deal && showsFinancials(c.deal) ? [c.deal.deal_id] : []))].sort().join("|") : "";
   const statements = useComparisonStatements(statementIds);
@@ -117,34 +118,50 @@ export default function CompareTray({
     column.rows.push({label:"Open evidence gaps",key:count,value});
   }
   const measures = comparisonMeasures(columns);
-  const differences = measures.filter(row => row.kind === "different").length;
-  const gaps = measures.filter(row => row.label !== "Suggested drop" && row.missing > 0);
+  const decisionMeasures = measures.filter(row => row.label !== "Power" || !signedIn);
+  const differences = decisionMeasures.filter(row => row.kind === "different").length;
+  const gaps = decisionMeasures.filter(row => row.label !== "Suggested drop" && row.missing > 0);
   const allMissing = gaps.filter(row => row.allMissing);
-  const basis = measures.filter(row => row.kind === "basis").length;
-  const visible = showAll ? measures : measures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || ["different", "gap", "basis"].includes(row.kind));
+  const basis = decisionMeasures.filter(row => row.kind === "basis").length;
+  const visible = showAll ? measures : decisionMeasures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || ["different", "gap", "basis"].includes(row.kind));
+
+  const sections = compareSections.filter(section => visible.some(row => row.section === section));
+  const selectedSection = sections.find(section => section === sectionFilter) || "";
 
   function renderCell(column: typeof columns[number], label: string, kind: string, value: string) {
+    const row = column.rows.find(row => row.label === label);
+    const canFollowUp = column.followUps && column.deal?.kind !== "land" && column.deal?.stage_group !== "dropped";
     const statement = options.get(column.id+"|"+label);
     if (statement && value === "Unavailable") return <button type="button" className="text-link" onClick={statements.retry}>Retry statement</button>;
     if (statement && !["Not applicable","Checking…",MISSING].includes(value)) return <button type="button" className="text-link compare-evidence"
       onClick={()=>openStatement(statement)}>{statement.value}<small>{[statement.period,statement.basis,statement.source].join(" · ")}</small></button>;
     if (value === MISSING) {
-      const target = evidenceEnabled && (statement || evidenceTarget(column.targetKind, column.id, label, column.deal));
+      const target = evidenceEnabled && canFollowUp && (statement || evidenceTarget(column.targetKind, column.id, label, column.deal));
       if (!target) return label === "Suggested drop" ? "None recorded" : "Not on file";
-      return <button className="text-link compare-evidence" type="button"
-        aria-label={`Not on file · Check missing ${label} for ${column.title}`}
+      return <>{label === "On-site service" && <strong className="comparison-unconfirmed">Unconfirmed</strong>}<button className="text-link compare-evidence" type="button"
+        aria-label={label === "On-site service" ? `Check on-site service for ${column.title}` : `Not on file · Check missing ${label} for ${column.title}`}
         onClick={event => {
           inspectedCell.current = event.currentTarget;
           setGap({target, title:column.title, label});
-        }}>Not on file</button>;
+        }}>{label === "On-site service" ? "Check on-site service" : "Not on file"}</button></>;
     }
     if (!onInspect || kind === "detail" || ["Unavailable", "Checking…", "Not applicable"].includes(value)) return value;
-    return <button className="text-link compare-evidence" type="button"
+    const pieces = value.split(" · ");
+    const power = label === "On-site service" || label === "Street-frontage hosting";
+    const primary = power ? String(row?.key || value) : pieces[0];
+    const detail = power ? [row?.basis === "Partial" && "Partial service record", row?.source || "Source not recorded"].filter(Boolean).join(" · ") : pieces.slice(1).join(" · ");
+    const request = label === "On-site service" && row?.basis !== "Verified" && evidenceEnabled && canFollowUp &&
+      evidenceTarget(column.targetKind, column.id, label, column.deal);
+    return <><button className="text-link compare-evidence compare-reading" type="button"
       aria-label={`${value} · Inspect ${label} for ${column.title}`}
       onClick={event => {
         inspectedCell.current = event.currentTarget;
         onInspect(column.id, label);
-      }}>{value}</button>;
+      }}><strong>{primary}</strong>{detail && <small>{detail}</small>}</button>
+      {request && <button type="button" className="text-link compare-evidence" onClick={event => {
+        inspectedCell.current = event.currentTarget;
+        setGap({target:request, title:column.title, label, context:value});
+      }}>Check on-site service</button>}</>;
   }
 
   return (
@@ -173,13 +190,17 @@ export default function CompareTray({
             if (statement) return [{...statement,siteName:column.title}];
             const target = evidenceTarget(column.targetKind, column.id, row.label, column.deal);
             return target
-              ? [{ ...target, value: row.value, siteName: column.title, ...(["revenue","cash_flow","ebitda"].includes(target.measure) ? {source:column.deal?.figures_source || "Deal record"} : {}) }] : [];
+              ? [{ ...target, value: row.value, siteName: column.title, source: row.source || "", ...(["revenue","cash_flow","ebitda"].includes(target.measure) ? {source:column.deal?.figures_source || "Deal record"} : {}) }] : [];
           }))} />}
       </div>
       {count >= 2 ? (
         <>
           <div className="comparison-mode">
-            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "measure has" : "measures have"} missing figures{allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}{gaps.some(row => row.partial) && ` · ${gaps.filter(row => row.partial).length} partly recorded`}{basis > 0 && ` · ${basis} with different bases`}</span>
+            <span role="status">{differences} {differences === 1 ? "decision difference" : "decision differences"} · {gaps.length} {gaps.length === 1 ? "evidence gap" : "evidence gaps"}{basis > 0 && ` · ${basis} with different bases`}{showAll && allMissing.length > 0 && ` · ${allMissing.length} missing for every applicable site`}</span>
+            <select className="secondary" aria-label="Comparison section" value={selectedSection} onChange={event => {
+              setSectionFilter(event.target.value);
+              matrixRef.current?.scrollTo({top:0});
+            }}><option value="">All sections</option>{sections.map(section => <option key={section}>{section}</option>)}</select>
             {coverage?.query === gapQuery && coverage.counts === null && <button type="button" className="text-link" onClick={()=>setRefresh(n=>n+1)}>Retry gap counts</button>}
             <label className="act-check"><input type="checkbox" className="check" checked={highlight} onChange={e=>setHighlight(e.target.checked)} />Highlight differences</label>
             <button type="button" className="text-link" onClick={()=>{
@@ -208,18 +229,22 @@ export default function CompareTray({
             <table className="comparison-table" data-highlight={highlight} data-sites={columns.length}>
               <caption className="sr">Site comparison</caption>
               <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
-              {compareSections.map(section => {
+              {sections.filter(section => !selectedSection || selectedSection === section).map(section => {
                 const group = visible.filter(row => row.section === section);
+                const order = section === "Acquisition economics" ? ["Asking","Land estimate","Implied business price","Asking / earnings","Business-only multiple","Savings versus hub"] : section === "Financials" ? ["Revenue","Statement revenue","Cash flow","Statement SDE","EBITDA","Statement EBITDA"] : [];
+                const rank = (label:string) => order.includes(label) ? order.indexOf(label) : order.length;
+                group.sort((a,b) => rank(a.label) - rank(b.label));
                 if (!group.length) return null;
                 return (
                   <tbody key={section} aria-label={section}>
                     <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
                     {group.map(({ label, values, kind, available, partial, allMissing }) => (
                       <tr key={label} data-compare-row={label} data-state={kind}>
-                        <th scope="row">{label}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
+                        <th scope="row">{label}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>Figures use different measures, periods or bases</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
                             {renderCell(columns[i], label, kind, value)}
+                            {label === "Cash flow" && value !== MISSING && value !== "Not applicable" && columns[i].deal?.figures_source && <small className="comparison-source">{columns[i].deal?.figures_source}</small>}
                           </td>
                         ))}
                       </tr>
@@ -241,7 +266,7 @@ export default function CompareTray({
         : opened && <ComparisonEvidence target={opened} title={openColumn?.title || opened.targetId}
           context="The cited statement line is unavailable. Check the supporting document."
           saved={()=>setRefresh(n=>n+1)} close={()=>setOpened(null)} inspect={note=>{setOpened(null);onInspect?.(opened.targetId,evidenceMeasures[opened.measure],new URLSearchParams({panel:"discussion",note}));}} />}
-      {gap && <ComparisonEvidence target={gap.target} title={gap.title} close={()=>{setGap(null); requestAnimationFrame(()=>inspectedCell.current?.focus({preventScroll:true}));}} saved={()=>setRefresh(n=>n+1)}
+      {gap && <ComparisonEvidence target={gap.target} title={gap.title} context={gap.context} close={()=>{setGap(null); requestAnimationFrame(()=>inspectedCell.current?.focus({preventScroll:true}));}} saved={()=>setRefresh(n=>n+1)}
         inspect={note=>{setGap(null);onInspect?.(gap.target.targetId,gap.label,new URLSearchParams({panel:"discussion",note}));}} />}
     </aside>
   );

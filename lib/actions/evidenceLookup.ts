@@ -14,8 +14,9 @@ export function parseEvidenceTarget(query: URLSearchParams) {
   if ([period, basis].some(value => value.length > 160 || /[\r\n]/.test(value))) throw new InputError("Invalid reporting period or basis.");
   const label = evidenceMeasures[measure as EvidenceMeasure];
   const context = [label, period, basis].filter(Boolean).join(" · ");
-  const key = new URLSearchParams({ measure, period: period.toLowerCase(), basis: basis.toLowerCase() });
-  const linked = measure === "power" ? linkedPowerRecord(target) : undefined;
+  const requestMeasure = measure === "on_site_service" ? "power" : measure;
+  const key = new URLSearchParams({ measure: requestMeasure, period: period.toLowerCase(), basis: basis.toLowerCase() });
+  const linked = ["power", "frontage_hosting"].includes(requestMeasure) ? linkedPowerRecord(target) : undefined;
   return { ...target, linked, context, source: "\nSource: Compare?" + key };
 }
 

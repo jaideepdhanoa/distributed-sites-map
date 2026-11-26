@@ -603,7 +603,7 @@ export default function Explorer() {
     const inspectedId = source?.get("site") || id;
     setSelected(inspectedId);
     const panel = measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
-    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (["Revenue","Cash flow","EBITDA"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
+    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {

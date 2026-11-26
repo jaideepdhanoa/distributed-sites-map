@@ -4127,6 +4127,10 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 }
 .compare-tray[hidden] { display: none; }
 .compare-evidence { font: inherit; text-align: left; }
+.compare-reading { text-decoration: none; }
+.compare-reading strong { font-weight: 600; text-decoration: underline; text-decoration-color: rgba(30,70,54,.35); text-underline-offset: .15em; }
+.comparison-unconfirmed { display: block; color: #75521c; font-style: normal; font-weight: 600; }
+.compare-evidence small, .comparison-source { display: block; margin-top: .2rem; color: var(--ink-2); font-size: .76rem; line-height: 1.35; font-style: normal; }
 .comparison-back { align-self: flex-start; margin: 0 16px 6px; }
 .comparison-save, .comparison-receipt { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .comparison-save label { font-size: 12px; display: grid; gap: 3px; }

@@ -826,7 +826,7 @@ for (const width of [1440,390]) {
 }
 
 for (const width of [1440, 390]) {
-  test(`team comparison preserves a cited gap after sourced evidence arrives at ${width}px`, async ({ page, request }, info) => {
+  test(`revisit a frontage-only site when its utility confirms on-site service at ${width}px`, async ({ page, request }, info) => {
     test.slow();
     await login(request, "reviewer");
     const catalog = JSON.parse(await readFile("data/generated/sites.geojson", "utf8"));
@@ -840,8 +840,23 @@ for (const width of [1440, 390]) {
       type: "Feature", geometry: { type: "Point", coordinates: [-112.07 + i * 0.01, 33.45] },
       properties: { site_id: id, city: "PHX", origin: "universe", counts_as_site: true, in_area: true,
         service_area_class: "inside", business_type: "Car wash", land_only: false, coord_status: "located",
-        name: ["Canyon Wash", "Mesa Wash"][i], address: "Example avenue" },
+        name: ["Canyon Wash", "Mesa Wash"][i], address: "Example avenue",
+        asking_price: i === 0 ? 400000 : 600000, asking_price_source: "Example listing",
+        ...(i === 0 ? { cap_b_frontage: 2.1, cap_b_source: "Example utility hosting map",
+          cap_b_confidence: "Estimated", cap_b_as_of: "2030-01-10" } :
+          { cap_c_amps: 800, cap_c_volts: 480, cap_c_phase: "3-phase", cap_c_confidence: "Verified",
+            cap_c_source: "Example utility letter", cap_c_as_of: "2030-01-11" }) },
     }));
+    const dealId = width === 390 ? "PIPE-PHX-9011" : "PIPE-PHX-9012";
+    Object.assign(sites[1].properties, {linked_deal_id:dealId});
+    const linked = { ...sites[1], properties: {...sites[1].properties, deal_id:dealId, universe_id:ids[1],
+      kind:"pipeline", stage_group:"desk", stage:"Desk screen", financials_open:true, saving_vs_hub:"18%",
+      figures_source:"Example deal record", figures_status:"shown" } };
+    const pricing = { deals: { [dealId]: { land_estimate:240000, land_estimate_display:"$240,000",
+      business_value:360000, business_value_display:"$360,000", cash_flow_label:"EBITDA", earnings_multiple_which:"EBITDA",
+      stated_cash_flow:90000, stated_cash_flow_display:"$90,000", earnings_period:"FY 2029", earnings_basis:"Broker-stated",
+      earnings_multiple:6.7, earnings_multiple_display:"6.7x", business_multiple:4, business_multiple_display:"4.0x",
+      business_multiple_basis:"Estimate", pricing_eligible:true } } };
     // Only the isolated Actions test database is writable. Use the ordinary catalog
     // and detail endpoints so a projection that drops a sourced field fails this test.
     const database = "postgres://postgres:postgres@127.0.0.1:55433/postgres";
@@ -859,7 +874,8 @@ for (const width of [1440, 390]) {
         sourceRunId: `decision-test-${width}-${info.retry}-${published.length}`,
         workbookModifiedAt: null, gitSha: "test",
         files: [{ name: "sites.geojson", body: JSON.stringify({ type: "FeatureCollection", features: sites }) },
-          { name: "deals.geojson", body: JSON.stringify({ type: "FeatureCollection", features: [] }) }],
+          { name: "deals.geojson", body: JSON.stringify({ type: "FeatureCollection", features: [linked] }) },
+          { name:"pricing.json", body:JSON.stringify(pricing) }],
       }));
       published.push(snapshot.id);
       await refresh();
@@ -876,8 +892,33 @@ for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       await openAs(page, "reviewer", "/?city=PHX&stage=universe&funnel=universe&view=list&compare=" + ids.join("|"));
       const tray = page.getByTestId("compare-tray");
-      const power = tray.locator('[data-compare-row="Power"]');
-      await expect(power).toContainText("Missing for every applicable site");
+      const power = tray.locator('[data-compare-row="On-site service"]');
+      await expect(power.locator("td").first()).toContainText("Unconfirmed");
+      await expect(power.locator("td").last()).toContainText("Verified");
+      const street = tray.locator('[data-compare-row="Street-frontage hosting"]');
+      await expect(street.locator("td").first()).toContainText("2.1 MW");
+      await expect(tray.locator('[data-compare-row="Asking"] td').first()).toContainText("$400,000");
+      await mkdir("review-shots", { recursive: true });
+      await tray.screenshot({path:`review-shots/${width}-power-comparison.png`});
+      const multiple = tray.locator('[data-compare-row="Business-only multiple"] td').last();
+      await expect(multiple).toContainText("4.0x");
+      await expect(multiple).toContainText("FY 2029");
+      await multiple.getByRole("button").click();
+      await expect(page.locator('[data-financial-measure="Business-only multiple"]')).toBeInViewport();
+      await page.getByRole("button",{name:/Back to comparison/}).click();
+      const savings = tray.locator('[data-compare-row="Savings versus hub"] td').last();
+      await expect(savings).toContainText("18%");
+      const section = tray.getByRole("combobox", {name:"Comparison section"});
+      await section.selectOption("Acquisition economics");
+      await expect(tray.locator('[data-compare-row="On-site service"]')).toHaveCount(0);
+      await tray.screenshot({path:`review-shots/${width}-acquisition-economics.png`});
+      await section.selectOption("Power evidence");
+      await power.locator("td").first().getByRole("button").click();
+      const sheet = page.getByRole("dialog");
+      await expect(sheet).toContainText("contributor");
+      await sheet.getByRole("button", {name:"View follow-up"}).click();
+      await expect(sheet).toContainText("Verify service with the field survey.");
+      await sheet.getByRole("button", {name:"Close evidence request"}).click();
       await tray.getByRole("button", { name: "Save comparison" }).click();
       const form = tray.getByRole("form", { name: "Save comparison" });
       await form.getByLabel("Comparison name").fill(`Field survey ${width} ${info.retry}`);
@@ -885,10 +926,14 @@ for (const width of [1440, 390]) {
       await form.getByRole("button", { name: "Save", exact: true }).click();
       await tray.getByRole("button", { name: "Record decision" }).click();
       const brief = tray.getByRole("region", { name: "Comparison decision" });
-      await brief.getByRole("combobox", { name: "Decision", exact: true }).selectOption(ids[0]);
-      await brief.getByLabel("Reason").fill("Prefer Canyon Wash pending confirmation of line proximity.");
-      await brief.getByLabel("Cite a figure").selectOption({ label: "Canyon Wash · Power" });
+      await brief.getByRole("combobox", { name: "Decision", exact: true }).selectOption(ids[1]);
+      await brief.getByLabel("Reason").fill("Prefer Mesa Wash for its verified service. Canyon Wash costs less and has only a street hosting estimate.");
+      await brief.getByLabel("Cite a figure").selectOption({ label: "Canyon Wash · On-site service" });
       await brief.getByRole("button", { name: "Add citation" }).click();
+      for (const label of ["Mesa Wash · On-site service", "Canyon Wash · Street-frontage hosting", "Mesa Wash · Business-only multiple", "Mesa Wash · Savings versus hub"]) {
+        await brief.getByLabel("Cite a figure").selectOption({label});
+        await brief.getByRole("button", { name: "Add citation" }).click();
+      }
       await brief.getByRole("button", { name: "Save decision" }).click();
       await expect(brief).toContainText("Awaiting approval");
       const savedUrl = new URL(page.url());
@@ -896,19 +941,19 @@ for (const width of [1440, 390]) {
       const proposals = await (await request.get("/api/actions/suggestions?targetKind=site&targetId=" + ids[0])).json();
       const proposal = proposals.suggestions.find((p: { reason: string }) => p.reason.endsWith("note=" + followUp.note));
       expect((await request.post("/api/actions/suggestions/" + proposal.id, { data: { status: "accepted" } })).ok()).toBeTruthy();
-      Object.assign(sites[0].properties, { cap_a_line_ft: 420, cap_a_source: "Example field survey" });
+      Object.assign(sites[0].properties, { cap_c_amps: 400, cap_c_volts: 480, cap_c_phase: "3-phase", cap_c_source: "Example utility confirmation", cap_c_confidence: "Verified", cap_c_as_of: "2030-02-01" });
       await publish();
       await login(page.request, "viewer");
       await page.goto(savedUrl.pathname + savedUrl.search);
-      await expect(brief).toContainText("Prefer Canyon Wash");
-      await expect(brief).toContainText("Not on file → Line 420 ft");
+      await expect(brief).toContainText("Prefer Mesa Wash");
+      await expect(brief).toContainText("Not on file → 400 A");
       await expect(brief).toContainText("Approved");
       await expect(brief).toContainText("2030-04-15");
       await expect(brief.getByRole("button", { name: "Revise decision" })).toHaveCount(0);
       await mkdir("review-shots", { recursive: true });
       await brief.screenshot({ path: `review-shots/${width}-comparison-decision.png` });
-      await brief.getByRole("button", { name: "Inspect power" }).click();
-      await expect(page.locator("aside.drawer")).toContainText("Example field survey");
+      await brief.getByRole("button", { name: "Inspect on-site service" }).first().click();
+      await expect(page.locator("aside.drawer")).toContainText("Example utility confirmation");
       await page.getByRole("button", { name: /Back to comparison/ }).click();
       await brief.getByRole("button", { name: /Follow-up/ }).click();
       await expect(page).toHaveURL(new RegExp("note=" + followUp.note));
@@ -917,28 +962,28 @@ for (const width of [1440, 390]) {
       const hub = page.getByRole("region", { name:"My work" });
       const change = hub.locator(".decision-work-row").filter({ hasText:`Field survey ${width} ${info.retry}` });
       await expect(change).toContainText("New evidence");
-      await expect(change).toContainText("Line 420 ft");
+      await expect(change).toContainText("400 A");
       await hub.screenshot({path:`review-shots/${width}-decision-queue.png`});
-      await change.getByRole("link", { name:"Canyon Wash · Power" }).click();
+      await change.getByRole("link", { name:"Canyon Wash · On-site service" }).click();
       const citation = brief.locator("[data-focused-citation=true]");
       await expect(citation).toBeFocused();
-      await expect(citation).toContainText("Example field survey");
+      await expect(citation).toContainText("Example utility confirmation");
       await brief.screenshot({ path:`review-shots/${width}-decision-to-revisit.png` });
       await citation.getByRole("button", { name:"Keep decision" }).click();
       await expect(citation).toContainText("Kept by reviewer");
       await brief.getByRole("link", { name:"Back to My work" }).click();
       await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
-      Object.assign(sites[0].properties, { cap_a_line_ft: 510 });
+      Object.assign(sites[0].properties, { cap_c_amps: 600 });
       await publish();
       await page.reload();
-      await expect(change).toContainText("Line 420 ft → Line 510 ft");
+      await expect(change).toContainText("600 A");
       await change.getByRole("link").click();
       await citation.getByRole("button", { name:"Revise decision" }).click();
       await brief.getByRole("combobox", { name:"Decision", exact:true }).selectOption("hold");
       await brief.getByLabel("Reason").fill("Hold both sites pending a service quote.");
       await brief.getByRole("button", { name:"Save decision" }).click();
       await expect(brief.getByRole("heading")).toHaveText("Hold all sites");
-      await expect(brief).toContainText("Reviewed Canyon Wash · Power");
+      await expect(brief).toContainText("Reviewed Canyon Wash · On-site service");
       await brief.getByRole("link", { name:"Back to My work" }).click();
       await expect(hub.getByText("Your saved decisions are up to date.", { exact:true })).toBeVisible();
 

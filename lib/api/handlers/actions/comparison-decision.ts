@@ -39,21 +39,24 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body.view !== "string" || !request.headers.get("Idempotency-Key")) return jsonError("Invalid decision or save reference.", 400);
   const draft = body.decision?.citations;
-  const financial = (c:CitedFigure) => isStatementMeasure(c?.measure) || (Boolean(c?.source) && ["cash_flow","revenue","ebitda"].includes(c?.measure));
-  const hasFinancial = Array.isArray(draft) && draft.some(financial);
-  if (hasFinancial && draft.length > 6) return jsonError("Cite one to six figures.",400);
-  const catalog = body.review || body.keep || hasFinancial ? await loadDecisionCatalog(session.actionRole).catch(() => null) : undefined;
+  const verifyFigure = (c:CitedFigure) => isStatementMeasure(c?.measure) ||
+    ["on_site_service","frontage_hosting","business_price","business_multiple","asking_multiple","hub_savings"].includes(c?.measure) ||
+    (Boolean(c?.source) && ["cash_flow","revenue","ebitda"].includes(c?.measure));
+  const hasFiguresToVerify = Array.isArray(draft) && draft.some(verifyFigure);
+  if (hasFiguresToVerify && draft.length > 6) return jsonError("Cite one to six figures.",400);
+  const catalog = body.review || body.keep || hasFiguresToVerify ? await loadDecisionCatalog(session.actionRole).catch(() => null) : undefined;
   if (catalog === null) return jsonError("Current decision evidence is unavailable.", 503);
   const result = await runWrite(session, { action:"view.decision" }, sql =>
     createWithReceipt(sql, request, session.u, body, async tx => {
-      if (catalog && hasFinancial) {
-        if (draft.some(c => !c || typeof c.measure !== "string")) throw new InputError("Invalid citation.");
+      if (catalog && hasFiguresToVerify) {
+        if (draft.some(c => !c || [c.measure,c.value,c.period,c.basis].some(field => typeof field !== "string"))) throw new InputError("Invalid citation.");
         await catalog.prepareStatements(tx,draft);
-        for (const c of draft.filter(financial)) {
+        for (const c of draft.filter(verifyFigure)) {
           const live = catalog.figure(c);
           const wrongPeriod = isStatementMeasure(c.measure) && (!live || !("anchor" in live) || !c.anchor || c.anchor !== live.anchor || c.value === "—");
-          if (!live || wrongPeriod || c.source !== (live.source || "Deal record") || evidenceChanged(c,live))
-            throw new InputError("The financial figure changed. Reload the comparison.",409);
+          const fallback = ["cash_flow","revenue","ebitda"].includes(c.measure) ? "Deal record" : "";
+          if (!live || wrongPeriod || (c.source || "") !== (live.source || fallback) || evidenceChanged(c,live))
+            throw new InputError("The cited figure changed. Reload the comparison.",409);
         }
       }
       if (catalog && (body.review || body.keep)) {

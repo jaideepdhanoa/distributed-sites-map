@@ -30,6 +30,8 @@ jobs:
         with:
           name: review-change-screenshots
           path: |
+            review-shots/*-power-comparison.png
+            review-shots/*-acquisition-economics.png
             review-shots/*-comparison-coverage.png
             review-shots/*-review-change.png
             review-shots/*-finding-*.png

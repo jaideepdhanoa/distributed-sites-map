@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { isDeepStrictEqual } from "node:util";
 import { signedInReleaseReader } from "./verify-space-layouts.mjs";
 import research from "../lib/selection/research.ts";
@@ -35,6 +35,7 @@ if (body) {
       }
     }
     if (!matches) throw Error("No active site matched the selection evidence.");
+    await writeFile(".selection-readback","verified\n");
     console.log(JSON.stringify({activeResearch:matches,mappedResearch:onMap,datedSourceRows:expected.size}));
   } else console.log(JSON.stringify({validatedResearch:expected.size}));
 }

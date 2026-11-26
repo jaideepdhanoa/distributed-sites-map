@@ -49,11 +49,20 @@ test("open released financials without changing a record",async({page})=>{
   const response=await page.request.get("/api/data/deals");
   expect(response.ok()).toBeTruthy();
   const payload=await response.json();
-  const row=payload.features.find((f:{properties:DealProps})=>f.properties.kind==="pipeline" &&
+  const operating=payload.features.filter((f:{properties:DealProps})=>f.properties.kind==="pipeline" &&
     f.properties.financials_open!==false && f.properties.stage_group!=="dropped" && !isExcludedSite(f.properties.deal_id));
+  const row=operating.find((f:{properties:DealProps})=>f.properties.purchase?.inputs.cash!=null) || operating[0];
   expect(Boolean(row)).toBeTruthy();
   const id=row.properties.deal_id;
   await page.goto("/?city="+id.split("-")[1]+"&funnel=pipeline&site="+id+"&panel=purchase&sheet=full");
-  await expect(page.getByTestId("purchase-review")).toBeVisible();
+  const panel=page.getByTestId("purchase-review");
+  await expect(panel).toBeVisible();
+  if (row.properties.purchase?.inputs.cash!=null) {
+    if (row.properties.purchase.inputs.normalized!=null) await panel.getByRole("button",{name:"Workbook input"}).click();
+    const expected=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0})
+      .format(row.properties.purchase.inputs.cash);
+    // Keep site amounts out of public CI diagnostics.
+    expect((await panel.locator(".purchase-lead strong").innerText())===expected).toBe(true);
+  }
   await expect(page.getByRole("tab",{name:"Financials",exact:true})).toHaveAttribute("aria-selected","true");
 });

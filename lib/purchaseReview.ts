@@ -87,6 +87,8 @@ export function purchaseRows(d:DealProps, scenario:PurchaseScenario=preferredSce
   const result=d.purchase ? purchaseCase(d.purchase,scenario) : null;
   const applicable = financialEvidence(d) !== "Not applicable";
   const changed = layoutName(d,scenario) === "Footprint changed";
+  const ownership = w?.ownership?.trim();
+  const scope = /^yes$/i.test(ownership || "") ? "Real estate included" : /^no$/i.test(ownership || "") ? "Real estate excluded" : ownership ? "Sale scope: " + ownership : "Sale scope unknown";
   const values = [financialEvidence(d), result?.cash, result?.charge, result?.gap, result?.cashPrice,
     result?.ceiling, result?.firstYear, changed ? "Review the changed footprint" : purchaseCheck(d)];
   return purchaseLabels.map((label,i) => {
@@ -104,7 +106,7 @@ export function purchaseRows(d:DealProps, scenario:PurchaseScenario=preferredSce
     const basis = label === "Annual capital charge" ? "Workbook charge at ask" : [
       adjustments.length ? "Adjusted case" : "Base case", ...adjustments, earnings,
       w?.periods?.[scenario.basis === "normalized" ? "normalized" : "ebitda"] || "Period unknown",
-      w?.archetype || "Default layout", w?.ownership || "Scope unknown",
+      w?.archetype || "Default layout", scope,
     ].join(" · ");
     const stale = changed && monetary && label !== "Annual capital charge";
     return {label, key:applicable && !stale ? v ?? null : null,

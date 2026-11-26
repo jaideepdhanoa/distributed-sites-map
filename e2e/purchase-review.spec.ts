@@ -94,6 +94,8 @@ test("compare an adjusted purchase against a common baseline and restore the sel
   const exportedCash = csv.split("\r\n").find(line=>line.includes("Retained annual cash")) || "";
   expect(exportedCash.includes("$40,000") && exportedCash.includes("$5,000/yr displaced")).toBe(true);
   await row.scrollIntoViewIfNeeded();
+  const heading=row.getByRole("rowheader");
+  expect(await heading.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await mkdir("review-shots",{recursive:true});
   await row.screenshot({path:"review-shots/"+info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"")+"compared-cases.png"});
   const base=tray.getByLabel("Use workbook baseline for all sites");

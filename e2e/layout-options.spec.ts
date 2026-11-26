@@ -10,12 +10,12 @@ test("compare operating layouts and model a four-stall boundary", async ({ page 
   await page.route("**/api/data/space-options?site=*",r=>r.fulfill({json:{assessment:{row:sample,reviewedOn:"2026-11-01"}}}));
   await page.route("**/api/actions/status",route=>route.fulfill({json:{enabled:true,actionRole:"contributor",username:"reviewer"}}));
   await page.route("**/api/actions/notes?*",route=>route.fulfill({json:{notes:[]}}));
-  const response=await page.request.get("/api/data/deals");
-  expect(response.ok()).toBeTruthy();
-  const deals=await response.json();
-  const id=deals.features.find((f: {properties:{kind:string;city:string;stage_group:string}})=>f.properties.kind==="pipeline" && f.properties.city==="PHX" && f.properties.stage_group==="desk").properties.deal_id;
-  await page.goto("/?"+new URLSearchParams({site:id,city:"PHX",funnel:"pipeline",panel:"space-options",sheet:"full"}));
-  const panel=page.getByTestId("space-options").filter({has:page.getByRole("group", {name:"Operating layout"})});
+  const id = "PIPE-PHX-9999";
+  const record = {id, mapped:false, city:"PHX", name:"Example wash", stage:"Assessment cohort", cohort:"active",
+    focus:"Test a conversion", baseline:"0 stalls in the earlier screen", options:["outdoor"], kinds:["Vacuum row"], finding:"Canopy row", next:"Measure the operating aisle."};
+  await page.route("**/api/data/space-options?view=portfolio",r=>r.fulfill({json:{rows:[record]}}));
+  await page.goto("/space-review?" + new URLSearchParams({site:id,panel:"space-options"}));
+  const panel = page.getByRole("main").getByTestId("space-options");
   await expect(panel.getByRole("button",{name:"Convert outdoor space",exact:true})).toHaveAttribute("aria-pressed","true");
   await expect(panel).toContainText("0 stalls in the earlier screen");
   await panel.getByRole("button",{name:"Convert bays",exact:true}).click();

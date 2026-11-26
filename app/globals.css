@@ -3460,7 +3460,7 @@ span.listing-link.muted { text-decoration: none; }
   .top .icon-btn, .phone-step, .review-launch { min-height: 44px; min-width: 44px; }
   .top .phone-step { flex: 1 1 auto; max-width: 100%; overflow: visible; text-overflow: unset; white-space: normal; }
   .top .icon-btn.only-mobile { margin-left: auto; }
-  .maplibregl-ctrl-top-right { top: 112px !important; right: 8px; }
+  .stage-map:not(:has(.space-map-open)) .maplibregl-ctrl-top-right { top: calc(var(--bar-h, 156px) + 8px); right: 8px; }
   .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: calc(var(--sheet-h, 120px) + 8px); }
   .map-float { top: calc(var(--bar-h, 188px) + 8px); right: 8px; }
   .layers:not(.open) { top: calc(var(--bar-h, 188px) + 60px); right: 8px; left: auto; }
@@ -4041,7 +4041,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   box-shadow: 0 2px 6px #171a1460; font: 600 12px/1.35 var(--font-sans, sans-serif);
 }
 @media (max-width: 767px) {
-  .shell:not(.space-marking) .map-float { right: 60px; }
+  .shell:not(.space-marking) .map-float,
+  .shell:not(.space-marking) .layers:not(.open) { right: 60px; }
   .selected-pin-name { max-width: min(200px, 54vw); }
   .map-preview .primary.preview-open { min-height: 44px; }
   .comparison-table[data-sites="2"] { table-layout: fixed; }

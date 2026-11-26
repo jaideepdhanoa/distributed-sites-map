@@ -23,7 +23,12 @@ async function visiblePins(page: Page) {
       const [lng, lat] = feature.geometry.coordinates;
       const pt = map.project([lng, lat]);
       const x = box.left + pt.x, y = box.top + pt.y;
-      return document.elementFromPoint(x, y) === canvas ? [{ id: String(feature.properties.site_id), x, y }] : [];
+      if (document.elementFromPoint(x, y) !== canvas) return [];
+      const layers = ["sites","pin-singles","offmarket","deals-pipe","focus-pin","clusters"].filter(id => map.getLayer(id));
+      const hits = map.queryRenderedFeatures([Math.round(pt.x),Math.round(pt.y)],{layers});
+      const id = String(feature.properties.site_id);
+      if (!hits.length || hits.some(hit => (hit.properties.site_id || hit.properties.deal_id) !== id)) return [];
+      return [{id,x,y}];
     });
   });
 }
@@ -51,6 +56,7 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
     return map?.getLayer("sites") && map.isStyleLoaded() && !map.isMoving();
   });
   const zoomIn = page.locator(".maplibregl-ctrl-zoom-in");
+  if (phone) await zoomIn.click({trial:true,timeout:5000});
   for (let i = 0; i < 4 && (await visiblePins(page)).length < 2; i++) {
     await zoomIn.click();
     await page.waitForFunction(() => !(window as unknown as MapWindow).__sitesMap.isMoving());
@@ -73,8 +79,9 @@ test("enter Phoenix by market label, compare nearby pins and return to the map",
     else await page.mouse.click(pin.x, pin.y);
     const preview = page.locator(".map-preview");
     await expect(preview).toBeVisible();
-    const id = await preview.getAttribute("data-record");
-    expect(id && !ids.includes(id)).toBeTruthy();
+    await expect(preview).toHaveAttribute("data-record",pin.id);
+    const id = pin.id;
+    expect(ids).not.toContain(id);
     ids.push(id!);
     previous = { ...pin, id: id! };
     await preview.getByRole("button", { name: "Add to comparison" }).click();

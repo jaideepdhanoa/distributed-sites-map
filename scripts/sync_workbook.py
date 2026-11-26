@@ -177,6 +177,8 @@ def fetch_source_folder(token: str, source_dir: Path | None = None) -> None:
         else:
             blob = _download(f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media", token, target)
         path = src / "kmz" / target if target.lower().endswith(".kmz") else src / target
+        if target == "opportunity-reviews.xlsx":
+            path = src / "reviews" / target
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(blob)
         if target == "opportunity-reviews.xlsx" and mime == SHEET:

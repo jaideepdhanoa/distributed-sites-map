@@ -5,7 +5,8 @@ import opportunity from "../lib/selection/opportunity.ts";
 import { signedInReleaseReader } from "./verify-space-layouts.mjs";
 
 const path = "data/generated/opportunity-reviews.json";
-if (existsSync(path)) {
+if (!existsSync(path)) throw Error("The generated opportunity register is missing.");
+{
   let expected;
   try { expected = opportunity.parseOpportunities(JSON.parse(readFileSync(path, "utf8"))); }
   catch { throw Error("The opportunity register failed validation. Check roles, dates, ranks, review fields and site IDs."); }

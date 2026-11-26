@@ -9,7 +9,7 @@ export type MapSpaceSite = {
   market: string;
   cohort: Assessment["cohort"];
   revision: string;
-  frame: Pick<Aerial, "id" | "bounds" | "kind" | "source" | "date">;
+  frame: Pick<Aerial, "id" | "bounds" | "kind" | "source" | "date" | "width" | "height" | "metersPerPixel">;
   center: Point | null;
   zones: MapZone[];
 };

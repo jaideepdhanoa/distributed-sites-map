@@ -247,3 +247,28 @@ test("cancel and Escape discard an unfinished lot", async ({ page }) => {
   await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
   await expect(page.getByTestId("space-summary")).toHaveText(before);
 });
+
+test("remove one saved Draw lot from its site list", async ({ page }) => {
+  await openAs(page, `/?funnel=universe&site=${site}`);
+  async function liveIds() {
+    const response = await page.request.get("/api/data/spaces?site=" + site);
+    expect(response.ok()).toBeTruthy();
+    const {spaces} = await response.json();
+    return spaces.map((lot: { id: string }) => lot.id).sort();
+  }
+  const before = await liveIds();
+  const added = await markSample(page);
+  expect(added.status, added.error).toBe(200);
+  await page.reload();
+  const list = page.getByTestId("saved-manual-lots");
+  await list.locator("summary").click();
+  const remove = list.getByRole("button", {name: "Remove " + added.id, exact:true});
+  await remove.click();
+  await list.getByRole("button", {name:"Cancel", exact:true}).click();
+  await expect(remove).toBeVisible();
+  expect(await liveIds()).toContain(added.id);
+  await remove.click();
+  await list.getByRole("button", {name:"Confirm removal of " + added.id, exact:true}).click();
+  await expect.poll(liveIds).toEqual(before);
+  await expect(remove).toHaveCount(0);
+});

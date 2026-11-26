@@ -60,12 +60,13 @@ test("Streets is the default basemap and a switch is remembered", async ({ page 
   }
   await expect(chooser.getByRole("button", { name: "Streets" })).toHaveClass(/on/);
   await page.waitForFunction(() => {
-    const map = (window as unknown as { __sitesMap?: { isStyleLoaded: () => boolean } }).__sitesMap;
-    return Boolean(map?.isStyleLoaded());
+    const map = (window as unknown as { __sitesMap?: import("maplibre-gl").Map }).__sitesMap;
+    const pins = Number(document.querySelector(".stage-map")?.getAttribute("data-group-count"));
+    return Boolean(map?.isStyleLoaded() && !map.isMoving() && pins > 0);
   });
   await page.evaluate(() => {
-    const map = (window as unknown as { __sitesMap: { jumpTo: (camera: { center: [number, number]; zoom: number }) => void } }).__sitesMap;
-    map.jumpTo({ center: [-112.2, 33.55], zoom: 12.2 });
+    const map = (window as unknown as { __sitesMap: import("maplibre-gl").Map }).__sitesMap;
+    map.jumpTo({ center: [-112.2, 33.55], zoom: 12.2 }, { originalEvent: new WheelEvent("wheel") });
   });
   const readCamera = () => page.evaluate(() => {
     const map = (window as unknown as { __sitesMap: { getZoom: () => number; getCenter: () => { lng: number; lat: number } } }).__sitesMap;

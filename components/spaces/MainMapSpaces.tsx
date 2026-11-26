@@ -21,6 +21,7 @@ import { outlineId } from "@/lib/spaces/outlineAnchor";
 import { reviewBody } from "@/lib/spaces/optionReview";
 import type { MapSpaceSite, SpaceCatalog } from "@/lib/spaces/mapCatalog";
 import OptionReview, { useOptionReviews, useSaveReview } from "./OptionReview";
+import { checkSpaceFit, fitChecks, type FitCheck } from "@/lib/spaces/fitCheck";
 import MapSpaceFit from "./MapSpaceFit";
 import OptionAerial from "./OptionAerial";
 import SpaceGeography from "./SpaceGeography";
@@ -82,6 +83,7 @@ export default function MainMapSpaces({
   const [catalog, setCatalog] = useState<SpaceCatalog | null>(null);
   const [loadError, setLoadError] = useState("");
   const [attempt, retry] = useState(0);
+  const [fitCheck,setFitCheck] = useState<FitCheck|"">("");
   const [cohort, setCohort] = useState<MapSpaceSite["cohort"]>("active");
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState("");
@@ -196,36 +198,28 @@ export default function MainMapSpaces({
       ),
     [catalog, cohort, region, site],
   );
-  const visible = useMemo(
-    () =>
-      open
-        ? site && !scoped.includes(site)
-          ? [...scoped, site]
-          : scoped
-        : (catalog?.sites || []).filter(
-            (s) =>
-              s.id !== previewSite &&
-              s.cohort === "active" &&
-              (!market || market === "all" || s.market === market),
-          ),
-    [catalog, open, scoped, site, market, previewSite],
-  );
-  const needle = search.toLowerCase().trim();
-  const list = scoped.filter(
-    (s) =>
-      !needle ||
-      [s.name, s.id, markets[s.market], ...s.zones.map((z) => z.label)]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-  );
+  const needle=search.trim().toLowerCase();
+  const list=useMemo(()=>scoped.flatMap(s=>{
+    const matchesSite=[s.name,s.id,markets[s.market]].join(" ").toLowerCase().includes(needle);
+    const zones=candidates(s).filter(z=>(matchesSite || z.label.toLowerCase().includes(needle))
+      && (!fitCheck || checkSpaceFit(z,s.frame).check===fitCheck));
+    if(!zones.length) return [];
+    return [zones.length===candidates(s).length ? s : {...s,zones}];
+  }),[scoped,needle,fitCheck]);
+  const footprintCount = list.reduce((total, record) => total + candidates(record).length, 0);
+  const visible=useMemo(()=>{
+    if(!open) return (catalog?.sites||[]).filter(s=>s.id!==previewSite && s.cohort==="active" && (!market||market==="all"||s.market===market));
+    return site ? [...list.filter(s=>s.id!==site.id),site] : list;
+  },[open,catalog,previewSite,market,site,list]);
   function leave(action: () => void) {
     if (locked.current) return;
     if (dirty) setDiscard(() => action);
     else action();
   }
   function pick(s: string, a?: string) {
-    leave(() => navigate(true, s, a));
+    const match = !a && (needle || fitCheck) ? list.find((item) => item.id === s) : undefined;
+    const first = match && candidates(match)[0];
+    leave(() => navigate(true, s, a ?? (first && outlineId(first))));
   }
   function move(p: Point, i = corner) {
     setCorner(i);
@@ -497,6 +491,11 @@ export default function MainMapSpaces({
                     </select>
                   </label>
                 </div>
+                <label>Physical fit
+                  <select className="secondary" aria-label="Physical fit filter" value={fitCheck} onChange={e=>setFitCheck(e.target.value as FitCheck|"")}>
+                    <option value="">All fit checks</option>{Object.entries(fitChecks).map(([key,label])=><option value={key} key={key}>{label}</option>)}
+                  </select>
+                </label>
                 <input
                   className="field"
                   aria-label="Find a site or space"
@@ -505,11 +504,11 @@ export default function MainMapSpaces({
                   onChange={(e) => setSearch(e.target.value)}
                 />
                 <p>
-                  {list.reduce((n, s) => n + candidates(s).length, 0)} spaces across {list.length} sites
+                  {footprintCount} {footprintCount === 1 ? "space" : "spaces"} across {list.length} {list.length === 1 ? "site" : "sites"}
                 </p>
                 <div className="space-map-list">
                   {list.map((s) => (
-                    <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id)}>
+                    <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id,outlineId(candidates(s)[0]))}>
                       <strong>{s.name}</strong>
                       <small>
                         {s.id} · {candidates(s).length} {candidates(s).length === 1 ? "space" : "spaces"} ·{" "}
@@ -564,7 +563,7 @@ export default function MainMapSpaces({
                   {prior?.review && <span>{prior.review.disposition==="Dismiss option" ? "Dismissed" : "Kept for diligence"}</span>}
                   <span>{site.frame.bounds ? "Map aligned" : "Source image · alignment needed"}</span>
                 </div>
-                {!draft && <MapSpaceFit zone={active} image={image} review={prior?.review?.reason} />}
+                {!draft && <MapSpaceFit zone={active} image={image} review={prior?.review} />}
                 <div className="space-actions">
                   {!draft && assessment && (
                     <button

@@ -1,11 +1,6 @@
-import {
-  edgeFitRange,
-  fitRange,
-  kinds,
-  outlineDimensions,
-  type Aerial,
-  type Zone,
-} from "@/lib/spaces/options";
+import { kinds, type Aerial, type Zone } from "@/lib/spaces/options";
+import { checkSpaceFit, fitChecks } from "@/lib/spaces/fitCheck";
+import type { Review } from "@/lib/spaces/optionReview";
 
 const availability: Record<Zone["kind"], string> = {
   parking: "Confirm peak parking demand and rights to the row.",
@@ -26,19 +21,14 @@ export default function MapSpaceFit({
 }: {
   zone: Zone;
   image?: Aerial;
-  review?: string;
+  review?: Review|null;
 }) {
-  const dims = outlineDimensions(zone, image?.bounds, image);
-  const range = dims && fitRange(dims[0], dims[1], Math.min(6, dims[1]), "stalls_90");
-  const edge =
-    dims && range && range[1] < 4
-      ? edgeFitRange(dims[0], dims[1], Math.min(6, dims[1]), 24, "stalls_90")
-      : null;
+  const {dimensions:dims,inside:range,adjacent:edge,check} = checkSpaceFit(zone,image);
   const adjacent = edge && range && edge[1] > range[1] ? edge : null;
   return (
     <div className="map-space-fit">
       <strong>
-        {adjacent
+        {zone.fitHold && check === zone.fitHold ? fitChecks[check] : adjacent
           ? rangeText(adjacent) + " stalls with an adjacent aisle"
           : range
             ? rangeText(range) +
@@ -63,8 +53,10 @@ export default function MapSpaceFit({
             <> The higher estimate requires a continuous, usable 24 ft aisle alongside the row.</>
           )}
         </dd>
+        {review?.measured && <><dt>Recorded measurement</dt><dd>{review.measured.stalls} stalls · {review.measured.source}</dd></>}
         <dt>Availability</dt>
-        <dd>{review || zone.check || availability[zone.kind] || kinds[zone.kind].check}</dd>
+        <dd>{zone.check || availability[zone.kind] || kinds[zone.kind].check}</dd>
+        {review?.reason && <><dt>Team review</dt><dd>{review.reason}</dd></>}
       </dl>
     </div>
   );
